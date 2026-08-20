@@ -85,6 +85,48 @@ function toApiSel(s) {
   };
 }
 
+function describeSelector(s) {
+  const isLine = s.eventType === "Treatment line (derived)";
+  const pre = [];
+  if (s.occurrence === "FIRST") pre.push("first");
+  if (s.occurrence === "LAST") pre.push("last");
+  let base = s.eventType.replace(" (derived)", "").replace("Lab_Test", "lab test").toLowerCase();
+  const brackets = [];
+  for (const a of s.attrs || []) {
+    if (!a.key || !a.value) continue;
+    if (a.key === "SUBTYPE") pre.push(a.value);
+    else if (a.key === "TEST") pre.push(a.value);
+    else if (a.key === "PROGRESSION" && a.value === "Y") base = "progression";
+    else if (a.key === "LINE_NO" && isLine) base = "treatment line " + a.value;
+    else if (a.key === "COMPOSITION" && isLine) pre.push(a.value);
+    else if (a.key === "GAP") continue;
+    else brackets.push(a.key + "=" + a.value);
+  }
+  let label = [...pre, base].join(" ");
+  if (brackets.length) label += " [" + brackets.join(", ") + "]";
+  if (s.numKey && s.numVal !== "") label += " with " + s.numKey + " " + s.numOp + " " + s.numVal;
+  if (s.minDurationDays) label += " lasting ≥" + s.minDurationDays + "d";
+  return label;
+}
+
+function describeQuery(a, b, rel, guard) {
+  const A = describeSelector(a);
+  let text;
+  if (rel.type === "BEFORE") {
+    const win = Number(rel.minDays || 0) > 0 ? rel.minDays + "–" + rel.maxDays : "" + rel.maxDays;
+    text = "Patients with " + A + " followed by " + describeSelector(b) + " within " + win + " days";
+  } else if (rel.type === "DURING") {
+    text = "Patients with " + describeSelector(b) + " during a " + A + " interval";
+  } else if (rel.type === "NOT_FOLLOWED_BY") {
+    text = "Patients with " + A + " NOT followed by " + describeSelector(b) + " within " + rel.withinDays + " days" +
+      (rel.observed ? " (observed past the window)" : "");
+  } else {
+    text = "Patients with " + A;
+  }
+  if (guard) text += " — “No prior medications” patients only";
+  return text;
+}
+
 function Bars({ rows }) {
   if (!rows || !rows.length) return <span className="meta">no rows</span>;
   const max = Math.max(1, ...rows.map(r => r.n));
@@ -204,6 +246,9 @@ export default function Page() {
       const res = await fetch("/api/cohort", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
+      j.queryDesc = describeQuery(a, b, r, guard);
+      j.labelA = describeSelector(a);
+      j.labelB = r.type !== "NONE" ? describeSelector(b) : null;
       setResult(j);
     } catch (e) { setRunError(String(e.message || e)); }
     setRunning(false);
@@ -327,8 +372,9 @@ export default function Page() {
                 <div className="stat"><div className="n">{pct.toFixed(1)}%</div><div className="lbl">of anchor patients</div></div>
               </div>
               <div className="ratebar"><div style={{ width: Math.min(100, pct) + "%" }} /></div>
+              <p className="meta" style={{ margin: "0 0 0.9rem" }}>{result.queryDesc}</p>
               {histRows && <div className="chart" id="histChart">
-                <h3>Days from A to first subsequent B <span className="meta">(patients, by minimum gap)</span></h3>
+                <h3>Days from {result.labelA} to {/^(first|last) /.test(result.labelB || "") ? "subsequent " + result.labelB : "first subsequent " + result.labelB} <span className="meta">(patients, by minimum gap)</span></h3>
                 <Bars rows={histRows} />
               </div>}
               <div className="chart">
