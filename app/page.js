@@ -251,8 +251,8 @@ export default function Page() {
         <span className="sub">temporal cohort queries over cBioPortal timeline events — live prototype</span>
         <span className="spacer" />
         <span className={"pill" + (catalog ? " on" : "")} id="connPill">
-          <span className="dot" />
-          <span id="connText">{catalog ? catalog.study + " · " + catalog.totalPatients.toLocaleString() + " pts" : (catError ? "backend error" : "loading…")}</span>
+          {catalog || catError ? <span className="dot" /> : <span className="spinner" aria-label="loading" />}
+          <span id="connText">{catalog ? catalog.study + " · " + catalog.totalPatients.toLocaleString() + " pts" : (catError ? "backend error" : "loading catalog…")}</span>
         </span>
       </header>
       <main>
@@ -307,6 +307,7 @@ export default function Page() {
                 </label>}
               <div className="row" style={{ marginTop: "0.8rem" }}>
                 <button className="primary" id="runBtn" disabled={!catalog || running} onClick={() => runCohort()}>
+                  {running && <span className="spinner onprimary" />}
                   {running ? "Running…" : "Run cohort query"}
                 </button>
               </div>
@@ -315,8 +316,11 @@ export default function Page() {
 
           <div className="card" id="resultCard">
             <h2>Result</h2>
-            {!result && !runError && <div className="note">Define a cohort (or click a recipe) and run. Every result is computed live; credentials stay on the server.</div>}
-            {result && <div id="resultBody">
+            {!result && !runError && !running &&
+              <div className="note">Define a cohort (or click a recipe) and run. Every result is computed live; credentials stay on the server.</div>}
+            {!result && running &&
+              <div className="loading-block"><span className="spinner" /> Running cohort query against ClickHouse…</div>}
+            {result && <div id="resultBody" className={running ? "busy" : ""}>
               <div className="stats">
                 <div className="stat"><div className="n accent" id="rMatched">{result.matched.toLocaleString()}</div><div className="lbl">patients in cohort</div></div>
                 <div className="stat"><div className="n" id="rDenom">{result.denom.toLocaleString()}</div><div className="lbl">anchor-event patients</div></div>
@@ -365,11 +369,14 @@ export default function Page() {
               “No prior medications” patients only
             </label>
             <button className="primary" id="linesBtn" disabled={!catalog || linesBusy} onClick={runLines}>
+              {linesBusy && <span className="spinner onprimary" />}
               {linesBusy ? "Running…" : "Derive lines"}
             </button>
-            {lines && <span className="meta">{lines.ms} ms total</span>}
+            {lines && !linesBusy && <span className="meta">{lines.ms} ms total</span>}
           </div>
-          {lines && <div className="two-col" style={{ marginTop: "1rem" }}>
+          {!lines && linesBusy &&
+            <div className="loading-block"><span className="spinner" /> Deriving treatment lines…</div>}
+          {lines && <div className={"two-col" + (linesBusy ? " busy" : "")} style={{ marginTop: "1rem" }}>
             <div className="chart"><h3>Lines per patient</h3>
               <div id="lineHist"><Bars rows={lines.hist.map(r => ({ label: (r.bucket >= 8 ? "8+" : r.bucket) + (r.bucket === 1 ? " line" : " lines"), n: r.n }))} /></div>
             </div>

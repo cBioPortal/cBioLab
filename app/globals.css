@@ -111,4 +111,20 @@ pre {
 @media (max-width: 880px) { .two-col { grid-template-columns: 1fr; } }
 .chk { display: flex; gap: 0.4rem; align-items: center; }
 .chk input { width: auto; }
+.spinner {
+  width: 14px; height: 14px; flex: none; display: inline-block; vertical-align: -2px;
+  border: 2px solid var(--accent-soft); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+}
+.spinner.onprimary { border-color: rgba(255,255,255,0.35); border-top-color: #fff; }
+@media (prefers-color-scheme: dark) {
+  .spinner.onprimary { border-color: rgba(13,20,23,0.35); border-top-color: #0d1417; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.busy { opacity: 0.45; pointer-events: none; transition: opacity 0.15s; }
+.loading-block {
+  display: flex; align-items: center; gap: 0.6rem; color: var(--muted);
+  font-size: 0.82rem; padding: 1.2rem 0;
+}
+button.primary { display: inline-flex; align-items: center; gap: 0.5rem; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
