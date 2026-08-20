@@ -109,22 +109,23 @@ function describeSelector(s) {
   return label;
 }
 
-function describeQuery(a, b, rel, guard) {
-  const A = describeSelector(a);
-  let text;
+function QueryDesc({ result }) {
+  const { labelA, labelB, relSnap: rel, guardSnap: guard } = result;
+  if (!rel) return null;
+  const A = <><span className="tag">A</span> <strong>{labelA}</strong></>;
+  const B = labelB ? <><span className="tag">B</span> <strong>{labelB}</strong></> : null;
+  let body;
   if (rel.type === "BEFORE") {
-    const win = Number(rel.minDays || 0) > 0 ? rel.minDays + "–" + rel.maxDays : "" + rel.maxDays;
-    text = "Patients with " + A + " followed by " + describeSelector(b) + " within " + win + " days";
+    const win = Number(rel.minDays || 0) > 0 ? rel.minDays + "–" + rel.maxDays : "≤ " + rel.maxDays;
+    body = <>Patients with {A} followed by {B} within <strong>{win} days</strong></>;
   } else if (rel.type === "DURING") {
-    text = "Patients with " + describeSelector(b) + " during a " + A + " interval";
+    body = <>Patients with {B} during a {A} interval</>;
   } else if (rel.type === "NOT_FOLLOWED_BY") {
-    text = "Patients with " + A + " NOT followed by " + describeSelector(b) + " within " + rel.withinDays + " days" +
-      (rel.observed ? " (observed past the window)" : "");
+    body = <>Patients with {A} <span className="qnot">NOT</span> followed by {B} within <strong>{rel.withinDays} days</strong>{rel.observed ? " (observed past the window)" : ""}</>;
   } else {
-    text = "Patients with " + A;
+    body = <>Patients with {A}</>;
   }
-  if (guard) text += " — “No prior medications” patients only";
-  return text;
+  return <p className="qdesc">{body}{guard ? <span className="qguard">restricted to “No prior medications” patients</span> : null}</p>;
 }
 
 function Bars({ rows }) {
@@ -246,9 +247,10 @@ export default function Page() {
       const res = await fetch("/api/cohort", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
-      j.queryDesc = describeQuery(a, b, r, guard);
       j.labelA = describeSelector(a);
       j.labelB = r.type !== "NONE" ? describeSelector(b) : null;
+      j.relSnap = { ...r };
+      j.guardSnap = guard;
       setResult(j);
     } catch (e) { setRunError(String(e.message || e)); }
     setRunning(false);
@@ -372,7 +374,7 @@ export default function Page() {
                 <div className="stat"><div className="n">{pct.toFixed(1)}%</div><div className="lbl">of anchor patients</div></div>
               </div>
               <div className="ratebar"><div style={{ width: Math.min(100, pct) + "%" }} /></div>
-              <p className="meta" style={{ margin: "0 0 0.9rem" }}>{result.queryDesc}</p>
+              <QueryDesc result={result} />
               {histRows && <div className="chart" id="histChart">
                 <h3>Days from {result.labelA} to {/^(first|last) /.test(result.labelB || "") ? "subsequent " + result.labelB : "first subsequent " + result.labelB} <span className="meta">(patients, by minimum gap)</span></h3>
                 <Bars rows={histRows} />

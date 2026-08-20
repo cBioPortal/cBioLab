@@ -111,6 +111,18 @@ pre {
 @media (max-width: 880px) { .two-col { grid-template-columns: 1fr; } }
 .chk { display: flex; gap: 0.4rem; align-items: center; }
 .chk input { width: auto; }
+.qdesc {
+  font-size: 0.8rem; color: var(--muted); line-height: 1.9;
+  margin: 0 0 0.9rem; max-width: 44rem;
+}
+.qdesc strong { color: var(--ink); font-weight: 600; }
+.qdesc .tag {
+  font-family: "IBM Plex Mono", monospace; font-size: 0.68rem; font-weight: 500;
+  color: var(--accent-ink); background: var(--accent-soft);
+  padding: 0.08rem 0.42rem; border-radius: 4px; margin-right: 0.15rem;
+}
+.qdesc .qnot { color: var(--mark); font-weight: 600; }
+.qdesc .qguard { display: block; line-height: 1.4; font-style: italic; }
 .spinner {
   width: 14px; height: 14px; flex: none; display: inline-block; vertical-align: -2px;
   border: 2px solid var(--accent-soft); border-top-color: var(--accent);
