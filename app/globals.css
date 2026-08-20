@@ -122,10 +122,10 @@ pre {
   padding: 0.08rem 0.42rem; border-radius: 4px; margin-right: 0.15rem;
 }
 .qdesc .qchip {
-  display: inline-block; background: var(--accent-soft); color: var(--ink);
+  background: var(--accent-soft); color: var(--ink);
   border: 1px solid var(--line); border-radius: 999px;
-  padding: 0.05rem 0.6rem; font-weight: 500; white-space: nowrap;
-  max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: -1px;
+  padding: 0.12rem 0.6rem; font-weight: 500; white-space: nowrap;
+  box-decoration-break: clone; -webkit-box-decoration-break: clone;
 }
 .qdesc .qletter {
   font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; font-weight: 600;
