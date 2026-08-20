@@ -112,8 +112,8 @@ function describeSelector(s) {
 function QueryDesc({ result }) {
   const { labelA, labelB, relSnap: rel, guardSnap: guard } = result;
   if (!rel) return null;
-  const A = <><span className="tag">A</span> <strong>{labelA}</strong></>;
-  const B = labelB ? <><span className="tag">B</span> <strong>{labelB}</strong></> : null;
+  const A = <span className="qchip"><span className="qletter">A</span>{labelA}</span>;
+  const B = labelB ? <span className="qchip"><span className="qletter">B</span>{labelB}</span> : null;
   let body;
   if (rel.type === "BEFORE") {
     const win = Number(rel.minDays || 0) > 0 ? rel.minDays + "–" + rel.maxDays : "≤ " + rel.maxDays;
