@@ -21,10 +21,9 @@ export async function GET() {
       const types = [...tRes.data, { t: LINE_TYPE, n_pat: lStats.data[0].n_pat, n_ev: lStats.data[0].n_ev }];
       values[LINE_TYPE] = {
         LINE_NO: ["1", "2", "3", "4", "5"],
-        COMPOSITION: lCombos.data.map(r => r.combo),
-        GAP: ["30", "60", "90", "180"]
+        COMPOSITION: lCombos.data.map(r => r.combo)
       };
-      keys[LINE_TYPE] = ["LINE_NO", "COMPOSITION", "GAP"];
+      keys[LINE_TYPE] = ["LINE_NO", "COMPOSITION"];
       cache = { study: STUDY, portal: PORTAL, totalPatients, hasPriorMedFlag, types, values, keys };
     }
     return Response.json(cache);

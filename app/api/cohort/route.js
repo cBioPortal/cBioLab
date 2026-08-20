@@ -6,7 +6,8 @@ export async function POST(req) {
     const body = await req.json();
     const { countSql, patientsSql, histSql, histBucket } = compileCohort({
       db: DB, study: STUDY,
-      a: body.a, b: body.b, rel: body.rel, priorGuard: !!body.priorGuard
+      a: body.a, b: body.b, rel: body.rel, priorGuard: !!body.priorGuard,
+      lineGap: body.lineGap
     });
     const cRes = await chQuery(countSql);
     const pRes = await chQuery(patientsSql);

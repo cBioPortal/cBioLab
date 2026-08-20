@@ -216,8 +216,7 @@ export default function Page() {
   const [runError, setRunError] = useState(null);
   const [activeRecipe, setActiveRecipe] = useState(null);
   const [recipeHint, setRecipeHint] = useState("Click a recipe to fill the cohort definition and run it.");
-  const [gap, setGap] = useState("90");
-  const [lineGuard, setLineGuard] = useState(false);
+  const [gap, setGap] = useState("90"); // shared: builder line-events AND explorer
   const [linesBusy, setLinesBusy] = useState(false);
   const [lines, setLines] = useState(null);
   const [linesError, setLinesError] = useState(null);
@@ -243,7 +242,7 @@ export default function Page() {
   const runCohort = useCallback(async (a = selA, b = selB, r = rel, guard = priorGuard) => {
     setRunning(true); setRunError(null);
     try {
-      const payload = { a: toApiSel(a), b: r.type === "NONE" ? null : toApiSel(b), rel: r, priorGuard: guard };
+      const payload = { a: toApiSel(a), b: r.type === "NONE" ? null : toApiSel(b), rel: r, priorGuard: guard, lineGap: Number(gap) };
       const res = await fetch("/api/cohort", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
@@ -254,7 +253,7 @@ export default function Page() {
       setResult(j);
     } catch (e) { setRunError(String(e.message || e)); }
     setRunning(false);
-  }, [selA, selB, rel, priorGuard]);
+  }, [selA, selB, rel, priorGuard, gap]);
 
   const applyRecipe = (i) => {
     const rc = RECIPES[i];
@@ -279,7 +278,7 @@ export default function Page() {
   const runLines = async () => {
     setLinesBusy(true); setLinesError(null);
     try {
-      const res = await fetch("/api/lines", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gap: Number(gap), guard: lineGuard }) });
+      const res = await fetch("/api/lines", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gap: Number(gap), guard: priorGuard }) });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
       setLines(j);
@@ -347,6 +346,17 @@ export default function Page() {
                 </>}
               </div>
               {rel.type !== "NONE" && <Selector tag="B · second event" sel={selB} setSel={setSelB} catalog={catalog} />}
+              {(selA.eventType === "Treatment line (derived)" || (rel.type !== "NONE" && selB.eventType === "Treatment line (derived)")) &&
+                <div className="sel-card">
+                  <span className="tag">line derivation</span>
+                  <div className="row">
+                    <div><label>New-line gap threshold (days)</label>
+                      <select value={gap} onChange={e => setGap(e.target.value)}>
+                        <option>30</option><option>60</option><option>90</option><option>180</option>
+                      </select></div>
+                  </div>
+                  <p className="note" style={{ marginBottom: 0 }}>Lines are derived at query time. This setting is shared with the treatment-lines explorer below — one definition of “a line” on the whole page. The “No prior medications” checkbox below applies to the derivation too.</p>
+                </div>}
               {catalog && catalog.hasPriorMedFlag &&
                 <label className="chk">
                   <input type="checkbox" checked={priorGuard} onChange={e => setPriorGuard(e.target.checked)} />
@@ -413,7 +423,7 @@ export default function Page() {
               </select>
             </div>
             <label className="chk" style={{ marginBottom: "0.35rem" }}>
-              <input type="checkbox" id="lineGuard" checked={lineGuard} onChange={e => setLineGuard(e.target.checked)} />
+              <input type="checkbox" id="lineGuard" checked={priorGuard} onChange={e => setPriorGuard(e.target.checked)} />
               “No prior medications” patients only
             </label>
             <button className="primary" id="linesBtn" disabled={!catalog || linesBusy} onClick={runLines}>
@@ -434,7 +444,7 @@ export default function Page() {
           </div>}
           {lines && <details><summary>Generated SQL</summary><pre>{lines.sql}</pre></details>}
           {linesError && <div className="error">{linesError}</div>}
-          <p className="note">Lines are derived from event sequence only — “line 1” means <em>first line observed in this study</em>. In msk_chord_2024, ~20% of treated patients carry the “Prior medications to MSK” flag and ~20% have no determination; use the guard above for true first-line questions.</p>
+          <p className="note">Lines are derived from event sequence only — “line 1” means <em>first line observed in this study</em>. In msk_chord_2024, ~20% of treated patients carry the “Prior medications to MSK” flag and ~20% have no determination; use the guard for true first-line questions. The gap threshold and guard here are <strong>the same settings</strong> used by “Treatment line (derived)” events in the query builder above — changing them in either place changes both.</p>
         </div>
       </main>
     </>
