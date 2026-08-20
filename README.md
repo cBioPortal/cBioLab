@@ -12,6 +12,13 @@ Users define cohorts by relationships between events — "progression within 180
   occurrence pinning, observability guard, derived treatment-line events)
 - `lib/ch.js` — server-side ClickHouse HTTP client; credentials come from env and never reach the client
 
+## The DSL
+
+The query language is documented in [`docs/dsl.md`](docs/dsl.md) — selectors, temporal
+relations, guards, derived treatment-line events, semantics, and worked examples with real
+msk_chord_2024 counts. A machine-readable contract is in
+[`docs/cohort-query.schema.json`](docs/cohort-query.schema.json) (JSON Schema 2020-12).
+
 ## Environment variables
 
 | var | example |
