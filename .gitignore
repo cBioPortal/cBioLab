@@ -5,3 +5,4 @@ node_modules
 server.log
 nohup.out
 *.png
+mcp.log

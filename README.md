@@ -32,6 +32,21 @@ msk_chord_2024 counts. A machine-readable contract is in
 
 Copy them into `.env.local` for local dev; set them in Vercel Project Settings → Environment Variables for deploys.
 
+## MCP server
+
+`npm run mcp` starts a Streamable HTTP MCP server (default `127.0.0.1:3201/mcp`) exposing four
+tools to LLM clients: `describe_study`, `query_cohort` (the DSL), `derive_treatment_lines`, and
+`render_oncoprint` (returns a PNG image block rendered server-side from the OncoprintSpec
+contract via `lib/oncoprint-svg.js`). Tool schemas mirror `docs/cohort-query.schema.json`, and
+results carry the semantic caveats (observability guard, prior-medication guard, panel-aware
+denominators) for the model to surface. Register in Claude Code:
+
+```bash
+claude mcp add --transport http cohort-lab https://<your-host>/mcp
+```
+
+`mcp/test-client.mjs` exercises all four tools end to end.
+
 ## Run locally
 
 ```bash
