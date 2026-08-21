@@ -153,11 +153,15 @@ export function registerTools(server) {
       const png = await sharp(Buffer.from(svg), { density: 144 }).png().toBuffer();
       const stats = contract.tracks.filter(t => t.kind === "gene")
         .map(t => `${t.label}: ${t.freqPct}% (${t.altered}/${t.profiled} profiled)`).join("  ");
+      const base = process.env.APP_BASE_URL || "https://cohort-lab.vercel.app";
+      const provUrl = base + "/provenance?spec=" + Buffer.from(JSON.stringify(spec)).toString("base64url");
       const summary =
         `Oncoprint: ${contract.stats.nColumns.toLocaleString()} patients` +
         (contract.groups.length > 1 ? ` in groups ${contract.groups.map(g => `${g.name}(${g.count})`).join(", ")}` : "") +
         `.\nGene frequencies (panel-aware denominators): ${stats}` +
-        `\nConventions: CNA ±2 only; striped = not profiled (not the same as unaltered).`;
+        `\nConventions: CNA ±2 only; striped = not profiled (not the same as unaltered).` +
+        `\nProvenance (share this with the user): ${provUrl}\n` +
+        `That page re-renders this exact oncoprint and shows the DSL spec and every generated SQL query.`;
       return {
         content: [
           { type: "image", data: png.toString("base64"), mimeType: "image/png" },
