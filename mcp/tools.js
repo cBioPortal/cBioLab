@@ -5,6 +5,7 @@ import { compileCohort, compileLines, catalogSqls, lineCatalogSqls, LINE_TYPE } 
 import { buildContract } from "../lib/oncoprint.js";
 import { contractToSvg } from "../lib/oncoprint-svg.js";
 import sharp from "sharp";
+import { ensureFonts } from "../lib/fonts.js";
 
 // ---------- shared zod fragments (mirrors docs/cohort-query.schema.json) ----------
 const zSelector = z.object({
@@ -146,6 +147,7 @@ export function registerTools(server) {
         layout: groups && groups.length ? { groupBy: { kind: "cohorts", groups } } : null,
         conventions: { lineGap: 90 }
       };
+      ensureFonts();
       const contract = await buildContract(spec);
       const svg = contractToSvg(contract, 1200);
       const png = await sharp(Buffer.from(svg), { density: 144 }).png().toBuffer();
