@@ -102,6 +102,18 @@ async function main() {
       ok("no credentials in served HTML/DOM", !secretLeak);
 
       await page.screenshot({ path: "shot-next-light.png", fullPage: true });
+
+      // Oncoprint page: default two-group preset auto-renders
+      await page.goto(BASE + "/oncoprint");
+      await page.waitForSelector("#oncoCanvas", { timeout: 180000 });
+      await page.waitForFunction(() => {
+        const h = [...document.querySelectorAll(".card h2")].map(e => e.textContent).join(" ");
+        return h.includes("patients");
+      }, null, { timeout: 180000 });
+      const oncoHeader = [...await page.locator(".card h2").allTextContents()].join(" ");
+      ok("oncoprint contract built (2,946 patients)", oncoHeader.includes("2,946 patients"), oncoHeader.slice(0, 80));
+      const canvasH = await page.locator("#oncoCanvas").evaluate(c => c.height);
+      ok("oncoprint canvas painted", canvasH > 100, "canvas height " + canvasH);
     } else {
       await page.screenshot({ path: "shot-next-dark.png", fullPage: false });
     }

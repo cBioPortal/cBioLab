@@ -296,6 +296,7 @@ export default function Page() {
         <h1>Cohort Lab</h1>
         <span className="sub">temporal cohort queries over cBioPortal timeline events — live prototype</span>
         <span className="spacer" />
+        <a href="/oncoprint" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>oncoprint demo →</a>
         <span className={"pill" + (catalog ? " on" : "")} id="connPill">
           {catalog || catError ? <span className="dot" /> : <span className="spinner" aria-label="loading" />}
           <span id="connText">{catalog ? catalog.study + " · " + catalog.totalPatients.toLocaleString() + " pts" : (catError ? "backend error" : "loading catalog…")}</span>
