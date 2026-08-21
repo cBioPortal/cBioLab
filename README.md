@@ -34,7 +34,9 @@ Copy them into `.env.local` for local dev; set them in Vercel Project Settings â
 
 ## MCP server
 
-`npm run mcp` starts a Streamable HTTP MCP server (default `127.0.0.1:3201/mcp`) exposing four
+The MCP endpoint ships inside the Next.js app at **`/api/mcp`** (`app/api/[transport]/route.js`
+via `mcp-handler`), so a Vercel deploy serves it automatically. `npm run mcp` runs the same tools
+as a standalone Streamable HTTP server (default `127.0.0.1:3201/mcp`). Both expose four
 tools to LLM clients: `describe_study`, `query_cohort` (the DSL), `derive_treatment_lines`, and
 `render_oncoprint` (returns a PNG image block rendered server-side from the OncoprintSpec
 contract via `lib/oncoprint-svg.js`). Tool schemas mirror `docs/cohort-query.schema.json`, and
@@ -42,7 +44,7 @@ results carry the semantic caveats (observability guard, prior-medication guard,
 denominators) for the model to surface. Register in Claude Code:
 
 ```bash
-claude mcp add --transport http cohort-lab https://<your-host>/mcp
+claude mcp add --transport http cohort-lab https://<your-deployment>/api/mcp
 ```
 
 `mcp/test-client.mjs` exercises all four tools end to end.
