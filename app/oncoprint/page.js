@@ -148,6 +148,7 @@ function decode(code) {
 
 export default function OncoprintPage() {
   const [preset, setPreset] = useState(0);
+  const [custom, setCustom] = useState(null); // spec loaded from ?spec= (shared link)
   const [genes, setGenes] = useState("TP53 KRAS STK11 KEAP1 EGFR ARID1A MSH3");
   const [withDerived, setWithDerived] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -167,18 +168,28 @@ export default function OncoprintPage() {
     return () => mq.removeEventListener("change", fn);
   }, []);
 
-  const run = async () => {
+  const run = async (override) => {
     setBusy(true); setError(null);
     try {
-      const p = PRESETS[preset];
-      const s = {
-        genes: genes.split(/[\s,]+/).filter(Boolean),
-        clinical: ["OS_STATUS", "SMOKING_PREDICTIONS_3_CLASSES"],
-        derivedEvents: withDerived ? [{ label: "Reached 2L", expression: LINE2 }] : [],
-        cohort: p.cohort !== undefined ? p.cohort : null,
-        layout: p.layout || null,
-        conventions: { lineGap: 90 }
-      };
+      let s;
+      if (override) {
+        s = override;
+      } else if (preset === -1 && custom) {
+        s = { ...custom,
+          genes: genes.split(/[\s,]+/).filter(Boolean),
+          derivedEvents: withDerived ? (custom.derivedEvents && custom.derivedEvents.length ? custom.derivedEvents : [{ label: "Reached 2L", expression: LINE2 }]) : []
+        };
+      } else {
+        const p = PRESETS[preset];
+        s = {
+          genes: genes.split(/[\s,]+/).filter(Boolean),
+          clinical: ["OS_STATUS", "SMOKING_PREDICTIONS_3_CLASSES"],
+          derivedEvents: withDerived ? [{ label: "Reached 2L", expression: LINE2 }] : [],
+          cohort: p.cohort !== undefined ? p.cohort : null,
+          layout: p.layout || null,
+          conventions: { lineGap: 90 }
+        };
+      }
       setSpec(s);
       const res = await fetch("/api/oncoprint", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(s) });
       const j = await res.json();
@@ -188,7 +199,22 @@ export default function OncoprintPage() {
     setBusy(false);
   };
 
-  useEffect(() => { run(); /* initial render */ }, []); // eslint-disable-line
+  useEffect(() => {
+    // shared-link preload: /oncoprint?spec=<base64url OncoprintSpec>
+    try {
+      const b64 = new URLSearchParams(window.location.search).get("spec");
+      if (b64) {
+        const sp = JSON.parse(atob(b64.replace(/-/g, "+").replace(/_/g, "/")));
+        setCustom(sp);
+        setGenes((sp.genes || []).join(" "));
+        setWithDerived(!!(sp.derivedEvents || []).length);
+        setPreset(-1);
+        run(sp);
+        return;
+      }
+    } catch (e) { setError("Could not parse the shared spec link: " + String(e.message || e)); }
+    run(); /* initial render */
+  }, []); // eslint-disable-line
 
   useEffect(() => {
     if (!contract || !canvasRef.current) return;
@@ -250,6 +276,7 @@ export default function OncoprintPage() {
             <div style={{ minWidth: "20rem" }}>
               <label>Cohort / column groups (from the cohort DSL)</label>
               <select style={{ width: "100%" }} value={preset} onChange={e => setPreset(Number(e.target.value))}>
+                {custom && <option value={-1}>Custom — loaded from shared link</option>}
                 {PRESETS.map((p, i) => <option key={i} value={i}>{p.name}</option>)}
               </select>
             </div>
@@ -259,7 +286,9 @@ export default function OncoprintPage() {
             </div>
             <label className="chk" style={{ marginBottom: "0.4rem" }}>
               <input type="checkbox" checked={withDerived} onChange={e => setWithDerived(e.target.checked)} />
-              “Reached 2L” derived track
+              {custom && custom.derivedEvents && custom.derivedEvents.length
+                ? "derived-event track" + (custom.derivedEvents.length > 1 ? "s" : "") + " (" + custom.derivedEvents.map(d => d.label).join(", ") + ")"
+                : "“Reached 2L” derived track"}
             </label>
             <button className="primary" id="renderBtn" disabled={busy} onClick={run}>
               {busy && <span className="spinner onprimary" />}{busy ? "Building…" : "Render"}
@@ -289,7 +318,7 @@ export default function OncoprintPage() {
           <div className="legend-strip" style={{ display: "flex", flexWrap: "wrap", gap: "0.9rem", marginTop: "0.8rem", fontSize: "0.74rem", color: "var(--muted)" }}>
             {[["Amplification", P.amp], ["Deep deletion", P.homdel], ["Structural variant", P.sv],
               ["Missense", P.missense], ["Truncating", P.truncating], ["In-frame", P.inframe], ["Splice", P.splice],
-              ["Reached 2L", P.derived]].map(([l, c]) => (
+              ...contract.tracks.filter(t => t.kind === "derivedEvent").map(t => [t.label, P.derived])].map(([l, c]) => (
               <span key={l} style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
                 <span style={{ width: 11, height: 11, background: c, borderRadius: 2, display: "inline-block" }} />{l}
               </span>

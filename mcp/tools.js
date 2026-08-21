@@ -154,14 +154,21 @@ export function registerTools(server) {
       const stats = contract.tracks.filter(t => t.kind === "gene")
         .map(t => `${t.label}: ${t.freqPct}% (${t.altered}/${t.profiled} profiled)`).join("  ");
       const base = process.env.APP_BASE_URL || "https://cohort-lab.vercel.app";
-      const provUrl = base + "/provenance?spec=" + Buffer.from(JSON.stringify(spec)).toString("base64url");
+      const specB64 = Buffer.from(JSON.stringify(spec)).toString("base64url");
+      const provUrl = base + "/provenance?spec=" + specB64;
       const summary =
         `Oncoprint: ${contract.stats.nColumns.toLocaleString()} patients` +
         (contract.groups.length > 1 ? ` in groups ${contract.groups.map(g => `${g.name}(${g.count})`).join(", ")}` : "") +
         `.\nGene frequencies (panel-aware denominators): ${stats}` +
         `\nConventions: CNA ±2 only; striped = not profiled (not the same as unaltered).` +
         `\nProvenance (share this with the user): ${provUrl}\n` +
-        `That page re-renders this exact oncoprint and shows the DSL spec and every generated SQL query.`;
+        `That page re-renders this exact oncoprint and shows the DSL spec and every generated SQL query.` +
+        `\nInteractive editor (share this too — it opens THIS oncoprint with live controls): ${base}/oncoprint?spec=${specB64}` +
+        `\nModifications the user can ask for right here in chat: add or remove gene tracks (up to 12); ` +
+        `add clinical attribute tracks (e.g. OS_STATUS, GENDER, SMOKING_PREDICTIONS_3_CLASSES); ` +
+        `add derived-event phenotype tracks from any cohort expression (e.g. "reached 3rd line", "had surgery"); ` +
+        `regroup columns by different cohorts (up to 4 side-by-side); change the treatment-line gap rule (lineGap); ` +
+        `restrict any group to treatment-naive patients (priorGuard). Offer 1-2 of these as next steps when relevant.`;
       return {
         content: [
           { type: "image", data: png.toString("base64"), mimeType: "image/png" },
