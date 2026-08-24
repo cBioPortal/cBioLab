@@ -152,7 +152,7 @@ export function registerTools(server) {
       const svg = contractToSvg(contract, 1200);
       const png = await sharp(Buffer.from(svg), { density: 144 }).png().toBuffer();
       const stats = contract.tracks.filter(t => t.kind === "gene")
-        .map(t => `${t.label}: ${t.freqPct}% (${t.altered}/${t.profiled} profiled)`).join("  ");
+        .map(t => `${t.label}: ${t.driverPct}% driver / ${t.freqPct}% any (${t.driverAltered}/${t.altered}/${t.profiled} driver/altered/profiled)`).join("  ");
       const base = process.env.APP_BASE_URL || "https://cohort-lab.vercel.app";
       const specB64 = Buffer.from(JSON.stringify(spec)).toString("base64url");
       const provUrl = base + "/provenance?spec=" + specB64;
@@ -160,7 +160,8 @@ export function registerTools(server) {
         `Oncoprint: ${contract.stats.nColumns.toLocaleString()} patients` +
         (contract.groups.length > 1 ? ` in groups ${contract.groups.map(g => `${g.name}(${g.count})`).join(", ")}` : "") +
         `.\nGene frequencies (panel-aware denominators): ${stats}` +
-        `\nConventions: CNA ±2 only; striped = not profiled (not the same as unaltered).` +
+        `\nConventions: CNA ±2 only; striped = not profiled (not the same as unaltered); solid = putative driver, faded = VUS.` +
+        `\nANNOTATION SOURCE (tell the user): ${contract.conventions.annotation} — driver/VUS calls are a mock placeholder until the OncoKB store is populated; treat driver percentages as illustrative only.` +
         `\nProvenance (share this with the user): ${provUrl}\n` +
         `That page re-renders this exact oncoprint and shows the DSL spec and every generated SQL query.` +
         `\nInteractive editor (share this too — it opens THIS oncoprint with live controls): ${base}/oncoprint?spec=${specB64}` +

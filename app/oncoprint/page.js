@@ -19,7 +19,7 @@ const PRESETS = [
 
 // Okabe–Ito, CVD-safe
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#999999"];
-const BITS = { MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16, SV: 32, AMP: 64, HOMDEL: 128 };
+const BITS = { MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16, SV: 32, AMP: 64, HOMDEL: 128, DRIVER: 256 };
 const BIT_LABELS = [
   [BITS.AMP, "Amplification"], [BITS.HOMDEL, "Deep deletion"], [BITS.SV, "Structural variant"],
   [BITS.MISSENSE, "Missense"], [BITS.TRUNCATING, "Truncating"], [BITS.INFRAME, "In-frame"],
@@ -100,7 +100,7 @@ function drawContract(canvas, contract, dark, hover) {
     if (t.freqPct != null) {
       ctx.fillStyle = P.muted;
       ctx.textAlign = "right";
-      ctx.fillText(t.freqPct + "%", GUTTER - 8, y + 14);
+      ctx.fillText(t.driverPct != null ? t.driverPct + "% / " + t.freqPct + "%" : t.freqPct + "%", GUTTER - 8, y + 14);
       ctx.textAlign = "left";
     }
     contract.groups.forEach((g, gi) => {
@@ -113,12 +113,17 @@ function drawContract(canvas, contract, dark, hover) {
             ctx.fillStyle = P.np2;
             ctx.fillRect(x, y + ROW_H * 0.4, w, ROW_H * 0.2);
           } else {
-            ctx.fillStyle = b.code & BITS.AMP ? P.amp : b.code & BITS.HOMDEL ? P.homdel : P.unaltered;
-            ctx.fillRect(x, y, w, ROW_H);
+            // VUS fading: altered cells with no driver-annotated alteration render at low alpha
+            const vus = b.code > 0 && !(b.code & BITS.DRIVER);
+            const isCnaBg = (b.code & BITS.AMP) || (b.code & BITS.HOMDEL);
+            ctx.fillStyle = P.unaltered; ctx.fillRect(x, y, w, ROW_H);
+            if (vus) ctx.globalAlpha = 0.35;
+            if (isCnaBg) { ctx.fillStyle = b.code & BITS.AMP ? P.amp : P.homdel; ctx.fillRect(x, y, w, ROW_H); }
             if (b.code & BITS.SV) { ctx.fillStyle = P.sv; ctx.fillRect(x, y + ROW_H * 0.15, w, ROW_H * 0.7); }
             const mutBit = b.code & BITS.MISSENSE ? "missense" : b.code & BITS.TRUNCATING ? "truncating"
               : b.code & BITS.INFRAME ? "inframe" : b.code & BITS.SPLICE ? "splice" : b.code & BITS.OTHER_MUT ? "otherMut" : null;
             if (mutBit) { ctx.fillStyle = P[mutBit]; ctx.fillRect(x, y + ROW_H * 0.3, w, ROW_H * 0.4); }
+            ctx.globalAlpha = 1;
           }
         } else if (t.kind === "derivedEvent") {
           ctx.fillStyle = b.code > 0 ? P.derived : P.unaltered;
@@ -143,7 +148,9 @@ function drawContract(canvas, contract, dark, hover) {
 function decode(code) {
   if (code === -1) return ["not profiled"];
   if (code === 0) return ["no alteration"];
-  return BIT_LABELS.filter(([b]) => code & b).map(([, l]) => l);
+  const parts = BIT_LABELS.filter(([b]) => code & b).map(([, l]) => l);
+  parts.push(code & BITS.DRIVER ? "putative driver" : "VUS/unknown significance");
+  return parts;
 }
 
 export default function OncoprintPage() {
@@ -327,6 +334,7 @@ export default function OncoprintPage() {
               <span style={{ width: 11, height: 11, borderRadius: 2, display: "inline-block", background: `repeating-linear-gradient(45deg, ${P.np1}, ${P.np1} 2px, ${P.np2} 2px, ${P.np2} 4px)` }} />
               Not profiled
             </span>
+            <span>solid = putative driver · faded = VUS · gene %: driver / any ({contract.conventions && contract.conventions.annotation})</span>
             {contract.tracks.filter(t => t.kind === "clinical").map(t => (
               <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
                 <strong style={{ color: "var(--ink)" }}>{t.label}:</strong>
