@@ -150,3 +150,12 @@ pre {
 }
 button.primary { display: inline-flex; align-items: center; gap: 0.5rem; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* analysis page: 3 panes, responsive */
+.ana-grid { display: grid; grid-template-columns: minmax(300px, 24rem) minmax(0, 1fr) minmax(280px, 22rem); gap: 1rem; align-items: start; }
+.ana-chat { position: sticky; top: 1rem; }
+@media (max-width: 1500px) {
+  .ana-grid { grid-template-columns: minmax(280px, 22rem) minmax(0, 1fr); }
+  .ana-chat { grid-column: 1 / -1; position: static; }
+}
+@media (max-width: 880px) { .ana-grid { grid-template-columns: 1fr; } }

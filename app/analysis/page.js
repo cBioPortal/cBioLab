@@ -125,7 +125,7 @@ export default function AnalysisPage() {
       </header>
       <main style={{ maxWidth: "96rem" }}>
         {error && <div className="error">{error}</div>}
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(300px,26rem) 1fr minmax(280px,24rem)", gap: "1rem", alignItems: "start" }}>
+        <div className="ana-grid">
 
           {/* ---- Define ---- */}
           <div>
@@ -189,7 +189,7 @@ export default function AnalysisPage() {
           </div>
 
           {/* ---- Chat ---- */}
-          <div className="card" style={{ position: "sticky", top: "1rem" }}>
+          <div className="card ana-chat">
             <h2>Chat <span className="plain">— edits the same document</span></h2>
             {chatReady === false && <p className="note">Chat needs <code>ANTHROPIC_API_KEY</code> in the server environment. The document editor and views work without it.</p>}
             <div style={{ maxHeight: "26rem", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "0.6rem" }}>
