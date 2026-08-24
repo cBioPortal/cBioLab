@@ -161,7 +161,9 @@ export function registerTools(server) {
         (contract.groups.length > 1 ? ` in groups ${contract.groups.map(g => `${g.name}(${g.count})`).join(", ")}` : "") +
         `.\nGene frequencies (panel-aware denominators): ${stats}` +
         `\nConventions: CNA ±2 only; striped = not profiled (not the same as unaltered); solid = putative driver, faded = VUS.` +
-        `\nANNOTATION SOURCE (tell the user): ${contract.conventions.annotation} — driver/VUS calls are a mock placeholder until the OncoKB store is populated; treat driver percentages as illustrative only.` +
+        (String(contract.conventions.annotation).startsWith("MOCK")
+          ? `\nANNOTATION SOURCE (tell the user): ${contract.conventions.annotation} — driver/VUS calls are a mock placeholder; treat driver percentages as illustrative only.`
+          : `\nAnnotations: ${contract.conventions.annotation} — driver/VUS classification is version-pinned; the same spec re-renders identically against this release.`) +
         `\nProvenance (share this with the user): ${provUrl}\n` +
         `That page re-renders this exact oncoprint and shows the DSL spec and every generated SQL query.` +
         `\nInteractive editor (share this too — it opens THIS oncoprint with live controls): ${base}/oncoprint?spec=${specB64}` +
