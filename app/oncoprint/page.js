@@ -352,6 +352,16 @@ export default function OncoprintPage() {
               </span>
             ))}
           </div>
+          <p className="note" style={{ marginTop: "0.6rem" }}>
+            <a target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-ink)" }}
+              href={"https://www.cbioportal.org/results/oncoprint?cancer_study_list=" + contract.study +
+                "&case_set_id=" + contract.study + "_all&gene_list=" +
+                encodeURIComponent(contract.tracks.filter(t => t.kind === "gene").map(t => t.label).join(" ")) +
+                "&profileFilter=mutations%2Cstructural_variants%2Cgistic&Z_SCORE_THRESHOLD=2.0&tab_index=tab_visualize&Action=Submit"}>
+              Open these genes in the cBioPortal oncoprint ↗
+            </a>{" "}
+            — full study, all samples (the portal can’t express Cohort Lab cohorts, column groups, or derived tracks).
+          </p>
           <details>
             <summary>Spec &amp; contract</summary>
             <pre>{JSON.stringify(spec, null, 2)}</pre>
