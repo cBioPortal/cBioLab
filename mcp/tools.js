@@ -134,16 +134,18 @@ export function registerTools(server) {
       cohort: z.object(zCohortDsl).nullish().describe("Cohort for the columns; omit for all patients (ignored when groups given)"),
       groups: z.array(z.object({ name: z.string().max(60), dsl: z.object(zCohortDsl) })).max(4).nullish()
         .describe("Optional column groups, each its own cohort DSL — e.g. progressors vs non-progressors side by side"),
+      patientList: z.array(z.string().max(64)).max(10000).nullish()
+        .describe("Explicit patient IDs (e.g. imported from a portal custom case list) to use as the cohort — overrides `cohort`; ids not in the study are dropped"),
       derivedEventTracks: z.array(z.object({ label: z.string().max(60), expression: z.object(zCohortDsl) })).max(3).nullish()
         .describe("Optional phenotype tracks from cohort-DSL expressions, e.g. 'Reached 2L'"),
       clinical: z.array(z.string()).max(3).nullish().describe("Patient-level clinical attribute tracks, e.g. ['OS_STATUS']")
     },
-    async ({ genes, cohort, groups, derivedEventTracks, clinical }) => {
+    async ({ genes, cohort, groups, derivedEventTracks, clinical, patientList }) => {
       const spec = {
         genes,
         clinical: clinical || [],
         derivedEvents: derivedEventTracks || [],
-        cohort: cohort ? { dsl: cohort } : null,
+        cohort: patientList && patientList.length ? { dsl: { patients: patientList } } : (cohort ? { dsl: cohort } : null),
         layout: groups && groups.length ? { groupBy: { kind: "cohorts", groups } } : null,
         conventions: { lineGap: 90 }
       };

@@ -14,7 +14,10 @@ const PRESETS = [
   { name: "Immuno-treated patients", cohort: { dsl: { a: IMMUNO, rel: { type: "NONE" } } } },
   { name: "True 1L immuno, guarded (prior-med restricted)",
     cohort: { dsl: { a: { ...IMMUNO, occurrence: "FIRST" }, rel: { type: "NONE" }, priorGuard: true } } },
-  { name: "All patients", cohort: null }
+  { name: "All patients", cohort: null },
+  { name: "Portal session 6a8c8041 — custom case list (121 pts)",
+    genes: "TP53",
+    cohort: { dsl: { patients: ["P-0000879", "P-0001138", "P-0001313", "P-0001509", "P-0001943", "P-0002103", "P-0002202", "P-0002369", "P-0002839", "P-0003864", "P-0004026", "P-0004141", "P-0004223", "P-0004307", "P-0004595", "P-0004644", "P-0005980", "P-0006018", "P-0006451", "P-0006710", "P-0007076", "P-0008552", "P-0008707", "P-0008799", "P-0009515", "P-0009597", "P-0010090", "P-0010445", "P-0010490", "P-0010496", "P-0010830", "P-0011163", "P-0011464", "P-0012231", "P-0012246", "P-0012786", "P-0013225", "P-0013555", "P-0013655", "P-0013749", "P-0013974", "P-0014036", "P-0014475", "P-0015140", "P-0015723", "P-0015935", "P-0017012", "P-0017348", "P-0017466", "P-0018828", "P-0018954", "P-0019275", "P-0019281", "P-0019506", "P-0019646", "P-0020684", "P-0021768", "P-0022134", "P-0022652", "P-0022955", "P-0023837", "P-0024465", "P-0025693", "P-0027620", "P-0028691", "P-0029272", "P-0029477", "P-0029599", "P-0030377", "P-0031556", "P-0031836", "P-0032031", "P-0034624", "P-0035025", "P-0035509", "P-0037352", "P-0037557", "P-0037684", "P-0040641", "P-0041028", "P-0041552", "P-0042403", "P-0043063", "P-0043725", "P-0044178", "P-0047236", "P-0048010", "P-0052227", "P-0052323", "P-0054029", "P-0054316", "P-0054515", "P-0055078", "P-0056003", "P-0057495", "P-0059101", "P-0062211", "P-0064545", "P-0067047", "P-0067601", "P-0068058", "P-0068210", "P-0068740", "P-0069463", "P-0069589", "P-0070211", "P-0070827", "P-0077168", "P-0078138", "P-0078284", "P-0079446", "P-0081628", "P-0082773", "P-0083700", "P-0083726", "P-0086101", "P-0086775", "P-0087565", "P-0087726", "P-0088329", "P-0089254"] } } }
 ];
 
 // Okabe–Ito, CVD-safe
@@ -282,7 +285,10 @@ export default function OncoprintPage() {
           <div className="row">
             <div style={{ minWidth: "20rem" }}>
               <label>Cohort / column groups (from the cohort DSL)</label>
-              <select style={{ width: "100%" }} value={preset} onChange={e => setPreset(Number(e.target.value))}>
+              <select style={{ width: "100%" }} value={preset} onChange={e => {
+                const i = Number(e.target.value); setPreset(i);
+                if (PRESETS[i] && PRESETS[i].genes) setGenes(PRESETS[i].genes);
+              }}>
                 {custom && <option value={-1}>Custom — loaded from shared link</option>}
                 {PRESETS.map((p, i) => <option key={i} value={i}>{p.name}</option>)}
               </select>
