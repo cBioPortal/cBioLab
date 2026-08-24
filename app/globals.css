@@ -152,13 +152,9 @@ button.primary { display: inline-flex; align-items: center; gap: 0.5rem; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
 /* analysis page: 3 panes, responsive */
-.ana-grid { display: grid; grid-template-columns: minmax(300px, 24rem) minmax(0, 1fr) minmax(280px, 22rem); gap: 1rem; align-items: start; }
+.ana-grid { display: grid; grid-template-columns: minmax(300px, 26rem) minmax(0, 1fr); gap: 1rem; align-items: start; }
 .ana-chat { position: sticky; top: 1rem; }
-@media (max-width: 1500px) {
-  .ana-grid { grid-template-columns: minmax(280px, 22rem) minmax(0, 1fr); }
-  .ana-chat { grid-column: 1 / -1; position: static; }
-}
-@media (max-width: 880px) { .ana-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .ana-grid { grid-template-columns: 1fr; } }
 .tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; border-bottom: 1px solid var(--line); }
 .tabs button { border: none; background: none; border-radius: 0; padding: 0.45rem 0.9rem; color: var(--muted); border-bottom: 2px solid transparent; font-weight: 500; }
 .tabs button.active { color: var(--accent-ink); border-bottom-color: var(--accent); }
