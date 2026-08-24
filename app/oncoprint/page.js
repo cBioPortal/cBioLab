@@ -290,7 +290,7 @@ export default function OncoprintPage() {
                 ? "derived-event track" + (custom.derivedEvents.length > 1 ? "s" : "") + " (" + custom.derivedEvents.map(d => d.label).join(", ") + ")"
                 : "“Reached 2L” derived track"}
             </label>
-            <button className="primary" id="renderBtn" disabled={busy} onClick={run}>
+            <button className="primary" id="renderBtn" disabled={busy} onClick={() => run()}>
               {busy && <span className="spinner onprimary" />}{busy ? "Building…" : "Render"}
             </button>
           </div>
