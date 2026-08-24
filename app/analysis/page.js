@@ -56,6 +56,43 @@ export default function AnalysisPage() {
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
   const [chatReady, setChatReady] = useState(null);
+  const [tab, setTab] = useState("analysis");
+  const [saved, setSaved] = useState({});          // name -> {def, savedAt, lastEval:{count,text}}
+  const [cName, setCName] = useState("");
+  const [cDefText, setCDefText] = useState(JSON.stringify({ all: [{ kind: "alteration", gene: "KRAS", driver: "driverOnly" }] }, null, 2));
+  const [cPreview, setCPreview] = useState(null);
+  const [cBusy, setCBusy] = useState(false);
+
+  const LS_KEY = "cohortlab.savedCohorts";
+  const persist = (next) => { setSaved(next); try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {} };
+
+  const previewCohort = async (name, defText) => {
+    setCBusy(true); setCPreview(null);
+    try {
+      const def = JSON.parse(defText);
+      const res = await fetch("/api/analysis", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cohorts: { [name || "preview"]: def }, views: [] }) });
+      const j = await res.json();
+      if (j.error) throw new Error(j.error);
+      const c = Object.values(j.cohorts)[0];
+      setCPreview({ count: c.count, text: c.text });
+      return { def, eval: { count: c.count, text: c.text } };
+    } catch (e) { setCPreview({ error: String(e.message || e) }); return null; }
+    finally { setCBusy(false); }
+  };
+
+  const saveCohort = async () => {
+    const name = cName.trim();
+    if (!name) { setCPreview({ error: "give the cohort a name" }); return; }
+    const r = await previewCohort(name, cDefText);
+    if (!r) return;
+    persist({ ...saved, [name]: { def: r.def, savedAt: new Date().toISOString().slice(0, 16).replace("T", " "), lastEval: r.eval } });
+  };
+
+  const addToAnalysis = (name) => {
+    const d = { ...doc, cohorts: { ...doc.cohorts, [name]: saved[name].def } };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2)); setTab("analysis"); run(d);
+  };
 
   const run = async (d = doc) => {
     setBusy(true); setError(null);
@@ -70,6 +107,7 @@ export default function AnalysisPage() {
   };
 
   useEffect(() => {
+    try { setSaved(JSON.parse(localStorage.getItem("cohortlab.savedCohorts") || "{}")); } catch {}
     fetch("/api/chat").then(r => setChatReady(r.status !== 501)).catch(() => setChatReady(false));
     try {
       const b64 = new URLSearchParams(window.location.search).get("doc");
@@ -124,8 +162,55 @@ export default function AnalysisPage() {
         <a href="/" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>builder</a>
       </header>
       <main style={{ maxWidth: "96rem" }}>
+        <div className="tabs">
+          <button className={tab === "analysis" ? "active" : ""} onClick={() => setTab("analysis")}>Analysis</button>
+          <button className={tab === "cohorts" ? "active" : ""} onClick={() => setTab("cohorts")}>Cohorts</button>
+        </div>
         {error && <div className="error">{error}</div>}
-        <div className="ana-grid">
+
+        {tab === "cohorts" && <div className="grid2">
+          <div className="card">
+            <h2>Create a cohort</h2>
+            <label>Name</label>
+            <input style={{ width: "100%" }} value={cName} onChange={e => setCName(e.target.value)} placeholder="e.g. KRAS-driver never-smokers" />
+            <label>Definition</label>
+            <textarea value={cDefText} onChange={e => setCDefText(e.target.value)} spellCheck={false}
+              style={{ width: "100%", height: "16rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
+            <div className="recipes" style={{ margin: "0.5rem 0" }}>
+              <button onClick={() => setCDefText(JSON.stringify({ all: [{ kind: "alteration", gene: "KRAS", driver: "driverOnly" }] }, null, 2))}>alteration</button>
+              <button onClick={() => setCDefText(JSON.stringify({ all: [{ kind: "clinical", attribute: "SMOKING_PREDICTIONS_3_CLASSES", op: "=", value: "Never" }] }, null, 2))}>clinical</button>
+              <button onClick={() => setCDefText(JSON.stringify({ all: [{ kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] }, rel: { type: "BEFORE", minDays: 0, maxDays: 180 } }] }, null, 2))}>timeline event</button>
+              <button onClick={() => setCDefText(JSON.stringify({ all: [{ kind: "alteration", gene: "STK11", driver: "driverOnly" }, { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" }, priorGuard: true }] }, null, 2))}>combined</button>
+            </div>
+            <div className="row">
+              <button className="primary" disabled={cBusy} onClick={() => previewCohort(cName, cDefText)}>{cBusy && <span className="spinner onprimary" />}Preview</button>
+              <button className="primary" disabled={cBusy} onClick={saveCohort}>Save</button>
+            </div>
+            {cPreview && (cPreview.error
+              ? <div className="error">{cPreview.error}</div>
+              : <p className="qdesc" style={{ marginTop: "0.6rem" }}><strong>{cPreview.count.toLocaleString()}</strong> patients — {cPreview.text}</p>)}
+          </div>
+          <div className="card">
+            <h2>Saved cohorts <span className="plain">— this browser (localStorage)</span></h2>
+            {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet. Create one on the left, or ask chat to define one and save it from the Analysis tab.</p>}
+            {Object.entries(saved).map(([n, s2]) => (
+              <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
+                <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
+                  <strong>{n}</strong>
+                  {s2.lastEval && <span className="meta">{s2.lastEval.count.toLocaleString()} pts</span>}
+                  <span className="meta">saved {s2.savedAt}</span>
+                  <span className="spacer" />
+                  <button className="linklike" onClick={() => addToAnalysis(n)}>add to analysis</button>
+                  <button className="linklike" onClick={() => { setCName(n); setCDefText(JSON.stringify(s2.def, null, 2)); setCPreview(s2.lastEval || null); }}>edit</button>
+                  <button className="linklike" onClick={() => { const nx = { ...saved }; delete nx[n]; persist(nx); }}>delete</button>
+                </div>
+                {s2.lastEval && <div className="meta" style={{ marginTop: "0.15rem" }}>{s2.lastEval.text}</div>}
+              </div>
+            ))}
+          </div>
+        </div>}
+
+        {tab === "analysis" && <div className="ana-grid">
 
           {/* ---- Define ---- */}
           <div>
@@ -205,7 +290,7 @@ export default function AnalysisPage() {
             </div>
             <p className="note">Try: “why might STK11 patients do worse?” · “add MSH3 and NF1 to the compare view” · “restrict both cohorts to treatment-naïve patients”.</p>
           </div>
-        </div>
+        </div>}
       </main>
     </>
   );
