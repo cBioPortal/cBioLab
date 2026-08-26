@@ -9,7 +9,11 @@ const KIND_META = {
   oql: { label: "OQL", color: "#CC79A7" },
   clinical: { label: "clinical", color: "#0072B2" },
   event: { label: "timeline", color: "#009E73" },
-  patients: { label: "patients", color: "#999999" }
+  patients: { label: "patients", color: "#999999" },
+  profiled: { label: "profiled", color: "#56B4E9" },
+  caseList: { label: "case list", color: "#999999" },
+  genomicData: { label: "data", color: "#CC79A7" },
+  genericAssay: { label: "assay", color: "#CC79A7" }
 };
 
 function leafKind(leaf) {
@@ -36,7 +40,17 @@ function leafText(leaf) {
     const t = leaf.types && leaf.types.length && leaf.types.length < 3 ? " " + leaf.types.join("/") : "";
     return leaf.gene + (leaf.driver === "driverOnly" ? " · driver" : "") + t;
   }
-  if (k === "clinical") return `${leaf.attribute} ${leaf.op} ${leaf.value}`;
+  if (k === "clinical") {
+    const bits = [];
+    if (leaf.values && leaf.values.length) bits.push("∈ {" + leaf.values.join(", ") + "}");
+    if (leaf.range) bits.push(Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" "));
+    if (leaf.op != null) bits.push(`${leaf.op} ${leaf.value}`);
+    return `${leaf.attribute} ${bits.join(" ")}` + (leaf.per === "sample" ? " ·any sample" : "");
+  }
+  if (k === "profiled") return "profiled: " + leaf.type;
+  if (k === "caseList") return leaf.id;
+  if (k === "genomicData") return `${leaf.gene} ${leaf.profileType} ` + (leaf.range ? Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ") : "");
+  if (k === "genericAssay") return `${leaf.entity} ` + JSON.stringify(leaf.range || leaf.values);
   if (k === "patients") return `${(leaf.ids || []).length} listed`;
   // event
   const rel = leaf.rel || {};

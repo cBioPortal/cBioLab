@@ -32,6 +32,14 @@ Leaf kinds:
   priorGuard:true restricts to treatment-naive patients — REQUIRED for honest "first-line" claims
   (~20% of patients had prior treatment elsewhere, ~20% undetermined).
 - {"kind":"patients","ids":[...]} — explicit list.
+- {"kind":"clinical",...} also supports "values":[...] (OR across values), "range":{"gte":60,"lt":80}
+  (numeric), and "per":"sample" (patient matches if ANY sample matches — say so when used).
+- {"kind":"profiled","type":"MUTATION"|"CNA"|"SV"} — patient was profiled for that data type
+  (use with {"not":...} to distinguish wild-type from not-profiled).
+- {"kind":"caseList","id":"sequenced"|"cna"|full stable id} — portal case lists.
+- {"kind":"genomicData","gene":"CDKN2A","profileType":"cna","range":{"lte":-2}} — continuous
+  per-gene values; profile must exist in the study or it errors listing what does.
+- OQL EXP>z / PROT>z work only if the study has mRNA/protein profiles (msk_chord does not).
 - OQL details for {"kind":"oql"}: per gene MUT,
   MUT=<pchange>, MISSENSE/NONSENSE/TRUNC/INFRAME/SPLICE, AMP, HOMDEL, FUSION, DRIVER and _DRIVER
   modifiers; entries separated by ';' are OR'd (portal "altered in query" semantics).
