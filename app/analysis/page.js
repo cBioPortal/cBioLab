@@ -204,6 +204,22 @@ export default function AnalysisPage() {
     setExplore(null);
   };
 
+  const removeCohort = (name) => {
+    const cs = { ...doc.cohorts }; delete cs[name];
+    // views naming the cohort explicitly drop it; a view with no cohorts left goes too
+    const views = (doc.views || [])
+      .map(v => Array.isArray(v.cohorts) ? { ...v, cohorts: v.cohorts.filter(c => c !== name) } : v)
+      .filter(v => !Array.isArray(v.cohorts) || v.cohorts.length);
+    const d = { ...doc, cohorts: cs, views };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    if (Object.keys(cs).length) run(d); else setResult(null);
+  };
+
+  const clearAnalysis = () => {
+    const d = { ...EMPTY_DOC, study };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setError(null);
+  };
+
   const addDefToAnalysis = (name, def) => {
     const d = { ...doc, study, cohorts: { ...doc.cohorts, [name]: def } };
     if (!d.views || !d.views.length) d.views = DEFAULT_VIEWS; // a cohort with nothing to look at is a blank page
@@ -460,7 +476,8 @@ export default function AnalysisPage() {
                 <div key={n} style={{ marginBottom: "0.65rem" }}>
                   <p className="qdesc" style={{ marginBottom: "0.25rem" }}>
                     <span className="qchip"><span className="qletter" style={{ color: CAT_COLORS[i % CAT_COLORS.length] }}>■</span>{n}</span>{" "}
-                    <strong>{c.count.toLocaleString()}</strong> patients
+                    <strong>{c.count.toLocaleString()}</strong> patients{" "}
+                    <button className="linklike" disabled={busy} title="remove this cohort from the analysis" onClick={() => removeCohort(n)}>remove</button>
                   </p>
                   {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} />}
                 </div>
@@ -469,6 +486,8 @@ export default function AnalysisPage() {
                 style={{ width: "100%", height: "20rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
               <div className="row" style={{ marginTop: "0.6rem" }}>
                 <button className="primary" disabled={busy} onClick={applyText}>{busy && <span className="spinner onprimary" />}{busy ? "Running…" : "Run document"}</button>
+                {doc.cohorts && Object.keys(doc.cohorts).length > 0 &&
+                  <button disabled={busy} title="empty the document — removes all cohorts and views" onClick={clearAnalysis}>Clear analysis</button>}
                 {result && <span className="meta">{result.stats.ms}ms · OncoKB {result.oncokbPin}</span>}
               </div>
               <p className="note">Views: <code>{`{"kind":"compare","genes":[…]}`}</code> · <code>{`{"kind":"survival"}`}</code> · <code>{`{"kind":"oncoprint","genes":[…]}`}</code></p>
