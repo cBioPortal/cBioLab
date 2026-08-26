@@ -10,6 +10,8 @@ const EXAMPLES = [
     def: { all: [IMMUNO_EVENT] } },
   { name: "STK11-driver", desc: "STK11 altered with an OncoKB driver call",
     def: { all: [{ kind: "alteration", gene: "STK11", driver: "driverOnly" }] } },
+  { name: "OQL: KRAS G12C or STK11 driver", desc: "portal OQL syntax as a clause",
+    def: { all: [{ kind: "oql", q: "KRAS: MUT=G12C; STK11: DRIVER" }] } },
   { name: "Never smokers", desc: "clinical attribute predicate",
     def: { all: [{ kind: "clinical", attribute: "SMOKING_PREDICTIONS_3_CLASSES", op: "=", value: "Never" }] } },
   { name: "Progressed ≤180d post-immuno", desc: "temporal relation on the timeline",

@@ -33,6 +33,10 @@ Leaf kinds:
   priorGuard:true restricts to treatment-naive patients — REQUIRED for honest "first-line" claims
   (~20% of patients had prior treatment elsewhere, ~20% undetermined).
 - {"kind":"patients","ids":[...]} — explicit list.
+- {"kind":"oql","q":"KRAS: MUT=G12C; STK11: DRIVER"} — cBioPortal OQL (subset): per gene MUT,
+  MUT=<pchange>, MISSENSE/NONSENSE/TRUNC/INFRAME/SPLICE, AMP, HOMDEL, FUSION, DRIVER and _DRIVER
+  modifiers; entries separated by ';' are OR'd (portal "altered in query" semantics).
+  GAIN/HETLOSS/EXP/PROT/GERMLINE are rejected — do not use them.
 
 Rules: keep cohort names short and meaningful. Preserve parts of the document the user didn't ask to
 change. Surface caveats (panel-aware denominators, VUS vs driver, left truncation in survival,

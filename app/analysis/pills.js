@@ -6,6 +6,7 @@ import { Fragment } from "react";
 
 const KIND_META = {
   alteration: { label: "gene", color: "#CC79A7" },
+  oql: { label: "OQL", color: "#CC79A7" },
   clinical: { label: "clinical", color: "#0072B2" },
   event: { label: "timeline", color: "#009E73" },
   patients: { label: "patients", color: "#999999" }
@@ -30,6 +31,7 @@ function selText(s) {
 
 function leafText(leaf) {
   const k = leafKind(leaf);
+  if (k === "oql") return leaf.q;
   if (k === "alteration") {
     const t = leaf.types && leaf.types.length && leaf.types.length < 3 ? " " + leaf.types.join("/") : "";
     return leaf.gene + (leaf.driver === "driverOnly" ? " · driver" : "") + t;
