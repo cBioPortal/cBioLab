@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import CohortPills, { normalizeDef } from "./pills";
 
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
 const IMMUNO_EVENT = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
@@ -222,6 +223,14 @@ export default function AnalysisPage() {
             <label>Definition</label>
             <textarea value={cDefText} onChange={e => setCDefText(e.target.value)} spellCheck={false}
               style={{ width: "100%", height: "16rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
+            {(() => { let d = null; try { d = JSON.parse(cDefText); } catch {} return d ? (
+              <div style={{ margin: "0.55rem 0" }}>
+                <CohortPills def={d} onRemoveClause={(i) => {
+                  const nd = normalizeDef(JSON.parse(cDefText));
+                  nd.all = nd.all.filter((_, j) => j !== i);
+                  setCDefText(JSON.stringify(nd, null, 2)); setCPreview(null);
+                }} />
+              </div>) : <p className="note">⚠ definition JSON doesn’t parse yet</p>; })()}
             <div className="row" style={{ marginTop: "0.5rem" }}>
               <button className="primary" disabled={cBusy} onClick={previewCohort}>{cBusy && <span className="spinner onprimary" />}Preview</button>
               <button className="primary" disabled={cBusy} onClick={saveCohort}>Save</button>
@@ -265,7 +274,7 @@ export default function AnalysisPage() {
                   <button className="linklike" onClick={() => { setCName(n); setCDefText(JSON.stringify(s2.def, null, 2)); setCPreview(s2.lastEval || null); }}>edit</button>
                   <button className="linklike" onClick={() => { const nx = { ...saved }; delete nx[n]; persist(nx); }}>delete</button>
                 </div>
-                {s2.lastEval && <div className="meta" style={{ marginTop: "0.15rem" }}>{s2.lastEval.text}</div>}
+                <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} /></div>
               </div>
             ))}
           </div>
@@ -277,10 +286,13 @@ export default function AnalysisPage() {
             <div className="card">
               <h2>The document <span className="plain">— cohorts &amp; views</span></h2>
               {result && Object.entries(result.cohorts).map(([n, c], i) => (
-                <p key={n} className="qdesc" style={{ marginBottom: "0.5rem" }}>
-                  <span className="qchip"><span className="qletter" style={{ color: CAT_COLORS[i % CAT_COLORS.length] }}>■</span>{n}</span>{" "}
-                  <strong>{c.count.toLocaleString()}</strong> — {c.text}
-                </p>
+                <div key={n} style={{ marginBottom: "0.65rem" }}>
+                  <p className="qdesc" style={{ marginBottom: "0.25rem" }}>
+                    <span className="qchip"><span className="qletter" style={{ color: CAT_COLORS[i % CAT_COLORS.length] }}>■</span>{n}</span>{" "}
+                    <strong>{c.count.toLocaleString()}</strong> patients
+                  </p>
+                  {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} />}
+                </div>
               ))}
               <textarea value={docText} onChange={e => setDocText(e.target.value)} spellCheck={false}
                 style={{ width: "100%", height: "20rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
