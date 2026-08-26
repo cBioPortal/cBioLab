@@ -526,6 +526,7 @@ export default function AnalysisPage() {
                 </>}
                 {v.kind === "oncoprint" && v.svg && <>
                   <h2>Oncoprint <span className="plain">— {v.nColumns.toLocaleString()} patients · {v.annotation}</span></h2>
+                  {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto", background: "#fff", borderRadius: 8, border: "1px solid var(--line)" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
                 {v.error && <div className="error">{v.kind}: {v.error}</div>}

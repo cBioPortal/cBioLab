@@ -21,7 +21,7 @@ Document shape:
 
 cohortDef: { "all": [clause, ...], "study"?: "<id>", "studies"?: ["<id>", ...] } — clauses ANDed;
 a cohort may target another study or union across several (members are study-qualified; overlap
-across studies is NOT deduplicated — say so when comparing). Oncoprint views are single-study.
+across studies is NOT deduplicated — say so when comparing). Oncoprint views federate too: cross-study columns are qualified per study (duplicates appear twice) and a Study track shows each column's origin.
 clause = leaf | {"any":[leaf,...]} | {"not":leaf}.
 Leaf kinds:
 - {"kind":"oql","q":"STK11: DRIVER"} — genomic status in cBioPortal OQL (preferred; full notes below).
