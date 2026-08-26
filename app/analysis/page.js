@@ -76,6 +76,8 @@ export default function AnalysisPage() {
   const [cPreview, setCPreview] = useState(null);
   const [cBusy, setCBusy] = useState(false);
   const [exEvals, setExEvals] = useState({});
+  const [studies, setStudies] = useState([]);
+  const [study, setStudy] = useState("msk_chord_2024");
 
   const LS_KEY = "cohortlab.savedCohorts";
   const persist = (next) => { setSaved(next); try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {} };
@@ -84,7 +86,8 @@ export default function AnalysisPage() {
     if (!Object.keys(d.cohorts || {}).length) { setResult(null); return; }
     setBusy(true); setError(null);
     try {
-      const res = await fetch("/api/analysis", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(d) });
+      const payload = { study: d.study || study, ...d };
+      const res = await fetch("/api/analysis", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
       setResult(j);
@@ -96,10 +99,12 @@ export default function AnalysisPage() {
   useEffect(() => {
     try { setSaved(JSON.parse(localStorage.getItem(LS_KEY) || "{}")); } catch {}
     fetch("/api/chat").then(r => setChatReady(r.status !== 501)).catch(() => setChatReady(false));
+    fetch("/api/studies").then(r => r.json()).then(j => setStudies(j.studies || [])).catch(() => {});
     try {
       const b64 = new URLSearchParams(window.location.search).get("doc");
       if (b64) {
         const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0))));
+        if (d.study) setStudy(d.study);
         setDoc(d); setDocText(JSON.stringify(d, null, 2)); setTab("analysis"); run(d);
       }
     } catch (e) { setError("bad ?doc= link: " + String(e.message || e)); }
@@ -113,7 +118,7 @@ export default function AnalysisPage() {
   // ---- cohort creator / library -----------------------------------------
   const evalDef = async (name, def) => {
     const res = await fetch("/api/analysis", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cohorts: { [name || "preview"]: def }, views: [] }) });
+      body: JSON.stringify({ study, cohorts: { [name || "preview"]: def }, views: [] }) });
     const j = await res.json();
     if (j.error) throw new Error(j.error);
     const c = Object.values(j.cohorts)[0];
@@ -139,8 +144,14 @@ export default function AnalysisPage() {
     persist({ ...saved, [name]: { def: r.def, savedAt: new Date().toISOString().slice(0, 16).replace("T", " "), lastEval: r.ev } });
   };
 
+  const switchStudy = (id) => {
+    setStudy(id);
+    const d = { study: id, cohorts: {}, views: [] };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setCPreview(null); setExEvals({});
+  };
+
   const addDefToAnalysis = (name, def) => {
-    const d = { ...doc, cohorts: { ...doc.cohorts, [name]: def } };
+    const d = { ...doc, study, cohorts: { ...doc.cohorts, [name]: def } };
     if (!d.views || !d.views.length) d.views = DEFAULT_VIEWS; // a cohort with nothing to look at is a blank page
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); setTab("analysis"); run(d);
   };
@@ -175,7 +186,7 @@ export default function AnalysisPage() {
     setChat(msgs);
     try {
       const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: msgs.map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.text })), doc, resultSummary: summarize(result) }) });
+        body: JSON.stringify({ messages: msgs.map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.text })), doc: { study, ...doc }, resultSummary: summarize(result) }) });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
       setChat([...msgs, { role: "assistant", text: j.reply }]);
@@ -196,6 +207,18 @@ export default function AnalysisPage() {
         <a href="/" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>builder</a>
       </header>
       <main style={{ maxWidth: "96rem" }}>
+        <div className="row" style={{ marginBottom: "0.8rem", alignItems: "center" }}>
+          <label style={{ margin: 0 }}>Study</label>
+          <select value={study} onChange={e => switchStudy(e.target.value)} style={{ maxWidth: "34rem" }}>
+            {!studies.length && <option value={study}>{study}</option>}
+            {studies.map(s => (
+              <option key={s.id} value={s.id}>
+                {s.name} — {s.patients.toLocaleString()} pts{s.timelinePatients ? " · timeline" : ""}
+              </option>
+            ))}
+          </select>
+          <span className="meta">switching studies starts a fresh document (vocabularies differ)</span>
+        </div>
 
         {/* ---- Chat: always at the top ---- */}
         <div className="card">

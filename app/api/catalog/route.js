@@ -1,22 +1,28 @@
 import { chQuery, DB, STUDY, PORTAL } from "../../../lib/ch";
 import { catalogSqls, lineCatalogSqls, LINE_TYPE } from "../../../lib/compiler";
 
-let cache = null; // module-level, per server process
+const cache = new Map(); // per-study, per server process
 
-export async function GET() {
+export async function GET(req) {
   try {
-    if (!cache) {
-      const sqls = catalogSqls(DB, STUDY);
+    const url = new URL(req.url);
+    const study = (url.searchParams.get("study") || STUDY).replace(/[^A-Za-z0-9._-]/g, "");
+    if (!cache.has(study)) {
+      const sqls = catalogSqls(DB, study);
       const chk = await chQuery(sqls.studyCheck);
-      if (Number(chk.data[0].n) !== 1) throw new Error("Study '" + STUDY + "' not found");
+      if (Number(chk.data[0].n) !== 1) throw new Error("Study '" + study + "' not found");
       const [tRes, vRes, kRes] = [await chQuery(sqls.types), await chQuery(sqls.values), await chQuery(sqls.keys)];
       const values = {}, keys = {};
       vRes.data.forEach(r => { (values[r.t] = values[r.t] || {}); (values[r.t][r.k] = values[r.t][r.k] || []).push(r.v); });
       kRes.data.forEach(r => { (keys[r.t] = keys[r.t] || []).push(r.k); });
-      const totalPatients = tRes.data.reduce((m, t) => Math.max(m, Number(t.n_pat)), 0);
+      let totalPatients = tRes.data.reduce((m, t) => Math.max(m, Number(t.n_pat)), 0);
+      if (!totalPatients) {
+        const pc = await chQuery("SELECT uniqExact(patient_unique_id) AS n FROM " + DB + ".sample_derived WHERE cancer_study_identifier = " + "'" + study.replace(/'/g, "") + "'");
+        totalPatients = Number(pc.data[0].n);
+      }
       const hasPriorMedFlag = Object.keys(values["Treatment"] || {}).includes("PRIOR_MED_TO_MSK");
       // synthetic event type: derived treatment lines (default gap 90d), queryable like any other event
-      const lSqls = lineCatalogSqls(DB, STUDY);
+      const lSqls = lineCatalogSqls(DB, study);
       const [lStats, lCombos] = [await chQuery(lSqls.stats), await chQuery(lSqls.combos)];
       const types = [...tRes.data, { t: LINE_TYPE, n_pat: lStats.data[0].n_pat, n_ev: lStats.data[0].n_ev }];
       values[LINE_TYPE] = {
@@ -24,9 +30,9 @@ export async function GET() {
         COMPOSITION: lCombos.data.map(r => r.combo)
       };
       keys[LINE_TYPE] = ["LINE_NO", "COMPOSITION"];
-      cache = { study: STUDY, portal: PORTAL, totalPatients, hasPriorMedFlag, types, values, keys };
+      cache.set(study, { study, portal: PORTAL, totalPatients, hasPriorMedFlag, types, values, keys });
     }
-    return Response.json(cache);
+    return Response.json(cache.get(study));
   } catch (e) {
     return Response.json({ error: String(e.message || e) }, { status: 500 });
   }

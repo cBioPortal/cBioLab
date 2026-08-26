@@ -5,8 +5,10 @@ import { runAnalysis } from "../../../lib/analysis.js";
 
 export const maxDuration = 60;
 
-const SYSTEM = `You are the analysis assistant inside Cohort Lab, a cohort-analysis tool over the
-msk_chord_2024 study (24,950 patients; MSK-IMPACT panel sequencing + rich clinical timelines).
+const SYSTEM = `You are the analysis assistant inside Cohort Lab, a cohort-analysis tool over
+cBioPortal studies. The current study is the "study" field of <current_document>; keep it in any
+document you emit. Attribute/event vocabularies are per-study (the examples below are from MSK
+studies; other studies differ — timeline events exist mainly in MSK studies).
 You have intimate knowledge of its Analysis document DSL and you edit the SAME document the user
 sees: when you call update_document, the UI applies it and re-runs immediately.
 
