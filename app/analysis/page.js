@@ -53,6 +53,11 @@ function KMChart({ curves }) {
 }
 
 const EMPTY_DOC = { cohorts: {}, views: [] };
+const DEFAULT_VIEWS = [
+  { kind: "compare", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR", "ARID1A", "MSH3"] },
+  { kind: "survival" },
+  { kind: "oncoprint", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR"] }
+];
 
 export default function AnalysisPage() {
   const [tab, setTab] = useState("cohorts");
@@ -136,6 +141,7 @@ export default function AnalysisPage() {
 
   const addDefToAnalysis = (name, def) => {
     const d = { ...doc, cohorts: { ...doc.cohorts, [name]: def } };
+    if (!d.views || !d.views.length) d.views = DEFAULT_VIEWS; // a cohort with nothing to look at is a blank page
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); setTab("analysis"); run(d);
   };
 
@@ -316,6 +322,15 @@ export default function AnalysisPage() {
               </div>
             )}
             {busy && !result && <div className="card"><div className="loading-block"><span className="spinner" /> Evaluating analysis document…</div></div>}
+            {result && !result.views.length && (
+              <div className="card">
+                <h2>Cohorts evaluated — no views defined</h2>
+                <p className="note" style={{ fontSize: "0.85rem" }}>
+                  Add a views array to the document (e.g. <code>{`{"kind":"survival"}`}</code>),{" "}
+                  <button className="linklike" onClick={() => { const d = { ...doc, views: DEFAULT_VIEWS }; setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d); }}>add the default views</button>, or ask chat.
+                </p>
+              </div>
+            )}
             {result && result.views.map((v, vi) => (
               <div className="card" key={vi}>
                 {v.kind === "compare" && v.rows && <>
