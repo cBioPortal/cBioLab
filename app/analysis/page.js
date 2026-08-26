@@ -358,6 +358,7 @@ export default function AnalysisPage() {
               <div className="card" key={vi}>
                 {v.kind === "compare" && v.rows && <>
                   <h2>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2>
+                  {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
                       <thead><tr>
