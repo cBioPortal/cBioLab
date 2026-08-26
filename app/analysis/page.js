@@ -19,7 +19,15 @@ const EXAMPLES = [
   { name: "True 1L immuno (naïve)", desc: "first immuno, prior-treatment guard on",
     def: { all: [{ kind: "event", a: { ...IMMUNO_EVENT.a, occurrence: "FIRST" }, rel: { type: "NONE" }, priorGuard: true }] } },
   { name: "Reached 2nd line", desc: "derived treatment-line event",
-    def: { all: [{ kind: "event", a: { eventType: "Treatment line (derived)", attrs: [{ key: "LINE_NO", value: "2" }] }, rel: { type: "NONE" } }] } }
+    def: { all: [{ kind: "event", a: { eventType: "Treatment line (derived)", attrs: [{ key: "LINE_NO", value: "2" }] }, rel: { type: "NONE" } }] } },
+  { name: "STK11-driver in IMPACT-50k", desc: "cross-study: same definition, another study",
+    def: { study: "msk_impact_50k_2026", all: [{ kind: "oql", q: "STK11: DRIVER" }] } },
+  { name: "TP53-mut across CHORD + MET", desc: "cross-study union (overlap not deduplicated)",
+    def: { studies: ["msk_chord_2024", "msk_met_2021"], all: [{ kind: "oql", q: "TP53: MUT" }] } },
+  { name: "EGFR-driver pan-MSK", desc: "union across three MSK studies",
+    def: { studies: ["msk_chord_2024", "msk_met_2021", "msk_impact_50k_2026"], all: [{ kind: "oql", q: "EGFR: DRIVER" }] } },
+  { name: "ERBB2 over-expressed (TCGA BRCA)", desc: "cross-study: OQL EXP>2 where mRNA exists",
+    def: { study: "brca_tcga_pan_can_atlas_2018", all: [{ kind: "oql", q: "ERBB2: EXP>2" }] } }
 ];
 
 function KMChart({ curves }) {
