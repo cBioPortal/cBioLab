@@ -18,8 +18,7 @@ Document shape:
 
 cohortDef: { "all": [clause, ...] } — clauses ANDed. clause = leaf | {"any":[leaf,...]} | {"not":leaf}.
 Leaf kinds:
-- {"kind":"alteration","gene":"STK11","driver":"driverOnly"|"any","types":["MUT","CNA","SV"]?}
-  driver calls come from a version-pinned OncoKB store; "driverOnly" excludes VUS.
+- {"kind":"oql","q":"STK11: DRIVER"} — genomic status in cBioPortal OQL (preferred; full notes below).
 - {"kind":"clinical","attribute":"GENDER","op":"=","value":"Male"} (ops = != > >= < <=; numeric values compare numerically).
   Useful attributes: OS_STATUS (0:LIVING/1:DECEASED), OS_MONTHS, GENDER, RACE, CURRENT_AGE_DEID,
   SMOKING_PREDICTIONS_3_CLASSES (Former/Current Smoker, Never, Unknown), CANCER_TYPE-site flags (LUNG, LIVER, BONE... values Yes/No).
@@ -33,7 +32,7 @@ Leaf kinds:
   priorGuard:true restricts to treatment-naive patients — REQUIRED for honest "first-line" claims
   (~20% of patients had prior treatment elsewhere, ~20% undetermined).
 - {"kind":"patients","ids":[...]} — explicit list.
-- {"kind":"oql","q":"KRAS: MUT=G12C; STK11: DRIVER"} — cBioPortal OQL (subset): per gene MUT,
+- OQL details for {"kind":"oql"}: per gene MUT,
   MUT=<pchange>, MISSENSE/NONSENSE/TRUNC/INFRAME/SPLICE, AMP, HOMDEL, FUSION, DRIVER and _DRIVER
   modifiers; entries separated by ';' are OR'd (portal "altered in query" semantics).
   GAIN/HETLOSS/EXP/PROT/GERMLINE are rejected — do not use them.

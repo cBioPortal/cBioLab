@@ -8,8 +8,8 @@ const IMMUNO_EVENT = { kind: "event", a: { eventType: "Treatment", attrs: [{ key
 const EXAMPLES = [
   { name: "Immuno-treated", desc: "any immunotherapy on the timeline",
     def: { all: [IMMUNO_EVENT] } },
-  { name: "STK11-driver", desc: "STK11 altered with an OncoKB driver call",
-    def: { all: [{ kind: "alteration", gene: "STK11", driver: "driverOnly" }] } },
+  { name: "STK11-driver", desc: "OQL: STK11 with an OncoKB driver call",
+    def: { all: [{ kind: "oql", q: "STK11: DRIVER" }] } },
   { name: "OQL: KRAS G12C or STK11 driver", desc: "portal OQL syntax as a clause",
     def: { all: [{ kind: "oql", q: "KRAS: MUT=G12C; STK11: DRIVER" }] } },
   { name: "Never smokers", desc: "clinical attribute predicate",
@@ -240,7 +240,7 @@ export default function AnalysisPage() {
             {cPreview && (cPreview.error
               ? <div className="error">{cPreview.error}</div>
               : <p className="qdesc" style={{ marginTop: "0.6rem" }}><strong>{cPreview.count.toLocaleString()}</strong> patients — {cPreview.text}</p>)}
-            <p className="note">Clause kinds: <code>alteration</code> (gene, driver), <code>clinical</code> (attribute/op/value), <code>event</code> (timeline), <code>patients</code>; composed with <code>all</code> / <code>any</code> / <code>not</code>. Start from an example on the right, or ask chat above.</p>
+            <p className="note">Clause kinds: <code>oql</code> (genomic status, portal OQL syntax), <code>clinical</code> (attribute/op/value), <code>event</code> (timeline), <code>patients</code>; composed with <code>all</code> / <code>any</code> / <code>not</code>. Start from an example on the right, or ask chat above.</p>
           </div>
           <div className="card">
             <h2>Examples</h2>
