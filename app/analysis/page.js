@@ -88,6 +88,7 @@ export default function AnalysisPage() {
   const [study, setStudy] = useState("msk_chord_2024");
   const [explore, setExplore] = useState(null);
   const [exploreBusy, setExploreBusy] = useState(false);
+  const [trackAttrs, setTrackAttrs] = useState({ key: "", attrs: [] }); // clinical-track picker options
 
   const LS_KEY = "cohortlab.savedCohorts";
   const persist = (next) => { setSaved(next); try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {} };
@@ -202,6 +203,29 @@ export default function AnalysisPage() {
     const d = { study: id, cohorts: {}, views: [] };
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setCPreview(null); setExEvals({});
     setExplore(null);
+  };
+
+  // clinical-track options for oncoprint views: union of attribute names across the
+  // result's involved studies (an attribute absent in one study just renders gaps there)
+  useEffect(() => {
+    if (!result || !result.views.some(v => v.kind === "oncoprint" && v.svg)) return;
+    const studies = result.involvedStudies && result.involvedStudies.length ? result.involvedStudies : [result.study];
+    const key = studies.join(",");
+    if (trackAttrs.key === key) return;
+    Promise.all(studies.map(s =>
+      fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ study: s }) })
+        .then(r => r.json()).catch(() => null)))
+      .then(js => {
+        const seen = new Map(); // attribute -> kind
+        for (const j of js) if (j && j.clinical) for (const a of j.clinical) if (!seen.has(a.attribute)) seen.set(a.attribute, a.kind);
+        setTrackAttrs({ key, attrs: [...seen.entries()].map(([attribute, kind]) => ({ attribute, kind })).sort((x, y) => x.attribute < y.attribute ? -1 : 1) });
+      });
+  }, [result]); // eslint-disable-line
+
+  const setViewClinical = (vi, attrs) => {
+    const views = (doc.views || []).map((v, i) => i === vi ? { ...v, clinical: attrs } : v);
+    const d = { ...doc, views };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
   };
 
   const removeCohort = (name) => {
@@ -546,6 +570,22 @@ export default function AnalysisPage() {
                 {v.kind === "oncoprint" && v.svg && <>
                   <h2>Oncoprint <span className="plain">— {v.nColumns.toLocaleString()} patients · {v.annotation}</span></h2>
                   {v.note && <p className="note">{v.note}</p>}
+                  <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", margin: "0.35rem 0 0.5rem" }}>
+                    <span className="meta">clinical tracks:</span>
+                    {((doc.views && doc.views[vi] && doc.views[vi].clinical) || []).map(a => (
+                      <button key={a} className="linklike" disabled={busy} title="remove this track"
+                        onClick={() => setViewClinical(vi, (doc.views[vi].clinical || []).filter(x => x !== a))}>{a} ✕</button>
+                    ))}
+                    <select value="" disabled={busy || !trackAttrs.attrs.length}
+                      onChange={e => { const a = e.target.value; if (!a) return;
+                        const cur = (doc.views && doc.views[vi] && doc.views[vi].clinical) || [];
+                        if (!cur.includes(a) && cur.length < 8) setViewClinical(vi, [...cur, a]); }}
+                      style={{ fontSize: "0.78rem" }}>
+                      <option value="">{trackAttrs.attrs.length ? "add clinical track…" : "loading attributes…"}</option>
+                      {trackAttrs.attrs.filter(a => !((doc.views && doc.views[vi] && doc.views[vi].clinical) || []).includes(a.attribute))
+                        .map(a => <option key={a.attribute} value={a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric)" : ""}</option>)}
+                    </select>
+                  </div>
                   <div style={{ overflowX: "auto", background: "#fff", borderRadius: 8, border: "1px solid var(--line)" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
                 {v.error && <div className="error">{v.kind}: {v.error}</div>}
