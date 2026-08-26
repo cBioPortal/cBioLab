@@ -170,6 +170,7 @@ export default function OncoprintPage() {
   const [custom, setCustom] = useState(null); // spec loaded from ?spec= (shared link)
   const [genes, setGenes] = useState("TP53 KRAS STK11 KEAP1 EGFR ARID1A MSH3");
   const [clinAttrs, setClinAttrs] = useState("OS_STATUS SMOKING_PREDICTIONS_3_CLASSES");
+  const [sortKey, setSortKey] = useState("genomic");
   const [withDerived, setWithDerived] = useState(true);
   const [busy, setBusy] = useState(false);
   const [contract, setContract] = useState(null);
@@ -198,13 +199,16 @@ export default function OncoprintPage() {
         s = { ...custom,
           genes: genes.split(/[\s,]+/).filter(Boolean),
           clinical: clinAttrs.split(/[\s,]+/).filter(Boolean),
+          ...(sortKey !== "genomic" ? { sort: [sortKey] } : {}),
           derivedEvents: withDerived ? (custom.derivedEvents && custom.derivedEvents.length ? custom.derivedEvents : [{ label: "Reached 2L", expression: LINE2 }]) : []
         };
+        if (sortKey === "genomic") delete s.sort;
       } else {
         const p = PRESETS[preset];
         s = {
           genes: genes.split(/[\s,]+/).filter(Boolean),
           clinical: clinAttrs.split(/[\s,]+/).filter(Boolean),
+          ...(sortKey !== "genomic" ? { sort: [sortKey] } : {}),
           derivedEvents: withDerived ? [{ label: "Reached 2L", expression: LINE2 }] : [],
           cohort: p.cohort !== undefined ? p.cohort : null,
           layout: p.layout || null,
@@ -229,6 +233,7 @@ export default function OncoprintPage() {
         setCustom(sp);
         setGenes((sp.genes || []).join(" "));
         if (sp.clinical && sp.clinical.length) setClinAttrs(sp.clinical.join(" "));
+        if (Array.isArray(sp.sort) && typeof sp.sort[0] === "string") setSortKey(sp.sort[0]);
         setWithDerived(!!(sp.derivedEvents || []).length);
         setPreset(-1);
         run(sp);
@@ -314,6 +319,16 @@ export default function OncoprintPage() {
             <div style={{ flex: 1, minWidth: "16rem" }}>
               <label>Clinical tracks <span style={{ fontWeight: 400, color: "var(--muted)" }}>(attribute names, max 8; numeric render as heat)</span></label>
               <input style={{ width: "100%" }} value={clinAttrs} onChange={e => setClinAttrs(e.target.value)} />
+            </div>
+            <div>
+              <label>Sort columns by</label>
+              <select value={sortKey} onChange={e => setSortKey(e.target.value)}>
+                <option value="genomic">genomic (staircase)</option>
+                {clinAttrs.split(/[\s,]+/).filter(Boolean).flatMap(a => [
+                  <option key={a} value={a}>{a} ↑</option>,
+                  <option key={"-" + a} value={"-" + a}>{a} ↓</option>
+                ])}
+              </select>
             </div>
             <label className="chk" style={{ marginBottom: "0.4rem" }}>
               <input type="checkbox" checked={withDerived} onChange={e => setWithDerived(e.target.checked)} />

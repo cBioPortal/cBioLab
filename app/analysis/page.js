@@ -222,11 +222,25 @@ export default function AnalysisPage() {
       });
   }, [result]); // eslint-disable-line
 
-  const setViewClinical = (vi, attrs) => {
-    const views = (doc.views || []).map((v, i) => i === vi ? { ...v, clinical: attrs } : v);
+  const updateView = (vi, patch) => {
+    const views = (doc.views || []).map((v, i) => i === vi ? patch(v) : v);
     const d = { ...doc, views };
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
   };
+
+  const setViewClinical = (vi, attrs) => updateView(vi, v => {
+    // drop sort keys whose track was just removed
+    const keep = new Set(["genomic", "Study", ...attrs]);
+    const sort = (v.sort || []).filter(s => keep.has(String(s).replace(/^-/, "")));
+    const next = { ...v, clinical: attrs };
+    if (sort.length) next.sort = sort; else delete next.sort;
+    return next;
+  });
+
+  const setViewSort = (vi, key) => updateView(vi, v => {
+    if (key === "genomic") { const { sort, ...rest } = v; return rest; }
+    return { ...v, sort: [key] };
+  });
 
   const removeCohort = (name) => {
     const cs = { ...doc.cohorts }; delete cs[name];
@@ -584,6 +598,16 @@ export default function AnalysisPage() {
                       <option value="">{trackAttrs.attrs.length ? "add clinical track…" : "loading attributes…"}</option>
                       {trackAttrs.attrs.filter(a => !((doc.views && doc.views[vi] && doc.views[vi].clinical) || []).includes(a.attribute))
                         .map(a => <option key={a.attribute} value={a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric)" : ""}</option>)}
+                    </select>
+                    <span className="meta">sort:</span>
+                    <select value={(doc.views && doc.views[vi] && doc.views[vi].sort && doc.views[vi].sort[0]) || "genomic"}
+                      disabled={busy} onChange={e => setViewSort(vi, e.target.value)} style={{ fontSize: "0.78rem" }}>
+                      <option value="genomic">genomic (staircase)</option>
+                      {(result.involvedStudies || []).length > 1 && <option value="Study">Study</option>}
+                      {((doc.views && doc.views[vi] && doc.views[vi].clinical) || []).flatMap(a => [
+                        <option key={a} value={a}>{a} ↑</option>,
+                        <option key={"-" + a} value={"-" + a}>{a} ↓</option>
+                      ])}
                     </select>
                   </div>
                   <div style={{ overflowX: "auto", background: "#fff", borderRadius: 8, border: "1px solid var(--line)" }} dangerouslySetInnerHTML={{ __html: v.svg }} />

@@ -146,12 +146,15 @@ export function registerTools(server) {
         .describe("Explicit patient IDs (e.g. imported from a portal custom case list) to use as the cohort — overrides `cohort`; ids not in the study are dropped"),
       derivedEventTracks: z.array(z.object({ label: z.string().max(60), expression: z.object(zCohortDsl) })).max(3).nullish()
         .describe("Optional phenotype tracks from cohort-DSL expressions, e.g. 'Reached 2L'"),
+      sort: z.array(z.string()).max(4).nullish()
+        .describe("Column sort: ordered track keys — 'genomic' (default staircase), a clinical track label (must also be in clinical), or '-label' for descending; missing values sort last"),
       clinical: z.array(z.string()).max(8).nullish().describe("Clinical attribute tracks, e.g. ['OS_STATUS','CURRENT_AGE_DEID']; sample-level attributes fall back to a sample value per patient; numeric attributes render as continuous heat tracks; unknown names render a labeled '(no data)' track")
     },
-    async ({ genes, cohort, groups, derivedEventTracks, clinical, patientList }) => {
+    async ({ genes, cohort, groups, derivedEventTracks, clinical, sort, patientList }) => {
       const spec = {
         genes,
         clinical: clinical || [],
+        ...(sort && sort.length ? { sort } : {}),
         derivedEvents: derivedEventTracks || [],
         cohort: patientList && patientList.length ? { dsl: { patients: patientList } } : (cohort ? { dsl: cohort } : null),
         layout: groups && groups.length ? { groupBy: { kind: "cohorts", groups } } : null,
@@ -181,7 +184,7 @@ export function registerTools(server) {
         `add clinical attribute tracks, up to 8 (e.g. OS_STATUS, GENDER, SMOKING_PREDICTIONS_3_CLASSES; numeric ones like CURRENT_AGE_DEID render as heat); ` +
         `add derived-event phenotype tracks from any cohort expression (e.g. "reached 3rd line", "had surgery"); ` +
         `regroup columns by different cohorts (up to 4 side-by-side); change the treatment-line gap rule (lineGap); ` +
-        `restrict any group to treatment-naive patients (priorGuard). Offer 1-2 of these as next steps when relevant.`;
+        `restrict any group to treatment-naive patients (priorGuard); sort columns by a clinical track ('sort':['CANCER_TYPE'] or '-CURRENT_AGE_DEID' for descending). Offer 1-2 of these as next steps when relevant.`;
       return {
         content: [
           { type: "image", data: png.toString("base64"), mimeType: "image/png" },

@@ -94,7 +94,7 @@ rel      := { "type": "NONE" }                                                 /
 |---|---|---|
 | `compare` | `genes:[≤20], cohorts?:[names]` | per-gene driver% / altered% per cohort with **panel-aware denominators** (profiled patients only); two-sided Fisher p when exactly 2 cohorts |
 | `survival` | `cohorts?:[names]` | Kaplan–Meier on OS_MONTHS/OS_STATUS; left truncation caveat applies; cross-study baselines are not harmonized |
-| `oncoprint` | `genes:[≤12], clinical?:[≤8], cohorts?:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins), staircase-sorted by alteration type + driver; NOT_PROFILED is a first-class cell state |
+| `oncoprint` | `genes:[≤12], clinical?:[≤8], sort?:[≤4], cohorts?:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 `views[].cohorts` defaults to all cohorts. Oncoprints federate across studies: columns are
 study-qualified, a synthetic **Study** track shows each column's origin, and duplicates appear twice.
@@ -103,6 +103,13 @@ study-qualified, a synthetic **Study** track shows each column's origin, and dup
 fall back to one sample value per patient. Numeric attributes (≥90% parseable, >10 distinct) render
 as a continuous heat track scaled to the cohort's min→max with a gradient key; unknown attributes
 render a labeled "(no data)" track.
+
+**Oncoprint sorting**: `sort` is an ordered list of track keys — `"genomic"` (the default
+staircase: alteration type + driver rank across the gene tracks), a clinical or derived-event track
+label, or `"-label"` for descending (e.g. `["CANCER_TYPE", "-CURRENT_AGE_DEID"]`). Applied
+within each cohort group; missing values always sort last; the genomic staircase and patient id are
+always the final tiebreakers. A sort key that names a track not in the oncoprint errors loudly,
+listing the sortable tracks. The effective sort is echoed in `conventions.sort`.
 
 ## OncoprintSpec (standalone)
 
@@ -113,6 +120,7 @@ take a standalone spec (the analysis oncoprint view compiles to the same engine)
 { "study"?: "<id>",
   "genes": [≤12],
   "clinical": [≤8],
+  "sort"?: ["CANCER_TYPE", "-CURRENT_AGE_DEID", "genomic"],                   // column sort (≤4 keys)
   "derivedEvents": [{ "label": L, "expression": <event cohortDef> } × ≤3],   // phenotype tracks
   "cohort"?: { "dsl": <cohortDef> },                                          // single column group
   "layout"?: { "groupBy": { "kind": "cohorts", "groups": [{name,dsl} × ≤4] } },
@@ -304,7 +312,7 @@ Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep 
 
 ### Example 4: Cross-study federation with an oncoprint
 
-One cohort unioned across two studies (members are study-qualified; overlap is NOT deduplicated), rendered as a federated oncoprint with a categorical and a numeric clinical track. The Study track is added automatically.
+One cohort unioned across two studies (members are study-qualified; overlap is NOT deduplicated), rendered as a federated oncoprint with a categorical and a numeric clinical track, columns sorted by cancer type then descending age. The Study track is added automatically.
 
 ```json
 {
@@ -334,6 +342,10 @@ One cohort unioned across two studies (members are study-qualified; overlap is N
       "clinical": [
         "CANCER_TYPE",
         "CURRENT_AGE_DEID"
+      ],
+      "sort": [
+        "CANCER_TYPE",
+        "-CURRENT_AGE_DEID"
       ]
     }
   ]
