@@ -514,7 +514,7 @@ export default function AnalysisPage() {
                   <button disabled={busy} title="empty the document — removes all cohorts and views" onClick={clearAnalysis}>Clear analysis</button>}
                 {result && <span className="meta">{result.stats.ms}ms · OncoKB {result.oncokbPin}</span>}
               </div>
-              <p className="note">Views: <code>{`{"kind":"compare","genes":[…]}`}</code> · <code>{`{"kind":"survival"}`}</code> · <code>{`{"kind":"oncoprint","genes":[…]}`}</code></p>
+              <p className="note">Views: <code>{`{"kind":"compare","genes":[…]}`}</code> · <code>{`{"kind":"survival"}`}</code> · <code>{`{"kind":"oncoprint","genes":[…],"clinical":[attrs…]}`}</code></p>
             </div>
           </div>
           <div>

@@ -22,6 +22,13 @@ const PRESETS = [
 
 // Okabe–Ito, CVD-safe
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#999999"];
+// numeric clinical heat: scaled 0..255 -> light..dark sequential blue (#deebf7 -> #084887)
+function heatColor(v) {
+  const t = Math.max(0, Math.min(1, v / 255));
+  const mix = (a, b) => Math.round(a + (b - a) * t);
+  return `rgb(${mix(222, 8)},${mix(235, 72)},${mix(247, 135)})`;
+}
+const fmtNum = (x) => Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : Math.round(x * 10) / 10;
 const BITS = { MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16, SV: 32, AMP: 64, HOMDEL: 128, DRIVER: 256 };
 const BIT_LABELS = [
   [BITS.AMP, "Amplification"], [BITS.HOMDEL, "Deep deletion"], [BITS.SV, "Structural variant"],
@@ -73,7 +80,7 @@ function drawContract(canvas, contract, dark, hover) {
     ctx.fillText(label, groupX[gi], 12, Math.max(60, w));
   });
 
-  const bucketOf = (cells, from, count, pxW) => {
+  const bucketOf = (cells, from, count, pxW, numeric) => {
     // returns array of {x0,w,code} merged per device pixel when colW < 1
     const out = [];
     if (colW >= 1) {
@@ -83,13 +90,15 @@ function drawContract(canvas, contract, dark, hover) {
     const buckets = Math.max(1, Math.floor(pxW));
     for (let b = 0; b < buckets; b++) {
       const i0 = Math.floor(b * count / buckets), i1 = Math.max(i0 + 1, Math.floor((b + 1) * count / buckets));
-      let code = -1, sawAny = false;
+      let code = -1, sawAny = false, sum = 0, nNum = 0;
       for (let i = i0; i < i1; i++) {
         const c = cells[from + i];
         if (c === -1) continue;
         sawAny = true;
-        code = (code === -1 ? 0 : code) | (c > 0 ? c : 0);
+        if (numeric) { sum += c; nNum++; }
+        else code = (code === -1 ? 0 : code) | (c > 0 ? c : 0);
       }
+      if (numeric && nNum) code = Math.round(sum / nNum);
       out.push({ x0: b * pxW / buckets, w: pxW / buckets, code: sawAny ? code : -1, first: from + i0 });
     }
     return out;
@@ -108,7 +117,7 @@ function drawContract(canvas, contract, dark, hover) {
     }
     contract.groups.forEach((g, gi) => {
       const x0 = groupX[gi], pxW = g.count * colW;
-      for (const b of bucketOf(t.cells, g.start, g.count, pxW)) {
+      for (const b of bucketOf(t.cells, g.start, g.count, pxW, !!t.numeric)) {
         const x = x0 + b.x0, w = Math.max(b.w, 0.5);
         if (t.kind === "gene") {
           if (b.code === -1) { // not profiled: striped
@@ -131,8 +140,8 @@ function drawContract(canvas, contract, dark, hover) {
         } else if (t.kind === "derivedEvent") {
           ctx.fillStyle = b.code > 0 ? P.derived : P.unaltered;
           ctx.fillRect(x, y, w, ROW_H);
-        } else { // clinical
-          ctx.fillStyle = b.code === -1 ? P.np1 : CAT_COLORS[b.code % CAT_COLORS.length];
+        } else { // clinical (categorical -> palette; numeric heat -> sequential blue)
+          ctx.fillStyle = b.code === -1 ? P.np1 : (t.numeric ? heatColor(b.code) : CAT_COLORS[b.code % CAT_COLORS.length]);
           ctx.fillRect(x, y, w, ROW_H);
         }
       }
@@ -160,6 +169,7 @@ export default function OncoprintPage() {
   const [preset, setPreset] = useState(0);
   const [custom, setCustom] = useState(null); // spec loaded from ?spec= (shared link)
   const [genes, setGenes] = useState("TP53 KRAS STK11 KEAP1 EGFR ARID1A MSH3");
+  const [clinAttrs, setClinAttrs] = useState("OS_STATUS SMOKING_PREDICTIONS_3_CLASSES");
   const [withDerived, setWithDerived] = useState(true);
   const [busy, setBusy] = useState(false);
   const [contract, setContract] = useState(null);
@@ -187,13 +197,14 @@ export default function OncoprintPage() {
       } else if (preset === -1 && custom) {
         s = { ...custom,
           genes: genes.split(/[\s,]+/).filter(Boolean),
+          clinical: clinAttrs.split(/[\s,]+/).filter(Boolean),
           derivedEvents: withDerived ? (custom.derivedEvents && custom.derivedEvents.length ? custom.derivedEvents : [{ label: "Reached 2L", expression: LINE2 }]) : []
         };
       } else {
         const p = PRESETS[preset];
         s = {
           genes: genes.split(/[\s,]+/).filter(Boolean),
-          clinical: ["OS_STATUS", "SMOKING_PREDICTIONS_3_CLASSES"],
+          clinical: clinAttrs.split(/[\s,]+/).filter(Boolean),
           derivedEvents: withDerived ? [{ label: "Reached 2L", expression: LINE2 }] : [],
           cohort: p.cohort !== undefined ? p.cohort : null,
           layout: p.layout || null,
@@ -217,6 +228,7 @@ export default function OncoprintPage() {
         const sp = JSON.parse(atob(b64.replace(/-/g, "+").replace(/_/g, "/")));
         setCustom(sp);
         setGenes((sp.genes || []).join(" "));
+        if (sp.clinical && sp.clinical.length) setClinAttrs(sp.clinical.join(" "));
         setWithDerived(!!(sp.derivedEvents || []).length);
         setPreset(-1);
         run(sp);
@@ -256,7 +268,9 @@ export default function OncoprintPage() {
     const t = contract.tracks[h.ti];
     const code = t.cells[h.ci];
     const value = t.kind === "clinical"
-      ? (code === -1 ? "n/a" : t.categories[code] || "Other")
+      ? (code === -1 ? "n/a"
+        : t.numeric ? "≈" + fmtNum(t.min + (code / 255) * (t.max - t.min))
+        : (t.categories && t.categories[code]) || "Other")
       : t.kind === "derivedEvent" ? (code ? "yes" : "no")
       : decode(code).join(" + ");
     setTip({ x: e.clientX, y: e.clientY, pid: contract.columns[h.ci], group: contract.groups[h.gi].name, track: t.label, value });
@@ -296,6 +310,10 @@ export default function OncoprintPage() {
             <div style={{ flex: 1, minWidth: "16rem" }}>
               <label>Gene tracks</label>
               <input style={{ width: "100%" }} value={genes} onChange={e => setGenes(e.target.value)} />
+            </div>
+            <div style={{ flex: 1, minWidth: "16rem" }}>
+              <label>Clinical tracks <span style={{ fontWeight: 400, color: "var(--muted)" }}>(attribute names, max 8; numeric render as heat)</span></label>
+              <input style={{ width: "100%" }} value={clinAttrs} onChange={e => setClinAttrs(e.target.value)} />
             </div>
             <label className="chk" style={{ marginBottom: "0.4rem" }}>
               <input type="checkbox" checked={withDerived} onChange={e => setWithDerived(e.target.checked)} />
@@ -344,11 +362,16 @@ export default function OncoprintPage() {
             {contract.tracks.filter(t => t.kind === "clinical").map(t => (
               <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
                 <strong style={{ color: "var(--ink)" }}>{t.label}:</strong>
-                {t.categories.map((c, i) => (
-                  <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-                    <span style={{ width: 10, height: 10, background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 2, display: "inline-block" }} />{c}
-                  </span>
-                ))}
+                {t.numeric
+                  ? <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                      <span style={{ width: 64, height: 10, borderRadius: 2, display: "inline-block", background: "linear-gradient(90deg, rgb(222,235,247), rgb(8,72,135))" }} />
+                      {fmtNum(t.min)} → {fmtNum(t.max)}
+                    </span>
+                  : (t.categories || []).map((c, i) => (
+                    <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                      <span style={{ width: 10, height: 10, background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 2, display: "inline-block" }} />{c}
+                    </span>
+                  ))}
               </span>
             ))}
           </div>

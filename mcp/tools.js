@@ -138,7 +138,7 @@ export function registerTools(server) {
         .describe("Explicit patient IDs (e.g. imported from a portal custom case list) to use as the cohort — overrides `cohort`; ids not in the study are dropped"),
       derivedEventTracks: z.array(z.object({ label: z.string().max(60), expression: z.object(zCohortDsl) })).max(3).nullish()
         .describe("Optional phenotype tracks from cohort-DSL expressions, e.g. 'Reached 2L'"),
-      clinical: z.array(z.string()).max(3).nullish().describe("Patient-level clinical attribute tracks, e.g. ['OS_STATUS']")
+      clinical: z.array(z.string()).max(8).nullish().describe("Clinical attribute tracks, e.g. ['OS_STATUS','CURRENT_AGE_DEID']; sample-level attributes fall back to a sample value per patient; numeric attributes render as continuous heat tracks; unknown names render a labeled '(no data)' track")
     },
     async ({ genes, cohort, groups, derivedEventTracks, clinical, patientList }) => {
       const spec = {
@@ -170,7 +170,7 @@ export function registerTools(server) {
         `That page re-renders this exact oncoprint and shows the DSL spec and every generated SQL query.` +
         `\nInteractive editor (share this too — it opens THIS oncoprint with live controls): ${base}/oncoprint?spec=${specB64}` +
         `\nModifications the user can ask for right here in chat: add or remove gene tracks (up to 12); ` +
-        `add clinical attribute tracks (e.g. OS_STATUS, GENDER, SMOKING_PREDICTIONS_3_CLASSES); ` +
+        `add clinical attribute tracks, up to 8 (e.g. OS_STATUS, GENDER, SMOKING_PREDICTIONS_3_CLASSES; numeric ones like CURRENT_AGE_DEID render as heat); ` +
         `add derived-event phenotype tracks from any cohort expression (e.g. "reached 3rd line", "had surgery"); ` +
         `regroup columns by different cohorts (up to 4 side-by-side); change the treatment-line gap rule (lineGap); ` +
         `restrict any group to treatment-naive patients (priorGuard). Offer 1-2 of these as next steps when relevant.`;

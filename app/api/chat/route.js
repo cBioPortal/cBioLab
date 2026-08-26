@@ -17,7 +17,11 @@ Document shape:
   "cohorts": { "<name>": <cohortDef>, ... (max 6) },
   "views": [ {"kind":"compare","genes":[...],"cohorts":[names?]},
              {"kind":"survival","cohorts":[names?]},
-             {"kind":"oncoprint","genes":[...(max 12)],"cohorts":[names?]} ] }
+             {"kind":"oncoprint","genes":[...(max 12)],"clinical":["<attribute>", ...(max 8)]?,"cohorts":[names?]} ] }
+
+Oncoprint clinical tracks: any clinical attribute name works (patient- or sample-level; sample-level
+falls back to one sample's value per patient). Numeric attributes (age, TMB, ...) render as a
+continuous heat track with a min→max key; unknown attributes render a labeled "(no data)" track.
 
 cohortDef: { "all": [clause, ...], "study"?: "<id>", "studies"?: ["<id>", ...] } — clauses ANDed;
 a cohort may target another study or union across several (members are study-qualified; overlap
