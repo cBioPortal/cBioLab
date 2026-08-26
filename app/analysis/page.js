@@ -80,12 +80,14 @@ export default function AnalysisPage() {
   const [chatReady, setChatReady] = useState(null);
   const [saved, setSaved] = useState({});
   const [cName, setCName] = useState("");
-  const [cDefText, setCDefText] = useState(JSON.stringify(EXAMPLES[1].def, null, 2));
+  const [cDefText, setCDefText] = useState(JSON.stringify({ all: [] }, null, 2));
   const [cPreview, setCPreview] = useState(null);
   const [cBusy, setCBusy] = useState(false);
   const [exEvals, setExEvals] = useState({});
   const [studies, setStudies] = useState([]);
   const [study, setStudy] = useState("msk_chord_2024");
+  const [explore, setExplore] = useState(null);
+  const [exploreBusy, setExploreBusy] = useState(false);
 
   const LS_KEY = "cohortlab.savedCohorts";
   const persist = (next) => { setSaved(next); try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {} };
@@ -152,10 +154,54 @@ export default function AnalysisPage() {
     persist({ ...saved, [name]: { def: r.def, savedAt: new Date().toISOString().slice(0, 16).replace("T", " "), lastEval: r.ev } });
   };
 
+  const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
+
+  const fetchExplore = async (draftOverride) => {
+    setExploreBusy(true);
+    try {
+      const res = await fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ study, draft: draftOverride !== undefined ? draftOverride : parseDraft() }) });
+      const j = await res.json();
+      if (!j.error) setExplore(j); else setError(j.error);
+    } catch (e) { setError(String(e.message || e)); }
+    setExploreBusy(false);
+  };
+
+  const addClause = (clause) => {
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
+    if (!d || !Array.isArray(d.all)) d = { all: [] };
+    if (clause.kind === "clinical" && clause.op === "=") {
+      const same = d.all.find(c => c.kind === "clinical" && c.attribute === clause.attribute && (c.per || "patient") === (clause.per || "patient") && (c.op === "=" || c.values));
+      if (same) { // second value on the same attribute becomes an OR list
+        const vals = new Set([...(same.values || []), ...(same.op === "=" ? [same.value] : []), clause.value]);
+        delete same.op; delete same.value; same.values = [...vals];
+        const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d); return;
+      }
+    }
+    if (clause.kind === "oql") {
+      const same = d.all.find(c => c.kind === "oql");
+      if (same) { same.q += "; " + clause.q; const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d); return; }
+    }
+    d.all.push(clause);
+    const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d);
+  };
+
+  const removeDraftClause = (i) => {
+    try {
+      const d = normalizeDef(JSON.parse(cDefText));
+      d.all = d.all.filter((_, j) => j !== i);
+      setCDefText(JSON.stringify(d, null, 2));
+      fetchExplore(d.all.length ? d : null);
+    } catch {}
+  };
+
+  const clearDraft = () => { setCDefText(JSON.stringify({ all: [] }, null, 2)); fetchExplore(null); };
+
   const switchStudy = (id) => {
     setStudy(id);
     const d = { study: id, cohorts: {}, views: [] };
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setCPreview(null); setExEvals({});
+    setExplore(null);
   };
 
   const addDefToAnalysis = (name, def) => {
@@ -216,7 +262,7 @@ export default function AnalysisPage() {
       </header>
       <main style={{ maxWidth: "96rem" }}>
         <div className="row" style={{ marginBottom: "0.8rem", alignItems: "center" }}>
-          <label style={{ margin: 0 }}>Study</label>
+          <label style={{ margin: 0 }}>Working study</label>
           <select value={study} onChange={e => switchStudy(e.target.value)} style={{ maxWidth: "34rem" }}>
             {!studies.length && <option value={study}>{study}</option>}
             {studies.map(s => (
@@ -225,7 +271,7 @@ export default function AnalysisPage() {
               </option>
             ))}
           </select>
-          <span className="meta">switching studies starts a fresh document (vocabularies differ)</span>
+          <span className="meta">the default for cohorts without their own study; switching starts a fresh document</span>
         </div>
 
         {/* ---- Chat: always at the top ---- */}
@@ -248,10 +294,96 @@ export default function AnalysisPage() {
         </div>
 
         <div className="tabs">
+          <button className={tab === "explore" ? "active" : ""} onClick={() => { setTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
           <button className={tab === "cohorts" ? "active" : ""} onClick={() => setTab("cohorts")}>Cohorts</button>
           <button className={tab === "analysis" ? "active" : ""} onClick={() => setTab("analysis")}>Analysis</button>
         </div>
         {error && <div className="error">{error}</div>}
+
+        {/* ================= Explore tab ================= */}
+        {tab === "explore" && <div>
+          <div className="card">
+            <h2>Draft cohort <span className="plain">— click anything below to add a clause; counts narrow to your draft</span></h2>
+            <div className="row" style={{ alignItems: "center" }}>
+              {(() => { const d = parseDraft(); return d
+                ? <CohortPills def={d} onRemoveClause={removeDraftClause} />
+                : <span className="meta">no clauses yet — the numbers below describe the whole study</span>; })()}
+              {explore && explore.draftCount != null && <strong style={{ marginLeft: "0.5rem" }}>{explore.draftCount.toLocaleString()} patients</strong>}
+              {exploreBusy && <span className="spinner" />}
+            </div>
+            <div className="row" style={{ marginTop: "0.5rem" }}>
+              <input placeholder="name this cohort…" value={cName} onChange={e => setCName(e.target.value)} />
+              <button className="primary" onClick={saveCohort}>Save</button>
+              <button className="primary" onClick={() => { const d = parseDraft(); if (d) addDefToAnalysis(cName.trim() || "explored cohort", d); }}>Add to analysis</button>
+              <button onClick={clearDraft}>Clear</button>
+            </div>
+          </div>
+          {!explore && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
+          {explore && <div className="two-col" style={{ alignItems: "start" }}>
+            <div>
+              <div className="card">
+                <h2>Clinical <span className="plain">— patient &amp; sample attributes</span></h2>
+                {explore.clinical.map(c => (
+                  <div key={c.per + c.attribute} style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0" }}>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 600 }}>{c.attribute} <span className="meta">{c.per === "sample" ? "· sample-level" : ""} · {c.patients.toLocaleString()} pts</span></div>
+                    {c.kind === "cat" && <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", marginTop: "0.25rem" }}>
+                      {c.values.map(v => {
+                        const d = parseDraft();
+                        const sel = d && d.all.some(cl => cl.kind === "clinical" && cl.attribute === c.attribute &&
+                          ((cl.op === "=" && cl.value === v.v) || (cl.values || []).includes(v.v)));
+                        return (
+                          <button key={v.v} className={"facet" + (sel ? " on" : "")} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v, ...(c.per === "sample" ? { per: "sample" } : {}) })}>
+                            {v.v.length > 28 ? v.v.slice(0, 27) + "…" : v.v} <span className="meta">{v.n.toLocaleString()}</span>
+                          </button>
+                        );
+                      })}
+                    </div>}
+                    {c.kind === "num" && <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", marginTop: "0.25rem", flexWrap: "wrap" }}>
+                      <span className="meta">min {Math.round(c.min * 10) / 10} · median {Math.round(c.median * 10) / 10} · max {Math.round(c.max * 10) / 10}</span>
+                      <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>≥ median</button>
+                      <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>&lt; median</button>
+                    </div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="card">
+                <h2>Genes <span className="plain">— most-altered (click = OQL clause)</span></h2>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+                  {explore.genes.map(g => (
+                    <button key={g.gene} className="facet" onClick={() => addClause({ kind: "oql", q: g.gene + ":" })}>
+                      {g.gene} <span className="meta">{g.n.toLocaleString()}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="note">Bare gene = any alteration; edit the OQL pill afterwards for MUT/AMP/DRIVER specifics.</p>
+              </div>
+              <div className="card">
+                <h2>Timeline events</h2>
+                {explore.events.length === 0 && <p className="note">This study has no clinical timeline events.</p>}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+                  {explore.events.map(e => (
+                    <button key={e.type} className="facet" onClick={() => addClause({ kind: "event", a: { eventType: e.type }, rel: { type: "NONE" } })}>
+                      has {e.type} <span className="meta">{e.n.toLocaleString()}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="card">
+                <h2>Case lists</h2>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+                  {explore.caseLists.map(l => (
+                    <button key={l.id} className="facet" title={l.name} onClick={() => addClause({ kind: "caseList", id: l.id })}>
+                      {l.id} <span className="meta">{l.n.toLocaleString()}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="note">Profiles here: {(explore.profiles || []).join(", ") || "none"}{explore.gaProfiles && explore.gaProfiles.length ? " · assays: " + explore.gaProfiles.join(", ") : ""} · facet counts {explore.draftCount != null ? "narrowed to your draft" : "study-wide"} · {explore.stats.ms}ms</p>
+              </div>
+            </div>
+          </div>}
+        </div>}
 
         {/* ================= Cohorts tab ================= */}
         {tab === "cohorts" && <div className="grid2">

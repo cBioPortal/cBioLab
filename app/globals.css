@@ -173,3 +173,10 @@ button.primary { display: inline-flex; align-items: center; gap: 0.5rem; }
 .fpill .fx:hover, .fgroup .fx:hover { color: var(--err); }
 .fconn { font-size: 0.64rem; font-weight: 700; color: var(--muted); letter-spacing: 0.09em; }
 .fgroup { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; border: 1px dashed var(--line); border-radius: 8px; padding: 0.15rem 0.4rem; }
+button.facet {
+  font-size: 0.76rem; padding: 0.18rem 0.55rem; border-radius: 999px;
+  background: var(--paper); border: 1px solid var(--line); cursor: pointer;
+}
+button.facet:hover { border-color: var(--accent); color: var(--accent-ink); }
+button.facet .meta { margin-left: 0.25rem; }
+button.facet.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
