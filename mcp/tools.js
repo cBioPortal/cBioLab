@@ -6,6 +6,7 @@ import { buildContract } from "../lib/oncoprint.js";
 import { contractToSvg } from "../lib/oncoprint-svg.js";
 import sharp from "sharp";
 import { ensureFonts } from "../lib/fonts.js";
+import { renderDslMarkdown } from "../lib/dsl-reference.js";
 
 // ---------- shared zod fragments (mirrors docs/cohort-query.schema.json) ----------
 const zSelector = z.object({
@@ -55,6 +56,13 @@ function cohortCaveats(args) {
 function text(t) { return { content: [{ type: "text", text: t }] }; }
 
 export function registerTools(server) {
+  server.tool(
+    "describe_dsl",
+    "The complete, generated reference for the Cohort Lab DSL: the Analysis document (cohorts + views), every clause kind (OQL, clinical, timeline events, case lists, continuous genomic data, ...), cross-study federation semantics, the OncoprintSpec, and runnable examples. Read this before composing documents by hand; it is generated from the same source as the docs and the in-app chat grammar, and its examples are CI-executed against the live compiler.",
+    {},
+    async () => ({ content: [{ type: "text", text: renderDslMarkdown() }] })
+  );
+
 
   server.tool(
     "describe_study",

@@ -1,148 +1,342 @@
-# Cohort Query DSL
+<!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.js; regenerate with `npm run docs:gen`. -->
 
-A small JSON language for defining patient cohorts by temporal relationships between clinical
-timeline events. The client sends this DSL to the server (`POST /api/cohort`); the server
-validates it and compiles it to ClickHouse SQL (`lib/compiler.js`). The client never sends SQL.
+# Cohort Lab DSL (v2.2)
 
-## Top-level shape
+One declarative JSON object — the **Analysis document** — describes everything Cohort Lab does:
+which patients form each cohort, and which views compare them. The server compiles it to
+ClickHouse SQL (`lib/cohort2.js`, `lib/oql.js`, `lib/compiler.js`, `lib/analysis.js`);
+clients never send SQL. Every result carries provenance: the definition readback and the exact
+SQL each cohort compiled to.
 
-```json
-{
-  "a":   { …selector… },              // required: the anchor event (A)
-  "b":   { …selector… },              // required unless rel.type = "NONE"
-  "rel": { "type": "BEFORE", … },     // temporal relation between A and B
-  "priorGuard": false,                // restrict to "No prior medications" patients
-  "lineGap": 90                       // gap threshold for derived treatment lines (days)
-}
+## Analysis document
+
+```
+{ "study":   "<default study id>",            // validated against cancer_study
+  "cohorts": { "<name>": cohortDef, ... },    // max 6
+  "views":   [ view, ... ] }                  // max 6
 ```
 
-**Cohort semantics.** A patient is in the cohort if there EXISTS at least one pair of event
-occurrences (one from A, one from B) satisfying the relation. Duplicate qualifying pairs do not
-inflate counts — results are distinct patients. `occurrence: FIRST/LAST` pins a selector to a
-single event per patient *before* the relation is evaluated.
+Sent to `POST /api/analysis`, edited by the in-app chat, and encoded in shareable
+`/analysis?doc=<base64url>` links.
 
-## Selector
+## Cohort definitions
 
-Selects a set of event occurrences per patient: `(patient, start_date[, stop_date])`.
-
-```json
-{
-  "eventType": "Treatment",                       // required; from the study catalog
-  "attrs": [{ "key": "SUBTYPE", "value": "Immuno" }],   // 0–3 string-equality filters, ANDed
-  "numeric": { "key": "RESULT", "op": ">", "value": 10 },  // optional; op ∈ > >= < <= =
-  "occurrence": "ANY",                            // ANY | FIRST | LAST (default ANY)
-  "minDurationDays": 365                          // optional; requires a stop_date
-}
+```
+cohortDef := { "all": [clause × 1-8],         // ANDed (INTERSECT DISTINCT)
+               "study"?:   "<id>",            // evaluate in another study
+               "studies"?: ["<id>" × ≤8],     // union across studies (federated)
+               "lineGap"?: 90 }               // derived-treatment-line gap, days
+clause    := leaf | { "any": [leaf × 1-8] }   // OR (UNION DISTINCT)
+                  | { "not": leaf }           // study base EXCEPT leaf
 ```
 
-Notes:
+**Cross-study semantics.** A cohort with `studies` is compiled per study (compilers are
+single-study by design); members are study-qualified patient ids. Patient overlap across studies
+is deliberately **not** deduplicated, and clinical vocabularies are **not** harmonized — views
+say so in their captions.
 
-- `attrs` match `clinical_event_data` key/value pairs exactly (strings).
-- `numeric` casts the attribute value with `toFloat64OrNull` — non-numeric values simply don't
-  match; they never error.
-- `minDurationDays` filters to events whose `stop_date - start_date >= N`; events without a
-  stop date never match it. Only Treatment events (and derived lines) carry stop dates.
-- Timeline dates are **per-patient day offsets** (negative = before the study reference date).
-  Only intervals and orderings are meaningful, never absolute dates across patients.
+### Leaf kinds
 
-## Relations (`rel.type`)
-
-| type | extra fields | meaning |
+| kind | shape | meaning |
 |---|---|---|
-| `NONE` | — | cohort = patients with any qualifying A. `b` is ignored. |
-| `BEFORE` | `minDays` (default 0), `maxDays` | some B starts in `(A.start + minDays, A.start + maxDays]` |
-| `DURING` | — | some B starts inside A's interval: `A.start ≤ B.start ≤ coalesce(A.stop, A.start)`. For point events (no stop date) this degenerates to same-day. |
-| `NOT_FOLLOWED_BY` | `withinDays`, `observed` | **absence**: no B starts in `(A.start, A.start + withinDays]` for *any* qualifying A occurrence. |
+| `oql` | `{"kind":"oql","q":"STK11: DRIVER"}` | genomic status in cBioPortal OQL (see below) |
+| `clinical` | `{"kind":"clinical","attribute":A, ...predicate, "per"?:"sample"}` | clinical attribute; predicate is `values:[≤50]` (OR), `range:{gt,gte,lt,lte}` (numeric via toFloat64OrNull), or `op`(`= != > >= < <=`)+`value`; `per:"sample"` = patient matches if ANY sample matches |
+| `event` | `{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}` | timeline sub-DSL (below) |
+| `patients` | `{"kind":"patients","ids":[≤50000]}` | explicit list, intersected with the study |
+| `profiled` | `{"kind":"profiled","type":"MUTATION"\|"CNA"\|"SV"}` | patient has a sample on a gene panel for that data type — combine with `not` to separate wild-type from not-profiled |
+| `caseList` | `{"kind":"caseList","id":"sequenced"}` | portal sample list; bare ids get the study prefix |
+| `genomicData` | `{"kind":"genomicData","gene":G,"profileType":P,"range"\|"values"}` | continuous per-gene values (cna, mrna z-scores, …); unknown profiles error listing what the study has |
+| `genericAssay` | `{"kind":"genericAssay","profileType":P,"entity":E,"range"\|"values"}` | generic assay values (mutational signatures, …) |
+| `alteration` | *(deprecated)* | translated to OQL internally; do not write new ones |
 
-### The observability guard (`observed: true`)
+### OQL subset
 
-Absence queries must distinguish "event didn't happen" from "patient wasn't observed."
-With `observed: true`, patients are additionally required to have *any* timeline event at or
-after `A.start + withinDays` — i.e., they were still being followed past the window. Without
-it, a patient lost to follow-up the day after treatment counts as "no progression," which is
-almost never what a clinical question means. **Default to true for absence queries.**
+`q` is 1–10 entries separated by `;`, each `GENE` (any alteration) or `GENE: spec spec ...`.
+A patient matches if **any** entry matches (portal "altered in query" semantics).
 
-## `priorGuard` — the prior-medications restriction
+- Mutations: `MUT`, `MUT=<protein change>` (e.g. `MUT=G12C`), classes `MISSENSE NONSENSE TRUNC INFRAME SPLICE`; bare `G12C` is protein-change shorthand.
+- Copy number: `AMP`, `HOMDEL`, `CNA` (either, high-level ±2 only).
+- Structural variants: `FUSION`.
+- Drivers: `DRIVER` alone (any driver alteration) or as modifier (`MUT_DRIVER`, `DRIVER_G12D`, `TRUNC_DRIVER`). Requires the version-pinned OncoKB annotation store; the pin is reported in every result.
+- Expression: `EXP>z EXP<z PROT>z` — only in studies with mRNA/protein profiles (errors otherwise, listing available profiles).
+- **Rejected loudly** (never silently approximated): `GAIN HETLOSS GERMLINE SOMATIC PROMOTER`.
 
-`"priorGuard": true` restricts the *entire query* (selector A and, when line events are used,
-the line derivation itself) to patients whose NLP-derived `PRIOR_MED_TO_MSK` flag says
-"No prior medications." Why it exists, in msk_chord_2024 numbers: of treated patients, ~60% are
-flagged treatment-naïve on arrival, ~20% had prior treatment elsewhere (their observed "first"
-events are not really first), and ~20% have no determination. Any query whose meaning depends on
-"first" (first line, first treatment, treatment-naïve cohorts) should set this guard.
+### Event sub-DSL (timeline)
 
-## Derived treatment lines — the synthetic event type
+The v1 language, embedded as an `event` leaf (the flat v1 shape `{a,b,rel,...}` is also accepted
+anywhere a cohortDef is expected, for back-compat).
 
-`"eventType": "Treatment line (derived)"` selects **treatment lines** instead of raw events.
-Lines don't exist in the database; the compiler derives them inside the query by interval-merging
-systemic-therapy events (Chemo, Immuno, Targeted, Hormone, Biologic, Investigational — RT and
-surgery excluded) per patient, starting a new line when a treatment-free gap exceeds the
-threshold. A line's `start_date`/`stop_date` span the merged block, so all relations (including
-`DURING`) work on lines.
+```
+selector := { "eventType": "Treatment" | "Diagnosis" | "Lab_Test" | ...        // per-study catalog
+                        | "Treatment line (derived)",                          // synthetic type
+              "attrs"?: [{ "key": K, "value": V } × ≤3],                       // event attributes
+              "occurrence"?: "ANY" | "FIRST" | "LAST",                         // pin per patient
+              "numeric"?: { "key": K, "op": ">"|">="|"<"|"<="|"=", "value": N },
+              "minDurationDays"?: N }
+rel      := { "type": "NONE" }                                                 // A exists
+           | { "type": "BEFORE", "minDays"?: 0, "maxDays": N }                 // A then B within window
+           | { "type": "DURING" }                                              // B inside A's start..stop
+           | { "type": "NOT_FOLLOWED_BY", "withinDays": N, "observed"?: true } // absence of B after A
+```
 
-Line-selector attributes:
+- **Exists-pair semantics**: a patient qualifies if at least one (A,B) occurrence pair satisfies
+  the relation; results are distinct patients.
+- **Absence queries**: always set `"observed": true` on NOT_FOLLOWED_BY, restricting to patients
+  whose follow-up actually covers the window — otherwise "no event" conflates with lost-to-follow-up.
+- **`priorGuard: true`** restricts to treatment-naive patients (required for honest "first-line"
+  claims; ~20% of MSK-CHORD patients had prior treatment elsewhere).
+- **"Treatment line (derived)"** is synthesized at query time from treatment gaps (`lineGap`,
+  default 90 days) and supports attrs `LINE_NO`, `COMPOSITION`, `GAP`.
 
-| key | meaning |
+## Views
+
+| kind | fields | semantics |
+|---|---|---|
+| `compare` | `genes:[≤20], cohorts?:[names]` | per-gene driver% / altered% per cohort with **panel-aware denominators** (profiled patients only); two-sided Fisher p when exactly 2 cohorts |
+| `survival` | `cohorts?:[names]` | Kaplan–Meier on OS_MONTHS/OS_STATUS; left truncation caveat applies; cross-study baselines are not harmonized |
+| `oncoprint` | `genes:[≤12], clinical?:[≤8], cohorts?:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins), staircase-sorted by alteration type + driver; NOT_PROFILED is a first-class cell state |
+
+`views[].cohorts` defaults to all cohorts. Oncoprints federate across studies: columns are
+study-qualified, a synthetic **Study** track shows each column's origin, and duplicates appear twice.
+
+**Oncoprint clinical tracks**: any attribute name; patient-level rows win, sample-level attributes
+fall back to one sample value per patient. Numeric attributes (≥90% parseable, >10 distinct) render
+as a continuous heat track scaled to the cohort's min→max with a gradient key; unknown attributes
+render a labeled "(no data)" track.
+
+## OncoprintSpec (standalone)
+
+The builder page (`/oncoprint`), `POST /api/oncoprint`, and the MCP `render_oncoprint` tool
+take a standalone spec (the analysis oncoprint view compiles to the same engine):
+
+```
+{ "study"?: "<id>",
+  "genes": [≤12],
+  "clinical": [≤8],
+  "derivedEvents": [{ "label": L, "expression": <event cohortDef> } × ≤3],   // phenotype tracks
+  "cohort"?: { "dsl": <cohortDef> },                                          // single column group
+  "layout"?: { "groupBy": { "kind": "cohorts", "groups": [{name,dsl} × ≤4] } },
+  "conventions"?: { "lineGap": 90 } }
+```
+
+Cell values are bitmasks (MISSENSE 1, TRUNCATING 2, INFRAME 4, SPLICE 8, OTHER_MUT 16, SV 32,
+AMP 64, HOMDEL 128, DRIVER 256); −1 is NOT_PROFILED. Frequencies use profiled denominators.
+Shareable links: `/oncoprint?spec=<base64url>`.
+
+## Endpoints
+
+| endpoint | takes |
 |---|---|
-| `LINE_NO` | equality (`"2"`), or use `numeric` (`{"key": "LINE_NO", "op": ">=", "value": 3}`) |
-| `COMPOSITION` | canonical regimen makeup, e.g. `"Chemo"`, `"Biologic+Chemo"` (sorted, `+`-joined) |
-| `GAP` | per-selector override of the gap threshold (rare; prefer top-level `lineGap`) |
+| `POST /api/analysis` | Analysis document → cohorts (counts, readback, SQL provenance) + views |
+| `POST /api/explore` | `{study, draft?}` → faceted catalog (clinical/events/genes/case lists), counts conditioned on the draft |
+| `POST /api/oncoprint` | OncoprintSpec → render contract |
+| `POST /api/cohort` | v1 event DSL → count + histogram + provenance |
+| `GET /api/catalog?study=` | event-type / attribute vocabulary for the event sub-DSL |
+| `GET /api/studies` | all loadable studies |
 
-The gap threshold comes from top-level `lineGap` (default 90). It matters: msk_chord_2024 has
-24.1k line-starts at 30 days, 15.2k at 90, 9.4k at 180. `LINE_NO` means "Nth line *observed in
-this study*" unless `priorGuard` is set — see above.
+## Examples
 
-## Validation rules (server-enforced)
+Every example below is executed against the live compiler by `npm run docs:check`
+(part of the e2e suite) — if one breaks, the build fails.
 
-- `rel.type`, `occurrence`, `numeric.op` are whitelisted; unknown values fall back or error.
-- ≤ 3 attribute filters per selector; key ≤ 200 chars, value ≤ 500 chars.
-- All numeric fields must be finite numbers; `lineGap` ∈ [1, 3650].
-- String values are escaped; identifiers (database) are sanitized server-side. The study is
-  fixed by server config — the DSL cannot address other studies.
+### Example 1: Genomic status via OQL, compared
 
-## Worked examples (with msk_chord_2024 counts)
-
-Progression within 180 days after any immunotherapy start — **2,024 / 3,341**:
+STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it includes not-profiled unless you add a profiled clause). Two views: co-alteration frequencies and overall survival.
 
 ```json
-{ "a": { "eventType": "Treatment", "attrs": [{ "key": "SUBTYPE", "value": "Immuno" }] },
-  "b": { "eventType": "Diagnosis", "attrs": [{ "key": "PROGRESSION", "value": "Y" }] },
-  "rel": { "type": "BEFORE", "minDays": 0, "maxDays": 180 } }
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "STK11 driver": {
+      "all": [
+        {
+          "kind": "oql",
+          "q": "STK11: DRIVER"
+        }
+      ]
+    },
+    "STK11 wt": {
+      "all": [
+        {
+          "not": {
+            "kind": "oql",
+            "q": "STK11:"
+          }
+        },
+        {
+          "kind": "profiled",
+          "type": "MUTATION"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "genes": [
+        "KEAP1",
+        "KRAS",
+        "TP53"
+      ]
+    },
+    {
+      "kind": "survival"
+    }
+  ]
+}
 ```
 
-PSA > 10 in the 90 days before first hormone therapy — numeric + occurrence pinning:
+### Example 2: Clinical + timeline event composition
+
+Never-smokers whose timeline shows progression within 180 days after first immunotherapy. The event leaf is the v1 timeline sub-DSL embedded as a clause.
 
 ```json
-{ "a": { "eventType": "Lab_Test", "attrs": [{ "key": "TEST", "value": "PSA" }],
-         "numeric": { "key": "RESULT", "op": ">", "value": 10 } },
-  "b": { "eventType": "Treatment", "attrs": [{ "key": "SUBTYPE", "value": "Hormone" }],
-         "occurrence": "FIRST" },
-  "rel": { "type": "BEFORE", "minDays": 0, "maxDays": 90 } }
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "never-smoker fast progressors": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "SMOKING_PREDICTIONS_3_CLASSES",
+          "values": [
+            "Never"
+          ]
+        },
+        {
+          "kind": "event",
+          "a": {
+            "eventType": "Treatment",
+            "attrs": [
+              {
+                "key": "SUBTYPE",
+                "value": "Immuno"
+              }
+            ],
+            "occurrence": "FIRST"
+          },
+          "b": {
+            "eventType": "Diagnosis",
+            "attrs": [
+              {
+                "key": "PROGRESSION",
+                "value": "Y"
+              }
+            ]
+          },
+          "rel": {
+            "type": "BEFORE",
+            "maxDays": 180
+          }
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "genes": [
+        "STK11",
+        "KEAP1",
+        "TP53"
+      ]
+    }
+  ]
+}
 ```
 
-True first-line immuno, progression-free for a year — absence + both guards — **417 / 2,392**:
+### Example 3: any / not / genomicData
+
+Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep deletions expressed as a continuous copy-number threshold.
 
 ```json
-{ "a": { "eventType": "Treatment", "attrs": [{ "key": "SUBTYPE", "value": "Immuno" }],
-         "occurrence": "FIRST" },
-  "b": { "eventType": "Diagnosis", "attrs": [{ "key": "PROGRESSION", "value": "Y" }] },
-  "rel": { "type": "NOT_FOLLOWED_BY", "withinDays": 365, "observed": true },
-  "priorGuard": true }
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "CRC/PAAD without CDKN2A loss": {
+      "all": [
+        {
+          "any": [
+            {
+              "kind": "clinical",
+              "attribute": "CANCER_TYPE",
+              "values": [
+                "Colorectal Cancer"
+              ],
+              "per": "sample"
+            },
+            {
+              "kind": "clinical",
+              "attribute": "CANCER_TYPE",
+              "values": [
+                "Pancreatic Cancer"
+              ],
+              "per": "sample"
+            }
+          ]
+        },
+        {
+          "not": {
+            "kind": "genomicData",
+            "gene": "CDKN2A",
+            "profileType": "cna",
+            "range": {
+              "lte": -2
+            }
+          }
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "genes": [
+        "KRAS",
+        "TP53",
+        "APC",
+        "SMAD4"
+      ]
+    }
+  ]
+}
 ```
 
-Progression within 180 days of starting second-line therapy — derived lines — **3,003 / 7,824**:
+### Example 4: Cross-study federation with an oncoprint
+
+One cohort unioned across two studies (members are study-qualified; overlap is NOT deduplicated), rendered as a federated oncoprint with a categorical and a numeric clinical track. The Study track is added automatically.
 
 ```json
-{ "a": { "eventType": "Treatment line (derived)", "attrs": [{ "key": "LINE_NO", "value": "2" }] },
-  "b": { "eventType": "Diagnosis", "attrs": [{ "key": "PROGRESSION", "value": "Y" }] },
-  "rel": { "type": "BEFORE", "minDays": 0, "maxDays": 180 }, "lineGap": 90 }
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "TP53-mut, CHORD+MET": {
+      "studies": [
+        "msk_chord_2024",
+        "msk_met_2021"
+      ],
+      "all": [
+        {
+          "kind": "oql",
+          "q": "TP53: MUT"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "oncoprint",
+      "genes": [
+        "TP53",
+        "KRAS",
+        "EGFR"
+      ],
+      "clinical": [
+        "CANCER_TYPE",
+        "CURRENT_AGE_DEID"
+      ]
+    }
+  ]
+}
 ```
 
-## Known limits (deliberate, v1)
-
-- Two selectors and one relation — no three-event sequences, no boolean nesting.
-- No value-trajectory relations ("PSA doubled within 90 days") yet.
-- No aggregations ("median time from A to B") — the histogram endpoint covers the common case.
-- Attribute matching is exact string equality; no ranges over strings, no OR within a key.
-
-A machine-readable contract for this document lives in `docs/cohort-query.schema.json`.

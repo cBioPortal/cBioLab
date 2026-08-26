@@ -121,6 +121,17 @@ async function main() {
     await ctx.close();
   }
   await browser.close();
+  // DSL doc sync gate: docs/dsl.md must match lib/dsl-reference.js, and every
+  // documented example must run against the live compiler.
+  try {
+    const { execSync } = require("child_process");
+    const out = execSync("npm run --silent docs:check", { cwd: __dirname, encoding: "utf8", timeout: 180000 });
+    for (const line of out.trim().split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
+  } catch (e) {
+    const out = String((e.stdout || "") + (e.stderr || "")).trim();
+    for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
+    if (!/^FAIL /m.test(out)) results.push("FAIL docs:check crashed: " + String(e.message).slice(0, 120));
+  }
   console.log(results.join("\n"));
   process.exit(results.some(r => r.startsWith("FAIL")) ? 1 : 0);
 }

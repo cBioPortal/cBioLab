@@ -2,6 +2,7 @@
 // The model reads the current document + result summary and may call
 // update_document to modify it; the client applies the returned doc and re-runs.
 import { runAnalysis } from "../../../lib/analysis.js";
+import { CHAT_GRAMMAR } from "../../../lib/dsl-reference.js";
 
 export const maxDuration = 60;
 
@@ -12,48 +13,7 @@ studies; other studies differ — timeline events exist mainly in MSK studies).
 You have intimate knowledge of its Analysis document DSL and you edit the SAME document the user
 sees: when you call update_document, the UI applies it and re-runs immediately.
 
-Document shape:
-{ "study": "<default study id>",
-  "cohorts": { "<name>": <cohortDef>, ... (max 6) },
-  "views": [ {"kind":"compare","genes":[...],"cohorts":[names?]},
-             {"kind":"survival","cohorts":[names?]},
-             {"kind":"oncoprint","genes":[...(max 12)],"clinical":["<attribute>", ...(max 8)]?,"cohorts":[names?]} ] }
-
-Oncoprint clinical tracks: any clinical attribute name works (patient- or sample-level; sample-level
-falls back to one sample's value per patient). Numeric attributes (age, TMB, ...) render as a
-continuous heat track with a min→max key; unknown attributes render a labeled "(no data)" track.
-
-cohortDef: { "all": [clause, ...], "study"?: "<id>", "studies"?: ["<id>", ...] } — clauses ANDed;
-a cohort may target another study or union across several (members are study-qualified; overlap
-across studies is NOT deduplicated — say so when comparing). Oncoprint views federate too: cross-study columns are qualified per study (duplicates appear twice) and a Study track shows each column's origin.
-clause = leaf | {"any":[leaf,...]} | {"not":leaf}.
-Leaf kinds:
-- {"kind":"oql","q":"STK11: DRIVER"} — genomic status in cBioPortal OQL (preferred; full notes below).
-- {"kind":"clinical","attribute":"GENDER","op":"=","value":"Male"} (ops = != > >= < <=; numeric values compare numerically).
-  Useful attributes: OS_STATUS (0:LIVING/1:DECEASED), OS_MONTHS, GENDER, RACE, CURRENT_AGE_DEID,
-  SMOKING_PREDICTIONS_3_CLASSES (Former/Current Smoker, Never, Unknown), CANCER_TYPE-site flags (LUNG, LIVER, BONE... values Yes/No).
-- {"kind":"event", "a":{selector}, "b":{selector}?, "rel":{...}, "priorGuard":bool} — timeline DSL:
-  selectors: eventType (Treatment, Diagnosis, Lab_Test, Surgery, Pathology, "Treatment line (derived)"),
-  attrs [{key,value}] (Treatment SUBTYPE: Immuno/Chemo/Targeted/Hormone/Biologic/Radiation Therapy;
-  Diagnosis PROGRESSION=Y; Lab_Test TEST: PSA/CEA/CA 15-3/CA 19-9 with numeric{key:"RESULT",op,value});
-  occurrence ANY|FIRST|LAST. rel: {"type":"NONE"} | {"type":"BEFORE","minDays":0,"maxDays":N} |
-  {"type":"DURING"} | {"type":"NOT_FOLLOWED_BY","withinDays":N,"observed":true}.
-  For absence queries ALWAYS set observed:true (else "no event" conflates with lost-to-follow-up).
-  priorGuard:true restricts to treatment-naive patients — REQUIRED for honest "first-line" claims
-  (~20% of patients had prior treatment elsewhere, ~20% undetermined).
-- {"kind":"patients","ids":[...]} — explicit list.
-- {"kind":"clinical",...} also supports "values":[...] (OR across values), "range":{"gte":60,"lt":80}
-  (numeric), and "per":"sample" (patient matches if ANY sample matches — say so when used).
-- {"kind":"profiled","type":"MUTATION"|"CNA"|"SV"} — patient was profiled for that data type
-  (use with {"not":...} to distinguish wild-type from not-profiled).
-- {"kind":"caseList","id":"sequenced"|"cna"|full stable id} — portal case lists.
-- {"kind":"genomicData","gene":"CDKN2A","profileType":"cna","range":{"lte":-2}} — continuous
-  per-gene values; profile must exist in the study or it errors listing what does.
-- OQL EXP>z / PROT>z work only if the study has mRNA/protein profiles (msk_chord does not).
-- OQL details for {"kind":"oql"}: per gene MUT,
-  MUT=<pchange>, MISSENSE/NONSENSE/TRUNC/INFRAME/SPLICE, AMP, HOMDEL, FUSION, DRIVER and _DRIVER
-  modifiers; entries separated by ';' are OR'd (portal "altered in query" semantics).
-  GAIN/HETLOSS/EXP/PROT/GERMLINE are rejected — do not use them.
+${CHAT_GRAMMAR}
 
 Rules: keep cohort names short and meaningful. Preserve parts of the document the user didn't ask to
 change. Surface caveats (panel-aware denominators, VUS vs driver, left truncation in survival,

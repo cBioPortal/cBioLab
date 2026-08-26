@@ -5,7 +5,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start -p 3000",
-    "mcp": "node mcp/server.js"
+    "mcp": "node mcp/server.js",
+    "docs:gen": "node scripts/gen-dsl-doc.mjs",
+    "docs:check": "node --env-file=.env.local scripts/check-dsl-doc.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
