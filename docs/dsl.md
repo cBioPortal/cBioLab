@@ -24,7 +24,7 @@ Sent to `POST /api/analysis`, edited by the in-app chat, and encoded in shareabl
 ```
 cohortDef := { "all": [clause × 1-8],         // ANDed (INTERSECT DISTINCT)
                "study"?:   "<id>",            // evaluate in another study
-               "studies"?: ["<id>" × ≤8],     // union across studies (federated)
+               "studies"?: ["<id>", ...],     // union across studies (federated, no count limit)
                "lineGap"?: 90 }               // derived-treatment-line gap, days
 clause    := leaf | { "any": [leaf × 1-8] }   // OR (UNION DISTINCT)
                   | { "not": leaf }           // study base EXCEPT leaf

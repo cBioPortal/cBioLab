@@ -93,6 +93,8 @@ export default function AnalysisPage() {
   const [sCaps, setSCaps] = useState(() => new Set());                  // study-panel capability filters
   const [exStudies, setExStudies] = useState(["msk_chord_2024"]);       // studies being explored (checkboxes)
   const [exPanelOpen, setExPanelOpen] = useState(false);                // study panel expanded?
+  const exSel = useRef(["msk_chord_2024"]);                             // current selection (ref: immune to state races)
+  const exFetchTimer = useRef(null);                                    // debounce for multi-toggle refetch
   const [qaAttr, setQaAttr] = useState("");                             // creator quick-add: attribute
   const [qaVal, setQaVal] = useState("");                               // creator quick-add: numeric threshold
   const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
@@ -208,22 +210,27 @@ export default function AnalysisPage() {
 
   const switchStudy = (id) => {
     setStudy(id);
-    setExStudies([id]);
+    setExStudies([id]); exSel.current = [id];
     const d = { study: id, cohorts: {}, views: [] };
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setCPreview(null); setExEvals({});
     setExplore(null);
   };
 
   // toggle a study in the explore selection; the draft def carries "studies"
-  // (so Save / Preview / Add-to-analysis all evaluate federated) when > 1
+  // (so Save / Preview / Add-to-analysis all evaluate federated) when > 1.
+  // exSel (ref) is the always-current selection so rapid checkbox toggles don't
+  // race on stale render-time state; the refetch is debounced so checking many
+  // boxes fires one request.
   const setExploreStudies = (ids) => {
     if (!ids.length) return;
+    exSel.current = ids;
     setExStudies(ids);
     let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
     if (!d || !Array.isArray(d.all)) d = { all: [] };
     if (ids.length > 1) d.studies = ids; else delete d.studies;
     setCDefText(JSON.stringify(d, null, 2));
-    fetchExplore(d.all.length ? d : null, ids);
+    clearTimeout(exFetchTimer.current);
+    exFetchTimer.current = setTimeout(() => fetchExplore(d.all.length ? d : null, ids), 350);
   };
 
   // clinical-track options for oncoprint views: union of attribute names across the
@@ -393,8 +400,9 @@ export default function AnalysisPage() {
             const byId = new Map(studies.map(s => [s.id, s]));
             const selPts = exStudies.reduce((n, id) => n + (byId.get(id) ? byId.get(id).patients : 0), 0);
             const toggle = (id) => {
-              const next = exStudies.includes(id) ? exStudies.filter(x => x !== id) : [...exStudies, id];
-              if (next.length && next.length <= 6) setExploreStudies(next);
+              const cur = exSel.current;
+              const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+              if (next.length) setExploreStudies(next);
             };
             const q = sQuery.trim().toLowerCase();
             const hits = studies.filter(s =>
@@ -423,28 +431,26 @@ export default function AnalysisPage() {
                         {label}
                       </button>
                     ))}
-                    <span className="meta">{hits.length.toLocaleString()} of {studies.length.toLocaleString()} · pick up to 6</span>
+                    <span className="meta">{hits.length.toLocaleString()} of {studies.length.toLocaleString()}</span>
                   </div>
                   {!studies.length && <div className="loading-block"><span className="spinner" /> Loading studies…</div>}
                   <div style={{ maxHeight: "22rem", overflowY: "auto" }}>
-                    {hits.slice(0, 100).map(s => (
-                      <label key={s.id} title={s.name}
-                        style={{ display: "flex", gap: "0.7rem", alignItems: "baseline", flexWrap: "wrap", padding: "0.4rem 0.5rem",
-                          borderTop: "1px solid var(--line)", cursor: "pointer", fontWeight: 400,
-                          background: exStudies.includes(s.id) ? "var(--code-bg)" : "transparent" }}>
-                        <input type="checkbox" checked={exStudies.includes(s.id)} onChange={() => toggle(s.id)} style={{ transform: "translateY(1px)" }} />
-                        <strong style={{ fontSize: "0.85rem" }}>{s.name}</strong>
-                        <span className="meta" style={{ fontFamily: "IBM Plex Mono, monospace" }}>{s.id}</span>
+                    {hits.slice(0, 200).map(s => (
+                      <label key={s.id} title={s.name} className={"study-row" + (exStudies.includes(s.id) ? " sel" : "")}>
+                        <input type="checkbox" checked={exStudies.includes(s.id)} onChange={() => toggle(s.id)} />
+                        <strong>{s.name}</strong>
+                        <span className="meta mono">{s.id}</span>
                         <span className="meta">{s.cancerType}</span>
-                        <span className="spacer" />
-                        <span className="meta" style={{ fontVariantNumeric: "tabular-nums" }}>{s.patients.toLocaleString()} pts</span>
-                        {s.timelinePatients > 0 && <span className="meta" style={{ color: "var(--accent-ink)" }}>timeline</span>}
-                        {s.caps && s.caps.mrna && <span className="meta">mRNA</span>}
-                        {s.caps && s.caps.protein && <span className="meta">protein</span>}
-                        {s.oncokb && <span className="meta" style={{ color: "var(--accent-ink)" }}>OncoKB ✓</span>}
+                        <span className="meta pts">{s.patients.toLocaleString()}</span>
+                        <span className="meta caps">{[
+                          s.timelinePatients > 0 ? "timeline" : null,
+                          s.caps && s.caps.mrna ? "mRNA" : null,
+                          s.caps && s.caps.protein ? "protein" : null,
+                          s.oncokb ? "OncoKB ✓" : null
+                        ].filter(Boolean).join(" · ")}</span>
                       </label>
                     ))}
-                    {hits.length > 100 && <p className="note">Showing the 100 largest of {hits.length.toLocaleString()} matches — refine the search.</p>}
+                    {hits.length > 200 && <p className="note">Showing the 200 largest of {hits.length.toLocaleString()} matches — refine the search.</p>}
                   </div>
                 </>}
               </div>

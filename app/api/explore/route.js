@@ -15,7 +15,7 @@ export async function POST(req) {
   try {
     const body = await req.json();
     const requested = Array.isArray(body.studies) && body.studies.length
-      ? body.studies.slice(0, 6) : [body.study];
+      ? body.studies : [body.study];
     const studies = [];
     for (const s of requested) studies.push(await resolveStudy(s));
     const pin = process.env.ONCOKB_PIN || await oncokbPin();

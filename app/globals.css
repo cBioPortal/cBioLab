@@ -180,3 +180,23 @@ button.facet {
 button.facet:hover { border-color: var(--accent); color: var(--accent-ink); }
 button.facet .meta { margin-left: 0.25rem; }
 button.facet.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+
+/* condensed study rows in the Explore study panel */
+.study-row {
+  display: grid;
+  grid-template-columns: 16px minmax(14rem, 2.4fr) minmax(9rem, 1.1fr) minmax(8rem, 1fr) 4.8rem minmax(8rem, 1fr);
+  gap: 0 0.6rem;
+  align-items: baseline;
+  padding: 0.13rem 0.4rem;
+  cursor: pointer;
+  font-weight: 400;
+  border-radius: 4px;
+}
+.study-row:hover { background: var(--code-bg); }
+.study-row.sel { background: var(--code-bg); }
+.study-row input[type="checkbox"] { transform: translateY(2px); margin: 0; }
+.study-row strong { font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.study-row .meta { font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.study-row .mono { font-family: "IBM Plex Mono", monospace; }
+.study-row .pts { text-align: right; font-variant-numeric: tabular-nums; }
+.study-row .caps { color: var(--accent-ink); }
