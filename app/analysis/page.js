@@ -91,6 +91,9 @@ export default function AnalysisPage() {
   const [trackAttrs, setTrackAttrs] = useState({ key: "", attrs: [] }); // clinical-track picker options
   const [sQuery, setSQuery] = useState("");                             // studies-tab search
   const [sCaps, setSCaps] = useState(() => new Set());                  // studies-tab capability filters
+  const [qaAttr, setQaAttr] = useState("");                             // creator quick-add: attribute
+  const [qaVal, setQaVal] = useState("");                               // creator quick-add: numeric threshold
+  const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
 
   const LS_KEY = "cohortlab.savedCohorts";
   const persist = (next) => { setSaved(next); try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {} };
@@ -231,6 +234,11 @@ export default function AnalysisPage() {
         setTrackAttrs({ key, attrs: [...seen.entries()].map(([attribute, kind]) => ({ attribute, kind })).sort((x, y) => x.attribute < y.attribute ? -1 : 1) });
       });
   }, [result]); // eslint-disable-line
+
+  // the creator's quick-add row needs the study catalog even before Explore is visited
+  useEffect(() => {
+    if (tab === "cohorts" && !explore && !exploreBusy) fetchExplore(null);
+  }, [tab, study, explore]); // eslint-disable-line
 
   const updateView = (vi, patch) => {
     const views = (doc.views || []).map((v, i) => i === vi ? patch(v) : v);
@@ -508,6 +516,45 @@ export default function AnalysisPage() {
             <label>Definition</label>
             <textarea value={cDefText} onChange={e => setCDefText(e.target.value)} spellCheck={false}
               style={{ width: "100%", height: "16rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
+            {explore && (
+              <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.4rem" }}>
+                <span className="meta">quick add:</span>
+                <select value={qaAttr} onChange={e => { setQaAttr(e.target.value); setQaVal(""); }} style={{ fontSize: "0.78rem", maxWidth: "14rem" }}>
+                  <option value="">attribute…</option>
+                  {explore.clinical.map(a => <option key={a.per + a.attribute} value={a.per + "|" + a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric)" : ""}{a.per === "sample" ? " ·sample" : ""}</option>)}
+                </select>
+                {(() => {
+                  const a = explore.clinical.find(x => qaAttr === x.per + "|" + x.attribute);
+                  if (!a) return null;
+                  const perExtra = a.per === "sample" ? { per: "sample" } : {};
+                  if (a.kind === "num") return (
+                    <>
+                      <span className="meta">min {a.min} · median {a.median} · max {a.max} —</span>
+                      <input placeholder="≥" value={qaVal} onChange={e => setQaVal(e.target.value)} style={{ width: "4.5rem", fontSize: "0.78rem" }} />
+                      <button className="facet" disabled={!Number.isFinite(Number(qaVal)) || qaVal === ""}
+                        onClick={() => { addClause({ kind: "clinical", attribute: a.attribute, range: { gte: Number(qaVal) }, ...perExtra }); setQaVal(""); }}>add ≥</button>
+                      <button className="facet" disabled={!Number.isFinite(Number(qaVal)) || qaVal === ""}
+                        onClick={() => { addClause({ kind: "clinical", attribute: a.attribute, range: { lt: Number(qaVal) }, ...perExtra }); setQaVal(""); }}>add &lt;</button>
+                    </>
+                  );
+                  return (
+                    <select value="" onChange={e => { if (e.target.value !== "") addClause({ kind: "clinical", attribute: a.attribute, op: "=", value: e.target.value, ...perExtra }); }}
+                      style={{ fontSize: "0.78rem", maxWidth: "14rem" }}>
+                      <option value="">value… (patients)</option>
+                      {a.values.map(v => <option key={v.v} value={v.v}>{v.v} ({v.n.toLocaleString()})</option>)}
+                    </select>
+                  );
+                })()}
+                <input list="qa-genes" placeholder="gene → OQL" value={qaGene} onChange={e => setQaGene(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && qaGene.trim()) { addClause({ kind: "oql", q: qaGene.trim().toUpperCase() + ":" }); setQaGene(""); } }}
+                  style={{ width: "9rem", fontSize: "0.78rem" }} />
+                <datalist id="qa-genes">
+                  {explore.genes.map(g => <option key={g.gene} value={g.gene}>{g.n.toLocaleString()} altered</option>)}
+                </datalist>
+                <button className="facet" disabled={!qaGene.trim()}
+                  onClick={() => { addClause({ kind: "oql", q: qaGene.trim().toUpperCase() + ":" }); setQaGene(""); }}>add gene</button>
+              </div>
+            )}
             {(() => { let d = null; try { d = JSON.parse(cDefText); } catch {} return d ? (
               <div style={{ margin: "0.55rem 0" }}>
                 <CohortPills def={d} onRemoveClause={(i) => {

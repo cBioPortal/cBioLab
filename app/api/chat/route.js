@@ -2,6 +2,7 @@
 // The model reads the current document + result summary and may call
 // update_document to modify it; the client applies the returned doc and re-runs.
 import { runAnalysis } from "../../../lib/analysis.js";
+import { catalogText } from "../../../lib/catalog-text.js";
 import { CHAT_GRAMMAR } from "../../../lib/dsl-reference.js";
 
 export const maxDuration = 60;
@@ -15,7 +16,9 @@ sees: when you call update_document, the UI applies it and re-runs immediately.
 
 ${CHAT_GRAMMAR}
 
-Rules: keep cohort names short and meaningful. Preserve parts of the document the user didn't ask to
+Rules: when unsure of an attribute name, value spelling, or event type in the current study, call
+get_catalog FIRST instead of guessing — vocabularies differ per study and a wrong value silently
+matches nobody. Keep cohort names short and meaningful. Preserve parts of the document the user didn't ask to
 change. Surface caveats (panel-aware denominators, VUS vs driver, left truncation in survival,
 prior-treatment guard) when they matter. After updating, briefly say what changed and what the user
 might look at next. If a request exceeds the DSL, say so plainly instead of approximating silently.`;
@@ -27,7 +30,15 @@ const TOOLS = [{
     type: "object", required: ["document"],
     properties: { document: { type: "object", description: "The full Analysis document" } }
   }
+}, {
+  name: "get_catalog",
+  description: "Look up a study's real queryable vocabulary: clinical attributes with their actual values and patient counts, timeline event types, most-altered genes, case lists, and molecular profiles. Use this BEFORE composing clauses whenever you are not certain of an attribute name, value spelling, or event type in the current study — especially in non-MSK studies.",
+  input_schema: {
+    type: "object",
+    properties: { study: { type: "string", description: "Study id; defaults to the current document's study" } }
+  }
 }];
+
 
 export async function GET() {
   return new Response(null, { status: process.env.ANTHROPIC_API_KEY ? 204 : 501 });
@@ -48,7 +59,7 @@ export async function POST(req) {
         "<current_results>\n" + String(resultSummary || "").slice(0, 3000) + "\n</current_results>"
     };
     let newDoc = null, reply = "";
-    for (let round = 0; round < 3; round++) {
+    for (let round = 0; round < 4; round++) {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
@@ -59,17 +70,22 @@ export async function POST(req) {
       const toolUse = (out.content || []).find(b => b.type === "tool_use");
       reply = (out.content || []).filter(b => b.type === "text").map(b => b.text).join("\n") || reply;
       if (!toolUse) break;
-      newDoc = toolUse.input.document;
-      // validate by running; feed a compact result back so the model can narrate real numbers
       let toolResult;
-      try {
-        const r = await runAnalysis(newDoc);
-        toolResult = "applied. cohorts: " +
-          Object.entries(r.cohorts).map(([n, c]) => `${n}=${c.count}`).join(", ") +
-          (r.views.some(v => v.kind === "survival") ? " | medians: " + r.views.find(v => v.kind === "survival").curves.map(c => `${c.cohort}:${c.median ? c.median.toFixed(1) : ">obs"}mo`).join(", ") : "");
-      } catch (e) {
-        toolResult = "REJECTED: " + String(e.message || e);
-        newDoc = null;
+      if (toolUse.name === "get_catalog") {
+        try { toolResult = await catalogText(toolUse.input.study || (doc && doc.study)); }
+        catch (e) { toolResult = "catalog lookup failed: " + String(e.message || e); }
+      } else {
+        newDoc = toolUse.input.document;
+        // validate by running; feed a compact result back so the model can narrate real numbers
+        try {
+          const r = await runAnalysis(newDoc);
+          toolResult = "applied. cohorts: " +
+            Object.entries(r.cohorts).map(([n, c]) => `${n}=${c.count}`).join(", ") +
+            (r.views.some(v => v.kind === "survival") ? " | medians: " + r.views.find(v => v.kind === "survival").curves.map(c => `${c.cohort}:${c.median ? c.median.toFixed(1) : ">obs"}mo`).join(", ") : "");
+        } catch (e) {
+          toolResult = "REJECTED: " + String(e.message || e);
+          newDoc = null;
+        }
       }
       convo.push({ role: "assistant", content: out.content });
       convo.push({ role: "user", content: [{ type: "tool_result", tool_use_id: toolUse.id, content: toolResult }] });
