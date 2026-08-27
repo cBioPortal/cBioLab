@@ -6,7 +6,7 @@ export async function GET() {
   try {
     if (!cache) {
       const r = await chQuery(
-        "SELECT sd.cancer_study_identifier AS id, any(cs.name) AS name,\n" +
+        "SELECT sd.cancer_study_identifier AS id, any(cs.name) AS name, any(cs.type_of_cancer_id) AS toc,\n" +
         "       uniqExact(sd.patient_unique_id) AS patients, uniqExact(sd.sample_unique_id) AS samples\n" +
         "FROM " + DB + ".sample_derived sd\n" +
         "JOIN " + DB + ".cancer_study cs ON cs.cancer_study_identifier = sd.cancer_study_identifier\n" +
@@ -18,11 +18,36 @@ export async function GET() {
         "JOIN " + DB + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
         "GROUP BY id");
       const evMap = new Map(ev.data.map(x => [x.id, Number(x.event_patients)]));
-      cache = r.data.map(x => ({
-        id: x.id, name: x.name,
-        patients: Number(x.patients), samples: Number(x.samples),
-        timelinePatients: evMap.get(x.id) || 0
-      }));
+      // molecular capabilities from genetic_profile (cheap: ~2.5k rows total)
+      const gp = await chQuery(
+        "SELECT cs.cancer_study_identifier AS id, groupUniqArray(gp.genetic_alteration_type) AS types\n" +
+        "FROM " + DB + ".genetic_profile gp\n" +
+        "JOIN " + DB + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+        "GROUP BY id");
+      const gpMap = new Map(gp.data.map(x => [x.id, new Set(x.types)]));
+      const toc = await chQuery("SELECT type_of_cancer_id AS id, name FROM " + DB + ".type_of_cancer");
+      const tocMap = new Map(toc.data.map(x => [x.id, x.name]));
+      // studies whose variants are synced into the OncoKB annotation store
+      let oncokb = new Set();
+      try {
+        const ok = await chQuery("SELECT DISTINCT study FROM oncokb_annotation.sync_run WHERE annotated_new > 0 OR already_stored > 0");
+        oncokb = new Set(ok.data.map(x => x.study));
+      } catch {}
+      cache = r.data.map(x => {
+        const types = gpMap.get(x.id) || new Set();
+        return {
+          id: x.id, name: x.name,
+          cancerType: tocMap.get(x.toc) || x.toc,
+          patients: Number(x.patients), samples: Number(x.samples),
+          timelinePatients: evMap.get(x.id) || 0,
+          caps: {
+            mut: types.has("MUTATION_EXTENDED"), cna: types.has("COPY_NUMBER_ALTERATION"),
+            sv: types.has("STRUCTURAL_VARIANT"), mrna: types.has("MRNA_EXPRESSION"),
+            protein: types.has("PROTEIN_LEVEL"), ga: types.has("GENERIC_ASSAY")
+          },
+          oncokb: oncokb.has(x.id)
+        };
+      });
     }
     return Response.json({ studies: cache });
   } catch (e) {
