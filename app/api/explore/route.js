@@ -1,4 +1,4 @@
-import { buildExplore } from "../../../lib/explore.js";
+import { buildExplore, buildExploreFederated } from "../../../lib/explore.js";
 import { studyProfiles, resolveStudy } from "../../../lib/analysis.js";
 import { chQuery } from "../../../lib/ch.js";
 
@@ -14,10 +14,18 @@ async function oncokbPin() {
 export async function POST(req) {
   try {
     const body = await req.json();
-    const study = await resolveStudy(body.study);
-    const { profiles, gaProfiles } = await studyProfiles(study);
+    const requested = Array.isArray(body.studies) && body.studies.length
+      ? body.studies.slice(0, 6) : [body.study];
+    const studies = [];
+    for (const s of requested) studies.push(await resolveStudy(s));
     const pin = process.env.ONCOKB_PIN || await oncokbPin();
-    return Response.json(await buildExplore({ study, draft: body.draft || null, oncokbPin: pin, profiles, gaProfiles }));
+    const profilesByStudy = new Map();
+    for (const s of studies) profilesByStudy.set(s, await studyProfiles(s));
+    if (studies.length === 1) {
+      const { profiles, gaProfiles } = profilesByStudy.get(studies[0]);
+      return Response.json(await buildExplore({ study: studies[0], draft: body.draft || null, oncokbPin: pin, profiles, gaProfiles }));
+    }
+    return Response.json(await buildExploreFederated({ studies, draft: body.draft || null, oncokbPin: pin, profilesByStudy }));
   } catch (e) {
     return Response.json({ error: String(e.message || e) }, { status: 400 });
   }

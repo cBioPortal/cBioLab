@@ -89,8 +89,10 @@ export default function AnalysisPage() {
   const [explore, setExplore] = useState(null);
   const [exploreBusy, setExploreBusy] = useState(false);
   const [trackAttrs, setTrackAttrs] = useState({ key: "", attrs: [] }); // clinical-track picker options
-  const [sQuery, setSQuery] = useState("");                             // studies-tab search
-  const [sCaps, setSCaps] = useState(() => new Set());                  // studies-tab capability filters
+  const [sQuery, setSQuery] = useState("");                             // study-panel search
+  const [sCaps, setSCaps] = useState(() => new Set());                  // study-panel capability filters
+  const [exStudies, setExStudies] = useState(["msk_chord_2024"]);       // studies being explored (checkboxes)
+  const [exPanelOpen, setExPanelOpen] = useState(false);                // study panel expanded?
   const [qaAttr, setQaAttr] = useState("");                             // creator quick-add: attribute
   const [qaVal, setQaVal] = useState("");                               // creator quick-add: numeric threshold
   const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
@@ -162,11 +164,12 @@ export default function AnalysisPage() {
 
   const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
 
-  const fetchExplore = async (draftOverride, studyOverride) => {
+  const fetchExplore = async (draftOverride, studiesOverride) => {
     setExploreBusy(true);
     try {
+      const list = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exStudies;
       const res = await fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ study: studyOverride || study, draft: draftOverride !== undefined ? draftOverride : parseDraft() }) });
+        body: JSON.stringify({ studies: list, draft: draftOverride !== undefined ? draftOverride : parseDraft() }) });
       const j = await res.json();
       if (!j.error) setExplore(j); else setError(j.error);
     } catch (e) { setError(String(e.message || e)); }
@@ -205,17 +208,22 @@ export default function AnalysisPage() {
 
   const switchStudy = (id) => {
     setStudy(id);
+    setExStudies([id]);
     const d = { study: id, cohorts: {}, views: [] };
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setCPreview(null); setExEvals({});
     setExplore(null);
   };
 
-  // from the Studies tab: make it the working study and land in its Explore tab
-  const goExplore = (id) => {
-    switchStudy(id);
-    setCDefText(JSON.stringify({ all: [] }, null, 2));
-    setTab("explore");
-    fetchExplore(null, id);
+  // toggle a study in the explore selection; the draft def carries "studies"
+  // (so Save / Preview / Add-to-analysis all evaluate federated) when > 1
+  const setExploreStudies = (ids) => {
+    if (!ids.length) return;
+    setExStudies(ids);
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
+    if (!d || !Array.isArray(d.all)) d = { all: [] };
+    if (ids.length > 1) d.studies = ids; else delete d.studies;
+    setCDefText(JSON.stringify(d, null, 2));
+    fetchExplore(d.all.length ? d : null, ids);
   };
 
   // clinical-track options for oncoprint views: union of attribute names across the
@@ -366,7 +374,6 @@ export default function AnalysisPage() {
         </div>
 
         <div className="tabs">
-          <button className={tab === "studies" ? "active" : ""} onClick={() => setTab("studies")}>Studies</button>
           <button className={tab === "explore" ? "active" : ""} onClick={() => { setTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
           <button className={tab === "cohorts" ? "active" : ""} onClick={() => setTab("cohorts")}>Cohorts</button>
           <button className={tab === "analysis" ? "active" : ""} onClick={() => setTab("analysis")}>Analysis</button>
@@ -374,56 +381,75 @@ export default function AnalysisPage() {
         {error && <div className="error">{error}</div>}
 
         {/* ================= Explore tab ================= */}
-        {tab === "studies" && (() => {
-          const CAP_FILTERS = [
-            ["timeline", "timeline events", s => s.timelinePatients > 0],
-            ["mrna", "mRNA", s => s.caps && s.caps.mrna],
-            ["protein", "protein", s => s.caps && s.caps.protein],
-            ["ga", "generic assay", s => s.caps && s.caps.ga],
-            ["oncokb", "OncoKB-synced", s => s.oncokb]
-          ];
-          const q = sQuery.trim().toLowerCase();
-          const hits = studies.filter(s =>
-            (!q || (s.name + " " + s.id + " " + (s.cancerType || "")).toLowerCase().includes(q)) &&
-            CAP_FILTERS.every(([k, , pred]) => !sCaps.has(k) || pred(s)));
-          return (
-            <div className="card">
-              <h2>Studies <span className="plain">— {hits.length.toLocaleString()} of {studies.length.toLocaleString()} loadable · click one to explore it</span></h2>
-              <div className="row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center", marginBottom: "0.6rem" }}>
-                <input placeholder="search name, id, or cancer type…" value={sQuery} onChange={e => setSQuery(e.target.value)}
-                  style={{ flex: 1, minWidth: "16rem" }} />
-                {CAP_FILTERS.map(([k, label]) => (
-                  <button key={k} className={"facet" + (sCaps.has(k) ? " on" : "")}
-                    onClick={() => setSCaps(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; })}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {!studies.length && <div className="loading-block"><span className="spinner" /> Loading studies…</div>}
-              <div>
-                {hits.slice(0, 100).map(s => (
-                  <div key={s.id} onClick={() => goExplore(s.id)} title="explore this study"
-                    style={{ display: "flex", gap: "0.7rem", alignItems: "baseline", flexWrap: "wrap", padding: "0.45rem 0.5rem",
-                      borderTop: "1px solid var(--line)", cursor: "pointer", background: s.id === study ? "var(--code-bg)" : "transparent" }}>
-                    <strong style={{ fontSize: "0.85rem" }}>{s.name}</strong>
-                    <span className="meta" style={{ fontFamily: "IBM Plex Mono, monospace" }}>{s.id}</span>
-                    <span className="meta">{s.cancerType}</span>
-                    <span className="spacer" />
-                    <span className="meta" style={{ fontVariantNumeric: "tabular-nums" }}>{s.patients.toLocaleString()} pts · {s.samples.toLocaleString()} samples</span>
-                    {s.timelinePatients > 0 && <span className="meta" style={{ color: "var(--accent-ink)" }}>timeline {s.timelinePatients.toLocaleString()}</span>}
-                    {s.caps && s.caps.mrna && <span className="meta">mRNA</span>}
-                    {s.caps && s.caps.protein && <span className="meta">protein</span>}
-                    {s.caps && s.caps.ga && <span className="meta">assay</span>}
-                    {s.oncokb && <span className="meta" style={{ color: "var(--accent-ink)" }}>OncoKB ✓</span>}
-                  </div>
-                ))}
-                {hits.length > 100 && <p className="note">Showing the 100 largest of {hits.length.toLocaleString()} matches — refine the search to narrow further.</p>}
-              </div>
-            </div>
-          );
-        })()}
-
         {tab === "explore" && <div>
+          {(() => {
+            const CAP_FILTERS = [
+              ["timeline", "timeline events", s => s.timelinePatients > 0],
+              ["mrna", "mRNA", s => s.caps && s.caps.mrna],
+              ["protein", "protein", s => s.caps && s.caps.protein],
+              ["ga", "generic assay", s => s.caps && s.caps.ga],
+              ["oncokb", "OncoKB-synced", s => s.oncokb]
+            ];
+            const byId = new Map(studies.map(s => [s.id, s]));
+            const selPts = exStudies.reduce((n, id) => n + (byId.get(id) ? byId.get(id).patients : 0), 0);
+            const toggle = (id) => {
+              const next = exStudies.includes(id) ? exStudies.filter(x => x !== id) : [...exStudies, id];
+              if (next.length && next.length <= 6) setExploreStudies(next);
+            };
+            const q = sQuery.trim().toLowerCase();
+            const hits = studies.filter(s =>
+              (!q || (s.name + " " + s.id + " " + (s.cancerType || "")).toLowerCase().includes(q)) &&
+              CAP_FILTERS.every(([k, , pred]) => !sCaps.has(k) || pred(s)));
+            return (
+              <div className="card">
+                <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <h2 style={{ margin: 0 }}>Exploring <span className="plain">— {exStudies.length} {exStudies.length === 1 ? "study" : "studies"} · {selPts.toLocaleString()} patients{exStudies.length > 1 ? " (overlap not deduplicated)" : ""}</span></h2>
+                  {exStudies.map(id => (
+                    <span key={id} className="qchip" title={byId.get(id) ? byId.get(id).name : id}>
+                      {id}
+                      {exStudies.length > 1 && <button className="linklike" style={{ marginLeft: "0.3rem" }} onClick={() => toggle(id)}>×</button>}
+                    </span>
+                  ))}
+                  <span className="spacer" />
+                  <button onClick={() => setExPanelOpen(!exPanelOpen)}>{exPanelOpen ? "done" : "add / change studies"}</button>
+                </div>
+                {exPanelOpen && <>
+                  <div className="row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center", margin: "0.6rem 0" }}>
+                    <input placeholder="search name, id, or cancer type…" value={sQuery} onChange={e => setSQuery(e.target.value)}
+                      style={{ flex: 1, minWidth: "16rem" }} />
+                    {CAP_FILTERS.map(([k, label]) => (
+                      <button key={k} className={"facet" + (sCaps.has(k) ? " on" : "")}
+                        onClick={() => setSCaps(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; })}>
+                        {label}
+                      </button>
+                    ))}
+                    <span className="meta">{hits.length.toLocaleString()} of {studies.length.toLocaleString()} · pick up to 6</span>
+                  </div>
+                  {!studies.length && <div className="loading-block"><span className="spinner" /> Loading studies…</div>}
+                  <div style={{ maxHeight: "22rem", overflowY: "auto" }}>
+                    {hits.slice(0, 100).map(s => (
+                      <label key={s.id} title={s.name}
+                        style={{ display: "flex", gap: "0.7rem", alignItems: "baseline", flexWrap: "wrap", padding: "0.4rem 0.5rem",
+                          borderTop: "1px solid var(--line)", cursor: "pointer", fontWeight: 400,
+                          background: exStudies.includes(s.id) ? "var(--code-bg)" : "transparent" }}>
+                        <input type="checkbox" checked={exStudies.includes(s.id)} onChange={() => toggle(s.id)} style={{ transform: "translateY(1px)" }} />
+                        <strong style={{ fontSize: "0.85rem" }}>{s.name}</strong>
+                        <span className="meta" style={{ fontFamily: "IBM Plex Mono, monospace" }}>{s.id}</span>
+                        <span className="meta">{s.cancerType}</span>
+                        <span className="spacer" />
+                        <span className="meta" style={{ fontVariantNumeric: "tabular-nums" }}>{s.patients.toLocaleString()} pts</span>
+                        {s.timelinePatients > 0 && <span className="meta" style={{ color: "var(--accent-ink)" }}>timeline</span>}
+                        {s.caps && s.caps.mrna && <span className="meta">mRNA</span>}
+                        {s.caps && s.caps.protein && <span className="meta">protein</span>}
+                        {s.oncokb && <span className="meta" style={{ color: "var(--accent-ink)" }}>OncoKB ✓</span>}
+                      </label>
+                    ))}
+                    {hits.length > 100 && <p className="note">Showing the 100 largest of {hits.length.toLocaleString()} matches — refine the search.</p>}
+                  </div>
+                </>}
+              </div>
+            );
+          })()}
           <div className="card">
             <h2>Draft cohort <span className="plain">— click anything below to add a clause; counts narrow to your draft</span></h2>
             <div className="row" style={{ alignItems: "center" }}>
