@@ -95,6 +95,7 @@ export default function AnalysisPage() {
   const [exPanelOpen, setExPanelOpen] = useState(false);                // study panel expanded?
   const exSel = useRef(["msk_chord_2024"]);                             // current selection (ref: immune to state races)
   const exFetchTimer = useRef(null);                                    // debounce for multi-toggle refetch
+  const exFetchSeq = useRef(0);                                         // stale-response guard for explore fetches
   const [qaAttr, setQaAttr] = useState("");                             // creator quick-add: attribute
   const [qaVal, setQaVal] = useState("");                               // creator quick-add: numeric threshold
   const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
@@ -167,15 +168,18 @@ export default function AnalysisPage() {
   const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
 
   const fetchExplore = async (draftOverride, studiesOverride) => {
+    const seq = ++exFetchSeq.current; // a later call (or an emptied selection) supersedes this one
     setExploreBusy(true);
     try {
-      const list = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exStudies;
+      const list = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current;
+      if (!list.length) { setExplore(null); setExploreBusy(false); return; }
       const res = await fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ studies: list, draft: draftOverride !== undefined ? draftOverride : parseDraft() }) });
       const j = await res.json();
+      if (seq !== exFetchSeq.current) return; // superseded while in flight — discard
       if (!j.error) setExplore(j); else setError(j.error);
-    } catch (e) { setError(String(e.message || e)); }
-    setExploreBusy(false);
+    } catch (e) { if (seq === exFetchSeq.current) setError(String(e.message || e)); }
+    if (seq === exFetchSeq.current) setExploreBusy(false);
   };
 
   const addClause = (clause) => {
@@ -222,7 +226,6 @@ export default function AnalysisPage() {
   // race on stale render-time state; the refetch is debounced so checking many
   // boxes fires one request.
   const setExploreStudies = (ids) => {
-    if (!ids.length) return;
     exSel.current = ids;
     setExStudies(ids);
     let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
@@ -230,6 +233,7 @@ export default function AnalysisPage() {
     if (ids.length > 1) d.studies = ids; else delete d.studies;
     setCDefText(JSON.stringify(d, null, 2));
     clearTimeout(exFetchTimer.current);
+    if (!ids.length) { exFetchSeq.current++; setExplore(null); setExploreBusy(false); setExPanelOpen(true); return; } // empty selection: clear facets (and void in-flight fetches), keep the picker open
     exFetchTimer.current = setTimeout(() => fetchExplore(d.all.length ? d : null, ids), 350);
   };
 
@@ -252,7 +256,7 @@ export default function AnalysisPage() {
 
   // the creator's quick-add row needs the study catalog even before Explore is visited
   useEffect(() => {
-    if (tab === "cohorts" && !explore && !exploreBusy) fetchExplore(null);
+    if (tab === "cohorts" && !explore && !exploreBusy && exStudies.length) fetchExplore(null);
   }, [tab, study, explore]); // eslint-disable-line
 
   const updateView = (vi, patch) => {
@@ -401,8 +405,7 @@ export default function AnalysisPage() {
             const selPts = exStudies.reduce((n, id) => n + (byId.get(id) ? byId.get(id).patients : 0), 0);
             const toggle = (id) => {
               const cur = exSel.current;
-              const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
-              if (next.length) setExploreStudies(next);
+              setExploreStudies(cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
             };
             const q = sQuery.trim().toLowerCase();
             const hits = studies.filter(s =>
@@ -411,11 +414,12 @@ export default function AnalysisPage() {
             return (
               <div className="card">
                 <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <h2 style={{ margin: 0 }}>Exploring <span className="plain">— {exStudies.length} {exStudies.length === 1 ? "study" : "studies"} · {selPts.toLocaleString()} patients{exStudies.length > 1 ? " (overlap not deduplicated)" : ""}</span></h2>
+                  <h2 style={{ margin: 0 }}>Exploring <span className="plain">— {exStudies.length === 0 ? "no studies selected" :
+                    exStudies.length + (exStudies.length === 1 ? " study" : " studies") + " · " + selPts.toLocaleString() + " patients" + (exStudies.length > 1 ? " (overlap not deduplicated)" : "")}</span></h2>
                   {exStudies.map(id => (
                     <span key={id} className="qchip" title={byId.get(id) ? byId.get(id).name : id}>
                       {id}
-                      {exStudies.length > 1 && <button className="linklike" style={{ marginLeft: "0.3rem" }} onClick={() => toggle(id)}>×</button>}
+                      <button className="linklike" style={{ marginLeft: "0.3rem" }} onClick={() => toggle(id)}>×</button>
                     </span>
                   ))}
                   <span className="spacer" />
@@ -472,7 +476,9 @@ export default function AnalysisPage() {
               <button onClick={clearDraft}>Clear</button>
             </div>
           </div>
-          {!explore && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
+          {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "0.85rem", margin: 0 }}>
+            No studies selected — check one or more above to explore. A draft built with no selection evaluates against the working study ({study}).</p></div>}
+          {!explore && exStudies.length > 0 && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
           {explore && <div className="two-col" style={{ alignItems: "start" }}>
             <div>
               <div className="card">
