@@ -6,3 +6,4 @@ server.log
 nohup.out
 *.png
 mcp.log
+server-analysis.log
