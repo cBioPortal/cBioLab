@@ -7,6 +7,7 @@ import { contractToSvg } from "../lib/oncoprint-svg.js";
 import sharp from "sharp";
 import { ensureFonts } from "../lib/fonts.js";
 import { renderDslMarkdown } from "../lib/dsl-reference.js";
+import { runAnalysis } from "../lib/analysis.js";
 
 // ---------- shared zod fragments (mirrors docs/cohort-query.schema.json) ----------
 const zSelector = z.object({
@@ -63,6 +64,53 @@ export function registerTools(server) {
     async () => ({ content: [{ type: "text", text: renderDslMarkdown() }] })
   );
 
+
+  server.tool(
+    "run_analysis",
+    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), survival (Kaplan-Meier), and oncoprint (returned as a PNG). Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
+    {
+      document: z.object({}).passthrough()
+        .describe("The Analysis document: {study, cohorts: {name: def, ...}, views: [...]}. Grammar and examples: describe_dsl.")
+    },
+    async ({ document }) => {
+      let r;
+      try { r = await runAnalysis(document); }
+      catch (e) { return text("REJECTED: " + String(e.message || e) + "\nCall describe_dsl for the grammar and runnable examples."); }
+      const base = process.env.APP_BASE_URL || "https://cohort-lab.vercel.app";
+      const docB64 = Buffer.from(JSON.stringify(document)).toString("base64url");
+      const content = [];
+      const out = [];
+      out.push(`Analysis over ${r.involvedStudies.join(" + ")} — OncoKB pin ${r.oncokbPin || "none"} — ${r.stats.ms}ms.`);
+      out.push("Cohorts:\n" + Object.entries(r.cohorts)
+        .map(([n, c]) => `- ${n}: ${c.count.toLocaleString()} patients — ${c.text}`).join("\n"));
+      let images = 0;
+      for (const v of r.views) {
+        if (v.error) { out.push(`View ${v.kind}: ERROR — ${v.error}`); continue; }
+        if (v.kind === "compare") {
+          const rows = v.rows.slice(0, 20).map(row =>
+            `  ${row.gene}: ` + row.cells.map(c => `${c.cohort} ${c.driverPct}%/${c.anyPct}%`).join(" | ") +
+            (row.pAny != null ? `  p=${row.pAny < 1e-4 ? row.pAny.toExponential(1) : row.pAny.toFixed(4)}` : ""));
+          out.push(`Compare (driver%/any%, panel-aware denominators; annotation ${v.annotation}):\n` + rows.join("\n") +
+            (v.note ? "\nNOTE: " + v.note : ""));
+        } else if (v.kind === "survival") {
+          out.push("Survival (KM, overall survival):\n" + v.curves.map(c =>
+            `  ${c.cohort}: median ${c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n=${c.n}, ${c.events} events${c.missing ? ", " + c.missing + " missing OS" : ""})`).join("\n") +
+            "\nCAVEAT (tell the user): " + v.caveat);
+        } else if (v.kind === "oncoprint" && v.svg && images < 2) {
+          images++;
+          ensureFonts();
+          const png = await sharp(Buffer.from(v.svg), { density: 144 }).png().toBuffer();
+          content.push({ type: "image", data: png.toString("base64"), mimeType: "image/png" });
+          out.push(`Oncoprint: ${v.nColumns.toLocaleString()} patients — ` +
+            v.genes.map(g => `${g.gene} ${g.driverPct}%/${g.anyPct}%`).join(", ") +
+            ` — annotation ${v.annotation}.` + (v.note ? "\nNOTE (tell the user): " + v.note : ""));
+        }
+      }
+      out.push(`Interactive editor (share with the user — opens this exact document, live): ${base}/analysis?doc=${docB64}` +
+        `\nThat page also shows the generated SQL for every cohort (full provenance).`);
+      content.push({ type: "text", text: out.join("\n\n") });
+      return { content };
+    });
 
   server.tool(
     "describe_study",
