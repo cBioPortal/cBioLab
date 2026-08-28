@@ -200,3 +200,17 @@ button.facet.on { border-color: var(--accent); background: var(--accent-soft); c
 .study-row .mono { font-family: "IBM Plex Mono", monospace; }
 .study-row .pts { text-align: right; font-variant-numeric: tabular-nums; }
 .study-row .caps { color: var(--accent-ink); }
+
+/* gear menu (oncoprint card options) */
+details.gearmenu { position: relative; }
+details.gearmenu > summary { list-style: none; cursor: pointer; color: var(--muted); font-size: 1rem; line-height: 1; padding: 0.15rem 0.35rem; border-radius: 5px; user-select: none; }
+details.gearmenu > summary::-webkit-details-marker { display: none; }
+details.gearmenu > summary:hover, details.gearmenu[open] > summary { color: var(--ink); background: var(--code-bg); }
+details.gearmenu > .gearmenu-items {
+  position: absolute; right: 0; top: 1.7rem; z-index: 30;
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.55rem 0.75rem; min-width: 18rem; max-width: 24rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  display: flex; flex-direction: column; gap: 0.25rem;
+}
+.gearmenu-items a { color: var(--accent-ink); font-size: 0.8rem; }

@@ -727,7 +727,28 @@ export default function AnalysisPage() {
                   <p className="note">{v.caveat}</p>
                 </>}
                 {v.kind === "oncoprint" && v.svg && <>
-                  <h2>Oncoprint <span className="plain">— {v.nColumns.toLocaleString()} patients · {v.annotation}</span></h2>
+                  <div className="row" style={{ alignItems: "baseline" }}>
+                    <h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {v.nColumns.toLocaleString()} patients · {v.annotation}</span></h2>
+                    <span className="spacer" />
+                    <details className="gearmenu">
+                      <summary title="oncoprint options">⚙</summary>
+                      <div className="gearmenu-items">
+                        {(() => {
+                          const vNames = (doc.views && doc.views[vi] && doc.views[vi].cohorts) || Object.keys(result.cohorts);
+                          const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];
+                          const genes = (v.genes || []).map(g => g.gene);
+                          const url = "https://www.cbioportal.org/results/oncoprint?cancer_study_list=" + vStudies.join(",") +
+                            "&case_set_id=" + (vStudies.length === 1 ? vStudies[0] + "_all" : "all") +
+                            "&gene_list=" + encodeURIComponent(genes.join(" ")) +
+                            "&profileFilter=mutations%2Cstructural_variants%2Cgistic&Z_SCORE_THRESHOLD=2.0&tab_index=tab_visualize&Action=Submit";
+                          return <>
+                            <a target="_blank" rel="noopener noreferrer" href={url}>Open these genes in the cBioPortal oncoprint ↗</a>
+                            <span className="meta">full {vStudies.length === 1 ? "study" : vStudies.length + "-study"} view, all samples — the portal can't express Cohort Lab cohorts or tracks</span>
+                          </>;
+                        })()}
+                      </div>
+                    </details>
+                  </div>
                   {v.note && <p className="note">{v.note}</p>}
                   <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", margin: "0.35rem 0 0.5rem" }}>
                     <span className="meta">clinical tracks:</span>
