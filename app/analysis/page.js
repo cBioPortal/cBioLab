@@ -786,14 +786,14 @@ export default function AnalysisPage() {
                       <button key={h.profileType} className="linklike" disabled={busy} title="remove this heatmap"
                         onClick={() => setViewHeatmap(vi, (doc.views[vi].heatmap || []).filter((_, j) => j !== hi))}>{h.profileType} ✕</button>
                     ))}
-                    <select value="" disabled={busy || !(trackAttrs.profiles || []).length}
+                    <select value="" disabled={busy}
                       onChange={e => { const p = e.target.value; if (!p) return;
                         const cur = (doc.views && doc.views[vi] && doc.views[vi].heatmap) || [];
                         if (!cur.some(h => h.profileType === p) && cur.length < 4) setViewHeatmap(vi, [...cur, { profileType: p }]); }}
                       style={{ fontSize: "0.78rem" }}>
-                      <option value="">{(trackAttrs.profiles || []).length ? "add heatmap…" : "no continuous profiles"}</option>
-                      {(trackAttrs.profiles || []).filter(p => !((doc.views && doc.views[vi] && doc.views[vi].heatmap) || []).some(h => h.profileType === p))
-                        .map(p => <option key={p} value={p}>{p}</option>)}
+                      <option value="">add heatmap…</option>
+                      {["VAF", ...(trackAttrs.profiles || [])].filter(p => !((doc.views && doc.views[vi] && doc.views[vi].heatmap) || []).some(h => h.profileType === p))
+                        .map(p => <option key={p} value={p}>{p === "VAF" ? "VAF (mutation allele fraction)" : p}</option>)}
                     </select>
                     <span className="meta">sort:</span>
                     <select value={(doc.views && doc.views[vi] && doc.views[vi].sort && doc.views[vi].sort[0]) || "genomic"}

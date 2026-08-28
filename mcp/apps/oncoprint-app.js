@@ -85,7 +85,7 @@ const ARGS = {
     .describe("Optional named cohorts as v2 cohortDefs (describe_dsl) — each becomes a column group; omit for all study patients"),
   clinical: z.array(z.string()).max(8).nullish().describe("Clinical attribute tracks; numeric attributes render as heat"),
   heatmap: z.array(z.object({ profileType: z.string().max(120), genes: z.array(z.string()).max(12).nullish() })).max(4).nullish()
-    .describe("Continuous molecular-profile heatmap tracks, e.g. [{profileType:'mrna_median_Zscores'}] — one row per gene (defaults to the gene tracks); z-score profiles render on a fixed diverging +-3 ramp; unknown profiles error listing what the study has"),
+    .describe("Continuous molecular-profile heatmap tracks, e.g. [{profileType:'mrna_median_Zscores'}] — one row per gene (defaults to the gene tracks); z-score profiles render on a fixed diverging +-3 ramp; unknown profiles error listing what the study has; profileType 'VAF' is a synthetic profile rendering mutation variant-allele fraction from loaded alt/ref counts"),
   sort: z.array(z.string()).max(4).nullish()
     .describe("Column sort keys: 'genomic' (default staircase), a clinical track label, or '-label' descending")
 };

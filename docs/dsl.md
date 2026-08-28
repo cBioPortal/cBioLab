@@ -111,7 +111,9 @@ samples, since columns are patients). Z-score profiles render on a **fixed diver
 blue→white→red ramp** so colors are comparable across oncoprints; other sign-spanning data gets a
 symmetric diverging ramp; positive-only data a sequential ramp. Track labels are
 `GENE <short-profile>` (e.g. `ERBB2 mRNA-z`) and are valid `sort` keys. Unknown profiles
-error loudly, listing what the study has.
+error loudly, listing what the study has. The synthetic profile `"VAF"` renders variant allele
+fraction computed from mutation allele counts (max across a patient's mutations in the gene,
+fixed 0–1 ramp) — available wherever the study loaded tumor alt/ref counts.
 
 **Oncoprint sorting**: `sort` is an ordered list of track keys — `"genomic"` (the default
 staircase: alteration type + driver rank across the gene tracks), a clinical or derived-event track

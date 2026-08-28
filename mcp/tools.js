@@ -201,7 +201,7 @@ export function registerTools(server) {
         .describe("Column sort: ordered track keys — 'genomic' (default staircase), a clinical track label (must also be in clinical), or '-label' for descending; missing values sort last"),
       clinical: z.array(z.string()).max(8).nullish().describe("Clinical attribute tracks, e.g. ['OS_STATUS','CURRENT_AGE_DEID']; sample-level attributes fall back to a sample value per patient; numeric attributes render as continuous heat tracks; unknown names render a labeled '(no data)' track"),
       heatmap: z.array(z.object({ profileType: z.string().max(120), genes: z.array(z.string()).max(12).nullish() })).max(4).nullish()
-        .describe("Continuous molecular-profile heatmap tracks (portal-style), e.g. [{profileType:'mrna_median_Zscores'}] — one row per gene (defaults to the gene tracks), patient value = mean across samples; z-score profiles use a fixed diverging +-3 blue-white-red ramp; unknown profiles error listing what the study has")
+        .describe("Continuous molecular-profile heatmap tracks (portal-style), e.g. [{profileType:'mrna_median_Zscores'}] — one row per gene (defaults to the gene tracks), patient value = mean across samples; z-score profiles use a fixed diverging +-3 blue-white-red ramp; unknown profiles error listing what the study has; profileType 'VAF' is a synthetic profile rendering mutation variant-allele fraction from loaded alt/ref counts")
     },
     async ({ genes, cohort, groups, derivedEventTracks, clinical, heatmap, sort, patientList }) => {
       const spec = {
