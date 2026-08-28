@@ -52,7 +52,7 @@ export function downsampleContract(contract, maxCols = MAX_APP_COLUMNS) {
     const cells = new Array(ranges.length);
     for (let bi = 0; bi < ranges.length; bi++) {
       const [i0, i1] = ranges[bi];
-      if (t.kind === "clinical" && t.numeric) {
+      if (t.numeric) {
         let sum = 0, nn = 0;
         for (let i = i0; i < i1; i++) if (t.cells[i] !== -1) { sum += t.cells[i]; nn++; }
         cells[bi] = nn ? Math.round(sum / nn) : -1;
@@ -84,6 +84,8 @@ const ARGS = {
   cohorts: z.record(z.any()).nullish()
     .describe("Optional named cohorts as v2 cohortDefs (describe_dsl) — each becomes a column group; omit for all study patients"),
   clinical: z.array(z.string()).max(8).nullish().describe("Clinical attribute tracks; numeric attributes render as heat"),
+  heatmap: z.array(z.object({ profileType: z.string().max(120), genes: z.array(z.string()).max(12).nullish() })).max(4).nullish()
+    .describe("Continuous molecular-profile heatmap tracks, e.g. [{profileType:'mrna_median_Zscores'}] — one row per gene (defaults to the gene tracks); z-score profiles render on a fixed diverging +-3 ramp; unknown profiles error listing what the study has"),
   sort: z.array(z.string()).max(4).nullish()
     .describe("Column sort keys: 'genomic' (default staircase), a clinical track label, or '-label' descending")
 };
@@ -124,7 +126,7 @@ export function registerOncoprintApp(server) {
             })) } }
           : null;
         const contract = await buildContract({
-          study, genes: args.genes, clinical: args.clinical || [], sort: args.sort,
+          study, genes: args.genes, clinical: args.clinical || [], sort: args.sort, heatmap: args.heatmap || [],
           derivedEvents: [], cohort: null, layout, conventions: { lineGap: 90 }
         });
         const appContract = downsampleContract(contract);

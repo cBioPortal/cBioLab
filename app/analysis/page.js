@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
+import { heatmapTrackLabel } from "../../lib/profile-names.js";
 
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
 const IMMUNO_EVENT = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
@@ -88,7 +89,7 @@ export default function AnalysisPage() {
   const [study, setStudy] = useState("msk_chord_2024");
   const [explore, setExplore] = useState(null);
   const [exploreBusy, setExploreBusy] = useState(false);
-  const [trackAttrs, setTrackAttrs] = useState({ key: "", attrs: [] }); // clinical-track picker options
+  const [trackAttrs, setTrackAttrs] = useState({ key: "", attrs: [], profiles: [] }); // track picker options
   const [sQuery, setSQuery] = useState("");                             // study-panel search
   const [sCaps, setSCaps] = useState(() => new Set());                  // study-panel capability filters
   const [exStudies, setExStudies] = useState(["msk_chord_2024"]);       // studies being explored (checkboxes)
@@ -249,8 +250,13 @@ export default function AnalysisPage() {
         .then(r => r.json()).catch(() => null)))
       .then(js => {
         const seen = new Map(); // attribute -> kind
-        for (const j of js) if (j && j.clinical) for (const a of j.clinical) if (!seen.has(a.attribute)) seen.set(a.attribute, a.kind);
-        setTrackAttrs({ key, attrs: [...seen.entries()].map(([attribute, kind]) => ({ attribute, kind })).sort((x, y) => x.attribute < y.attribute ? -1 : 1) });
+        const profs = new Set(); // continuous molecular profiles (for heatmap tracks)
+        for (const j of js) if (j) {
+          if (j.clinical) for (const a of j.clinical) if (!seen.has(a.attribute)) seen.set(a.attribute, a.kind);
+          for (const p of j.profiles || []) if (p !== "cna") profs.add(p); // discrete cna isn't a heatmap
+        }
+        setTrackAttrs({ key, attrs: [...seen.entries()].map(([attribute, kind]) => ({ attribute, kind })).sort((x, y) => x.attribute < y.attribute ? -1 : 1),
+          profiles: [...profs].sort() });
       });
   }, [result]); // eslint-disable-line
 
@@ -265,13 +271,23 @@ export default function AnalysisPage() {
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
   };
 
-  const setViewClinical = (vi, attrs) => updateView(vi, v => {
-    // drop sort keys whose track was just removed
-    const keep = new Set(["genomic", "Study", ...attrs]);
+  const heatmapLabels = (v) => (v.heatmap || []).flatMap(h =>
+    (h.genes && h.genes.length ? h.genes : v.genes || []).map(g => heatmapTrackLabel(String(g).toUpperCase(), h.profileType)));
+
+  const pruneSort = (v) => {
+    // drop sort keys whose track no longer exists
+    const keep = new Set(["genomic", "Study", ...(v.clinical || []), ...heatmapLabels(v)]);
     const sort = (v.sort || []).filter(s => keep.has(String(s).replace(/^-/, "")));
-    const next = { ...v, clinical: attrs };
-    if (sort.length) next.sort = sort; else delete next.sort;
-    return next;
+    if (sort.length) v.sort = sort; else delete v.sort;
+    return v;
+  };
+
+  const setViewClinical = (vi, attrs) => updateView(vi, v => pruneSort({ ...v, clinical: attrs }));
+
+  const setViewHeatmap = (vi, entries) => updateView(vi, v => {
+    const next = { ...v };
+    if (entries.length) next.heatmap = entries; else delete next.heatmap;
+    return pruneSort(next);
   });
 
   const setViewSort = (vi, key) => updateView(vi, v => {
@@ -765,6 +781,20 @@ export default function AnalysisPage() {
                       {trackAttrs.attrs.filter(a => !((doc.views && doc.views[vi] && doc.views[vi].clinical) || []).includes(a.attribute))
                         .map(a => <option key={a.attribute} value={a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric)" : ""}</option>)}
                     </select>
+                    <span className="meta">heatmap:</span>
+                    {((doc.views && doc.views[vi] && doc.views[vi].heatmap) || []).map((h, hi) => (
+                      <button key={h.profileType} className="linklike" disabled={busy} title="remove this heatmap"
+                        onClick={() => setViewHeatmap(vi, (doc.views[vi].heatmap || []).filter((_, j) => j !== hi))}>{h.profileType} ✕</button>
+                    ))}
+                    <select value="" disabled={busy || !(trackAttrs.profiles || []).length}
+                      onChange={e => { const p = e.target.value; if (!p) return;
+                        const cur = (doc.views && doc.views[vi] && doc.views[vi].heatmap) || [];
+                        if (!cur.some(h => h.profileType === p) && cur.length < 4) setViewHeatmap(vi, [...cur, { profileType: p }]); }}
+                      style={{ fontSize: "0.78rem" }}>
+                      <option value="">{(trackAttrs.profiles || []).length ? "add heatmap…" : "no continuous profiles"}</option>
+                      {(trackAttrs.profiles || []).filter(p => !((doc.views && doc.views[vi] && doc.views[vi].heatmap) || []).some(h => h.profileType === p))
+                        .map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
                     <span className="meta">sort:</span>
                     <select value={(doc.views && doc.views[vi] && doc.views[vi].sort && doc.views[vi].sort[0]) || "genomic"}
                       disabled={busy} onChange={e => setViewSort(vi, e.target.value)} style={{ fontSize: "0.78rem" }}>
@@ -773,6 +803,10 @@ export default function AnalysisPage() {
                       {((doc.views && doc.views[vi] && doc.views[vi].clinical) || []).flatMap(a => [
                         <option key={a} value={a}>{a} ↑</option>,
                         <option key={"-" + a} value={"-" + a}>{a} ↓</option>
+                      ])}
+                      {doc.views && doc.views[vi] && heatmapLabels(doc.views[vi]).flatMap(l => [
+                        <option key={l} value={l}>{l} ↑</option>,
+                        <option key={"-" + l} value={"-" + l}>{l} ↓</option>
                       ])}
                     </select>
                   </div>

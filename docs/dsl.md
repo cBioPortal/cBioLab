@@ -94,7 +94,7 @@ rel      := { "type": "NONE" }                                                 /
 |---|---|---|
 | `compare` | `genes:[≤20], cohorts?:[names]` | per-gene driver% / altered% per cohort with **panel-aware denominators** (profiled patients only); two-sided Fisher p when exactly 2 cohorts |
 | `survival` | `cohorts?:[names]` | Kaplan–Meier on OS_MONTHS/OS_STATUS; left truncation caveat applies; cross-study baselines are not harmonized |
-| `oncoprint` | `genes:[≤12], clinical?:[≤8], sort?:[≤4], cohorts?:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
+| `oncoprint` | `genes:[≤12], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], cohorts?:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 `views[].cohorts` defaults to all cohorts. Oncoprints federate across studies: columns are
 study-qualified, a synthetic **Study** track shows each column's origin, and duplicates appear twice.
@@ -103,6 +103,15 @@ study-qualified, a synthetic **Study** track shows each column's origin, and dup
 fall back to one sample value per patient. Numeric attributes (≥90% parseable, >10 distinct) render
 as a continuous heat track scaled to the cohort's min→max with a gradient key; unknown attributes
 render a labeled "(no data)" track.
+
+**Oncoprint heatmap tracks** (portal-style): `heatmap: [{"profileType": P, "genes"?: [...]}]` adds
+one continuous row per gene from a molecular profile (mRNA/protein z-scores, methylation, log2 CNA,
+…; `genes` defaults to the gene tracks). Values are patient-level (mean across a patient's
+samples, since columns are patients). Z-score profiles render on a **fixed diverging ±3
+blue→white→red ramp** so colors are comparable across oncoprints; other sign-spanning data gets a
+symmetric diverging ramp; positive-only data a sequential ramp. Track labels are
+`GENE <short-profile>` (e.g. `ERBB2 mRNA-z`) and are valid `sort` keys. Unknown profiles
+error loudly, listing what the study has.
 
 **Oncoprint sorting**: `sort` is an ordered list of track keys — `"genomic"` (the default
 staircase: alteration type + driver rank across the gene tracks), a clinical or derived-event track
@@ -120,6 +129,7 @@ take a standalone spec (the analysis oncoprint view compiles to the same engine)
 { "study"?: "<id>",
   "genes": [≤12],
   "clinical": [≤8],
+  "heatmap"?: [{ "profileType": P, "genes"?: [...] } × ≤4],                   // continuous molecular tracks
   "sort"?: ["CANCER_TYPE", "-CURRENT_AGE_DEID", "genomic"],                   // column sort (≤4 keys)
   "derivedEvents": [{ "label": L, "expression": <event cohortDef> } × ≤3],   // phenotype tracks
   "cohort"?: { "dsl": <cohortDef> },                                          // single column group
@@ -346,6 +356,44 @@ One cohort unioned across two studies (members are study-qualified; overlap is N
       "sort": [
         "CANCER_TYPE",
         "-CURRENT_AGE_DEID"
+      ]
+    }
+  ]
+}
+```
+
+### Example 5: Molecular heatmap tracks, sorted by expression
+
+ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene tracks, columns sorted by descending ERBB2 expression. Z-scores render on a fixed diverging ±3 ramp; the track label (gene + short profile name) is the sort key.
+
+```json
+{
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "ERBB2 amp": {
+      "all": [
+        {
+          "kind": "oql",
+          "q": "ERBB2: AMP"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "oncoprint",
+      "genes": [
+        "ERBB2",
+        "EGFR",
+        "PIK3CA"
+      ],
+      "heatmap": [
+        {
+          "profileType": "rna_seq_v2_mrna_median_Zscores"
+        }
+      ],
+      "sort": [
+        "-ERBB2 mRNA-z"
       ]
     }
   ]

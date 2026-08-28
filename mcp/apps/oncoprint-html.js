@@ -100,6 +100,13 @@ export const ONCOPRINT_APP_HTML = String.raw`<!DOCTYPE html>
     function mix(a, b) { return Math.round(a + (b - a) * t); }
     return "rgb(" + mix(222, 8) + "," + mix(235, 72) + "," + mix(247, 135) + ")";
   }
+  function diverging(v, c) {
+    function lerp(a, b, t) { return Math.round(a + (b - a) * t); }
+    if (v <= c) { var t0 = c ? v / c : 1; return "rgb(" + lerp(33, 255, t0) + "," + lerp(102, 255, t0) + "," + lerp(172, 255, t0) + ")"; }
+    var t1 = (v - c) / (255 - c || 1);
+    return "rgb(" + lerp(255, 178, t1) + "," + lerp(255, 24, t1) + "," + lerp(255, 43, t1) + ")";
+  }
+  function numColor(t, v) { return t.center != null ? diverging(v, t.center) : heat(v); }
   function mutColor(code, P) {
     if (code & BITS.MISSENSE) return P.missense;
     if (code & BITS.TRUNCATING) return P.truncating;
@@ -185,7 +192,7 @@ export const ONCOPRINT_APP_HTML = String.raw`<!DOCTYPE html>
           } else if (t.kind === "derivedEvent") {
             ctx.fillStyle = b.code > 0 ? P.derived : P.unaltered; ctx.fillRect(x, y, w, ROW_H);
           } else if (t.numeric) {
-            ctx.fillStyle = b.code === -1 ? P.np : heat(b.code); ctx.fillRect(x, y, w, ROW_H);
+            ctx.fillStyle = b.code === -1 ? P.np : numColor(t, b.code); ctx.fillRect(x, y, w, ROW_H);
           } else {
             ctx.fillStyle = b.code === -1 ? P.np : CAT[b.code % CAT.length]; ctx.fillRect(x, y, w, ROW_H);
           }
@@ -208,7 +215,7 @@ export const ONCOPRINT_APP_HTML = String.raw`<!DOCTYPE html>
     function opt(v, label) { var o = document.createElement("option"); o.value = v; o.textContent = label; if (v === cur) o.selected = true; sel.appendChild(o); }
     opt("genomic", "genomic (staircase)");
     contract.tracks.forEach(function (t) {
-      if (t.kind !== "clinical" && t.kind !== "derivedEvent") return;
+      if (t.kind !== "clinical" && t.kind !== "derivedEvent" && t.kind !== "heatmap") return;
       if (t.label.indexOf("(no data)") >= 0) return;
       opt(t.label, t.label + " ↑"); opt("-" + t.label, t.label + " ↓");
     });
@@ -225,11 +232,14 @@ export const ONCOPRINT_APP_HTML = String.raw`<!DOCTYPE html>
     note.textContent = "solid = putative driver, faded = VUS; striped/pale = not profiled; % = driver/any";
     lg.appendChild(note);
     contract.tracks.forEach(function (t) {
-      if (t.kind !== "clinical") return;
+      if (t.kind !== "clinical" && t.kind !== "heatmap") return;
       if (t.numeric) {
         var s = document.createElement("span");
         var sw = document.createElement("span"); sw.className = "sw";
-        sw.style.width = "44px"; sw.style.background = "linear-gradient(90deg, rgb(222,235,247), rgb(8,72,135))";
+        sw.style.width = "44px";
+        sw.style.background = t.center != null
+          ? "linear-gradient(90deg, rgb(33,102,172), #fff, rgb(178,24,43))"
+          : "linear-gradient(90deg, rgb(222,235,247), rgb(8,72,135))";
         s.appendChild(document.createTextNode(t.label + ": ")); s.appendChild(sw);
         s.appendChild(document.createTextNode(" " + t.min + " → " + t.max));
         lg.appendChild(s);

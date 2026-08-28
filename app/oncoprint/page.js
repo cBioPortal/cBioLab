@@ -28,6 +28,14 @@ function heatColor(v) {
   const mix = (a, b) => Math.round(a + (b - a) * t);
   return `rgb(${mix(222, 8)},${mix(235, 72)},${mix(247, 135)})`;
 }
+// diverging blue->white->red for heatmap tracks with a center (z-scores etc.)
+function divergingColor(v, c) {
+  const lerp = (a, b, t) => Math.round(a + (b - a) * t);
+  if (v <= c) { const t = c ? v / c : 1; return `rgb(${lerp(33, 255, t)},${lerp(102, 255, t)},${lerp(172, 255, t)})`; }
+  const t = (v - c) / (255 - c || 1);
+  return `rgb(${lerp(255, 178, t)},${lerp(255, 24, t)},${lerp(255, 43, t)})`;
+}
+const numTrackColor = (t, v) => t.center != null ? divergingColor(v, t.center) : heatColor(v);
 const fmtNum = (x) => Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : Math.round(x * 10) / 10;
 const BITS = { MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16, SV: 32, AMP: 64, HOMDEL: 128, DRIVER: 256 };
 const BIT_LABELS = [
@@ -140,8 +148,8 @@ function drawContract(canvas, contract, dark, hover) {
         } else if (t.kind === "derivedEvent") {
           ctx.fillStyle = b.code > 0 ? P.derived : P.unaltered;
           ctx.fillRect(x, y, w, ROW_H);
-        } else { // clinical (categorical -> palette; numeric heat -> sequential blue)
-          ctx.fillStyle = b.code === -1 ? P.np1 : (t.numeric ? heatColor(b.code) : CAT_COLORS[b.code % CAT_COLORS.length]);
+        } else { // clinical / heatmap (categorical -> palette; numeric -> heat ramp)
+          ctx.fillStyle = b.code === -1 ? P.np1 : (t.numeric ? numTrackColor(t, b.code) : CAT_COLORS[b.code % CAT_COLORS.length]);
           ctx.fillRect(x, y, w, ROW_H);
         }
       }
@@ -272,7 +280,7 @@ export default function OncoprintPage() {
     if (!h) { setTip(null); geomRef.current = drawContract(canvasRef.current, contract, dark, null); return; }
     const t = contract.tracks[h.ti];
     const code = t.cells[h.ci];
-    const value = t.kind === "clinical"
+    const value = (t.kind === "clinical" || t.kind === "heatmap")
       ? (code === -1 ? "n/a"
         : t.numeric ? "≈" + fmtNum(t.min + (code / 255) * (t.max - t.min))
         : (t.categories && t.categories[code]) || "Other")
@@ -374,12 +382,15 @@ export default function OncoprintPage() {
               Not profiled
             </span>
             <span>solid = putative driver · faded = VUS · gene %: driver / any ({contract.conventions && contract.conventions.annotation})</span>
-            {contract.tracks.filter(t => t.kind === "clinical").map(t => (
+            {contract.tracks.filter(t => t.kind === "clinical" || t.kind === "heatmap").map(t => (
               <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
                 <strong style={{ color: "var(--ink)" }}>{t.label}:</strong>
                 {t.numeric
                   ? <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-                      <span style={{ width: 64, height: 10, borderRadius: 2, display: "inline-block", background: "linear-gradient(90deg, rgb(222,235,247), rgb(8,72,135))" }} />
+                      <span style={{ width: 64, height: 10, borderRadius: 2, display: "inline-block",
+                        background: t.center != null
+                          ? "linear-gradient(90deg, rgb(33,102,172), #fff, rgb(178,24,43))"
+                          : "linear-gradient(90deg, rgb(222,235,247), rgb(8,72,135))" }} />
                       {fmtNum(t.min)} → {fmtNum(t.max)}
                     </span>
                   : (t.categories || []).map((c, i) => (
