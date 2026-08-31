@@ -37,6 +37,63 @@ source module the chat prompt uses — so nothing can drift, because there is on
 version in the web app one click away. Fancier in-chat rendering (MCP Apps) exists as an
 optional, additive experiment on top — the load-bearing path never depends on it.
 
+## The shape of the system
+
+Every surface reads and writes the same document; the engine owns all semantics; data access is
+read-only with the licensed annotation store isolated behind its own database grant; and the
+DSL's documentation, chat grammar, and MCP self-description all render from one source module.
+
+```mermaid
+flowchart TB
+    subgraph SURFACES["Surfaces — all speak the same document"]
+        UI["Web UI<br/>Explore · Cohorts · Analysis"]
+        CHAT["In-app chat<br/>Claude tool loop: update_document · get_catalog"]
+        MCP["MCP clients<br/>run_analysis · render_oncoprint · describe_dsl"]
+    end
+
+    DOC[["<b>Analysis document</b> (JSON)<br/>{ study, cohorts: {name: def}, views: [...] }<br/>shareable / re-runnable as ?doc= links"]]
+
+    UI <--> DOC
+    CHAT <--> DOC
+    MCP <--> DOC
+
+    subgraph ENGINE["Server engine — clients never send SQL"]
+        RA["runAnalysis — lib/analysis.js<br/>per-study evaluation · cross-study federation<br/>(study-qualified ids, no dedup, labeled)"]
+        COMP["Cohort compilers<br/>lib/cohort2.js · lib/oql.js · lib/compiler.js<br/><i>loud rejection of anything unanswerable</i>"]
+        VIEWS["Views<br/>compare (Fisher, panel-aware denominators)<br/>survival (KM + left-truncation caveat)<br/>oncoprint"]
+        CONTRACT["Render contract — lib/oncoprint.js<br/>bitmask cells · NOT_PROFILED first-class<br/>declarative sort · clinical + heatmap tracks"]
+    end
+
+    DOC --> RA
+    RA --> COMP
+    RA --> VIEWS
+    VIEWS --> CONTRACT
+
+    subgraph DATA["Data — read-only"]
+        CH[("ClickHouse<br/>cBioPortal derived tables<br/>542 studies")]
+        OKB[("oncokb_annotation<br/>separate DB · version-pinned<br/>license = GRANT boundary")]
+    end
+    COMP -- "compiled SQL" --> CH
+    COMP -- "DRIVER joins the pin" --> OKB
+
+    subgraph OUT["Outputs — renderers hold zero data logic"]
+        SVG["server SVG → PNG<br/>(any chat client)"]
+        CANVAS["browser canvas<br/>(interactive web app)"]
+        APP["MCP App iframe<br/>(optional enhancement)"]
+        PROV["Provenance<br/>readback + compiled SQL + live editor link"]
+    end
+    CONTRACT --> SVG
+    CONTRACT --> CANVAS
+    CONTRACT --> APP
+    RA --> PROV
+    PROV -. "one click back to" .-> UI
+
+    REF["lib/dsl-reference.js<br/><b>single source of DSL truth</b>"]
+    REF -- "generates docs/dsl.md<br/>(examples CI-executed)" --> DOCS["docs/dsl.md"]
+    REF -- "grammar" --> CHAT
+    REF -- "describe_dsl" --> MCP
+```
+
 ## Methodological honesty, with concrete examples
 
 These four caveats are not fine print — each one changes real numbers materially, which is why
