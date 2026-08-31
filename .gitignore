@@ -7,3 +7,4 @@ nohup.out
 *.png
 mcp.log
 server-analysis.log
+HANDOFF.local.md
