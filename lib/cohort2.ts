@@ -23,12 +23,13 @@ import type {
 
 /** Every leaf compiler receives a fully-resolved context. */
 type Ctx = CompileCtx & { study: string };
+const dbOf = (ctx: Ctx): string => ctx.db || DB;
 
 const PID = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
 const CLIN_OP: Record<string, string> = { "=": "=", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<=" };
 
-export function basePatientsSql(study: string = STUDY): string {
-  return "SELECT DISTINCT " + PID("patient_unique_id", study) + " AS pid FROM " + DB + ".sample_derived\n" +
+export function basePatientsSql(study: string = STUDY, db: string = DB): string {
+  return "SELECT DISTINCT " + PID("patient_unique_id", study) + " AS pid FROM " + db + ".sample_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(study);
 }
 
@@ -76,7 +77,7 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
   }
   if (!conds.length) throw new Error("clinical clause needs op/value, values[], or range{gt,gte,lt,lte}");
   return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
-    "  FROM " + DB + ".clinical_data_derived\n" +
+    "  FROM " + dbOf(ctx) + ".clinical_data_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(ctx.study) + " AND type = " + sq(per) + "\n" +
     "    AND attribute_name = " + sq(attr) + " AND " + conds.join(" AND ");
 }
@@ -87,8 +88,8 @@ function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): string {
   const t = PROFILED_TYPE[String(leaf.type || "").toUpperCase()];
   if (!t) throw new Error("profiled clause: type must be MUTATION, CNA, or SV");
   return "SELECT DISTINCT " + PID("sd.patient_unique_id", ctx.study) + " AS pid\n" +
-    "  FROM " + DB + ".sample_to_gene_panel_derived sp\n" +
-    "  JOIN " + DB + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
+    "  FROM " + dbOf(ctx) + ".sample_to_gene_panel_derived sp\n" +
+    "  JOIN " + dbOf(ctx) + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(ctx.study) + " AND sp.alteration_type = " + sq(t);
 }
 
@@ -97,10 +98,10 @@ function caseListLeafSql(leaf: CaseListLeaf, ctx: Ctx): string {
   if (!/^[A-Za-z0-9._-]{1,120}$/.test(id)) throw new Error("caseList clause: bad list id");
   if (!id.startsWith(ctx.study)) id = ctx.study + "_" + id; // accept 'sequenced' shorthand
   return "SELECT DISTINCT p.stable_id AS pid\n" +
-    "  FROM " + DB + ".sample_list sl\n" +
-    "  JOIN " + DB + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
-    "  JOIN " + DB + ".sample s ON s.internal_id = sll.sample_id\n" +
-    "  JOIN " + DB + ".patient p ON p.internal_id = s.patient_id\n" +
+    "  FROM " + dbOf(ctx) + ".sample_list sl\n" +
+    "  JOIN " + dbOf(ctx) + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
+    "  JOIN " + dbOf(ctx) + ".sample s ON s.internal_id = sll.sample_id\n" +
+    "  JOIN " + dbOf(ctx) + ".patient p ON p.internal_id = s.patient_id\n" +
     "  WHERE sl.stable_id = " + sq(id);
 }
 
@@ -127,8 +128,8 @@ function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): string {
     conds.push("ga.alteration_value IN (" + leaf.values.slice(0, 20).map(v => sq(String(v))).join(",") + ")");
   if (!conds.length) throw new Error("genomicData clause needs range{gt,gte,lt,lte} or values[]");
   return "SELECT DISTINCT " + PID("sd.patient_unique_id", ctx.study) + " AS pid\n" +
-    "  FROM " + DB + ".genetic_alteration_derived ga\n" +
-    "  JOIN " + DB + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
+    "  FROM " + dbOf(ctx) + ".genetic_alteration_derived ga\n" +
+    "  JOIN " + dbOf(ctx) + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
     "  WHERE ga.cancer_study_identifier = " + sq(ctx.study) + "\n" +
     "    AND ga.hugo_gene_symbol = " + sq(gene) + " AND ga.profile_type = " + sq(pt) + "\n" +
     "    AND " + conds.join(" AND ");
@@ -146,7 +147,7 @@ function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): string {
     conds.push("value IN (" + leaf.values.slice(0, 20).map(v => sq(String(v))).join(",") + ")");
   if (!conds.length) throw new Error("genericAssay clause needs range or values[]");
   return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
-    "  FROM " + DB + ".generic_assay_data_derived\n" +
+    "  FROM " + dbOf(ctx) + ".generic_assay_data_derived\n" +
     "  WHERE (sample_unique_id LIKE " + sq(ctx.study + "_%") + " OR patient_unique_id LIKE " + sq(ctx.study + "_%") + ")\n" +
     "    AND profile_type = " + sq(pt) + " AND entity_stable_id = " + sq(entity) + "\n" +
     "    AND " + conds.join(" AND ");
@@ -154,7 +155,7 @@ function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): string {
 
 function eventLeafSql(leaf: EventLeafFields, ctx: Ctx): string {
   const { patientsSql } = compileCohort({
-    db: DB, study: ctx.study, a: leaf.a, b: leaf.b, rel: leaf.rel,
+    db: dbOf(ctx), study: ctx.study, a: leaf.a, b: leaf.b, rel: leaf.rel,
     priorGuard: !!leaf.priorGuard, lineGap: leaf.lineGap ?? ctx.lineGap, patientsLimit: 1000000
   });
   return patientsSql;
@@ -163,12 +164,12 @@ function eventLeafSql(leaf: EventLeafFields, ctx: Ctx): string {
 function patientsLeafSql(leaf: PatientsLeaf, ctx: Ctx): string {
   const ids = (leaf.ids || []).map(String).filter(p => /^[A-Za-z0-9._-]{1,64}$/.test(p)).slice(0, 50000);
   if (!ids.length) throw new Error("patients clause has no valid ids");
-  return basePatientsSql(ctx.study) + "\n    AND " + PID("patient_unique_id", ctx.study) + " IN (" + ids.map(sq).join(",") + ")";
+  return basePatientsSql(ctx.study, dbOf(ctx)) + "\n    AND " + PID("patient_unique_id", ctx.study) + " IN (" + ids.map(sq).join(",") + ")";
 }
 
 function leafSql(leaf: any, ctx: Ctx): string {
-  if (leaf.kind === "oql") return oqlLeafSql(leaf.q, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study });
-  if (leaf.kind === "alteration") return oqlLeafSql(alterationToOql(leaf), { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study }); // deprecated alias
+  if (leaf.kind === "oql") return oqlLeafSql(leaf.q, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx) });
+  if (leaf.kind === "alteration") return oqlLeafSql(alterationToOql(leaf), { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx) }); // deprecated alias
   if (leaf.kind === "clinical") return clinicalLeafSql(leaf, ctx);
   if (leaf.kind === "profiled") return profiledLeafSql(leaf, ctx);
   if (leaf.kind === "caseList") return caseListLeafSql(leaf, ctx);
@@ -187,7 +188,7 @@ function clauseSql(clause: any, ctx: Ctx): string {
     return clause.any.map((l: any) => "(" + leafSql(l, ctx) + ")").join("\nUNION DISTINCT\n");
   }
   if (clause.not) {
-    return "(" + basePatientsSql(ctx.study) + ")\nEXCEPT DISTINCT\n(" + leafSql(clause.not, ctx) + ")";
+    return "(" + basePatientsSql(ctx.study, dbOf(ctx)) + ")\nEXCEPT DISTINCT\n(" + leafSql(clause.not, ctx) + ")";
   }
   return leafSql(clause, ctx);
 }
@@ -200,12 +201,12 @@ function normalizeSugar(def: CohortDef): CohortDef {
 }
 
 // def -> SQL producing the cohort's patient stable ids (column: pid)
-export function compileCohortDef(def: CohortDef | null | undefined, { oncokbPin, profiles, gaProfiles, study = STUDY }: Partial<CompileCtx> = {}): string {
-  if (!def) return basePatientsSql(study);
+export function compileCohortDef(def: CohortDef | null | undefined, { oncokbPin, profiles, gaProfiles, study = STUDY, db }: Partial<CompileCtx> = {}): string {
+  if (!def) return basePatientsSql(study, db || DB);
   const d = normalizeSugar(def);
   const clauses = d.all;
   if (!Array.isArray(clauses) || !clauses.length || clauses.length > 8) throw new Error("cohort def needs all: [1-8 clauses]");
-  const ctx: Ctx = { oncokbPin, profiles, gaProfiles, study, lineGap: d.lineGap ?? 90 };
+  const ctx: Ctx = { oncokbPin, profiles, gaProfiles, study, db: db || DB, lineGap: d.lineGap ?? 90 };
   return clauses.map((c) => "(" + clauseSql(c, ctx) + ")").join("\nINTERSECT DISTINCT\n");
 }
 

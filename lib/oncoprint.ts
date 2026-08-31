@@ -434,7 +434,7 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
       for (const c of cmps) { const r = c(x, y); if (r) return r; }
       return allPids[x] < allPids[y] ? -1 : 1;
     });
-    order.push(...idxs);
+    for (const i of idxs) order.push(i); // not push(...idxs): spreads over ~100k args overflow the stack
     groupRanges.push({ name: g.name, start: cursor, count: idxs.length });
     cursor += idxs.length;
   }

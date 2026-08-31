@@ -97,6 +97,8 @@ export interface CohortDef {
 /** Context threaded into every leaf compiler. */
 export interface CompileCtx {
   study: string;
+  /** database (schema) holding this study — per instance, so never a constant */
+  db?: string;
   oncokbPin?: string | null;
   profiles?: string[];
   gaProfiles?: string[];

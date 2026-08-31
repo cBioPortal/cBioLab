@@ -4,7 +4,7 @@
 // (compilers stay single-study) and members are unioned as fully-qualified patient ids
 // ("<study>_<patient>"). Views fetch data per involved study and join on those ids.
 // Deliberately deferred: cross-study patient dedup and attribute harmonization.
-import { chQuery, DB, STUDY } from "./ch.ts";
+import { chQuery, DB, STUDY, PRIMARY } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { compileCohortDef, describeCohortDef } from "./cohort2.ts";
 import { genomicEventsSql, coverageSql, buildContract, PIDS_SQL } from "./oncoprint.ts";
@@ -14,7 +14,7 @@ import { contractToSvg } from "./oncoprint-svg.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
-  resolverFor, isPatientLevel, expandSurvivalCounts,
+  resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting,
   type Resolver, type GeneCounts, type SurvivalCount, type Instance
 } from "./federation.ts";
 
@@ -31,25 +31,30 @@ const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
 const _profileCache = new Map<string, { profiles: string[]; gaProfiles: string[] }>(); // per-study
 export async function studyProfiles(study: string): Promise<{ profiles: string[]; gaProfiles: string[] }> {
   if (_profileCache.has(study)) return _profileCache.get(study)!;
+  const { peerForStudy } = await import("./federation-remote.ts");
+  if (peerForStudy(study)) return { profiles: [], gaProfiles: [] }; // the peer owns its own profile inventory
+  const conn = (await studyRouting()).get(study) || PRIMARY;
   const profiles = (await chQuery(
-    "SELECT DISTINCT profile_type FROM " + DB + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study))).data.map((r) => r.profile_type);
+    "SELECT DISTINCT profile_type FROM " + conn.db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study), conn)).data.map((r) => r.profile_type);
   const gaProfiles = (await chQuery(
-    "SELECT DISTINCT replaceOne(profile_stable_id, " + sq(study + "_") + ", '') AS pt FROM " + DB + ".generic_assay_profile_entity_derived WHERE profile_stable_id LIKE " + sq(study + "_%"))).data.map((r) => r.pt);
+    "SELECT DISTINCT replaceOne(profile_stable_id, " + sq(study + "_") + ", '') AS pt FROM " + conn.db + ".generic_assay_profile_entity_derived WHERE profile_stable_id LIKE " + sq(study + "_%"), conn)).data.map((r) => r.pt);
   const out = { profiles, gaProfiles };
   _profileCache.set(study, out);
   return out;
 }
 
 let _studySet: Set<string> | null = null;
+/** Every study any configured instance holds (federation-aware). */
 export async function validStudies(): Promise<Set<string>> {
   if (_studySet) return _studySet;
-  const r = await chQuery("SELECT cancer_study_identifier AS id FROM " + DB + ".cancer_study");
-  _studySet = new Set(r.data.map((x) => x.id));
+  _studySet = new Set((await studyRouting()).keys());
   return _studySet;
 }
 
 export async function resolveStudy(requested?: string | null, fallback?: string | null): Promise<string> {
   const study = String(requested || fallback || STUDY).replace(/[^A-Za-z0-9._-]/g, "");
+  const { peerForStudy } = await import("./federation-remote.ts");
+  if (peerForStudy(study)) return study; // held by a peer; only it can validate
   const set = await validStudies();
   if (!set.has(study)) throw new Error("unknown study '" + study.slice(0, 60) + "'");
   return study;
@@ -81,7 +86,7 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
     // resolver, which may or may not be permitted to return member ids
     const evals = await Promise.all(studies.map(async (s) => {
       const { profiles, gaProfiles } = await studyProfiles(s);
-      const res = resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
+      const res = await resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
       resolvers[s] = res;
       const sql = res.cohortSql(def);
       if (isPatientLevel(res)) return { s, res, sql, pids: await res.members(def), count: -1 };

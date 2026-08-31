@@ -110,7 +110,7 @@ const DRIVER_JOIN = (pin: string): string =>
   "     OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))\n";
 
 // full OQL leaf -> SQL of matching patient stable ids (portal semantics: altered by ANY entry)
-export function oqlLeafSql(q: string, { oncokbPin, profiles, study = STUDY }: { oncokbPin?: string | null; profiles?: string[]; study?: string } = {}): string {
+export function oqlLeafSql(q: string, { oncokbPin, profiles, study = STUDY, db = DB }: { oncokbPin?: string | null; profiles?: string[]; study?: string; db?: string } = {}): string {
   const parsed = parseOql(q);
   const parts: string[] = [];
   for (const { gene, specs } of parsed) {
@@ -123,15 +123,15 @@ export function oqlLeafSql(q: string, { oncokbPin, profiles, study = STUDY }: { 
           " profile; this study has: " + ((profiles || []).join(", ") || "none"));
         parts.push(
           "SELECT DISTINCT replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '') AS pid\n" +
-          "  FROM " + DB + ".genetic_alteration_derived ga\n" +
-          "  JOIN " + DB + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
+          "  FROM " + db + ".genetic_alteration_derived ga\n" +
+          "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
           "  WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.hugo_gene_symbol = " + sq(gene) + "\n" +
           "    AND ga.profile_type = " + sq(prof) + " AND toFloat64OrNull(ga.alteration_value) " + spec.op + " " + spec.z);
         continue;
       }
       parts.push(
         "SELECT DISTINCT replaceOne(g.patient_unique_id, " + sq(study + "_") + ", '') AS pid\n" +
-        "  FROM " + DB + ".genomic_event_derived g\n" +
+        "  FROM " + db + ".genomic_event_derived g\n" +
         (spec.driver ? DRIVER_JOIN(oncokbPin!) : "") +
         "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
         "    AND g.hugo_gene_symbol = " + sq(gene) + "\n" +

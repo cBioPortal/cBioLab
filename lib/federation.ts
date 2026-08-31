@@ -19,7 +19,7 @@
 // for the transport — a real deployment swaps in a second connection
 // (data-level federation) or an MCP client to a remote Cohort Lab
 // (document-level federation) behind the same interface.
-import { chQuery, DB } from "./ch.ts";
+import { chQuery, DB, PRIMARY, connections, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { genomicEventsSql, coverageSql } from "./oncoprint.ts";
@@ -32,6 +32,8 @@ export interface Instance {
   mode: InstanceMode;
   /** human label for captions */
   label: string;
+  /** the ClickHouse connection (and database) that answers for this instance */
+  conn: ChConn;
 }
 
 /** per (cohort, gene) alteration tallies — the compare view's atom */
@@ -39,19 +41,47 @@ export interface GeneCounts { gene: string; profiled: number; altered: number; d
 /** (months, event) multiset — pools exactly across instances, carries no ids */
 export interface SurvivalCount { months: number; event: number; n: number }
 
-const LOCAL: Instance = { id: "local", mode: "patient-level", label: "this instance" };
-
 /**
- * Which instance owns a study. Prototype: studies listed in
- * AGGREGATE_ONLY_STUDIES belong to a simulated aggregate-only peer.
+ * study -> owning connection, discovered by asking each configured instance
+ * which studies it holds. Cached per process. First instance wins a collision,
+ * and the collision is reported rather than silently resolved.
  */
-export function instanceForStudy(study: string): Instance {
-  const agg = (process.env.AGGREGATE_ONLY_STUDIES || "")
-    .split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
-  if (agg.includes(study)) {
-    return { id: "peer", mode: "aggregate-only", label: "peer instance (aggregate-only)" };
+let _routing: Map<string, ChConn> | null = null;
+export const routingCollisions: string[] = [];
+export async function studyRouting(): Promise<Map<string, ChConn>> {
+  if (_routing) return _routing;
+  const map = new Map<string, ChConn>();
+  for (const conn of connections()) {
+    try {
+      const r = await chQuery<{ id: string }>("SELECT cancer_study_identifier AS id FROM " + conn.db + ".cancer_study", conn);
+      for (const { id } of r.data) {
+        if (map.has(id)) { routingCollisions.push(id); continue; } // first instance wins; surfaced, not hidden
+        map.set(id, conn);
+      }
+    } catch { /* an unreachable instance simply contributes no studies */ }
   }
-  return LOCAL;
+  _routing = map;
+  return map;
+}
+
+/** Instances the deployment treats as aggregate-only (prototype switch). */
+function aggregateOnlyIds(): string[] {
+  return (process.env.AGGREGATE_ONLY_INSTANCES || "").split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+}
+/** Studies forced aggregate-only regardless of instance (finer-grained switch). */
+function aggregateOnlyStudies(): string[] {
+  return (process.env.AGGREGATE_ONLY_STUDIES || "").split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+}
+
+export async function instanceForStudy(study: string): Promise<Instance> {
+  const conn = (await studyRouting()).get(study) || PRIMARY;
+  const agg = aggregateOnlyIds().includes(conn.id) || aggregateOnlyStudies().includes(study);
+  return {
+    id: conn.id,
+    mode: agg ? "aggregate-only" : "patient-level",
+    label: conn.label + (agg ? " (aggregate-only)" : ""),
+    conn
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +108,7 @@ function driverJoin(pin: string): string {
  * Per-gene (profiled, altered, driver) counts for one cohort in one study,
  * computed entirely in the database. Returns counts only — no ids.
  */
-export function geneCountsSql(cohortSql: string, genes: string[], study: string, pin: string | null): string {
+export function geneCountsSql(cohortSql: string, genes: string[], study: string, pin: string | null, db: string = DB): string {
   const pid = "replaceOne(g.patient_unique_id, " + sq(study + "_") + ", '')";
   const covPid = "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')";
   const geneList = genes.map(sq).join(",");
@@ -87,7 +117,7 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
     "altered AS (\n" +
     "  SELECT g.hugo_gene_symbol AS gene, " + pid + " AS pid,\n" +
     (pin ? "         max(ann.is_driver) AS is_driver\n" : "         0 AS is_driver\n") +
-    "  FROM " + DB + ".genomic_event_derived g\n" +
+    "  FROM " + db + ".genomic_event_derived g\n" +
     (pin ? driverJoin(pin) : "") +
     "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
     "    AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
@@ -96,9 +126,9 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
     "),\n" +
     "covered AS (\n" +
     "  SELECT DISTINCT pg.gene AS gene, " + covPid + " AS pid\n" +
-    "  FROM " + DB + ".sample_to_gene_panel_derived sp\n" +
-    "  JOIN " + DB + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + geneList + ")\n" +
-    "  JOIN " + DB + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
+    "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + geneList + ")\n" +
+    "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
     "    AND " + covPid + " IN (SELECT pid FROM cohort)\n" +
     ")\n" +
@@ -119,7 +149,7 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
  * (months, event, n) triples for one cohort in one study. Aggregate — pools
  * exactly with other instances' triples to give a correct pooled KM curve.
  */
-export function survivalCountsSql(cohortSql: string, study: string): string {
+export function survivalCountsSql(cohortSql: string, study: string, db: string = DB): string {
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
@@ -127,7 +157,7 @@ export function survivalCountsSql(cohortSql: string, study: string): string {
     "  SELECT " + pid + " AS pid,\n" +
     "         anyIf(attribute_value, attribute_name='OS_MONTHS') AS months,\n" +
     "         anyIf(attribute_value, attribute_name='OS_STATUS') AS status\n" +
-    "  FROM " + DB + ".clinical_data_derived\n" +
+    "  FROM " + db + ".clinical_data_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
     "    AND attribute_name IN ('OS_MONTHS','OS_STATUS')\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
@@ -180,21 +210,22 @@ abstract class BaseResolver implements AggregateCapable {
   }
 
   cohortSql(def: CohortDef | null | undefined): string {
-    return compileCohortDef(def, { ...this.ctx, study: this.study });
+    return compileCohortDef(def, { ...this.ctx, study: this.study, db: this.instance.conn.db });
   }
   async count(def: CohortDef | null | undefined): Promise<number> {
-    const r = await chQuery<ChRow>("SELECT count() AS n FROM (" + this.cohortSql(def) + ")");
+    const r = await chQuery<ChRow>("SELECT count() AS n FROM (" + this.cohortSql(def) + ")", this.instance.conn);
     return Number(r.data[0].n);
   }
   async geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]> {
     if (!genes.length) return [];
-    const r = await chQuery<ChRow>(geneCountsSql(this.cohortSql(def), genes, this.study, this.ctx.oncokbPin ?? null));
+    const sql = geneCountsSql(this.cohortSql(def), genes, this.study, this.ctx.oncokbPin ?? null, this.instance.conn.db);
+    const r = await chQuery<ChRow>(sql, this.instance.conn);
     return r.data.map((x) => ({
       gene: x.gene, profiled: Number(x.profiled), altered: Number(x.altered), driver: Number(x.driver)
     }));
   }
   async survivalCounts(def: CohortDef | null | undefined): Promise<SurvivalCount[]> {
-    const r = await chQuery<ChRow>(survivalCountsSql(this.cohortSql(def), this.study));
+    const r = await chQuery<ChRow>(survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
     return r.data.map((x) => ({ months: Number(x.m), event: Number(x.ev), n: Number(x.n) }));
   }
 }
@@ -207,7 +238,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     this.instance = { ...instance, mode: "patient-level" };
   }
   async members(def: CohortDef | null | undefined): Promise<string[]> {
-    const r = await chQuery<ChRow>("SELECT pid FROM (" + this.cohortSql(def) + ")");
+    const r = await chQuery<ChRow>("SELECT pid FROM (" + this.cohortSql(def) + ")", this.instance.conn);
     return r.data.map((x) => x.pid);
   }
 }
@@ -225,8 +256,16 @@ export class AggregateResolver extends BaseResolver {
   }
 }
 
-export function resolverFor(study: string, ctx: Partial<CompileCtx>): Resolver {
-  const inst = instanceForStudy(study);
+export async function resolverFor(study: string, ctx: Partial<CompileCtx>): Promise<Resolver> {
+  // A peer reached over MCP takes precedence: its data is not ours to query.
+  const { peerForStudy, RemoteAggregateResolver } = await import("./federation-remote.ts");
+  const peer = peerForStudy(study);
+  if (peer) {
+    return new RemoteAggregateResolver(study, peer.url, {
+      id: "peer", mode: "aggregate-only", label: peer.label, conn: PRIMARY /* unused: nothing is queried locally */
+    });
+  }
+  const inst = await instanceForStudy(study);
   return inst.mode === "patient-level"
     ? new PatientLevelResolver(study, ctx, inst)
     : new AggregateResolver(study, ctx, inst);

@@ -7,7 +7,8 @@ import { contractToSvg } from "../lib/oncoprint-svg.ts";
 import sharp from "sharp";
 import { ensureFonts } from "../lib/fonts.ts";
 import { renderDslMarkdown } from "../lib/dsl-reference.ts";
-import { runAnalysis } from "../lib/analysis.ts";
+import { runAnalysis, resolveStudy, studyProfiles } from "../lib/analysis.ts";
+import { resolverFor } from "../lib/federation.ts";
 import type { AnalysisDoc, CohortDef, OncoprintSpec } from "../lib/types.ts";
 import type { PidsCarrier } from "../lib/oncoprint.ts";
 import { registerOncoprintApp } from "./apps/oncoprint-app.ts";
@@ -61,6 +62,46 @@ function text(t: string) { return { content: [{ type: "text", text: t }] }; }
 
 export function registerTools(server: any): void {
   registerOncoprintApp(server); // MCP Apps (SEP-1865) interactive oncoprint — additive side-module
+
+  // ---- federation endpoint -------------------------------------------------
+  // What a peer instance exposes to another Cohort Lab: AGGREGATES ONLY.
+  // Counts computed inside this instance's database; no patient id is ever
+  // returned, which is what makes document-level federation safe to point at
+  // data that cannot be shared row-wise.
+  server.registerTool(
+    "federated_aggregates",
+    {
+      description:
+        "Federation endpoint for another Cohort Lab instance. Evaluates a cohort definition against a study THIS instance holds and returns aggregates only — cohort size, per-gene (profiled, altered, driver) counts, and (months, event, n) survival triples. Never returns patient identifiers. Used by a coordinating instance to include this site's patients in compare and survival views without patient-level data leaving.",
+      inputSchema: {
+        study: z.string().max(120).describe("Study id held by this instance"),
+        cohort: z.record(z.string(), z.any()).describe("Cohort definition (v2 DSL; see describe_dsl)"),
+        genes: z.array(z.string()).max(20).nullish().describe("Genes for per-gene counts"),
+        survival: z.boolean().nullish().describe("Also return (months, event, n) survival triples")
+      }
+    },
+    async ({ study, cohort, genes, survival }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null }) => {
+      try {
+        const s = await resolveStudy(study);
+        const { profiles, gaProfiles } = await studyProfiles(s);
+        const pin = process.env.ONCOKB_PIN || null;
+        const res = await resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
+        const [count, geneCounts, survivalCounts] = await Promise.all([
+          res.count(cohort),
+          genes && genes.length ? res.geneCounts(cohort, genes) : Promise.resolve([]),
+          survival ? res.survivalCounts(cohort) : Promise.resolve([])
+        ]);
+        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, oncokbPin: pin };
+        return {
+          content: [{ type: "text" as const, text: `aggregates for ${s}: ${count.toLocaleString()} patients` +
+            (geneCounts.length ? `, ${geneCounts.length} gene counts` : "") +
+            (survivalCounts.length ? `, ${survivalCounts.length} survival strata` : "") + " (no patient identifiers returned)" }],
+          structuredContent: payload
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };
+      }
+    });
 
   server.tool(
     "describe_dsl",
