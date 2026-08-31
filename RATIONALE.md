@@ -14,6 +14,23 @@ versioned annotation; and being a **portable representation of the question** ra
 any backend, it extends naturally across portal instances — up to privacy-preserving
 federation where only documents and results cross institutional boundaries.
 
+**Key advantages at a glance:**
+
+- **Reproducible, shareable analyses** — the artifact is a re-runnable document with pinned
+  annotation, not a screenshot
+- **LLM-safe by construction** — models write the DSL, never SQL; the unanswerable is rejected
+  loudly instead of approximated
+- **Full provenance** — every result links to its definition, its compiled SQL, and a live
+  re-runnable view
+- **Methodological honesty enforced by the engine** — panel-aware denominators, left-truncation
+  and prior-treatment caveats, labeled non-deduplication
+- **One semantics owner, many cheap surfaces** — web UI, chat, and MCP all speak the same
+  document; docs and grammars are generated from one source
+- **Living user state** *(roadmap)* — dynamic groups, versioned annotation, and membership
+  diffs subsume virtual studies / groups / sessions
+- **Cross-instance federation** *(roadmap)* — one document fulfilled across many portal
+  databases, up to privacy-preserving results-only exchange
+
 ## The advantages of the approach
 
 **1. The document is the deliverable, not the picture.** A chat conversation doesn't end in a
