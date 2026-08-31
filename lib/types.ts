@@ -195,6 +195,8 @@ export interface ClinicalFacet {
   kind: "cat" | "num";
   values?: { v: string; n: number }[];
   min?: number; max?: number; median?: number;
+  /** set when this facet was re-queried against the draft minus its own clauses */
+  disjunctive?: true;
 }
 export interface ExploreResult {
   study: string; studies?: string[]; draftCount: number | null;

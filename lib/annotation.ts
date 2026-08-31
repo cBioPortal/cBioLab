@@ -40,9 +40,9 @@ function mockIndex(eventRows: EvRow[]): AnnotationIndex {
     }
     if (r.vt === "cna") {
       const v = Number(r.cna);
-      return (v >= 2 && ONCOGENE_AMP.has(r.gene)) || (v <= -2 && TSG.has(r.gene));
+      return (v >= 2 && ONCOGENE_AMP.has(r.gene!)) || (v <= -2 && TSG.has(r.gene!));
     }
-    if (r.vt === "structural_variant") return FUSION_GENES.has(r.gene);
+    if (r.vt === "structural_variant") return FUSION_GENES.has(r.gene!);
     return false;
   };
   return { isDriver, source: MOCK_SOURCE };

@@ -10,7 +10,7 @@ export async function catalogText(study?: string): Promise<string> {
   lines.push("Clinical attributes (name [patient|sample level]: values with patient counts, or numeric range):");
   for (const a of ex.clinical.slice(0, 40)) {
     if (a.kind === "num") lines.push(`- ${a.attribute} [${a.per}]: numeric, min ${a.min} median ${a.median} max ${a.max} (${a.patients} pts)`);
-    else lines.push(`- ${a.attribute} [${a.per}]: ` + a.values.map(v => `${v.v} (${v.n})`).join(", "));
+    else lines.push(`- ${a.attribute} [${a.per}]: ` + a.values!.map(v => `${v.v} (${v.n})`).join(", "));
   }
   if (ex.events.length) lines.push("Timeline event types: " + ex.events.map(e => `${e.type} (${e.n} pts)`).join(", "));
   lines.push("Most-altered genes: " + ex.genes.slice(0, 12).map(g => `${g.gene} (${g.n})`).join(", "));
