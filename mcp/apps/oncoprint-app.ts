@@ -7,11 +7,11 @@
 // The iframe (mcp/apps/oncoprint-html.js) renders the contract on a canvas and
 // re-calls this tool through the host bridge to change the sort.
 import { z } from "zod";
-import { buildContract, PIDS_SQL } from "../../lib/oncoprint.js";
-import { compileCohortDef, describeCohortDef } from "../../lib/cohort2.js";
-import { resolveStudy, studyProfiles } from "../../lib/analysis.js";
-import { chQuery } from "../../lib/ch.js";
-import { ONCOPRINT_APP_HTML } from "./oncoprint-html.js";
+import { buildContract, PIDS_SQL } from "../../lib/oncoprint.ts";
+import { compileCohortDef, describeCohortDef } from "../../lib/cohort2.ts";
+import { resolveStudy, studyProfiles } from "../../lib/analysis.ts";
+import { chQuery } from "../../lib/ch.ts";
+import { ONCOPRINT_APP_HTML } from "./oncoprint-html.ts";
 
 export const ONCOPRINT_APP_URI = "ui://cohort-lab/oncoprint";
 const MIME = "text/html;profile=mcp-app";

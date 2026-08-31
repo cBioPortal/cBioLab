@@ -92,11 +92,11 @@ export const EXAMPLES = [
   }
 ];
 
-const exampleBlock = (ex, i) =>
+const exampleBlock = (ex: { title: string; note: string; doc: unknown }, i: number) =>
   `### Example ${i + 1}: ${ex.title}\n\n${ex.note}\n\n\`\`\`json\n${JSON.stringify(ex.doc, null, 2)}\n\`\`\`\n`;
 
 // ---- the full reference (docs/dsl.md + MCP describe_dsl) -------------------
-export function renderDslMarkdown() {
+export function renderDslMarkdown(): string {
   return `<!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.js; regenerate with \`npm run docs:gen\`. -->
 
 # Cohort Lab DSL (v${DSL_VERSION})

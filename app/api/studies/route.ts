@@ -1,4 +1,4 @@
-import { chQuery, DB } from "../../../lib/ch.js";
+import { chQuery, DB } from "../../../lib/ch.ts";
 
 let cache = null;
 

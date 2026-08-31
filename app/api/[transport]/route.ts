@@ -1,6 +1,6 @@
 // MCP endpoint on Vercel/Next: serves the same tools as mcp/server.js at /api/mcp.
 import { createMcpHandler } from "mcp-handler";
-import { registerTools } from "../../../mcp/tools.js";
+import { registerTools } from "../../../mcp/tools.ts";
 
 const handler = createMcpHandler(
   (server) => registerTools(server),

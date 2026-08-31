@@ -1,11 +1,14 @@
 // Faceted study explorer: what exists, in what numbers — optionally conditioned on a
 // draft cohort so every count narrows as clauses are added (study-view-style feedback).
 // Everything returned is designed to be clickable into a DSL clause.
-import { chQuery, DB } from "./ch.js";
-import { sq } from "./compiler.js";
-import { compileCohortDef } from "./cohort2.js";
+import { chQuery, DB } from "./ch.ts";
+import { sq } from "./compiler.ts";
+import { compileCohortDef } from "./cohort2.ts";
 
-export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles }) {
+import type { ExploreResult, ClinicalFacet, CohortDef, ChRow } from "./types.ts";
+import { isClinicalLeaf } from "./types.ts";
+
+export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[] }): Promise<ExploreResult> {
   const t0 = Date.now();
   let cond = "", draftCount = null, dsql = null;
   if (draft && Array.isArray(draft.all) && draft.all.length) {
@@ -28,7 +31,7 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
   const catAttrs = cls.data.filter(r => Number(r.nv) <= 30 && Number(r.numratio) < 0.9);
   const numAttrs = cls.data.filter(r => Number(r.numratio) >= 0.9 && Number(r.nv) > 10);
 
-  let catValues = [];
+  let catValues: ChRow[] = [];
   if (catAttrs.length) {
     const v = await chQuery(
       "SELECT type, attribute_name AS a, attribute_value AS v, uniqExact(patient_unique_id) AS n\n" +
@@ -41,18 +44,18 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
   // Disjunctive faceting: attributes already constrained in the draft get their value
   // lists conditioned on the draft MINUS their own clauses — otherwise a selected
   // attribute collapses to its chosen value and can never be OR-extended.
-  const draftedAttrs = new Set();
+  const draftedAttrs = new Set<string>();
   if (draft && Array.isArray(draft.all)) {
     for (const c of draft.all) {
-      if (c && c.kind === "clinical" && c.attribute) draftedAttrs.add((c.per === "sample" ? "sample|" : "patient|") + c.attribute);
+      if (isClinicalLeaf(c)) draftedAttrs.add((c.per === "sample" ? "sample|" : "patient|") + c.attribute);
     }
   }
-  const disjValues = new Map(); // "per|attr" -> [{v,n}]
+  const disjValues = new Map<string, { v: string; n: number }[]>(); // "per|attr" -> [{v,n}]
   for (const key of draftedAttrs) {
     const [per, attr] = [key.split("|")[0], key.split("|").slice(1).join("|")];
-    const rest = { ...draft, all: draft.all.filter(c => !(c && c.kind === "clinical" && c.attribute === attr && (c.per === "sample" ? "sample" : "patient") === per)) };
+    const rest: CohortDef = { ...draft!, all: (draft!.all || []).filter((c) => !(isClinicalLeaf(c) && c.attribute === attr && (c.per === "sample" ? "sample" : "patient") === per)) };
     let subCond = "";
-    if (rest.all.length) {
+    if (rest.all!.length) {
       const rsql = compileCohortDef(rest, { oncokbPin, profiles, gaProfiles, study });
       subCond = "\n  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + rsql + "))";
     }
@@ -65,15 +68,15 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     disjValues.set(key, v.data.map(x => ({ v: x.v, n: Number(x.n) })));
   }
 
-  const clinical = [
-    ...catAttrs.map(r => ({
-      attribute: r.a, per: r.type, kind: "cat", patients: Number(r.np),
+  const clinical: ClinicalFacet[] = [
+    ...catAttrs.map((r): ClinicalFacet => ({
+      attribute: r.a, per: r.type as "patient" | "sample", kind: "cat", patients: Number(r.np),
       values: disjValues.get(r.type + "|" + r.a) ||
-        catValues.filter(x => x.a === r.a && x.type === r.type).map(x => ({ v: x.v, n: Number(x.n) })),
+        catValues.filter((x) => x.a === r.a && x.type === r.type).map((x) => ({ v: x.v, n: Number(x.n) })),
       disjunctive: disjValues.has(r.type + "|" + r.a) || undefined
     })),
-    ...numAttrs.map(r => ({
-      attribute: r.a, per: r.type, kind: "num", patients: Number(r.np),
+    ...numAttrs.map((r): ClinicalFacet => ({
+      attribute: r.a, per: r.type as "patient" | "sample", kind: "num", patients: Number(r.np),
       min: Number(r.mn), max: Number(r.mx), median: Number(r.md)
     }))
   ].sort((x, y) => y.patients - x.patients).slice(0, 30);
@@ -109,10 +112,10 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
   return {
     study, draftCount,
     clinical,
-    events: ev.data.map(r => ({ type: r.t, n: Number(r.n) })),
-    genes: genes.data.map(r => ({ gene: r.g, n: Number(r.n) })),
-    caseLists: lists.data.map(r => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
-    profiles, gaProfiles,
+    events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
+    genes: genes.data.map((r) => ({ gene: r.g, n: Number(r.n) })),
+    caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
+    profiles: profiles || [], gaProfiles: gaProfiles || [],
     stats: { ms: Date.now() - t0 }
   };
 }
@@ -124,41 +127,41 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
 // whole harmonization). Numeric medians are patient-weighted approximations;
 // min/max are exact. An attribute classified differently across studies takes
 // the kind of the study with the most patients for it.
-export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy }) {
+export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }> }): Promise<ExploreResult> {
   const t0 = Date.now();
   const parts = await Promise.all(studies.map(s =>
     buildExplore({ study: s, draft, oncokbPin, ...(profilesByStudy.get(s) || {}) })));
   if (parts.length === 1) return parts[0];
 
-  const clin = new Map(); // per|attribute -> list of items
+  const clin = new Map<string, ClinicalFacet[]>(); // per|attribute -> list of items
   for (const p of parts) for (const a of p.clinical) {
     const k = a.per + "|" + a.attribute;
     if (!clin.has(k)) clin.set(k, []);
-    clin.get(k).push(a);
+    clin.get(k)!.push(a);
   }
-  const clinical = [...clin.values()].map(items => {
+  const clinical: ClinicalFacet[] = [...clin.values()].map((items) => {
     const kind = items.slice().sort((x, y) => y.patients - x.patients)[0].kind;
-    const same = items.filter(i => i.kind === kind);
-    const patients = same.reduce((s, i) => s + i.patients, 0);
+    const same = items.filter((i) => i.kind === kind);
+    const patients = same.reduce((s: number, i) => s + i.patients, 0);
     const base = { attribute: same[0].attribute, per: same[0].per, kind, patients };
     if (kind === "num") {
       return { ...base,
-        min: Math.min(...same.map(i => i.min)), max: Math.max(...same.map(i => i.max)),
-        median: Math.round(10 * same.reduce((s, i) => s + i.median * i.patients, 0) / patients) / 10 };
+        min: Math.min(...same.map((i) => i.min!)), max: Math.max(...same.map((i) => i.max!)),
+        median: Math.round(10 * same.reduce((s: number, i) => s + i.median! * i.patients, 0) / patients) / 10 };
     }
-    const vals = new Map();
-    for (const i of same) for (const v of i.values) vals.set(v.v, (vals.get(v.v) || 0) + v.n);
+    const vals = new Map<string, number>();
+    for (const i of same) for (const v of i.values!) vals.set(v.v, (vals.get(v.v) || 0) + v.n);
     return { ...base, values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n).slice(0, 8) };
   }).sort((x, y) => y.patients - x.patients);
 
-  const sumBy = (arrs, key) => {
-    const m = new Map();
+  const sumBy = (arrs: any[][], key: string): Map<string, number> => {
+    const m = new Map<string, number>();
     for (const r of arrs.flat()) m.set(r[key], (m.get(r[key]) || 0) + r.n);
     return m;
   };
   const evm = sumBy(parts.map(p => p.events), "type");
   const gm = sumBy(parts.map(p => p.genes), "gene");
-  const lm = new Map();
+  const lm = new Map<string, { id: string; name: string; n: number }>();
   for (const p of parts) for (const l of p.caseLists) {
     const cur = lm.get(l.id) || { id: l.id, name: l.name, n: 0 };
     cur.n += l.n; lm.set(l.id, cur);
@@ -171,8 +174,8 @@ export async function buildExploreFederated({ studies, draft, oncokbPin, profile
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
     genes: [...gm.entries()].map(([gene, n]) => ({ gene, n })).sort((x, y) => y.n - x.n).slice(0, 15),
     caseLists: [...lm.values()].sort((x, y) => y.n - x.n).slice(0, 10),
-    profiles: [...new Set(parts.flatMap(p => p.profiles))],
-    gaProfiles: [...new Set(parts.flatMap(p => p.gaProfiles))],
+    profiles: [...new Set(parts.flatMap((p) => p.profiles))],
+    gaProfiles: [...new Set(parts.flatMap((p) => p.gaProfiles))],
     stats: { ms: Date.now() - t0, perStudy: Object.fromEntries(parts.map((p, i) => [studies[i], p.draftCount])) }
   };
 }

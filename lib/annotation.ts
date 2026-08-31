@@ -8,8 +8,9 @@
 // grant is revoked (or the store is empty) this degrades to the rule-based MOCK below,
 // clearly labeled as such. Pin a specific release with ONCOKB_PIN; default is the
 // most recently synced version in the store.
-import { chQuery } from "./ch.js";
-import { sq } from "./compiler.js";
+import { chQuery } from "./ch.ts";
+import type { ChRow } from "./types.ts";
+import { sq } from "./compiler.ts";
 
 export const MOCK_SOURCE = "MOCK-2026.08 (rule-based placeholder — NOT OncoKB)";
 
@@ -20,17 +21,20 @@ const FUSION_GENES = new Set(["ALK", "RET", "ROS1", "NTRK1", "NTRK2", "NTRK3", "
 const TRUNCATING = /^(nonsense|frame_shift|splice|nonstop)/i;
 const HOTSPOT_MIN_RECURRENCE = 5;
 
-function mockIndex(eventRows) {
-  const counts = new Map();
+type EvRow = { vt?: string; gene?: string; mv?: string; mt?: string; cna?: string | number };
+export interface AnnotationIndex { isDriver: (r: EvRow) => boolean; source: string }
+
+function mockIndex(eventRows: EvRow[]): AnnotationIndex {
+  const counts = new Map<string, number>();
   for (const r of eventRows) {
     if (r.vt === "mutation" && r.mv) {
       const k = r.gene + "|" + r.mv;
       counts.set(k, (counts.get(k) || 0) + 1);
     }
   }
-  const isDriver = (r) => {
+  const isDriver = (r: EvRow): boolean => {
     if (r.vt === "mutation") {
-      if (TSG.has(r.gene) && TRUNCATING.test(r.mt || "")) return true;
+      if (TSG.has(r.gene!) && TRUNCATING.test(r.mt || "")) return true;
       if (r.mv && (counts.get(r.gene + "|" + r.mv) || 0) >= HOTSPOT_MIN_RECURRENCE) return true;
       return false;
     }
@@ -46,17 +50,17 @@ function mockIndex(eventRows) {
 
 const ANNOT_DB = "oncokb_annotation";
 
-let _syncedStudies = null;
-async function syncedStudies() {
+let _syncedStudies: string[] | null = null;
+async function syncedStudies(): Promise<string[]> {
   if (_syncedStudies) return _syncedStudies;
   try {
     const r = await chQuery("SELECT DISTINCT study FROM oncokb_annotation.sync_run WHERE annotated_new > 0 OR already_stored > 0");
-    _syncedStudies = r.data.map(x => x.study);
+    _syncedStudies = (r.data as ChRow[]).map(x => x.study);
   } catch { _syncedStudies = []; }
   return _syncedStudies;
 }
 
-export async function buildAnnotationIndex(eventRows, genes, study) {
+export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], study?: string | string[]): Promise<AnnotationIndex> {
   try {
     const pin = process.env.ONCOKB_PIN ||
       (await chQuery(
@@ -68,9 +72,9 @@ export async function buildAnnotationIndex(eventRows, genes, study) {
        FROM ${ANNOT_DB}.variant_annotation
        WHERE oncokb_version = ${sq(pin)} AND hugo_gene_symbol IN (${genes.map(sq).join(",")})
        GROUP BY t, gene, alteration`);
-    const driverSet = new Set();
-    for (const r of rows.data) if (Number(r.is_driver)) driverSet.add(r.t + "|" + r.gene + "|" + r.alteration);
-    const isDriver = (r) => {
+    const driverSet = new Set<string>();
+    for (const r of rows.data as ChRow[]) if (Number(r.is_driver)) driverSet.add(r.t + "|" + r.gene + "|" + r.alteration);
+    const isDriver = (r: EvRow): boolean => {
       if (r.vt === "mutation") return driverSet.has("MUTATION|" + r.gene + "|" + r.mv);
       if (r.vt === "cna") {
         const v = Number(r.cna);
@@ -89,7 +93,7 @@ export async function buildAnnotationIndex(eventRows, genes, study) {
       : unsynced.length + " of " + list.length + " studies";
     return { isDriver, source: "OncoKB " + pin + " (pinned)" +
       (partial ? " — variants synced from " + synced.join("/") + "; coverage for " + where + " may be partial" : "") };
-  } catch (e) {
+  } catch {
     // not licensed / store empty / db absent -> degrade loudly to the mock
     return mockIndex(eventRows);
   }

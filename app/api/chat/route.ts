@@ -1,9 +1,9 @@
 // In-app chat: a Claude tool-use loop over the Analysis document.
 // The model reads the current document + result summary and may call
 // update_document to modify it; the client applies the returned doc and re-runs.
-import { runAnalysis } from "../../../lib/analysis.js";
-import { catalogText } from "../../../lib/catalog-text.js";
-import { CHAT_GRAMMAR } from "../../../lib/dsl-reference.js";
+import { runAnalysis } from "../../../lib/analysis.ts";
+import { catalogText } from "../../../lib/catalog-text.ts";
+import { CHAT_GRAMMAR } from "../../../lib/dsl-reference.ts";
 
 export const maxDuration = 60;
 

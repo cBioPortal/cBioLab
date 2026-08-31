@@ -1,12 +1,12 @@
 // Compact study-vocabulary text for LLM tool results (chat get_catalog).
-import { resolveStudy, studyProfiles } from "./analysis.js";
-import { buildExplore } from "./explore.js";
+import { resolveStudy, studyProfiles } from "./analysis.ts";
+import { buildExplore } from "./explore.ts";
 
-export async function catalogText(study) {
+export async function catalogText(study?: string): Promise<string> {
   const s = await resolveStudy(study);
   const { profiles, gaProfiles } = await studyProfiles(s);
   const ex = await buildExplore({ study: s, draft: null, oncokbPin: null, profiles, gaProfiles });
-  const lines = [`Catalog for ${s}:`];
+  const lines: string[] = [`Catalog for ${s}:`];
   lines.push("Clinical attributes (name [patient|sample level]: values with patient counts, or numeric range):");
   for (const a of ex.clinical.slice(0, 40)) {
     if (a.kind === "num") lines.push(`- ${a.attribute} [${a.per}]: numeric, min ${a.min} median ${a.median} max ${a.max} (${a.patients} pts)`);

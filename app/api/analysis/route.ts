@@ -1,4 +1,4 @@
-import { runAnalysis } from "../../../lib/analysis.js";
+import { runAnalysis } from "../../../lib/analysis.ts";
 
 export const maxDuration = 60;
 

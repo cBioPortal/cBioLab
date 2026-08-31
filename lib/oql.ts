@@ -8,14 +8,22 @@
 // Rejected with an explanation (not silently approximated): GAIN/HETLOSS (only high-level
 // CNA (+-2) is stored), EXP/PROT (no expression thresholds here), GERMLINE/SOMATIC
 // (public studies are germline-stripped), PROMOTER.
-import { DB, STUDY } from "./ch.js";
-import { sq } from "./compiler.js";
+import { DB, STUDY } from "./ch.ts";
+import { sq } from "./compiler.ts";
+
+export type OqlSpecType = "MUT" | "CNA" | "SV" | "ANY" | "EXP" | "PROT";
+export interface OqlSpec {
+  type: OqlSpecType; driver?: boolean;
+  pchange?: string; cls?: string; cna?: number;
+  op?: string; z?: number;
+}
+export interface OqlEntry { gene: string; specs: OqlSpec[] }
 
 const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
-const CLASS_MAP = {
+const CLASS_MAP: Record<string, string> = {
   MISSENSE: "missense", NONSENSE: "nonsense", TRUNC: "trunc", INFRAME: "in_frame", SPLICE: "splice"
 };
-const REJECT = {
+const REJECT: Record<string, string> = {
   GAIN: "GAIN is not supported: only high-level CNA (amp/deep-deletion, ±2) is stored",
   HETLOSS: "HETLOSS is not supported: only high-level CNA (±2) is stored",
 
@@ -25,7 +33,7 @@ const REJECT = {
 };
 
 // -> [{gene, specs: [{type:'MUT'|'CNA'|'SV'|'ANY', pchange?, cls?, cna?, driver}]}]
-export function parseOql(q) {
+export function parseOql(q: string): OqlEntry[] {
   if (typeof q !== "string" || !q.trim()) throw new Error("empty OQL");
   if (q.length > 500) throw new Error("OQL too long");
   const entries = q.split(/[;\n]/).map(s => s.trim()).filter(Boolean);
@@ -41,7 +49,7 @@ export function parseOql(q) {
   });
 }
 
-function parseSpec(tok0, entry) {
+function parseSpec(tok0: string, entry: string): OqlSpec {
   let tok = tok0.toUpperCase();
   let driver = false;
   // DRIVER as prefix/suffix modifier (DRIVER_G12D, G12D_DRIVER, MUT=DRIVER_G12D, TRUNC_DRIVER…)
@@ -49,7 +57,7 @@ function parseSpec(tok0, entry) {
   if (tok.endsWith("_DRIVER")) { driver = true; tok = tok.slice(0, -7); }
   if (tok === "DRIVER") return { type: "ANY", driver: true };
   let em = tok.match(/^(EXP|PROT)([<>]=?)(-?\d+(?:\.\d+)?)$/);
-  if (em) return { type: em[1], op: em[2], z: Number(em[3]) };
+  if (em) return { type: em[1] as OqlSpecType, op: em[2], z: Number(em[3]) };
   if (tok === "EXP" || tok === "PROT") throw new Error("OQL " + tok + " needs a threshold, e.g. " + tok + ">2");
   for (const k of Object.keys(REJECT)) {
     if (tok === k || tok.startsWith(k + "_") || tok.endsWith("_" + k)) throw new Error("OQL '" + entry + "': " + REJECT[k]);
@@ -75,8 +83,8 @@ function parseSpec(tok0, entry) {
   throw new Error("OQL: unrecognized token '" + tok0.slice(0, 20) + "' in '" + entry + "'");
 }
 
-function specCond(spec) {
-  const conds = [];
+function specCond(spec: OqlSpec): string {
+  const conds: string[] = [];
   if (spec.type === "MUT") {
     conds.push("g.variant_type = 'mutation'");
     if (spec.cls === "trunc") conds.push("(lower(g.mutation_type) LIKE 'nonsense%' OR lower(g.mutation_type) LIKE 'frame_shift%' OR lower(g.mutation_type) LIKE 'nonstop%')");
@@ -93,7 +101,7 @@ function specCond(spec) {
   return conds.join(" AND ");
 }
 
-const DRIVER_JOIN = (pin) =>
+const DRIVER_JOIN = (pin: string): string =>
   "  JOIN oncokb_annotation.variant_annotation ann\n" +
   "    ON ann.oncokb_version = " + sq(pin) + " AND ann.is_driver\n" +
   "   AND ann.hugo_gene_symbol = g.hugo_gene_symbol\n" +
@@ -102,9 +110,9 @@ const DRIVER_JOIN = (pin) =>
   "     OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))\n";
 
 // full OQL leaf -> SQL of matching patient stable ids (portal semantics: altered by ANY entry)
-export function oqlLeafSql(q, { oncokbPin, profiles, study = STUDY } = {}) {
+export function oqlLeafSql(q: string, { oncokbPin, profiles, study = STUDY }: { oncokbPin?: string | null; profiles?: string[]; study?: string } = {}): string {
   const parsed = parseOql(q);
-  const parts = [];
+  const parts: string[] = [];
   for (const { gene, specs } of parsed) {
     for (const spec of specs) {
       if (spec.driver && !oncokbPin) throw new Error("OQL DRIVER requires the OncoKB annotation store");
@@ -124,7 +132,7 @@ export function oqlLeafSql(q, { oncokbPin, profiles, study = STUDY } = {}) {
       parts.push(
         "SELECT DISTINCT replaceOne(g.patient_unique_id, " + sq(study + "_") + ", '') AS pid\n" +
         "  FROM " + DB + ".genomic_event_derived g\n" +
-        (spec.driver ? DRIVER_JOIN(oncokbPin) : "") +
+        (spec.driver ? DRIVER_JOIN(oncokbPin!) : "") +
         "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
         "    AND g.hugo_gene_symbol = " + sq(gene) + "\n" +
         "    AND " + specCond(spec)

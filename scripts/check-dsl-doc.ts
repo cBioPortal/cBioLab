@@ -8,7 +8,7 @@
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { renderDslMarkdown, EXAMPLES } from "../lib/dsl-reference.js";
+import { renderDslMarkdown, EXAMPLES } from "../lib/dsl-reference.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
@@ -22,7 +22,7 @@ if (committed === fresh) report(true, "docs/dsl.md matches lib/dsl-reference.js"
 else { failed++; report(false, "docs/dsl.md is stale — run `npm run docs:gen` and commit the result"); }
 
 // 2. every documented example runs
-const { runAnalysis } = await import("../lib/analysis.js");
+const { runAnalysis } = await import("../lib/analysis.ts");
 for (const ex of EXAMPLES) {
   try {
     const r = await runAnalysis(ex.doc);

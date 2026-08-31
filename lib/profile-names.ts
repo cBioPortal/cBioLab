@@ -1,6 +1,6 @@
 // Short display names for molecular profile types (shared by server engine and
 // client UI — keep this module dependency-free so both can import it).
-export function shortProfileName(pt) {
+export function shortProfileName(pt: string): string {
   const p = String(pt).toLowerCase();
   if (p === "vaf") return "VAF";
   if (/protein|rppa|mass_spec|abundance/.test(p)) return /zscore/.test(p) ? "prot-z" : "prot";
@@ -12,6 +12,6 @@ export function shortProfileName(pt) {
 
 // A heatmap track's label — this is also its sort key, so engine and UI must
 // derive it identically.
-export function heatmapTrackLabel(gene, profileType) {
+export function heatmapTrackLabel(gene: string, profileType: string): string {
   return gene + " " + shortProfileName(profileType);
 }

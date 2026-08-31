@@ -4,15 +4,17 @@
 // (compilers stay single-study) and members are unioned as fully-qualified patient ids
 // ("<study>_<patient>"). Views fetch data per involved study and join on those ids.
 // Deliberately deferred: cross-study patient dedup and attribute harmonization.
-import { chQuery, DB, STUDY } from "./ch.js";
-import { sq } from "./compiler.js";
-import { compileCohortDef, describeCohortDef } from "./cohort2.js";
-import { genomicEventsSql, coverageSql, buildContract, PIDS_SQL } from "./oncoprint.js";
-import { buildAnnotationIndex } from "./annotation.js";
-import { fisherExact, kaplanMeier } from "./stats.js";
-import { contractToSvg } from "./oncoprint-svg.js";
+import { chQuery, DB, STUDY } from "./ch.ts";
+import { sq } from "./compiler.ts";
+import { compileCohortDef, describeCohortDef } from "./cohort2.ts";
+import { genomicEventsSql, coverageSql, buildContract, PIDS_SQL } from "./oncoprint.ts";
+import { buildAnnotationIndex } from "./annotation.ts";
+import { fisherExact, kaplanMeier } from "./stats.ts";
+import { contractToSvg } from "./oncoprint-svg.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView } from "./types.ts";
+import type { PidsCarrier } from "./oncoprint.ts";
 
-async function oncokbPin() {
+async function oncokbPin(): Promise<string | null> {
   try {
     const r = await chQuery(
       "SELECT oncokb_version FROM oncokb_annotation.variant_annotation GROUP BY oncokb_version ORDER BY max(resolved_at) DESC LIMIT 1");
@@ -22,40 +24,40 @@ async function oncokbPin() {
 
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
 
-const _profileCache = new Map(); // per-study
-export async function studyProfiles(study) {
-  if (_profileCache.has(study)) return _profileCache.get(study);
+const _profileCache = new Map<string, { profiles: string[]; gaProfiles: string[] }>(); // per-study
+export async function studyProfiles(study: string): Promise<{ profiles: string[]; gaProfiles: string[] }> {
+  if (_profileCache.has(study)) return _profileCache.get(study)!;
   const profiles = (await chQuery(
-    "SELECT DISTINCT profile_type FROM " + DB + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study))).data.map(r => r.profile_type);
+    "SELECT DISTINCT profile_type FROM " + DB + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study))).data.map((r) => r.profile_type);
   const gaProfiles = (await chQuery(
-    "SELECT DISTINCT replaceOne(profile_stable_id, " + sq(study + "_") + ", '') AS pt FROM " + DB + ".generic_assay_profile_entity_derived WHERE profile_stable_id LIKE " + sq(study + "_%"))).data.map(r => r.pt);
+    "SELECT DISTINCT replaceOne(profile_stable_id, " + sq(study + "_") + ", '') AS pt FROM " + DB + ".generic_assay_profile_entity_derived WHERE profile_stable_id LIKE " + sq(study + "_%"))).data.map((r) => r.pt);
   const out = { profiles, gaProfiles };
   _profileCache.set(study, out);
   return out;
 }
 
-let _studySet = null;
-export async function validStudies() {
+let _studySet: Set<string> | null = null;
+export async function validStudies(): Promise<Set<string>> {
   if (_studySet) return _studySet;
   const r = await chQuery("SELECT cancer_study_identifier AS id FROM " + DB + ".cancer_study");
-  _studySet = new Set(r.data.map(x => x.id));
+  _studySet = new Set(r.data.map((x) => x.id));
   return _studySet;
 }
 
-export async function resolveStudy(requested, fallback) {
+export async function resolveStudy(requested?: string | null, fallback?: string | null): Promise<string> {
   const study = String(requested || fallback || STUDY).replace(/[^A-Za-z0-9._-]/g, "");
   const set = await validStudies();
   if (!set.has(study)) throw new Error("unknown study '" + study.slice(0, 60) + "'");
   return study;
 }
 
-function cohortStudies(def, docStudy) {
+function cohortStudies(def: CohortDef | undefined, docStudy: string): string[] {
   if (def && Array.isArray(def.studies) && def.studies.length) return def.studies;
   if (def && def.study) return [def.study];
   return [docStudy];
 }
 
-export async function runAnalysis(doc) {
+export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
   const t0 = Date.now();
   const docStudy = await resolveStudy(doc.study);
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
@@ -63,20 +65,20 @@ export async function runAnalysis(doc) {
   if (!names.length) throw new Error("document has no cohorts");
 
   // ---- evaluate cohorts: per study, union fully-qualified members ---------
-  const cohorts = {};
+  const cohorts: Record<string, { studies: string[]; members: Set<string>; perStudy: Record<string, { sql: string; count: number }>; count: number; text: string }> = {};
   for (const name of names) {
     const def = doc.cohorts[name];
     const studies = [];
     for (const s of cohortStudies(def, docStudy)) studies.push(await resolveStudy(s, docStudy));
-    const members = new Set(); // "<study>_<pid>"
-    const perStudy = {};       // study -> {sql, count}
+    const members = new Set<string>(); // "<study>_<pid>"
+    const perStudy: Record<string, { sql: string; count: number }> = {};       // study -> {sql, count}
     // per-study evaluation in parallel (latency-bound, not data-bound); merge in
     // study order so member insertion stays deterministic
     const evals = await Promise.all(studies.map(async (s) => {
       const { profiles, gaProfiles } = await studyProfiles(s);
       const sql = compileCohortDef(def, { oncokbPin: pin, profiles, gaProfiles, study: s });
       const r = await chQuery("SELECT pid FROM (\n" + sql + "\n)");
-      return { s, sql, pids: r.data.map(x => x.pid) };
+      return { s, sql, pids: (r.data as ChRow[]).map((x) => x.pid) };
     }));
     for (const { s, sql, pids } of evals) {
       for (const p of pids) members.add(s + "_" + p);
@@ -90,20 +92,20 @@ export async function runAnalysis(doc) {
          studies[0] !== docStudy ? " — in " + studies[0] : "")
     };
   }
-  const involved = [...new Set(Object.values(cohorts).flatMap(c => c.studies))];
+  const involved = [...new Set(Object.values(cohorts).flatMap((c) => c.studies))];
 
   // ---- views --------------------------------------------------------------
-  const views = [];
+  const views: ViewResult[] = [];
   for (const view of (doc.views || []).slice(0, 6)) {
-    const vNames = (view.cohorts && view.cohorts.length ? view.cohorts : names).filter(n => cohorts[n]);
-    const vStudies = [...new Set(vNames.flatMap(n => cohorts[n].studies))];
+    const vNames = (view.cohorts && view.cohorts.length ? view.cohorts : names).filter((n) => cohorts[n]);
+    const vStudies = [...new Set(vNames.flatMap((n) => cohorts[n].studies))];
 
     if (view.kind === "compare") {
-      const genes = (view.genes || []).map(g => String(g).toUpperCase().trim()).filter(g => GENE_RE.test(g)).slice(0, 20);
+      const genes = ((view as CompareView).genes || []).map((g) => String(g).toUpperCase().trim()).filter((g) => GENE_RE.test(g)).slice(0, 20);
       if (!genes.length) { views.push({ kind: "compare", error: "compare view needs genes" }); continue; }
       // fetch events + coverage per involved study; key everything by full member id
-      const evRows = [];
-      const covPairs = new Map(); // gene -> Set(member)
+      const evRows: any[] = [];
+      const covPairs = new Map<string, Set<string>>(); // gene -> Set(member)
       for (const g of genes) covPairs.set(g, new Set());
       const fetched = await Promise.all(vStudies.map(s =>
         Promise.all([chQuery(genomicEventsSql(genes, s)), chQuery(coverageSql(genes, s))]).then(([ev, cov]) => ({ s, ev, cov }))));
@@ -112,7 +114,7 @@ export async function runAnalysis(doc) {
         for (const r of cov.data) covPairs.get(r.gene)?.add(s + "_" + r.pid);
       }
       const ann = await buildAnnotationIndex(evRows, genes, vStudies.length === 1 ? vStudies[0] : vStudies);
-      const per = new Map(); // gene -> Map(member -> {any, driver})
+      const per = new Map<string, Map<string, { any: boolean; driver: boolean }>>(); // gene -> Map(member -> {any, driver})
       for (const g of genes) per.set(g, new Map());
       for (const r of evRows) {
         const m = per.get(r.gene); if (!m) continue;
@@ -122,9 +124,9 @@ export async function runAnalysis(doc) {
         if (ann.isDriver(r)) e.driver = true;
         m.set(r.member, e);
       }
-      const rows = genes.map(g => {
-        const m = per.get(g), covSet = covPairs.get(g);
-        const cells = vNames.map(n => {
+      const rows: CompareRow[] = genes.map((g) => {
+        const m = per.get(g)!, covSet = covPairs.get(g)!;
+        const cells: CompareCell[] = vNames.map((n) => {
           let profiled = 0, any = 0, driver = 0;
           for (const member of cohorts[n].members) {
             const isCov = covSet.has(member), e = m.get(member);
@@ -135,7 +137,7 @@ export async function runAnalysis(doc) {
             anyPct: profiled ? Math.round(1000 * any / profiled) / 10 : null,
             driverPct: profiled ? Math.round(1000 * driver / profiled) / 10 : null };
         });
-        const row = { gene: g, cells };
+        const row: CompareRow = { gene: g, cells };
         if (vNames.length === 2) {
           const [x, y] = cells;
           row.pAny = fisherExact(x.any, x.profiled - x.any, y.any, y.profiled - y.any);
@@ -150,7 +152,7 @@ export async function runAnalysis(doc) {
             ": denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated" } : {}) });
 
     } else if (view.kind === "survival") {
-      const osMap = new Map(); // member -> {t, event}
+      const osMap = new Map<string, { t: number; event: number }>(); // member -> {t, event}
       const osFetched = await Promise.all(vStudies.map(async (s) => ({ s, os: await chQuery(
           "SELECT replaceOne(patient_unique_id, " + sq(s + "_") + ", '') AS pid,\n" +
           "       anyIf(attribute_value, attribute_name='OS_MONTHS') AS months,\n" +
@@ -160,8 +162,8 @@ export async function runAnalysis(doc) {
           "GROUP BY pid") })));
       for (const { s, os } of osFetched)
         for (const r of os.data) osMap.set(s + "_" + r.pid, { t: parseFloat(r.months), event: String(r.status).startsWith("1") ? 1 : 0 });
-      const curves = vNames.map(n => {
-        const data = [...cohorts[n].members].map(m => osMap.get(m)).filter(Boolean);
+      const curves = vNames.map((n) => {
+        const data = [...cohorts[n].members].map((m) => osMap.get(m)).filter((d): d is { t: number; event: number } => !!d);
         return { cohort: n, ...kaplanMeier(data), missing: cohorts[n].count - data.length };
       });
       views.push({ kind: "survival", cohorts: vNames, curves,
@@ -170,38 +172,40 @@ export async function runAnalysis(doc) {
 
     } else if (view.kind === "oncoprint") {
       const multi = vStudies.length > 1;
-      const genes = (view.genes || []).slice(0, 12);
+      const genes = ((view as OncoprintView).genes || []).slice(0, 12);
       // federated: each group carries a {study: sql} map; each cohort contributes
       // only the studies it was actually evaluated in
       const contract = await buildContract({
         study: vStudies[0],
         studies: vStudies,
         genes,
-        clinical: view.clinical || [],
-        heatmap: view.heatmap || [],
-        sort: view.sort,
+        clinical: (view as OncoprintView).clinical || [],
+        heatmap: (view as OncoprintView).heatmap || [],
+        sort: (view as OncoprintView).sort,
         derivedEvents: [],
-        layout: { groupBy: { kind: "cohorts", groups: vNames.map(n => ({ name: n, dsl: {
+        layout: { groupBy: { kind: "cohorts" as const, groups: vNames.map((n) => ({ name: n, dsl: {
           [PIDS_SQL]: multi
-            ? Object.fromEntries(vStudies.filter(s => cohorts[n].perStudy[s]).map(s => [s, cohorts[n].perStudy[s].sql]))
+            ? Object.fromEntries(vStudies.filter((s) => cohorts[n].perStudy[s]).map((s) => [s, cohorts[n].perStudy[s].sql]))
             : cohorts[n].perStudy[vStudies[0]].sql
-        } })) } },
+        } as PidsCarrier })) } },
         conventions: { lineGap: 90 }
       });
       views.push({ kind: "oncoprint", cohorts: vNames, svg: contractToSvg(contract, 1200),
-        genes: contract.tracks.filter(t => t.kind === "gene").map(t => ({ gene: t.label, driverPct: t.driverPct, anyPct: t.freqPct })),
+        genes: contract.tracks.filter((t) => t.kind === "gene").map((t) => ({ gene: t.label, driverPct: t.driverPct ?? null, anyPct: t.freqPct ?? null })),
         nColumns: contract.stats.nColumns, annotation: contract.conventions.annotation,
         ...(multi ? { studies: vStudies,
           note: "cross-study oncoprint" + (vStudies.length <= 2 ? " (" + vStudies.join(", ") + ")" : " across " + vStudies.length + " studies") +
             ": duplicate patients across studies appear as separate columns; clinical tracks merge attribute values by name without harmonization; the Study track shows each column's origin" } : {}) });
     } else {
-      views.push({ kind: view.kind, error: "unknown view kind" });
+      // unreachable for well-typed documents, but documents arrive as untrusted
+      // JSON from clients/chat/MCP, so an unknown kind must still be reported
+      views.push({ kind: String((view as { kind?: unknown }).kind ?? "unknown"), error: "unknown view kind" });
     }
   }
 
   return {
     study: docStudy, involvedStudies: involved, oncokbPin: pin,
-    cohorts: Object.fromEntries(names.map(n => [n, {
+    cohorts: Object.fromEntries(names.map((n) => [n, {
       count: cohorts[n].count, text: cohorts[n].text,
       studies: cohorts[n].studies,
       sql: Object.entries(cohorts[n].perStudy).map(([s, x]) => "-- " + s + "\n" + x.sql).join("\n\n-- UNION (federated at the analysis layer)\n\n")

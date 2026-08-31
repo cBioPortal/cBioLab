@@ -1,13 +1,24 @@
 // DSL -> ClickHouse SQL compiler. Server-side only.
-export function sq(s) { return "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'"; }
+import type { EventSelector, EventRel, Occurrence, ClinicalOp } from "./types.ts";
 
-function mskCte(db, study) {
+/** A selector after runtime validation: defaults applied, fields narrowed. */
+export interface ValidSelector {
+  eventType: string;
+  attrs: { key: string; value: string }[];
+  occurrence: Occurrence;
+  numeric: { key: string; op: string; value: number } | null;
+  minDurationDays: number | null;
+}
+
+export function sq(s: unknown): string { return "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'"; }
+
+function mskCte(db: string, study: string): string {
   return "msk AS (\n  SELECT p.internal_id FROM " + db + ".patient p\n" +
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n)";
 }
 
-function priorMedCte(db) {
+function priorMedCte(db: string): string {
   return "nopriormed AS (\n  SELECT ce.patient_id AS patient_id FROM " + db + ".clinical_event ce\n" +
     "  JOIN " + db + ".clinical_event_data pm ON pm.clinical_event_id = ce.clinical_event_id\n" +
     "    AND pm.key = 'PRIOR_MED_TO_MSK' AND pm.value = 'No prior medications'\n" +
@@ -16,31 +27,31 @@ function priorMedCte(db) {
 
 const OCCURRENCES = new Set(["ANY", "FIRST", "LAST"]);
 const REL_TYPES = new Set(["NONE", "BEFORE", "DURING", "NOT_FOLLOWED_BY"]);
-const NUM_OPS = { ">": ">", ">=": ">=", "<": "<", "<=": "<=", "=": "=" };
+const NUM_OPS: Record<string, string> = { ">": ">", ">=": ">=", "<": "<", "<=": "<=", "=": "=" };
 
-function asNum(x, name) {
+function asNum(x: unknown, name: string): number {
   const n = Number(x);
   if (!Number.isFinite(n)) throw new Error("invalid number for " + name);
   return n;
 }
 
-export function validateSelector(sel) {
+export function validateSelector(sel: EventSelector | null | undefined): ValidSelector {
   if (!sel || typeof sel.eventType !== "string" || !sel.eventType || sel.eventType.length > 200)
     throw new Error("invalid eventType");
-  const attrs = (sel.attrs || []).slice(0, 3).filter(a => a && a.key && a.value)
-    .map(a => ({ key: String(a.key).slice(0, 200), value: String(a.value).slice(0, 500) }));
-  const occurrence = OCCURRENCES.has(sel.occurrence) ? sel.occurrence : "ANY";
-  let numeric = null;
+  const attrs = (sel.attrs || []).slice(0, 3).filter((a) => a && a.key && a.value)
+    .map((a) => ({ key: String(a.key).slice(0, 200), value: String(a.value).slice(0, 500) }));
+  const occurrence: Occurrence = OCCURRENCES.has(sel.occurrence as string) ? (sel.occurrence as Occurrence) : "ANY";
+  let numeric: ValidSelector["numeric"] = null;
   if (sel.numeric && sel.numeric.key && sel.numeric.value !== "" && sel.numeric.value != null) {
-    numeric = { key: String(sel.numeric.key).slice(0, 200), op: NUM_OPS[sel.numeric.op] || ">", value: asNum(sel.numeric.value, "numeric value") };
+    numeric = { key: String(sel.numeric.key).slice(0, 200), op: NUM_OPS[sel.numeric.op as string] || ">", value: asNum(sel.numeric.value, "numeric value") };
   }
   const minDurationDays = sel.minDurationDays ? asNum(sel.minDurationDays, "minDurationDays") : null;
   return { eventType: sel.eventType, attrs, occurrence, numeric, minDurationDays };
 }
 
-function selectorCte(name, sel, db, priorGuard) {
-  const joins = [], conds = ["ce.event_type = " + sq(sel.eventType)];
-  sel.attrs.forEach((a, i) => {
+function selectorCte(name: string, sel: ValidSelector, db: string, priorGuard: boolean): string {
+  const joins: string[] = [], conds: string[] = ["ce.event_type = " + sq(sel.eventType)];
+  sel.attrs.forEach((a, i: number) => {
     joins.push("JOIN " + db + ".clinical_event_data a" + i +
       " ON a" + i + ".clinical_event_id = ce.clinical_event_id AND a" + i + ".key = " +
       sq(a.key) + " AND a" + i + ".value = " + sq(a.value));
@@ -66,17 +77,27 @@ function selectorCte(name, sel, db, priorGuard) {
   return name + " AS (\n" + base + "\n)";
 }
 
-export function compileCohort({ db, study, a, b, rel, priorGuard, lineGap: lineGapIn, patientsLimit }) {
+export interface CompileCohortArgs {
+  db: string; study: string;
+  a: EventSelector; b?: EventSelector | null; rel?: EventRel | null;
+  priorGuard?: boolean; lineGap?: number | null; patientsLimit?: number;
+}
+export interface CompiledCohort {
+  countSql: string; patientsSql: string; histSql: string | null; histBucket: number;
+}
+
+export function compileCohort({ db, study, a: aIn, b: bIn, rel, priorGuard, lineGap: lineGapIn, patientsLimit }: CompileCohortArgs): CompiledCohort {
   const A = "sel_a", B = "sel_b";
-  a = validateSelector(a);
+  const a = validateSelector(aIn);
+  let b: ValidSelector | null = null;
   const relType = rel && REL_TYPES.has(rel.type) ? rel.type : "NONE";
-  if (relType !== "NONE") b = validateSelector(b);
-  const isLine = s => s && s.eventType === LINE_TYPE;
+  if (relType !== "NONE") b = validateSelector(bIn);
+  const isLine = (s: ValidSelector | null): boolean => !!s && s.eventType === LINE_TYPE;
   // shared page-level gap setting; a selector-level GAP attribute still overrides
   const lineGap = (() => {
     for (const s of [a, relType !== "NONE" ? b : null]) {
       if (!isLine(s)) continue;
-      const g = (s.attrs || []).find(x => x.key === "GAP");
+      const g = (s!.attrs || []).find((x) => x.key === "GAP");
       if (g) return asNum(g.value, "GAP");
     }
     return lineGapIn != null ? asNum(lineGapIn, "lineGap") : 90;
@@ -86,11 +107,13 @@ export function compileCohort({ db, study, a, b, rel, priorGuard, lineGap: lineG
   if (isLine(a) || (relType !== "NONE" && isLine(b)))
     ctes.push(...linesCoreCtes(db, lineGap, !!priorGuard));
   ctes.push(isLine(a) ? lineSelectorCte(A, a) : selectorCte(A, a, db, !!priorGuard));
-  let joins = [], wheres = [], maxDays = 0, minDays = 0;
+  const joins: string[] = [], wheres: string[] = [];
+  let maxDays = 0, minDays = 0;
   if (relType !== "NONE") {
-    ctes.push(isLine(b) ? lineSelectorCte(B, b) : selectorCte(B, b, db, false));
+    ctes.push(isLine(b) ? lineSelectorCte(B, b!) : selectorCte(B, b!, db, false));
     if (relType === "BEFORE") {
-      minDays = asNum(rel.minDays || 0, "minDays"); maxDays = asNum(rel.maxDays, "maxDays");
+      const relB = rel as Extract<EventRel, { type: "BEFORE" }>;
+      minDays = asNum(relB.minDays || 0, "minDays"); maxDays = asNum(relB.maxDays, "maxDays");
       joins.push("JOIN " + B + " ON " + B + ".patient_id = " + A + ".patient_id");
       wheres.push(B + ".start_date > " + A + ".start_date + " + minDays +
         " AND " + B + ".start_date <= " + A + ".start_date + " + maxDays);
@@ -99,11 +122,12 @@ export function compileCohort({ db, study, a, b, rel, priorGuard, lineGap: lineG
       wheres.push(B + ".start_date >= " + A + ".start_date AND " + B +
         ".start_date <= coalesce(" + A + ".stop_date, " + A + ".start_date)");
     } else if (relType === "NOT_FOLLOWED_BY") {
-      const w = asNum(rel.withinDays, "withinDays");
+      const relN = rel as Extract<EventRel, { type: "NOT_FOLLOWED_BY" }>;
+      const w = asNum(relN.withinDays, "withinDays");
       wheres.push(A + ".patient_id NOT IN (SELECT a2.patient_id FROM " + A + " AS a2 JOIN " + B +
         " ON " + B + ".patient_id = a2.patient_id AND " + B + ".start_date > a2.start_date AND " +
         B + ".start_date <= a2.start_date + " + w + ")");
-      if (rel.observed) {
+      if (relN.observed) {
         ctes.push("obs AS (\n  SELECT patient_id, max(start_date) AS max_date FROM " + db + ".clinical_event\n" +
           "  WHERE patient_id IN (SELECT internal_id FROM msk) GROUP BY patient_id\n)");
         joins.push("JOIN obs ON obs.patient_id = " + A + ".patient_id");
@@ -122,7 +146,7 @@ export function compileCohort({ db, study, a, b, rel, priorGuard, lineGap: lineG
       "FROM " + A + "\n  JOIN " + db + ".patient p ON p.internal_id = " + A + ".patient_id") +
     (wheres.length ? "\n" : "\nWHERE 1\n") + "ORDER BY pid LIMIT " +
     (Number.isFinite(Number(patientsLimit)) ? Number(patientsLimit) : 24);
-  let histSql = null, histBucket = 0;
+  let histSql: string | null = null, histBucket = 0;
   if (relType === "BEFORE") {
     histBucket = Math.max(1, Math.round(maxDays / 12));
     histSql = withBlock +
@@ -139,7 +163,7 @@ export function compileCohort({ db, study, a, b, rel, priorGuard, lineGap: lineG
 const SYSTEMIC = ["Chemo", "Immuno", "Targeted", "Hormone", "Biologic", "Investigational"];
 export const LINE_TYPE = "Treatment line (derived)";
 
-function linesCoreCtes(db, gap, priorGuard) {
+function linesCoreCtes(db: string, gap: number, priorGuard: boolean): string[] {
   return [
     "tx AS (\n  SELECT ce.clinical_event_id AS eid, ce.patient_id, ce.start_date,\n" +
     "         coalesce(ce.stop_date, ce.start_date) AS stop_date, st.value AS subtype\n" +
@@ -161,9 +185,9 @@ function linesCoreCtes(db, gap, priorGuard) {
   ];
 }
 
-function lineSelectorCte(name, sel) {
+function lineSelectorCte(name: string, sel: ValidSelector): string {
   const conds = ["1"];
-  sel.attrs.forEach(a => {
+  sel.attrs.forEach((a) => {
     if (a.key === "LINE_NO") conds.push("line_no = " + asNum(a.value, "LINE_NO"));
     else if (a.key === "COMPOSITION") conds.push("combo = " + sq(a.value));
     else if (a.key === "GAP") { /* consumed by compileCohort */ }
@@ -184,7 +208,7 @@ function lineSelectorCte(name, sel) {
   return name + " AS (\n" + base + "\n)";
 }
 
-export function compileLines(db, study, gapDays, priorGuard) {
+export function compileLines(db: string, study: string, gapDays: number, priorGuard: boolean): { histSql: string; transSql: string } {
   const gap = asNum(gapDays, "gap");
   if (gap < 1 || gap > 3650) throw new Error("gap out of range");
   const ctes = [mskCte(db, study)];
@@ -205,7 +229,7 @@ export function compileLines(db, study, gapDays, priorGuard) {
   return { histSql, transSql };
 }
 
-export function lineCatalogSqls(db, study, gap = 90) {
+export function lineCatalogSqls(db: string, study: string, gap = 90): { stats: string; combos: string } {
   const withBlock = "WITH\n" + [mskCte(db, study), ...linesCoreCtes(db, gap, false)].join(",\n") + "\n";
   return {
     stats: withBlock + "SELECT uniqExact(patient_id) AS n_pat, count() AS n_ev FROM line_events",
@@ -213,7 +237,7 @@ export function lineCatalogSqls(db, study, gap = 90) {
   };
 }
 
-export function catalogSqls(db, study) {
+export function catalogSqls(db: string, study: string): Record<string, string> {
   const withBlock = "WITH\n" + mskCte(db, study) + "\n";
   return {
     studyCheck: "SELECT count() AS n FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(study),

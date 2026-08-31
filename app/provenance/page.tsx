@@ -1,9 +1,9 @@
 // Provenance page: /provenance?spec=<base64url OncoprintSpec>
 // Server component — decodes the spec from the URL, re-renders the oncoprint (inline SVG),
 // and shows the DSL plus every SQL query the spec compiles to. Stateless: the link IS the spec.
-import { buildContract } from "../../lib/oncoprint.js";
-import { specToQueries } from "../../lib/oncoprint.js";
-import { contractToSvg } from "../../lib/oncoprint-svg.js";
+import { buildContract } from "../../lib/oncoprint.ts";
+import { specToQueries } from "../../lib/oncoprint.ts";
+import { contractToSvg } from "../../lib/oncoprint-svg.ts";
 
 export const metadata = { title: "Oncoprint provenance — Cohort Lab" };
 export const maxDuration = 60;

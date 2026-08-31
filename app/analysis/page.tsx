@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
-import { heatmapTrackLabel } from "../../lib/profile-names.js";
+import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
 const IMMUNO_EVENT = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };

@@ -1,15 +1,16 @@
 // Small, dependency-free stats for comparison views.
+import type { KmCurve, KmPoint } from "./types.ts";
 
 // log(n!) via Lanczos-free cumulative sum with memo
-const LF = [0, 0];
-function logFact(n) {
+const LF: number[] = [0, 0];
+function logFact(n: number): number {
   for (let i = LF.length; i <= n; i++) LF[i] = LF[i - 1] + Math.log(i);
   return LF[n];
 }
 
 // Fisher's exact test (two-sided) for a 2x2 table [[a,b],[c,d]]
-export function fisherExact(a, b, c, d) {
-  const logHyper = (a, b, c, d) =>
+export function fisherExact(a: number, b: number, c: number, d: number): number {
+  const logHyper = (a: number, b: number, c: number, d: number): number =>
     logFact(a + b) + logFact(c + d) + logFact(a + c) + logFact(b + d) -
     logFact(a) - logFact(b) - logFact(c) - logFact(d) - logFact(a + b + c + d);
   const pObs = logHyper(a, b, c, d);
@@ -26,11 +27,12 @@ export function fisherExact(a, b, c, d) {
 
 // Kaplan-Meier product-limit estimator.
 // data: [{t: months, event: 0|1}] -> { points: [{t, s}], median, n, events }
-export function kaplanMeier(data) {
+export function kaplanMeier(data: { t: number; event: number }[]): Omit<KmCurve, "cohort"> {
   const clean = data.filter(d => Number.isFinite(d.t) && d.t >= 0).sort((x, y) => x.t - y.t);
   const n0 = clean.length;
-  let atRisk = n0, s = 1, median = null;
-  const points = [{ t: 0, s: 1 }];
+  let atRisk = n0, s = 1;
+  let median: number | null = null;
+  const points: KmPoint[] = [{ t: 0, s: 1 }];
   let events = 0;
   let i = 0;
   while (i < clean.length) {

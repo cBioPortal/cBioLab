@@ -12,14 +12,22 @@
 // per-leaf CTEs over patient stable ids combined with INTERSECT / UNION / EXCEPT,
 // and everything stays renderable as a sentence. Back-compat: the v1 flat event
 // shape {a, b?, rel, ...} is accepted anywhere a definition is expected.
-import { DB, STUDY } from "./ch.js";
-import { compileCohort, sq } from "./compiler.js";
-import { oqlLeafSql } from "./oql.js";
+import { DB, STUDY } from "./ch.ts";
+import { compileCohort, sq } from "./compiler.ts";
+import { oqlLeafSql } from "./oql.ts";
+import type {
+  CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
+  ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
+  PatientsLeaf, AlterationLeaf, EventLeafFields
+} from "./types.ts";
 
-const PID = (col, study) => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
-const CLIN_OP = { "=": "=", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<=" };
+/** Every leaf compiler receives a fully-resolved context. */
+type Ctx = CompileCtx & { study: string };
 
-export function basePatientsSql(study = STUDY) {
+const PID = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
+const CLIN_OP: Record<string, string> = { "=": "=", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<=" };
+
+export function basePatientsSql(study: string = STUDY): string {
   return "SELECT DISTINCT " + PID("patient_unique_id", study) + " AS pid FROM " + DB + ".sample_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(study);
 }
@@ -28,30 +36,30 @@ export function basePatientsSql(study = STUDY) {
 // saved cohorts and old links keep working, but no longer part of the public DSL.
 // It translates to OQL and compiles through the same engine, so equivalence with the
 // OQL form holds by construction (one semantics owner).
-function alterationToOql(leaf) {
+function alterationToOql(leaf: AlterationLeaf): string {
   const gene = String(leaf.gene || "").toUpperCase().trim();
   if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(gene)) throw new Error("invalid gene symbol in alteration clause");
   const types = (leaf.types && leaf.types.length ? leaf.types : ["MUT", "CNA", "SV"])
     .filter(t => ["MUT", "CNA", "SV"].includes(t));
   const driver = leaf.driver === "driverOnly";
   if (types.length === 3) return gene + ":" + (driver ? " DRIVER" : "");
-  const specs = [];
+  const specs: string[] = [];
   if (types.includes("MUT")) specs.push(driver ? "MUT_DRIVER" : "MUT");
   if (types.includes("CNA")) specs.push(driver ? "AMP_DRIVER HOMDEL_DRIVER" : "AMP HOMDEL");
   if (types.includes("SV")) specs.push(driver ? "FUSION_DRIVER" : "FUSION");
   return gene + ": " + specs.join(" ");
 }
 
-function clinicalLeafSql(leaf, ctx) {
+function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
   const attr = String(leaf.attribute || "");
   if (!attr || attr.length > 200) throw new Error("invalid clinical attribute");
   const per = leaf.per === "sample" ? "sample" : "patient"; // sample-level collapses: patient matches if ANY sample matches
-  const conds = [];
+  const conds: string[] = [];
   if (Array.isArray(leaf.values) && leaf.values.length) {
     conds.push("attribute_value IN (" + leaf.values.slice(0, 50).map(v => sq(String(v))).join(",") + ")");
   }
   if (leaf.range && typeof leaf.range === "object") {
-    const r = leaf.range, num = "toFloat64OrNull(attribute_value)";
+    const r = leaf.range as Record<string, number | undefined>, num = "toFloat64OrNull(attribute_value)";
     for (const [k, opSym] of [["gt", ">"], ["gte", ">="], ["lt", "<"], ["lte", "<="]]) {
       if (r[k] != null) {
         if (!Number.isFinite(Number(r[k]))) throw new Error("clinical range." + k + " must be a number");
@@ -73,9 +81,9 @@ function clinicalLeafSql(leaf, ctx) {
     "    AND attribute_name = " + sq(attr) + " AND " + conds.join(" AND ");
 }
 
-const PROFILED_TYPE = { MUTATION: "MUTATION_EXTENDED", CNA: "COPY_NUMBER_ALTERATION", SV: "STRUCTURAL_VARIANT" };
+const PROFILED_TYPE: Record<string, string> = { MUTATION: "MUTATION_EXTENDED", CNA: "COPY_NUMBER_ALTERATION", SV: "STRUCTURAL_VARIANT" };
 
-function profiledLeafSql(leaf, ctx) {
+function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): string {
   const t = PROFILED_TYPE[String(leaf.type || "").toUpperCase()];
   if (!t) throw new Error("profiled clause: type must be MUTATION, CNA, or SV");
   return "SELECT DISTINCT " + PID("sd.patient_unique_id", ctx.study) + " AS pid\n" +
@@ -84,7 +92,7 @@ function profiledLeafSql(leaf, ctx) {
     "  WHERE sp.cancer_study_identifier = " + sq(ctx.study) + " AND sp.alteration_type = " + sq(t);
 }
 
-function caseListLeafSql(leaf, ctx) {
+function caseListLeafSql(leaf: CaseListLeaf, ctx: Ctx): string {
   let id = String(leaf.id || "").trim();
   if (!/^[A-Za-z0-9._-]{1,120}$/.test(id)) throw new Error("caseList clause: bad list id");
   if (!id.startsWith(ctx.study)) id = ctx.study + "_" + id; // accept 'sequenced' shorthand
@@ -96,18 +104,19 @@ function caseListLeafSql(leaf, ctx) {
     "  WHERE sl.stable_id = " + sq(id);
 }
 
-function numRangeConds(range, expr) {
-  const conds = [];
+function numRangeConds(range: ClinicalRange | undefined, expr: string): string[] {
+  const conds: string[] = [];
   for (const [k, opSym] of [["gt", ">"], ["gte", ">="], ["lt", "<"], ["lte", "<="]]) {
-    if (range && range[k] != null) {
-      if (!Number.isFinite(Number(range[k]))) throw new Error("range." + k + " must be a number");
-      conds.push(expr + " " + opSym + " " + Number(range[k]));
+    const rv = range ? (range as Record<string, number | undefined>)[k] : undefined;
+    if (rv != null) {
+      if (!Number.isFinite(Number(rv))) throw new Error("range." + k + " must be a number");
+      conds.push(expr + " " + opSym + " " + Number(rv));
     }
   }
   return conds;
 }
 
-function genomicDataLeafSql(leaf, ctx) {
+function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): string {
   const gene = String(leaf.gene || "").toUpperCase().trim();
   if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(gene)) throw new Error("genomicData clause: bad gene");
   const pt = String(leaf.profileType || "");
@@ -125,7 +134,7 @@ function genomicDataLeafSql(leaf, ctx) {
     "    AND " + conds.join(" AND ");
 }
 
-function genericAssayLeafSql(leaf, ctx) {
+function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): string {
   if (ctx.gaProfiles && !ctx.gaProfiles.length)
     throw new Error("genericAssay: this study has no generic assay profiles");
   const pt = String(leaf.profileType || ""), entity = String(leaf.entity || "");
@@ -143,7 +152,7 @@ function genericAssayLeafSql(leaf, ctx) {
     "    AND " + conds.join(" AND ");
 }
 
-function eventLeafSql(leaf, ctx) {
+function eventLeafSql(leaf: EventLeafFields, ctx: Ctx): string {
   const { patientsSql } = compileCohort({
     db: DB, study: ctx.study, a: leaf.a, b: leaf.b, rel: leaf.rel,
     priorGuard: !!leaf.priorGuard, lineGap: leaf.lineGap ?? ctx.lineGap, patientsLimit: 1000000
@@ -151,13 +160,13 @@ function eventLeafSql(leaf, ctx) {
   return patientsSql;
 }
 
-function patientsLeafSql(leaf, ctx) {
+function patientsLeafSql(leaf: PatientsLeaf, ctx: Ctx): string {
   const ids = (leaf.ids || []).map(String).filter(p => /^[A-Za-z0-9._-]{1,64}$/.test(p)).slice(0, 50000);
   if (!ids.length) throw new Error("patients clause has no valid ids");
   return basePatientsSql(ctx.study) + "\n    AND " + PID("patient_unique_id", ctx.study) + " IN (" + ids.map(sq).join(",") + ")";
 }
 
-function leafSql(leaf, ctx) {
+function leafSql(leaf: any, ctx: Ctx): string {
   if (leaf.kind === "oql") return oqlLeafSql(leaf.q, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study });
   if (leaf.kind === "alteration") return oqlLeafSql(alterationToOql(leaf), { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study }); // deprecated alias
   if (leaf.kind === "clinical") return clinicalLeafSql(leaf, ctx);
@@ -172,10 +181,10 @@ function leafSql(leaf, ctx) {
   throw new Error("unknown clause kind: " + JSON.stringify(Object.keys(leaf)));
 }
 
-function clauseSql(clause, ctx) {
+function clauseSql(clause: any, ctx: Ctx): string {
   if (clause.any) {
     if (!Array.isArray(clause.any) || !clause.any.length || clause.any.length > 8) throw new Error("any: 1-8 leaves");
-    return clause.any.map(l => "(" + leafSql(l, ctx) + ")").join("\nUNION DISTINCT\n");
+    return clause.any.map((l: any) => "(" + leafSql(l, ctx) + ")").join("\nUNION DISTINCT\n");
   }
   if (clause.not) {
     return "(" + basePatientsSql(ctx.study) + ")\nEXCEPT DISTINCT\n(" + leafSql(clause.not, ctx) + ")";
@@ -183,26 +192,32 @@ function clauseSql(clause, ctx) {
   return leafSql(clause, ctx);
 }
 
+/** v1 sugar: a bare event definition, or an explicit patient list, becomes {all:[...]}. */
+function normalizeSugar(def: CohortDef): CohortDef {
+  if (def.a && def.rel && !def.all) return { all: [def as unknown as Leaf], lineGap: def.lineGap };
+  if (def.patients && !def.all) return { all: [{ kind: "patients", ids: def.patients }] };
+  return def;
+}
+
 // def -> SQL producing the cohort's patient stable ids (column: pid)
-export function compileCohortDef(def, { oncokbPin, profiles, gaProfiles, study = STUDY } = {}) {
+export function compileCohortDef(def: CohortDef | null | undefined, { oncokbPin, profiles, gaProfiles, study = STUDY }: Partial<CompileCtx> = {}): string {
   if (!def) return basePatientsSql(study);
-  if (def.a && def.rel && !def.all) def = { all: [def], lineGap: def.lineGap }; // v1 sugar
-  if (def.patients && !def.all) def = { all: [{ kind: "patients", ids: def.patients }] };
-  const clauses = def.all;
+  const d = normalizeSugar(def);
+  const clauses = d.all;
   if (!Array.isArray(clauses) || !clauses.length || clauses.length > 8) throw new Error("cohort def needs all: [1-8 clauses]");
-  const ctx = { oncokbPin, profiles, gaProfiles, study, lineGap: def.lineGap ?? 90 };
-  return clauses.map(c => "(" + clauseSql(c, ctx) + ")").join("\nINTERSECT DISTINCT\n");
+  const ctx: Ctx = { oncokbPin, profiles, gaProfiles, study, lineGap: d.lineGap ?? 90 };
+  return clauses.map((c) => "(" + clauseSql(c, ctx) + ")").join("\nINTERSECT DISTINCT\n");
 }
 
 // ---- plain-language readback --------------------------------------------
-function leafText(leaf) {
+function leafText(leaf: any): string {
   if (leaf.kind === "oql") return "OQL[" + leaf.q + "]";
   if (leaf.kind === "alteration") {
     const t = leaf.types && leaf.types.length && leaf.types.length < 3 ? " (" + leaf.types.join("/") + ")" : "";
     return leaf.gene + (leaf.driver === "driverOnly" ? " driver-altered" : " altered") + t;
   }
   if (leaf.kind === "clinical") {
-    const bits = [];
+    const bits: string[] = [];
     if (leaf.values && leaf.values.length) bits.push("in [" + leaf.values.join(", ") + "]");
     if (leaf.range) bits.push(Object.entries(leaf.range).map(([k, v]) => k + " " + v).join(", "));
     if (leaf.op != null) bits.push(leaf.op + " " + leaf.value);
@@ -215,9 +230,9 @@ function leafText(leaf) {
   if (leaf.kind === "patients") return "in a list of " + (leaf.ids || []).length + " patients";
   if (leaf.kind === "event" || (leaf.a && leaf.rel)) {
     const rel = leaf.rel || {};
-    const selText = s => {
+    const selText = (s: any): string => {
       if (!s) return "?";
-      const attrs = (s.attrs || []).map(a => a.value).join(" ");
+      const attrs = (s.attrs || []).map((a: any) => a.value).join(" ");
       const base = (attrs ? attrs + " " : "") + s.eventType.replace(" (derived)", "").toLowerCase();
       return (s.occurrence === "FIRST" ? "first " : s.occurrence === "LAST" ? "last " : "") + base;
     };
@@ -229,11 +244,10 @@ function leafText(leaf) {
   return "?";
 }
 
-export function describeCohortDef(def) {
+export function describeCohortDef(def: CohortDef | null | undefined): string {
   if (!def) return "all patients in the study";
-  if (def.a && def.rel && !def.all) def = { all: [def] };
-  if (def.patients && !def.all) def = { all: [{ kind: "patients", ids: def.patients }] };
-  return (def.all || []).map(c => {
+  const d = normalizeSugar(def);
+  return (d.all || []).map((c: any) => {
     if (c.any) return "(" + c.any.map(leafText).join(" OR ") + ")";
     if (c.not) return "NOT " + leafText(c.not);
     return leafText(c);

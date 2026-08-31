@@ -1,6 +1,6 @@
-import { buildExplore, buildExploreFederated } from "../../../lib/explore.js";
-import { studyProfiles, resolveStudy } from "../../../lib/analysis.js";
-import { chQuery } from "../../../lib/ch.js";
+import { buildExplore, buildExploreFederated } from "../../../lib/explore.ts";
+import { studyProfiles, resolveStudy } from "../../../lib/analysis.ts";
+import { chQuery } from "../../../lib/ch.ts";
 
 export const maxDuration = 60;
 

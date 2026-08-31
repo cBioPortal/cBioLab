@@ -1,14 +1,14 @@
 // Shared MCP tool registry — consumed by mcp/server.js (standalone) and app/api/[transport]/route.js (Vercel).
 import { z } from "zod";
-import { chQuery, DB, STUDY, PORTAL } from "../lib/ch.js";
-import { compileCohort, compileLines, catalogSqls, lineCatalogSqls, LINE_TYPE } from "../lib/compiler.js";
-import { buildContract } from "../lib/oncoprint.js";
-import { contractToSvg } from "../lib/oncoprint-svg.js";
+import { chQuery, DB, STUDY, PORTAL } from "../lib/ch.ts";
+import { compileCohort, compileLines, catalogSqls, lineCatalogSqls, LINE_TYPE } from "../lib/compiler.ts";
+import { buildContract } from "../lib/oncoprint.ts";
+import { contractToSvg } from "../lib/oncoprint-svg.ts";
 import sharp from "sharp";
-import { ensureFonts } from "../lib/fonts.js";
-import { renderDslMarkdown } from "../lib/dsl-reference.js";
-import { runAnalysis } from "../lib/analysis.js";
-import { registerOncoprintApp } from "./apps/oncoprint-app.js";
+import { ensureFonts } from "../lib/fonts.ts";
+import { renderDslMarkdown } from "../lib/dsl-reference.ts";
+import { runAnalysis } from "../lib/analysis.ts";
+import { registerOncoprintApp } from "./apps/oncoprint-app.ts";
 
 // ---------- shared zod fragments (mirrors docs/cohort-query.schema.json) ----------
 const zSelector = z.object({

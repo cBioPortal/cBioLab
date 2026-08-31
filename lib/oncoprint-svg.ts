@@ -1,6 +1,8 @@
 // Server-side SVG renderer for the oncoprint render contract.
 // Second renderer over the same contract as the browser canvas — zero data logic.
-const BITS = { MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16, SV: 32, AMP: 64, HOMDEL: 128, DRIVER: 256 };
+import type { Contract, Track } from "./types.ts";
+
+const BITS: Record<string, number> = { MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16, SV: 32, AMP: 64, HOMDEL: 128, DRIVER: 256 };
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#999999"];
 const P = {
   paper: "#ffffff", unaltered: "#e8ecee", np: "#f4f6f7", npStripe: "#dfe4e7",
@@ -9,32 +11,32 @@ const P = {
   derived: "#0f86a1", text: "#1f2933", muted: "#5b6b76"
 };
 const ROW_H = 20, ROW_GAP = 3, GUTTER = 168, GROUP_GAP = 10, HEADER_H = 22, LEGEND_H = 58;
-const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+const esc = (s: unknown): string => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 
-export function contractToSvg(contract, width = 1200) {
+export function contractToSvg(contract: Contract, width = 1200): string {
   const nTracks = contract.tracks.length;
-  const catTracks = contract.tracks.filter(t =>
+  const catTracks = contract.tracks.filter((t) =>
     (t.kind === "clinical" && ((t.categories && t.categories.length) || t.numeric)) || t.kind === "heatmap");
   const height = HEADER_H + nTracks * (ROW_H + ROW_GAP) + LEGEND_H + catTracks.length * 16;
   const plotW = width - GUTTER - (contract.groups.length - 1) * GROUP_GAP - 8;
   const n = contract.columns.length;
   const colW = plotW / n;
-  const groupX = [];
+  const groupX: number[] = [];
   let gx = GUTTER;
   for (const g of contract.groups) { groupX.push(gx); gx += g.count * colW + GROUP_GAP; }
 
-  const parts = [];
+  const parts: string[] = [];
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" font-family="IBM Plex Sans,Helvetica,Arial,sans-serif" font-size="11">`);
   parts.push(`<rect width="${width}" height="${height}" fill="${P.paper}"/>`);
   parts.push(`<defs><pattern id="np" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">` +
     `<rect width="4" height="4" fill="${P.np}"/><rect width="2" height="4" fill="${P.npStripe}"/></pattern></defs>`);
 
-  contract.groups.forEach((g, gi) => {
+  contract.groups.forEach((g, gi: number) => {
     parts.push(`<text x="${groupX[gi]}" y="13" fill="${P.muted}">${esc(g.name)} (${g.count.toLocaleString("en-US")})</text>`);
   });
 
-  const bucketOf = (cells, from, count, pxW, numeric) => {
-    const out = [];
+  const bucketOf = (cells: number[] | Int32Array, from: number, count: number, pxW: number, numeric: boolean): { x0: number; w: number; code: number }[] => {
+    const out: { x0: number; w: number; code: number }[] = [];
     if (colW >= 1) {
       for (let i = 0; i < count; i++) out.push({ x0: i * colW, w: colW, code: cells[from + i] });
       return out;
@@ -58,26 +60,26 @@ export function contractToSvg(contract, width = 1200) {
   };
 
   // sequential blue heat for numeric clinical tracks: 0..255 -> light..dark
-  const heat = (v) => {
+  const heat = (v: number): string => {
     const t = Math.max(0, Math.min(1, v / 255));
-    const mix = (a, b) => Math.round(a + (b - a) * t);
+    const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
     return `rgb(${mix(222, 8)},${mix(235, 72)},${mix(247, 135)})`; // #deebf7 -> #084887
   };
   // diverging blue->white->red for heatmap tracks with a center (z-scores etc.)
-  const diverging = (v, c) => {
-    const lerp = (a, b, t) => Math.round(a + (b - a) * t);
+  const diverging = (v: number, c: number): string => {
+    const lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
     if (v <= c) { const t = c ? v / c : 1; return `rgb(${lerp(33, 255, t)},${lerp(102, 255, t)},${lerp(172, 255, t)})`; }   // #2166ac -> white
     const t = (v - c) / (255 - c || 1); return `rgb(${lerp(255, 178, t)},${lerp(255, 24, t)},${lerp(255, 43, t)})`;        // white -> #b2182b
   };
-  const numColor = (t) => (v) => t.center != null ? diverging(v, t.center) : heat(v);
-  const fmtNum = (x) => Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : Math.round(x * 10) / 10;
+  const numColor = (t: Track) => (v: number): string => t.center != null ? diverging(v, t.center) : heat(v);
+  const fmtNum = (x: number): string | number => Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : Math.round(x * 10) / 10;
 
-  const r2 = x => Math.round(x * 100) / 100;
-  contract.tracks.forEach((t, ti) => {
+  const r2 = (x: number): number => Math.round(x * 100) / 100;
+  contract.tracks.forEach((t, ti: number) => {
     const y = HEADER_H + ti * (ROW_H + ROW_GAP);
     parts.push(`<text x="4" y="${y + 14}" fill="${P.text}">${esc(t.label.length > 17 ? t.label.slice(0, 16) + "…" : t.label)}</text>`);
     if (t.freqPct != null) parts.push(`<text x="${GUTTER - 8}" y="${y + 14}" fill="${P.muted}" text-anchor="end">${t.driverPct != null ? t.driverPct + "% / " + t.freqPct + "%" : t.freqPct + "%"}</text>`);
-    contract.groups.forEach((g, gi) => {
+    contract.groups.forEach((g, gi: number) => {
       const x0 = groupX[gi], pxW = g.count * colW;
       for (const b of bucketOf(t.cells, g.start, g.count, pxW, !!t.numeric)) {
         const x = r2(x0 + b.x0), w = r2(Math.max(b.w, 0.5));
@@ -129,16 +131,16 @@ export function contractToSvg(contract, width = 1200) {
       const cf = numColor(t);
       for (let i = 0; i < 24; i++)
         parts.push(`<rect x="${cx + i * 4}" y="${cy - 9}" width="4" height="10" fill="${cf(255 * i / 23)}"/>`);
-      parts.push(`<text x="${cx + 24 * 4 + 8}" y="${cy}" fill="${P.muted}">${fmtNum(t.min)} → ${fmtNum(t.max)}${t.center != null ? " (0 at white)" : ""}${t.kind === "heatmap" ? " · " + esc(t.profileType) + ", " + esc(t.note || "") : ""}</text>`);
+      parts.push(`<text x="${cx + 24 * 4 + 8}" y="${cy}" fill="${P.muted}">${fmtNum(t.min!)} → ${fmtNum(t.max!)}${t.center != null ? " (0 at white)" : ""}${t.kind === "heatmap" ? " · " + esc(t.profileType) + ", " + esc(t.note || "") : ""}</text>`);
       continue;
     }
-    t.categories.slice(0, 8).forEach((c, i) => {
+    t.categories!.slice(0, 8).forEach((c, i: number) => {
       const name = String(c).length > 20 ? String(c).slice(0, 19) + "…" : String(c);
       parts.push(`<rect x="${cx}" y="${cy - 9}" width="10" height="10" fill="${CAT_COLORS[i % CAT_COLORS.length]}"/>`);
       parts.push(`<text x="${cx + 14}" y="${cy}" fill="${P.muted}">${esc(name)}</text>`);
       cx += 14 + name.length * 6.2 + 16;
     });
-    if (t.categories.length > 8) parts.push(`<text x="${cx}" y="${cy}" fill="${P.muted}">+${t.categories.length - 8} more</text>`);
+    if (t.categories!.length > 8) parts.push(`<text x="${cx}" y="${cy}" fill="${P.muted}">+${t.categories!.length - 8} more</text>`);
   }
   parts.push("</svg>");
   return parts.join("");

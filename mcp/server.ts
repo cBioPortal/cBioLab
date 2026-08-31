@@ -16,7 +16,7 @@ try {
 const { McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js");
 const { StreamableHTTPServerTransport } = await import("@modelcontextprotocol/sdk/server/streamableHttp.js");
 const express = (await import("express")).default;
-const { registerTools } = await import("./tools.js");
+const { registerTools } = await import("./tools.ts");
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
