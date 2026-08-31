@@ -81,7 +81,7 @@ export default function AnalysisPage() {
   const [chatReady, setChatReady] = useState(null);
   const [saved, setSaved] = useState({});
   const [cName, setCName] = useState("");
-  const [cDefText, setCDefText] = useState(JSON.stringify({ all: [] }, null, 2));
+  const [cDefText, setCDefText] = useState(JSON.stringify({ study: "msk_chord_2024", all: [] }, null, 2));
   const [cPreview, setCPreview] = useState(null);
   const [cBusy, setCBusy] = useState(false);
   const [exEvals, setExEvals] = useState({});
@@ -126,7 +126,7 @@ export default function AnalysisPage() {
       const b64 = new URLSearchParams(window.location.search).get("doc");
       if (b64) {
         const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0))));
-        if (d.study) setStudy(d.study);
+        if (d.study) { setStudy(d.study); setExStudies([d.study]); exSel.current = [d.study]; }
         setDoc(d); setDocText(JSON.stringify(d, null, 2)); setTab("analysis"); run(d);
       }
     } catch (e) { setError("bad ?doc= link: " + String(e.message || e)); }
@@ -211,27 +211,29 @@ export default function AnalysisPage() {
     } catch {}
   };
 
-  const clearDraft = () => { setCDefText(JSON.stringify({ all: [] }, null, 2)); fetchExplore(null); };
-
-  const switchStudy = (id) => {
-    setStudy(id);
-    setExStudies([id]); exSel.current = [id];
-    const d = { study: id, cohorts: {}, views: [] };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setCPreview(null); setExEvals({});
-    setExplore(null);
+  // studies-explicit draft scaffold for the current explore selection
+  const draftScaffold = (ids) => {
+    const d = { all: [] };
+    if (ids.length > 1) d.studies = ids; else if (ids.length === 1) d.study = ids[0];
+    return d;
   };
 
-  // toggle a study in the explore selection; the draft def carries "studies"
-  // (so Save / Preview / Add-to-analysis all evaluate federated) when > 1.
-  // exSel (ref) is the always-current selection so rapid checkbox toggles don't
-  // race on stale render-time state; the refetch is debounced so checking many
-  // boxes fires one request.
+  const clearDraft = () => { setCDefText(JSON.stringify(draftScaffold(exSel.current), null, 2)); fetchExplore(null); };
+
+  // toggle a study in the explore selection. The draft def is STUDY-EXPLICIT —
+  // it carries "study" (one selected) or "studies" (several) itself, so Save /
+  // Preview / Add-to-analysis evaluate against the selection with no separate
+  // "working study" concept. exSel (ref) is the always-current selection so
+  // rapid checkbox toggles don't race on stale render-time state; the refetch
+  // is debounced so checking many boxes fires one request.
   const setExploreStudies = (ids) => {
     exSel.current = ids;
     setExStudies(ids);
+    if (ids.length) setStudy(ids[0]); // doc-level default for study-less defs (examples, hand edits)
     let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
     if (!d || !Array.isArray(d.all)) d = { all: [] };
-    if (ids.length > 1) d.studies = ids; else delete d.studies;
+    if (ids.length > 1) { d.studies = ids; delete d.study; }
+    else { delete d.studies; if (ids.length === 1) d.study = ids[0]; else delete d.study; }
     setCDefText(JSON.stringify(d, null, 2));
     clearTimeout(exFetchTimer.current);
     if (!ids.length) { exFetchSeq.current++; setExplore(null); setExploreBusy(false); setExPanelOpen(true); return; } // empty selection: clear facets (and void in-flight fetches), keep the picker open
@@ -368,19 +370,6 @@ export default function AnalysisPage() {
         <a href="/" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>builder</a>
       </header>
       <main style={{ maxWidth: "96rem" }}>
-        <div className="row" style={{ marginBottom: "0.8rem", alignItems: "center" }}>
-          <label style={{ margin: 0 }}>Working study</label>
-          <select value={study} onChange={e => switchStudy(e.target.value)} style={{ maxWidth: "34rem" }}>
-            {!studies.length && <option value={study}>{study}</option>}
-            {studies.map(s => (
-              <option key={s.id} value={s.id}>
-                {s.name} — {s.patients.toLocaleString()} pts{s.timelinePatients ? " · timeline" : ""}
-              </option>
-            ))}
-          </select>
-          <span className="meta">the default for cohorts without their own study; switching starts a fresh document</span>
-        </div>
-
         {/* ---- Chat: always at the top ---- */}
         <div className="card">
           <h2>Chat <span className="plain">— define cohorts, add views, ask about results; it edits the document below</span></h2>
@@ -493,7 +482,7 @@ export default function AnalysisPage() {
             </div>
           </div>
           {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "0.85rem", margin: 0 }}>
-            No studies selected — check one or more above to explore. A draft built with no selection evaluates against the working study ({study}).</p></div>}
+            No studies selected — check one or more above to explore.</p></div>}
           {!explore && exStudies.length > 0 && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
           {explore && <div className="two-col" style={{ alignItems: "start" }}>
             <div>
@@ -690,6 +679,19 @@ export default function AnalysisPage() {
                 {result && <span className="meta">{result.stats.ms}ms · OncoKB {result.oncokbPin}</span>}
               </div>
               <p className="note">Views: <code>{`{"kind":"compare","genes":[…]}`}</code> · <code>{`{"kind":"survival"}`}</code> · <code>{`{"kind":"oncoprint","genes":[…],"clinical":[attrs…]}`}</code></p>
+              {result && (
+                <details style={{ marginTop: "0.5rem" }}>
+                  <summary className="meta" style={{ cursor: "pointer" }}>
+                    Generated SQL (provenance) — the exact query each cohort compiled to, per study · OncoKB pin {result.oncokbPin || "none"}
+                  </summary>
+                  {Object.entries(result.cohorts).map(([n, c]) => (
+                    <div key={n} style={{ marginTop: "0.5rem" }}>
+                      <p className="meta" style={{ margin: "0 0 0.25rem" }}><strong>{n}</strong> — {c.count.toLocaleString()} patients{c.studies && c.studies.length > 1 ? " across " + c.studies.length + " studies" : ""}</p>
+                      <pre style={{ maxHeight: "16rem", overflow: "auto", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem", fontSize: "0.68rem", whiteSpace: "pre" }}>{c.sql}</pre>
+                    </div>
+                  ))}
+                </details>
+              )}
             </div>
           </div>
           <div>
