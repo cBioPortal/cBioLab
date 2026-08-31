@@ -1,9 +1,9 @@
 import { chQuery, DB, STUDY, PORTAL } from "../../../lib/ch";
 import { catalogSqls, lineCatalogSqls, LINE_TYPE } from "../../../lib/compiler";
 
-const cache = new Map(); // per-study, per server process
+const cache = new Map<string, unknown>(); // per-study, per server process
 
-export async function GET(req) {
+export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const study = (url.searchParams.get("study") || STUDY).replace(/[^A-Za-z0-9._-]/g, "");
@@ -12,10 +12,10 @@ export async function GET(req) {
       const chk = await chQuery(sqls.studyCheck);
       if (Number(chk.data[0].n) !== 1) throw new Error("Study '" + study + "' not found");
       const [tRes, vRes, kRes] = [await chQuery(sqls.types), await chQuery(sqls.values), await chQuery(sqls.keys)];
-      const values = {}, keys = {};
-      vRes.data.forEach(r => { (values[r.t] = values[r.t] || {}); (values[r.t][r.k] = values[r.t][r.k] || []).push(r.v); });
-      kRes.data.forEach(r => { (keys[r.t] = keys[r.t] || []).push(r.k); });
-      let totalPatients = tRes.data.reduce((m, t) => Math.max(m, Number(t.n_pat)), 0);
+      const values: Record<string, Record<string, string[]>> = {}, keys: Record<string, string[]> = {};
+      vRes.data.forEach((r) => { (values[r.t] = values[r.t] || {}); (values[r.t][r.k] = values[r.t][r.k] || []).push(r.v); });
+      kRes.data.forEach((r) => { (keys[r.t] = keys[r.t] || []).push(r.k); });
+      let totalPatients = tRes.data.reduce((m: number, t) => Math.max(m, Number(t.n_pat)), 0);
       if (!totalPatients) {
         const pc = await chQuery("SELECT uniqExact(patient_unique_id) AS n FROM " + DB + ".sample_derived WHERE cancer_study_identifier = " + "'" + study.replace(/'/g, "") + "'");
         totalPatients = Number(pc.data[0].n);
@@ -34,6 +34,6 @@ export async function GET(req) {
     }
     return Response.json(cache.get(study));
   } catch (e) {
-    return Response.json({ error: String(e.message || e) }, { status: 500 });
+    return Response.json({ error: String((e as Error)?.message || e) }, { status: 500 });
   }
 }

@@ -1,10 +1,10 @@
-<!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.js; regenerate with `npm run docs:gen`. -->
+<!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.ts; regenerate with `npm run docs:gen`. -->
 
 # Cohort Lab DSL (v2.2)
 
 One declarative JSON object — the **Analysis document** — describes everything Cohort Lab does:
 which patients form each cohort, and which views compare them. The server compiles it to
-ClickHouse SQL (`lib/cohort2.js`, `lib/oql.js`, `lib/compiler.js`, `lib/analysis.js`);
+ClickHouse SQL (`lib/cohort2.ts`, `lib/oql.ts`, `lib/compiler.ts`, `lib/analysis.ts`);
 clients never send SQL. Every result carries provenance: the definition readback and the exact
 SQL each cohort compiled to.
 

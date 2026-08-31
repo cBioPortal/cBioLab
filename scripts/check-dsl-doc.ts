@@ -12,7 +12,7 @@ import { renderDslMarkdown, EXAMPLES } from "../lib/dsl-reference.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 let failed = 0;
-const report = (ok, label, extra = "") =>
+const report = (ok: boolean, label: string, extra = "") =>
   console.log((ok ? "PASS" : "FAIL") + " " + label + (extra ? "  [" + extra + "]" : ""));
 
 // 1. committed doc matches the reference
@@ -33,7 +33,7 @@ for (const ex of EXAMPLES) {
     else report(true, "example “" + ex.title + "” runs",
       Object.entries(r.cohorts).map(([n, c]) => n + "=" + c.count.toLocaleString("en-US")).join(", ") + " · " + r.stats.ms + "ms");
   } catch (e) {
-    failed++; report(false, "example “" + ex.title + "”: " + String(e.message || e));
+    failed++; report(false, "example “" + ex.title + "”: " + String((e as Error)?.message || e));
   }
 }
 

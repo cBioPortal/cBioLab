@@ -232,7 +232,7 @@ export default function Page() {
       } catch (e) {
         if (cancelled) return;
         if (attempt < 3) setTimeout(() => load(attempt + 1), 3000);
-        else setCatError(String(e.message || e));
+        else setCatError(String((e as Error)?.message || e));
       }
     };
     load(0);
@@ -251,7 +251,7 @@ export default function Page() {
       j.relSnap = { ...r };
       j.guardSnap = guard;
       setResult(j);
-    } catch (e) { setRunError(String(e.message || e)); }
+    } catch (e) { setRunError(String((e as Error)?.message || e)); }
     setRunning(false);
   }, [selA, selB, rel, priorGuard, gap]);
 
@@ -282,7 +282,7 @@ export default function Page() {
       const j = await res.json();
       if (j.error) throw new Error(j.error);
       setLines(j);
-    } catch (e) { setLinesError(String(e.message || e)); }
+    } catch (e) { setLinesError(String((e as Error)?.message || e)); }
     setLinesBusy(false);
   };
 

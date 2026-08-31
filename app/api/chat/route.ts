@@ -2,6 +2,7 @@
 // The model reads the current document + result summary and may call
 // update_document to modify it; the client applies the returned doc and re-runs.
 import { runAnalysis } from "../../../lib/analysis.ts";
+import type { AnalysisDoc } from "../../../lib/types.ts";
 import { catalogText } from "../../../lib/catalog-text.ts";
 import { CHAT_GRAMMAR } from "../../../lib/dsl-reference.ts";
 
@@ -44,13 +45,13 @@ export async function GET() {
   return new Response(null, { status: process.env.ANTHROPIC_API_KEY ? 204 : 501 });
 }
 
-export async function POST(req) {
+export async function POST(req: Request) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return Response.json({ error: "chat is not configured (ANTHROPIC_API_KEY missing)" }, { status: 501 });
   try {
-    const { messages, doc, resultSummary } = await req.json();
+    const { messages, doc, resultSummary } = await req.json() as { messages: { role: string; content: string }[]; doc: AnalysisDoc; resultSummary?: string };
     const convo = [
-      ...messages.slice(-12).map(m => ({ role: m.role, content: m.content })),
+      ...messages.slice(-12).map((m: { role: string; content: unknown }) => ({ role: m.role, content: m.content })),
     ];
     convo[convo.length - 1] = {
       role: "user",
@@ -58,7 +59,7 @@ export async function POST(req) {
         "\n\n<current_document>\n" + JSON.stringify(doc) + "\n</current_document>\n" +
         "<current_results>\n" + String(resultSummary || "").slice(0, 3000) + "\n</current_results>"
     };
-    let newDoc = null, reply = "";
+    let newDoc: AnalysisDoc | null = null, reply = "";
     for (let round = 0; round < 4; round++) {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -67,23 +68,23 @@ export async function POST(req) {
       });
       const out = await res.json();
       if (out.error) throw new Error(out.error.message || JSON.stringify(out.error));
-      const toolUse = (out.content || []).find(b => b.type === "tool_use");
-      reply = (out.content || []).filter(b => b.type === "text").map(b => b.text).join("\n") || reply;
+      const toolUse = (out.content || []).find((b: { type: string }) => b.type === "tool_use");
+      reply = (out.content || []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("\n") || reply;
       if (!toolUse) break;
       let toolResult;
       if (toolUse.name === "get_catalog") {
         try { toolResult = await catalogText(toolUse.input.study || (doc && doc.study)); }
-        catch (e) { toolResult = "catalog lookup failed: " + String(e.message || e); }
+        catch (e) { toolResult = "catalog lookup failed: " + String((e as Error)?.message || e); }
       } else {
-        newDoc = toolUse.input.document;
+        newDoc = toolUse.input.document as AnalysisDoc;
         // validate by running; feed a compact result back so the model can narrate real numbers
         try {
           const r = await runAnalysis(newDoc);
           toolResult = "applied. cohorts: " +
             Object.entries(r.cohorts).map(([n, c]) => `${n}=${c.count}`).join(", ") +
-            (r.views.some(v => v.kind === "survival") ? " | medians: " + r.views.find(v => v.kind === "survival").curves.map(c => `${c.cohort}:${c.median ? c.median.toFixed(1) : ">obs"}mo`).join(", ") : "");
+            (r.views.some((v) => v.kind === "survival") ? " | medians: " + r.views.find((v) => v.kind === "survival")!.curves!.map((c) => `${c.cohort}:${c.median ? c.median.toFixed(1) : ">obs"}mo`).join(", ") : "");
         } catch (e) {
-          toolResult = "REJECTED: " + String(e.message || e);
+          toolResult = "REJECTED: " + String((e as Error)?.message || e);
           newDoc = null;
         }
       }
@@ -92,6 +93,6 @@ export async function POST(req) {
     }
     return Response.json({ reply: reply || "(no reply)", doc: newDoc });
   } catch (e) {
-    return Response.json({ error: String(e.message || e) }, { status: 500 });
+    return Response.json({ error: String((e as Error)?.message || e) }, { status: 500 });
   }
 }

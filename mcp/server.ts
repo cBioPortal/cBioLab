@@ -20,7 +20,7 @@ const { registerTools } = await import("./tools.ts");
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
-app.post("/mcp", async (req, res) => {
+app.post("/mcp", async (req: any, res: any) => {
   try {
     const server = new McpServer({ name: "cohort-lab", version: "1.0.0" });
     registerTools(server);
@@ -29,10 +29,10 @@ app.post("/mcp", async (req, res) => {
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
   } catch (e) {
-    if (!res.headersSent) res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: String(e.message || e) }, id: null });
+    if (!res.headersSent) res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: String((e as Error)?.message || e) }, id: null });
   }
 });
-app.get("/mcp", (req, res) => res.status(405).json({ error: "POST only (stateless)" }));
+app.get("/mcp", (req: any, res: any) => res.status(405).json({ error: "POST only (stateless)" }));
 
 const PORT = process.env.MCP_PORT || 3201;
-app.listen(PORT, "127.0.0.1", () => console.log("cohort-lab MCP on http://127.0.0.1:" + PORT + "/mcp"));
+app.listen(Number(PORT), "127.0.0.1", () => console.log("cohort-lab MCP on http://127.0.0.1:" + PORT + "/mcp"));

@@ -8,6 +8,8 @@ import sharp from "sharp";
 import { ensureFonts } from "../lib/fonts.ts";
 import { renderDslMarkdown } from "../lib/dsl-reference.ts";
 import { runAnalysis } from "../lib/analysis.ts";
+import type { AnalysisDoc, CohortDef, OncoprintSpec } from "../lib/types.ts";
+import type { PidsCarrier } from "../lib/oncoprint.ts";
 import { registerOncoprintApp } from "./apps/oncoprint-app.ts";
 
 // ---------- shared zod fragments (mirrors docs/cohort-query.schema.json) ----------
@@ -44,20 +46,20 @@ const CAVEATS = {
   lines: "Treatment lines are DERIVED from event sequence by interval-merging systemic therapy with a gap rule; 'line 1' means first line observed in this study unless priorGuard is set."
 };
 
-function cohortCaveats(args) {
-  const out = [];
+function cohortCaveats(args: any): string[] {
+  const out: string[] = [];
   if (args.rel && args.rel.type === "NOT_FOLLOWED_BY")
     out.push(CAVEATS.absence + (args.rel.observed ? "applied." : "NOT applied — interpret with caution."));
-  const usesFirst = [args.a, args.b].some(s => s && s.occurrence === "FIRST");
+  const usesFirst = [args.a, args.b].some((s: any) => s && s.occurrence === "FIRST");
   if (usesFirst && !args.priorGuard) out.push(CAVEATS.priorMed);
-  const usesLines = [args.a, args.b].some(s => s && s.eventType === LINE_TYPE);
+  const usesLines = [args.a, args.b].some((s: any) => s && s.eventType === LINE_TYPE);
   if (usesLines) out.push(CAVEATS.lines);
   return out;
 }
 
-function text(t) { return { content: [{ type: "text", text: t }] }; }
+function text(t: string) { return { content: [{ type: "text", text: t }] }; }
 
-export function registerTools(server) {
+export function registerTools(server: any): void {
   registerOncoprintApp(server); // MCP Apps (SEP-1865) interactive oncoprint — additive side-module
 
   server.tool(
@@ -75,14 +77,14 @@ export function registerTools(server) {
       document: z.object({}).passthrough()
         .describe("The Analysis document: {study, cohorts: {name: def, ...}, views: [...]}. Grammar and examples: describe_dsl.")
     },
-    async ({ document }) => {
+    async ({ document }: { document: AnalysisDoc }) => {
       let r;
       try { r = await runAnalysis(document); }
-      catch (e) { return text("REJECTED: " + String(e.message || e) + "\nCall describe_dsl for the grammar and runnable examples."); }
+      catch (e) { return text("REJECTED: " + String((e as Error)?.message || e) + "\nCall describe_dsl for the grammar and runnable examples."); }
       const base = process.env.APP_BASE_URL || "https://cohort-lab.vercel.app";
       const docB64 = Buffer.from(JSON.stringify(document)).toString("base64url");
-      const content = [];
-      const out = [];
+      const content: any[] = [];
+      const out: string[] = [];
       out.push(`Analysis over ${r.involvedStudies.join(" + ")} — OncoKB pin ${r.oncokbPin || "none"} — ${r.stats.ms}ms.`);
       out.push("Cohorts:\n" + Object.entries(r.cohorts)
         .map(([n, c]) => `- ${n}: ${c.count.toLocaleString()} patients — ${c.text}`).join("\n"));
@@ -90,13 +92,13 @@ export function registerTools(server) {
       for (const v of r.views) {
         if (v.error) { out.push(`View ${v.kind}: ERROR — ${v.error}`); continue; }
         if (v.kind === "compare") {
-          const rows = v.rows.slice(0, 20).map(row =>
-            `  ${row.gene}: ` + row.cells.map(c => `${c.cohort} ${c.driverPct}%/${c.anyPct}%`).join(" | ") +
+          const rows = v.rows!.slice(0, 20).map((row) =>
+            `  ${row.gene}: ` + row.cells.map((c) => `${c.cohort} ${c.driverPct}%/${c.anyPct}%`).join(" | ") +
             (row.pAny != null ? `  p=${row.pAny < 1e-4 ? row.pAny.toExponential(1) : row.pAny.toFixed(4)}` : ""));
           out.push(`Compare (driver%/any%, panel-aware denominators; annotation ${v.annotation}):\n` + rows.join("\n") +
             (v.note ? "\nNOTE: " + v.note : ""));
         } else if (v.kind === "survival") {
-          out.push("Survival (KM, overall survival):\n" + v.curves.map(c =>
+          out.push("Survival (KM, overall survival):\n" + v.curves!.map((c) =>
             `  ${c.cohort}: median ${c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n=${c.n}, ${c.events} events${c.missing ? ", " + c.missing + " missing OS" : ""})`).join("\n") +
             "\nCAVEAT (tell the user): " + v.caveat);
         } else if (v.kind === "oncoprint" && v.svg && images < 2) {
@@ -104,8 +106,8 @@ export function registerTools(server) {
           ensureFonts();
           const png = await sharp(Buffer.from(v.svg), { density: 144 }).png().toBuffer();
           content.push({ type: "image", data: png.toString("base64"), mimeType: "image/png" });
-          out.push(`Oncoprint: ${v.nColumns.toLocaleString()} patients — ` +
-            v.genes.map(g => `${g.gene} ${g.driverPct}%/${g.anyPct}%`).join(", ") +
+          out.push(`Oncoprint: ${v.nColumns!.toLocaleString()} patients — ` +
+            v.genes!.map((g) => `${g.gene} ${g.driverPct}%/${g.anyPct}%`).join(", ") +
             ` — annotation ${v.annotation}.` + (v.note ? "\nNOTE (tell the user): " + v.note : ""));
         }
       }
@@ -122,11 +124,11 @@ export function registerTools(server) {
     async () => {
       const sqls = catalogSqls(DB, STUDY);
       const [tRes, vRes] = [await chQuery(sqls.types), await chQuery(sqls.values)];
-      const values = {};
-      vRes.data.forEach(r => { (values[r.t] = values[r.t] || {}); (values[r.t][r.k] = values[r.t][r.k] || []).push(r.v); });
+      const values: Record<string, Record<string, string[]>> = {};
+      vRes.data.forEach((r) => { (values[r.t] = values[r.t] || {}); (values[r.t][r.k] = values[r.t][r.k] || []).push(r.v); });
       const lc = lineCatalogSqls(DB, STUDY);
-      const combos = (await chQuery(lc.combos)).data.map(r => r.combo);
-      const lines = [];
+      const combos = (await chQuery(lc.combos)).data.map((r) => r.combo);
+      const lines: string[] = [];
       lines.push(`Study: ${STUDY} (unit of counting: patient). Portal: ${PORTAL}/study/summary?id=${STUDY}`);
       lines.push("\nEvent types (patients | events):");
       for (const t of tRes.data) {
@@ -144,25 +146,25 @@ export function registerTools(server) {
     "query_cohort",
     "Define a patient cohort by temporal relationships between clinical timeline events and count it. Semantics: a patient is in the cohort if there EXISTS a pair of event occurrences satisfying the relation. Returns counts, a plain-language readback (echo it to the user to confirm intent), a days-from-A-to-B histogram for BEFORE queries, sample patient portal links, and caveats you MUST surface to the user.",
     zCohortDsl,
-    async (args) => {
+    async (args: any) => {
       const q = { db: DB, study: STUDY, a: args.a, b: args.b, rel: args.rel, priorGuard: !!args.priorGuard, lineGap: args.lineGap, patientsLimit: 10 };
       const { countSql, patientsSql, histSql, histBucket } = compileCohort(q);
       const c = await chQuery(countSql);
       const matched = Number(c.data[0].matched), denom = Number(c.data[0].denom);
-      const pts = (await chQuery(patientsSql)).data.map(r => r.pid);
-      const out = [];
+      const pts = (await chQuery(patientsSql)).data.map((r) => r.pid);
+      const out: string[] = [];
       out.push(`Cohort: ${matched.toLocaleString()} patients (of ${denom.toLocaleString()} with the anchor event, ${denom ? (100 * matched / denom).toFixed(1) : 0}%).`);
       if (histSql) {
         const h = await chQuery(histSql);
         if (h.data.length) {
           out.push(`Days from A to first subsequent B (bucket=${histBucket}d): ` +
-            h.data.map(r => `${r.bucket}–${Number(r.bucket) + histBucket - 1}d:${r.n}`).join("  "));
+            h.data.map((r) => `${r.bucket}–${Number(r.bucket) + histBucket - 1}d:${r.n}`).join("  "));
         }
       }
-      out.push("Sample patients: " + pts.slice(0, 6).map(p => `${PORTAL}/patient?studyId=${STUDY}&caseId=${p}`).join("  "));
+      out.push("Sample patients: " + pts.slice(0, 6).map((p) => `${PORTAL}/patient?studyId=${STUDY}&caseId=${p}`).join("  "));
       const cv = cohortCaveats(args);
       if (cv.length) out.push("CAVEATS (tell the user): " + cv.join(" | "));
-      out.push(`Query ran in ${c._ms}ms scanning ${Number(c.statistics.rows_read).toLocaleString()} rows.`);
+      out.push(`Query ran in ${c._ms}ms scanning ${Number(c.statistics?.rows_read).toLocaleString()} rows.`);
       return text(out.join("\n\n"));
     });
 
@@ -173,14 +175,14 @@ export function registerTools(server) {
       gap: z.number().min(1).max(3650).default(90).describe("Treatment-free gap in days that starts a new line"),
       guard: z.boolean().default(false).describe("Restrict to 'No prior medications' patients so line numbers are absolute")
     },
-    async ({ gap, guard }) => {
+    async ({ gap, guard }: { gap: number; guard: boolean }) => {
       const { histSql, transSql } = compileLines(DB, STUDY, gap, guard);
       const h = await chQuery(histSql);
       const t = await chQuery(transSql);
-      const out = [];
+      const out: string[] = [];
       out.push(`Lines per patient (gap=${gap}d${guard ? ", 'No prior medications' only" : ""}): ` +
-        h.data.map(r => `${r.bucket >= 8 ? "8+" : r.bucket}:${Number(r.n).toLocaleString()}`).join("  "));
-      out.push("Top 1L→2L transitions: " + t.data.map(r => `${r.line1}→${r.line2}:${r.n}`).join("  "));
+        h.data.map((r) => `${Number(r.bucket) >= 8 ? "8+" : r.bucket}:${Number(r.n).toLocaleString()}`).join("  "));
+      out.push("Top 1L→2L transitions: " + t.data.map((r) => `${r.line1}→${r.line2}:${r.n}`).join("  "));
       out.push("CAVEAT (tell the user): " + CAVEATS.lines + (guard ? "" : " " + CAVEATS.priorMed));
       return text(out.join("\n\n"));
     });
@@ -203,29 +205,29 @@ export function registerTools(server) {
       heatmap: z.array(z.object({ profileType: z.string().max(120), genes: z.array(z.string()).max(12).nullish() })).max(4).nullish()
         .describe("Continuous molecular-profile heatmap tracks (portal-style), e.g. [{profileType:'mrna_median_Zscores'}] — one row per gene (defaults to the gene tracks), patient value = mean across samples; z-score profiles use a fixed diverging +-3 blue-white-red ramp; unknown profiles error listing what the study has; profileType 'VAF' is a synthetic profile rendering mutation variant-allele fraction from loaded alt/ref counts")
     },
-    async ({ genes, cohort, groups, derivedEventTracks, clinical, heatmap, sort, patientList }) => {
-      const spec = {
+    async ({ genes, cohort, groups, derivedEventTracks, clinical, heatmap, sort, patientList }: any) => {
+      const spec: OncoprintSpec = {
         genes,
         clinical: clinical || [],
         ...(heatmap && heatmap.length ? { heatmap } : {}),
         ...(sort && sort.length ? { sort } : {}),
         derivedEvents: derivedEventTracks || [],
         cohort: patientList && patientList.length ? { dsl: { patients: patientList } } : (cohort ? { dsl: cohort } : null),
-        layout: groups && groups.length ? { groupBy: { kind: "cohorts", groups } } : null,
+        layout: groups && groups.length ? { groupBy: { kind: "cohorts" as const, groups } } : null,
         conventions: { lineGap: 90 }
       };
       ensureFonts();
       const contract = await buildContract(spec);
       const svg = contractToSvg(contract, 1200);
       const png = await sharp(Buffer.from(svg), { density: 144 }).png().toBuffer();
-      const stats = contract.tracks.filter(t => t.kind === "gene")
-        .map(t => `${t.label}: ${t.driverPct}% driver / ${t.freqPct}% any (${t.driverAltered}/${t.altered}/${t.profiled} driver/altered/profiled)`).join("  ");
+      const stats = contract.tracks.filter((t) => t.kind === "gene")
+        .map((t) => `${t.label}: ${t.driverPct}% driver / ${t.freqPct}% any (${t.driverAltered}/${t.altered}/${t.profiled} driver/altered/profiled)`).join("  ");
       const base = process.env.APP_BASE_URL || "https://cohort-lab.vercel.app";
       const specB64 = Buffer.from(JSON.stringify(spec)).toString("base64url");
       const provUrl = base + "/provenance?spec=" + specB64;
       const summary =
         `Oncoprint: ${contract.stats.nColumns.toLocaleString()} patients` +
-        (contract.groups.length > 1 ? ` in groups ${contract.groups.map(g => `${g.name}(${g.count})`).join(", ")}` : "") +
+        (contract.groups.length > 1 ? ` in groups ${contract.groups.map((g) => `${g.name}(${g.count})`).join(", ")}` : "") +
         `.\nGene frequencies (panel-aware denominators): ${stats}` +
         `\nConventions: CNA ±2 only; striped = not profiled (not the same as unaltered); solid = putative driver, faded = VUS.` +
         (String(contract.conventions.annotation).startsWith("MOCK")

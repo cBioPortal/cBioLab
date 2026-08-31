@@ -8,6 +8,8 @@
 // re-calls this tool through the host bridge to change the sort.
 import { z } from "zod";
 import { buildContract, PIDS_SQL } from "../../lib/oncoprint.ts";
+import type { PidsCarrier } from "../../lib/oncoprint.ts";
+import type { Contract, Track, CohortDef } from "../../lib/types.ts";
 import { compileCohortDef, describeCohortDef } from "../../lib/cohort2.ts";
 import { resolveStudy, studyProfiles } from "../../lib/analysis.ts";
 import { chQuery } from "../../lib/ch.ts";
@@ -30,12 +32,12 @@ async function oncokbPin() {
 // and kept; only the cell arrays are bucketed. Aggregation per track kind:
 // gene/derivedEvent -> OR of altered (NOT_PROFILED only if the whole bucket is),
 // numeric clinical -> mean, categorical clinical -> mode.
-export function downsampleContract(contract, maxCols = MAX_APP_COLUMNS) {
+export function downsampleContract(contract: Contract, maxCols = MAX_APP_COLUMNS): Contract {
   const n = contract.columns.length;
   if (n <= maxCols) return { ...contract, bucketed: false };
-  const groups = [];
-  const bucketSizes = [];
-  const ranges = []; // [i0, i1) per bucket, in original column space
+  const groups: Contract["groups"] = [];
+  const bucketSizes: number[] = [];
+  const ranges: [number, number][] = []; // [i0, i1) per bucket, in original column space
   let cursor = 0;
   for (const g of contract.groups) {
     const nb = Math.max(1, Math.round(maxCols * g.count / n));
@@ -48,24 +50,24 @@ export function downsampleContract(contract, maxCols = MAX_APP_COLUMNS) {
     }
     cursor += nb;
   }
-  const tracks = contract.tracks.map(t => {
-    const cells = new Array(ranges.length);
+  const tracks = contract.tracks.map((t: Track) => {
+    const cells: number[] = new Array(ranges.length);
     for (let bi = 0; bi < ranges.length; bi++) {
       const [i0, i1] = ranges[bi];
       if (t.numeric) {
         let sum = 0, nn = 0;
-        for (let i = i0; i < i1; i++) if (t.cells[i] !== -1) { sum += t.cells[i]; nn++; }
+        for (let i = i0; i < i1; i++) if ((t.cells as number[])[i] !== -1) { sum += (t.cells as number[])[i]; nn++; }
         cells[bi] = nn ? Math.round(sum / nn) : -1;
       } else if (t.kind === "clinical") {
-        const counts = new Map();
-        for (let i = i0; i < i1; i++) if (t.cells[i] !== -1) counts.set(t.cells[i], (counts.get(t.cells[i]) || 0) + 1);
+        const counts = new Map<number, number>();
+        for (let i = i0; i < i1; i++) if ((t.cells as number[])[i] !== -1) counts.set((t.cells as number[])[i], (counts.get((t.cells as number[])[i]) || 0) + 1);
         let best = -1, bn = 0;
         for (const [c, k] of counts) if (k > bn) { best = c; bn = k; }
         cells[bi] = best;
       } else {
         let code = -1, saw = false;
         for (let i = i0; i < i1; i++) {
-          const c = t.cells[i];
+          const c = (t.cells as number[])[i];
           if (c === -1) continue;
           saw = true;
           code = (code === -1 ? 0 : code) | (c > 0 ? c : 0);
@@ -81,7 +83,7 @@ export function downsampleContract(contract, maxCols = MAX_APP_COLUMNS) {
 const ARGS = {
   study: z.string().max(120).nullish().describe("Study id (see get_catalog / the studies list); defaults to msk_chord_2024"),
   genes: z.array(z.string()).min(1).max(12).describe("Gene symbols for the gene tracks"),
-  cohorts: z.record(z.any()).nullish()
+  cohorts: z.record(z.string(), z.any()).nullish()
     .describe("Optional named cohorts as v2 cohortDefs (describe_dsl) — each becomes a column group; omit for all study patients"),
   clinical: z.array(z.string()).max(8).nullish().describe("Clinical attribute tracks; numeric attributes render as heat"),
   heatmap: z.array(z.object({ profileType: z.string().max(120), genes: z.array(z.string()).max(12).nullish() })).max(4).nullish()
@@ -90,7 +92,7 @@ const ARGS = {
     .describe("Column sort keys: 'genomic' (default staircase), a clinical track label, or '-label' descending")
 };
 
-export function registerOncoprintApp(server) {
+export function registerOncoprintApp(server: any): void {
   server.resource(
     "oncoprint_view",
     ONCOPRINT_APP_URI,
@@ -113,20 +115,22 @@ export function registerOncoprintApp(server) {
       inputSchema: ARGS,
       _meta: { ui: { resourceUri: ONCOPRINT_APP_URI, visibility: ["model", "app"] } }
     },
-    async (args) => {
+    async (args: { study?: string | null; genes: string[]; cohorts?: Record<string, CohortDef> | null; clinical?: string[] | null; heatmap?: { profileType: string; genes?: string[] | null }[] | null; sort?: string[] | null }) => {
       try {
         const study = await resolveStudy(args.study);
         const { profiles, gaProfiles } = await studyProfiles(study);
         const pin = process.env.ONCOKB_PIN || await oncokbPin();
         const names = Object.keys(args.cohorts || {}).slice(0, 4);
         const layout = names.length
-          ? { groupBy: { kind: "cohorts", groups: names.map(n => ({
+          ? { groupBy: { kind: "cohorts" as const, groups: names.map((n) => ({
               name: n,
-              dsl: { [PIDS_SQL]: compileCohortDef(args.cohorts[n], { oncokbPin: pin, profiles, gaProfiles, study }) }
+              dsl: { [PIDS_SQL]: compileCohortDef(args.cohorts![n], { oncokbPin: pin, profiles, gaProfiles, study }) } as PidsCarrier
             })) } }
           : null;
         const contract = await buildContract({
-          study, genes: args.genes, clinical: args.clinical || [], sort: args.sort, heatmap: args.heatmap || [],
+          study, genes: args.genes, clinical: args.clinical || [], sort: args.sort || undefined,
+          heatmap: (args.heatmap || []).map((h): { profileType: string; genes?: string[] } =>
+            h.genes ? { profileType: h.profileType, genes: h.genes } : { profileType: h.profileType }),
           derivedEvents: [], cohort: null, layout, conventions: { lineGap: 90 }
         });
         const appContract = downsampleContract(contract);
@@ -135,7 +139,7 @@ export function registerOncoprintApp(server) {
         const summary =
           `Interactive oncoprint over ${study}: ${contract.stats.nColumns.toLocaleString("en-US")} patients` +
           (names.length ? ` in groups ${contract.groups.map(g => `${g.name}(${g.count.toLocaleString("en-US")})`).join(", ")}` : "") +
-          `.\nCohorts: ${names.length ? names.map(n => `${n} = ${describeCohortDef(args.cohorts[n])}`).join("; ") : "all study patients"}.` +
+          `.\nCohorts: ${names.length ? names.map(n => `${n} = ${describeCohortDef(args.cohorts![n])}`).join("; ") : "all study patients"}.` +
           `\nGene driver%/any% (panel-aware): ${geneStats}. Annotation: ${contract.conventions.annotation}.` +
           `\nSort: ${(contract.conventions.sort || []).join(", ")}. The embedded view supports hover, re-sorting, and portal click-through` +
           (appContract.bucketed ? " (columns bucketed to display resolution; statistics are full-cohort)" : "") + ".";
@@ -144,7 +148,7 @@ export function registerOncoprintApp(server) {
           structuredContent: { contract: appContract, args }
         };
       } catch (e) {
-        return { content: [{ type: "text", text: "REJECTED: " + String(e.message || e) + "\nCall describe_dsl for cohortDef grammar." }], isError: true };
+        return { content: [{ type: "text", text: "REJECTED: " + String((e as Error)?.message || e) + "\nCall describe_dsl for cohortDef grammar." }], isError: true };
       }
     }
   );

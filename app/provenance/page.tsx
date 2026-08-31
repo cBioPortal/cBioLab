@@ -19,7 +19,7 @@ export default async function ProvenancePage({ searchParams }) {
     contract = await buildContract(spec);
     svg = contractToSvg(contract, 1200);
   } catch (e) {
-    error = String(e.message || e);
+    error = String((e as Error)?.message || e);
   }
   return (
     <>

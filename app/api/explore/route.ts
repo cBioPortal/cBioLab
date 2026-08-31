@@ -11,7 +11,7 @@ async function oncokbPin() {
   } catch { return null; }
 }
 
-export async function POST(req) {
+export async function POST(req: Request) {
   try {
     const body = await req.json();
     const requested = Array.isArray(body.studies) && body.studies.length
@@ -27,6 +27,6 @@ export async function POST(req) {
     }
     return Response.json(await buildExploreFederated({ studies, draft: body.draft || null, oncokbPin: pin, profilesByStudy }));
   } catch (e) {
-    return Response.json({ error: String(e.message || e) }, { status: 400 });
+    return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
   }
 }

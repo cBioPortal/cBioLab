@@ -1,7 +1,7 @@
 import { chQuery, DB, STUDY } from "../../../lib/ch";
 import { compileCohort } from "../../../lib/compiler";
 
-export async function POST(req) {
+export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { countSql, patientsSql, histSql, histBucket } = compileCohort({
@@ -22,9 +22,9 @@ export async function POST(req) {
       patients: pRes.data.map(r => r.pid),
       hist, histBucket,
       sql: countSql,
-      ms: cRes._ms, rowsRead: Number(cRes.statistics.rows_read)
+      ms: cRes._ms, rowsRead: Number(cRes.statistics?.rows_read)
     });
   } catch (e) {
-    return Response.json({ error: String(e.message || e) }, { status: 400 });
+    return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
   }
 }

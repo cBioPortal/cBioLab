@@ -114,7 +114,7 @@ export default function AnalysisPage() {
       if (j.error) throw new Error(j.error);
       setResult(j);
       try { history.replaceState(null, "", "?doc=" + btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")); } catch {}
-    } catch (e) { setError(String(e.message || e)); }
+    } catch (e) { setError(String((e as Error)?.message || e)); }
     setBusy(false);
   };
 
@@ -129,12 +129,12 @@ export default function AnalysisPage() {
         if (d.study) { setStudy(d.study); setExStudies([d.study]); exSel.current = [d.study]; }
         setDoc(d); setDocText(JSON.stringify(d, null, 2)); setTab("analysis"); run(d);
       }
-    } catch (e) { setError("bad ?doc= link: " + String(e.message || e)); }
+    } catch (e) { setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
   }, []); // eslint-disable-line
 
   const applyText = () => {
     try { const d = JSON.parse(docText); setDoc(d); run(d); }
-    catch (e) { setError("document JSON: " + String(e.message || e)); }
+    catch (e) { setError("document JSON: " + String((e as Error)?.message || e)); }
   };
 
   // ---- cohort creator / library -----------------------------------------
@@ -154,7 +154,7 @@ export default function AnalysisPage() {
       const ev = await evalDef(cName, def);
       setCPreview(ev);
       return { def, ev };
-    } catch (e) { setCPreview({ error: String(e.message || e) }); return null; }
+    } catch (e) { setCPreview({ error: String((e as Error)?.message || e) }); return null; }
     finally { setCBusy(false); }
   };
 
@@ -179,7 +179,7 @@ export default function AnalysisPage() {
       const j = await res.json();
       if (seq !== exFetchSeq.current) return; // superseded while in flight — discard
       if (!j.error) setExplore(j); else setError(j.error);
-    } catch (e) { if (seq === exFetchSeq.current) setError(String(e.message || e)); }
+    } catch (e) { if (seq === exFetchSeq.current) setError(String((e as Error)?.message || e)); }
     if (seq === exFetchSeq.current) setExploreBusy(false);
   };
 
@@ -322,7 +322,7 @@ export default function AnalysisPage() {
   const previewExample = async (ex) => {
     setExEvals(s => ({ ...s, [ex.name]: { busy: true } }));
     try { const ev = await evalDef(ex.name, ex.def); setExEvals(s => ({ ...s, [ex.name]: ev })); }
-    catch (e) { setExEvals(s => ({ ...s, [ex.name]: { error: String(e.message || e) } })); }
+    catch (e) { setExEvals(s => ({ ...s, [ex.name]: { error: String((e as Error)?.message || e) } })); }
   };
 
   const saveExample = async (ex) => {
@@ -356,7 +356,7 @@ export default function AnalysisPage() {
       if (j.doc) {
         setDoc(j.doc); setDocText(JSON.stringify(j.doc, null, 2)); setTab("analysis"); run(j.doc);
       }
-    } catch (e) { setChat([...msgs, { role: "assistant", text: "⚠ " + String(e.message || e) }]); }
+    } catch (e) { setChat([...msgs, { role: "assistant", text: "⚠ " + String((e as Error)?.message || e) }]); }
     setChatBusy(false);
   };
 

@@ -10,15 +10,19 @@
 // `npm run docs:check` (also run by e2e.cjs), and docs/dsl.md is diffed against
 // a regeneration — so a stale doc or a broken example fails the suite.
 //
-// When you change the DSL (lib/cohort2.js, lib/oql.js, lib/compiler.js,
-// lib/analysis.js views, lib/oncoprint.js), update this file in the same
+// When you change the DSL (lib/cohort2.ts, lib/oql.ts, lib/compiler.ts,
+// lib/analysis.ts views, lib/oncoprint.js), update this file in the same
 // commit and run `npm run docs:gen`.
 // ============================================================================
 
+import type { AnalysisDoc } from "./types.ts";
+
 export const DSL_VERSION = "2.2";
 
+export interface DslExample { title: string; note: string; doc: AnalysisDoc }
+
 // ---- runnable examples (rendered into the doc AND executed by docs:check) --
-export const EXAMPLES = [
+export const EXAMPLES: DslExample[] = [
   {
     title: "Genomic status via OQL, compared",
     note: "STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it includes not-profiled unless you add a profiled clause). Two views: co-alteration frequencies and overall survival.",
@@ -97,13 +101,13 @@ const exampleBlock = (ex: { title: string; note: string; doc: unknown }, i: numb
 
 // ---- the full reference (docs/dsl.md + MCP describe_dsl) -------------------
 export function renderDslMarkdown(): string {
-  return `<!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.js; regenerate with \`npm run docs:gen\`. -->
+  return `<!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.ts; regenerate with \`npm run docs:gen\`. -->
 
 # Cohort Lab DSL (v${DSL_VERSION})
 
 One declarative JSON object — the **Analysis document** — describes everything Cohort Lab does:
 which patients form each cohort, and which views compare them. The server compiles it to
-ClickHouse SQL (\`lib/cohort2.js\`, \`lib/oql.js\`, \`lib/compiler.js\`, \`lib/analysis.js\`);
+ClickHouse SQL (\`lib/cohort2.ts\`, \`lib/oql.ts\`, \`lib/compiler.ts\`, \`lib/analysis.ts\`);
 clients never send SQL. Every result carries provenance: the definition readback and the exact
 SQL each cohort compiled to.
 

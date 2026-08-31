@@ -228,7 +228,7 @@ export default function OncoprintPage() {
       const j = await res.json();
       if (j.error) throw new Error(j.error);
       setContract(j);
-    } catch (e) { setError(String(e.message || e)); }
+    } catch (e) { setError(String((e as Error)?.message || e)); }
     setBusy(false);
   };
 
@@ -247,7 +247,7 @@ export default function OncoprintPage() {
         run(sp);
         return;
       }
-    } catch (e) { setError("Could not parse the shared spec link: " + String(e.message || e)); }
+    } catch (e) { setError("Could not parse the shared spec link: " + String((e as Error)?.message || e)); }
     run(); /* initial render */
   }, []); // eslint-disable-line
 
