@@ -152,3 +152,74 @@ a "corrected" count resting on a linkage the data can't support.
 `lib/oncoprint.js`, `lib/compiler.js`), surfaces in results as machine-attached captions, and
 is documented in the generated DSL reference (`docs/dsl.md`) whose examples are executed
 against the live compiler on every test run.*
+
+## User state: from frozen ID lists to living definitions
+
+*(Proposed direction — not yet built. This may be the strongest justification of all.)*
+
+The portal's persistence artifacts — **virtual studies, groups, sessions** — are what make
+analysis reproducible, continuable, and shareable across time. Underneath, they are all the
+same thing: **frozen ID lists** in the session service. That representation was never a design
+choice; it was forced. The portal has no language for *why* a sample belongs to a group, so
+the only thing it can save is the enumeration. Every known weakness of these artifacts follows:
+virtual studies go stale as studies grow, groups can't explain themselves, a session can be
+reloaded but not meaningfully edited.
+
+A DSL cohort is the **intensional** counterpart — it saves the *rule*, not the roster. Once
+the saved artifact is a rule, two long-wished-for features stop being projects and become
+corollaries:
+
+- **Dynamic groups** are just *evaluation time*: "STK11-driver never-smokers" re-run today
+  includes the patients loaded since the cohort was saved. The portal could never build this
+  without first building a membership language — the language was the hard part, and it exists.
+- **Versioned annotation** is already half-built here: a saved definition plus the OncoKB pin
+  is a reproducible driver-dependent cohort — structurally impossible in the portal, where
+  annotation is baked into the database at load time.
+
+### The artifact model: definition + frozen evaluation + diff
+
+Extensional artifacts aren't wrong — a published paper's cohort *should* be frozen. The saved
+artifact should therefore be a trio: **(1)** the definition (small JSON — the rule), **(2)** a
+frozen evaluation (member ids, counts, annotation pin, data timestamp at save time), and
+**(3)** the diff between them, computed on demand. That covers all three portal verbs and adds
+a fourth the portal has never had:
+
+| verb | mechanism |
+|---|---|
+| **Reproduce** | the frozen evaluation — exact members, exact pin |
+| **Continue** | re-evaluate the definition against today's data |
+| **Share** | the definition is self-describing (readback, pills, compiled SQL — provenance already built) |
+| **Understand change** | the diff: *"since you saved this: +214 patients entered, 3 left; 12 membership changes came from OncoKB v7.4→v7.5 reclassifying STK11 variants"* |
+
+Drift stops being a silent bug (the stale virtual study) and becomes a first-class, explained
+result. A dynamic group with drift notifications is effectively a continuously running
+screening rule — for use cases like trial matching, genuinely new capability.
+
+### Why this completes the chat-first argument
+
+A chat transcript is not a scientific artifact — it can't be re-run, diffed, or cited. The DSL
+is the **persistable residue of a conversation**: chat needs the language to be *safe*
+(trust boundaries, above), and it needs the language to have *memory*. A user-aware MCP server
+is the natural custodian, because one artifact store then serves every surface — "compare my
+STK11 cohort against never-smokers" in chat, a "My cohorts" list in the web UI, `$ref`-style
+cohort references inside analysis documents over MCP.
+
+Architecturally this is an evolution, not an invasion: cBioPortal already keeps user state
+outside the portal database (the session service). This keeps that separation — a small
+writable artifact store, never the read-only analytics database — but upgrades what is stored
+from ID lists to definitions. Virtual studies are subsumed rather than replaced: DSL cohorts
+are already cross-study, which is the main thing virtual studies exist to do.
+
+### Honest caveats
+
+Full reproducibility needs **data versioning** too — a definition re-evaluated after a study
+re-import changes with no pin to blame. The frozen evaluation is the pragmatic fallback (the
+exact saved members are always retained), but a real deployment would stamp import
+timestamps/release tags into evaluations so the diff can attribute change: *data changed* vs
+*annotation changed* vs *the rule matched differently*. And **identity is real work** (OAuth on
+the MCP server, auth on the web app) — unglamorous but well-trodden.
+
+A minimal demonstrator: a tiny writable store; `save_cohort` / `list_cohorts` / `diff_cohort`
+as MCP tools and UI; `$ref` resolution in documents; and one staged demo — save a cohort, bump
+the OncoKB pin, show the diff explaining exactly which patients moved and why. That last
+screenshot is the whole pitch in one image.
