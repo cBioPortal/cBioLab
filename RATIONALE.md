@@ -7,13 +7,23 @@ declarative object** — the Analysis document (cohorts defined by OQL / clinica
 clauses, plus views) — that a human, a chatbot, and an MCP client all read and write, with the
 server compiling it to ClickHouse SQL and every result carrying its own provenance.
 
+That one object also carries the project's future (roadmap sections at the end of this
+document): **saved**, it generalizes the portal's user state — virtual studies, groups,
+sessions — from frozen ID lists into living, diffable definitions with dynamic membership and
+versioned annotation; and being a **portable representation of the question** rather than of
+any backend, it extends naturally across portal instances — up to privacy-preserving
+federation where only documents and results cross institutional boundaries.
+
 ## The advantages of the approach
 
 **1. The document is the deliverable, not the picture.** A chat conversation doesn't end in a
 screenshot; it ends in a small JSON object that *is* the analysis. That object re-runs
 identically later (OncoKB annotations are version-pinned), can be handed to a colleague as a
 URL, edited in the UI, or refined in another conversation. This is the single biggest advantage
-over "chatbot draws a chart": the artifact survives the conversation.
+over "chatbot draws a chart": the artifact survives the conversation. It is also the seed of a
+better persistence model than the portal's — a saved definition subsumes virtual studies,
+groups, and sessions, and makes dynamic groups and annotation-version diffs corollaries rather
+than projects (see *User state*, below).
 
 **2. Trust boundaries that make an LLM safe to put in front of real data.** The model never
 writes SQL — it writes the DSL, the server compiles it. Anything the data can't honestly answer
@@ -27,10 +37,13 @@ showing the definition, the exact SQL each cohort compiled to, and the live re-r
 analysis. For a scientific audience this is the feature: a skeptical reviewer can audit the
 whole chain without trusting either the chatbot or us.
 
-**4. One interface, many cheap surfaces.** Because everything speaks the document, each new
-surface has been thin: the in-app chat is a small loop around the same `runAnalysis`, the MCP
-tools are wrappers over the same engine, and the DSL documentation is *generated from* the same
-source module the chat prompt uses — so nothing can drift, because there is one semantics owner.
+**4. One interface, many cheap surfaces — and many cheap backends.** Because everything speaks
+the document, each new surface has been thin: the in-app chat is a small loop around the same
+`runAnalysis`, the MCP tools are wrappers over the same engine, and the DSL documentation is
+*generated from* the same source module the chat prompt uses — so nothing can drift, because
+there is one semantics owner. The same property cuts the other way: since no SQL ever crosses a
+study boundary, the backends can multiply as cheaply as the surfaces did — cross-instance
+federation is a routing change, not a redesign (see *Cross-instance federation*, below).
 
 **Visualization is layered accordingly**: server-rendered PNGs for any chat client
 (works everywhere, today), and a provenance/editor link that opens the fully interactive
