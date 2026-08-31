@@ -223,3 +223,58 @@ A minimal demonstrator: a tiny writable store; `save_cohort` / `list_cohorts` / 
 as MCP tools and UI; `$ref` resolution in documents; and one staged demo — save a cohort, bump
 the OncoKB pin, show the diff explaining exactly which patients moved and why. That last
 screenshot is the whole pitch in one image.
+
+## Cross-instance federation
+
+*(Proposed direction — not yet built. A long-standing community wish — GENIE + public portal +
+institutional private instances — that this architecture is accidentally already shaped for.)*
+
+The critical enabling fact: **no SQL in this engine ever crosses a study boundary.** The
+compilers are single-study by design, and all federation — cross-study cohorts, compare,
+survival, oncoprint, explore — happens in the application layer by merging study-qualified
+member ids in JS. Every SQL statement the engine emits is therefore already executable against
+*whichever database holds that study*. Fulfilling one analysis document from multiple
+ClickHouse instances is not a redesign; it is a **routing change**:
+
+- the connection layer grows a registry (`chQuery(sql, instance)` instead of one fixed
+  connection);
+- studies become instance-qualified (`genie:brca_...`), with explicit collision handling since
+  the same study id can exist on two instances;
+- member ids gain one more prefix (`instance:study_pid`) — and the standing no-deduplication
+  policy becomes *more* correct, since overlapping patients across institutions genuinely
+  cannot be linked;
+- per-study caches re-key by `instance:study`.
+
+The compilers, OQL parser, render contract, and view merge logic need zero changes — the
+payoff of having refused cross-study SQL from the start.
+
+### The honest hard parts
+
+1. **The OncoKB store**: `DRIVER` joins `oncokb_annotation` on the same connection, so the
+   store must be replicated per instance — small (≈135k variants), the sync pipeline is
+   idempotent, and replicating the *same pin* everywhere strengthens reproducibility (one pin
+   across the federation, or a loud label when pins diverge). License-as-GRANT scales
+   naturally: each instance grants or doesn't, and the engine already degrades loudly.
+2. **Partial availability**: per-instance timeouts and *labeled* partial results ("GENIE
+   unreachable; counts exclude it") — the caveat machinery already used everywhere else.
+3. **Schema drift**: instances on different portal versions need a schema-version handshake
+   and loud rejection below the floor.
+4. **Per-instance authorization**: real work, but it composes with the identity layer from the
+   user-state proposal above rather than adding a second system.
+
+### Two federation modes
+
+The DSL enables both, and they serve different trust models:
+
+| mode | instance is reached as | what crosses the wire | fits |
+|---|---|---|---|
+| **Data-level** | another ClickHouse connection | patient-level rows, merged by the one engine | instances under one trust umbrella |
+| **Document-level** | another Cohort Lab engine, over MCP | sub-documents out; *results* back | institutions that cannot share patient-level data |
+
+Document-level federation is the deeper possibility: an institution could answer compare views
+with per-group aggregates and survival with computed KM curves while member ids never leave
+the building — privacy-preserving federated analysis. The community has wanted cross-instance
+analysis for years; the blocker was never plumbing but the absence of a **portable
+representation of the question**. That representation is precisely what the analysis document
+is — which makes federation the strongest stress-test of the project's central claim: one
+declarative document, many backends.
