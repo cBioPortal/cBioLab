@@ -13,6 +13,10 @@ import { fisherExact, kaplanMeier } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
+import {
+  resolverFor, isPatientLevel, expandSurvivalCounts,
+  type Resolver, type GeneCounts, type SurvivalCount, type Instance
+} from "./federation.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -65,28 +69,31 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
   if (!names.length) throw new Error("document has no cohorts");
 
   // ---- evaluate cohorts: per study, union fully-qualified members ---------
-  const cohorts: Record<string, { studies: string[]; members: Set<string>; perStudy: Record<string, { sql: string; count: number }>; count: number; text: string }> = {};
+  const cohorts: Record<string, { studies: string[]; members: Set<string>; perStudy: Record<string, { sql: string; count: number; mode: string }>; count: number; text: string }> = {};
+  const resolvers: Record<string, Resolver> = {}; // study -> its instance's resolver
   for (const name of names) {
     const def = doc.cohorts[name];
     const studies = [];
     for (const s of cohortStudies(def, docStudy)) studies.push(await resolveStudy(s, docStudy));
-    const members = new Set<string>(); // "<study>_<pid>"
-    const perStudy: Record<string, { sql: string; count: number }> = {};       // study -> {sql, count}
-    // per-study evaluation in parallel (latency-bound, not data-bound); merge in
-    // study order so member insertion stays deterministic
+    const members = new Set<string>(); // "<study>_<pid>" — patient-level instances only
+    const perStudy: Record<string, { sql: string; count: number; mode: string }> = {};
+    // per-study evaluation in parallel; each study is answered by its instance's
+    // resolver, which may or may not be permitted to return member ids
     const evals = await Promise.all(studies.map(async (s) => {
       const { profiles, gaProfiles } = await studyProfiles(s);
-      const sql = compileCohortDef(def, { oncokbPin: pin, profiles, gaProfiles, study: s });
-      const r = await chQuery("SELECT pid FROM (\n" + sql + "\n)");
-      return { s, sql, pids: (r.data as ChRow[]).map((x) => x.pid) };
+      const res = resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
+      resolvers[s] = res;
+      const sql = res.cohortSql(def);
+      if (isPatientLevel(res)) return { s, res, sql, pids: await res.members(def), count: -1 };
+      return { s, res, sql, pids: null, count: await res.count(def) };
     }));
-    for (const { s, sql, pids } of evals) {
-      for (const p of pids) members.add(s + "_" + p);
-      perStudy[s] = { sql, count: pids.length };
+    for (const { s, res, sql, pids, count } of evals) {
+      if (pids) for (const p of pids) members.add(s + "_" + p);
+      perStudy[s] = { sql, count: pids ? pids.length : count, mode: res.instance.mode };
     }
     cohorts[name] = {
       studies, members, perStudy,
-      count: members.size,
+      count: Object.values(perStudy).reduce((n, x) => n + x.count, 0),
       text: describeCohortDef(def) +
         (studies.length > 1 ? " — across " + studies.length + " studies" :
          studies[0] !== docStudy ? " — in " + studies[0] : "")
@@ -103,36 +110,29 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
     if (view.kind === "compare") {
       const genes = ((view as CompareView).genes || []).map((g) => String(g).toUpperCase().trim()).filter((g) => GENE_RE.test(g)).slice(0, 20);
       if (!genes.length) { views.push({ kind: "compare", error: "compare view needs genes" }); continue; }
-      // fetch events + coverage per involved study; key everything by full member id
-      const evRows: any[] = [];
-      const covPairs = new Map<string, Set<string>>(); // gene -> Set(member)
-      for (const g of genes) covPairs.set(g, new Set());
-      const fetched = await Promise.all(vStudies.map(s =>
-        Promise.all([chQuery(genomicEventsSql(genes, s)), chQuery(coverageSql(genes, s))]).then(([ev, cov]) => ({ s, ev, cov }))));
-      for (const { s, ev, cov } of fetched) {
-        for (const r of ev.data) evRows.push({ ...r, member: s + "_" + r.pid });
-        for (const r of cov.data) covPairs.get(r.gene)?.add(s + "_" + r.pid);
-      }
-      const ann = await buildAnnotationIndex(evRows, genes, vStudies.length === 1 ? vStudies[0] : vStudies);
-      const per = new Map<string, Map<string, { any: boolean; driver: boolean }>>(); // gene -> Map(member -> {any, driver})
-      for (const g of genes) per.set(g, new Map());
-      for (const r of evRows) {
-        const m = per.get(r.gene); if (!m) continue;
-        if (r.vt === "cna" && Math.abs(Number(r.cna)) < 2) continue;
-        const e = m.get(r.member) || { any: false, driver: false };
-        e.any = true;
-        if (ann.isDriver(r)) e.driver = true;
-        m.set(r.member, e);
-      }
-      const rows: CompareRow[] = genes.map((g) => {
-        const m = per.get(g)!, covSet = covPairs.get(g)!;
-        const cells: CompareCell[] = vNames.map((n) => {
-          let profiled = 0, any = 0, driver = 0;
-          for (const member of cohorts[n].members) {
-            const isCov = covSet.has(member), e = m.get(member);
-            if (isCov || e) profiled++;
-            if (e) { any++; if (e.driver) driver++; }
+      // Every participant answers with per-gene counts computed in its own
+      // database; the analysis layer only sums. Identical arithmetic whether the
+      // instance is patient-level or aggregate-only — which is what makes mixed
+      // federation possible at all.
+      const tally = new Map<string, GeneCounts>(); // "cohort|gene" -> summed counts
+      const perSite: { cohort: string; study: string; counts: GeneCounts[] }[] = [];
+      await Promise.all(vNames.flatMap((n) =>
+        cohorts[n].studies.map(async (st) => {
+          const counts = await resolvers[st].geneCounts(doc.cohorts[n], genes);
+          perSite.push({ cohort: n, study: st, counts });
+          for (const c of counts) {
+            const k = n + "|" + c.gene;
+            const cur = tally.get(k) || { gene: c.gene, profiled: 0, altered: 0, driver: 0 };
+            cur.profiled += c.profiled; cur.altered += c.altered; cur.driver += c.driver;
+            tally.set(k, cur);
           }
+        })));
+      const aggOnly = vStudies.filter((st) => !isPatientLevel(resolvers[st]));
+      const annSource = (await buildAnnotationIndex([], genes, vStudies.length === 1 ? vStudies[0] : vStudies)).source;
+      const rows: CompareRow[] = genes.map((g) => {
+        const cells: CompareCell[] = vNames.map((n) => {
+          const t = tally.get(n + "|" + g) || { gene: g, profiled: 0, altered: 0, driver: 0 };
+          const profiled = t.profiled, any = t.altered, driver = t.driver;
           return { cohort: n, profiled, any, driver,
             anyPct: profiled ? Math.round(1000 * any / profiled) / 10 : null,
             driverPct: profiled ? Math.round(1000 * driver / profiled) / 10 : null };
@@ -146,24 +146,24 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
         return row;
       });
       if (vNames.length === 2) rows.sort((a, b) => (a.pAny ?? 1) - (b.pAny ?? 1));
-      views.push({ kind: "compare", cohorts: vNames, annotation: ann.source, rows,
+      views.push({ kind: "compare", cohorts: vNames, annotation: annSource, rows,
         ...(vStudies.length > 1 ? { studies: vStudies,
           note: "cross-study comparison" + (vStudies.length <= 2 ? " (" + vStudies.join(", ") + ")" : " across " + vStudies.length + " studies") +
-            ": denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated" } : {}) });
+            ": denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated" +
+            "; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic" +
+            (aggOnly.length ? "; " + aggOnly.join(", ") + " contributed aggregate counts only (no patient-level access)" : "") } : {}) });
 
     } else if (view.kind === "survival") {
-      const osMap = new Map<string, { t: number; event: number }>(); // member -> {t, event}
-      const osFetched = await Promise.all(vStudies.map(async (s) => ({ s, os: await chQuery(
-          "SELECT replaceOne(patient_unique_id, " + sq(s + "_") + ", '') AS pid,\n" +
-          "       anyIf(attribute_value, attribute_name='OS_MONTHS') AS months,\n" +
-          "       anyIf(attribute_value, attribute_name='OS_STATUS') AS status\n" +
-          "FROM " + DB + ".clinical_data_derived\n" +
-          "WHERE cancer_study_identifier = " + sq(s) + " AND type='patient' AND attribute_name IN ('OS_MONTHS','OS_STATUS')\n" +
-          "GROUP BY pid") })));
-      for (const { s, os } of osFetched)
-        for (const r of os.data) osMap.set(s + "_" + r.pid, { t: parseFloat(r.months), event: String(r.status).startsWith("1") ? 1 : 0 });
+      // Each participant returns (months, event, n) triples for its own patients:
+      // aggregate, id-free, and poolable into an exact combined KM curve.
+      const pooled = new Map<string, SurvivalCount[]>(); // cohort -> triples
+      await Promise.all(vNames.flatMap((n) =>
+        cohorts[n].studies.map(async (st) => {
+          const cs = await resolvers[st].survivalCounts(doc.cohorts[n]);
+          pooled.set(n, [...(pooled.get(n) || []), ...cs]);
+        })));
       const curves = vNames.map((n) => {
-        const data = [...cohorts[n].members].map((m) => osMap.get(m)).filter((d): d is { t: number; event: number } => !!d);
+        const data = expandSurvivalCounts(pooled.get(n) || []);
         return { cohort: n, ...kaplanMeier(data), missing: cohorts[n].count - data.length };
       });
       views.push({ kind: "survival", cohorts: vNames, curves,
@@ -171,13 +171,29 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
           (vStudies.length > 1 ? "; baselines are NOT harmonized across studies" : "") + "); status '0:...' treated as censored." });
 
     } else if (view.kind === "oncoprint") {
-      const multi = vStudies.length > 1;
+      // Oncoprint columns ARE patients, so an instance that will not disclose
+      // member ids cannot contribute columns. Render what is permitted and say
+      // exactly what was left out — never silently narrow the cohort.
+      const okStudies = vStudies.filter((st) => isPatientLevel(resolvers[st]));
+      const withheld = vStudies.filter((st) => !isPatientLevel(resolvers[st]));
+      const withheldPts = vNames.reduce((n, cn) =>
+        n + withheld.reduce((m, st) => m + (cohorts[cn].perStudy[st]?.count || 0), 0), 0);
+      const shownPts = vNames.reduce((n, cn) =>
+        n + okStudies.reduce((m, st) => m + (cohorts[cn].perStudy[st]?.count || 0), 0), 0);
+      if (!okStudies.length) {
+        views.push({ kind: "oncoprint", cohorts: vNames, studies: vStudies,
+          error: "no participating instance permits patient-level access, and an oncoprint's columns are patients — " +
+            withheld.join(", ") + " answer with aggregates only. Compare and survival still cover all " +
+            (shownPts + withheldPts).toLocaleString() + " patients." });
+        continue;
+      }
+      const multi = okStudies.length > 1;
       const genes = ((view as OncoprintView).genes || []).slice(0, 12);
       // federated: each group carries a {study: sql} map; each cohort contributes
       // only the studies it was actually evaluated in
       const contract = await buildContract({
-        study: vStudies[0],
-        studies: vStudies,
+        study: okStudies[0],
+        studies: okStudies,
         genes,
         clinical: (view as OncoprintView).clinical || [],
         heatmap: (view as OncoprintView).heatmap || [],
@@ -185,17 +201,24 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
         derivedEvents: [],
         layout: { groupBy: { kind: "cohorts" as const, groups: vNames.map((n) => ({ name: n, dsl: {
           [PIDS_SQL]: multi
-            ? Object.fromEntries(vStudies.filter((s) => cohorts[n].perStudy[s]).map((s) => [s, cohorts[n].perStudy[s].sql]))
-            : cohorts[n].perStudy[vStudies[0]].sql
+            ? Object.fromEntries(okStudies.filter((s) => cohorts[n].perStudy[s]).map((s) => [s, cohorts[n].perStudy[s].sql]))
+            : cohorts[n].perStudy[okStudies[0]].sql
         } as PidsCarrier })) } },
         conventions: { lineGap: 90 }
       });
       views.push({ kind: "oncoprint", cohorts: vNames, svg: contractToSvg(contract, 1200),
         genes: contract.tracks.filter((t) => t.kind === "gene").map((t) => ({ gene: t.label, driverPct: t.driverPct ?? null, anyPct: t.freqPct ?? null })),
         nColumns: contract.stats.nColumns, annotation: contract.conventions.annotation,
-        ...(multi ? { studies: vStudies,
-          note: "cross-study oncoprint" + (vStudies.length <= 2 ? " (" + vStudies.join(", ") + ")" : " across " + vStudies.length + " studies") +
-            ": duplicate patients across studies appear as separate columns; clinical tracks merge attribute values by name without harmonization; the Study track shows each column's origin" } : {}) });
+        ...(multi || withheld.length ? { studies: okStudies,
+          note: (multi
+            ? "cross-study oncoprint" + (okStudies.length <= 2 ? " (" + okStudies.join(", ") + ")" : " across " + okStudies.length + " studies") +
+              ": duplicate patients across studies appear as separate columns; clinical tracks merge attribute values by name without harmonization; the Study track shows each column's origin"
+            : "") +
+            (withheld.length
+              ? (multi ? " — " : "") + "columns cover " + shownPts.toLocaleString() + " of " +
+                (shownPts + withheldPts).toLocaleString() + " patients: " + withheld.join(", ") +
+                " answer with aggregates only, so their patients cannot be drawn as columns (compare and survival above include them)"
+              : "") } : {}) });
     } else {
       // unreachable for well-typed documents, but documents arrive as untrusted
       // JSON from clients/chat/MCP, so an unknown kind must still be reported
