@@ -8,3 +8,4 @@ nohup.out
 mcp.log
 server-analysis.log
 HANDOFF.local.md
+tsconfig.tsbuildinfo
