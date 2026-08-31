@@ -718,7 +718,8 @@ export default function AnalysisPage() {
               <div className="card" key={vi}>
                 {v.kind === "compare" && v.rows && <>
                   <h2>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2>
-                  {v.note && <p className="note">{v.note}</p>}
+                  {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
+                    style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
                       <thead><tr>
@@ -767,7 +768,8 @@ export default function AnalysisPage() {
                       </div>
                     </details>
                   </div>
-                  {v.note && <p className="note">{v.note}</p>}
+                  {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
+                    style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
                   <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", margin: "0.35rem 0 0.5rem" }}>
                     <span className="meta">clinical tracks:</span>
                     {((doc.views && doc.views[vi] && doc.views[vi].clinical) || []).map(a => (
