@@ -139,19 +139,21 @@ export async function buildExploreFederated({ studies, draft, oncokbPin, profile
     if (!clin.has(k)) clin.set(k, []);
     clin.get(k)!.push(a);
   }
-  const clinical: ClinicalFacet[] = [...clin.values()].map((items) => {
+  const clinical: ClinicalFacet[] = [...clin.values()].map((items): ClinicalFacet => {
     const kind = items.slice().sort((x, y) => y.patients - x.patients)[0].kind;
     const same = items.filter((i) => i.kind === kind);
+    const nums = same.filter((i): i is Extract<ClinicalFacet, { kind: "num" }> => i.kind === "num");
+    const cats = same.filter((i): i is Extract<ClinicalFacet, { kind: "cat" }> => i.kind === "cat");
     const patients = same.reduce((s: number, i) => s + i.patients, 0);
-    const base = { attribute: same[0].attribute, per: same[0].per, kind, patients };
+    const base = { attribute: same[0].attribute, per: same[0].per, patients };
     if (kind === "num") {
-      return { ...base,
-        min: Math.min(...same.map((i) => i.min!)), max: Math.max(...same.map((i) => i.max!)),
-        median: Math.round(10 * same.reduce((s: number, i) => s + i.median! * i.patients, 0) / patients) / 10 };
+      return { ...base, kind: "num" as const,
+        min: Math.min(...nums.map((i) => i.min)), max: Math.max(...nums.map((i) => i.max)),
+        median: Math.round(10 * nums.reduce((s: number, i) => s + i.median * i.patients, 0) / patients) / 10 };
     }
     const vals = new Map<string, number>();
-    for (const i of same) for (const v of i.values!) vals.set(v.v, (vals.get(v.v) || 0) + v.n);
-    return { ...base, values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n).slice(0, 8) };
+    for (const i of cats) for (const v of i.values) vals.set(v.v, (vals.get(v.v) || 0) + v.n);
+    return { ...base, kind: "cat" as const, values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n).slice(0, 8) };
   }).sort((x, y) => y.patients - x.patients);
 
   const sumBy = (arrs: any[][], key: string): Map<string, number> => {

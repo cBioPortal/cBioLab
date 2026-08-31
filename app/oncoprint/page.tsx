@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import type { Contract, OncoprintSpec } from "../../lib/types.ts";
 
 const LINE2 = { a: { eventType: "Treatment line (derived)", attrs: [{ key: "LINE_NO", value: "2" }] }, rel: { type: "NONE" } };
 const IMMUNO = { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] };
@@ -23,28 +24,28 @@ const PRESETS = [
 // Okabe–Ito, CVD-safe
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#999999"];
 // numeric clinical heat: scaled 0..255 -> light..dark sequential blue (#deebf7 -> #084887)
-function heatColor(v) {
+function heatColor(v: any) {
   const t = Math.max(0, Math.min(1, v / 255));
-  const mix = (a, b) => Math.round(a + (b - a) * t);
+  const mix = (a: any, b: any) => Math.round(a + (b - a) * t);
   return `rgb(${mix(222, 8)},${mix(235, 72)},${mix(247, 135)})`;
 }
 // diverging blue->white->red for heatmap tracks with a center (z-scores etc.)
-function divergingColor(v, c) {
-  const lerp = (a, b, t) => Math.round(a + (b - a) * t);
+function divergingColor(v: any, c: any) {
+  const lerp = (a: any, b: any, t: any) => Math.round(a + (b - a) * t);
   if (v <= c) { const t = c ? v / c : 1; return `rgb(${lerp(33, 255, t)},${lerp(102, 255, t)},${lerp(172, 255, t)})`; }
   const t = (v - c) / (255 - c || 1);
   return `rgb(${lerp(255, 178, t)},${lerp(255, 24, t)},${lerp(255, 43, t)})`;
 }
-const numTrackColor = (t, v) => t.center != null ? divergingColor(v, t.center) : heatColor(v);
-const fmtNum = (x) => Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : Math.round(x * 10) / 10;
+const numTrackColor = (t: any, v: any) => t.center != null ? divergingColor(v, t.center) : heatColor(v);
+const fmtNum = (x: any) => Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : Math.round(x * 10) / 10;
 const BITS = { MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16, SV: 32, AMP: 64, HOMDEL: 128, DRIVER: 256 };
-const BIT_LABELS = [
+const BIT_LABELS: [number, string][] = [
   [BITS.AMP, "Amplification"], [BITS.HOMDEL, "Deep deletion"], [BITS.SV, "Structural variant"],
   [BITS.MISSENSE, "Missense"], [BITS.TRUNCATING, "Truncating"], [BITS.INFRAME, "In-frame"],
   [BITS.SPLICE, "Splice"], [BITS.OTHER_MUT, "Other mutation"]
 ];
 
-function palette(dark) {
+function palette(dark: any) {
   return {
     unaltered: dark ? "#262d32" : "#e8ecee",
     np1: dark ? "#1b2126" : "#f4f6f7", np2: dark ? "#2c343a" : "#dfe4e7",
@@ -59,7 +60,7 @@ function palette(dark) {
 
 const ROW_H = 20, ROW_GAP = 3, GUTTER = 168, GROUP_GAP = 10, HEADER_H = 20;
 
-function drawContract(canvas, contract, dark, hover) {
+function drawContract(canvas: any, contract: any, dark: any, hover: any) {
   const P = palette(dark);
   const dpr = window.devicePixelRatio || 1;
   const cssW = canvas.clientWidth;
@@ -76,19 +77,19 @@ function drawContract(canvas, contract, dark, hover) {
   const n = contract.columns.length;
   const colW = plotW / n;
   // LOD: px buckets per group when columns are sub-pixel
-  const groupX = [];
+  const groupX: number[] = [];
   let gx = GUTTER;
   for (const g of contract.groups) { groupX.push(gx); gx += g.count * colW + GROUP_GAP; }
 
   // group headers
   ctx.fillStyle = P.muted;
-  contract.groups.forEach((g, gi) => {
+  contract.groups.forEach((g: any, gi: any) => {
     const w = g.count * colW;
     const label = g.name + " (" + g.count.toLocaleString() + ")";
     ctx.fillText(label, groupX[gi], 12, Math.max(60, w));
   });
 
-  const bucketOf = (cells, from, count, pxW, numeric) => {
+  const bucketOf = (cells: any, from: any, count: any, pxW: any, numeric: any) => {
     // returns array of {x0,w,code} merged per device pixel when colW < 1
     const out = [];
     if (colW >= 1) {
@@ -112,7 +113,7 @@ function drawContract(canvas, contract, dark, hover) {
     return out;
   };
 
-  contract.tracks.forEach((t, ti) => {
+  contract.tracks.forEach((t: any, ti: any) => {
     const y = HEADER_H + ti * (ROW_H + ROW_GAP);
     // gutter label
     ctx.fillStyle = P.text;
@@ -123,7 +124,7 @@ function drawContract(canvas, contract, dark, hover) {
       ctx.fillText(t.driverPct != null ? t.driverPct + "% / " + t.freqPct + "%" : t.freqPct + "%", GUTTER - 8, y + 14);
       ctx.textAlign = "left";
     }
-    contract.groups.forEach((g, gi) => {
+    contract.groups.forEach((g: any, gi: any) => {
       const x0 = groupX[gi], pxW = g.count * colW;
       for (const b of bucketOf(t.cells, g.start, g.count, pxW, !!t.numeric)) {
         const x = x0 + b.x0, w = Math.max(b.w, 0.5);
@@ -165,7 +166,7 @@ function drawContract(canvas, contract, dark, hover) {
   return { colW, groupX, cssH };
 }
 
-function decode(code) {
+function decode(code: any) {
   if (code === -1) return ["not profiled"];
   if (code === 0) return ["no alteration"];
   const parts = BIT_LABELS.filter(([b]) => code & b).map(([, l]) => l);
@@ -175,32 +176,32 @@ function decode(code) {
 
 export default function OncoprintPage() {
   const [preset, setPreset] = useState(0);
-  const [custom, setCustom] = useState(null); // spec loaded from ?spec= (shared link)
+  const [custom, setCustom] = useState<OncoprintSpec | null>(null); // spec loaded from ?spec= (shared link)
   const [genes, setGenes] = useState("TP53 KRAS STK11 KEAP1 EGFR ARID1A MSH3");
   const [clinAttrs, setClinAttrs] = useState("OS_STATUS SMOKING_PREDICTIONS_3_CLASSES");
   const [sortKey, setSortKey] = useState("genomic");
   const [withDerived, setWithDerived] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [contract, setContract] = useState(null);
-  const [error, setError] = useState(null);
-  const [spec, setSpec] = useState(null);
-  const [tip, setTip] = useState(null);
-  const canvasRef = useRef(null);
-  const geomRef = useRef(null);
+  const [contract, setContract] = useState<Contract | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [spec, setSpec] = useState<OncoprintSpec | null>(null);
+  const [tip, setTip] = useState<{ x: number; y: number; pid: string; group: string; track: string; value: string } | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const geomRef = useRef<any>(null);
   const [dark, setDark] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     setDark(mq.matches);
-    const fn = e => setDark(e.matches);
+    const fn = (e: any) => setDark(e.matches);
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);
   }, []);
 
-  const run = async (override) => {
+  const run = async (override: any) => {
     setBusy(true); setError(null);
     try {
-      let s;
+      let s: any;
       if (override) {
         s = override;
       } else if (preset === -1 && custom) {
@@ -248,7 +249,7 @@ export default function OncoprintPage() {
         return;
       }
     } catch (e) { setError("Could not parse the shared spec link: " + String((e as Error)?.message || e)); }
-    run(); /* initial render */
+    run(undefined); /* initial render */
   }, []); // eslint-disable-line
 
   useEffect(() => {
@@ -259,7 +260,8 @@ export default function OncoprintPage() {
     return () => window.removeEventListener("resize", onResize);
   }, [contract, dark]);
 
-  const locate = (e) => {
+  const locate = (e: any) => {
+    if (!canvasRef.current) return null;
     const rect = canvasRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left, y = e.clientY - rect.top;
     const g = geomRef.current; if (!g || !contract) return null;
@@ -275,14 +277,14 @@ export default function OncoprintPage() {
     return null;
   };
 
-  const onMove = (e) => {
+  const onMove = (e: any) => {
     const h = locate(e);
-    if (!h) { setTip(null); geomRef.current = drawContract(canvasRef.current, contract, dark, null); return; }
+    if (!h || !contract) { setTip(null); geomRef.current = drawContract(canvasRef.current, contract, dark, null); return; }
     const t = contract.tracks[h.ti];
     const code = t.cells[h.ci];
     const value = (t.kind === "clinical" || t.kind === "heatmap")
       ? (code === -1 ? "n/a"
-        : t.numeric ? "≈" + fmtNum(t.min + (code / 255) * (t.max - t.min))
+        : t.numeric ? "≈" + fmtNum(t.min! + (code / 255) * (t.max! - t.min!))
         : (t.categories && t.categories[code]) || "Other")
       : t.kind === "derivedEvent" ? (code ? "yes" : "no")
       : decode(code).join(" + ");
@@ -290,9 +292,9 @@ export default function OncoprintPage() {
     geomRef.current = drawContract(canvasRef.current, contract, dark, { x: h.x });
   };
 
-  const onClick = (e) => {
+  const onClick = (e: any) => {
     const h = locate(e);
-    if (!h) return;
+    if (!h || !contract) return;
     window.open("https://www.cbioportal.org/patient?studyId=" + contract.study + "&caseId=" + contract.columns[h.ci], "_blank");
   };
 
@@ -341,10 +343,10 @@ export default function OncoprintPage() {
             <label className="chk" style={{ marginBottom: "0.4rem" }}>
               <input type="checkbox" checked={withDerived} onChange={e => setWithDerived(e.target.checked)} />
               {custom && custom.derivedEvents && custom.derivedEvents.length
-                ? "derived-event track" + (custom.derivedEvents.length > 1 ? "s" : "") + " (" + custom.derivedEvents.map(d => d.label).join(", ") + ")"
+                ? "derived-event track" + (custom.derivedEvents.length > 1 ? "s" : "") + " (" + custom.derivedEvents.map((d: any) => d.label).join(", ") + ")"
                 : "“Reached 2L” derived track"}
             </label>
-            <button className="primary" id="renderBtn" disabled={busy} onClick={() => run()}>
+            <button className="primary" id="renderBtn" disabled={busy} onClick={() => run(undefined)}>
               {busy && <span className="spinner onprimary" />}{busy ? "Building…" : "Render"}
             </button>
           </div>
@@ -372,7 +374,7 @@ export default function OncoprintPage() {
           <div className="legend-strip" style={{ display: "flex", flexWrap: "wrap", gap: "0.9rem", marginTop: "0.8rem", fontSize: "0.74rem", color: "var(--muted)" }}>
             {[["Amplification", P.amp], ["Deep deletion", P.homdel], ["Structural variant", P.sv],
               ["Missense", P.missense], ["Truncating", P.truncating], ["In-frame", P.inframe], ["Splice", P.splice],
-              ...contract.tracks.filter(t => t.kind === "derivedEvent").map(t => [t.label, P.derived])].map(([l, c]) => (
+              ...contract.tracks.filter((t: any) => t.kind === "derivedEvent").map((t: any) => [t.label, P.derived])].map(([l, c]) => (
               <span key={l} style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
                 <span style={{ width: 11, height: 11, background: c, borderRadius: 2, display: "inline-block" }} />{l}
               </span>
@@ -382,7 +384,7 @@ export default function OncoprintPage() {
               Not profiled
             </span>
             <span>solid = putative driver · faded = VUS · gene %: driver / any ({contract.conventions && contract.conventions.annotation})</span>
-            {contract.tracks.filter(t => t.kind === "clinical" || t.kind === "heatmap").map(t => (
+            {contract.tracks.filter((t: any) => t.kind === "clinical" || t.kind === "heatmap").map((t: any) => (
               <span key={t.label} style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
                 <strong style={{ color: "var(--ink)" }}>{t.label}:</strong>
                 {t.numeric
@@ -393,7 +395,7 @@ export default function OncoprintPage() {
                           : "linear-gradient(90deg, rgb(222,235,247), rgb(8,72,135))" }} />
                       {fmtNum(t.min)} → {fmtNum(t.max)}
                     </span>
-                  : (t.categories || []).map((c, i) => (
+                  : (t.categories || []).map((c: any, i: any) => (
                     <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
                       <span style={{ width: 10, height: 10, background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 2, display: "inline-block" }} />{c}
                     </span>
@@ -405,7 +407,7 @@ export default function OncoprintPage() {
             <a target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-ink)" }}
               href={"https://www.cbioportal.org/results/oncoprint?cancer_study_list=" + contract.study +
                 "&case_set_id=" + contract.study + "_all&gene_list=" +
-                encodeURIComponent(contract.tracks.filter(t => t.kind === "gene").map(t => t.label).join(" ")) +
+                encodeURIComponent(contract.tracks.filter((t: any) => t.kind === "gene").map((t: any) => t.label).join(" ")) +
                 "&profileFilter=mutations%2Cstructural_variants%2Cgistic&Z_SCORE_THRESHOLD=2.0&tab_index=tab_visualize&Action=Submit"}>
               Open these genes in the cBioPortal oncoprint ↗
             </a>{" "}

@@ -190,14 +190,16 @@ export interface OncoprintSpec {
 }
 
 // ---------- explore ---------------------------------------------------------
-export interface ClinicalFacet {
-  attribute: string; per: "patient" | "sample"; patients: number;
-  kind: "cat" | "num";
-  values?: { v: string; n: number }[];
-  min?: number; max?: number; median?: number;
-  /** set when this facet was re-queried against the draft minus its own clauses */
-  disjunctive?: true;
-}
+interface FacetBase { attribute: string; per: "patient" | "sample"; patients: number }
+/** Discriminated on `kind` so consumers narrow instead of asserting. */
+export type ClinicalFacet =
+  | (FacetBase & {
+      kind: "cat";
+      values: { v: string; n: number }[];
+      /** set when re-queried against the draft minus its own clauses */
+      disjunctive?: true;
+    })
+  | (FacetBase & { kind: "num"; min: number; max: number; median: number });
 export interface ExploreResult {
   study: string; studies?: string[]; draftCount: number | null;
   clinical: ClinicalFacet[];

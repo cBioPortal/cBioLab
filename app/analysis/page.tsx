@@ -2,11 +2,13 @@
 import { useEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
 import { heatmapTrackLabel } from "../../lib/profile-names.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
 
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
-const IMMUNO_EVENT = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
+const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
 
-const EXAMPLES = [
+interface Example { name: string; desc: string; def: CohortDef }
+const EXAMPLES: Example[] = [
   { name: "Immuno-treated", desc: "any immunotherapy on the timeline",
     def: { all: [IMMUNO_EVENT] } },
   { name: "STK11-driver", desc: "OQL: STK11 with an OncoKB driver call",
@@ -31,19 +33,19 @@ const EXAMPLES = [
     def: { study: "brca_tcga_pan_can_atlas_2018", all: [{ kind: "oql", q: "ERBB2: EXP>2" }] } }
 ];
 
-function KMChart({ curves }) {
-  const ref = useRef(null);
+function KMChart({ curves }: { curves: KmCurve[] }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const c = ref.current; if (!c) return;
     const dpr = window.devicePixelRatio || 1;
     const W = c.clientWidth, H = 260;
     c.width = W * dpr; c.height = H * dpr; c.style.height = H + "px";
-    const ctx = c.getContext("2d"); ctx.scale(dpr, dpr);
+    const ctx = c.getContext("2d"); if (!ctx) return; ctx.scale(dpr, dpr);
     const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const grid = dark ? "#2a353c" : "#dde4e8", muted = dark ? "#93a3ad" : "#5b6b76";
     const L = 44, R = 10, T = 10, B = 28;
-    const tMax = Math.max(12, ...curves.flatMap(cv => cv.points.map(p => p.t)));
-    const x = t => L + (W - L - R) * t / tMax, y = s => T + (H - T - B) * (1 - s);
+    const tMax = Math.max(12, ...curves.flatMap((cv) => cv.points.map((p) => p.t)));
+    const x = (t: number) => L + (W - L - R) * t / tMax, y = (s: number) => T + (H - T - B) * (1 - s);
     ctx.strokeStyle = grid; ctx.fillStyle = muted; ctx.font = "10px 'IBM Plex Sans',sans-serif";
     for (const s of [0, 0.25, 0.5, 0.75, 1]) {
       ctx.beginPath(); ctx.moveTo(L, y(s)); ctx.lineTo(W - R, y(s)); ctx.stroke();
@@ -51,7 +53,7 @@ function KMChart({ curves }) {
     }
     const step = tMax > 60 ? 24 : 12;
     for (let t = 0; t <= tMax; t += step) ctx.fillText(t + "mo", x(t) - 8, H - 10);
-    curves.forEach((cv, i) => {
+    curves.forEach((cv, i: number) => {
       ctx.strokeStyle = CAT_COLORS[i % CAT_COLORS.length]; ctx.lineWidth = 2; ctx.beginPath();
       let py = y(1); ctx.moveTo(x(0), py);
       for (const p of cv.points) { const nx = x(p.t), ny = y(p.s); ctx.lineTo(nx, py); ctx.lineTo(nx, ny); py = ny; }
@@ -61,50 +63,50 @@ function KMChart({ curves }) {
   return <canvas ref={ref} style={{ width: "100%", display: "block" }} />;
 }
 
-const EMPTY_DOC = { cohorts: {}, views: [] };
-const DEFAULT_VIEWS = [
+const EMPTY_DOC: AnalysisDoc = { cohorts: {}, views: [] };
+const DEFAULT_VIEWS: View[] = [
   { kind: "compare", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR", "ARID1A", "MSH3"] },
   { kind: "survival" },
   { kind: "oncoprint", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR"] }
 ];
 
 export default function AnalysisPage() {
-  const [tab, setTab] = useState("cohorts");
-  const [doc, setDoc] = useState(EMPTY_DOC);
+  const [tab, setTab] = useState<"explore" | "cohorts" | "analysis">("cohorts");
+  const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const [chat, setChat] = useState([]);
+  const [error, setError] = useState<string | null>(null);
+  const [chat, setChat] = useState<{ role: string; text: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
-  const [chatReady, setChatReady] = useState(null);
-  const [saved, setSaved] = useState({});
+  const [chatReady, setChatReady] = useState<boolean | null>(null);
+  const [saved, setSaved] = useState<Record<string, { def: CohortDef; savedAt: string; lastEval?: { count: number; text: string } | null }>>({});
   const [cName, setCName] = useState("");
   const [cDefText, setCDefText] = useState(JSON.stringify({ study: "msk_chord_2024", all: [] }, null, 2));
-  const [cPreview, setCPreview] = useState(null);
+  const [cPreview, setCPreview] = useState<{ error?: string; count?: number; text?: string } | null>(null);
   const [cBusy, setCBusy] = useState(false);
-  const [exEvals, setExEvals] = useState({});
-  const [studies, setStudies] = useState([]);
+  const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
+  const [studies, setStudies] = useState<{ id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean }[]>([]);
   const [study, setStudy] = useState("msk_chord_2024");
-  const [explore, setExplore] = useState(null);
+  const [explore, setExplore] = useState<ExploreResult | null>(null);
   const [exploreBusy, setExploreBusy] = useState(false);
-  const [trackAttrs, setTrackAttrs] = useState({ key: "", attrs: [], profiles: [] }); // track picker options
+  const [trackAttrs, setTrackAttrs] = useState<{ key: string; attrs: { attribute: string; kind: string }[]; profiles: string[] }>({ key: "", attrs: [], profiles: [] }); // track picker options
   const [sQuery, setSQuery] = useState("");                             // study-panel search
-  const [sCaps, setSCaps] = useState(() => new Set());                  // study-panel capability filters
-  const [exStudies, setExStudies] = useState(["msk_chord_2024"]);       // studies being explored (checkboxes)
+  const [sCaps, setSCaps] = useState<Set<string>>(() => new Set());                  // study-panel capability filters
+  const [exStudies, setExStudies] = useState<string[]>(["msk_chord_2024"]);       // studies being explored (checkboxes)
   const [exPanelOpen, setExPanelOpen] = useState(false);                // study panel expanded?
-  const exSel = useRef(["msk_chord_2024"]);                             // current selection (ref: immune to state races)
-  const exFetchTimer = useRef(null);                                    // debounce for multi-toggle refetch
+  const exSel = useRef<string[]>(["msk_chord_2024"]);                             // current selection (ref: immune to state races)
+  const exFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);                                    // debounce for multi-toggle refetch
   const exFetchSeq = useRef(0);                                         // stale-response guard for explore fetches
   const [qaAttr, setQaAttr] = useState("");                             // creator quick-add: attribute
   const [qaVal, setQaVal] = useState("");                               // creator quick-add: numeric threshold
   const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
 
   const LS_KEY = "cohortlab.savedCohorts";
-  const persist = (next) => { setSaved(next); try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {} };
+  const persist = (next: typeof saved) => { setSaved(next); try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {} };
 
-  const run = async (d = doc) => {
+  const run = async (d: AnalysisDoc = doc) => {
     if (!Object.keys(d.cohorts || {}).length) { setResult(null); return; }
     setBusy(true); setError(null);
     try {
@@ -138,12 +140,12 @@ export default function AnalysisPage() {
   };
 
   // ---- cohort creator / library -----------------------------------------
-  const evalDef = async (name, def) => {
+  const evalDef = async (name: string, def: CohortDef) => {
     const res = await fetch("/api/analysis", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ study, cohorts: { [name || "preview"]: def }, views: [] }) });
     const j = await res.json();
     if (j.error) throw new Error(j.error);
-    const c = Object.values(j.cohorts)[0];
+    const c = Object.values(j.cohorts)[0] as { count: number; text: string };
     return { count: c.count, text: c.text };
   };
 
@@ -168,7 +170,7 @@ export default function AnalysisPage() {
 
   const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
 
-  const fetchExplore = async (draftOverride, studiesOverride) => {
+  const fetchExplore = async (draftOverride?: CohortDef | null, studiesOverride?: string[] | string) => {
     const seq = ++exFetchSeq.current; // a later call (or an emptied selection) supersedes this one
     setExploreBusy(true);
     try {
@@ -183,11 +185,11 @@ export default function AnalysisPage() {
     if (seq === exFetchSeq.current) setExploreBusy(false);
   };
 
-  const addClause = (clause) => {
+  const addClause = (clause: any) => {
     let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
     if (!d || !Array.isArray(d.all)) d = { all: [] };
     if (clause.kind === "clinical" && clause.op === "=") {
-      const same = d.all.find(c => c.kind === "clinical" && c.attribute === clause.attribute && (c.per || "patient") === (clause.per || "patient") && (c.op === "=" || c.values));
+      const same = d.all.find((c: any) => c.kind === "clinical" && c.attribute === clause.attribute && (c.per || "patient") === (clause.per || "patient") && (c.op === "=" || c.values));
       if (same) { // second value on the same attribute becomes an OR list
         const vals = new Set([...(same.values || []), ...(same.op === "=" ? [same.value] : []), clause.value]);
         delete same.op; delete same.value; same.values = [...vals];
@@ -195,25 +197,25 @@ export default function AnalysisPage() {
       }
     }
     if (clause.kind === "oql") {
-      const same = d.all.find(c => c.kind === "oql");
+      const same = d.all.find((c: any) => c.kind === "oql");
       if (same) { same.q += "; " + clause.q; const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d); return; }
     }
     d.all.push(clause);
     const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d);
   };
 
-  const removeDraftClause = (i) => {
+  const removeDraftClause = (i: number) => {
     try {
       const d = normalizeDef(JSON.parse(cDefText));
-      d.all = d.all.filter((_, j) => j !== i);
+      d.all = d.all.filter((_: any, j: any) => j !== i);
       setCDefText(JSON.stringify(d, null, 2));
       fetchExplore(d.all.length ? d : null);
     } catch {}
   };
 
   // studies-explicit draft scaffold for the current explore selection
-  const draftScaffold = (ids) => {
-    const d = { all: [] };
+  const draftScaffold = (ids: string[]): CohortDef => {
+    const d: CohortDef = { all: [] };
     if (ids.length > 1) d.studies = ids; else if (ids.length === 1) d.study = ids[0];
     return d;
   };
@@ -226,7 +228,7 @@ export default function AnalysisPage() {
   // "working study" concept. exSel (ref) is the always-current selection so
   // rapid checkbox toggles don't race on stale render-time state; the refetch
   // is debounced so checking many boxes fires one request.
-  const setExploreStudies = (ids) => {
+  const setExploreStudies = (ids: string[]) => {
     exSel.current = ids;
     setExStudies(ids);
     if (ids.length) setStudy(ids[0]); // doc-level default for study-less defs (examples, hand edits)
@@ -235,9 +237,9 @@ export default function AnalysisPage() {
     if (ids.length > 1) { d.studies = ids; delete d.study; }
     else { delete d.studies; if (ids.length === 1) d.study = ids[0]; else delete d.study; }
     setCDefText(JSON.stringify(d, null, 2));
-    clearTimeout(exFetchTimer.current);
+    if (exFetchTimer.current) clearTimeout(exFetchTimer.current);
     if (!ids.length) { exFetchSeq.current++; setExplore(null); setExploreBusy(false); setExPanelOpen(true); return; } // empty selection: clear facets (and void in-flight fetches), keep the picker open
-    exFetchTimer.current = setTimeout(() => fetchExplore(d.all.length ? d : null, ids), 350);
+    exFetchTimer.current = setTimeout(() => fetchExplore(d.all!.length ? d : null, ids), 350);
   };
 
   // clinical-track options for oncoprint views: union of attribute names across the
@@ -251,8 +253,8 @@ export default function AnalysisPage() {
       fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ study: s }) })
         .then(r => r.json()).catch(() => null)))
       .then(js => {
-        const seen = new Map(); // attribute -> kind
-        const profs = new Set(); // continuous molecular profiles (for heatmap tracks)
+        const seen = new Map<string, string>(); // attribute -> kind
+        const profs = new Set<string>(); // continuous molecular profiles (for heatmap tracks)
         for (const j of js) if (j) {
           if (j.clinical) for (const a of j.clinical) if (!seen.has(a.attribute)) seen.set(a.attribute, a.kind);
           for (const p of j.profiles || []) if (p !== "cna") profs.add(p); // discrete cna isn't a heatmap
@@ -267,37 +269,40 @@ export default function AnalysisPage() {
     if (tab === "cohorts" && !explore && !exploreBusy && exStudies.length) fetchExplore(null);
   }, [tab, study, explore]); // eslint-disable-line
 
-  const updateView = (vi, patch) => {
-    const views = (doc.views || []).map((v, i) => i === vi ? patch(v) : v);
+  const updateView = (vi: number, patch: (v: any) => any) => {
+    const views = (doc.views || []).map((v, i: number) => i === vi ? patch(v) : v);
     const d = { ...doc, views };
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
   };
 
-  const heatmapLabels = (v) => (v.heatmap || []).flatMap(h =>
-    (h.genes && h.genes.length ? h.genes : v.genes || []).map(g => heatmapTrackLabel(String(g).toUpperCase(), h.profileType)));
+  /** the view at index vi, read as an oncoprint view (its editor only renders there) */
+  const ocView = (vi: number): OncoprintView => ((doc.views || [])[vi] || {}) as OncoprintView;
 
-  const pruneSort = (v) => {
+  const heatmapLabels = (v: any): string[] => (v.heatmap || []).flatMap((h: any) =>
+    (h.genes && h.genes.length ? h.genes : v.genes || []).map((g: any) => heatmapTrackLabel(String(g).toUpperCase(), h.profileType)));
+
+  const pruneSort = (v: any) => {
     // drop sort keys whose track no longer exists
     const keep = new Set(["genomic", "Study", ...(v.clinical || []), ...heatmapLabels(v)]);
-    const sort = (v.sort || []).filter(s => keep.has(String(s).replace(/^-/, "")));
+    const sort = (v.sort || []).filter((s: any) => keep.has(String(s).replace(/^-/, "")));
     if (sort.length) v.sort = sort; else delete v.sort;
     return v;
   };
 
-  const setViewClinical = (vi, attrs) => updateView(vi, v => pruneSort({ ...v, clinical: attrs }));
+  const setViewClinical = (vi: number, attrs: string[]) => updateView(vi, v => pruneSort({ ...v, clinical: attrs }));
 
-  const setViewHeatmap = (vi, entries) => updateView(vi, v => {
+  const setViewHeatmap = (vi: number, entries: any[]) => updateView(vi, v => {
     const next = { ...v };
     if (entries.length) next.heatmap = entries; else delete next.heatmap;
     return pruneSort(next);
   });
 
-  const setViewSort = (vi, key) => updateView(vi, v => {
+  const setViewSort = (vi: number, key: string) => updateView(vi, v => {
     if (key === "genomic") { const { sort, ...rest } = v; return rest; }
     return { ...v, sort: [key] };
   });
 
-  const removeCohort = (name) => {
+  const removeCohort = (name: string) => {
     const cs = { ...doc.cohorts }; delete cs[name];
     // views naming the cohort explicitly drop it; a view with no cohorts left goes too
     const views = (doc.views || [])
@@ -313,31 +318,31 @@ export default function AnalysisPage() {
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setError(null);
   };
 
-  const addDefToAnalysis = (name, def) => {
+  const addDefToAnalysis = (name: string, def: CohortDef) => {
     const d = { ...doc, study, cohorts: { ...doc.cohorts, [name]: def } };
     if (!d.views || !d.views.length) d.views = DEFAULT_VIEWS; // a cohort with nothing to look at is a blank page
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); setTab("analysis"); run(d);
   };
 
-  const previewExample = async (ex) => {
+  const previewExample = async (ex: any) => {
     setExEvals(s => ({ ...s, [ex.name]: { busy: true } }));
     try { const ev = await evalDef(ex.name, ex.def); setExEvals(s => ({ ...s, [ex.name]: ev })); }
     catch (e) { setExEvals(s => ({ ...s, [ex.name]: { error: String((e as Error)?.message || e) } })); }
   };
 
-  const saveExample = async (ex) => {
-    let ev = exEvals[ex.name] && exEvals[ex.name].count != null ? exEvals[ex.name] : null;
+  const saveExample = async (ex: any) => {
+    let ev: { count?: number; error?: string; busy?: boolean } | null = exEvals[ex.name] && exEvals[ex.name]!.count != null ? exEvals[ex.name] : null;
     if (!ev) { try { ev = await evalDef(ex.name, ex.def); setExEvals(s => ({ ...s, [ex.name]: ev })); } catch { ev = null; } }
     persist({ ...saved, [ex.name]: { def: ex.def, savedAt: new Date().toISOString().slice(0, 16).replace("T", " "), lastEval: ev } });
   };
 
   // ---- chat ---------------------------------------------------------------
-  const summarize = (r) => {
+  const summarize = (r: any) => {
     if (!r) return "no results yet (document may be empty)";
-    const parts = Object.entries(r.cohorts).map(([n, c]) => `${n}: ${c.count} patients (${c.text})`);
+    const parts = Object.entries(r.cohorts as Record<string, { count: number; text: string }>).map(([n, c]) => `${n}: ${c.count} patients (${c.text})`);
     for (const v of r.views) {
-      if (v.kind === "compare" && v.rows) parts.push("compare top: " + v.rows.slice(0, 4).map(x => `${x.gene} ${x.cells[0].anyPct}% vs ${x.cells[1] ? x.cells[1].anyPct : "-"}% p=${x.pAny ? x.pAny.toExponential(1) : "-"}`).join("; "));
-      if (v.kind === "survival") parts.push("survival medians: " + v.curves.map(c => `${c.cohort}=${c.median ? c.median.toFixed(1) : ">obs"}mo (n=${c.n})`).join("; "));
+      if (v.kind === "compare" && v.rows) parts.push("compare top: " + v.rows.slice(0, 4).map((x: any) => `${x.gene} ${x.cells[0].anyPct}% vs ${x.cells[1] ? x.cells[1].anyPct : "-"}% p=${x.pAny ? x.pAny.toExponential(1) : "-"}`).join("; "));
+      if (v.kind === "survival") parts.push("survival medians: " + v.curves.map((c: any) => `${c.cohort}=${c.median ? c.median.toFixed(1) : ">obs"}mo (n=${c.n})`).join("; "));
     }
     return parts.join(" | ");
   };
@@ -399,16 +404,16 @@ export default function AnalysisPage() {
         {/* ================= Explore tab ================= */}
         {tab === "explore" && <div>
           {(() => {
-            const CAP_FILTERS = [
-              ["timeline", "timeline events", s => s.timelinePatients > 0],
-              ["mrna", "mRNA", s => s.caps && s.caps.mrna],
-              ["protein", "protein", s => s.caps && s.caps.protein],
-              ["ga", "generic assay", s => s.caps && s.caps.ga],
-              ["oncokb", "OncoKB-synced", s => s.oncokb]
+            const CAP_FILTERS: [string, string, (s: any) => boolean][] = [
+              ["timeline", "timeline events", (s: any) => s.timelinePatients > 0],
+              ["mrna", "mRNA", (s: any) => s.caps && s.caps.mrna],
+              ["protein", "protein", (s: any) => s.caps && s.caps.protein],
+              ["ga", "generic assay", (s: any) => s.caps && s.caps.ga],
+              ["oncokb", "OncoKB-synced", (s: any) => s.oncokb]
             ];
-            const byId = new Map(studies.map(s => [s.id, s]));
-            const selPts = exStudies.reduce((n, id) => n + (byId.get(id) ? byId.get(id).patients : 0), 0);
-            const toggle = (id) => {
+            const byId = new Map(studies.map((s) => [s.id, s] as const));
+            const selPts = exStudies.reduce((n: number, id: string) => n + (byId.get(id)?.patients ?? 0), 0);
+            const toggle = (id: any) => {
               const cur = exSel.current;
               setExploreStudies(cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
             };
@@ -422,7 +427,7 @@ export default function AnalysisPage() {
                   <h2 style={{ margin: 0 }}>Exploring <span className="plain">— {exStudies.length === 0 ? "no studies selected" :
                     exStudies.length + (exStudies.length === 1 ? " study" : " studies") + " · " + selPts.toLocaleString() + " patients" + (exStudies.length > 1 ? " (overlap not deduplicated)" : "")}</span></h2>
                   {exStudies.map(id => (
-                    <span key={id} className="qchip" title={byId.get(id) ? byId.get(id).name : id}>
+                    <span key={id} className="qchip" title={byId.get(id)?.name ?? id}>
                       {id}
                       <button className="linklike" style={{ marginLeft: "0.3rem" }} onClick={() => toggle(id)}>×</button>
                     </span>
@@ -494,7 +499,7 @@ export default function AnalysisPage() {
                     {c.kind === "cat" && <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", marginTop: "0.25rem" }}>
                       {c.values.map(v => {
                         const d = parseDraft();
-                        const sel = d && d.all.some(cl => cl.kind === "clinical" && cl.attribute === c.attribute &&
+                        const sel = d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === c.attribute &&
                           ((cl.op === "=" && cl.value === v.v) || (cl.values || []).includes(v.v)));
                         return (
                           <button key={v.v} className={"facet" + (sel ? " on" : "")} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v, ...(c.per === "sample" ? { per: "sample" } : {}) })}>
@@ -600,9 +605,9 @@ export default function AnalysisPage() {
             )}
             {(() => { let d = null; try { d = JSON.parse(cDefText); } catch {} return d ? (
               <div style={{ margin: "0.55rem 0" }}>
-                <CohortPills def={d} onRemoveClause={(i) => {
+                <CohortPills def={d} onRemoveClause={(i: any) => {
                   const nd = normalizeDef(JSON.parse(cDefText));
-                  nd.all = nd.all.filter((_, j) => j !== i);
+                  nd.all = nd.all.filter((_: any, j: any) => j !== i);
                   setCDefText(JSON.stringify(nd, null, 2)); setCPreview(null);
                 }} />
               </div>) : <p className="note">⚠ definition JSON doesn’t parse yet</p>; })()}
@@ -612,7 +617,7 @@ export default function AnalysisPage() {
             </div>
             {cPreview && (cPreview.error
               ? <div className="error">{cPreview.error}</div>
-              : <p className="qdesc" style={{ marginTop: "0.6rem" }}><strong>{cPreview.count.toLocaleString()}</strong> patients — {cPreview.text}</p>)}
+              : <p className="qdesc" style={{ marginTop: "0.6rem" }}><strong>{cPreview.count?.toLocaleString()}</strong> patients — {cPreview.text}</p>)}
             <p className="note">Clause kinds: <code>oql</code> (genomic status, portal OQL syntax), <code>clinical</code> (attribute/op/value), <code>event</code> (timeline), <code>patients</code>; composed with <code>all</code> / <code>any</code> / <code>not</code>. Start from an example on the right, or ask chat above.</p>
           </div>
           <div className="card">
@@ -724,8 +729,8 @@ export default function AnalysisPage() {
                     <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
                       <thead><tr>
                         <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>gene</th>
-                        {v.cohorts.map((n, i) => <th key={n} style={{ textAlign: "right", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}<br /><span style={{ fontWeight: 400, color: "var(--muted)" }}>driver / any</span></th>)}
-                        {v.rows[0] && v.rows[0].pAny != null && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p (any)</th>}
+                        {v.cohorts!.map((n, i: number) => <th key={n} style={{ textAlign: "right", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}<br /><span style={{ fontWeight: 400, color: "var(--muted)" }}>driver / any</span></th>)}
+                        {v.rows![0] && v.rows![0].pAny != null && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p (any)</th>}
                       </tr></thead>
                       <tbody>{v.rows.map(r => (
                         <tr key={r.gene} style={{ borderTop: "1px solid var(--line)" }}>
@@ -739,21 +744,21 @@ export default function AnalysisPage() {
                 </>}
                 {v.kind === "survival" && <>
                   <h2>Survival <span className="plain">— Kaplan–Meier, overall survival</span></h2>
-                  <KMChart curves={v.curves} />
+                  <KMChart curves={v.curves!} />
                   <div style={{ display: "flex", gap: "1.2rem", fontSize: "0.76rem", color: "var(--muted)", marginTop: "0.4rem", flexWrap: "wrap" }}>
-                    {v.curves.map((c, i) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: median {c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}
+                    {v.curves!.map((c, i: number) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: median {c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}
                   </div>
                   <p className="note">{v.caveat}</p>
                 </>}
                 {v.kind === "oncoprint" && v.svg && <>
                   <div className="row" style={{ alignItems: "baseline" }}>
-                    <h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {v.nColumns.toLocaleString()} patients · {v.annotation}</span></h2>
+                    <h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {v.nColumns!.toLocaleString()} patients · {v.annotation}</span></h2>
                     <span className="spacer" />
                     <details className="gearmenu">
                       <summary title="oncoprint options">⚙</summary>
                       <div className="gearmenu-items">
                         {(() => {
-                          const vNames = (doc.views && doc.views[vi] && doc.views[vi].cohorts) || Object.keys(result.cohorts);
+                          const vNames = ocView(vi).cohorts || Object.keys(result.cohorts);
                           const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];
                           const genes = (v.genes || []).map(g => g.gene);
                           const url = "https://www.cbioportal.org/results/oncoprint?cancer_study_list=" + vStudies.join(",") +
@@ -772,43 +777,43 @@ export default function AnalysisPage() {
                     style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
                   <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", margin: "0.35rem 0 0.5rem" }}>
                     <span className="meta">clinical tracks:</span>
-                    {((doc.views && doc.views[vi] && doc.views[vi].clinical) || []).map(a => (
+                    {(ocView(vi).clinical || []).map((a: any) => (
                       <button key={a} className="linklike" disabled={busy} title="remove this track"
-                        onClick={() => setViewClinical(vi, (doc.views[vi].clinical || []).filter(x => x !== a))}>{a} ✕</button>
+                        onClick={() => setViewClinical(vi, (ocView(vi).clinical || []).filter((x: any) => x !== a))}>{a} ✕</button>
                     ))}
                     <select value="" disabled={busy || !trackAttrs.attrs.length}
                       onChange={e => { const a = e.target.value; if (!a) return;
-                        const cur = (doc.views && doc.views[vi] && doc.views[vi].clinical) || [];
+                        const cur = (ocView(vi).clinical || []);
                         if (!cur.includes(a) && cur.length < 8) setViewClinical(vi, [...cur, a]); }}
                       style={{ fontSize: "0.78rem" }}>
                       <option value="">{trackAttrs.attrs.length ? "add clinical track…" : "loading attributes…"}</option>
-                      {trackAttrs.attrs.filter(a => !((doc.views && doc.views[vi] && doc.views[vi].clinical) || []).includes(a.attribute))
+                      {trackAttrs.attrs.filter(a => !(ocView(vi).clinical || []).includes(a.attribute))
                         .map(a => <option key={a.attribute} value={a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric)" : ""}</option>)}
                     </select>
                     <span className="meta">heatmap:</span>
-                    {((doc.views && doc.views[vi] && doc.views[vi].heatmap) || []).map((h, hi) => (
+                    {(ocView(vi).heatmap || []).map((h: any, hi: any) => (
                       <button key={h.profileType} className="linklike" disabled={busy} title="remove this heatmap"
-                        onClick={() => setViewHeatmap(vi, (doc.views[vi].heatmap || []).filter((_, j) => j !== hi))}>{h.profileType} ✕</button>
+                        onClick={() => setViewHeatmap(vi, (ocView(vi).heatmap || []).filter((_: any, j: any) => j !== hi))}>{h.profileType} ✕</button>
                     ))}
                     <select value="" disabled={busy}
                       onChange={e => { const p = e.target.value; if (!p) return;
-                        const cur = (doc.views && doc.views[vi] && doc.views[vi].heatmap) || [];
-                        if (!cur.some(h => h.profileType === p) && cur.length < 4) setViewHeatmap(vi, [...cur, { profileType: p }]); }}
+                        const cur = (ocView(vi).heatmap || []);
+                        if (!cur.some((h: any) => h.profileType === p) && cur.length < 4) setViewHeatmap(vi, [...cur, { profileType: p }]); }}
                       style={{ fontSize: "0.78rem" }}>
                       <option value="">add heatmap…</option>
-                      {["VAF", ...(trackAttrs.profiles || [])].filter(p => !((doc.views && doc.views[vi] && doc.views[vi].heatmap) || []).some(h => h.profileType === p))
+                      {["VAF", ...(trackAttrs.profiles || [])].filter(p => !(ocView(vi).heatmap || []).some((h: any) => h.profileType === p))
                         .map(p => <option key={p} value={p}>{p === "VAF" ? "VAF (mutation allele fraction)" : p}</option>)}
                     </select>
                     <span className="meta">sort:</span>
-                    <select value={(doc.views && doc.views[vi] && doc.views[vi].sort && doc.views[vi].sort[0]) || "genomic"}
+                    <select value={ocView(vi).sort?.[0] || "genomic"}
                       disabled={busy} onChange={e => setViewSort(vi, e.target.value)} style={{ fontSize: "0.78rem" }}>
                       <option value="genomic">genomic (staircase)</option>
                       {(result.involvedStudies || []).length > 1 && <option value="Study">Study</option>}
-                      {((doc.views && doc.views[vi] && doc.views[vi].clinical) || []).flatMap(a => [
+                      {(ocView(vi).clinical || []).flatMap((a: any) => [
                         <option key={a} value={a}>{a} ↑</option>,
                         <option key={"-" + a} value={"-" + a}>{a} ↓</option>
                       ])}
-                      {doc.views && doc.views[vi] && heatmapLabels(doc.views[vi]).flatMap(l => [
+                      {heatmapLabels(ocView(vi)).flatMap(l => [
                         <option key={l} value={l}>{l} ↑</option>,
                         <option key={"-" + l} value={"-" + l}>{l} ↓</option>
                       ])}

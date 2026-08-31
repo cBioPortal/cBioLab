@@ -4,7 +4,7 @@
 // get an × on each top-level clause (creator mode).
 import { Fragment } from "react";
 
-const KIND_META = {
+const KIND_META: Record<string, { label: string; color: string }> = {
   alteration: { label: "gene", color: "#CC79A7" },
   oql: { label: "OQL", color: "#CC79A7" },
   clinical: { label: "clinical", color: "#0072B2" },
@@ -16,24 +16,24 @@ const KIND_META = {
   genericAssay: { label: "assay", color: "#CC79A7" }
 };
 
-function leafKind(leaf) {
+function leafKind(leaf: any) {
   if (leaf.kind) return leaf.kind;
   if (leaf.a && leaf.rel) return "event";
   return "clinical";
 }
 
-function selText(s) {
+function selText(s: any) {
   if (!s) return "?";
-  const attrs = (s.attrs || []).map(a => a.value).filter(Boolean).join(" ");
+  const attrs = (s.attrs || []).map((a: any) => a.value).filter(Boolean).join(" ");
   let base = s.eventType === "Treatment line (derived)"
-    ? "line " + (((s.attrs || []).find(a => a.key === "LINE_NO") || {}).value || "n")
+    ? "line " + (((s.attrs || []).find((a: any) => a.key === "LINE_NO") || {}).value || "n")
     : (attrs ? attrs + " " : "") + String(s.eventType || "").replace("Lab_Test", "lab").toLowerCase();
-  if ((s.attrs || []).some(a => a.key === "PROGRESSION" && a.value === "Y")) base = "progression";
+  if ((s.attrs || []).some((a: any) => a.key === "PROGRESSION" && a.value === "Y")) base = "progression";
   if (s.numeric && s.numeric.key) base += ` ${s.numeric.key}${s.numeric.op}${s.numeric.value}`;
   return (s.occurrence === "FIRST" ? "first " : s.occurrence === "LAST" ? "last " : "") + base;
 }
 
-function leafText(leaf) {
+function leafText(leaf: any) {
   const k = leafKind(leaf);
   if (k === "oql") return leaf.q;
   if (k === "alteration") {
@@ -63,7 +63,7 @@ function leafText(leaf) {
   return t;
 }
 
-function Pill({ leaf, negated, onRemove }) {
+function Pill({ leaf, negated, onRemove }: { leaf: any; negated?: boolean; onRemove?: () => void }) {
   const meta = KIND_META[leafKind(leaf)] || KIND_META.clinical;
   return (
     <span className="fpill" style={{ borderLeftColor: meta.color }} title={JSON.stringify(leaf)}>
@@ -75,24 +75,24 @@ function Pill({ leaf, negated, onRemove }) {
   );
 }
 
-export function normalizeDef(def) {
+export function normalizeDef(def: any) {
   if (!def) return null;
   if (def.a && def.rel && !def.all) return { ...def, all: [{ ...def }] };
   if (def.patients && !def.all) return { all: [{ kind: "patients", ids: def.patients }] };
   return def;
 }
 
-export default function CohortPills({ def, onRemoveClause }) {
+export default function CohortPills({ def, onRemoveClause }: { def: any; onRemoveClause?: (i: number) => void }) {
   const d = normalizeDef(def);
   if (!d || !Array.isArray(d.all) || !d.all.length) return <span className="meta">no clauses</span>;
   return (
     <span className="fpills">
-      {d.all.map((c, i) => (
+      {d.all.map((c: any, i: any) => (
         <Fragment key={i}>
           {i > 0 && <span className="fconn">AND</span>}
           {c.any ? (
             <span className="fgroup">
-              {c.any.map((l, j) => (
+              {c.any.map((l: any, j: any) => (
                 <Fragment key={j}>
                   {j > 0 && <span className="fconn">OR</span>}
                   <Pill leaf={l} />

@@ -68,24 +68,24 @@ const RECIPES = [
     rel: { type: "NONE" } }
 ];
 
-function normSel(s) {
+function normSel(s: any) {
   return { ...EMPTY_SEL, ...s,
     attrs: (s.attrs && s.attrs.length ? s.attrs : [{ key: "", value: "" }]),
     minDurationDays: s.minDurationDays || "",
     numKey: s.numKey || "", numOp: s.numOp || ">", numVal: s.numVal || "" };
 }
 
-function toApiSel(s) {
+function toApiSel(s: any) {
   return {
     eventType: s.eventType,
-    attrs: s.attrs.filter(a => a.key && a.value),
+    attrs: s.attrs.filter((a: any) => a.key && a.value),
     occurrence: s.occurrence,
     minDurationDays: s.minDurationDays ? Number(s.minDurationDays) : null,
     numeric: s.numKey && s.numVal !== "" ? { key: s.numKey, op: s.numOp, value: Number(s.numVal) } : null
   };
 }
 
-function describeSelector(s) {
+function describeSelector(s: any) {
   const isLine = s.eventType === "Treatment line (derived)";
   const pre = [];
   if (s.occurrence === "FIRST") pre.push("first");
@@ -109,7 +109,7 @@ function describeSelector(s) {
   return label;
 }
 
-function QueryDesc({ result }) {
+function QueryDesc({ result }: { result: any }) {
   const { labelA, labelB, relSnap: rel, guardSnap: guard } = result;
   if (!rel) return null;
   const A = <span className="qchip"><span className="qletter">A:</span>{labelA}</span>;
@@ -128,12 +128,12 @@ function QueryDesc({ result }) {
   return <p className="qdesc">{body}{guard ? <span className="qguard">restricted to “No prior medications” patients</span> : null}</p>;
 }
 
-function Bars({ rows }) {
+function Bars({ rows }: { rows: any[] }) {
   if (!rows || !rows.length) return <span className="meta">no rows</span>;
-  const max = Math.max(1, ...rows.map(r => r.n));
+  const max = Math.max(1, ...rows.map((r: any) => r.n));
   return (
     <div className="bars">
-      {rows.map((r, i) => (
+      {rows.map((r: any, i: any) => (
         <div className="bar-row" key={i} title={r.label + ": " + r.n.toLocaleString()}>
           <span className="lbl">{r.label}</span>
           <span className="track"><span className="fill" style={{ width: (100 * r.n / max) + "%" }} /></span>
@@ -144,12 +144,12 @@ function Bars({ rows }) {
   );
 }
 
-function Selector({ tag, sel, setSel, catalog }) {
+function Selector({ tag, sel, setSel, catalog }: { tag: string; sel: any; setSel: (s: any) => void; catalog: any }) {
   const uid = useId();
   const keys = (catalog && catalog.keys[sel.eventType]) || [];
   const values = (catalog && catalog.values[sel.eventType]) || {};
-  const setAttr = (i, field, v) => {
-    const attrs = sel.attrs.map((a, j) => j === i ? { ...a, [field]: v } : a);
+  const setAttr = (i: any, field: any, v: any) => {
+    const attrs = sel.attrs.map((a: any, j: any) => j === i ? { ...a, [field]: v } : a);
     setSel({ ...sel, attrs });
   };
   return (
@@ -158,21 +158,21 @@ function Selector({ tag, sel, setSel, catalog }) {
       <label>Event type</label>
       <select style={{ width: "100%" }} value={sel.eventType}
         onChange={e => setSel({ ...sel, eventType: e.target.value, attrs: [{ key: "", value: "" }] })}>
-        {(catalog ? catalog.types : []).map(t => (
+        {(catalog ? catalog.types : []).map((t: any) => (
           <option key={t.t} value={t.t}>{t.t} ({Number(t.n_pat).toLocaleString()} pts)</option>
         ))}
       </select>
       <label>Attribute filters</label>
-      {sel.attrs.map((a, i) => (
+      {sel.attrs.map((a: any, i: any) => (
         <div className="attr-row" key={i}>
           <input list={uid + "-k"} placeholder="key" value={a.key} onChange={e => setAttr(i, "key", e.target.value)} />
           <input list={uid + "-v" + i} placeholder="value" value={a.value} onChange={e => setAttr(i, "value", e.target.value)} />
-          <datalist id={uid + "-v" + i}>{(values[a.key] || []).map(v => <option key={v} value={v} />)}</datalist>
+          <datalist id={uid + "-v" + i}>{(values[a.key] || []).map((v: any) => <option key={v} value={v} />)}</datalist>
           <button type="button" className="rm" aria-label="remove filter"
-            onClick={() => setSel({ ...sel, attrs: sel.attrs.filter((_, j) => j !== i) })}>×</button>
+            onClick={() => setSel({ ...sel, attrs: sel.attrs.filter((_: any, j: any) => j !== i) })}>×</button>
         </div>
       ))}
-      <datalist id={uid + "-k"}>{keys.map(k => <option key={k} value={k} />)}</datalist>
+      <datalist id={uid + "-k"}>{keys.map((k: any) => <option key={k} value={k} />)}</datalist>
       {sel.attrs.length < 3 &&
         <button type="button" className="linklike" onClick={() => setSel({ ...sel, attrs: [...sel.attrs, { key: "", value: "" }] })}>
           + add attribute filter
@@ -205,25 +205,25 @@ function Selector({ tag, sel, setSel, catalog }) {
 }
 
 export default function Page() {
-  const [catalog, setCatalog] = useState(null);
-  const [catError, setCatError] = useState(null);
+  const [catalog, setCatalog] = useState<any>(null);
+  const [catError, setCatError] = useState<string | null>(null);
   const [selA, setSelA] = useState(normSel(RECIPES[0].a));
   const [selB, setSelB] = useState(normSel(RECIPES[0].b));
-  const [rel, setRel] = useState({ type: "BEFORE", minDays: 0, maxDays: 180, withinDays: 365, observed: true });
+  const [rel, setRel] = useState<{ type: string; minDays: number | string; maxDays: number | string; withinDays: number | string; observed: boolean }>({ type: "BEFORE", minDays: 0, maxDays: 180, withinDays: 365, observed: true });
   const [priorGuard, setPriorGuard] = useState(false);
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState(null);
-  const [runError, setRunError] = useState(null);
-  const [activeRecipe, setActiveRecipe] = useState(null);
+  const [result, setResult] = useState<any>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [activeRecipe, setActiveRecipe] = useState<any>(null);
   const [recipeHint, setRecipeHint] = useState("Click a recipe to fill the cohort definition and run it.");
   const [gap, setGap] = useState("90"); // shared: builder line-events AND explorer
   const [linesBusy, setLinesBusy] = useState(false);
-  const [lines, setLines] = useState(null);
-  const [linesError, setLinesError] = useState(null);
+  const [lines, setLines] = useState<any>(null);
+  const [linesError, setLinesError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const load = async (attempt) => {
+    const load = async (attempt: any) => {
       try {
         const j = await (await fetch("/api/catalog")).json();
         if (cancelled) return;
@@ -255,7 +255,7 @@ export default function Page() {
     setRunning(false);
   }, [selA, selB, rel, priorGuard, gap]);
 
-  const applyRecipe = (i) => {
+  const applyRecipe = (i: any) => {
     const rc = RECIPES[i];
     const a = normSel(rc.a), b = rc.b ? normSel(rc.b) : normSel({ eventType: catalog ? catalog.types[0].t : "" });
     const r = { ...rel, ...rc.rel, type: rc.rel.type };
@@ -287,7 +287,7 @@ export default function Page() {
   };
 
   const pct = result && result.denom ? (100 * result.matched / result.denom) : 0;
-  const histRows = result && result.hist ? result.hist.map(h => ({
+  const histRows = result && result.hist ? result.hist.map((h: any) => ({
     label: h.bucket + "–" + (h.bucket + (result.histBucket || 1) - 1) + "d", n: h.n })) : null;
 
   return (
@@ -393,7 +393,7 @@ export default function Page() {
               <div className="chart">
                 <h3>Sample patients <span className="meta">(links open the portal patient timeline)</span></h3>
                 <div className="patients" id="rPatients">
-                  {result.patients.length ? result.patients.map(pid => (
+                  {result.patients.length ? result.patients.map((pid: any) => (
                     <a key={pid} target="_blank" rel="noopener noreferrer"
                       href={(catalog ? catalog.portal : "") + "/patient?studyId=" + encodeURIComponent(catalog ? catalog.study : "") + "&caseId=" + encodeURIComponent(pid)}>
                       {pid}
@@ -437,10 +437,10 @@ export default function Page() {
             <div className="loading-block"><span className="spinner" /> Deriving treatment lines…</div>}
           {lines && <div className={"two-col" + (linesBusy ? " busy" : "")} style={{ marginTop: "1rem" }}>
             <div className="chart"><h3>Lines per patient</h3>
-              <div id="lineHist"><Bars rows={lines.hist.map(r => ({ label: (r.bucket >= 8 ? "8+" : r.bucket) + (r.bucket === 1 ? " line" : " lines"), n: r.n }))} /></div>
+              <div id="lineHist"><Bars rows={lines.hist.map((r: any) => ({ label: (r.bucket >= 8 ? "8+" : r.bucket) + (r.bucket === 1 ? " line" : " lines"), n: r.n }))} /></div>
             </div>
             <div className="chart"><h3>Line 1 → Line 2 transitions <span className="meta">(top 12, by regimen composition)</span></h3>
-              <div id="lineTrans"><Bars rows={lines.transitions.map(r => ({ label: r.line1 + " → " + r.line2, n: r.n }))} /></div>
+              <div id="lineTrans"><Bars rows={lines.transitions.map((r: any) => ({ label: r.line1 + " → " + r.line2, n: r.n }))} /></div>
             </div>
           </div>}
           {lines && <details><summary>Generated SQL</summary><pre>{lines.sql}</pre></details>}

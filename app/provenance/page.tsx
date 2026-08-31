@@ -9,11 +9,11 @@ export const metadata = { title: "Oncoprint provenance — Cohort Lab" };
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-export default async function ProvenancePage({ searchParams }) {
+export default async function ProvenancePage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const sp = await searchParams;
-  let spec = null, queries = null, svg = null, contract = null, error = null;
+  let spec: any = null, queries: any = null, svg: string | null = null, contract: any = null, error: string | null = null;
   try {
-    if (!sp.spec) throw new Error("missing ?spec= parameter (base64url-encoded OncoprintSpec)");
+    if (typeof sp.spec !== "string") throw new Error("missing ?spec= parameter (base64url-encoded OncoprintSpec)");
     spec = JSON.parse(Buffer.from(String(sp.spec), "base64url").toString("utf8"));
     ({ queries } = specToQueries(spec));
     contract = await buildContract(spec);
@@ -35,7 +35,7 @@ export default async function ProvenancePage({ searchParams }) {
           <div className="card">
             <h2>Rendered oncoprint <span className="plain">— {contract.stats.nColumns.toLocaleString()} patients · {contract.tracks.length} tracks · re-rendered live from the spec below</span></h2>
             <div style={{ overflowX: "auto", background: "#fff", borderRadius: 8, border: "1px solid var(--line)" }}
-              dangerouslySetInnerHTML={{ __html: svg }} />
+              dangerouslySetInnerHTML={{ __html: svg ?? "" }} />
             <p className="note">Conventions: {JSON.stringify(contract.conventions)}</p>
           </div>
         )}
@@ -48,7 +48,7 @@ export default async function ProvenancePage({ searchParams }) {
         {queries && (
           <div className="card">
             <h2>Generated SQL <span className="plain">— every query the spec compiles to, in execution order</span></h2>
-            {queries.map((q, i) => (
+            {queries.map((q: { label: string; sql: string }, i: number) => (
               <div key={i} style={{ marginBottom: "1rem" }}>
                 <p style={{ margin: "0 0 0.3rem", fontSize: "0.85rem" }}><strong>{i + 1}. {q.label}</strong></p>
                 <pre>{q.sql}</pre>
