@@ -192,7 +192,15 @@ export interface OncoprintSpec {
 }
 
 // ---------- explore ---------------------------------------------------------
-interface FacetBase { attribute: string; per: "patient" | "sample"; patients: number }
+interface FacetBase {
+  attribute: string; per: "patient" | "sample"; patients: number;
+  /** from clinical_attribute_meta — the portal's own declarations */
+  displayName?: string; description?: string;
+  /** the portal orders charts by this and hides priority 0 by default */
+  priority?: number;
+  /** distinct values in the cohort (categorical: decides pie vs ranked list) */
+  distinct?: number;
+}
 /** Discriminated on `kind` so consumers narrow instead of asserting. */
 export type ClinicalFacet =
   | (FacetBase & {

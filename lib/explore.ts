@@ -17,6 +17,8 @@ const BIN_INTERVALS_DISCRETE = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 100
 const TARGET_BINS = 20;
 /** how many numeric attributes get a histogram (each costs two grouped queries per study) */
 const NUM_HISTOGRAM_LIMIT = 14;
+/** values returned per categorical facet (a pie shows a few; a ranked list more) */
+const FACET_VALUE_LIMIT = 20;
 
 /**
  * Bin edges for a numeric attribute, reproducing the portal's algorithm:
@@ -137,6 +139,18 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     "WHERE cancer_study_identifier = " + sq(study) + sampleCond, conn)).data[0];
   const totals = { patients: Number(totalsRow.pts), samples: Number(totalsRow.smp) };
 
+  // ---- attribute metadata: the portal's own declarations -----------------
+  // datatype here is DECLARED, not sniffed from values, which is what the study
+  // view uses to decide pie-vs-histogram. priority drives chart ordering, and
+  // priority 0 means "available but hidden by default" in the portal.
+  const metaRows = await chQuery<ChRow>(
+    "SELECT cam.attr_id AS a, cam.datatype AS datatype, cam.display_name AS display_name,\n" +
+    "       cam.description AS description, cam.priority AS priority, cam.patient_attribute AS patient_attribute\n" +
+    "FROM " + db + ".clinical_attribute_meta cam\n" +
+    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study), conn).catch(() => ({ data: [] as ChRow[] }));
+  const meta = new Map(metaRows.data.map((r) => [r.a, r]));
+
   // ---- clinical attributes: classify categorical vs numeric --------------
   const cls = await chQuery(
     "SELECT type, attribute_name AS a, uniqExact(attribute_value) AS nv,\n" +
@@ -150,9 +164,16 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     "  countIf(toFloat64OrNull(attribute_value) = round(toFloat64OrNull(attribute_value))) = countIf(toFloat64OrNull(attribute_value) IS NOT NULL) AS allints\n" +
     "FROM " + db + ".clinical_data_derived\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''" + cond + "\n" +
-    "GROUP BY type, a ORDER BY np DESC LIMIT 44", conn);
-  const catAttrs = cls.data.filter(r => Number(r.nv) <= 30 && Number(r.numratio) < 0.9);
-  const numAttrs = cls.data.filter(r => Number(r.numratio) >= 0.9 && Number(r.nv) > 10);
+    "GROUP BY type, a ORDER BY np DESC LIMIT 250", conn);
+  // Declared datatype wins; the old value-sniffing survives only as a fallback
+  // for attributes with no metadata row, so nothing is silently discarded.
+  const declaredNumeric = (r: ChRow): boolean => {
+    const m = meta.get(r.a);
+    if (m) return String(m.datatype).toUpperCase() === "NUMBER";
+    return Number(r.numratio) >= 0.9 && Number(r.nv) > 10;
+  };
+  const numAttrs = cls.data.filter(declaredNumeric);
+  const catAttrs = cls.data.filter((r) => !declaredNumeric(r));
 
   let catValues: ChRow[] = [];
   if (catAttrs.length) {
@@ -162,7 +183,7 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
       "FROM " + db + ".clinical_data_derived\n" +
       "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
       "  AND attribute_name IN (" + catAttrs.map(r => sq(r.a)).join(",") + ")" + cond + "\n" +
-      "GROUP BY type, a, v ORDER BY n DESC LIMIT 6 BY type, a", conn);
+      "GROUP BY type, a, v ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT + " BY type, a", conn);
     catValues = v.data;
   }
   // Disjunctive faceting: attributes already constrained in the draft get their value
@@ -188,13 +209,14 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
       "FROM " + db + ".clinical_data_derived\n" +
       "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
       "  AND type = " + sq(per) + " AND attribute_name = " + sq(attr) + subCond + "\n" +
-      "GROUP BY v ORDER BY n DESC LIMIT 6", conn);
+      "GROUP BY v ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT, conn);
     disjValues.set(key, v.data.map(x => ({ v: x.v, n: Number(x.n) })));
   }
 
   const clinical: ClinicalFacet[] = [
     ...catAttrs.map((r): ClinicalFacet => ({
       attribute: r.a, per: r.type as "patient" | "sample", kind: "cat", patients: Number(r.np),
+      distinct: Number(r.nv),
       values: disjValues.get(r.type + "|" + r.a) ||
         catValues.filter((x) => x.a === r.a && x.type === r.type).map((x) => ({ v: x.v, n: Number(x.n) })),
       disjunctive: disjValues.has(r.type + "|" + r.a) || undefined
@@ -203,7 +225,19 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
       attribute: r.a, per: r.type as "patient" | "sample", kind: "num", patients: Number(r.np),
       min: Number(r.mn), max: Number(r.mx), median: Number(r.md), naCount: Number(r.na)
     }))
-  ].sort((x, y) => y.patients - x.patients).slice(0, 30);
+  ].map((f) => {
+    const m = meta.get(f.attribute);
+    return m ? {
+      ...f,
+      displayName: m.display_name || undefined,
+      description: m.description || undefined,
+      priority: Number(m.priority) || 0
+    } : f;
+  }).sort((x, y) => {
+    // portal ordering: declared priority first, then coverage
+    const pd = (y.priority ?? 0) - (x.priority ?? 0);
+    return pd !== 0 ? pd : y.patients - x.patients;
+  });
 
   // ---- numeric histograms (cBioPortal study-view bins) --------------------
   if (!skipBins) {
@@ -451,7 +485,12 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     const nums = same.filter((i): i is Extract<ClinicalFacet, { kind: "num" }> => i.kind === "num");
     const cats = same.filter((i): i is Extract<ClinicalFacet, { kind: "cat" }> => i.kind === "cat");
     const patients = same.reduce((s: number, i) => s + i.patients, 0);
-    const base = { attribute: same[0].attribute, per: same[0].per, patients };
+    const withMeta = same.find((i) => i.displayName || i.priority != null) || same[0];
+    const base = {
+      attribute: same[0].attribute, per: same[0].per, patients,
+      displayName: withMeta.displayName, description: withMeta.description,
+      priority: withMeta.priority, distinct: Math.max(...same.map((i) => i.distinct ?? 0)) || undefined
+    };
     if (kind === "num") {
       return { ...base, kind: "num" as const,
         min: Math.min(...nums.map((i) => i.min)), max: Math.max(...nums.map((i) => i.max)),
@@ -462,8 +501,11 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     // preserve the disjunctive marker: if any participant re-queried this
     // attribute without its own clauses, the merged totals are on that basis
     const disjunctive = cats.some((i) => i.disjunctive) || undefined;
-    return { ...base, kind: "cat" as const, ...(disjunctive ? { disjunctive } : {}), values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n).slice(0, 8) };
-  }).sort((x, y) => y.patients - x.patients);
+    return { ...base, kind: "cat" as const, ...(disjunctive ? { disjunctive } : {}), values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n).slice(0, FACET_VALUE_LIMIT) };
+  }).sort((x, y) => {
+    const pd = (y.priority ?? 0) - (x.priority ?? 0);
+    return pd !== 0 ? pd : y.patients - x.patients;
+  });
 
   const sumBy = (arrs: any[][], key: string): Map<string, number> => {
     const m = new Map<string, number>();

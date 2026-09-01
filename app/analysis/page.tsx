@@ -5,6 +5,8 @@ import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
 
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
+/** beyond this many distinct values a pie is unreadable — the portal shows a table */
+const PIE_MAX_SLICES = 8;
 const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
 
 interface Example { name: string; desc: string; def: CohortDef }
@@ -108,6 +110,8 @@ export default function AnalysisPage() {
   const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
   const [geneSearch, setGeneSearch] = useState("");                     // server-side gene filter for the three tables
   const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
+  const [attrLimit, setAttrLimit] = useState(20);                       // clinical attributes shown
+  const valueLimit = 10;                                                // values per ranked-list facet
 
   const LS_KEY = "cohortlab.savedCohorts";
   const persist = (next: typeof saved) => { setSaved(next); try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {} };
@@ -521,8 +525,19 @@ export default function AnalysisPage() {
           {explore && <div className="two-col" style={{ alignItems: "start" }}>
             <div>
               <div className="card">
-                <h2>Clinical <span className="plain">— counted in each attribute's own unit, as the portal does</span></h2>
-                {explore.clinical.map(c => (
+                {(() => {
+                  const shown = Math.min(explore.clinical.length, attrLimit);
+                  return (
+                    <div className="row" style={{ alignItems: "baseline" }}>
+                      <h2 style={{ margin: 0 }}>Clinical <span className="plain">— counted in each attribute's own unit, as the portal does</span></h2>
+                      <span className="spacer" />
+                      <span className="meta">{shown < explore.clinical.length
+                        ? "showing " + shown + " of " + explore.clinical.length + " attributes"
+                        : explore.clinical.length + " attributes"}</span>
+                    </div>
+                  );
+                })()}
+                {explore.clinical.slice(0, attrLimit).map(c => (
                   <div key={c.per + c.attribute} style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0" }}>
                     {(() => {
                       // A facet already in the draft is re-queried WITHOUT its own
@@ -534,7 +549,10 @@ export default function AnalysisPage() {
                       const shown = disj ? c.values.reduce((n: number, v: any) => n + v.n, 0) : c.patients;
                       const unit = c.per === "sample" ? " samples" : " patients";
                       return (
-                        <div style={{ fontSize: "0.78rem", fontWeight: 600 }}>{c.attribute}{" "}
+                        <div style={{ fontSize: "0.78rem", fontWeight: 600 }}
+                          title={[c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
+                            .filter(Boolean).join(" — ") || undefined}>
+                          {c.displayName || c.attribute}{" "}
                           <span className="meta">
                             {(c.per === "sample" ? "· sample-level · " : "· ") + shown.toLocaleString() + unit}
                             {disj ? " · not narrowed by its own filter" : ""}
@@ -550,6 +568,7 @@ export default function AnalysisPage() {
                       const clause = (v: any) => ({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v,
                         ...(c.per === "sample" ? { per: "sample" } : {}) });
                       // slice geometry: cumulative angles over the returned values
+                      const asList = (c.distinct ?? c.values.length) > PIE_MAX_SLICES;
                       let acc = 0;
                       const R = 34, CX = 36, CY = 36;
                       const arcs = c.values.map((v: any, i: number) => {
@@ -565,6 +584,26 @@ export default function AnalysisPage() {
                           : "M " + CX + " " + CY + " L " + x0 + " " + y0 + " A " + R + " " + R + " 0 " + large + " 1 " + x1 + " " + y1 + " Z";
                         return { v, path, color: CAT_COLORS[i % CAT_COLORS.length], frac };
                       });
+                      if (asList) {
+                        const max = Math.max(...c.values.map((v: any) => v.n), 1);
+                        return (
+                          <div className="vallist">
+                            {c.values.slice(0, valueLimit).map((v: any, i: number) => (
+                              <button key={i} className={isSel(v) ? "valrow on" : "valrow"} onClick={() => addClause(clause(v))}
+                                title={v.v + " — " + v.n.toLocaleString() + " (click to filter)"}>
+                                <span className="vname">{v.v}</span>
+                                <span className="vbar"><i style={{ width: Math.max(1, Math.round(100 * v.n / max)) + "%" }} /></span>
+                                <span className="vn">{v.n.toLocaleString()}</span>
+                              </button>
+                            ))}
+                            {(c.distinct ?? 0) > Math.min(c.values.length, valueLimit) && (
+                              <span className="meta" style={{ padding: "0.1rem 0.3rem" }}>
+                                showing {Math.min(c.values.length, valueLimit)} of {c.distinct!.toLocaleString()} values
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
                       return (
                         <div className="piewrap">
                           <svg viewBox="0 0 72 72" className="pie" role="img" aria-label={c.attribute + " distribution"}>
@@ -619,6 +658,11 @@ export default function AnalysisPage() {
                 ))}
               </div>
             </div>
+              {explore.clinical.length > attrLimit && (
+                <button className="linklike" onClick={() => setAttrLimit(attrLimit + 20)}>
+                  show {Math.min(20, explore.clinical.length - attrLimit)} more attributes
+                </button>
+              )}
             <div>
               {explore.studyBreakdown && explore.studyBreakdown.length > 0 && (
                 <div className="card">
