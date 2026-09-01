@@ -201,7 +201,22 @@ export type ClinicalFacet =
       /** set when re-queried against the draft minus its own clauses */
       disjunctive?: true;
     })
-  | (FacetBase & { kind: "num"; min: number; max: number; median: number });
+  | (FacetBase & {
+      kind: "num"; min: number; max: number; median: number;
+      /** histogram, cBioPortal-style: outlier bins plus fixed-width interior bins */
+      bins?: NumericBin[];
+      /** values that are not numbers (the portal's "NA" bar) */
+      naCount?: number;
+    });
+
+/** one bar of a numeric histogram */
+export interface NumericBin {
+  /** "<=" and ">" mark the outlier bins; interior bins have neither */
+  special?: "<=" | ">";
+  start?: number;
+  end?: number;
+  count: number;
+}
 /**
  * A row in one of the three gene tables (Mutated / CNA / SV), mirroring
  * cBioPortal's study-view semantics: counts are SAMPLES, the frequency

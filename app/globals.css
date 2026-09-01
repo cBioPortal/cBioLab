@@ -254,3 +254,17 @@ details.gearmenu > .gearmenu-items {
 .generow .gbar i { display: block; height: 100%; min-width: 2px; background: var(--accent-ink); opacity: 0.8; }
 .generow .gfreq { text-align: right; font-variant-numeric: tabular-nums; }
 .generow .gcount { text-align: right; font-variant-numeric: tabular-nums; font-size: 0.72rem; }
+
+/* Explore: numeric clinical histograms (cBioPortal study-view bins) */
+.histo { display: flex; align-items: flex-end; gap: 2px; height: 62px; }
+.hbar {
+  position: relative; flex: 1 1 0; min-width: 10px; height: 100%;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch;
+  background: none; border: none; padding: 0 0 12px; cursor: pointer;
+}
+.hbar:hover .hfill { opacity: 1; }
+.hbar .hfill { display: block; width: 100%; background: var(--accent-ink); opacity: 0.72; border-radius: 2px 2px 0 0; }
+.hbar .hlab {
+  position: absolute; bottom: 0; left: 0; right: 0; text-align: center;
+  font-size: 0.56rem; color: var(--muted); overflow: hidden; white-space: nowrap;
+}

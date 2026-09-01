@@ -537,6 +537,28 @@ export default function AnalysisPage() {
                         );
                       })}
                     </div>}
+                    {c.kind === "num" && c.bins && c.bins.length > 1 && (() => {
+                      const maxN = Math.max(...c.bins.map((b: any) => b.count), 1);
+                      const clauseFor = (b: any) => {
+                        const per = c.per === "sample" ? { per: "sample" } : {};
+                        if (b.special === "<=") return { kind: "clinical", attribute: c.attribute, range: { lte: b.end }, ...per };
+                        if (b.special === ">") return { kind: "clinical", attribute: c.attribute, range: { gt: b.start }, ...per };
+                        return { kind: "clinical", attribute: c.attribute, range: { gt: b.start, lte: b.end }, ...per };
+                      };
+                      const label = (b: any) => b.special === "<=" ? "≤" + b.end : b.special === ">" ? ">" + b.start : b.start + "–" + b.end;
+                      return (
+                        <div className="histo" style={{ marginTop: "0.3rem" }}>
+                          {c.bins.map((b: any, i: number) => (
+                            <button key={i} className="hbar" title={label(b) + " · " + b.count.toLocaleString() + " " + (c.per === "sample" ? "samples" : "patients") + " — click to filter"}
+                              onClick={() => addClause(clauseFor(b))}>
+                              <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
+                              <span className="hlab">{b.special === "<=" ? "≤" + b.end : b.special === ">" ? ">" + b.start : b.start}</span>
+                            </button>
+                          ))}
+                          {!!c.naCount && <span className="meta" style={{ alignSelf: "end", paddingLeft: "0.3rem" }}>NA {c.naCount.toLocaleString()}</span>}
+                        </div>
+                      );
+                    })()}
                     {c.kind === "num" && <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", marginTop: "0.25rem", flexWrap: "wrap" }}>
                       <span className="meta">min {Math.round(c.min * 10) / 10} · median {Math.round(c.median * 10) / 10} · max {Math.round(c.max * 10) / 10}</span>
                       <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>≥ median</button>

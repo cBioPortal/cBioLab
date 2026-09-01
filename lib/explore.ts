@@ -5,7 +5,43 @@ import { chQuery, DB, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
-import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow } from "./types.ts";
+import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, NumericBin } from "./types.ts";
+
+/**
+ * cBioPortal's linear bin intervals (LinearDataBinner). The binner picks the
+ * smallest interval that divides the range into at most ~20 bins.
+ */
+const BIN_INTERVALS = [0.001, 0.002, 0.0025, 0.005, 0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5,
+  1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000];
+const BIN_INTERVALS_DISCRETE = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000];
+const TARGET_BINS = 20;
+
+/**
+ * Bin edges for a numeric attribute, reproducing the portal's algorithm:
+ * IQR-based outlier bounds clamped to the data range, a "nice" interval, and
+ * edges anchored to multiples of it. Returns the interior edges; anything
+ * below the first or above the last becomes a "<=" / ">" outlier bar.
+ */
+export function numericBinEdges(
+  dataMin: number, dataMax: number, q1: number, q3: number, allIntegers: boolean
+): { edges: number[]; interval: number } {
+  if (!(dataMax > dataMin)) return { edges: [], interval: 0 };
+  const iqr = q3 - q1;
+  const lowerOutlier = Math.max(dataMin, q1 - 1.5 * iqr);
+  const upperOutlier = Math.min(dataMax, q3 + 1.5 * iqr);
+  const min = Math.max(dataMin, lowerOutlier), max = Math.min(dataMax, upperOutlier);
+  const list = allIntegers ? BIN_INTERVALS_DISCRETE : BIN_INTERVALS;
+  const interval = list.find((i) => (max - min) / i <= TARGET_BINS) ?? list[list.length - 1];
+  let start = min + interval - (min % interval);
+  if (start - interval > lowerOutlier) start -= interval;
+  const end = (max + interval < upperOutlier) ? max : max - interval;
+  const edges: number[] = [];
+  // guard against pathological ranges producing thousands of bars
+  for (let d = start; d <= end && edges.length <= TARGET_BINS + 4; d += interval) {
+    edges.push(Math.round(d * 1e6) / 1e6);
+  }
+  return { edges, interval };
+}
 
 /** display cap per gene table; totals report the full count behind it */
 const GENE_TABLE_LIMIT = 500;
@@ -47,7 +83,11 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     "  countIf(toFloat64OrNull(attribute_value) IS NOT NULL) / count() AS numratio,\n" +
     "  uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS np,\n" +
     "  min(toFloat64OrNull(attribute_value)) AS mn, max(toFloat64OrNull(attribute_value)) AS mx,\n" +
-    "  quantile(0.5)(toFloat64OrNull(attribute_value)) AS md\n" +
+    "  quantileExact(0.5)(toFloat64OrNull(attribute_value)) AS md,\n" +
+    "  quantileExact(0.25)(toFloat64OrNull(attribute_value)) AS q1,\n" +
+    "  quantileExact(0.75)(toFloat64OrNull(attribute_value)) AS q3,\n" +
+    "  countIf(toFloat64OrNull(attribute_value) IS NULL) AS na,\n" +
+    "  countIf(toFloat64OrNull(attribute_value) = round(toFloat64OrNull(attribute_value))) = countIf(toFloat64OrNull(attribute_value) IS NOT NULL) AS allints\n" +
     "FROM " + db + ".clinical_data_derived\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''" + cond + "\n" +
     "GROUP BY type, a ORDER BY np DESC LIMIT 44", conn);
@@ -101,9 +141,52 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     })),
     ...numAttrs.map((r): ClinicalFacet => ({
       attribute: r.a, per: r.type as "patient" | "sample", kind: "num", patients: Number(r.np),
-      min: Number(r.mn), max: Number(r.mx), median: Number(r.md)
+      min: Number(r.mn), max: Number(r.mx), median: Number(r.md), naCount: Number(r.na)
     }))
   ].sort((x, y) => y.patients - x.patients).slice(0, 30);
+
+  // ---- numeric histograms (cBioPortal study-view bins) --------------------
+  // Edges come from the portal's algorithm; the counts are aggregated in
+  // ClickHouse (one grouped query per attribute) rather than by pulling every
+  // value back, which is what makes this viable at 290k-patient scale.
+  const numFacets = clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num").slice(0, 8);
+  await Promise.all(numFacets.map(async (f) => {
+    const src = numAttrs.find((r) => r.a === f.attribute);
+    if (!src) return;
+    const { edges, interval } = numericBinEdges(
+      Number(src.mn), Number(src.mx), Number(src.q1), Number(src.q3), src.allints === "1" || src.allints === 1 as any);
+    if (edges.length < 2) return;
+    const lastEdge = edges[edges.length - 1] + interval;
+    const unit = f.per === "sample" ? "sample_unique_id" : "patient_unique_id";
+    const rows = await chQuery<ChRow>(
+      "SELECT toInt32(ceil((v - " + edges[0] + ") / " + interval + ")) - 1 AS b, uniqExact(id) AS n\n" +
+      "FROM (SELECT toFloat64OrNull(attribute_value) AS v, " + unit + " AS id\n" +
+      "      FROM " + db + ".clinical_data_derived\n" +
+      "      WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(f.attribute) +
+      "        AND type = " + sq(f.per) + " AND attribute_value != ''" + cond + ")\n" +
+      "WHERE v IS NOT NULL AND v > " + edges[0] + " AND v <= " + lastEdge + "\n" +
+      "GROUP BY b ORDER BY b", conn);
+    const outliers = await chQuery<ChRow>(
+      "SELECT uniqExactIf(id, v <= " + edges[0] + ") AS lo, uniqExactIf(id, v > " + lastEdge + ") AS hi,\n" +
+      "       uniqExactIf(id, v IS NULL) AS na\n" +
+      "FROM (SELECT toFloat64OrNull(attribute_value) AS v, " + unit + " AS id\n" +
+      "      FROM " + db + ".clinical_data_derived\n" +
+      "      WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(f.attribute) +
+      "        AND type = " + sq(f.per) + " AND attribute_value != ''" + cond + ")\n" +
+      "", conn);
+    const byBin = new Map<number, number>(rows.data.map((x) => [Number(x.b), Number(x.n)]));
+    const counted = rows.data.reduce((n, x) => n + Number(x.n), 0);
+    const bins: NumericBin[] = [];
+    const lo = Number(outliers.data[0]?.lo || 0), hi = Number(outliers.data[0]?.hi || 0);
+    if (lo) bins.push({ special: "<=", end: edges[0], count: lo });
+    edges.forEach((e, i) => bins.push({ start: e, end: Math.round((e + interval) * 1e6) / 1e6, count: byBin.get(i) || 0 }));
+    if (hi) bins.push({ special: ">", start: lastEdge, count: hi });
+    // the portal's NA bar: cohort members without a numeric value for this attribute
+    const cohortSize = f.per === "sample" ? totals.samples : totals.patients;
+    const missing = Math.max(0, cohortSize - (counted + lo + hi));
+    f.naCount = missing;
+    f.bins = bins;
+  }));
 
   // ---- timeline event types ----------------------------------------------
   const ev = await chQuery(
