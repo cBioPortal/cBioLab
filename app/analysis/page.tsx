@@ -524,19 +524,70 @@ export default function AnalysisPage() {
                 <h2>Clinical <span className="plain">— counted in each attribute's own unit, as the portal does</span></h2>
                 {explore.clinical.map(c => (
                   <div key={c.per + c.attribute} style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0" }}>
-                    <div style={{ fontSize: "0.78rem", fontWeight: 600 }}>{c.attribute} <span className="meta">{c.per === "sample" ? "· sample-level · " + c.patients.toLocaleString() + " samples" : " · " + c.patients.toLocaleString() + " patients"}</span></div>
-                    {c.kind === "cat" && <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", marginTop: "0.25rem" }}>
-                      {c.values.map(v => {
-                        const d = parseDraft();
-                        const sel = d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === c.attribute &&
-                          ((cl.op === "=" && cl.value === v.v) || (cl.values || []).includes(v.v)));
-                        return (
-                          <button key={v.v} className={"facet" + (sel ? " on" : "")} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v, ...(c.per === "sample" ? { per: "sample" } : {}) })}>
-                            {v.v.length > 28 ? v.v.slice(0, 27) + "…" : v.v} <span className="meta">{v.n.toLocaleString()}</span>
-                          </button>
-                        );
-                      })}
-                    </div>}
+                    {(() => {
+                      // A facet already in the draft is re-queried WITHOUT its own
+                      // clauses (disjunctive faceting) so its other values stay
+                      // selectable — so its total is the draft-minus-itself total,
+                      // not the draft total. Say so rather than show two numbers
+                      // that cannot be reconciled.
+                      const disj = c.kind === "cat" && (c as any).disjunctive;
+                      const shown = disj ? c.values.reduce((n: number, v: any) => n + v.n, 0) : c.patients;
+                      const unit = c.per === "sample" ? " samples" : " patients";
+                      return (
+                        <div style={{ fontSize: "0.78rem", fontWeight: 600 }}>{c.attribute}{" "}
+                          <span className="meta">
+                            {(c.per === "sample" ? "· sample-level · " : "· ") + shown.toLocaleString() + unit}
+                            {disj ? " · not narrowed by its own filter" : ""}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                    {c.kind === "cat" && (() => {
+                      const total = c.values.reduce((n: number, v: any) => n + v.n, 0) || 1;
+                      const d = parseDraft();
+                      const isSel = (v: any) => !!(d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === c.attribute &&
+                        ((cl.values || []).includes(v.v) || cl.value === v.v)));
+                      const clause = (v: any) => ({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v,
+                        ...(c.per === "sample" ? { per: "sample" } : {}) });
+                      // slice geometry: cumulative angles over the returned values
+                      let acc = 0;
+                      const R = 34, CX = 36, CY = 36;
+                      const arcs = c.values.map((v: any, i: number) => {
+                        const frac = v.n / total, a0 = acc * 2 * Math.PI - Math.PI / 2;
+                        acc += frac;
+                        const a1 = acc * 2 * Math.PI - Math.PI / 2;
+                        const large = frac > 0.5 ? 1 : 0;
+                        const p = (a: number) => [CX + R * Math.cos(a), CY + R * Math.sin(a)];
+                        const [x0, y0] = p(a0), [x1, y1] = p(a1);
+                        // a single value covering everything cannot be drawn as an arc
+                        const path = frac >= 0.999
+                          ? "M " + CX + " " + (CY - R) + " A " + R + " " + R + " 0 1 1 " + (CX - 0.01) + " " + (CY - R) + " Z"
+                          : "M " + CX + " " + CY + " L " + x0 + " " + y0 + " A " + R + " " + R + " 0 " + large + " 1 " + x1 + " " + y1 + " Z";
+                        return { v, path, color: CAT_COLORS[i % CAT_COLORS.length], frac };
+                      });
+                      return (
+                        <div className="piewrap">
+                          <svg viewBox="0 0 72 72" className="pie" role="img" aria-label={c.attribute + " distribution"}>
+                            {arcs.map((a: any, i: number) => (
+                              <path key={i} d={a.path} fill={a.color} className={isSel(a.v) ? "slice on" : "slice"}
+                                onClick={() => addClause(clause(a.v))}>
+                                <title>{a.v.v + " — " + a.v.n.toLocaleString() + " (" + Math.round(1000 * a.frac) / 10 + "%)"}</title>
+                              </path>
+                            ))}
+                          </svg>
+                          <div className="pielegend">
+                            {arcs.map((a: any, i: number) => (
+                              <button key={i} className={isSel(a.v) ? "pikey on" : "pikey"} onClick={() => addClause(clause(a.v))}
+                                title={"click to filter to " + a.v.v}>
+                                <span className="swatch" style={{ background: a.color }} />
+                                <span className="pname">{a.v.v}</span>
+                                <span className="pn">{a.v.n.toLocaleString()}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {c.kind === "num" && c.bins && c.bins.length > 1 && (() => {
                       const maxN = Math.max(...c.bins.map((b: any) => b.count), 1);
                       const clauseFor = (b: any) => {
@@ -594,6 +645,38 @@ export default function AnalysisPage() {
                   </p>}
                 </div>
               )}
+              {explore.dataTypes && explore.dataTypes.length > 0 && (
+                <div className="card">
+                  <h2>Data types <span className="plain">— samples with each kind of molecular data</span></h2>
+                  {(() => {
+                    const FILTERABLE: Record<string, "MUTATION" | "CNA" | "SV"> = {
+                      MUTATION_EXTENDED: "MUTATION", COPY_NUMBER_ALTERATION: "CNA", STRUCTURAL_VARIANT: "SV"
+                    };
+                    const d = parseDraft();
+                    const selected = (t: string) => !!(d && d.all.some((cl: any) => cl.kind === "profiled" && cl.type === t));
+                    const max = Math.max(...explore.dataTypes!.map((x) => x.n), 1);
+                    return explore.dataTypes!.map((dt) => {
+                      const t = FILTERABLE[dt.alterationType];
+                      const row = (
+                        <>
+                          <span className="gname">{dt.profile}</span>
+                          <span className="meta dtlabel">{dt.label}</span>
+                          <span className="gbar"><i style={{ width: Math.max(1, Math.round(100 * dt.n / max)) + "%" }} /></span>
+                          <span className="gcount">{dt.n.toLocaleString()}</span>
+                        </>
+                      );
+                      return t ? (
+                        <button key={dt.profile} className={"generow dtrow" + (selected(t) ? " on" : "")}
+                          title={"click to require " + t + " data (profiled clause)"}
+                          onClick={() => addClause({ kind: "profiled", type: t })}>{row}</button>
+                      ) : (
+                        <div key={dt.profile} className="generow dtrow static"
+                          title="no membership filter for this data type in the DSL — shown for completeness">{row}</div>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
               {(["mutated", "cna", "sv"] as const).map((kind) => {
                 const meta = {
                   mutated: { title: "Mutated Genes", rows: explore.mutatedGenes, total: explore.geneTotals?.mutated, oql: (g: any) => g.gene + ": MUT" },
@@ -617,7 +700,6 @@ export default function AnalysisPage() {
                           onClick={() => addClause({ kind: "oql", q: meta.oql(g) })}>
                           <span className="gname">{g.gene}</span>
                           <span className={g.cna != null ? "cnatag " + (g.cna === 2 ? "amp" : "del") : "cnatag none"}>{g.cna != null ? (g.cna === 2 ? "AMP" : "HOMDEL") : ""}</span>
-                          <span className="gbar"><i style={{ width: Math.max(1, Math.min(100, g.freqPct ?? 0)) + "%" }} /></span>
                           <span className="gfreq">{g.freqPct != null ? g.freqPct + "%" : "—"}</span>
                           <span className="gcount">{g.altered.toLocaleString()}<span className="meta">/{g.profiled.toLocaleString()}</span></span>
                         </button>

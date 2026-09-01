@@ -308,6 +308,22 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     "  AND (variant_type != 'cna' OR abs(cna_alteration) >= 2)" + cond + "\n" +
     "GROUP BY g ORDER BY n DESC LIMIT 15", conn);
 
+  // ---- molecular data types (portal: molecular-profile sample counts) -----
+  // Samples with data of each type. The three that our DSL can filter on
+  // (mutation / CNA / SV) become `profiled` clauses when clicked.
+  const dt = await chQuery<ChRow>(
+    "SELECT replaceOne(gp.stable_id, concat(sd.cancer_study_identifier, '_'), '') AS profile,\n" +
+    "       any(gp.name) AS label, gp.genetic_alteration_type AS atype, uniqExact(sp.sample_id) AS n\n" +
+    "FROM " + db + ".sample_profile sp\n" +
+    "JOIN " + db + ".sample_derived sd ON sp.sample_id = sd.internal_id\n" +
+    "JOIN " + db + ".genetic_profile gp ON sp.genetic_profile_id = gp.genetic_profile_id\n" +
+    "WHERE sd.cancer_study_identifier = " + sq(study) +
+    (dsql ? "\n  AND replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + dsql + "))" : "") + "\n" +
+    "GROUP BY gp.stable_id, sd.cancer_study_identifier, atype ORDER BY n DESC", conn);
+  const dataTypes = dt.data.map((r) => ({
+    profile: r.profile, label: r.label, alterationType: r.atype, n: Number(r.n)
+  }));
+
   // ---- case lists (draft-conditioned, like every other facet) ------------
   const lists = await chQuery(
     "SELECT sl.stable_id AS id, any(sl.name) AS name, uniqExact(p.stable_id) AS n\n" +
@@ -325,7 +341,7 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
     genes: genes.data.map((r) => ({ gene: r.g, n: Number(r.n) })),
     caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
-    mutatedGenes, cnaGenes, svGenes, geneTotals, totals,
+    mutatedGenes, cnaGenes, svGenes, geneTotals, totals, dataTypes,
     numStats: numAttrs.map((r) => ({ attribute: r.a, per: r.type as "patient" | "sample", min: Number(r.mn), max: Number(r.mx), q1: Number(r.q1), q3: Number(r.q3), allInts: String(r.allints) === "1", n: Number(r.np) })),
     profiles: profiles || [], gaProfiles: gaProfiles || [],
     stats: { ms: Date.now() - t0 }
@@ -443,7 +459,10 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     }
     const vals = new Map<string, number>();
     for (const i of cats) for (const v of i.values) vals.set(v.v, (vals.get(v.v) || 0) + v.n);
-    return { ...base, kind: "cat" as const, values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n).slice(0, 8) };
+    // preserve the disjunctive marker: if any participant re-queried this
+    // attribute without its own clauses, the merged totals are on that basis
+    const disjunctive = cats.some((i) => i.disjunctive) || undefined;
+    return { ...base, kind: "cat" as const, ...(disjunctive ? { disjunctive } : {}), values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n).slice(0, 8) };
   }).sort((x, y) => y.patients - x.patients);
 
   const sumBy = (arrs: any[][], key: string): Map<string, number> => {
@@ -495,6 +514,14 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
       patients: parts.reduce((n, p) => n + (p.totals?.patients || 0), 0),
       samples: parts.reduce((n, p) => n + (p.totals?.samples || 0), 0)
     },
+    dataTypes: (() => {
+      const m = new Map<string, { profile: string; label: string; alterationType: string; n: number }>();
+      for (const p of parts) for (const d of p.dataTypes || []) {
+        const cur = m.get(d.profile);
+        if (cur) cur.n += d.n; else m.set(d.profile, { ...d });
+      }
+      return [...m.values()].sort((a, b) => b.n - a.n);
+    })(),
     profiles: [...new Set(parts.flatMap((p) => p.profiles))],
     gaProfiles: [...new Set(parts.flatMap((p) => p.gaProfiles))],
     stats: { ms: Date.now() - t0, perStudy: Object.fromEntries(parts.map((p, i) => [studies[i], p.draftCount])) }

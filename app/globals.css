@@ -268,3 +268,28 @@ details.gearmenu > .gearmenu-items {
   position: absolute; bottom: 0; left: 0; right: 0; text-align: center;
   font-size: 0.56rem; color: var(--muted); overflow: hidden; white-space: nowrap;
 }
+
+/* Explore: categorical clinical facets as pie charts (portal study-view style) */
+.piewrap { display: flex; gap: 0.6rem; align-items: center; margin-top: 0.3rem; }
+.pie { width: 72px; height: 72px; flex: 0 0 72px; }
+.pie .slice { cursor: pointer; stroke: var(--card); stroke-width: 1; }
+.pie .slice:hover { opacity: 0.82; }
+.pie .slice.on { stroke: var(--ink); stroke-width: 2; }
+.pielegend { display: flex; flex-wrap: wrap; gap: 0.15rem 0.5rem; flex: 1; min-width: 0; }
+.pikey {
+  display: inline-flex; align-items: center; gap: 0.3rem; max-width: 100%;
+  background: none; border: none; padding: 0.06rem 0.2rem; border-radius: 4px;
+  font: inherit; font-size: 0.72rem; color: var(--ink); cursor: pointer;
+}
+.pikey:hover { background: var(--code-bg); }
+.pikey.on { background: var(--code-bg); outline: 1px solid var(--accent-ink); }
+.pikey .swatch { width: 9px; height: 9px; border-radius: 2px; flex: 0 0 9px; }
+.pikey .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 11rem; }
+.pikey .pn { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Explore: data-types rows */
+.generow.dtrow { grid-template-columns: minmax(6rem, 1fr) minmax(6rem, 1.4fr) minmax(3rem, 1.2fr) 6rem; }
+.generow.dtrow.static { cursor: default; }
+.generow.dtrow.static:hover { background: none; }
+.generow.dtrow.on { background: var(--code-bg); outline: 1px solid var(--accent-ink); }
+.generow .dtlabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
