@@ -13,6 +13,7 @@
 // a local aggregate-only instance.
 import type { CohortDef } from "./types.ts";
 import type { AggregateCapable, GeneCounts, Instance, SurvivalCount } from "./federation.ts";
+import { carriesPatientIds } from "./federation.ts";
 
 interface RemoteAggregates {
   study: string; instance: string; count: number;
@@ -87,14 +88,22 @@ export class RemoteAggregateResolver implements AggregateCapable {
     return "-- evaluated remotely by " + this.instance.label + " (" + this.url + ")\n" +
       "-- this instance receives aggregates only; the peer's SQL and rows stay there";
   }
+  /** nothing carrying identifiers is allowed to leave for a remote peer */
+  private guard(def: CohortDef | null | undefined): void {
+    if (carriesPatientIds(def))
+      throw new Error("this cohort contains an explicit patient list, which is not sent to remote peer " + this.instance.label);
+  }
   async count(def: CohortDef | null | undefined): Promise<number> {
+    this.guard(def);
     return (await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {} })).count;
   }
   async geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]> {
+    this.guard(def);
     if (!genes.length) return [];
     return (await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, genes })).geneCounts;
   }
   async survivalCounts(def: CohortDef | null | undefined): Promise<SurvivalCount[]> {
+    this.guard(def);
     return (await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, survival: true })).survivalCounts;
   }
 }

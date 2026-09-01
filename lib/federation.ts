@@ -194,6 +194,29 @@ export function survivalCountsSql(cohortSql: string, study: string, db: string =
 // Resolvers
 // ---------------------------------------------------------------------------
 
+/**
+ * Does this definition carry explicit patient identifiers? A `patients` leaf
+ * embeds ids directly into the compiled SQL, so sending one to an instance
+ * that is not entitled to patient-level data would push identifiers across
+ * exactly the boundary this design exists to respect — and the ids are
+ * study-scoped anyway, so they could never match there.
+ */
+export function carriesPatientIds(def: CohortDef | null | undefined): boolean {
+  if (!def) return false;
+  if (Array.isArray(def.patients) && def.patients.length) return true;
+  const leafHasIds = (l: any): boolean => !!l && l.kind === "patients" && Array.isArray(l.ids) && l.ids.length > 0;
+  for (const c of def.all || []) {
+    const any = (c as any).any, not = (c as any).not;
+    if (Array.isArray(any) ? any.some(leafHasIds) : false) return true;
+    if (not && leafHasIds(not)) return true;
+    if (leafHasIds(c)) return true;
+  }
+  return false;
+}
+
+const NO_IDS_MSG =
+  "this cohort contains an explicit patient list, which cannot be sent to an instance that is not entitled to patient-level data";
+
 /** What every participant can answer, whatever its trust level. */
 export interface AggregateCapable {
   readonly instance: Instance;
@@ -274,6 +297,11 @@ export class AggregateResolver extends BaseResolver {
   constructor(study: string, ctx: Partial<CompileCtx>, instance: Instance) {
     super(study, ctx);
     this.instance = instance;
+  }
+  /** compiled SQL for an aggregate-only instance may never embed identifiers */
+  cohortSql(def: CohortDef | null | undefined): string {
+    if (carriesPatientIds(def)) throw new Error(NO_IDS_MSG + " (" + this.instance.label + ")");
+    return super.cohortSql(def);
   }
 }
 
