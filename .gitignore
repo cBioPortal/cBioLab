@@ -6,6 +6,6 @@ server.log
 nohup.out
 *.png
 mcp.log
-server-analysis.log
+server-*.log
 HANDOFF.local.md
 tsconfig.tsbuildinfo
