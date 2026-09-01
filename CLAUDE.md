@@ -3,6 +3,12 @@
 > **New session? Read `HANDOFF.local.md` in this directory FIRST** (gitignored; machine/ops
 > specifics, credentials locations, pending work, and working-style notes that must not live
 > in this public repo).
+>
+> **Before touching federation, explore, or MCP tools, read
+> [`docs/DATA-BOUNDARY.md`](docs/DATA-BOUNDARY.md).** Patient-level data must never leave the
+> database that holds it except to a participant entitled to it. That rule outranks any feature
+> request; it is enforced by `test/boundary.test.ts` (`npm run test:boundary`), and those tests
+> are mutation-verified to actually fail when the boundary is weakened.
 
 ## What this is
 
@@ -54,12 +60,17 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
    `lib/profile-names.ts`; never fork that logic.
 7. Methodology caveats (panel-aware denominators, left truncation, prior-treatment guard,
    `observed:true` on absence queries) are attached by the engine, not left to prose.
+8. **The patient-data boundary** (`docs/DATA-BOUNDARY.md`) — aggregate-only and remote
+   participants never emit or receive patient identifiers, and the guarantee is a *missing
+   method* rather than a flag. Views degrade and say so rather than silently narrowing.
+   Never add an id-returning path to `AggregateResolver` / `RemoteAggregateResolver`.
 
 ## Workflows
 
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
-- Test: `node e2e.cjs` — 28 checks (Playwright + docs gate). Secrets come from `.env.local` at
-  runtime; never hardcode them anywhere, including tests.
+- Test: `npm test` — unit suites, no database needed (currently the patient-data boundary,
+  17 checks). `node e2e.cjs` — 29 checks (Playwright + docs gate + the boundary suite).
+  Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push `analysis` → fast-forward `master`
   (Vercel auto-deploys from `master`) → verify production.

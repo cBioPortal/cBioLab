@@ -121,6 +121,18 @@ async function main() {
     await ctx.close();
   }
   await browser.close();
+  // Patient-data boundary gate: aggregate-only participants must never emit or
+  // receive patient identifiers. See docs/DATA-BOUNDARY.md.
+  try {
+    const { execSync } = require("child_process");
+    const out = execSync("node --test test/boundary.test.ts", { cwd: __dirname, encoding: "utf8", timeout: 120000 });
+    const pass = /^# pass (\d+)/m.exec(out), fail = /^# fail (\d+)/m.exec(out);
+    ok("patient-data boundary (" + (pass ? pass[1] : "?") + " checks)", !!fail && fail[1] === "0",
+      fail && fail[1] !== "0" ? "BOUNDARY VIOLATION — see npm run test:boundary" : "");
+  } catch (e) {
+    ok("patient-data boundary", false, "boundary suite failed: " + String(e.message).slice(0, 160));
+  }
+
   // DSL doc sync gate: docs/dsl.md must match lib/dsl-reference.js, and every
   // documented example must run against the live compiler.
   try {

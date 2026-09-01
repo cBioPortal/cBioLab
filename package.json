@@ -7,7 +7,9 @@
     "start": "next start -p 3000",
     "mcp": "node mcp/server.ts",
     "docs:gen": "node scripts/gen-dsl-doc.ts",
-    "docs:check": "node --env-file=.env.local scripts/check-dsl-doc.ts"
+    "docs:check": "node --env-file=.env.local scripts/check-dsl-doc.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "test:boundary": "node --test test/boundary.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
