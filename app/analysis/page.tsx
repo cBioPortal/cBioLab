@@ -106,6 +106,8 @@ export default function AnalysisPage() {
   const [qaAttr, setQaAttr] = useState("");                             // creator quick-add: attribute
   const [qaVal, setQaVal] = useState("");                               // creator quick-add: numeric threshold
   const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
+  const [geneSearch, setGeneSearch] = useState("");                     // server-side gene filter for the three tables
+  const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
 
   const LS_KEY = "cohortlab.savedCohorts";
   const persist = (next: typeof saved) => { setSaved(next); try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {} };
@@ -191,7 +193,7 @@ export default function AnalysisPage() {
       const list = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current;
       if (!list.length) { setExplore(null); setExploreBusy(false); return; }
       const res = await fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studies: list, draft: draftOverride !== undefined ? draftOverride : parseDraft() }) });
+        body: JSON.stringify({ studies: list, draft: draftOverride !== undefined ? draftOverride : parseDraft(), geneSearch: geneSearch || undefined }) });
       const j = await res.json();
       if (seq !== exFetchSeq.current) return; // superseded while in flight — discard
       if (!j.error) setExplore(j); else setError(j.error);
@@ -440,7 +442,11 @@ export default function AnalysisPage() {
               <div className="card">
                 <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
                   <h2 style={{ margin: 0 }}>Exploring <span className="plain">— {exStudies.length === 0 ? "no studies selected" :
-                    exStudies.length + (exStudies.length === 1 ? " study" : " studies") + " · " + selPts.toLocaleString() + " patients" + (exStudies.length > 1 ? " (overlap not deduplicated)" : "")}</span></h2>
+                    exStudies.length + (exStudies.length === 1 ? " study" : " studies") + " · " +
+                    (explore?.totals
+                      ? explore.totals.patients.toLocaleString() + " patients · " + explore.totals.samples.toLocaleString() + " samples"
+                      : selPts.toLocaleString() + " patients") +
+                    (exStudies.length > 1 ? " (overlap not deduplicated)" : "")}</span></h2>
                   {exStudies.map(id => (
                     <span key={id} className="qchip" title={byId.get(id)?.name ?? id}>
                       {id}
@@ -501,6 +507,12 @@ export default function AnalysisPage() {
               <button className="primary" onClick={saveCohort}>Save</button>
               <button className="primary" onClick={() => { const d = parseDraft(); if (d) addDefToAnalysis(cName.trim() || "explored cohort", d); }}>Add to analysis</button>
               <button onClick={clearDraft}>Clear</button>
+              <span className="spacer" />
+              <input placeholder="find a gene…" value={geneSearch} style={{ width: "9rem", fontSize: "0.78rem" }}
+                onChange={e => setGeneSearch(e.target.value.toUpperCase())}
+                onKeyDown={e => { if (e.key === "Enter") fetchExplore(); }} />
+              <button className="facet" onClick={() => fetchExplore()} title="filter the gene tables (searches all genes, not just those shown)">search</button>
+              {geneSearch && <button className="linklike" onClick={() => { setGeneSearch(""); setTimeout(() => fetchExplore(), 0); }}>clear</button>}
             </div>
           </div>
           {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "0.85rem", margin: 0 }}>
@@ -509,10 +521,10 @@ export default function AnalysisPage() {
           {explore && <div className="two-col" style={{ alignItems: "start" }}>
             <div>
               <div className="card">
-                <h2>Clinical <span className="plain">— patient &amp; sample attributes</span></h2>
+                <h2>Clinical <span className="plain">— counted in each attribute's own unit, as the portal does</span></h2>
                 {explore.clinical.map(c => (
                   <div key={c.per + c.attribute} style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0" }}>
-                    <div style={{ fontSize: "0.78rem", fontWeight: 600 }}>{c.attribute} <span className="meta">{c.per === "sample" ? "· sample-level" : ""} · {c.patients.toLocaleString()} pts</span></div>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 600 }}>{c.attribute} <span className="meta">{c.per === "sample" ? "· sample-level · " + c.patients.toLocaleString() + " samples" : " · " + c.patients.toLocaleString() + " patients"}</span></div>
                     {c.kind === "cat" && <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem", marginTop: "0.25rem" }}>
                       {c.values.map(v => {
                         const d = parseDraft();
@@ -560,7 +572,42 @@ export default function AnalysisPage() {
                   </p>}
                 </div>
               )}
-              <div className="card">
+              {(["mutated", "cna", "sv"] as const).map((kind) => {
+                const meta = {
+                  mutated: { title: "Mutated Genes", rows: explore.mutatedGenes, total: explore.geneTotals?.mutated, oql: (g: any) => g.gene + ": MUT" },
+                  cna:     { title: "CNA Genes",     rows: explore.cnaGenes,     total: explore.geneTotals?.cna,     oql: (g: any) => g.gene + (g.cna === 2 ? ": AMP" : ": HOMDEL") },
+                  sv:      { title: "SV Genes",      rows: explore.svGenes,      total: explore.geneTotals?.sv,      oql: (g: any) => g.gene + ": FUSION" }
+                }[kind];
+                const rows = meta.rows || [];
+                if (!rows.length && !geneSearch) return null;
+                return (
+                  <div className="card" key={kind}>
+                    <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
+                      <h2 style={{ margin: 0 }}>{meta.title} <span className="plain">— samples, panel-aware frequency</span></h2>
+                      <span className="spacer" />
+                      <span className="meta">{"showing " + Math.min(rows.length, geneRowLimit).toLocaleString() +
+                        " of " + (meta.total || rows.length).toLocaleString() +
+                        (geneSearch ? " matching “" + geneSearch + "”" : "")}</span>
+                    </div>
+                    <div className="generows">
+                      {rows.slice(0, geneRowLimit).map((g) => (
+                        <button key={g.gene + (g.cna ?? "")} className="generow" title={"click to add " + meta.oql(g)}
+                          onClick={() => addClause({ kind: "oql", q: meta.oql(g) })}>
+                          <span className="gname">{g.gene}</span>
+                          <span className={g.cna != null ? "cnatag " + (g.cna === 2 ? "amp" : "del") : "cnatag none"}>{g.cna != null ? (g.cna === 2 ? "AMP" : "HOMDEL") : ""}</span>
+                          <span className="gbar"><i style={{ width: Math.max(1, Math.min(100, g.freqPct ?? 0)) + "%" }} /></span>
+                          <span className="gfreq">{g.freqPct != null ? g.freqPct + "%" : "—"}</span>
+                          <span className="gcount">{g.altered.toLocaleString()}<span className="meta">/{g.profiled.toLocaleString()}</span></span>
+                        </button>
+                      ))}
+                    </div>
+                    {rows.length > geneRowLimit && (
+                      <button className="linklike" onClick={() => setGeneRowLimit(geneRowLimit + 50)}>show more</button>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="card" style={{ display: "none" }}>
                 <h2>Genes <span className="plain">— most-altered (click = OQL clause)</span></h2>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
                   {explore.genes.map(g => (

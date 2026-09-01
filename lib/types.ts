@@ -202,6 +202,27 @@ export type ClinicalFacet =
       disjunctive?: true;
     })
   | (FacetBase & { kind: "num"; min: number; max: number; median: number });
+/**
+ * A row in one of the three gene tables (Mutated / CNA / SV), mirroring
+ * cBioPortal's study-view semantics: counts are SAMPLES, the frequency
+ * denominator is samples profiled for THAT gene in the relevant alteration
+ * type, and CNA rows are split per alteration (AMP / HOMDEL).
+ */
+export interface GeneTableRow {
+  gene: string;
+  /** distinct samples with such an alteration in this gene */
+  altered: number;
+  /** number of alteration events (a sample may carry several) */
+  events: number;
+  /** samples profiled for this gene = panel-profiled + whole-exome */
+  profiled: number;
+  /** altered / profiled, as a percentage */
+  freqPct: number | null;
+  /** CNA only: 2 = amplification, -2 = deep deletion, plus its cytoband */
+  cna?: number;
+  cytoband?: string;
+}
+
 /** one row per selected study: how the current draft distributes across them */
 export interface StudyBreakdownRow {
   study: string; n: number;
@@ -213,7 +234,16 @@ export interface ExploreResult {
   studyBreakdown?: StudyBreakdownRow[];
   clinical: ClinicalFacet[];
   events: { type: string; n: number }[];
+  /** legacy combined list — kept so existing consumers keep working */
   genes: { gene: string; n: number }[];
+  /** portal-equivalent gene tables (samples, panel-aware denominators) */
+  mutatedGenes?: GeneTableRow[];
+  cnaGenes?: GeneTableRow[];
+  svGenes?: GeneTableRow[];
+  /** total distinct genes behind each table, before the display cap */
+  geneTotals?: { mutated: number; cna: number; sv: number };
+  /** cohort size in both units, as the portal's header reports it */
+  totals?: { patients: number; samples: number };
   caseLists: { id: string; name: string; n: number }[];
   profiles: string[]; gaProfiles: string[];
   stats: { ms: number; perStudy?: Record<string, number | null> };

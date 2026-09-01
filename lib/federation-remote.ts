@@ -79,10 +79,10 @@ async function mcpCall<T = RemoteAggregates>(url: string, name: string, args: un
  * computes the facets against its own database and returns counts, so Explore
  * works over MCP exactly as it does over a direct connection.
  */
-export async function remoteFacets(study: string, url: string, draft: CohortDef | null | undefined, label: string): Promise<ExploreResult> {
+export async function remoteFacets(study: string, url: string, draft: CohortDef | null | undefined, label: string, geneSearch?: string): Promise<ExploreResult> {
   if (carriesPatientIds(draft))
     throw new Error("this draft contains an explicit patient list, which is not sent to remote peer " + label);
-  const facets = await mcpCall<ExploreResult>(url, "federated_facets", { study, draft: draft || null });
+  const facets = await mcpCall<ExploreResult>(url, "federated_facets", { study, draft: draft || null, geneSearch });
   // stamp provenance so the UI can badge peer-held rows
   return {
     ...facets,

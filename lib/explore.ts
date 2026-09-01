@@ -5,16 +5,24 @@ import { chQuery, DB, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
-import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow } from "./types.ts";
+import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow } from "./types.ts";
+
+/** display cap per gene table; totals report the full count behind it */
+const GENE_TABLE_LIMIT = 500;
 import { isClinicalLeaf } from "./types.ts";
 
-export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn }): Promise<ExploreResult> {
+export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn; geneSearch?: string }): Promise<ExploreResult> {
   const db = conn.db;
   const t0 = Date.now();
-  let cond = "", draftCount = null, dsql = null;
+  let cond = "", sampleCond = "", panelSampleCond = "", draftCount = null, dsql = null;
   if (draft && Array.isArray(draft.all) && draft.all.length) {
     dsql = compileCohortDef(draft, { oncokbPin, profiles, gaProfiles, study, db });
     cond = "\n  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + dsql + "))";
+    sampleCond = cond; // sample_derived / genomic_event_derived both carry patient_unique_id
+    // sample_to_gene_panel_derived has no patient column, so map through sample_derived
+    panelSampleCond = "\n  AND sample_unique_id IN (SELECT sample_unique_id FROM " + db + ".sample_derived" +
+      " WHERE cancer_study_identifier = " + sq(study) +
+      " AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + dsql + ")))";
     const c = await chQuery("SELECT uniqExact(pid) AS n FROM (" + dsql + ")", conn);
     draftCount = Number(c.data[0].n);
   }
@@ -25,12 +33,19 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
   const studyBreakdown: StudyBreakdownRow[] = [
     { study, n: studyN, instance: conn.id, instanceLabel: conn.label }
   ];
+  // both units, as the portal's study-view header reports them: facets are
+  // counted in their natural unit, so the header anchors what each one means
+  const totalsRow = (await chQuery<ChRow>(
+    "SELECT uniqExact(patient_unique_id) AS pts, uniqExact(sample_unique_id) AS smp\n" +
+    "FROM " + db + ".sample_derived\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + sampleCond, conn)).data[0];
+  const totals = { patients: Number(totalsRow.pts), samples: Number(totalsRow.smp) };
 
   // ---- clinical attributes: classify categorical vs numeric --------------
   const cls = await chQuery(
     "SELECT type, attribute_name AS a, uniqExact(attribute_value) AS nv,\n" +
     "  countIf(toFloat64OrNull(attribute_value) IS NOT NULL) / count() AS numratio,\n" +
-    "  uniqExact(patient_unique_id) AS np,\n" +
+    "  uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS np,\n" +
     "  min(toFloat64OrNull(attribute_value)) AS mn, max(toFloat64OrNull(attribute_value)) AS mx,\n" +
     "  quantile(0.5)(toFloat64OrNull(attribute_value)) AS md\n" +
     "FROM " + db + ".clinical_data_derived\n" +
@@ -42,7 +57,8 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
   let catValues: ChRow[] = [];
   if (catAttrs.length) {
     const v = await chQuery(
-      "SELECT type, attribute_name AS a, attribute_value AS v, uniqExact(patient_unique_id) AS n\n" +
+      "SELECT type, attribute_name AS a, attribute_value AS v,\n" +
+      "       uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
       "FROM " + db + ".clinical_data_derived\n" +
       "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
       "  AND attribute_name IN (" + catAttrs.map(r => sq(r.a)).join(",") + ")" + cond + "\n" +
@@ -68,7 +84,7 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
       subCond = "\n  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + rsql + "))";
     }
     const v = await chQuery(
-      "SELECT attribute_value AS v, uniqExact(patient_unique_id) AS n\n" +
+      "SELECT attribute_value AS v, uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
       "FROM " + db + ".clinical_data_derived\n" +
       "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
       "  AND type = " + sq(per) + " AND attribute_name = " + sq(attr) + subCond + "\n" +
@@ -99,7 +115,83 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     (dsql ? "\n  AND p.stable_id IN (SELECT pid FROM (" + dsql + "))" : "") + "\n" +
     "GROUP BY t ORDER BY n DESC", conn);
 
-  // ---- top altered genes --------------------------------------------------
+  // ---- gene tables: Mutated / CNA / SV, cBioPortal study-view semantics ----
+  // Counts are SAMPLES. The denominator is samples profiled for THAT gene in the
+  // relevant alteration type, computed the way the portal does it:
+  //   profiled(gene) = panel-profiled(gene)  +  whole-exome sample count
+  // The WES panel is excluded from the join on purpose: it enumerates ~45k genes,
+  // so joining it multiplies every WES sample by that many rows (47.8M for one
+  // TCGA study). The portal splits it into a scalar for exactly this reason.
+  const geneTable = async (
+    variantType: "mutation" | "cna" | "structural_variant",
+    alterationType: "MUTATION_EXTENDED" | "COPY_NUMBER_ALTERATION" | "STRUCTURAL_VARIANT"
+  ): Promise<{ rows: GeneTableRow[]; total: number }> => {
+    const isCna = variantType === "cna";
+    const where =
+      "WHERE cancer_study_identifier = " + sq(study) + "\n" +
+      "  AND variant_type = " + sq(variantType) +
+      // the portal excludes uncalled mutations: they exist only to show read support
+      (variantType === "mutation" ? "\n  AND mutation_status != 'UNCALLED'" : "") +
+      (geneSearch ? "\n  AND positionCaseInsensitive(hugo_gene_symbol, " + sq(geneSearch) + ") > 0" : "") +
+      sampleCond;
+
+    const [altered, panelProfiled, wes, distinct] = await Promise.all([
+      chQuery<ChRow>(
+        "SELECT hugo_gene_symbol AS g," + (isCna ? " cna_alteration AS cna, any(cna_cytoband) AS cytoband," : "") + "\n" +
+        "       uniqExact(sample_unique_id) AS altered, count() AS events\n" +
+        "FROM " + db + ".genomic_event_derived\n" + where + "\n" +
+        "GROUP BY g" + (isCna ? ", cna" : "") + "\n" +
+        "ORDER BY altered DESC, g ASC LIMIT " + GENE_TABLE_LIMIT, conn),
+      // Aggregate samples PER PANEL first, then join panels to their genes. The
+      // naive sample-level join costs 13s on a 290k-sample study; collapsing to
+      // ~100 panel rows first gives the identical answer in ~250ms.
+      chQuery<ChRow>(
+        "WITH pc AS (\n" +
+        "  SELECT gene_panel_id, count() AS n\n" +
+        "  FROM " + db + ".sample_to_gene_panel_derived\n" +
+        "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
+        "    AND alteration_type = " + sq(alterationType) + " AND gene_panel_id != 'WES'" +
+        panelSampleCond + "\n" +
+        "  GROUP BY gene_panel_id\n" +
+        ")\n" +
+        "SELECT gptg.gene AS g, sum(pc.n) AS n\n" +
+        "FROM " + db + ".gene_panel_to_gene_derived gptg\n" +
+        "INNER JOIN pc ON pc.gene_panel_id = gptg.gene_panel_id\n" +
+        "WHERE gptg.gene_panel_id IN (SELECT gene_panel_id FROM pc)\n" +
+        "GROUP BY g", conn),
+      chQuery<ChRow>(
+        "SELECT count() AS n\n" +
+        "FROM " + db + ".sample_to_gene_panel_derived\n" +
+        "WHERE cancer_study_identifier = " + sq(study) + "\n" +
+        "  AND alteration_type = " + sq(alterationType) + " AND gene_panel_id = 'WES'" +
+        panelSampleCond, conn),
+      chQuery<ChRow>(
+        "SELECT uniqExact(hugo_gene_symbol) AS n FROM " + db + ".genomic_event_derived\n" + where, conn)
+    ]);
+
+    const panelMap = new Map<string, number>(panelProfiled.data.map((r) => [r.g, Number(r.n)]));
+    const wesN = Number(wes.data[0]?.n || 0);
+    const rows = altered.data.map((r): GeneTableRow => {
+      const profiled = (panelMap.get(r.g) || 0) + wesN;
+      const alt = Number(r.altered);
+      return {
+        gene: r.g, altered: alt, events: Number(r.events), profiled,
+        freqPct: profiled ? Math.round(1000 * alt / profiled) / 10 : null,
+        ...(isCna ? { cna: Number(r.cna), cytoband: r.cytoband } : {})
+      };
+    });
+    return { rows, total: Number(distinct.data[0]?.n || 0) };
+  };
+
+  const [mut, cna, sv] = await Promise.all([
+    geneTable("mutation", "MUTATION_EXTENDED"),
+    geneTable("cna", "COPY_NUMBER_ALTERATION"),
+    geneTable("structural_variant", "STRUCTURAL_VARIANT")
+  ]);
+  const mutatedGenes = mut.rows, cnaGenes = cna.rows, svGenes = sv.rows;
+  const geneTotals = { mutated: mut.total, cna: cna.total, sv: sv.total };
+
+  // legacy combined list (patients), retained for existing consumers
   const genes = await chQuery(
     "SELECT hugo_gene_symbol AS g, uniqExact(patient_unique_id) AS n\n" +
     "FROM " + db + ".genomic_event_derived\n" +
@@ -124,6 +216,7 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
     genes: genes.data.map((r) => ({ gene: r.g, n: Number(r.n) })),
     caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
+    mutatedGenes, cnaGenes, svGenes, geneTotals, totals,
     profiles: profiles || [], gaProfiles: gaProfiles || [],
     stats: { ms: Date.now() - t0 }
   };
@@ -136,9 +229,9 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
 // whole harmonization). Numeric medians are patient-weighted approximations;
 // min/max are exact. An attribute classified differently across studies takes
 // the kind of the study with the most patients for it.
-export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy, connByStudy }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>; connByStudy?: Map<string, ChConn> }): Promise<ExploreResult> {
+export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>; connByStudy?: Map<string, ChConn>; geneSearch?: string }): Promise<ExploreResult> {
   const parts = await Promise.all(studies.map(s =>
-    buildExplore({ study: s, draft, oncokbPin, conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}) })));
+    buildExplore({ study: s, draft, oncokbPin, geneSearch, conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}) })));
   return mergeExplore(parts, !!draft);
 }
 
@@ -184,6 +277,22 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
   };
   const evm = sumBy(parts.map(p => p.events), "type");
   const gm = sumBy(parts.map(p => p.genes), "gene");
+  // gene tables: sum altered/events/profiled per (gene, cna) across participants
+  const mergeGeneTable = (pick: (p: ExploreResult) => GeneTableRow[] | undefined): GeneTableRow[] => {
+    const m = new Map<string, GeneTableRow>();
+    for (const p of parts) for (const r of pick(p) || []) {
+      const k = r.gene + "|" + (r.cna ?? "");
+      const cur = m.get(k);
+      if (!cur) { m.set(k, { ...r }); continue; }
+      cur.altered += r.altered; cur.events += r.events; cur.profiled += r.profiled;
+      cur.cytoband = cur.cytoband || r.cytoband;
+    }
+    return [...m.values()]
+      .map((r) => ({ ...r, freqPct: r.profiled ? Math.round(1000 * r.altered / r.profiled) / 10 : null }))
+      .sort((a, b) => b.altered - a.altered)
+      .slice(0, GENE_TABLE_LIMIT);
+  };
+
   const lm = new Map<string, { id: string; name: string; n: number }>();
   for (const p of parts) for (const l of p.caseLists) {
     const cur = lm.get(l.id) || { id: l.id, name: l.name, n: 0 };
@@ -198,6 +307,18 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
     genes: [...gm.entries()].map(([gene, n]) => ({ gene, n })).sort((x, y) => y.n - x.n).slice(0, 15),
     caseLists: [...lm.values()].sort((x, y) => y.n - x.n).slice(0, 10),
+    mutatedGenes: mergeGeneTable((p) => p.mutatedGenes),
+    cnaGenes: mergeGeneTable((p) => p.cnaGenes),
+    svGenes: mergeGeneTable((p) => p.svGenes),
+    geneTotals: {
+      mutated: Math.max(...parts.map((p) => p.geneTotals?.mutated || 0)),
+      cna: Math.max(...parts.map((p) => p.geneTotals?.cna || 0)),
+      sv: Math.max(...parts.map((p) => p.geneTotals?.sv || 0))
+    },
+    totals: {
+      patients: parts.reduce((n, p) => n + (p.totals?.patients || 0), 0),
+      samples: parts.reduce((n, p) => n + (p.totals?.samples || 0), 0)
+    },
     profiles: [...new Set(parts.flatMap((p) => p.profiles))],
     gaProfiles: [...new Set(parts.flatMap((p) => p.gaProfiles))],
     stats: { ms: Date.now() - t0, perStudy: Object.fromEntries(parts.map((p, i) => [studies[i], p.draftCount])) }

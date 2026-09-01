@@ -45,17 +45,18 @@ export async function POST(req: Request) {
       }
     }
     const draft = body.draft || null;
+    const geneSearch = typeof body.geneSearch === "string" ? body.geneSearch.slice(0, 40) : undefined;
     const remoteParts = await Promise.all(remote.map((s) => {
       const peer = peerForStudy(s)!;
-      return remoteFacets(s, peer.url, draft, peer.label);
+      return remoteFacets(s, peer.url, draft, peer.label, geneSearch);
     }));
     if (!local.length) {
       return Response.json(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts));
     }
     const localResult = local.length === 1
-      ? await buildExplore({ study: local[0], draft, oncokbPin: pin,
+      ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch,
           ...profilesByStudy.get(local[0]), conn: connByStudy.get(local[0]) })
-      : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy });
+      : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch });
     return Response.json(remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult);
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });

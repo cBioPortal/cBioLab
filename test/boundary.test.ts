@@ -196,11 +196,20 @@ describe("explore engine issues aggregate-only queries", () => {
     }
   });
 
-  test("the returned shape has no field that could carry identifiers", () => {
+  test("the returned shape carries counts, never lists of identifiers", () => {
     const types = readFileSync(new URL("../lib/types.ts", import.meta.url), "utf8");
     const m = /export interface ExploreResult \{([\s\S]*?)\n\}/.exec(types);
     assert.ok(m, "ExploreResult interface not found");
-    for (const col of ["ids", "patients:", "members", "columns"])
-      assert.equal(m![1].includes(col), false, "ExploreResult must not expose " + col);
+    // A count named `patients` is fine — a LIST of them is not. Flag any field
+    // whose name suggests identities and whose type is a string array.
+    for (const line of m![1].split("\n")) {
+      const f = /^\s*(\w+)\??\s*:\s*(.+?);?\s*$/.exec(line);
+      if (!f) continue;
+      const [, name, type] = f;
+      const identityish = /^(ids|patients|samples|members|columns|patientIds|sampleIds)$/i.test(name);
+      const isList = /string\s*\[\]|Array<\s*string/.test(type);
+      assert.equal(identityish && isList, false,
+        "ExploreResult." + name + " looks like a list of identifiers: " + line.trim());
+    }
   });
 });

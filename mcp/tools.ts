@@ -115,10 +115,11 @@ export function registerTools(server: any): void {
         "Federation endpoint for another Cohort Lab instance: the faceted catalog for a study THIS instance holds — clinical attributes with value counts (or numeric min/median/max), timeline event types, most-altered genes, case lists, molecular profiles, and the study's patient count — optionally conditioned on a draft cohort. Aggregates only; never returns patient identifiers. Lets a coordinating instance browse and filter this site's data without querying its database.",
       inputSchema: {
         study: z.string().max(120).describe("Study id held by this instance"),
-        draft: z.record(z.string(), z.any()).nullish().describe("Optional draft cohort definition (v2 DSL) to condition every count on")
+        draft: z.record(z.string(), z.any()).nullish().describe("Optional draft cohort definition (v2 DSL) to condition every count on"),
+        geneSearch: z.string().max(40).nullish().describe("Restrict the gene tables to symbols containing this substring")
       }
     },
-    async ({ study, draft }: { study: string; draft?: any }) => {
+    async ({ study, draft, geneSearch }: { study: string; draft?: any; geneSearch?: string | null }) => {
       try {
         const s = await resolveStudy(study);
         if (carriesPatientIds(draft))
@@ -127,7 +128,7 @@ export function registerTools(server: any): void {
         const conn = (await studyRouting()).get(s) || PRIMARY;
         const facets = await buildExplore({
           study: s, draft: draft || null, oncokbPin: process.env.ONCOKB_PIN || null,
-          profiles, gaProfiles, conn
+          geneSearch: geneSearch || undefined, profiles, gaProfiles, conn
         });
         return {
           content: [{ type: "text" as const, text: `facets for ${s}: ${facets.clinical.length} clinical attributes, ` +
