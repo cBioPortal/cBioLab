@@ -100,14 +100,15 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     "  AND (variant_type != 'cna' OR abs(cna_alteration) >= 2)" + cond + "\n" +
     "GROUP BY g ORDER BY n DESC LIMIT 15", conn);
 
-  // ---- case lists (sizes are study-wide, not draft-conditioned) ----------
+  // ---- case lists (draft-conditioned, like every other facet) ------------
   const lists = await chQuery(
     "SELECT sl.stable_id AS id, any(sl.name) AS name, uniqExact(p.stable_id) AS n\n" +
     "FROM " + db + ".sample_list sl\n" +
     "JOIN " + db + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
     "JOIN " + db + ".sample s ON s.internal_id = sll.sample_id\n" +
     "JOIN " + db + ".patient p ON p.internal_id = s.patient_id\n" +
-    "WHERE sl.stable_id LIKE " + sq(study + "_%") + "\n" +
+    "WHERE sl.stable_id LIKE " + sq(study + "_%") +
+    (dsql ? "\n  AND p.stable_id IN (SELECT pid FROM (" + dsql + "))" : "") + "\n" +
     "GROUP BY id ORDER BY n DESC LIMIT 10", conn);
 
   return {
