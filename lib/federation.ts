@@ -40,6 +40,11 @@ export interface Instance {
 export interface GeneCounts { gene: string; profiled: number; altered: number; driver: number }
 /** (months, event) multiset — pools exactly across instances, carries no ids */
 export interface SurvivalCount { months: number; event: number; n: number }
+/** One gene pair's 2x2 among patients profiled for BOTH genes. Counts only. */
+export interface PairCounts {
+  a: string; b: string;
+  both: number; onlyA: number; onlyB: number; neither: number; profiled: number;
+}
 
 /**
  * Access policy. Some studies in a portal database are consortium- or
@@ -170,6 +175,63 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
 }
 
 /**
+ * Per-PAIR 2x2 counts for one cohort in one study: of the patients profiled for
+ * both genes, how many carry both alterations, one, or neither.
+ *
+ * Returns four counts per pair and nothing else — which is the whole privacy
+ * argument in one line. The alternative shape (a per-patient alteration bitmask,
+ * which would answer every pair at once and be cheaper) is deliberately NOT used:
+ * a bitmask row with n=1 is one patient's complete genomic profile.
+ *
+ * "Profiled for both" is computed here, against this study's own panels, because
+ * only this instance knows what its panels cover. That is also why a federated
+ * co-occurrence is more correct than one computed from pooled exports.
+ */
+export function pairCountsSql(cohortSql: string, pairs: [string, string][], study: string, db: string = DB): string {
+  const genes = [...new Set(pairs.flat())];
+  const geneList = genes.map(sq).join(",");
+  const pid = "replaceOne(g.patient_unique_id, " + sq(study + "_") + ", '')";
+  const covPid = "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')";
+  const arrA = "[" + pairs.map((p) => sq(p[0])).join(",") + "]";
+  const arrB = "[" + pairs.map((p) => sq(p[1])).join(",") + "]";
+  const bothCov = "has(cov, ga) AND has(cov, gb)";
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "altered AS (\n" +
+    "  SELECT DISTINCT g.hugo_gene_symbol AS gene, " + pid + " AS pid\n" +
+    "  FROM " + db + ".genomic_event_derived g\n" +
+    "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "),\n" +
+    "covered AS (\n" +
+    "  SELECT DISTINCT pg.gene AS gene, " + covPid + " AS pid\n" +
+    "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + geneList + ")\n" +
+    "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
+    "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
+    "    AND " + covPid + " IN (SELECT pid FROM cohort)\n" +
+    "),\n" +
+    // one row per patient carrying the two gene sets it belongs to
+    "pp AS (\n" +
+    "  SELECT pid,\n" +
+    "         groupUniqArrayIf(gene, k = 1) AS alt,\n" +
+    "         groupUniqArrayIf(gene, k = 0) AS cov\n" +
+    "  FROM (SELECT gene, pid, 1 AS k FROM altered UNION ALL SELECT gene, pid, 0 AS k FROM covered)\n" +
+    "  GROUP BY pid\n" +
+    ")\n" +
+    "SELECT ga, gb,\n" +
+    "       countIf(" + bothCov + ") AS profiled,\n" +
+    "       countIf(" + bothCov + " AND has(alt, ga) AND has(alt, gb)) AS both,\n" +
+    "       countIf(" + bothCov + " AND has(alt, ga) AND NOT has(alt, gb)) AS only_a,\n" +
+    "       countIf(" + bothCov + " AND NOT has(alt, ga) AND has(alt, gb)) AS only_b\n" +
+    "FROM pp\n" +
+    "ARRAY JOIN " + arrA + " AS ga, " + arrB + " AS gb\n" +
+    "GROUP BY ga, gb"
+  );
+}
+
+/**
  * (months, event, n) triples for one cohort in one study. Aggregate — pools
  * exactly with other instances' triples to give a correct pooled KM curve.
  */
@@ -228,6 +290,7 @@ export interface AggregateCapable {
   count(def: CohortDef | null | undefined): Promise<number>;
   geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]>;
   survivalCounts(def: CohortDef | null | undefined): Promise<SurvivalCount[]>;
+  pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
   /** the SQL this participant would run, for provenance */
   cohortSql(def: CohortDef | null | undefined): string;
 }
@@ -274,6 +337,14 @@ abstract class BaseResolver implements AggregateCapable {
   async survivalCounts(def: CohortDef | null | undefined): Promise<SurvivalCount[]> {
     const r = await chQuery<ChRow>(survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
     return r.data.map((x) => ({ months: Number(x.m), event: Number(x.ev), n: Number(x.n) }));
+  }
+  async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
+    if (!pairs.length) return [];
+    const r = await chQuery<ChRow>(pairCountsSql(this.cohortSql(def), pairs, this.study, this.instance.conn.db), this.instance.conn);
+    return r.data.map((x) => {
+      const profiled = Number(x.profiled), both = Number(x.both), onlyA = Number(x.only_a), onlyB = Number(x.only_b);
+      return { a: x.ga, b: x.gb, both, onlyA, onlyB, profiled, neither: profiled - both - onlyA - onlyB };
+    });
   }
 }
 

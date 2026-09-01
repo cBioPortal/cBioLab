@@ -987,6 +987,45 @@ export default function AnalysisPage() {
                     </table>
                   </div>
                 </>}
+                {v.kind === "cooccurrence" && v.pairs && <>
+                  <h2>Co-occurrence <span className="plain">— pairwise, among patients profiled for both genes</span></h2>
+                  {v.note && <p className="note">{v.note}</p>}
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
+                      <thead><tr>
+                        <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>pair</th>
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>both</th>
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>A only</th>
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>B only</th>
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>neither</th>
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>log<sub>2</sub> OR</th>
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p</th>
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q</th>
+                        <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>tendency</th>
+                      </tr></thead>
+                      <tbody>{v.pairs.map(r => {
+                        const lor = r.oddsRatioMH != null ? Math.log2(r.oddsRatioMH) : r.log2Odds;
+                        const pShown = r.pStratified ?? r.p;
+                        return (
+                        <tr key={r.a + "|" + r.b} style={{ borderTop: "1px solid var(--line)" }}
+                          title={"profiled for both: " + r.profiled.toLocaleString() +
+                            (r.pStratified != null ? "  ·  stratified over " + r.strata + " studies (CMH); pooled Fisher p=" + r.p.toExponential(1) : "")}>
+                          <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600 }}>{r.a} / {r.b}</td>
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.both.toLocaleString()}</td>
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.onlyA.toLocaleString()}</td>
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.onlyB.toLocaleString()}</td>
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{r.neither.toLocaleString()}</td>
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{lor == null ? "—" : lor.toFixed(2)}</td>
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: pShown < 0.001 ? 600 : 400 }}>{fmtP(pShown).replace(/^p[=<] ?/, "")}</td>
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{fmtP(r.q).replace(/^p[=<] ?/, "")}</td>
+                          <td style={{ padding: "0.3rem 0.6rem" }}>
+                            {r.tendency && <span className={r.tendency === "co-occurrence" ? "tend co" : "tend mx"}>{r.tendency}</span>}
+                          </td>
+                        </tr>); })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>}
                 {v.kind === "survival" && <>
                   <h2>Survival <span className="plain">— Kaplan–Meier, overall survival</span></h2>
                   <KMChart curves={v.curves!} />

@@ -315,3 +315,8 @@ details.gearmenu > .gearmenu-items {
   font-size: 0.78rem; font-variant-numeric: tabular-nums;
   background: var(--code-bg); border-radius: 4px; border: 1px solid var(--line);
 }
+
+/* Co-occurrence: tendency chips */
+.tend { font-size: 0.7rem; padding: 0.08rem 0.4rem; border-radius: 999px; white-space: nowrap; }
+.tend.co { background: color-mix(in oklab, #0072B2 16%, transparent); color: #0072B2; }
+.tend.mx { background: color-mix(in oklab, #D55E00 16%, transparent); color: #D55E00; }

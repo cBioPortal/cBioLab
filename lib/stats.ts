@@ -1,5 +1,5 @@
 // Small, dependency-free stats for comparison views.
-import type { KmCurve, KmPoint, LogRank } from "./types.ts";
+import type { KmCurve, KmPoint, LogRank, Cmh } from "./types.ts";
 
 // log(n!) via Lanczos-free cumulative sum with memo
 const LF: number[] = [0, 0];
@@ -137,4 +137,71 @@ export function logRank(strata: { a: SurvPoint[]; b: SurvPoint[] }[]): LogRank {
     variance: Math.round(V * 1e4) / 1e4,
     strata: used
   };
+}
+
+// ---------------------------------------------------------------------------
+// Multiple testing and stratified 2x2 inference.
+// ---------------------------------------------------------------------------
+
+/**
+ * Benjamini-Hochberg adjusted p-values, returned in the caller's order.
+ * Needed as soon as a view tests many hypotheses at once (every gene pair, every
+ * clinical attribute) — an unadjusted list of "significant" pairs is mostly noise.
+ */
+export function benjaminiHochberg(ps: number[]): number[] {
+  const m = ps.length;
+  if (!m) return [];
+  const order = ps.map((p, i) => ({ p, i })).sort((x, y) => x.p - y.p);
+  const q = new Array<number>(m);
+  let running = 1;
+  for (let k = m - 1; k >= 0; k--) {
+    running = Math.min(running, (order[k].p * m) / (k + 1));  // enforce monotonicity
+    q[order[k].i] = Math.min(1, running);
+  }
+  return q;
+}
+
+/**
+ * Cochran-Mantel-Haenszel test across a series of 2x2 tables.
+ *
+ * The federated statistic par excellence: every site contributes four counts,
+ * the coordinator sums two running totals, and the result is the association
+ * ASKED WITHIN EACH SITE rather than across the pooled population. When case mix
+ * differs between sites, the pooled table can show the opposite association to
+ * every stratum in it (Simpson's paradox), so pooling is not merely less private
+ * than this — it is less correct.
+ *
+ * Includes the conventional 0.5 continuity correction.
+ */
+export function cochranMantelHaenszel(tables: { a: number; b: number; c: number; d: number }[]): Cmh {
+  let sumA = 0, sumE = 0, sumV = 0, num = 0, den = 0, used = 0;
+  for (const t of tables) {
+    const n = t.a + t.b + t.c + t.d;
+    const r1 = t.a + t.b, r2 = t.c + t.d, c1 = t.a + t.c, c2 = t.b + t.d;
+    if (n < 2 || !r1 || !r2 || !c1 || !c2) continue;   // an empty margin says nothing
+    sumA += t.a;
+    sumE += (r1 * c1) / n;
+    sumV += (r1 * r2 * c1 * c2) / (n * n * (n - 1));
+    num += (t.a * t.d) / n;
+    den += (t.b * t.c) / n;
+    used++;
+  }
+  const corrected = Math.max(0, Math.abs(sumA - sumE) - 0.5);
+  const chi2 = sumV > 0 ? (corrected * corrected) / sumV : 0;
+  return {
+    chi2: Math.round(chi2 * 1e4) / 1e4,
+    p: chiSquareP1df(chi2),
+    df: 1,
+    oddsRatio: den > 0 ? Math.round((num / den) * 1e4) / 1e4 : null,
+    tables: used
+  };
+}
+
+/** log2 odds ratio for one 2x2, Haldane-corrected so an empty cell stays finite. */
+export function log2OddsRatio(a: number, b: number, c: number, d: number): number | null {
+  const zero = a === 0 || b === 0 || c === 0 || d === 0;
+  const [A, B, C, D] = zero ? [a + 0.5, b + 0.5, c + 0.5, d + 0.5] : [a, b, c, d];
+  if (!B || !C) return null;
+  const or = (A * D) / (B * C);
+  return or > 0 ? Math.round(Math.log2(or) * 1e3) / 1e3 : null;
 }

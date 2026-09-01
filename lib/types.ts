@@ -110,12 +110,13 @@ export interface CompareView {
   kind: "compare"; genes: string[]; cohorts?: string[];
 }
 export interface SurvivalView { kind: "survival"; cohorts?: string[] }
+export interface CooccurrenceView { kind: "cooccurrence"; genes: string[]; cohorts?: string[] }
 export interface HeatmapSpec { profileType: string; genes?: string[] }
 export interface OncoprintView {
   kind: "oncoprint"; genes: string[]; cohorts?: string[];
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: string[];
 }
-export type View = CompareView | SurvivalView | OncoprintView;
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView;
 
 export interface AnalysisDoc {
   study?: string;
@@ -139,6 +140,26 @@ export interface KmCurve {
   cohort: string; points: KmPoint[]; median: number | null;
   n: number; events: number; missing?: number;
 }
+export interface Cmh {
+  chi2: number; p: number; df: number;
+  /** Mantel-Haenszel common odds ratio, null when undefined */
+  oddsRatio: number | null;
+  /** strata that carried information */
+  tables: number;
+}
+/** One gene pair, as a 2x2 among patients profiled for both, plus its inference. */
+export interface CooccurRow {
+  a: string; b: string;
+  both: number; onlyA: number; onlyB: number; neither: number; profiled: number;
+  log2Odds: number | null;
+  /** two-sided Fisher on the POOLED table */
+  p: number;
+  /** BH-adjusted across all pairs in this view, using whichever p is primary */
+  q: number;
+  /** present when more than one study contributed: the site-stratified answer */
+  pStratified?: number; oddsRatioMH?: number | null; strata?: number;
+  tendency: "co-occurrence" | "mutual exclusivity" | null;
+}
 export interface LogRank {
   chi2: number; p: number; df: number;
   /** total events in each group, then the expected counts under the null */
@@ -153,6 +174,7 @@ export interface ViewResult {
   rows?: CompareRow[];                      // compare
   curves?: KmCurve[]; caveat?: string;      // survival
   logrank?: LogRank; logrankPooled?: LogRank;
+  pairs?: CooccurRow[];                     // cooccurrence
   svg?: string; nColumns?: number;          // oncoprint
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
 }

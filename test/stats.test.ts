@@ -7,7 +7,8 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
-import { logRank, chiSquareP1df, fisherExact, kaplanMeier } from "../lib/stats.ts";
+import { logRank, chiSquareP1df, fisherExact, kaplanMeier,
+  benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio } from "../lib/stats.ts";
 
 /** Freireich et al. (1963), 6-MP vs placebo in acute leukaemia. `+` = censored. */
 const SIXMP = [
@@ -85,5 +86,68 @@ describe("Fisher's exact (already in use by the compare view)", () => {
   });
   test("a perfect 2x2 separation is significant", () => {
     assert.ok(fisherExact(10, 0, 0, 10) < 1e-4);
+  });
+});
+
+describe("Benjamini-Hochberg adjustment", () => {
+  test("hand-computable cases", () => {
+    // m=3: each raw q is p*m/rank, then made monotone from the largest down
+    assert.deepEqual(benjaminiHochberg([0.01, 0.02, 0.03]).map((q) => +q.toFixed(6)), [0.03, 0.03, 0.03]);
+    assert.deepEqual(benjaminiHochberg([0.001, 0.5, 0.9]).map((q) => +q.toFixed(6)), [0.003, 0.75, 0.9]);
+  });
+  test("order is preserved and q >= p", () => {
+    const ps = [0.9, 0.001, 0.04, 0.5];
+    const qs = benjaminiHochberg(ps);
+    assert.equal(qs.length, ps.length);
+    ps.forEach((p, i) => assert.ok(qs[i] >= p - 1e-12, "q must not be smaller than p at " + i));
+    assert.ok(qs[1] < qs[2] && qs[2] < qs[3], "ranking is preserved");
+  });
+  test("empty input", () => assert.deepEqual(benjaminiHochberg([]), []));
+});
+
+describe("Cochran-Mantel-Haenszel", () => {
+  // Simpson's paradox, constructed so every stratum points one way and the
+  // pooled table points the other. This is the case federation must get right:
+  // sites ARE the strata, so pooling their 2x2 tables can invert the finding.
+  const STRATUM_A = { a: 80, b: 20, c: 9, d: 1 };    // OR = (80*1)/(20*9) = 0.444
+  const STRATUM_B = { a: 10, b: 90, c: 18, d: 72 };  // OR = (10*72)/(90*18) = 0.444
+
+  test("recovers the within-stratum odds ratio, not the pooled one", () => {
+    const r = cochranMantelHaenszel([STRATUM_A, STRATUM_B]);
+    assert.equal(r.tables, 2);
+    assert.ok(Math.abs(r.oddsRatio! - 0.4444) < 5e-4, "OR_MH should be 0.444, got " + r.oddsRatio);
+    // pooled: a=90 b=110 c=27 d=73 -> OR = (90*73)/(110*27) = 2.212, the opposite direction
+    const pooled = (90 * 73) / (110 * 27);
+    assert.ok(pooled > 2.2 && pooled < 2.22, "the pooled table really does invert: " + pooled);
+    assert.ok(r.oddsRatio! < 1 && pooled > 1, "CMH and pooling disagree in DIRECTION, not just degree");
+  });
+
+  test("single stratum reduces to the Mantel-Haenszel form of chi-squared", () => {
+    const t = { a: 53, b: 414, c: 11, d: 37 };
+    const n = t.a + t.b + t.c + t.d;
+    const r1 = t.a + t.b, r2 = t.c + t.d, c1 = t.a + t.c, c2 = t.b + t.d;
+    // closed form: (|ad-bc| - n/2)^2 (n-1) / (r1 r2 c1 c2)
+    const expected = Math.pow(Math.abs(t.a * t.d - t.b * t.c) - n / 2, 2) * (n - 1) / (r1 * r2 * c1 * c2);
+    const r = cochranMantelHaenszel([t]);
+    assert.ok(Math.abs(r.chi2 - expected) < 1e-3, "chi2 " + r.chi2 + " vs closed form " + expected);
+    assert.ok(Math.abs(r.oddsRatio! - (t.a * t.d) / (t.b * t.c)) < 1e-3, "one stratum -> plain odds ratio");
+  });
+
+  test("degenerate tables are skipped, not counted", () => {
+    const r = cochranMantelHaenszel([{ a: 0, b: 0, c: 0, d: 0 }, { a: 5, b: 0, c: 3, d: 0 }]);
+    assert.equal(r.tables, 0, "an empty margin carries no information");
+    assert.equal(r.chi2, 0);
+    assert.equal(r.p, 1);
+  });
+});
+
+describe("log2 odds ratio", () => {
+  test("plain case", () => {
+    assert.equal(log2OddsRatio(10, 10, 10, 10), 0);
+    assert.ok(Math.abs(log2OddsRatio(20, 10, 10, 20)! - 2) < 1e-6, "OR=4 -> log2=2");
+  });
+  test("an empty cell is Haldane-corrected rather than infinite", () => {
+    const v = log2OddsRatio(10, 0, 0, 10);
+    assert.ok(v !== null && Number.isFinite(v) && v > 0, "should be large but finite, got " + v);
   });
 });
