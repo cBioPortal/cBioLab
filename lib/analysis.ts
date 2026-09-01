@@ -10,13 +10,13 @@ import { compileCohortDef, describeCohortDef } from "./cohort2.ts";
 import { genomicEventsSql, coverageSql, buildContract, PIDS_SQL } from "./oncoprint.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
-  chiSquareTest, welchT, varianceFromMoments } from "./stats.ts";
+  chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, fisherZMeta } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, CoexpressionView, CoexprRow } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting, restrictedStudies,
-  type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats
+  type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments
 } from "./federation.ts";
 
 async function oncokbPin(): Promise<string | null> {
@@ -210,6 +210,54 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
             : logrank
               ? " Log-rank on a single study, so no stratification applies."
               : " Log-rank needs exactly two cohorts.") });
+
+    } else if (view.kind === "coexpression") {
+      const v = view as CoexpressionView;
+      const profileType = String(v.profileType || "").trim();
+      const uniq = [...new Set((v.genes || []).map((g) => String(g).toUpperCase().trim()).filter((g) => GENE_RE.test(g)))]
+        .slice(0, COOCCUR_GENE_LIMIT);
+      if (!profileType) { views.push({ kind: "coexpression", error: "coexpression view needs a profileType (e.g. rna_seq_v2_mrna_median_Zscores)" }); continue; }
+      if (uniq.length < 2) { views.push({ kind: "coexpression", error: "coexpression needs at least 2 distinct genes" }); continue; }
+      const pairs: [string, string][] = [];
+      for (let i = 0; i < uniq.length; i++) for (let j = i + 1; j < uniq.length; j++) pairs.push([uniq[i], uniq[j]]);
+      const cn = vNames[0];
+      const byStudy = new Map<string, PairMoments[]>();
+      await Promise.all(cohorts[cn].studies.map(async (st) => {
+        byStudy.set(st, await resolvers[st].pairMoments(doc.cohorts[cn], pairs, profileType).catch(() => []));
+      }));
+      const sites = [...byStudy.keys()];
+      const rows: CoexprRow[] = pairs.map(([a, b]) => {
+        const parts = sites
+          .map((st) => ({ st, m: (byStudy.get(st) || []).find((x) => x.a === a && x.b === b) }))
+          .filter((x): x is { st: string; m: PairMoments } => !!x.m && x.m.n > 0);
+        const total = parts.reduce((acc, { m }) => ({
+          n: acc.n + m.n, sx: acc.sx + m.sx, sy: acc.sy + m.sy,
+          sxy: acc.sxy + m.sxy, sxx: acc.sxx + m.sxx, syy: acc.syy + m.syy
+        }), { n: 0, sx: 0, sy: 0, sxy: 0, sxx: 0, syy: 0 });
+        const pooled = pearsonFromMoments(total);
+        const row: CoexprRow = { a, b, r: pooled.r, n: pooled.n, p: pooled.p, q: 1 };
+        if (parts.length > 1) {
+          const per = parts.map(({ st, m }) => ({ study: st, ...pearsonFromMoments(m) }));
+          const meta = fisherZMeta(per.map((x) => ({ r: x.r, n: x.n })));
+          row.perStudy = per.map((x) => ({ study: x.study, r: x.r, n: x.n }));
+          row.rMeta = meta.r; row.pMeta = meta.p; row.sites = meta.sites;
+        }
+        return row;
+      });
+      const tested = rows.filter((r) => r.r != null);
+      benjaminiHochberg(tested.map((r) => r.pMeta ?? r.p)).forEach((q, i) => { tested[i].q = q; });
+      rows.sort((x, y) => Math.abs(y.r ?? 0) - Math.abs(x.r ?? 0));
+      views.push({ kind: "coexpression", cohorts: [cn], coexpression: rows, studies: cohorts[cn].studies,
+        note: "Pearson correlation on “" + profileType + "” within “" + cn + "”, over the patients with BOTH values" +
+          " (values averaged per patient, matching the heatmap convention). Each site reports six sums — n, Σx, Σy," +
+          " Σxy, Σx², Σy² — and nothing else; those sums are additive, so the pooled correlation is EXACT rather than" +
+          " an approximation of a centralized one." +
+          (sites.length > 1
+            ? " Two answers are given because they ask different questions: r pools every patient into one population," +
+              " while r(meta) combines the per-study correlations by Fisher z, weighted by study size — the latter asks" +
+              " whether the genes move together WITHIN a study, which differing study means can otherwise mask."
+            : "") +
+          " q-values are Benjamini–Hochberg across the " + tested.length + " pairs with a defined correlation." });
 
     } else if (view.kind === "clinical") {
       const attrs = ((view as ClinicalView).attributes || [])

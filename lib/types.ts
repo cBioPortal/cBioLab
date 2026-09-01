@@ -112,12 +112,13 @@ export interface CompareView {
 export interface SurvivalView { kind: "survival"; cohorts?: string[] }
 export interface CooccurrenceView { kind: "cooccurrence"; genes: string[]; cohorts?: string[] }
 export interface ClinicalView { kind: "clinical"; attributes: string[]; cohorts?: string[] }
+export interface CoexpressionView { kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[] }
 export interface HeatmapSpec { profileType: string; genes?: string[] }
 export interface OncoprintView {
   kind: "oncoprint"; genes: string[]; cohorts?: string[];
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: string[];
 }
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView;
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView;
 
 export interface AnalysisDoc {
   study?: string;
@@ -161,6 +162,16 @@ export interface CooccurRow {
   pStratified?: number; oddsRatioMH?: number | null; strata?: number;
   tendency: "co-occurrence" | "mutual exclusivity" | null;
 }
+/** One gene pair's correlation on a continuous profile, from six sums per site. */
+export interface CoexprRow {
+  a: string; b: string;
+  /** correlation of the pooled population, from summed moments (exact) */
+  r: number | null; n: number; p: number; q: number;
+  /** present with >1 study: per-site correlations combined by Fisher z */
+  rMeta?: number | null; pMeta?: number; sites?: number;
+  /** per-site r and n, so a reader can see whether the sites agree */
+  perStudy?: { study: string; r: number | null; n: number }[];
+}
 /** One clinical attribute compared across cohorts. */
 export interface ClinicalCell {
   cohort: string; n: number;
@@ -194,6 +205,7 @@ export interface ViewResult {
   logrank?: LogRank; logrankPooled?: LogRank;
   pairs?: CooccurRow[];                     // cooccurrence
   clinical?: ClinicalRow[];                 // clinical comparison
+  coexpression?: CoexprRow[];               // co-expression
   svg?: string; nColumns?: number;          // oncoprint
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
 }

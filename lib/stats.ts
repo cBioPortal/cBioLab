@@ -355,3 +355,69 @@ export function varianceFromMoments(n: number, sum: number, sumsq: number): numb
   if (n < 2) return 0;
   return Math.max(0, (sumsq - (sum * sum) / n) / (n - 1));
 }
+
+// ---------------------------------------------------------------------------
+// Correlation from moments.
+//
+// Pearson's r depends on the data only through six running totals — n, Sx, Sy,
+// Sxy, Sxx, Syy — every one of them a sum. A site can therefore report its
+// contribution to a correlation without transmitting a single expression value,
+// and the totals add, so the result is exact rather than approximate. This is
+// the classic sufficient-statistic argument for federated analytics.
+// ---------------------------------------------------------------------------
+
+export interface Moments { n: number; sx: number; sy: number; sxy: number; sxx: number; syy: number }
+
+/** Upper tail of the standard normal, two-sided. */
+export function normalP(z: number): number {
+  if (!Number.isFinite(z)) return 1;
+  return Math.min(1, erfc(Math.abs(z) / Math.SQRT2));
+}
+
+export interface Correlation { r: number | null; n: number; t: number; df: number; p: number }
+
+export function pearsonFromMoments(m: Moments): Correlation {
+  const { n, sx, sy, sxy, sxx, syy } = m;
+  if (n < 3) return { r: null, n, t: 0, df: 0, p: 1 };
+  const cov = n * sxy - sx * sy;
+  const vx = n * sxx - sx * sx, vy = n * syy - sy * sy;
+  if (vx <= 0 || vy <= 0) return { r: null, n, t: 0, df: 0, p: 1 };  // a constant series has no correlation
+  let r = cov / Math.sqrt(vx * vy);
+  r = Math.max(-1, Math.min(1, r));
+  const df = n - 2;
+  const t = r === 1 || r === -1 ? Infinity : r * Math.sqrt(df / (1 - r * r));
+  return {
+    r: Math.round(r * 1e4) / 1e4, n, df,
+    t: Number.isFinite(t) ? Math.round(t * 1e4) / 1e4 : Infinity,
+    p: Number.isFinite(t) ? studentTP(t, df) : 0
+  };
+}
+
+export interface CorrelationMeta { r: number | null; z: number; se: number; p: number; sites: number }
+
+/**
+ * Fixed-effects meta-analysis of per-site correlations (Fisher z transform).
+ *
+ * Pooling the moments instead would answer a different question: the
+ * correlation of the combined population, which can differ from the correlation
+ * present at every site when the sites have different means. Combining site
+ * correlations asks "do these genes move together WITHIN a site", weighted by
+ * how much each site knows. Each site contributes r and n; nothing else.
+ */
+export function fisherZMeta(parts: { r: number | null; n: number }[]): CorrelationMeta {
+  let sumWZ = 0, sumW = 0, sites = 0;
+  for (const p of parts) {
+    if (p.r == null || p.n < 4 || Math.abs(p.r) >= 1) continue;  // z is undefined at |r| = 1
+    const w = p.n - 3;
+    sumWZ += w * Math.atanh(p.r); sumW += w; sites++;
+  }
+  if (!sumW) return { r: null, z: 0, se: 0, p: 1, sites: 0 };
+  const z = sumWZ / sumW, se = 1 / Math.sqrt(sumW);
+  return {
+    r: Math.round(Math.tanh(z) * 1e4) / 1e4,
+    z: Math.round(z * 1e4) / 1e4,
+    se: Math.round(se * 1e5) / 1e5,
+    p: normalP(z / se),
+    sites
+  };
+}

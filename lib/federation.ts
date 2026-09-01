@@ -40,6 +40,11 @@ export interface Instance {
 export interface GeneCounts { gene: string; profiled: number; altered: number; driver: number }
 /** (months, event) multiset — pools exactly across instances, carries no ids */
 export interface SurvivalCount { months: number; event: number; n: number }
+/** Six sums for one gene pair on a continuous profile. Sufficient for Pearson's r. */
+export interface PairMoments {
+  a: string; b: string;
+  n: number; sx: number; sy: number; sxy: number; sxx: number; syy: number;
+}
 /** One clinical attribute's distribution in one cohort/study — counts or moments. */
 export interface AttrStats {
   attribute: string; per: "patient" | "sample"; kind: "cat" | "num";
@@ -241,6 +246,48 @@ export function pairCountsSql(cohortSql: string, pairs: [string, string][], stud
   );
 }
 
+/**
+ * Six sums per gene pair from a continuous molecular profile: n, Sx, Sy, Sxy,
+ * Sxx, Syy over the patients that have BOTH values.
+ *
+ * That is all a correlation depends on, so a site can join a co-expression
+ * analysis without transmitting one expression value — and because the six sums
+ * add, the federated correlation is exact rather than approximate. Values are
+ * averaged per patient first, matching the oncoprint heatmap convention.
+ */
+export function momentPairsSql(cohortSql: string, pairs: [string, string][], profileType: string, study: string, db: string = DB): string {
+  const genes = [...new Set(pairs.flat())];
+  const arrA = "[" + pairs.map((p) => sq(p[0])).join(",") + "]";
+  const arrB = "[" + pairs.map((p) => sq(p[1])).join(",") + "]";
+  const pid = "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')";
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "vals AS (\n" +
+    "  SELECT " + pid + " AS pid, ga.hugo_gene_symbol AS gene,\n" +
+    "         avg(toFloat64OrNull(ga.alteration_value)) AS v\n" +
+    "  FROM " + db + ".genetic_alteration_derived ga\n" +
+    "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
+    "  WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(profileType) + "\n" +
+    "    AND ga.hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
+    "    AND toFloat64OrNull(ga.alteration_value) IS NOT NULL\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid, gene\n" +
+    "),\n" +
+    "pp AS (SELECT pid, groupArray(gene) AS gs, groupArray(v) AS vs FROM vals GROUP BY pid)\n" +
+    "SELECT ga, gb, countIf(ok) AS n,\n" +
+    "       sumIf(x, ok) AS sx, sumIf(y, ok) AS sy,\n" +
+    "       sumIf(x * y, ok) AS sxy, sumIf(x * x, ok) AS sxx, sumIf(y * y, ok) AS syy\n" +
+    "FROM (\n" +
+    "  SELECT ga, gb, indexOf(gs, ga) AS ia, indexOf(gs, gb) AS ib,\n" +
+    "         (ia > 0 AND ib > 0) AS ok,\n" +
+    "         if(ok, vs[ia], 0) AS x, if(ok, vs[ib], 0) AS y\n" +
+    "  FROM pp\n" +
+    "  ARRAY JOIN " + arrA + " AS ga, " + arrB + " AS gb\n" +
+    ")\n" +
+    "GROUP BY ga, gb"
+  );
+}
+
 /** Cap on distinct categorical values before an attribute is refused rather than truncated. */
 export const ATTR_VALUE_CAP = 200;
 
@@ -355,6 +402,7 @@ export interface AggregateCapable {
   survivalCounts(def: CohortDef | null | undefined): Promise<SurvivalCount[]>;
   pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
   attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]>;
+  pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
   /** the SQL this participant would run, for provenance */
   cohortSql(def: CohortDef | null | undefined): string;
 }
@@ -402,6 +450,16 @@ abstract class BaseResolver implements AggregateCapable {
     const r = await chQuery<ChRow>(survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
     return r.data.map((x) => ({ months: Number(x.m), event: Number(x.ev), n: Number(x.n) }));
   }
+  async pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]> {
+    if (!pairs.length || !profileType) return [];
+    const sql = momentPairsSql(this.cohortSql(def), pairs, profileType, this.study, this.instance.conn.db);
+    const r = await chQuery<ChRow>(sql, this.instance.conn);
+    return r.data.map((x) => ({
+      a: x.ga, b: x.gb, n: Number(x.n),
+      sx: Number(x.sx), sy: Number(x.sy), sxy: Number(x.sxy), sxx: Number(x.sxx), syy: Number(x.syy)
+    }));
+  }
+
   /**
    * Clinical attribute distributions. The SITE decides which of its attributes
    * are numeric, from its own clinical_attribute_meta — only it knows what it

@@ -9,7 +9,8 @@ import assert from "node:assert/strict";
 
 import { logRank, chiSquareP1df, fisherExact, kaplanMeier,
   benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
-  chiSquareP, studentTP, chiSquareTest, welchT, varianceFromMoments } from "../lib/stats.ts";
+  chiSquareP, studentTP, chiSquareTest, welchT, varianceFromMoments,
+  pearsonFromMoments, fisherZMeta, normalP } from "../lib/stats.ts";
 
 /** Freireich et al. (1963), 6-MP vs placebo in acute leukaemia. `+` = censored. */
 const SIXMP = [
@@ -247,5 +248,65 @@ describe("Welch's t-test from moments", () => {
     // so the pooled variance is exact from per-site totals, never approximated
     assert.ok(Math.abs(varianceFromMoments(ma.n + mb.n, ma.s + mb.s, ma.q + mb.q)
       - varianceFromMoments(whole.n, whole.s, whole.q)) < 1e-9);
+  });
+});
+
+describe("Pearson correlation from moments", () => {
+  // x = 1..5, y = [2,4,5,4,5]; by hand r = 6/sqrt(10*6) = 0.7746
+  const X = [1, 2, 3, 4, 5], Y = [2, 4, 5, 4, 5];
+  const M = {
+    n: X.length,
+    sx: X.reduce((a, b) => a + b, 0), sy: Y.reduce((a, b) => a + b, 0),
+    sxy: X.reduce((a, b, i) => a + b * Y[i], 0),
+    sxx: X.reduce((a, b) => a + b * b, 0), syy: Y.reduce((a, b) => a + b * b, 0)
+  };
+
+  test("matches the hand-computed value", () => {
+    assert.deepEqual([M.n, M.sx, M.sy, M.sxy, M.sxx, M.syy], [5, 15, 20, 66, 55, 86]);
+    const r = pearsonFromMoments(M);
+    assert.ok(Math.abs(r.r! - 0.7746) < 5e-4, "r should be 0.7746, got " + r.r);
+    assert.equal(r.df, 3);
+  });
+
+  test("moments split across two sites give the identical r", () => {
+    const half = (xs: number[], ys: number[]) => ({
+      n: xs.length,
+      sx: xs.reduce((a, b) => a + b, 0), sy: ys.reduce((a, b) => a + b, 0),
+      sxy: xs.reduce((a, b, i) => a + b * ys[i], 0),
+      sxx: xs.reduce((a, b) => a + b * b, 0), syy: ys.reduce((a, b) => a + b * b, 0)
+    });
+    const a = half(X.slice(0, 2), Y.slice(0, 2)), b = half(X.slice(2), Y.slice(2));
+    const merged = { n: a.n + b.n, sx: a.sx + b.sx, sy: a.sy + b.sy,
+      sxy: a.sxy + b.sxy, sxx: a.sxx + b.sxx, syy: a.syy + b.syy };
+    assert.equal(pearsonFromMoments(merged).r, pearsonFromMoments(M).r,
+      "a federated correlation is EXACT, not an approximation");
+  });
+
+  test("perfect correlation, and constants", () => {
+    assert.equal(pearsonFromMoments({ n: 4, sx: 10, sy: 20, sxy: 60, sxx: 30, syy: 120 }).r, 1);
+    // y constant -> undefined, refused rather than reported as 0
+    assert.equal(pearsonFromMoments({ n: 4, sx: 10, sy: 8, sxy: 20, sxx: 30, syy: 16 }).r, null);
+    assert.equal(pearsonFromMoments({ n: 2, sx: 3, sy: 3, sxy: 5, sxx: 5, syy: 5 }).r, null);
+  });
+});
+
+describe("normal tail and Fisher-z meta-analysis", () => {
+  test("normal critical values", () => {
+    assert.ok(Math.abs(normalP(1.96) - 0.05) < 1e-3);
+    assert.ok(Math.abs(normalP(2.576) - 0.01) < 1e-3);
+    assert.equal(normalP(0), 1);
+  });
+  test("identical sites reproduce their own correlation", () => {
+    const m = fisherZMeta([{ r: 0.5, n: 100 }, { r: 0.5, n: 100 }]);
+    assert.ok(Math.abs(m.r! - 0.5) < 1e-3, "got " + m.r);
+    assert.equal(m.sites, 2);
+    // two sites of n=100 are more evidence than one: se shrinks by ~sqrt(2)
+    const one = fisherZMeta([{ r: 0.5, n: 100 }]);
+    assert.ok(m.se < one.se && Math.abs(one.se / m.se - Math.SQRT2) < 0.02);
+  });
+  test("weights by site size, and skips sites that cannot contribute", () => {
+    const m = fisherZMeta([{ r: 0.9, n: 1000 }, { r: 0.1, n: 10 }]);
+    assert.ok(m.r! > 0.85, "the large site dominates, got " + m.r);
+    assert.equal(fisherZMeta([{ r: null, n: 50 }, { r: 1, n: 50 }, { r: 0.3, n: 3 }]).sites, 0);
   });
 });

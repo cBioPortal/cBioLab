@@ -40,6 +40,7 @@ say so in their captions.
 | kind | shape | meaning |
 |---|---|---|
 | `oql` | `{"kind":"oql","q":"STK11: DRIVER"}` | genomic status in cBioPortal OQL (see below) |
+| `coexpression` | `genes:[2-12], profileType, cohorts?:[names]` | Pearson correlation between gene pairs on a continuous molecular profile, **within one cohort** (the first named). Each site reports only six sums (n, Σx, Σy, Σxy, Σx², Σy²), which are additive — so the federated correlation is exact, not approximate. Across studies a Fisher-z meta-analysis of per-study correlations is reported alongside the pooled one |
 | `clinical` | `{"kind":"clinical","attribute":A, ...predicate, "per"?:"sample"}` | clinical attribute; predicate is `values:[≤50]` (OR), `range:{gt,gte,lt,lte}` (numeric via toFloat64OrNull), or `op`(`= != > >= < <=`)+`value`; `per:"sample"` = patient matches if ANY sample matches |
 | `event` | `{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}` | timeline sub-DSL (below) |
 | `patients` | `{"kind":"patients","ids":[≤50000]}` | explicit list, intersected with the study |
@@ -404,7 +405,40 @@ ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene t
 }
 ```
 
-### Example 6: Clinical attributes compared between cohorts
+### Example 6: Co-expression from sums alone
+
+Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.
+
+```json
+{
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "BRCA": {
+      "all": [
+        {
+          "kind": "profiled",
+          "type": "MUTATION"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "coexpression",
+      "profileType": "rna_seq_v2_mrna_median_Zscores",
+      "genes": [
+        "ERBB2",
+        "GRB7",
+        "ESR1",
+        "PGR",
+        "MKI67"
+      ]
+    }
+  ]
+}
+```
+
+### Example 7: Clinical attributes compared between cohorts
 
 How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.
 
@@ -450,7 +484,7 @@ How TP53-mutant and wild-type tumors differ clinically. Categorical attributes a
 }
 ```
 
-### Example 7: Co-occurrence and mutual exclusivity in NSCLC
+### Example 8: Co-occurrence and mutual exclusivity in NSCLC
 
 Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.
 
@@ -487,7 +521,7 @@ Pairwise associations among lung cancer driver genes. Each site returns four cou
 }
 ```
 
-### Example 8: Study-stratified survival across two studies
+### Example 9: Study-stratified survival across two studies
 
 TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.
 

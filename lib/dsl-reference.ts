@@ -95,6 +95,16 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "Co-expression from sums alone",
+    note: "Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.",
+    doc: {
+      study: "brca_tcga_pan_can_atlas_2018",
+      cohorts: { "BRCA": { all: [{ kind: "profiled", type: "MUTATION" }] } },
+      views: [{ kind: "coexpression", profileType: "rna_seq_v2_mrna_median_Zscores",
+        genes: ["ERBB2", "GRB7", "ESR1", "PGR", "MKI67"] }]
+    }
+  },
+  {
     title: "Clinical attributes compared between cohorts",
     note: "How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.",
     doc: {
@@ -179,6 +189,7 @@ say so in their captions.
 | kind | shape | meaning |
 |---|---|---|
 | \`oql\` | \`{"kind":"oql","q":"STK11: DRIVER"}\` | genomic status in cBioPortal OQL (see below) |
+| \`coexpression\` | \`genes:[2-12], profileType, cohorts?:[names]\` | Pearson correlation between gene pairs on a continuous molecular profile, **within one cohort** (the first named). Each site reports only six sums (n, \u03a3x, \u03a3y, \u03a3xy, \u03a3x\u00b2, \u03a3y\u00b2), which are additive \u2014 so the federated correlation is exact, not approximate. Across studies a Fisher-z meta-analysis of per-study correlations is reported alongside the pooled one |
 | \`clinical\` | \`{"kind":"clinical","attribute":A, ...predicate, "per"?:"sample"}\` | clinical attribute; predicate is \`values:[≤50]\` (OR), \`range:{gt,gte,lt,lte}\` (numeric via toFloat64OrNull), or \`op\`(\`= != > >= < <=\`)+\`value\`; \`per:"sample"\` = patient matches if ANY sample matches |
 | \`event\` | \`{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}\` | timeline sub-DSL (below) |
 | \`patients\` | \`{"kind":"patients","ids":[≤50000]}\` | explicit list, intersected with the study |
@@ -314,6 +325,7 @@ export const CHAT_GRAMMAR = `Document shape:
              {"kind":"survival","cohorts":[names?]},
              {"kind":"cooccurrence","genes":[...(2-12)],"cohorts":[names?]},
              {"kind":"clinical","attributes":[...(1-20)],"cohorts":[names?]},
+             {"kind":"coexpression","genes":[...(2-12)],"profileType":"<mrna profile>","cohorts":[names?]},
              {"kind":"oncoprint","genes":[...(max 12)],"clinical":["<attribute>", ...(max 8)]?,
               "heatmap":[{"profileType":"<profile>","genes":[...]?}, ...(max 4)]?,
               "sort":["<track>"|"-<track>"|"genomic", ...(max 4)]?,"cohorts":[names?]} ] }

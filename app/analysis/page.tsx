@@ -990,6 +990,40 @@ export default function AnalysisPage() {
                     </table>
                   </div>
                 </>}
+                {v.kind === "coexpression" && v.coexpression && <>
+                  <h2>Co-expression <span className="plain">— Pearson correlation from per-site sums</span></h2>
+                  {v.note && <p className="note">{v.note}</p>}
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
+                      <thead><tr>
+                        <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>pair</th>
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>n</th>
+                        <th style={{ width: "9rem" }} aria-label="correlation, visualised" />
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>r</th>
+                        {v.coexpression.some(x => x.rMeta != null) && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>r (meta)</th>}
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p</th>
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q</th>
+                      </tr></thead>
+                      <tbody>{v.coexpression.map(r => (
+                        <tr key={r.a + "|" + r.b} style={{ borderTop: "1px solid var(--line)" }}
+                          title={(r.perStudy || []).map(s2 => s2.study + ": r=" + s2.r + " (n=" + s2.n + ")").join("\n") || undefined}>
+                          <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600 }}>{r.a} / {r.b}</td>
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{r.n.toLocaleString()}</td>
+                          <td style={{ padding: "0.3rem 0.6rem" }}>
+                            {r.r != null && <span className="rbar"><i style={{
+                              width: Math.abs(r.r) * 50 + "%",
+                              marginLeft: r.r < 0 ? (50 - Math.abs(r.r) * 50) + "%" : "50%",
+                              background: r.r < 0 ? "#D55E00" : "#0072B2" }} /></span>}
+                          </td>
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: Math.abs(r.r ?? 0) > 0.5 ? 600 : 400 }}>{r.r ?? "—"}</td>
+                          {v.coexpression!.some(x => x.rMeta != null) && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.rMeta ?? "—"}</td>}
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{pCell(r.pMeta ?? r.p)}</td>
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{pCell(r.q)}</td>
+                        </tr>))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>}
                 {v.kind === "clinical" && v.clinical && <>
                   <h2>Clinical comparison <span className="plain">— attribute distributions across cohorts</span></h2>
                   {v.note && <p className="note">{v.note}</p>}
