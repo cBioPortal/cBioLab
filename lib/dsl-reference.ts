@@ -95,6 +95,18 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "Clinical attributes compared between cohorts",
+    note: "How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] },
+        "TP53 wt": { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] }
+      },
+      views: [{ kind: "clinical", attributes: ["CANCER_TYPE", "SMOKING_PREDICTIONS_3_CLASSES", "CURRENT_AGE_DEID", "TMB_NONSYNONYMOUS", "FRACTION_GENOME_ALTERED"] }]
+    }
+  },
+  {
     title: "Co-occurrence and mutual exclusivity in NSCLC",
     note: "Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.",
     doc: {
@@ -220,6 +232,7 @@ rel      := { "type": "NONE" }                                                 /
 | kind | fields | semantics |
 |---|---|---|
 | \`compare\` | \`genes:[≤20], cohorts?:[names]\` | per-gene driver% / altered% per cohort with **panel-aware denominators** (profiled patients only); two-sided Fisher p when exactly 2 cohorts |
+| \`clinical\` | \`attributes:[\u22641-20], cohorts?:[names]\` | compares clinical attribute distributions across cohorts. Categorical: Pearson chi-squared over the **full** value vocabulary. Numeric: Welch's t from (n, \u03a3x, \u03a3x\u00b2) \u2014 additive across sites, so pooled mean/variance are exact and no individual value is transmitted. BH q across attributes. Each site types its own attributes from \`clinical_attribute_meta\`; disagreements are refused, not merged |
 | \`cooccurrence\` | \`genes:[2-12], cohorts?:[names]\` | pairwise co-occurrence / mutual exclusivity **within one cohort** (the first named). Each pair's 2×2 is counted among patients profiled for **both** genes, per study against that study's own panels; log₂ odds ratio, two-sided Fisher, Benjamini–Hochberg q across pairs. Across studies the test is **stratified by study** (Cochran–Mantel–Haenszel). Pairs no panel covers are reported as not assessable, never as a null result |
 | \`survival\` | \`cohorts?:[names]\` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts. Across studies the test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. Left truncation caveat applies; cross-study baselines are not harmonized |
 | \`oncoprint\` | \`genes:[≤12], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], cohorts?:[names]\` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
@@ -300,6 +313,7 @@ export const CHAT_GRAMMAR = `Document shape:
   "views": [ {"kind":"compare","genes":[...(max 20)],"cohorts":[names?]},
              {"kind":"survival","cohorts":[names?]},
              {"kind":"cooccurrence","genes":[...(2-12)],"cohorts":[names?]},
+             {"kind":"clinical","attributes":[...(1-20)],"cohorts":[names?]},
              {"kind":"oncoprint","genes":[...(max 12)],"clinical":["<attribute>", ...(max 8)]?,
               "heatmap":[{"profileType":"<profile>","genes":[...]?}, ...(max 4)]?,
               "sort":["<track>"|"-<track>"|"genomic", ...(max 4)]?,"cohorts":[names?]} ] }

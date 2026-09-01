@@ -111,12 +111,13 @@ export interface CompareView {
 }
 export interface SurvivalView { kind: "survival"; cohorts?: string[] }
 export interface CooccurrenceView { kind: "cooccurrence"; genes: string[]; cohorts?: string[] }
+export interface ClinicalView { kind: "clinical"; attributes: string[]; cohorts?: string[] }
 export interface HeatmapSpec { profileType: string; genes?: string[] }
 export interface OncoprintView {
   kind: "oncoprint"; genes: string[]; cohorts?: string[];
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: string[];
 }
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView;
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView;
 
 export interface AnalysisDoc {
   study?: string;
@@ -160,6 +161,23 @@ export interface CooccurRow {
   pStratified?: number; oddsRatioMH?: number | null; strata?: number;
   tendency: "co-occurrence" | "mutual exclusivity" | null;
 }
+/** One clinical attribute compared across cohorts. */
+export interface ClinicalCell {
+  cohort: string; n: number;
+  /** categorical: the most common values */
+  top?: { v: string; n: number }[];
+  /** numeric: computed from additive moments, never from transmitted values */
+  mean?: number | null; sd?: number; min?: number | null; max?: number | null;
+}
+export interface ClinicalRow {
+  attribute: string; per: "patient" | "sample"; kind: "cat" | "num";
+  cells: ClinicalCell[];
+  test?: string; statistic?: number; df?: number; p?: number; q?: number;
+  /** categorical only: vocabulary size, and the smallest expected cell */
+  distinct?: number; minExpected?: number;
+  /** why this attribute was not tested — stated, never silently omitted */
+  skipped?: string;
+}
 export interface LogRank {
   chi2: number; p: number; df: number;
   /** total events in each group, then the expected counts under the null */
@@ -175,6 +193,7 @@ export interface ViewResult {
   curves?: KmCurve[]; caveat?: string;      // survival
   logrank?: LogRank; logrankPooled?: LogRank;
   pairs?: CooccurRow[];                     // cooccurrence
+  clinical?: ClinicalRow[];                 // clinical comparison
   svg?: string; nColumns?: number;          // oncoprint
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
 }

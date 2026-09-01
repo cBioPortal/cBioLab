@@ -81,27 +81,31 @@ export function registerTools(server: any): void {
         genes: z.array(z.string()).max(20).nullish().describe("Genes for per-gene counts"),
         survival: z.boolean().nullish().describe("Also return (months, event, n) survival triples"),
         pairs: z.array(z.tuple([z.string(), z.string()])).max(66).nullish()
-          .describe("Gene pairs for co-occurrence: returns each pair's 2x2 (both/onlyA/onlyB/neither) among patients profiled for BOTH genes")
+          .describe("Gene pairs for co-occurrence: returns each pair's 2x2 (both/onlyA/onlyB/neither) among patients profiled for BOTH genes"),
+        attributes: z.array(z.string()).max(20).nullish()
+          .describe("Clinical attributes to describe: value counts for categorical, (n, sum, sum of squares, min, max) for numeric. Never individual values.")
       }
     },
-    async ({ study, cohort, genes, survival, pairs }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null }) => {
+    async ({ study, cohort, genes, survival, pairs, attributes }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null }) => {
       try {
         const s = await resolveStudy(study);
         const { profiles, gaProfiles } = await studyProfiles(s);
         const pin = process.env.ONCOKB_PIN || null;
         const res = await resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
-        const [count, geneCounts, survivalCounts, pairCounts] = await Promise.all([
+        const [count, geneCounts, survivalCounts, pairCounts, attributeStats] = await Promise.all([
           res.count(cohort),
           genes && genes.length ? res.geneCounts(cohort, genes) : Promise.resolve([]),
           survival ? res.survivalCounts(cohort) : Promise.resolve([]),
-          pairs && pairs.length ? res.pairCounts(cohort, pairs) : Promise.resolve([])
+          pairs && pairs.length ? res.pairCounts(cohort, pairs) : Promise.resolve([]),
+          attributes && attributes.length ? res.attributeStats(cohort, attributes) : Promise.resolve([])
         ]);
-        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, oncokbPin: pin };
+        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, oncokbPin: pin };
         return {
           content: [{ type: "text" as const, text: `aggregates for ${s}: ${count.toLocaleString()} patients` +
             (geneCounts.length ? `, ${geneCounts.length} gene counts` : "") +
             (survivalCounts.length ? `, ${survivalCounts.length} survival strata` : "") +
-            (pairCounts.length ? `, ${pairCounts.length} gene-pair tables` : "") + " (no patient identifiers returned)" }],
+            (pairCounts.length ? `, ${pairCounts.length} gene-pair tables` : "") +
+            (attributeStats.length ? `, ${attributeStats.length} clinical attributes` : "") + " (no patient identifiers returned)" }],
           structuredContent: payload
         };
       } catch (e) {

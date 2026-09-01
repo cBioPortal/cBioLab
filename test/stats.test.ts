@@ -8,7 +8,8 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
 import { logRank, chiSquareP1df, fisherExact, kaplanMeier,
-  benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio } from "../lib/stats.ts";
+  benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
+  chiSquareP, studentTP, chiSquareTest, welchT, varianceFromMoments } from "../lib/stats.ts";
 
 /** Freireich et al. (1963), 6-MP vs placebo in acute leukaemia. `+` = censored. */
 const SIXMP = [
@@ -149,5 +150,102 @@ describe("log2 odds ratio", () => {
   test("an empty cell is Haldane-corrected rather than infinite", () => {
     const v = log2OddsRatio(10, 0, 0, 10);
     assert.ok(v !== null && Number.isFinite(v) && v > 0, "should be large but finite, got " + v);
+  });
+});
+
+describe("chi-squared, arbitrary degrees of freedom", () => {
+  test("the 0.05 critical values across df match the table", () => {
+    const critical: [number, number][] = [[3.841, 1], [5.991, 2], [7.815, 3], [9.488, 4], [11.070, 5], [18.307, 10]];
+    for (const [x, df] of critical)
+      assert.ok(Math.abs(chiSquareP(x, df) - 0.05) < 1e-3, "chi2=" + x + " df=" + df + " -> p=0.05, got " + chiSquareP(x, df));
+  });
+  test("the 0.01 critical values too", () => {
+    for (const [x, df] of [[6.635, 1], [9.210, 2], [13.277, 4], [23.209, 10]] as [number, number][])
+      assert.ok(Math.abs(chiSquareP(x, df) - 0.01) < 1e-3, "chi2=" + x + " df=" + df + ", got " + chiSquareP(x, df));
+  });
+  test("agrees with the dedicated 1-df routine", () => {
+    for (const x of [0.5, 2, 3.841, 10, 25])
+      assert.ok(Math.abs(chiSquareP(x, 1) - chiSquareP1df(x)) < 1e-9, "two routines disagree at " + x);
+  });
+});
+
+describe("Student's t", () => {
+  test("two-sided critical values match the table", () => {
+    assert.ok(Math.abs(studentTP(2.228, 10) - 0.05) < 1e-3, "t=2.228 df=10 -> 0.05");
+    assert.ok(Math.abs(studentTP(3.169, 10) - 0.01) < 1e-3, "t=3.169 df=10 -> 0.01");
+    assert.ok(Math.abs(studentTP(2.086, 20) - 0.05) < 1e-3, "t=2.086 df=20 -> 0.05");
+    assert.ok(Math.abs(studentTP(1.96, 1e7) - 0.05) < 1e-3, "large df approaches the normal");
+  });
+});
+
+describe("chi-squared contingency test", () => {
+  test("a 2x2 matches the closed form", () => {
+    const t = [[20, 30], [30, 20]];
+    const n = 100, chi2 = (n * Math.pow(20 * 20 - 30 * 30, 2)) / (50 * 50 * 50 * 50);
+    const r = chiSquareTest(t);
+    assert.equal(r.df, 1);
+    assert.ok(Math.abs(r.chi2 - chi2) < 1e-3, r.chi2 + " vs " + chi2);
+  });
+  test("degrees of freedom for r x c, and empty rows/columns are dropped", () => {
+    assert.equal(chiSquareTest([[10, 20, 30], [30, 20, 10]]).df, 2);      // (2-1)(3-1)
+    assert.equal(chiSquareTest([[10, 20, 30], [30, 20, 10], [5, 5, 5]]).df, 4);
+    // an all-zero column must not inflate df
+    assert.equal(chiSquareTest([[10, 0, 30], [30, 0, 10]]).df, 1);
+  });
+  test("independence gives chi2 = 0 and p = 1", () => {
+    const r = chiSquareTest([[25, 25], [25, 25]]);
+    assert.equal(r.chi2, 0);
+    assert.equal(r.p, 1);
+    assert.equal(r.minExpected, 25);
+  });
+  test("degenerate tables are refused rather than guessed", () => {
+    assert.equal(chiSquareTest([]).p, 1);
+    assert.equal(chiSquareTest([[1, 2]]).p, 1);
+    assert.equal(chiSquareTest([[0, 0], [0, 0]]).p, 1);
+  });
+});
+
+describe("Welch's t-test from moments", () => {
+  // Checked against the Welch-Satterthwaite definition written out here, rather
+  // than against a remembered figure: t = (m1-m2)/sqrt(v1/n1 + v2/n2), and
+  // df = (v1/n1 + v2/n2)^2 / ((v1/n1)^2/(n1-1) + (v2/n2)^2/(n2-1)).
+  test("matches the Welch-Satterthwaite definition computed independently", () => {
+    const [n1, m1, v1, n2, m2, v2] = [10, 42.14, 68.15, 10, 43.23, 41.79];
+    const s1 = v1 / n1, s2 = v2 / n2;
+    const expectedT = (m1 - m2) / Math.sqrt(s1 + s2);                       // -0.3287
+    const expectedDf = (s1 + s2) ** 2 / (s1 ** 2 / (n1 - 1) + s2 ** 2 / (n2 - 1)); // 17.02
+    const r = welchT(n1, m1, v1, n2, m2, v2);
+    assert.ok(Math.abs(r.t - expectedT) < 1e-3, "t " + r.t + " vs " + expectedT.toFixed(4));
+    assert.ok(Math.abs(r.df - expectedDf) < 0.02, "df " + r.df + " vs " + expectedDf.toFixed(2));
+    assert.ok(r.p > 0.7 && r.p < 0.8, "clearly not significant, got p=" + r.p);
+  });
+  test("identical groups give t = 0", () => {
+    const r = welchT(50, 10, 4, 50, 10, 4);
+    assert.equal(r.t, 0);
+    assert.equal(r.p, 1);
+  });
+  test("too few observations is refused, not extrapolated", () => {
+    assert.equal(welchT(1, 5, 0, 30, 4, 2).p, 1);
+  });
+
+  test("variance recovered from additive moments equals the direct computation", () => {
+    const xs = [4, 8, 15, 16, 23, 42, 7, 9];
+    const n = xs.length, sum = xs.reduce((a, b) => a + b, 0);
+    const sumsq = xs.reduce((a, b) => a + b * b, 0);
+    const mean = sum / n;
+    const direct = xs.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1);
+    assert.ok(Math.abs(varianceFromMoments(n, sum, sumsq) - direct) < 1e-9);
+  });
+
+  test("moments are additive across sites — the property federation relies on", () => {
+    const a = [4, 8, 15, 16], b = [23, 42, 7, 9];
+    const mom = (xs: number[]) => ({ n: xs.length, s: xs.reduce((p, c) => p + c, 0), q: xs.reduce((p, c) => p + c * c, 0) });
+    const ma = mom(a), mb = mom(b), whole = mom([...a, ...b]);
+    assert.equal(ma.n + mb.n, whole.n);
+    assert.equal(ma.s + mb.s, whole.s);
+    assert.equal(ma.q + mb.q, whole.q);
+    // so the pooled variance is exact from per-site totals, never approximated
+    assert.ok(Math.abs(varianceFromMoments(ma.n + mb.n, ma.s + mb.s, ma.q + mb.q)
+      - varianceFromMoments(whole.n, whole.s, whole.q)) < 1e-9);
   });
 });

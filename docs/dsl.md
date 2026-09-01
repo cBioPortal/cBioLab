@@ -93,6 +93,7 @@ rel      := { "type": "NONE" }                                                 /
 | kind | fields | semantics |
 |---|---|---|
 | `compare` | `genes:[≤20], cohorts?:[names]` | per-gene driver% / altered% per cohort with **panel-aware denominators** (profiled patients only); two-sided Fisher p when exactly 2 cohorts |
+| `clinical` | `attributes:[≤1-20], cohorts?:[names]` | compares clinical attribute distributions across cohorts. Categorical: Pearson chi-squared over the **full** value vocabulary. Numeric: Welch's t from (n, Σx, Σx²) — additive across sites, so pooled mean/variance are exact and no individual value is transmitted. BH q across attributes. Each site types its own attributes from `clinical_attribute_meta`; disagreements are refused, not merged |
 | `cooccurrence` | `genes:[2-12], cohorts?:[names]` | pairwise co-occurrence / mutual exclusivity **within one cohort** (the first named). Each pair's 2×2 is counted among patients profiled for **both** genes, per study against that study's own panels; log₂ odds ratio, two-sided Fisher, Benjamini–Hochberg q across pairs. Across studies the test is **stratified by study** (Cochran–Mantel–Haenszel). Pairs no panel covers are reported as not assessable, never as a null result |
 | `survival` | `cohorts?:[names]` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts. Across studies the test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. Left truncation caveat applies; cross-study baselines are not harmonized |
 | `oncoprint` | `genes:[≤12], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], cohorts?:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
@@ -403,7 +404,53 @@ ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene t
 }
 ```
 
-### Example 6: Co-occurrence and mutual exclusivity in NSCLC
+### Example 6: Clinical attributes compared between cohorts
+
+How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "TP53 mut": {
+      "all": [
+        {
+          "kind": "oql",
+          "q": "TP53: MUT"
+        }
+      ]
+    },
+    "TP53 wt": {
+      "all": [
+        {
+          "not": {
+            "kind": "oql",
+            "q": "TP53:"
+          }
+        },
+        {
+          "kind": "profiled",
+          "type": "MUTATION"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "clinical",
+      "attributes": [
+        "CANCER_TYPE",
+        "SMOKING_PREDICTIONS_3_CLASSES",
+        "CURRENT_AGE_DEID",
+        "TMB_NONSYNONYMOUS",
+        "FRACTION_GENOME_ALTERED"
+      ]
+    }
+  ]
+}
+```
+
+### Example 7: Co-occurrence and mutual exclusivity in NSCLC
 
 Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.
 
@@ -440,7 +487,7 @@ Pairwise associations among lung cancer driver genes. Each site returns four cou
 }
 ```
 
-### Example 7: Study-stratified survival across two studies
+### Example 8: Study-stratified survival across two studies
 
 TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.
 

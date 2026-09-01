@@ -205,3 +205,153 @@ export function log2OddsRatio(a: number, b: number, c: number, d: number): numbe
   const or = (A * D) / (B * C);
   return or > 0 ? Math.round(Math.log2(or) * 1e3) / 1e3 : null;
 }
+
+// ---------------------------------------------------------------------------
+// Distributions needed by the clinical-comparison view. Numerical Recipes
+// algorithms, dependency-free; each is pinned to table values in test/stats.test.ts.
+// ---------------------------------------------------------------------------
+
+const GAMMA_COF = [
+  76.18009172947146, -86.50532032941677, 24.01409824083091,
+  -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5
+];
+/** log Gamma(x) for x > 0 (Lanczos). */
+function gammaLn(x: number): number {
+  let y = x;
+  const tmp = x + 5.5 - (x + 0.5) * Math.log(x + 5.5);
+  let ser = 1.000000000190015;
+  for (let j = 0; j < 6; j++) ser += GAMMA_COF[j] / ++y;
+  return -tmp + Math.log((2.5066282746310005 * ser) / x);
+}
+
+/** Regularized upper incomplete gamma Q(a,x) = 1 - P(a,x). */
+function gammaQ(a: number, x: number): number {
+  if (x < 0 || a <= 0) return 1;
+  if (x === 0) return 1;
+  if (x < a + 1) {                       // series for P, then complement
+    let ap = a, sum = 1 / a, del = sum;
+    for (let n = 0; n < 300; n++) {
+      ap++; del *= x / ap; sum += del;
+      if (Math.abs(del) < Math.abs(sum) * 1e-14) break;
+    }
+    return 1 - sum * Math.exp(-x + a * Math.log(x) - gammaLn(a));
+  }
+  // continued fraction for Q directly
+  const FPMIN = 1e-300;
+  let b = x + 1 - a, c = 1 / FPMIN, d = 1 / b, h = d;
+  for (let i = 1; i <= 300; i++) {
+    const an = -i * (i - a);
+    b += 2; d = an * d + b; if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = b + an / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d;
+    const del = d * c; h *= del;
+    if (Math.abs(del - 1) < 1e-14) break;
+  }
+  return Math.exp(-x + a * Math.log(x) - gammaLn(a)) * h;
+}
+
+/** Upper tail of chi-squared with arbitrary degrees of freedom. */
+export function chiSquareP(x: number, df: number): number {
+  if (!Number.isFinite(x) || x <= 0 || df < 1) return 1;
+  return Math.min(1, Math.max(0, gammaQ(df / 2, x / 2)));
+}
+
+/** Continued fraction for the incomplete beta function. */
+function betaCf(a: number, b: number, x: number): number {
+  const FPMIN = 1e-300;
+  const qab = a + b, qap = a + 1, qam = a - 1;
+  let c = 1, d = 1 - (qab * x) / qap;
+  if (Math.abs(d) < FPMIN) d = FPMIN;
+  d = 1 / d;
+  let h = d;
+  for (let m = 1; m <= 300; m++) {
+    const m2 = 2 * m;
+    let aa = (m * (b - m) * x) / ((qam + m2) * (a + m2));
+    d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d; h *= d * c;
+    aa = (-(a + m) * (qab + m) * x) / ((a + m2) * (qap + m2));
+    d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d;
+    const del = d * c; h *= del;
+    if (Math.abs(del - 1) < 1e-14) break;
+  }
+  return h;
+}
+
+/** Regularized incomplete beta I_x(a,b). */
+function betaI(a: number, b: number, x: number): number {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const bt = Math.exp(gammaLn(a + b) - gammaLn(a) - gammaLn(b) + a * Math.log(x) + b * Math.log(1 - x));
+  return x < (a + 1) / (a + b + 2) ? (bt * betaCf(a, b, x)) / a : 1 - (bt * betaCf(b, a, 1 - x)) / b;
+}
+
+/** Two-sided p-value for Student's t. */
+export function studentTP(t: number, df: number): number {
+  if (!Number.isFinite(t) || df <= 0) return 1;
+  return Math.min(1, betaI(df / 2, 0.5, df / (df + t * t)));
+}
+
+export interface ChiSquareTest { chi2: number; df: number; p: number; minExpected: number }
+
+/**
+ * Pearson chi-squared on an r x c contingency table of counts.
+ * `minExpected` is reported so a caller can say when the approximation is thin
+ * (the conventional rule of thumb is that expected counts should exceed 5).
+ */
+export function chiSquareTest(table: number[][]): ChiSquareTest {
+  const rows = table.length, cols = rows ? table[0].length : 0;
+  if (rows < 2 || cols < 2) return { chi2: 0, df: 0, p: 1, minExpected: 0 };
+  const rowSum = table.map((r) => r.reduce((a, b) => a + b, 0));
+  const colSum = Array.from({ length: cols }, (_, j) => table.reduce((a, r) => a + r[j], 0));
+  const n = rowSum.reduce((a, b) => a + b, 0);
+  if (!n) return { chi2: 0, df: 0, p: 1, minExpected: 0 };
+  // a row or column that is entirely zero carries no information; drop it
+  const keepR = rowSum.map((s) => s > 0), keepC = colSum.map((s) => s > 0);
+  const R = keepR.filter(Boolean).length, C = keepC.filter(Boolean).length;
+  if (R < 2 || C < 2) return { chi2: 0, df: 0, p: 1, minExpected: 0 };
+  let chi2 = 0, minExpected = Infinity;
+  for (let i = 0; i < rows; i++) {
+    if (!keepR[i]) continue;
+    for (let j = 0; j < cols; j++) {
+      if (!keepC[j]) continue;
+      const e = (rowSum[i] * colSum[j]) / n;
+      minExpected = Math.min(minExpected, e);
+      if (e > 0) chi2 += ((table[i][j] - e) * (table[i][j] - e)) / e;
+    }
+  }
+  const df = (R - 1) * (C - 1);
+  return {
+    chi2: Math.round(chi2 * 1e4) / 1e4, df,
+    p: chiSquareP(chi2, df),
+    minExpected: Math.round(minExpected * 100) / 100
+  };
+}
+
+export interface WelchTest { t: number; df: number; p: number }
+
+/**
+ * Welch's unequal-variance t-test from MOMENTS only — (n, mean, variance) per
+ * group. That is the point for federation: n, sum(x) and sum(x^2) are additive
+ * across sites, so a site never sends a value, only three running totals.
+ */
+export function welchT(
+  n1: number, mean1: number, var1: number,
+  n2: number, mean2: number, var2: number
+): WelchTest {
+  if (n1 < 2 || n2 < 2) return { t: 0, df: 0, p: 1 };
+  const s1 = var1 / n1, s2 = var2 / n2;
+  const denom = s1 + s2;
+  if (denom <= 0) return { t: 0, df: 0, p: 1 };
+  const t = (mean1 - mean2) / Math.sqrt(denom);
+  const df = (denom * denom) / ((s1 * s1) / (n1 - 1) + (s2 * s2) / (n2 - 1));
+  return { t: Math.round(t * 1e4) / 1e4, df: Math.round(df * 100) / 100, p: studentTP(t, df) };
+}
+
+/** Sample variance from the additive moments a federated site can report. */
+export function varianceFromMoments(n: number, sum: number, sumsq: number): number {
+  if (n < 2) return 0;
+  return Math.max(0, (sumsq - (sum * sum) / n) / (n - 1));
+}

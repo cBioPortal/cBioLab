@@ -40,6 +40,16 @@ export interface Instance {
 export interface GeneCounts { gene: string; profiled: number; altered: number; driver: number }
 /** (months, event) multiset — pools exactly across instances, carries no ids */
 export interface SurvivalCount { months: number; event: number; n: number }
+/** One clinical attribute's distribution in one cohort/study — counts or moments. */
+export interface AttrStats {
+  attribute: string; per: "patient" | "sample"; kind: "cat" | "num";
+  /** categorical: the complete value distribution */
+  values?: { v: string; n: number }[];
+  /** numeric: additive moments, from which mean and variance are exact */
+  n?: number; sum?: number; sumsq?: number; min?: number; max?: number;
+  /** set when THIS site declines to describe it, with the reason */
+  skipped?: string;
+}
 /** One gene pair's 2x2 among patients profiled for BOTH genes. Counts only. */
 export interface PairCounts {
   a: string; b: string;
@@ -231,6 +241,59 @@ export function pairCountsSql(cohortSql: string, pairs: [string, string][], stud
   );
 }
 
+/** Cap on distinct categorical values before an attribute is refused rather than truncated. */
+export const ATTR_VALUE_CAP = 200;
+
+/**
+ * Per-value counts for CATEGORICAL clinical attributes in one cohort/study.
+ *
+ * Returns the full value distribution up to ATTR_VALUE_CAP + 1 rows. It must be
+ * complete: a chi-squared on a silently truncated contingency table is simply
+ * wrong, so the caller refuses an attribute that exceeds the cap instead of
+ * testing a partial table.
+ */
+export function clinicalCountsSql(cohortSql: string, attrs: string[], study: string, db: string = DB): string {
+  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  return (
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT attribute_name AS a, type AS per, attribute_value AS v,\n" +
+    "       uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
+    "FROM " + db + ".clinical_data_derived\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + "\n" +
+    "  AND attribute_name IN (" + attrs.map(sq).join(",") + ")\n" +
+    "  AND attribute_value != ''\n" +
+    "  AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "GROUP BY a, per, v\n" +
+    "ORDER BY n DESC\n" +
+    "LIMIT " + (ATTR_VALUE_CAP + 1) + " BY a, per"
+  );
+}
+
+/**
+ * (n, sum, sum of squares, min, max) for NUMERIC clinical attributes.
+ *
+ * These five numbers are additive across sites, so a pooled mean and variance —
+ * and therefore Welch's t — are EXACT from per-site totals, never approximated.
+ * No individual value is ever transmitted.
+ */
+export function clinicalMomentsSql(cohortSql: string, attrs: string[], study: string, db: string = DB): string {
+  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  return (
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT a, per, count() AS n, sum(x) AS sx, sum(x * x) AS sxx, min(x) AS mn, max(x) AS mx\n" +
+    "FROM (\n" +
+    "  SELECT attribute_name AS a, type AS per, toFloat64OrNull(attribute_value) AS x\n" +
+    "  FROM " + db + ".clinical_data_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND attribute_name IN (" + attrs.map(sq).join(",") + ")\n" +
+    "    AND attribute_value != ''\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    ")\n" +
+    "WHERE x IS NOT NULL AND isFinite(x)\n" +
+    "GROUP BY a, per"
+  );
+}
+
 /**
  * (months, event, n) triples for one cohort in one study. Aggregate — pools
  * exactly with other instances' triples to give a correct pooled KM curve.
@@ -291,6 +354,7 @@ export interface AggregateCapable {
   geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]>;
   survivalCounts(def: CohortDef | null | undefined): Promise<SurvivalCount[]>;
   pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
+  attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]>;
   /** the SQL this participant would run, for provenance */
   cohortSql(def: CohortDef | null | undefined): string;
 }
@@ -338,6 +402,59 @@ abstract class BaseResolver implements AggregateCapable {
     const r = await chQuery<ChRow>(survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
     return r.data.map((x) => ({ months: Number(x.m), event: Number(x.ev), n: Number(x.n) }));
   }
+  /**
+   * Clinical attribute distributions. The SITE decides which of its attributes
+   * are numeric, from its own clinical_attribute_meta — only it knows what it
+   * declared. An attribute it does not declare is reported as skipped rather
+   * than sniffed from the data and silently mis-typed.
+   */
+  async attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]> {
+    const attrs = [...new Set(attributes)].filter((a) => /^[A-Za-z0-9_]{1,64}$/.test(a)).slice(0, 20);
+    if (!attrs.length) return [];
+    const db = this.instance.conn.db, conn = this.instance.conn;
+    const list = attrs.map(sq).join(",");
+    const meta = await chQuery<ChRow>(
+      "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt\n" +
+      "FROM " + db + ".clinical_attribute_meta cam\n" +
+      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
+      "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + list + ")", conn)
+      .catch(() => ({ data: [] as ChRow[] }));
+    const kindOf = new Map<string, "cat" | "num">(
+      meta.data.map((r) => [r.a, String(r.dt) === "NUMBER" ? "num" as const : "cat" as const]));
+    const catAttrs = attrs.filter((a) => kindOf.get(a) === "cat");
+    const numAttrs = attrs.filter((a) => kindOf.get(a) === "num");
+    const cohort = this.cohortSql(def);
+    const empty = { data: [] as ChRow[] };
+    const [cats, nums] = await Promise.all([
+      catAttrs.length ? chQuery<ChRow>(clinicalCountsSql(cohort, catAttrs, this.study, db), conn) : Promise.resolve(empty),
+      numAttrs.length ? chQuery<ChRow>(clinicalMomentsSql(cohort, numAttrs, this.study, db), conn) : Promise.resolve(empty)
+    ]);
+    const out: AttrStats[] = [];
+    const grouped = new Map<string, { per: string; values: { v: string; n: number }[] }>();
+    for (const r of cats.data) {
+      if (!grouped.has(r.a)) grouped.set(r.a, { per: r.per, values: [] });
+      grouped.get(r.a)!.values.push({ v: r.v, n: Number(r.n) });
+    }
+    for (const a of catAttrs) {
+      const g = grouped.get(a);
+      if (!g) { out.push({ attribute: a, per: "patient", kind: "cat", values: [] }); continue; }
+      out.push(g.values.length > ATTR_VALUE_CAP
+        // refused, not truncated: a chi-squared on a partial table is wrong
+        ? { attribute: a, per: g.per as "patient" | "sample", kind: "cat",
+            skipped: "more than " + ATTR_VALUE_CAP + " distinct values in " + this.study + "; a contingency test on a truncated table would be wrong" }
+        : { attribute: a, per: g.per as "patient" | "sample", kind: "cat", values: g.values });
+    }
+    for (const r of nums.data) {
+      out.push({ attribute: r.a, per: r.per as "patient" | "sample", kind: "num",
+        n: Number(r.n), sum: Number(r.sx), sumsq: Number(r.sxx), min: Number(r.mn), max: Number(r.mx) });
+    }
+    for (const a of attrs) {
+      if (!kindOf.has(a))
+        out.push({ attribute: a, per: "patient", kind: "cat", skipped: "not declared by " + this.study });
+    }
+    return out;
+  }
+
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
     if (!pairs.length) return [];
     const r = await chQuery<ChRow>(pairCountsSql(this.cohortSql(def), pairs, this.study, this.instance.conn.db), this.instance.conn);

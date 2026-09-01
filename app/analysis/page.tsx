@@ -13,6 +13,9 @@ const PIE_MAX_SLICES = 8;
  *  whole "p=..." / "p<..." label so the relation stays attached to the number. */
 const fmtP = (p: number): string =>
   p === 0 ? "p < 1e-300" : p < 1e-4 ? "p=" + p.toExponential(1) : "p=" + p.toFixed(4);
+/** the same value for a table cell, where the column header already says "p" */
+const pCell = (p: number): string =>
+  p === 0 ? "< 1e-300" : p < 1e-4 ? p.toExponential(1) : p.toFixed(4);
 /** true when two p-values land on opposite sides of the conventional threshold */
 const crossesThreshold = (a: number, b: number): boolean => (a < 0.05) !== (b < 0.05);
 const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
@@ -987,6 +990,45 @@ export default function AnalysisPage() {
                     </table>
                   </div>
                 </>}
+                {v.kind === "clinical" && v.clinical && <>
+                  <h2>Clinical comparison <span className="plain">— attribute distributions across cohorts</span></h2>
+                  {v.note && <p className="note">{v.note}</p>}
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
+                      <thead><tr>
+                        <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>attribute</th>
+                        {v.cohorts!.map((n, i: number) => <th key={n} style={{ textAlign: "left", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}</th>)}
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>test</th>
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p</th>
+                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q</th>
+                      </tr></thead>
+                      <tbody>{v.clinical.map(r => (
+                        <tr key={r.attribute} style={{ borderTop: "1px solid var(--line)" }}>
+                          <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600, whiteSpace: "nowrap" }}>
+                            {r.attribute}<br /><span className="meta" style={{ fontWeight: 400 }}>{r.per}-level · {r.kind === "num" ? "numeric" : (r.distinct ?? 0) + " values"}</span>
+                          </td>
+                          {r.skipped
+                            ? <td colSpan={v.cohorts!.length + 3} style={{ padding: "0.3rem 0.6rem", color: "var(--muted)", fontStyle: "italic" }}>not compared — {r.skipped}</td>
+                            : <>
+                              {r.cells.map(c => (
+                                <td key={c.cohort} style={{ padding: "0.3rem 0.6rem", verticalAlign: "top" }}>
+                                  {r.kind === "num"
+                                    ? <span style={{ fontVariantNumeric: "tabular-nums" }}>{c.mean} <span className="meta">± {c.sd} (n={c.n.toLocaleString()})</span></span>
+                                    : <span className="meta">{(c.top || []).slice(0, 3).map(t2 => t2.v + " " + Math.round(1000 * t2.n / (c.n || 1)) / 10 + "%").join(" · ")}</span>}
+                                </td>
+                              ))}
+                              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", whiteSpace: "nowrap" }}
+                                title={r.statistic != null ? r.test + " = " + r.statistic + ", df = " + r.df + (r.minExpected != null ? ", smallest expected cell = " + r.minExpected : "") : undefined}>
+                                <span className="meta">{r.test}</span>
+                              </td>
+                              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: (r.p ?? 1) < 0.001 ? 600 : 400 }}>{r.p != null ? pCell(r.p) : "—"}</td>
+                              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{r.q != null ? pCell(r.q) : "—"}</td>
+                            </>}
+                        </tr>))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
                   <h2>Co-occurrence <span className="plain">— pairwise, among patients profiled for both genes</span></h2>
                   {v.note && <p className="note">{v.note}</p>}
@@ -1016,8 +1058,8 @@ export default function AnalysisPage() {
                           <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.onlyB.toLocaleString()}</td>
                           <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{r.neither.toLocaleString()}</td>
                           <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{lor == null ? "—" : lor.toFixed(2)}</td>
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: pShown < 0.001 ? 600 : 400 }}>{fmtP(pShown).replace(/^p[=<] ?/, "")}</td>
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{fmtP(r.q).replace(/^p[=<] ?/, "")}</td>
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: pShown < 0.001 ? 600 : 400 }}>{pCell(pShown)}</td>
+                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{pCell(r.q)}</td>
                           <td style={{ padding: "0.3rem 0.6rem" }}>
                             {r.tendency && <span className={r.tendency === "co-occurrence" ? "tend co" : "tend mx"}>{r.tendency}</span>}
                           </td>

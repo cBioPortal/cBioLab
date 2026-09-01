@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 
 import {
   carriesPatientIds, geneCountsSql, survivalCountsSql, pairCountsSql,
+  clinicalCountsSql, clinicalMomentsSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
 import * as federation from "../lib/federation.ts";
@@ -148,6 +149,7 @@ describe("remote peers: nothing identifying leaves before the network is touched
       await assert.rejects(() => r.geneCounts(def, ["TP53"]), /explicit patient list/i);
       await assert.rejects(() => r.survivalCounts(def), /explicit patient list/i);
       await assert.rejects(() => r.pairCounts(def, [["TP53", "KRAS"]]), /explicit patient list/i);
+      await assert.rejects(() => r.attributeStats(def, ["SEX"]), /explicit patient list/i);
       assert.equal(calls, 0, "the guard must run before any request is made");
     } finally {
       globalThis.fetch = original;
@@ -175,7 +177,9 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "geneCountsSql": () => geneCountsSql(cohortSql, ["TP53", "KRAS"], "x", "v7.4", "db"),
     "geneCountsSql:no-annotation-pin": () => geneCountsSql(cohortSql, ["TP53"], "x", null, "db"),
     "survivalCountsSql": () => survivalCountsSql(cohortSql, "x", "db"),
-    "pairCountsSql": () => pairCountsSql(cohortSql, [["TP53", "KRAS"], ["EGFR", "ALK"]], "x", "db")
+    "pairCountsSql": () => pairCountsSql(cohortSql, [["TP53", "KRAS"], ["EGFR", "ALK"]], "x", "db"),
+    "clinicalCountsSql": () => clinicalCountsSql(cohortSql, ["SEX", "CANCER_TYPE"], "x", "db"),
+    "clinicalMomentsSql": () => clinicalMomentsSql(cohortSql, ["CURRENT_AGE_DEID"], "x", "db")
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

@@ -9,13 +9,14 @@ import { sq } from "./compiler.ts";
 import { compileCohortDef, describeCohortDef } from "./cohort2.ts";
 import { genomicEventsSql, coverageSql, buildContract, PIDS_SQL } from "./oncoprint.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
-import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio } from "./stats.ts";
+import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
+  chiSquareTest, welchT, varianceFromMoments } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting, restrictedStudies,
-  type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts
+  type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats
 } from "./federation.ts";
 
 async function oncokbPin(): Promise<string | null> {
@@ -209,6 +210,84 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
             : logrank
               ? " Log-rank on a single study, so no stratification applies."
               : " Log-rank needs exactly two cohorts.") });
+
+    } else if (view.kind === "clinical") {
+      const attrs = ((view as ClinicalView).attributes || [])
+        .map((a) => String(a).trim()).filter((a) => /^[A-Za-z0-9_]{1,64}$/.test(a)).slice(0, 20);
+      if (!attrs.length) { views.push({ kind: "clinical", error: "clinical view needs attributes" }); continue; }
+      if (vNames.length < 2) { views.push({ kind: "clinical", error: "clinical comparison needs at least 2 cohorts" }); continue; }
+      // cohort -> study -> that site's description of each attribute
+      const stats = new Map<string, AttrStats[]>();  // "cohort|study"
+      await Promise.all(vNames.flatMap((n) =>
+        cohorts[n].studies.map(async (st) => {
+          stats.set(n + "|" + st, await resolvers[st].attributeStats(doc.cohorts[n], attrs));
+        })));
+      const rows: ClinicalRow[] = [];
+      for (const attribute of attrs) {
+        const pick = (n: string, st: string) => (stats.get(n + "|" + st) || []).find((x) => x.attribute === attribute);
+        const all = vNames.flatMap((n) => cohorts[n].studies.map((st) => pick(n, st))).filter((x): x is AttrStats => !!x);
+        if (!all.length) { rows.push({ attribute, per: "patient", kind: "cat", cells: [], skipped: "no participating study reports this attribute" }); continue; }
+        const refused = all.find((x) => x.skipped);
+        if (refused) { rows.push({ attribute, per: refused.per, kind: refused.kind, cells: [], skipped: refused.skipped }); continue; }
+        // Sites disagreeing on the TYPE of an attribute is a real possibility and
+        // is refused, not resolved by majority — silently dropping the dissenting
+        // study's patients would understate the cohort with no way to notice.
+        const kinds = [...new Set(all.map((x) => x.kind))];
+        if (kinds.length > 1) {
+          rows.push({ attribute, per: all[0].per, kind: all[0].kind, cells: [],
+            skipped: "the participating studies disagree on its type (" + kinds.join(" vs ") + "); comparing them would mean discarding one side's patients" });
+          continue;
+        }
+        const kind = kinds[0], per = all[0].per;
+        if (kind === "cat") {
+          const cells = vNames.map((n) => {
+            const merged = new Map<string, number>();
+            for (const st of cohorts[n].studies)
+              for (const v of pick(n, st)?.values || []) merged.set(v.v, (merged.get(v.v) || 0) + v.n);
+            const values = [...merged].map(([v, c]) => ({ v, n: c })).sort((x, y) => y.n - x.n);
+            return { cohort: n, n: values.reduce((s, x) => s + x.n, 0), top: values.slice(0, 5), values };
+          });
+          const vocab = [...new Set(cells.flatMap((c) => c.values.map((v) => v.v)))];
+          const table = cells.map((c) => vocab.map((v) => c.values.find((x) => x.v === v)?.n || 0));
+          const t = chiSquareTest(table);
+          rows.push({ attribute, per, kind, test: "chi-squared",
+            cells: cells.map(({ cohort, n, top }) => ({ cohort, n, top })),
+            distinct: vocab.length, p: t.p, df: t.df, statistic: t.chi2, minExpected: t.minExpected, q: 1 });
+        } else {
+          const cells = vNames.map((n) => {
+            let n0 = 0, sum = 0, sumsq = 0, mn = Infinity, mx = -Infinity;
+            for (const st of cohorts[n].studies) {
+              const s = pick(n, st); if (!s || !s.n) continue;
+              n0 += s.n!; sum += s.sum!; sumsq += s.sumsq!;
+              mn = Math.min(mn, s.min!); mx = Math.max(mx, s.max!);
+            }
+            const variance = varianceFromMoments(n0, sum, sumsq);
+            return { cohort: n, n: n0, mean: n0 ? Math.round((sum / n0) * 1e3) / 1e3 : null,
+              sd: Math.round(Math.sqrt(variance) * 1e3) / 1e3,
+              min: Number.isFinite(mn) ? mn : null, max: Number.isFinite(mx) ? mx : null, variance };
+          });
+          const row: ClinicalRow = { attribute, per, kind, q: 1,
+            cells: cells.map(({ variance, ...c }) => c) };
+          if (vNames.length === 2) {
+            const [x, y] = cells;
+            const w = welchT(x.n, x.mean ?? 0, x.variance, y.n, y.mean ?? 0, y.variance);
+            row.test = "Welch t"; row.statistic = w.t; row.df = w.df; row.p = w.p;
+          } else {
+            row.skipped = "a numeric attribute is tested only for exactly 2 cohorts";
+          }
+          rows.push(row);
+        }
+      }
+      const tested = rows.filter((r) => r.p != null);
+      benjaminiHochberg(tested.map((r) => r.p!)).forEach((q, i) => { tested[i].q = q; });
+      rows.sort((a, b) => (a.p ?? 2) - (b.p ?? 2));
+      views.push({ kind: "clinical", cohorts: vNames, clinical: rows, studies: vStudies,
+        note: "Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary;" +
+          " numeric ones with Welch's unequal-variance t-test computed from (n, Σx, Σx²) — those three totals are" +
+          " ADDITIVE across sites, so the pooled mean and variance are exact from per-site aggregates and no" +
+          " individual value is ever transmitted. Counting unit follows the attribute: patients for patient-level," +
+          " samples for sample-level. q-values are Benjamini–Hochberg across the " + tested.length + " tested attributes." +
+          (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged." : "") });
 
     } else if (view.kind === "cooccurrence") {
       // Co-occurrence is a property of ONE cohort, not a comparison between two,
