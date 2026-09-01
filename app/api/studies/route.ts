@@ -1,4 +1,5 @@
 import { chQuery, connections, type ChConn } from "../../../lib/ch.ts";
+import { isRestrictedStudy } from "../../../lib/federation.ts";
 
 type StudyRow = {
   id: string; name: string; cancerType: string;
@@ -47,7 +48,7 @@ async function studiesFor(conn: ChConn): Promise<StudyRow[]> {
     oncokb = new Set(ok.data.map((x) => x.study));
   } catch { /* store not granted here */ }
 
-  return r.data.map((x): StudyRow => {
+  return r.data.filter((x) => !isRestrictedStudy(x.id, x.name)).map((x): StudyRow => {
     const types = gpMap.get(x.id) || new Set<string>();
     return {
       id: x.id, name: x.name,

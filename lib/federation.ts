@@ -42,19 +42,40 @@ export interface GeneCounts { gene: string; profiled: number; altered: number; d
 export interface SurvivalCount { months: number; event: number; n: number }
 
 /**
+ * Access policy. Some studies in a portal database are consortium- or
+ * institution-restricted (GENIE ships "-consortium" cohorts alongside their
+ * "-public" counterparts, plus the private cohort). This deployment is a public
+ * demo, so those are excluded — and excluded at the ROUTING layer, so no
+ * surface can reach them: not the study picker, not a hand-written ?doc= link,
+ * not an MCP call. Override with STUDY_ALLOW_RESTRICTED=1 in a deployment
+ * entitled to the data; add ids to STUDY_DENY to exclude more.
+ */
+export function isRestrictedStudy(id: string, name = ""): boolean {
+  const extra = (process.env.STUDY_DENY || "").split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
+  if (extra.includes(id)) return true;
+  if (process.env.STUDY_ALLOW_RESTRICTED === "1") return false;
+  return /consortium/i.test(name) || /\bprivate\b/i.test(name) || /_private$|^private_/i.test(id);
+}
+
+/**
  * study -> owning connection, discovered by asking each configured instance
  * which studies it holds. Cached per process. First instance wins a collision,
- * and the collision is reported rather than silently resolved.
+ * and the collision is reported rather than silently resolved. Restricted
+ * studies are never routed, so they are unreachable rather than merely hidden.
  */
 let _routing: Map<string, ChConn> | null = null;
 export const routingCollisions: string[] = [];
+/** ids withheld by policy — used to explain refusals rather than say "unknown" */
+export const restrictedStudies = new Set<string>();
 export async function studyRouting(): Promise<Map<string, ChConn>> {
   if (_routing) return _routing;
   const map = new Map<string, ChConn>();
   for (const conn of connections()) {
     try {
-      const r = await chQuery<{ id: string }>("SELECT cancer_study_identifier AS id FROM " + conn.db + ".cancer_study", conn);
-      for (const { id } of r.data) {
+      const r = await chQuery<{ id: string; name: string }>(
+        "SELECT cancer_study_identifier AS id, name FROM " + conn.db + ".cancer_study", conn);
+      for (const { id, name } of r.data) {
+        if (isRestrictedStudy(id, name)) { restrictedStudies.add(id); continue; }
         if (map.has(id)) { routingCollisions.push(id); continue; } // first instance wins; surfaced, not hidden
         map.set(id, conn);
       }

@@ -14,7 +14,7 @@ import { contractToSvg } from "./oncoprint-svg.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
-  resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting,
+  resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting, restrictedStudies,
   type Resolver, type GeneCounts, type SurvivalCount, type Instance
 } from "./federation.ts";
 
@@ -56,7 +56,11 @@ export async function resolveStudy(requested?: string | null, fallback?: string 
   const { peerForStudy } = await import("./federation-remote.ts");
   if (peerForStudy(study)) return study; // held by a peer; only it can validate
   const set = await validStudies();
-  if (!set.has(study)) throw new Error("unknown study '" + study.slice(0, 60) + "'");
+  if (!set.has(study)) {
+    if (restrictedStudies.has(study))
+      throw new Error("study '" + study.slice(0, 60) + "' is consortium/private-access and is excluded from this deployment");
+    throw new Error("unknown study '" + study.slice(0, 60) + "'");
+  }
   return study;
 }
 
