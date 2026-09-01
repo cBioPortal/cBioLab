@@ -9,9 +9,9 @@ import { sq } from "./compiler.ts";
 import { compileCohortDef, describeCohortDef } from "./cohort2.ts";
 import { genomicEventsSql, coverageSql, buildContract, PIDS_SQL } from "./oncoprint.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
-import { fisherExact, kaplanMeier } from "./stats.ts";
+import { fisherExact, kaplanMeier, logRank } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting, restrictedStudies,
@@ -165,19 +165,48 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
     } else if (view.kind === "survival") {
       // Each participant returns (months, event, n) triples for its own patients:
       // aggregate, id-free, and poolable into an exact combined KM curve.
-      const pooled = new Map<string, SurvivalCount[]>(); // cohort -> triples
+      // Triples are kept PER STUDY rather than merged on arrival, because the
+      // log-rank statistic is additive over strata — keeping the site dimension
+      // is what makes the stratified test available.
+      const perSite = new Map<string, Map<string, SurvivalCount[]>>(); // cohort -> study -> triples
+      for (const n of vNames) perSite.set(n, new Map());
       await Promise.all(vNames.flatMap((n) =>
         cohorts[n].studies.map(async (st) => {
-          const cs = await resolvers[st].survivalCounts(doc.cohorts[n]);
-          pooled.set(n, [...(pooled.get(n) || []), ...cs]);
+          perSite.get(n)!.set(st, await resolvers[st].survivalCounts(doc.cohorts[n]));
         })));
+      const pointsFor = (n: string, st?: string) => expandSurvivalCounts(
+        st ? (perSite.get(n)!.get(st) || []) : [...perSite.get(n)!.values()].flat());
       const curves = vNames.map((n) => {
-        const data = expandSurvivalCounts(pooled.get(n) || []);
+        const data = pointsFor(n);
         return { cohort: n, ...kaplanMeier(data), missing: cohorts[n].count - data.length };
       });
+      // Two cohorts is the case the log-rank test is defined for, matching the
+      // compare view's Fisher p.
+      let logrank: LogRank | undefined, logrankPooled: LogRank | undefined;
+      let sites: string[] = [];
+      if (vNames.length === 2) {
+        const [A, B] = vNames;
+        sites = [...new Set([...perSite.get(A)!.keys(), ...perSite.get(B)!.keys()])];
+        const pooledTest = logRank([{ a: pointsFor(A), b: pointsFor(B) }]);
+        if (sites.length > 1) {
+          logrank = logRank(sites.map((st) => ({ a: pointsFor(A, st), b: pointsFor(B, st) })));
+          logrankPooled = pooledTest;   // shown for contrast: the two can disagree
+        } else {
+          logrank = pooledTest;
+        }
+      }
       views.push({ kind: "survival", cohorts: vNames, curves,
+        ...(logrank ? { logrank } : {}), ...(logrankPooled ? { logrankPooled } : {}),
         caveat: "OS from each study's own baseline (left truncation applies" +
-          (vStudies.length > 1 ? "; baselines are NOT harmonized across studies" : "") + "); status '0:...' treated as censored." });
+          (vStudies.length > 1 ? "; baselines are NOT harmonized across studies" : "") + "); status '0:...' treated as censored." +
+          (logrankPooled
+            ? " The log-rank test is STRATIFIED by study (" + logrank!.strata + " strata contributed events): each study is" +
+              " compared only against itself, so a difference in case mix between studies cannot masquerade as a difference" +
+              " between cohorts. The pooled p is shown alongside — where the two disagree, the stratified one is the honest answer." +
+              " Every site contributes only (months, event, n) counts; no patient-level survival time crosses an instance boundary."
+            : logrank
+              ? " Log-rank on a single study, so no stratification applies."
+              : " Log-rank needs exactly two cohorts.") });
 
     } else if (view.kind === "oncoprint") {
       // Oncoprint columns ARE patients, so an instance that will not disclose

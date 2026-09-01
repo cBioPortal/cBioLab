@@ -93,6 +93,19 @@ export const EXAMPLES: DslExample[] = [
         heatmap: [{ profileType: "rna_seq_v2_mrna_median_Zscores" }],
         sort: ["-ERBB2 mRNA-z"] }]
     }
+  },
+  {
+    title: "Study-stratified survival across two studies",
+    note: "TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "TP53 mut": { studies: ["msk_chord_2024", "msk_met_2021"], all: [{ kind: "oql", q: "TP53: MUT" }] },
+        "TP53 wt": { studies: ["msk_chord_2024", "msk_met_2021"],
+          all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] }
+      },
+      views: [{ kind: "survival" }]
+    }
   }
 ];
 
@@ -196,7 +209,7 @@ rel      := { "type": "NONE" }                                                 /
 | kind | fields | semantics |
 |---|---|---|
 | \`compare\` | \`genes:[≤20], cohorts?:[names]\` | per-gene driver% / altered% per cohort with **panel-aware denominators** (profiled patients only); two-sided Fisher p when exactly 2 cohorts |
-| \`survival\` | \`cohorts?:[names]\` | Kaplan–Meier on OS_MONTHS/OS_STATUS; left truncation caveat applies; cross-study baselines are not harmonized |
+| \`survival\` | \`cohorts?:[names]\` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts. Across studies the test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. Left truncation caveat applies; cross-study baselines are not harmonized |
 | \`oncoprint\` | \`genes:[≤12], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], cohorts?:[names]\` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 \`views[].cohorts\` defaults to all cohorts. Oncoprints federate across studies: columns are

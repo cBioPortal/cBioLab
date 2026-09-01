@@ -7,6 +7,14 @@ import type { AnalysisDoc, AnalysisResult, CohortDef, View, OncoprintView, Explo
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
 /** beyond this many distinct values a pie is unreadable — the portal shows a table */
 const PIE_MAX_SLICES = 8;
+
+/** p-values: exponent notation once fixed notation would round to zero, and an
+ *  honest floor when the true value underflows double precision. Returns the
+ *  whole "p=..." / "p<..." label so the relation stays attached to the number. */
+const fmtP = (p: number): string =>
+  p === 0 ? "p < 1e-300" : p < 1e-4 ? "p=" + p.toExponential(1) : "p=" + p.toFixed(4);
+/** true when two p-values land on opposite sides of the conventional threshold */
+const crossesThreshold = (a: number, b: number): boolean => (a < 0.05) !== (b < 0.05);
 const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
 
 interface Example { name: string; desc: string; def: CohortDef }
@@ -985,6 +993,18 @@ export default function AnalysisPage() {
                   <div style={{ display: "flex", gap: "1.2rem", fontSize: "0.76rem", color: "var(--muted)", marginTop: "0.4rem", flexWrap: "wrap" }}>
                     {v.curves!.map((c, i: number) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: median {c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}
                   </div>
+                  {v.logrank && (
+                    <div className="logrank" title={"observed " + v.logrank.observed.join(" / ") + " events vs expected " + v.logrank.expected.join(" / ") + " under the null"}>
+                      <strong>log-rank</strong> χ²={v.logrank.chi2.toFixed(2)} ({v.logrank.df} df) · <strong>{fmtP(v.logrank.p)}</strong>
+                      {v.logrank.strata > 1 && <span className="meta"> · stratified by study, {v.logrank.strata} strata</span>}
+                      {v.logrankPooled && (
+                        <span className="meta" title="the unstratified test, which pools risk sets across studies and assumes a common baseline hazard">
+                          {"  ·  pooled " + fmtP(v.logrankPooled.p)}
+                          {crossesThreshold(v.logrank.p, v.logrankPooled.p) && <strong style={{ color: "var(--warn, #b45309)" }}> — the two disagree at p=0.05</strong>}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <p className="note">{v.caveat}</p>
                 </>}
                 {v.kind === "oncoprint" && v.svg && <>

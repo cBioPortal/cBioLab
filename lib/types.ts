@@ -139,11 +139,20 @@ export interface KmCurve {
   cohort: string; points: KmPoint[]; median: number | null;
   n: number; events: number; missing?: number;
 }
+export interface LogRank {
+  chi2: number; p: number; df: number;
+  /** total events in each group, then the expected counts under the null */
+  observed: number[]; expected: number[];
+  variance: number;
+  /** how many strata contributed events — >1 means the test is site-stratified */
+  strata: number;
+}
 export interface ViewResult {
   kind: string; error?: string; note?: string; studies?: string[];
   cohorts?: string[]; annotation?: string;
   rows?: CompareRow[];                      // compare
   curves?: KmCurve[]; caveat?: string;      // survival
+  logrank?: LogRank; logrankPooled?: LogRank;
   svg?: string; nColumns?: number;          // oncoprint
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
 }
