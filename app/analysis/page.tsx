@@ -63,6 +63,10 @@ function KMChart({ curves }: { curves: KmCurve[] }) {
   return <canvas ref={ref} style={{ width: "100%", display: "block" }} />;
 }
 
+/** Explore opens on these: one deeply-annotated MSK study and one large
+ *  consortium cohort on the peer instance, so federation is visible up front. */
+const DEFAULT_EXPLORE_STUDIES = ["msk_chord_2024", "genie_public"];
+
 const EMPTY_DOC: AnalysisDoc = { cohorts: {}, views: [] };
 const DEFAULT_VIEWS: View[] = [
   { kind: "compare", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR", "ARID1A", "MSH3"] },
@@ -83,7 +87,7 @@ export default function AnalysisPage() {
   const [chatReady, setChatReady] = useState<boolean | null>(null);
   const [saved, setSaved] = useState<Record<string, { def: CohortDef; savedAt: string; lastEval?: { count: number; text: string } | null }>>({});
   const [cName, setCName] = useState("");
-  const [cDefText, setCDefText] = useState(JSON.stringify({ study: "msk_chord_2024", all: [] }, null, 2));
+  const [cDefText, setCDefText] = useState(JSON.stringify({ studies: [...DEFAULT_EXPLORE_STUDIES], all: [] }, null, 2));
   const [cPreview, setCPreview] = useState<{ error?: string; count?: number; text?: string } | null>(null);
   const [cBusy, setCBusy] = useState(false);
   const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
@@ -94,9 +98,9 @@ export default function AnalysisPage() {
   const [trackAttrs, setTrackAttrs] = useState<{ key: string; attrs: { attribute: string; kind: string }[]; profiles: string[] }>({ key: "", attrs: [], profiles: [] }); // track picker options
   const [sQuery, setSQuery] = useState("");                             // study-panel search
   const [sCaps, setSCaps] = useState<Set<string>>(() => new Set());                  // study-panel capability filters
-  const [exStudies, setExStudies] = useState<string[]>(["msk_chord_2024"]);       // studies being explored (checkboxes)
+  const [exStudies, setExStudies] = useState<string[]>([...DEFAULT_EXPLORE_STUDIES]); // studies being explored (checkboxes)
   const [exPanelOpen, setExPanelOpen] = useState(false);                // study panel expanded?
-  const exSel = useRef<string[]>(["msk_chord_2024"]);                             // current selection (ref: immune to state races)
+  const exSel = useRef<string[]>([...DEFAULT_EXPLORE_STUDIES]);                   // current selection (ref: immune to state races)
   const exFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);                                    // debounce for multi-toggle refetch
   const exFetchSeq = useRef(0);                                         // stale-response guard for explore fetches
   const [qaAttr, setQaAttr] = useState("");                             // creator quick-add: attribute
