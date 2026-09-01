@@ -184,7 +184,7 @@ button.facet.on { border-color: var(--accent); background: var(--accent-soft); c
 /* condensed study rows in the Explore study panel */
 .study-row {
   display: grid;
-  grid-template-columns: 16px minmax(14rem, 2.4fr) minmax(9rem, 1.1fr) minmax(8rem, 1fr) 4.8rem minmax(8rem, 1fr);
+  grid-template-columns: 16px minmax(12rem, 2.2fr) minmax(8rem, 1fr) minmax(7rem, 0.9fr) auto 4.8rem minmax(7rem, 0.9fr);
   gap: 0 0.6rem;
   align-items: baseline;
   padding: 0.13rem 0.4rem;

@@ -1,20 +1,21 @@
 // Faceted study explorer: what exists, in what numbers — optionally conditioned on a
 // draft cohort so every count narrows as clauses are added (study-view-style feedback).
 // Everything returned is designed to be clickable into a DSL clause.
-import { chQuery, DB } from "./ch.ts";
+import { chQuery, DB, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
 import type { ExploreResult, ClinicalFacet, CohortDef, ChRow } from "./types.ts";
 import { isClinicalLeaf } from "./types.ts";
 
-export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[] }): Promise<ExploreResult> {
+export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn }): Promise<ExploreResult> {
+  const db = conn.db;
   const t0 = Date.now();
   let cond = "", draftCount = null, dsql = null;
   if (draft && Array.isArray(draft.all) && draft.all.length) {
-    dsql = compileCohortDef(draft, { oncokbPin, profiles, gaProfiles, study });
+    dsql = compileCohortDef(draft, { oncokbPin, profiles, gaProfiles, study, db });
     cond = "\n  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + dsql + "))";
-    const c = await chQuery("SELECT uniqExact(pid) AS n FROM (" + dsql + ")");
+    const c = await chQuery("SELECT uniqExact(pid) AS n FROM (" + dsql + ")", conn);
     draftCount = Number(c.data[0].n);
   }
 
@@ -25,9 +26,9 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     "  uniqExact(patient_unique_id) AS np,\n" +
     "  min(toFloat64OrNull(attribute_value)) AS mn, max(toFloat64OrNull(attribute_value)) AS mx,\n" +
     "  quantile(0.5)(toFloat64OrNull(attribute_value)) AS md\n" +
-    "FROM " + DB + ".clinical_data_derived\n" +
+    "FROM " + db + ".clinical_data_derived\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''" + cond + "\n" +
-    "GROUP BY type, a ORDER BY np DESC LIMIT 44");
+    "GROUP BY type, a ORDER BY np DESC LIMIT 44", conn);
   const catAttrs = cls.data.filter(r => Number(r.nv) <= 30 && Number(r.numratio) < 0.9);
   const numAttrs = cls.data.filter(r => Number(r.numratio) >= 0.9 && Number(r.nv) > 10);
 
@@ -35,10 +36,10 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
   if (catAttrs.length) {
     const v = await chQuery(
       "SELECT type, attribute_name AS a, attribute_value AS v, uniqExact(patient_unique_id) AS n\n" +
-      "FROM " + DB + ".clinical_data_derived\n" +
+      "FROM " + db + ".clinical_data_derived\n" +
       "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
       "  AND attribute_name IN (" + catAttrs.map(r => sq(r.a)).join(",") + ")" + cond + "\n" +
-      "GROUP BY type, a, v ORDER BY n DESC LIMIT 6 BY type, a");
+      "GROUP BY type, a, v ORDER BY n DESC LIMIT 6 BY type, a", conn);
     catValues = v.data;
   }
   // Disjunctive faceting: attributes already constrained in the draft get their value
@@ -56,15 +57,15 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     const rest: CohortDef = { ...draft!, all: (draft!.all || []).filter((c) => !(isClinicalLeaf(c) && c.attribute === attr && (c.per === "sample" ? "sample" : "patient") === per)) };
     let subCond = "";
     if (rest.all!.length) {
-      const rsql = compileCohortDef(rest, { oncokbPin, profiles, gaProfiles, study });
+      const rsql = compileCohortDef(rest, { oncokbPin, profiles, gaProfiles, study, db });
       subCond = "\n  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + rsql + "))";
     }
     const v = await chQuery(
       "SELECT attribute_value AS v, uniqExact(patient_unique_id) AS n\n" +
-      "FROM " + DB + ".clinical_data_derived\n" +
+      "FROM " + db + ".clinical_data_derived\n" +
       "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
       "  AND type = " + sq(per) + " AND attribute_name = " + sq(attr) + subCond + "\n" +
-      "GROUP BY v ORDER BY n DESC LIMIT 6");
+      "GROUP BY v ORDER BY n DESC LIMIT 6", conn);
     disjValues.set(key, v.data.map(x => ({ v: x.v, n: Number(x.n) })));
   }
 
@@ -84,30 +85,30 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
   // ---- timeline event types ----------------------------------------------
   const ev = await chQuery(
     "SELECT ce.event_type AS t, uniqExact(ce.patient_id) AS n\n" +
-    "FROM " + DB + ".clinical_event ce\n" +
-    "JOIN " + DB + ".patient p ON p.internal_id = ce.patient_id\n" +
-    "JOIN " + DB + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "FROM " + db + ".clinical_event ce\n" +
+    "JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) +
     (dsql ? "\n  AND p.stable_id IN (SELECT pid FROM (" + dsql + "))" : "") + "\n" +
-    "GROUP BY t ORDER BY n DESC");
+    "GROUP BY t ORDER BY n DESC", conn);
 
   // ---- top altered genes --------------------------------------------------
   const genes = await chQuery(
     "SELECT hugo_gene_symbol AS g, uniqExact(patient_unique_id) AS n\n" +
-    "FROM " + DB + ".genomic_event_derived\n" +
+    "FROM " + db + ".genomic_event_derived\n" +
     "WHERE cancer_study_identifier = " + sq(study) + "\n" +
     "  AND (variant_type != 'cna' OR abs(cna_alteration) >= 2)" + cond + "\n" +
-    "GROUP BY g ORDER BY n DESC LIMIT 15");
+    "GROUP BY g ORDER BY n DESC LIMIT 15", conn);
 
   // ---- case lists (sizes are study-wide, not draft-conditioned) ----------
   const lists = await chQuery(
     "SELECT sl.stable_id AS id, any(sl.name) AS name, uniqExact(p.stable_id) AS n\n" +
-    "FROM " + DB + ".sample_list sl\n" +
-    "JOIN " + DB + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
-    "JOIN " + DB + ".sample s ON s.internal_id = sll.sample_id\n" +
-    "JOIN " + DB + ".patient p ON p.internal_id = s.patient_id\n" +
+    "FROM " + db + ".sample_list sl\n" +
+    "JOIN " + db + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
+    "JOIN " + db + ".sample s ON s.internal_id = sll.sample_id\n" +
+    "JOIN " + db + ".patient p ON p.internal_id = s.patient_id\n" +
     "WHERE sl.stable_id LIKE " + sq(study + "_%") + "\n" +
-    "GROUP BY id ORDER BY n DESC LIMIT 10");
+    "GROUP BY id ORDER BY n DESC LIMIT 10", conn);
 
   return {
     study, draftCount,
@@ -127,10 +128,10 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
 // whole harmonization). Numeric medians are patient-weighted approximations;
 // min/max are exact. An attribute classified differently across studies takes
 // the kind of the study with the most patients for it.
-export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }> }): Promise<ExploreResult> {
+export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy, connByStudy }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>; connByStudy?: Map<string, ChConn> }): Promise<ExploreResult> {
   const t0 = Date.now();
   const parts = await Promise.all(studies.map(s =>
-    buildExplore({ study: s, draft, oncokbPin, ...(profilesByStudy.get(s) || {}) })));
+    buildExplore({ study: s, draft, oncokbPin, conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}) })));
   if (parts.length === 1) return parts[0];
 
   const clin = new Map<string, ClinicalFacet[]>(); // per|attribute -> list of items

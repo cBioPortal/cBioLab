@@ -1,4 +1,6 @@
 import { buildExplore, buildExploreFederated } from "../../../lib/explore.ts";
+import { studyRouting } from "../../../lib/federation.ts";
+import { PRIMARY } from "../../../lib/ch.ts";
 import { studyProfiles, resolveStudy } from "../../../lib/analysis.ts";
 import { chQuery } from "../../../lib/ch.ts";
 
@@ -21,11 +23,13 @@ export async function POST(req: Request) {
     const pin = process.env.ONCOKB_PIN || await oncokbPin();
     const profilesByStudy = new Map();
     for (const s of studies) profilesByStudy.set(s, await studyProfiles(s));
+    const routing = await studyRouting();
+    const connByStudy = new Map(studies.map((s) => [s, routing.get(s) || PRIMARY]));
     if (studies.length === 1) {
       const { profiles, gaProfiles } = profilesByStudy.get(studies[0]);
-      return Response.json(await buildExplore({ study: studies[0], draft: body.draft || null, oncokbPin: pin, profiles, gaProfiles }));
+      return Response.json(await buildExplore({ study: studies[0], draft: body.draft || null, oncokbPin: pin, profiles, gaProfiles, conn: connByStudy.get(studies[0]) }));
     }
-    return Response.json(await buildExploreFederated({ studies, draft: body.draft || null, oncokbPin: pin, profilesByStudy }));
+    return Response.json(await buildExploreFederated({ studies, draft: body.draft || null, oncokbPin: pin, profilesByStudy, connByStudy }));
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
   }

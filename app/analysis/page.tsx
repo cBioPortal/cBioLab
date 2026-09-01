@@ -87,7 +87,7 @@ export default function AnalysisPage() {
   const [cPreview, setCPreview] = useState<{ error?: string; count?: number; text?: string } | null>(null);
   const [cBusy, setCBusy] = useState(false);
   const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
-  const [studies, setStudies] = useState<{ id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean }[]>([]);
+  const [studies, setStudies] = useState<{ id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string }[]>([]);
   const [study, setStudy] = useState("msk_chord_2024");
   const [explore, setExplore] = useState<ExploreResult | null>(null);
   const [exploreBusy, setExploreBusy] = useState(false);
@@ -409,7 +409,8 @@ export default function AnalysisPage() {
               ["mrna", "mRNA", (s: any) => s.caps && s.caps.mrna],
               ["protein", "protein", (s: any) => s.caps && s.caps.protein],
               ["ga", "generic assay", (s: any) => s.caps && s.caps.ga],
-              ["oncokb", "OncoKB-synced", (s: any) => s.oncokb]
+              ["oncokb", "OncoKB-synced", (s: any) => s.oncokb],
+              ["peer", "other instance", (s: any) => s.instance && s.instance !== "a"]
             ];
             const byId = new Map(studies.map((s) => [s.id, s] as const));
             const selPts = exStudies.reduce((n: number, id: string) => n + (byId.get(id)?.patients ?? 0), 0);
@@ -455,6 +456,8 @@ export default function AnalysisPage() {
                         <strong>{s.name}</strong>
                         <span className="meta mono">{s.id}</span>
                         <span className="meta">{s.cancerType}</span>
+                        {s.instance && s.instance !== "a" &&
+                          <span className="meta" style={{ color: "var(--accent-ink)" }} title={"held by " + s.instanceLabel}>⧉ {s.instanceLabel}</span>}
                         <span className="meta pts">{s.patients.toLocaleString()}</span>
                         <span className="meta caps">{[
                           s.timelinePatients > 0 ? "timeline" : null,
