@@ -12,11 +12,11 @@ import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, fisherZMeta } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, CoexpressionView, CoexprRow, HotspotsView, HotspotGene } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting, restrictedStudies,
-  type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments
+  type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments
 } from "./federation.ts";
 
 async function oncokbPin(): Promise<string | null> {
@@ -467,6 +467,33 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       }
       const multi = okStudies.length > 1;
       const genes = ((view as OncoprintView).genes || []).slice(0, 12);
+      // Federated z-score reference: a heatmap track marked reference:"federation"
+      // is scored against a distribution pooled from EVERY participating study,
+      // including the aggregate-only ones that contribute no columns. Each of
+      // those returns three totals per gene — n, sum, sum of squares — so a site
+      // that will not disclose a patient still shapes what the drawn columns mean.
+      const heatSpecs = (view as OncoprintView).heatmap || [];
+      const zReference: Record<string, ZReference> = {};
+      for (const h of heatSpecs) {
+        if (h.reference !== "federation" || /^vaf$/i.test(h.profileType)) continue;
+        const hGenes = (h.genes && h.genes.length ? h.genes : genes).map((g) => String(g).toUpperCase().trim()).filter((g) => GENE_RE.test(g));
+        if (!hGenes.length) continue;
+        const per = await Promise.all(vStudies.map(async (st) => ({
+          st, m: await resolvers[st].profileMoments(null, hGenes, h.profileType).catch(() => [] as ProfileMoments[])
+        })));
+        for (const gene of hGenes) {
+          let n = 0, sum = 0, sumsq = 0; const contributing: string[] = [];
+          for (const { st, m } of per) {
+            const g = m.find((x) => x.gene === gene);
+            if (!g || !g.n) continue;
+            n += g.n; sum += g.sum; sumsq += g.sumsq; contributing.push(st);
+          }
+          if (n < 3) continue;                       // too little to define a reference
+          const sd = Math.sqrt(varianceFromMoments(n, sum, sumsq));
+          if (!(sd > 0)) continue;                   // a constant reference cannot z-score anything
+          zReference[h.profileType + "|" + gene] = { mean: sum / n, sd, n, studies: contributing };
+        }
+      }
       // federated: each group carries a {study: sql} map; each cohort contributes
       // only the studies it was actually evaluated in
       const contract = await buildContract({
@@ -476,6 +503,7 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
         clinical: (view as OncoprintView).clinical || [],
         heatmap: (view as OncoprintView).heatmap || [],
         sort: (view as OncoprintView).sort,
+        ...(Object.keys(zReference).length ? { zReference } : {}),
         derivedEvents: [],
         layout: { groupBy: { kind: "cohorts" as const, groups: vNames.map((n) => ({ name: n, dsl: {
           [PIDS_SQL]: multi

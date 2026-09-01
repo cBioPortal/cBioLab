@@ -40,6 +40,8 @@ export interface Instance {
 export interface GeneCounts { gene: string; profiled: number; altered: number; driver: number }
 /** (months, event) multiset — pools exactly across instances, carries no ids */
 export interface SurvivalCount { months: number; event: number; n: number }
+/** Additive moments for one gene on a continuous profile. */
+export interface ProfileMoments { gene: string; n: number; sum: number; sumsq: number }
 /** One protein change and how many patients carry it. */
 export interface VariantCount {
   gene: string; variant: string; type: string; pos: number | null; n: number;
@@ -250,6 +252,34 @@ export function pairCountsSql(cohortSql: string, pairs: [string, string][], stud
     "FROM pp\n" +
     "ARRAY JOIN " + arrA + " AS ga, " + arrB + " AS gb\n" +
     "GROUP BY ga, gb"
+  );
+}
+
+/**
+ * Per-gene (n, sum, sum of squares) on a continuous profile.
+ *
+ * Used to build a z-score REFERENCE distribution. Note what this enables: an
+ * instance that will never disclose a patient — and so can contribute no
+ * oncoprint columns — can still contribute three totals per gene, which is
+ * enough to define the population the drawn columns are scored against. The
+ * reference gets broader without anyone's values moving.
+ */
+export function profileMomentsSql(cohortSql: string, genes: string[], profileType: string, study: string, db: string = DB): string {
+  const pid = "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')";
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "vals AS (\n" +
+    "  SELECT " + pid + " AS pid, ga.hugo_gene_symbol AS gene,\n" +
+    "         avg(toFloat64OrNull(ga.alteration_value)) AS v\n" +
+    "  FROM " + db + ".genetic_alteration_derived ga\n" +
+    "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
+    "  WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(profileType) + "\n" +
+    "    AND ga.hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
+    "    AND toFloat64OrNull(ga.alteration_value) IS NOT NULL\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid, gene\n" +
+    ")\n" +
+    "SELECT gene, count() AS n, sum(v) AS sx, sum(v * v) AS sxx FROM vals GROUP BY gene"
   );
 }
 
@@ -464,6 +494,7 @@ export interface AggregateCapable {
   attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]>;
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
   variantCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<VariantReport>;
+  profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]>;
   /** the SQL this participant would run, for provenance */
   cohortSql(def: CohortDef | null | undefined): string;
 }
@@ -511,6 +542,13 @@ abstract class BaseResolver implements AggregateCapable {
     const r = await chQuery<ChRow>(survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
     return r.data.map((x) => ({ months: Number(x.m), event: Number(x.ev), n: Number(x.n) }));
   }
+  async profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]> {
+    if (!genes.length || !profileType) return [];
+    const sql = profileMomentsSql(this.cohortSql(def), genes, profileType, this.study, this.instance.conn.db);
+    const r = await chQuery<ChRow>(sql, this.instance.conn);
+    return r.data.map((x) => ({ gene: x.gene, n: Number(x.n), sum: Number(x.sx), sumsq: Number(x.sxx) }));
+  }
+
   async variantCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1): Promise<VariantReport> {
     const empty = { variants: [], totals: [], minCount };
     if (!genes.length) return empty;

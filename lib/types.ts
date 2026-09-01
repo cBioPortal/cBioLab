@@ -114,7 +114,18 @@ export interface CooccurrenceView { kind: "cooccurrence"; genes: string[]; cohor
 export interface ClinicalView { kind: "clinical"; attributes: string[]; cohorts?: string[] }
 export interface CoexpressionView { kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[] }
 export interface HotspotsView { kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number }
-export interface HeatmapSpec { profileType: string; genes?: string[] }
+export interface HeatmapSpec {
+  profileType: string; genes?: string[];
+  /**
+   * "federation" z-scores the drawn values against a reference distribution
+   * pooled from EVERY participating study — including instances that disclose
+   * no patients and so contribute no columns. Default "cohort" leaves values
+   * as the profile stores them.
+   */
+  reference?: "cohort" | "federation";
+}
+/** Pooled reference distribution for one (profileType, gene), from per-site moments. */
+export interface ZReference { mean: number; sd: number; n: number; studies: string[] }
 export interface OncoprintView {
   kind: "oncoprint"; genes: string[]; cohorts?: string[];
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: string[];
@@ -262,6 +273,8 @@ export interface OncoprintSpec {
   cohort?: { dsl: CohortDef } | null;
   layout?: { groupBy: { kind: "cohorts"; groups: { name: string; dsl: CohortDef }[] } } | null;
   conventions?: { lineGap?: number };
+  /** "<profileType>|<gene>" -> pooled reference, supplied by the analysis layer */
+  zReference?: Record<string, ZReference>;
 }
 
 // ---------- explore ---------------------------------------------------------

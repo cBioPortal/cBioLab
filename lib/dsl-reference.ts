@@ -95,6 +95,19 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "A federated z-score reference on an oncoprint",
+    note: "A heatmap track with reference:\"federation\" is scored against a distribution pooled from EVERY participating study, including instances that disclose no patients and therefore contribute no columns — each returns three totals per gene (n, sum, sum of squares), which is enough to define the reference. Run with luad_tcga_pan_can_atlas_2018 aggregate-only, its patients are absent from the columns while its 510 patients still shape what the drawn columns mean.",
+    doc: {
+      study: "brca_tcga_pan_can_atlas_2018",
+      cohorts: {
+        "ERBB2 amp": { studies: ["brca_tcga_pan_can_atlas_2018", "luad_tcga_pan_can_atlas_2018"],
+          all: [{ kind: "oql", q: "ERBB2: AMP" }] }
+      },
+      views: [{ kind: "oncoprint", genes: ["ERBB2", "EGFR"],
+        heatmap: [{ profileType: "rna_seq_v2_mrna_median_Zscores", reference: "federation" }] }]
+    }
+  },
+  {
     title: "Recurrent protein changes, with a suppression floor",
     note: "Hotspots in colorectal cancer. Percentages are of the patients carrying any mutation in that gene, so BRAF V600E accounts for roughly 70% of BRAF-mutant cases. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.",
     doc: {
@@ -268,7 +281,7 @@ fall back to one sample value per patient. Numeric attributes (≥90% parseable,
 as a continuous heat track scaled to the cohort's min→max with a gradient key; unknown attributes
 render a labeled "(no data)" track.
 
-**Oncoprint heatmap tracks** (portal-style): \`heatmap: [{"profileType": P, "genes"?: [...]}]\` adds
+**Oncoprint heatmap tracks** (portal-style): \`heatmap: [{"profileType": P, "genes"?: [...], "reference"?: "cohort"|"federation"}]\` adds
 one continuous row per gene from a molecular profile (mRNA/protein z-scores, methylation, log2 CNA,
 …; \`genes\` defaults to the gene tracks). Values are patient-level (mean across a patient's
 samples, since columns are patients). Z-score profiles render on a **fixed diverging ±3
@@ -278,6 +291,11 @@ symmetric diverging ramp; positive-only data a sequential ramp. Track labels are
 error loudly, listing what the study has. The synthetic profile \`"VAF"\` renders variant allele
 fraction computed from mutation allele counts (max across a patient's mutations in the gene,
 fixed 0–1 ramp) — available wherever the study loaded tumor alt/ref counts.
+
+\`reference: "federation"\` re-scores those values against a distribution pooled from **every**
+participating study — including instances that disclose no patients and so contribute no columns.
+Each returns three totals per gene (n, \u03a3x, \u03a3x\u00b2), which is all a mean and standard deviation need,
+so the reference population can be far larger than the drawn one without any value moving.
 
 **Oncoprint sorting**: \`sort\` is an ordered list of track keys — \`"genomic"\` (the default
 staircase: alteration type + driver rank across the gene tracks), a clinical or derived-event track

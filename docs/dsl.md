@@ -108,7 +108,7 @@ fall back to one sample value per patient. Numeric attributes (≥90% parseable,
 as a continuous heat track scaled to the cohort's min→max with a gradient key; unknown attributes
 render a labeled "(no data)" track.
 
-**Oncoprint heatmap tracks** (portal-style): `heatmap: [{"profileType": P, "genes"?: [...]}]` adds
+**Oncoprint heatmap tracks** (portal-style): `heatmap: [{"profileType": P, "genes"?: [...], "reference"?: "cohort"|"federation"}]` adds
 one continuous row per gene from a molecular profile (mRNA/protein z-scores, methylation, log2 CNA,
 …; `genes` defaults to the gene tracks). Values are patient-level (mean across a patient's
 samples, since columns are patients). Z-score profiles render on a **fixed diverging ±3
@@ -118,6 +118,11 @@ symmetric diverging ramp; positive-only data a sequential ramp. Track labels are
 error loudly, listing what the study has. The synthetic profile `"VAF"` renders variant allele
 fraction computed from mutation allele counts (max across a patient's mutations in the gene,
 fixed 0–1 ramp) — available wherever the study loaded tumor alt/ref counts.
+
+`reference: "federation"` re-scores those values against a distribution pooled from **every**
+participating study — including instances that disclose no patients and so contribute no columns.
+Each returns three totals per gene (n, Σx, Σx²), which is all a mean and standard deviation need,
+so the reference population can be far larger than the drawn one without any value moving.
 
 **Oncoprint sorting**: `sort` is an ordered list of track keys — `"genomic"` (the default
 staircase: alteration type + driver rank across the gene tracks), a clinical or derived-event track
@@ -406,7 +411,46 @@ ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene t
 }
 ```
 
-### Example 6: Recurrent protein changes, with a suppression floor
+### Example 6: A federated z-score reference on an oncoprint
+
+A heatmap track with reference:"federation" is scored against a distribution pooled from EVERY participating study, including instances that disclose no patients and therefore contribute no columns — each returns three totals per gene (n, sum, sum of squares), which is enough to define the reference. Run with luad_tcga_pan_can_atlas_2018 aggregate-only, its patients are absent from the columns while its 510 patients still shape what the drawn columns mean.
+
+```json
+{
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "ERBB2 amp": {
+      "studies": [
+        "brca_tcga_pan_can_atlas_2018",
+        "luad_tcga_pan_can_atlas_2018"
+      ],
+      "all": [
+        {
+          "kind": "oql",
+          "q": "ERBB2: AMP"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "oncoprint",
+      "genes": [
+        "ERBB2",
+        "EGFR"
+      ],
+      "heatmap": [
+        {
+          "profileType": "rna_seq_v2_mrna_median_Zscores",
+          "reference": "federation"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Example 7: Recurrent protein changes, with a suppression floor
 
 Hotspots in colorectal cancer. Percentages are of the patients carrying any mutation in that gene, so BRAF V600E accounts for roughly 70% of BRAF-mutant cases. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.
 
@@ -442,7 +486,7 @@ Hotspots in colorectal cancer. Percentages are of the patients carrying any muta
 }
 ```
 
-### Example 7: Co-expression from sums alone
+### Example 8: Co-expression from sums alone
 
 Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.
 
@@ -475,7 +519,7 @@ Pearson correlation between gene pairs in TCGA breast cancer. A correlation depe
 }
 ```
 
-### Example 8: Clinical attributes compared between cohorts
+### Example 9: Clinical attributes compared between cohorts
 
 How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.
 
@@ -521,7 +565,7 @@ How TP53-mutant and wild-type tumors differ clinically. Categorical attributes a
 }
 ```
 
-### Example 9: Co-occurrence and mutual exclusivity in NSCLC
+### Example 10: Co-occurrence and mutual exclusivity in NSCLC
 
 Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.
 
@@ -558,7 +602,7 @@ Pairwise associations among lung cancer driver genes. Each site returns four cou
 }
 ```
 
-### Example 10: Study-stratified survival across two studies
+### Example 11: Study-stratified survival across two studies
 
 TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.
 

@@ -163,6 +163,7 @@ export function normalizeSpec(spec: OncoprintSpec) {
   // [{profileType, genes?}] — genes default to the spec's gene tracks.
   const heatmap = (Array.isArray(spec.heatmap) ? spec.heatmap : []).slice(0, 4).map((h: HeatmapSpec) => ({
     profileType: String(h && h.profileType || ""),
+    reference: h && h.reference === "federation" ? "federation" as const : "cohort" as const,
     genes: (Array.isArray(h?.genes) && h.genes!.length ? h.genes! : genes)
       .map((g: string) => String(g).toUpperCase().trim()).filter((g: string) => GENE_RE.test(g)).slice(0, 12)
   })).filter((h) => h.profileType);
@@ -351,15 +352,21 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
     const isZ = /zscore/i.test(h.profileType);
     for (const gene of h.genes) {
       const label = heatmapTrackLabel(gene, h.profileType);
+      // A federation reference re-scores the drawn values against a distribution
+      // pooled from every participating study — including ones that disclose no
+      // patients, and so appear nowhere in the columns.
+      const ref = (spec.zReference || {})[h.profileType + "|" + gene];
+      const usingRef = !!(ref && ref.sd > 0);
+      const tx = (v: number) => usingRef ? (v - ref!.mean) / ref!.sd : v;
       const vals = [];
-      for (const p of allPids) { const v = valByKey.get(p + "|" + gene); if (v !== undefined) vals.push(v); }
+      for (const p of allPids) { const v = valByKey.get(p + "|" + gene); if (v !== undefined) vals.push(tx(v)); }
       if (!vals.length) {
         heatTracks.push({ kind: "clinical", label: label + " (no data)", categories: [], cells: new Int32Array(allPids.length).fill(-1) });
         continue;
       }
       let min: number, max: number, center: number | null;
       if (isVaf) { min = 0; max = 1; center = null; }
-      else if (isZ) { min = -3; max = 3; center = 0; }
+      else if (isZ || usingRef) { min = -3; max = 3; center = 0; }
       else {
         const dMin = Math.min(...vals), dMax = Math.max(...vals);
         if (dMin < 0 && dMax > 0) { const m = Math.max(-dMin, dMax); min = -m; max = m; center = 0; }
@@ -369,10 +376,14 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
       const cells = new Int32Array(allPids.length).fill(-1);
       allPids.forEach((p, i) => {
         const v = valByKey.get(p + "|" + gene);
-        if (v !== undefined) cells[i] = Math.round(255 * (Math.max(min, Math.min(max, v)) - min) / span);
+        if (v !== undefined) cells[i] = Math.round(255 * (Math.max(min, Math.min(max, tx(v))) - min) / span);
       });
       heatTracks.push({ kind: "heatmap", numeric: true, label, gene, profileType: h.profileType,
-        note: isVaf ? "allele fraction, max across a patient's mutations in the gene" : "mean across a patient's samples",
+        note: usingRef
+          ? "z-scored against " + ref!.n.toLocaleString() + " patients pooled from " + ref!.studies.length +
+            " stud" + (ref!.studies.length === 1 ? "y" : "ies") + " (" + ref!.studies.join(", ") + ") — " +
+            "the reference is federated even where the columns are not"
+          : isVaf ? "allele fraction, max across a patient's mutations in the gene" : "mean across a patient's samples",
         min: Math.round(min * 100) / 100, max: Math.round(max * 100) / 100,
         center: center == null ? null : Math.round(255 * (0 - min) / span), cells });
     }
