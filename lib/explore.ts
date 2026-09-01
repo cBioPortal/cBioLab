@@ -137,10 +137,22 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
 // min/max are exact. An attribute classified differently across studies takes
 // the kind of the study with the most patients for it.
 export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy, connByStudy }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>; connByStudy?: Map<string, ChConn> }): Promise<ExploreResult> {
-  const t0 = Date.now();
   const parts = await Promise.all(studies.map(s =>
     buildExplore({ study: s, draft, oncokbPin, conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}) })));
+  return mergeExplore(parts, !!draft);
+}
+
+/**
+ * Merge faceted catalogs from several participants. Every input is already
+ * aggregate, and the merge is pure arithmetic — which is exactly why it does
+ * not matter whether a part was computed over a local connection or fetched
+ * from a remote peer over MCP.
+ */
+export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): ExploreResult {
+  const t0 = Date.now();
   if (parts.length === 1) return parts[0];
+  const draft = hasDraft ?? parts.some((p) => p.draftCount != null);
+  const studies = parts.flatMap((p) => p.studies || [p.study]);
 
   const clin = new Map<string, ClinicalFacet[]>(); // per|attribute -> list of items
   for (const p of parts) for (const a of p.clinical) {

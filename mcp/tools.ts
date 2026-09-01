@@ -8,7 +8,9 @@ import sharp from "sharp";
 import { ensureFonts } from "../lib/fonts.ts";
 import { renderDslMarkdown } from "../lib/dsl-reference.ts";
 import { runAnalysis, resolveStudy, studyProfiles } from "../lib/analysis.ts";
-import { resolverFor } from "../lib/federation.ts";
+import { resolverFor, carriesPatientIds, studyRouting } from "../lib/federation.ts";
+import { buildExplore } from "../lib/explore.ts";
+import { PRIMARY } from "../lib/ch.ts";
 import type { AnalysisDoc, CohortDef, OncoprintSpec } from "../lib/types.ts";
 import type { PidsCarrier } from "../lib/oncoprint.ts";
 import { registerOncoprintApp } from "./apps/oncoprint-app.ts";
@@ -97,6 +99,40 @@ export function registerTools(server: any): void {
             (geneCounts.length ? `, ${geneCounts.length} gene counts` : "") +
             (survivalCounts.length ? `, ${survivalCounts.length} survival strata` : "") + " (no patient identifiers returned)" }],
           structuredContent: payload
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };
+      }
+    });
+
+  // Faceting counterpart to federated_aggregates: everything the Explore page
+  // needs, as aggregates. Same guarantee — attribute names, value counts, gene
+  // and event counts; never a patient identifier.
+  server.registerTool(
+    "federated_facets",
+    {
+      description:
+        "Federation endpoint for another Cohort Lab instance: the faceted catalog for a study THIS instance holds — clinical attributes with value counts (or numeric min/median/max), timeline event types, most-altered genes, case lists, molecular profiles, and the study's patient count — optionally conditioned on a draft cohort. Aggregates only; never returns patient identifiers. Lets a coordinating instance browse and filter this site's data without querying its database.",
+      inputSchema: {
+        study: z.string().max(120).describe("Study id held by this instance"),
+        draft: z.record(z.string(), z.any()).nullish().describe("Optional draft cohort definition (v2 DSL) to condition every count on")
+      }
+    },
+    async ({ study, draft }: { study: string; draft?: any }) => {
+      try {
+        const s = await resolveStudy(study);
+        if (carriesPatientIds(draft))
+          throw new Error("draft contains an explicit patient list; identifiers are not accepted across instances");
+        const { profiles, gaProfiles } = await studyProfiles(s);
+        const conn = (await studyRouting()).get(s) || PRIMARY;
+        const facets = await buildExplore({
+          study: s, draft: draft || null, oncokbPin: process.env.ONCOKB_PIN || null,
+          profiles, gaProfiles, conn
+        });
+        return {
+          content: [{ type: "text" as const, text: `facets for ${s}: ${facets.clinical.length} clinical attributes, ` +
+            `${facets.genes.length} genes, ${facets.events.length} event types (aggregates only)` }],
+          structuredContent: facets as unknown as Record<string, unknown>
         };
       } catch (e) {
         return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };

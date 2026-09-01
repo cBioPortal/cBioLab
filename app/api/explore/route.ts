@@ -1,5 +1,7 @@
 import { buildExplore, buildExploreFederated } from "../../../lib/explore.ts";
 import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/federation.ts";
+import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
+import { mergeExplore } from "../../../lib/explore.ts";
 import { PRIMARY } from "../../../lib/ch.ts";
 import { studyProfiles, resolveStudy } from "../../../lib/analysis.ts";
 import { chQuery } from "../../../lib/ch.ts";
@@ -24,13 +26,13 @@ export async function POST(req: Request) {
     const profilesByStudy = new Map();
     for (const s of studies) profilesByStudy.set(s, await studyProfiles(s));
     const routing = await studyRouting();
-    // A study held only by a remote MCP peer has no local connection. Explore is
-    // not yet federated over MCP (the analysis views are), so refuse rather than
-    // silently query the primary database and report zeroes for someone else's study.
-    const unreachable = studies.filter((s) => !routing.has(s));
+    // Studies held by a remote peer are faceted over MCP; the rest locally.
+    const remote = studies.filter((s) => !!peerForStudy(s));
+    const local = studies.filter((s) => !remote.includes(s));
+    const unreachable = local.filter((s) => !routing.has(s));
     if (unreachable.length)
       return Response.json({ error: "Explore cannot reach " + unreachable.join(", ") +
-        " — held by a remote peer, and faceting is not yet federated over MCP (compare/survival views are). Deselect it to continue." }, { status: 400 });
+        " — no local connection and no MCP peer configured for it. Deselect it to continue." }, { status: 400 });
     const connByStudy = new Map(studies.map((s) => [s, routing.get(s) || PRIMARY]));
     // An explicit patient list must not be compiled into SQL for an instance that
     // is not entitled to patient-level data — the ids would cross the boundary
@@ -42,11 +44,19 @@ export async function POST(req: Request) {
           return Response.json({ error: "this draft contains an explicit patient list, which cannot be sent to " + inst.label + "; remove that clause or deselect " + s }, { status: 400 });
       }
     }
-    if (studies.length === 1) {
-      const { profiles, gaProfiles } = profilesByStudy.get(studies[0]);
-      return Response.json(await buildExplore({ study: studies[0], draft: body.draft || null, oncokbPin: pin, profiles, gaProfiles, conn: connByStudy.get(studies[0]) }));
+    const draft = body.draft || null;
+    const remoteParts = await Promise.all(remote.map((s) => {
+      const peer = peerForStudy(s)!;
+      return remoteFacets(s, peer.url, draft, peer.label);
+    }));
+    if (!local.length) {
+      return Response.json(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts));
     }
-    return Response.json(await buildExploreFederated({ studies, draft: body.draft || null, oncokbPin: pin, profilesByStudy, connByStudy }));
+    const localResult = local.length === 1
+      ? await buildExplore({ study: local[0], draft, oncokbPin: pin,
+          ...profilesByStudy.get(local[0]), conn: connByStudy.get(local[0]) })
+      : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy });
+    return Response.json(remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult);
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
   }

@@ -11,7 +11,7 @@
 // Note what this type does NOT have: members(). A remote peer is aggregate-only
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
-import type { CohortDef } from "./types.ts";
+import type { CohortDef, ExploreResult } from "./types.ts";
 import type { AggregateCapable, GeneCounts, Instance, SurvivalCount } from "./federation.ts";
 import { carriesPatientIds } from "./federation.ts";
 
@@ -39,7 +39,7 @@ export function peerForStudy(study: string): { url: string; label: string } | nu
  * Minimal MCP streamable-HTTP client: initialize, then tools/call. Kept
  * dependency-free and stateless so a peer can be any conforming server.
  */
-async function mcpCall(url: string, name: string, args: unknown): Promise<RemoteAggregates> {
+async function mcpCall<T = RemoteAggregates>(url: string, name: string, args: unknown): Promise<T> {
   const headers: Record<string, string> = {
     "content-type": "application/json",
     accept: "application/json, text/event-stream"
@@ -69,9 +69,25 @@ async function mcpCall(url: string, name: string, args: unknown): Promise<Remote
   const r = out.json?.result;
   if (!r) throw new Error("peer returned no result for " + name);
   if (r.isError) throw new Error("peer rejected: " + (r.content?.[0]?.text || "unknown"));
-  const sc = r.structuredContent as RemoteAggregates | undefined;
+  const sc = r.structuredContent as T | undefined;
   if (!sc) throw new Error("peer returned no structured aggregates");
   return sc;
+}
+
+/**
+ * Faceted catalog for a study held by a remote peer. Aggregates only: the peer
+ * computes the facets against its own database and returns counts, so Explore
+ * works over MCP exactly as it does over a direct connection.
+ */
+export async function remoteFacets(study: string, url: string, draft: CohortDef | null | undefined, label: string): Promise<ExploreResult> {
+  if (carriesPatientIds(draft))
+    throw new Error("this draft contains an explicit patient list, which is not sent to remote peer " + label);
+  const facets = await mcpCall<ExploreResult>(url, "federated_facets", { study, draft: draft || null });
+  // stamp provenance so the UI can badge peer-held rows
+  return {
+    ...facets,
+    studyBreakdown: (facets.studyBreakdown || []).map((r) => ({ ...r, instance: "peer", instanceLabel: label }))
+  };
 }
 
 export class RemoteAggregateResolver implements AggregateCapable {
