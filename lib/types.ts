@@ -257,6 +257,8 @@ export interface ExploreResult {
   svGenes?: GeneTableRow[];
   /** total distinct genes behind each table, before the display cap */
   geneTotals?: { mutated: number; cna: number; sv: number };
+  /** per-attribute numeric stats, used to derive shared bins when federating */
+  numStats?: { attribute: string; per: "patient" | "sample"; min: number; max: number; q1: number; q3: number; allInts: boolean; n: number }[];
   /** cohort size in both units, as the portal's header reports it */
   totals?: { patients: number; samples: number };
   caseLists: { id: string; name: string; n: number }[];
