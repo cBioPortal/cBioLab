@@ -54,7 +54,10 @@ export function isRestrictedStudy(id: string, name = ""): boolean {
   const extra = (process.env.STUDY_DENY || "").split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
   if (extra.includes(id)) return true;
   if (process.env.STUDY_ALLOW_RESTRICTED === "1") return false;
-  return /consortium/i.test(name) || /\bprivate\b/i.test(name) || /_private$|^private_/i.test(id);
+  // GENIE's convention is a version SUFFIX: "v3.1-consortium" vs "v2.0-public".
+  // Match that, not the bare word — several public studies are named after a
+  // consortium (GLASS, A5, Pediatric Preclinical Testing) and must not be hidden.
+  return /-consortium\b/i.test(name) || /\bprivate\b/i.test(name) || /_private$|^private_/i.test(id);
 }
 
 /**

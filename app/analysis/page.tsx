@@ -127,7 +127,17 @@ export default function AnalysisPage() {
   useEffect(() => {
     try { setSaved(JSON.parse(localStorage.getItem(LS_KEY) || "{}")); } catch {}
     fetch("/api/chat").then(r => setChatReady(r.status !== 501)).catch(() => setChatReady(false));
-    fetch("/api/studies").then(r => r.json()).then(j => setStudies(j.studies || [])).catch(() => {});
+    fetch("/api/studies").then(r => r.json()).then(j => {
+      const list = j.studies || [];
+      setStudies(list);
+      // The default selection names studies that a given deployment may not hold
+      // (a peer instance need not be configured). Keep only what is reachable,
+      // and fall back to the largest available study rather than an empty state.
+      const have = new Set(list.map((s: { id: string }) => s.id));
+      const keep = exSel.current.filter((id) => have.has(id));
+      const next = keep.length ? keep : (list.length ? [list[0].id] : []);
+      if (list.length && next.join(",") !== exSel.current.join(",")) setExploreStudies(next);
+    }).catch(() => {});
     try {
       const b64 = new URLSearchParams(window.location.search).get("doc");
       if (b64) {
