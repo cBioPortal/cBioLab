@@ -55,7 +55,7 @@ silently drops those patients and reports a smaller cohort as if it were whole.
 
 ## What the tests cover
 
-`test/boundary.test.ts` (22 checks, no database required, wired into
+`test/boundary.test.ts` (25 checks, no database required, wired into
 `npm test` and into `e2e.cjs` so the standard gate catches a breach):
 
 - `carriesPatientIds` finds a `patients` leaf at top level, in `all`, nested in

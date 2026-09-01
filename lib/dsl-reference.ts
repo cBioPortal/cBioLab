@@ -95,6 +95,17 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "Recurrent protein changes, with a suppression floor",
+    note: "Hotspots in colorectal cancer. Percentages are of the patients carrying any mutation in that gene, so BRAF V600E accounts for roughly 70% of BRAF-mutant cases. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "CRC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" }] }
+      },
+      views: [{ kind: "hotspots", genes: ["KRAS", "BRAF", "PIK3CA", "TP53"], minCount: 3 }]
+    }
+  },
+  {
     title: "Co-expression from sums alone",
     note: "Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.",
     doc: {
@@ -189,6 +200,7 @@ say so in their captions.
 | kind | shape | meaning |
 |---|---|---|
 | \`oql\` | \`{"kind":"oql","q":"STK11: DRIVER"}\` | genomic status in cBioPortal OQL (see below) |
+| \`hotspots\` | \`genes:[\u226412], cohorts?:[names], minCount?\` | recurrent protein changes per gene (the lollipop's data): patients carrying each change, as a share of those with ANY mutation in that gene. The codon is parsed from the change string, since the schema stores no position. \`minCount\` is a suppression floor each site applies **before returning anything** \u2014 a variant carried by one patient is the most disclosive aggregate here |
 | \`coexpression\` | \`genes:[2-12], profileType, cohorts?:[names]\` | Pearson correlation between gene pairs on a continuous molecular profile, **within one cohort** (the first named). Each site reports only six sums (n, \u03a3x, \u03a3y, \u03a3xy, \u03a3x\u00b2, \u03a3y\u00b2), which are additive \u2014 so the federated correlation is exact, not approximate. Across studies a Fisher-z meta-analysis of per-study correlations is reported alongside the pooled one |
 | \`clinical\` | \`{"kind":"clinical","attribute":A, ...predicate, "per"?:"sample"}\` | clinical attribute; predicate is \`values:[≤50]\` (OR), \`range:{gt,gte,lt,lte}\` (numeric via toFloat64OrNull), or \`op\`(\`= != > >= < <=\`)+\`value\`; \`per:"sample"\` = patient matches if ANY sample matches |
 | \`event\` | \`{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}\` | timeline sub-DSL (below) |
@@ -326,6 +338,7 @@ export const CHAT_GRAMMAR = `Document shape:
              {"kind":"cooccurrence","genes":[...(2-12)],"cohorts":[names?]},
              {"kind":"clinical","attributes":[...(1-20)],"cohorts":[names?]},
              {"kind":"coexpression","genes":[...(2-12)],"profileType":"<mrna profile>","cohorts":[names?]},
+             {"kind":"hotspots","genes":[...(max 12)],"cohorts":[names?],"minCount":1},
              {"kind":"oncoprint","genes":[...(max 12)],"clinical":["<attribute>", ...(max 8)]?,
               "heatmap":[{"profileType":"<profile>","genes":[...]?}, ...(max 4)]?,
               "sort":["<track>"|"-<track>"|"genomic", ...(max 4)]?,"cohorts":[names?]} ] }

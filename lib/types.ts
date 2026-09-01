@@ -113,12 +113,13 @@ export interface SurvivalView { kind: "survival"; cohorts?: string[] }
 export interface CooccurrenceView { kind: "cooccurrence"; genes: string[]; cohorts?: string[] }
 export interface ClinicalView { kind: "clinical"; attributes: string[]; cohorts?: string[] }
 export interface CoexpressionView { kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[] }
+export interface HotspotsView { kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number }
 export interface HeatmapSpec { profileType: string; genes?: string[] }
 export interface OncoprintView {
   kind: "oncoprint"; genes: string[]; cohorts?: string[];
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: string[];
 }
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView;
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView;
 
 export interface AnalysisDoc {
   study?: string;
@@ -161,6 +162,15 @@ export interface CooccurRow {
   /** present when more than one study contributed: the site-stratified answer */
   pStratified?: number; oddsRatioMH?: number | null; strata?: number;
   tendency: "co-occurrence" | "mutual exclusivity" | null;
+}
+/** Recurrent protein changes in one gene, with the cohort's mutated total. */
+export interface HotspotGene {
+  gene: string;
+  /** patients with ANY mutation in this gene, and how many distinct changes */
+  mutated: number; distinctVariants: number;
+  variants: { variant: string; type: string; pos: number | null; n: number; pct: number }[];
+  /** variants withheld by the display cap, and by the suppression floor */
+  cappedAt?: number; withheld?: number;
 }
 /** One gene pair's correlation on a continuous profile, from six sums per site. */
 export interface CoexprRow {
@@ -206,6 +216,7 @@ export interface ViewResult {
   pairs?: CooccurRow[];                     // cooccurrence
   clinical?: ClinicalRow[];                 // clinical comparison
   coexpression?: CoexprRow[];               // co-expression
+  hotspots?: HotspotGene[];                 // hotspots / lollipop
   svg?: string; nColumns?: number;          // oncoprint
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
 }

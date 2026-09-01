@@ -84,25 +84,32 @@ export function registerTools(server: any): void {
           .describe("Gene pairs for co-occurrence: returns each pair's 2x2 (both/onlyA/onlyB/neither) among patients profiled for BOTH genes"),
         attributes: z.array(z.string()).max(20).nullish()
           .describe("Clinical attributes to describe: value counts for categorical, (n, sum, sum of squares, min, max) for numeric. Never individual values."),
+        variantGenes: z.array(z.string()).max(12).nullish()
+          .describe("Genes for per-protein-change (lollipop) counts: how many patients carry each variant, plus per-gene totals"),
+        minCount: z.number().int().min(1).max(1000).nullish()
+          .describe("Suppression floor applied by THIS instance before returning variant counts; variants carried by fewer patients are withheld"),
         profileType: z.string().max(120).nullish()
           .describe("With `pairs`, a continuous molecular profile (e.g. an mRNA z-score profile): returns the six sums (n, Sx, Sy, Sxy, Sxx, Syy) per pair, which are sufficient for a correlation and carry no individual value")
       }
     },
-    async ({ study, cohort, genes, survival, pairs, attributes, profileType }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; profileType?: string | null }) => {
+    async ({ study, cohort, genes, survival, pairs, attributes, profileType, variantGenes, minCount }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; profileType?: string | null; variantGenes?: string[] | null; minCount?: number | null }) => {
       try {
         const s = await resolveStudy(study);
         const { profiles, gaProfiles } = await studyProfiles(s);
         const pin = process.env.ONCOKB_PIN || null;
         const res = await resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
-        const [count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments] = await Promise.all([
+        const [count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts] = await Promise.all([
           res.count(cohort),
           genes && genes.length ? res.geneCounts(cohort, genes) : Promise.resolve([]),
           survival ? res.survivalCounts(cohort) : Promise.resolve([]),
           pairs && pairs.length ? res.pairCounts(cohort, pairs) : Promise.resolve([]),
           attributes && attributes.length ? res.attributeStats(cohort, attributes) : Promise.resolve([]),
-          pairs && pairs.length && profileType ? res.pairMoments(cohort, pairs, profileType) : Promise.resolve([])
+          pairs && pairs.length && profileType ? res.pairMoments(cohort, pairs, profileType) : Promise.resolve([]),
+          variantGenes && variantGenes.length
+            ? res.variantCounts(cohort, variantGenes, minCount || 1)
+            : Promise.resolve({ variants: [], totals: [], minCount: minCount || 1 })
         ]);
-        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, oncokbPin: pin };
+        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, oncokbPin: pin };
         return {
           content: [{ type: "text" as const, text: `aggregates for ${s}: ${count.toLocaleString()} patients` +
             (geneCounts.length ? `, ${geneCounts.length} gene counts` : "") +

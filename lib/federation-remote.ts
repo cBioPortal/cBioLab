@@ -12,12 +12,12 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, ExploreResult } from "./types.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments } from "./federation.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport } from "./federation.ts";
 import { carriesPatientIds } from "./federation.ts";
 
 interface RemoteAggregates {
   study: string; instance: string; count: number;
-  geneCounts: GeneCounts[]; survivalCounts: SurvivalCount[]; pairCounts: PairCounts[]; attributeStats: AttrStats[]; pairMoments: PairMoments[];
+  geneCounts: GeneCounts[]; survivalCounts: SurvivalCount[]; pairCounts: PairCounts[]; attributeStats: AttrStats[]; pairMoments: PairMoments[]; variantCounts: VariantReport;
   oncokbPin: string | null;
 }
 
@@ -131,6 +131,13 @@ export class RemoteAggregateResolver implements AggregateCapable {
     this.guard(def);
     if (!attributes.length) return [];
     return (await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, attributes })).attributeStats || [];
+  }
+  async variantCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1): Promise<VariantReport> {
+    this.guard(def);
+    if (!genes.length) return { variants: [], totals: [], minCount };
+    return (await mcpCall(this.url, "federated_aggregates",
+      { study: this.study, cohort: def || {}, variantGenes: genes, minCount })).variantCounts
+      || { variants: [], totals: [], minCount };
   }
   async pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]> {
     this.guard(def);

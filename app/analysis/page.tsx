@@ -990,6 +990,49 @@ export default function AnalysisPage() {
                     </table>
                   </div>
                 </>}
+                {v.kind === "hotspots" && v.hotspots && <>
+                  <h2>Hotspots <span className="plain">— recurrent protein changes, counted per patient</span></h2>
+                  {v.note && <p className="note">{v.note}</p>}
+                  {v.hotspots.map(h => {
+                    const positioned = h.variants.filter(x => x.pos != null);
+                    const maxPos = Math.max(1, ...positioned.map(x => x.pos!)) * 1.06;
+                    const maxN = Math.max(1, ...h.variants.map(x => x.n));
+                    const H = 74, PAD = 6;
+                    return (
+                      <div key={h.gene} className="lolli">
+                        <div className="row" style={{ alignItems: "baseline" }}>
+                          <strong style={{ fontSize: "0.82rem" }}>{h.gene}</strong>
+                          <span className="meta">{h.mutated.toLocaleString()} mutated patients · {h.variants.length} shown
+                            {h.withheld ? " of " + (h.variants.length + h.withheld) + " distinct changes" : ""}</span>
+                        </div>
+                        <svg viewBox={"0 0 600 " + H} preserveAspectRatio="none" style={{ width: "100%", height: H }} role="img"
+                          aria-label={h.gene + " protein changes by codon position"}>
+                          <line x1="0" y1={H - PAD} x2="600" y2={H - PAD} stroke="var(--line)" strokeWidth="2" />
+                          {positioned.map((x, i) => {
+                            const cx = (x.pos! / maxPos) * 600;
+                            const cy = (H - PAD) - PAD - ((H - 3 * PAD) * x.n) / maxN;
+                            return (
+                              <g key={i}>
+                                <line x1={cx} y1={H - PAD} x2={cx} y2={cy} stroke="var(--muted)" strokeWidth="1" opacity="0.55" />
+                                <circle cx={cx} cy={cy} r={Math.max(2.5, Math.min(6, 2 + 4 * x.n / maxN))}
+                                  fill={x.type && x.type.startsWith("Missense") ? "#0072B2" : "#D55E00"} opacity="0.85">
+                                  <title>{x.variant + " · " + x.n.toLocaleString() + " patients (" + x.pct + "% of mutated) · codon " + x.pos + " · " + x.type}</title>
+                                </circle>
+                              </g>
+                            );
+                          })}
+                        </svg>
+                        <div className="lollilist">
+                          {h.variants.slice(0, 6).map((x, i) => (
+                            <span key={i} title={x.type + (x.pos == null ? " · no parseable codon" : " · codon " + x.pos)}>
+                              <b>{x.variant}</b> {x.n.toLocaleString()} <span className="meta">({x.pct}%)</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>}
                 {v.kind === "coexpression" && v.coexpression && <>
                   <h2>Co-expression <span className="plain">— Pearson correlation from per-site sums</span></h2>
                   {v.note && <p className="note">{v.note}</p>}

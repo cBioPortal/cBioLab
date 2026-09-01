@@ -40,6 +40,13 @@ export interface Instance {
 export interface GeneCounts { gene: string; profiled: number; altered: number; driver: number }
 /** (months, event) multiset — pools exactly across instances, carries no ids */
 export interface SurvivalCount { months: number; event: number; n: number }
+/** One protein change and how many patients carry it. */
+export interface VariantCount {
+  gene: string; variant: string; type: string; pos: number | null; n: number;
+}
+/** Per-gene mutation totals — the denominator, and how much the cap withheld. */
+export interface GeneMutationTotal { gene: string; n: number; distinctVariants: number }
+export interface VariantReport { variants: VariantCount[]; totals: GeneMutationTotal[]; minCount: number }
 /** Six sums for one gene pair on a continuous profile. Sufficient for Pearson's r. */
 export interface PairMoments {
   a: string; b: string;
@@ -246,6 +253,59 @@ export function pairCountsSql(cohortSql: string, pairs: [string, string][], stud
   );
 }
 
+/** Display cap on variants per gene; the per-gene total is reported separately. */
+export const VARIANT_LIMIT = 100;
+
+/**
+ * Per-protein-change patient counts for a gene — the lollipop's data.
+ *
+ * NOTE that the codon is PARSED from the protein-change string (the schema has
+ * no position column), so a variant whose change does not contain a number is
+ * counted but not positioned, and says so rather than being dropped or placed
+ * at zero.
+ *
+ * This is the most disclosive aggregate in the system: a private variant seen
+ * in one patient is close to an identifier. `minCount` is the floor a site
+ * applies BEFORE returning anything, which is where small-cell suppression
+ * belongs — at the data holder, not at the coordinator.
+ */
+export function variantCountsSql(cohortSql: string, genes: string[], study: string, minCount = 1, db: string = DB): string {
+  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  const floor = Math.max(1, Math.floor(minCount));
+  return (
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT hugo_gene_symbol AS gene, mutation_variant AS variant,\n" +
+    "       any(mutation_type) AS mtype,\n" +
+    "       toUInt32OrNull(extract(mutation_variant, '([0-9]+)')) AS pos,\n" +
+    "       uniqExact(patient_unique_id) AS n\n" +
+    "FROM " + db + ".genomic_event_derived\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'mutation'\n" +
+    "  AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
+    "  AND mutation_variant != ''\n" +
+    "  AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "GROUP BY gene, variant, pos\n" +
+    "HAVING n >= " + floor + "\n" +
+    "ORDER BY n DESC\n" +
+    "LIMIT " + VARIANT_LIMIT + " BY gene"
+  );
+}
+
+/** Patients carrying ANY mutation in each gene — the lollipop's denominator. */
+export function geneMutationTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB): string {
+  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  return (
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT hugo_gene_symbol AS gene, uniqExact(patient_unique_id) AS n,\n" +
+    "       uniqExact(mutation_variant) AS distinct_variants\n" +
+    "FROM " + db + ".genomic_event_derived\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'mutation'\n" +
+    "  AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
+    "  AND mutation_variant != ''\n" +
+    "  AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "GROUP BY gene"
+  );
+}
+
 /**
  * Six sums per gene pair from a continuous molecular profile: n, Sx, Sy, Sxy,
  * Sxx, Syy over the patients that have BOTH values.
@@ -403,6 +463,7 @@ export interface AggregateCapable {
   pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
   attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]>;
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
+  variantCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<VariantReport>;
   /** the SQL this participant would run, for provenance */
   cohortSql(def: CohortDef | null | undefined): string;
 }
@@ -450,6 +511,24 @@ abstract class BaseResolver implements AggregateCapable {
     const r = await chQuery<ChRow>(survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
     return r.data.map((x) => ({ months: Number(x.m), event: Number(x.ev), n: Number(x.n) }));
   }
+  async variantCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1): Promise<VariantReport> {
+    const empty = { variants: [], totals: [], minCount };
+    if (!genes.length) return empty;
+    const cohort = this.cohortSql(def), db = this.instance.conn.db, conn = this.instance.conn;
+    const [v, t] = await Promise.all([
+      chQuery<ChRow>(variantCountsSql(cohort, genes, this.study, minCount, db), conn),
+      chQuery<ChRow>(geneMutationTotalsSql(cohort, genes, this.study, db), conn)
+    ]);
+    return {
+      minCount,
+      variants: v.data.map((x) => ({
+        gene: x.gene, variant: x.variant, type: x.mtype,
+        pos: x.pos == null || x.pos === "" ? null : Number(x.pos), n: Number(x.n)
+      })),
+      totals: t.data.map((x) => ({ gene: x.gene, n: Number(x.n), distinctVariants: Number(x.distinct_variants) }))
+    };
+  }
+
   async pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]> {
     if (!pairs.length || !profileType) return [];
     const sql = momentPairsSql(this.cohortSql(def), pairs, profileType, this.study, this.instance.conn.db);
