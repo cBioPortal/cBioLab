@@ -521,6 +521,31 @@ export default function AnalysisPage() {
               </div>
             </div>
             <div>
+              {explore.studyBreakdown && explore.studyBreakdown.length > 0 && (
+                <div className="card">
+                  <h2>Studies <span className="plain">— how {explore.draftCount != null ? "the draft" : "the selection"} breaks down{exStudies.length > 1 ? " across the " + exStudies.length + " selected studies" : ""}</span></h2>
+                  {(() => {
+                    const rows = explore.studyBreakdown!;
+                    const total = rows.reduce((n, r) => n + r.n, 0) || 1;
+                    return rows.map((r) => (
+                      <div key={r.study} className="sbrow" title={r.instanceLabel}>
+                        <span className="mono">{r.study}</span>
+                        <span className="meta inst">{r.instance !== "a" ? "⧉ " + r.instanceLabel : ""}</span>
+                        <span className="bar"><i style={{ width: Math.max(1, Math.round(100 * r.n / total)) + "%" }} /></span>
+                        <span className="meta pct">{Math.round(1000 * r.n / total) / 10}%</span>
+                        <span className="n">{r.n.toLocaleString()}</span>
+                        <span>{exStudies.length > 1 && (
+                          <button className="linklike" title="explore only this study"
+                            onClick={() => setExploreStudies([r.study])}>only</button>
+                        )}</span>
+                      </div>
+                    ));
+                  })()}
+                  {exStudies.length > 1 && <p className="note" style={{ marginTop: "0.4rem" }}>
+                    Patients are counted per study; a person enrolled in two studies counts in both (overlap is not deduplicated).
+                  </p>}
+                </div>
+              )}
               <div className="card">
                 <h2>Genes <span className="plain">— most-altered (click = OQL clause)</span></h2>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>

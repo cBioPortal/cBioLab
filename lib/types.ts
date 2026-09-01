@@ -202,8 +202,15 @@ export type ClinicalFacet =
       disjunctive?: true;
     })
   | (FacetBase & { kind: "num"; min: number; max: number; median: number });
+/** one row per selected study: how the current draft distributes across them */
+export interface StudyBreakdownRow {
+  study: string; n: number;
+  /** which instance holds it (federation) */
+  instance: string; instanceLabel: string;
+}
 export interface ExploreResult {
   study: string; studies?: string[]; draftCount: number | null;
+  studyBreakdown?: StudyBreakdownRow[];
   clinical: ClinicalFacet[];
   events: { type: string; n: number }[];
   genes: { gene: string; n: number }[];

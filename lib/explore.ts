@@ -5,7 +5,7 @@ import { chQuery, DB, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
-import type { ExploreResult, ClinicalFacet, CohortDef, ChRow } from "./types.ts";
+import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow } from "./types.ts";
 import { isClinicalLeaf } from "./types.ts";
 
 export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn }): Promise<ExploreResult> {
@@ -18,6 +18,13 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     const c = await chQuery("SELECT uniqExact(pid) AS n FROM (" + dsql + ")", conn);
     draftCount = Number(c.data[0].n);
   }
+  // how many patients this study contributes under the current draft (or in total)
+  const studyN = draftCount ?? Number((await chQuery<ChRow>(
+    "SELECT uniqExact(patient_unique_id) AS n FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + sq(study), conn
+  )).data[0].n);
+  const studyBreakdown: StudyBreakdownRow[] = [
+    { study, n: studyN, instance: conn.id, instanceLabel: conn.label }
+  ];
 
   // ---- clinical attributes: classify categorical vs numeric --------------
   const cls = await chQuery(
@@ -112,7 +119,7 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     "GROUP BY id ORDER BY n DESC LIMIT 10", conn);
 
   return {
-    study, draftCount,
+    study, draftCount, studyBreakdown,
     clinical,
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
     genes: genes.data.map((r) => ({ gene: r.g, n: Number(r.n) })),
@@ -174,6 +181,7 @@ export async function buildExploreFederated({ studies, draft, oncokbPin, profile
     study: studies.join(" + "),
     studies,
     draftCount: draft ? parts.reduce((s, p) => s + (p.draftCount || 0), 0) : null,
+    studyBreakdown: parts.flatMap((p) => p.studyBreakdown || []).sort((a, b) => b.n - a.n),
     clinical,
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
     genes: [...gm.entries()].map(([gene, n]) => ({ gene, n })).sort((x, y) => y.n - x.n).slice(0, 15),
