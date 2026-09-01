@@ -55,7 +55,7 @@ silently drops those patients and reports a smaller cohort as if it were whole.
 
 ## What the tests cover
 
-`test/boundary.test.ts` (17 checks, no database required, wired into
+`test/boundary.test.ts` (18 checks, no database required, wired into
 `npm test` and into `e2e.cjs` so the standard gate catches a breach):
 
 - `carriesPatientIds` finds a `patients` leaf at top level, in `all`, nested in
@@ -65,9 +65,14 @@ silently drops those patients and reports a smaller cohort as if it were whole.
   ones; a patient-level resolver *may* use an explicit list.
 - The remote resolver refuses **before `fetch` is called** (asserted by counting
   calls against a stubbed `fetch`).
-- `geneCountsSql` and `survivalCountsSql` project only aggregates at the top
-  level — a depth-aware parser checks the outer `SELECT`, since inner cohort
-  subqueries legitimately select ids.
+- **Every** exported `*Sql` builder projects only aggregates at the top level —
+  a depth-aware parser checks the outer `SELECT`, since inner cohort subqueries
+  legitimately select ids. An identifier is permitted *inside* an aggregate
+  (`uniqExact(pid)` returns a number, which is the point); what is forbidden is
+  one surviving as a value, or a returned field being identifier-*named*.
+- The builder list is not maintained by memory: the suite enumerates the module's
+  `*Sql` exports and fails if any lacks a case, so a new aggregate cannot reach a
+  peer without someone deciding what it may project.
 - Source tripwires: no query in `lib/explore.ts` projects a bare identifier
   column, and `ExploreResult` exposes no field that could carry one.
 

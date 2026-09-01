@@ -24,6 +24,7 @@ import {
   carriesPatientIds, geneCountsSql, survivalCountsSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
+import * as federation from "../lib/federation.ts";
 import { RemoteAggregateResolver } from "../lib/federation-remote.ts";
 import type { Instance } from "../lib/federation.ts";
 import { PRIMARY } from "../lib/ch.ts";
@@ -162,20 +163,45 @@ describe("remote peers: nothing identifying leaves before the network is touched
 describe("federation SQL returns aggregates, never identifiers", () => {
   const cohortSql = "SELECT DISTINCT replaceOne(patient_unique_id, 'x_', '') AS pid FROM db.sample_derived";
 
-  test("geneCountsSql projects only counts", () => {
-    assertAggregateOnly(geneCountsSql(cohortSql, ["TP53", "KRAS"], "x", "v7.4", "db"), "geneCountsSql");
+  /**
+   * Every aggregate SQL builder, with arguments that exercise it. Naming a
+   * builder here is not optional: the coverage test below fails if any
+   * `*Sql` export from lib/federation.ts is absent, so a new aggregate cannot
+   * reach a peer without someone deciding what it may project. Several cases
+   * may share one builder — the suffix after ':' is free-form.
+   */
+  const BUILDERS: Record<string, () => string> = {
+    "geneCountsSql": () => geneCountsSql(cohortSql, ["TP53", "KRAS"], "x", "v7.4", "db"),
+    "geneCountsSql:no-annotation-pin": () => geneCountsSql(cohortSql, ["TP53"], "x", null, "db"),
+    "survivalCountsSql": () => survivalCountsSql(cohortSql, "x", "db")
+  };
+
+  test("every exported *Sql builder is covered by this suite", () => {
+    const exported = Object.entries(federation as Record<string, unknown>)
+      .filter(([n, v]) => /Sql$/.test(n) && typeof v === "function").map(([n]) => n);
+    assert.ok(exported.length >= 2, "expected to find the federation SQL builders; did the file move?");
+    const covered = new Set(Object.keys(BUILDERS).map((k) => k.split(":")[0]));
+    const missing = exported.filter((n) => !covered.has(n));
+    assert.deepEqual(missing, [],
+      "these aggregate SQL builders have no boundary test — add a case to BUILDERS: " + missing.join(", "));
   });
-  test("geneCountsSql without an annotation pin still projects only counts", () => {
-    assertAggregateOnly(geneCountsSql(cohortSql, ["TP53"], "x", null, "db"), "geneCountsSql (no pin)");
-  });
-  test("survivalCountsSql projects only (months, event, n)", () => {
-    const sql = survivalCountsSql(cohortSql, "x", "db");
-    assertAggregateOnly(sql, "survivalCountsSql");
-    // months+event are strata, not identities: assert no id column survives
-    for (const col of IDENTIFIER_COLUMNS)
-      assert.equal(outerProjection(sql).some((p) => p.toLowerCase().includes(col)), false,
-        "survival strata must not carry " + col);
-  });
+
+  for (const [name, build] of Object.entries(BUILDERS)) {
+    test(name + " projects only aggregates", () => {
+      const sql = build();
+      // An identifier may appear ONLY inside an aggregate call — uniqExact(pid)
+      // yields a number, which is the entire point. What must never happen is an
+      // identifier surviving as a value: that is what assertAggregateOnly checks.
+      assertAggregateOnly(sql, name);
+      // ...and no returned FIELD may be identifier-named, whatever it holds,
+      // since the field name is what a caller binds to.
+      for (const item of outerProjection(sql)) {
+        const alias = item.split(/\s+as\s+/i).pop()!.trim().replace(/[`"]/g, "");
+        assert.equal(IDENTIFIER_COLUMNS.includes(alias.toLowerCase()), false,
+          name + " returns a field named '" + alias + "'");
+      }
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------
