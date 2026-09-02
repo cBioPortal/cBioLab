@@ -395,7 +395,7 @@ Sent to \`POST /api/analysis\`, edited by the in-app chat, and encoded in sharea
 ## Cohort definitions
 
 \`\`\`
-cohortDef := { "all": [clause × 1-8],         // ANDed (INTERSECT DISTINCT)
+cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient in the study
                "study"?:   "<id>",            // evaluate in another study
                "studies"?: ["<id>", ...],     // union across studies (federated, no count limit)
                "lineGap"?: 90 }               // derived-treatment-line gap, days
@@ -573,7 +573,7 @@ Oncoprint sort: ordered track keys — "genomic" (default staircase), a clinical
 be in clinical), or "-label" descending; missing values sort last; staircase + patient id are the
 final tiebreakers. Example: "sort":["CANCER_TYPE","-CURRENT_AGE_DEID"].
 
-cohortDef: { "all": [clause, ...(max 8)], "study"?: "<id>", "studies"?: ["<id>", ...] } — clauses ANDed;
+cohortDef: { "all": [clause, ...(max 8)], "study"?: "<id>", "studies"?: ["<id>", ...] } — clauses ANDed; an empty all[] is every patient in the study;
 a cohort may target another study or union across several (members are study-qualified; overlap
 across studies is NOT deduplicated — say so when comparing). Oncoprint views federate too: cross-study
 columns are qualified per study (duplicates appear twice) and a Study track shows each column's origin.

@@ -434,3 +434,10 @@ details.gearmenu > .gearmenu-items {
   padding-top: 0.6rem; padding-bottom: 0.6rem;
   box-shadow: 0 6px 12px -10px rgba(0, 0, 0, 0.45);
 }
+
+/* Explore action bar: the name field is visually joined to the Save button it feeds */
+.savegroup { display: inline-flex; align-items: stretch; }
+.savegroup > button { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.savegroup > input {
+  border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: none;
+}

@@ -120,8 +120,16 @@ async function main() {
       await page.goto(BASE + "/analysis");
       await page.locator("button:has-text('Explore')").first().click();
       await page.waitForSelector(".exbar", { timeout: 120000 });
-      const barEmpty = await page.locator(".exbar button:has-text('Analyze')").isDisabled();
-      ok("Analyze is refused until the draft has a filter", barEmpty);
+      // A study alone is a cohort — every patient in it — so Analyze must work
+      // before any filtering, and the bar must say what it would analyse.
+      let unfiltered = "";
+      try {
+        await page.waitForFunction(() => /every patient in/.test(document.querySelector(".exbar")?.textContent || ""),
+          null, { timeout: 240000 });
+        unfiltered = (await page.locator(".exbar").innerText()).replace(/\s+/g, " ").split(" Analyze")[0];
+      } catch { /* left empty */ }
+      const canAnalyseUnfiltered = !(await page.locator(".exbar button:has-text('Analyze')").isDisabled());
+      ok("a study with no filters is analysable", canAnalyseUnfiltered && !!unfiltered, unfiltered || "bar never offered the unfiltered cohort");
       await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
       await page.locator(".valrow, .slice").first().click();
       let drafted = true;

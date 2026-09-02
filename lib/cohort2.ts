@@ -205,7 +205,13 @@ export function compileCohortDef(def: CohortDef | null | undefined, { oncokbPin,
   if (!def) return basePatientsSql(study, db || DB);
   const d = normalizeSugar(def);
   const clauses = d.all;
-  if (!Array.isArray(clauses) || !clauses.length || clauses.length > 8) throw new Error("cohort def needs all: [1-8 clauses]");
+  // No clauses means every patient in the study — the same thing an absent
+  // definition means, and a legitimate cohort (it is the denominator for
+  // everything else). Kept consistent with the null case rather than erroring on
+  // one spelling of the same intent; the readback says "all patients in the
+  // study" so it can never be mistaken for a filter that silently did nothing.
+  if (Array.isArray(clauses) && clauses.length === 0) return basePatientsSql(study, db || DB);
+  if (!Array.isArray(clauses) || clauses.length > 8) throw new Error("cohort def needs all: [0-8 clauses]");
   const ctx: Ctx = { oncokbPin, profiles, gaProfiles, study, db: db || DB, lineGap: d.lineGap ?? 90 };
   return clauses.map((c) => "(" + clauseSql(c, ctx) + ")").join("\nINTERSECT DISTINCT\n");
 }
@@ -248,6 +254,7 @@ function leafText(leaf: any): string {
 export function describeCohortDef(def: CohortDef | null | undefined): string {
   if (!def) return "all patients in the study";
   const d = normalizeSugar(def);
+  if (Array.isArray(d.all) && d.all.length === 0) return "all patients in the study";
   return (d.all || []).map((c: any) => {
     if (c.any) return "(" + c.any.map(leafText).join(" OR ") + ")";
     if (c.not) return "NOT " + leafText(c.not);

@@ -246,15 +246,27 @@ export default function AnalysisPage() {
   };
 
   /** Explore's top action bar: acting on the draft you have built by clicking facets. */
+  /**
+   * What the top bar acts on. With no clauses that is every patient in the
+   * selected studies — a real cohort, and the denominator for everything else —
+   * so exploring a study and hitting Analyze works without filtering first.
+   */
+  const barDef = (): CohortDef | null => {
+    if (!exSel.current.length) return null;
+    return parseDraft() || draftScaffold(exSel.current);
+  };
+  const barDefaultName = () =>
+    parseDraft() ? "explored cohort"
+      : exSel.current.length === 1 ? "all of " + exSel.current[0] : "all selected studies";
   const analyzeDraft = () => {
-    const d = parseDraft();
-    if (!d) { setExMsg("add at least one filter first — click any facet below"); return; }
+    const d = barDef();
+    if (!d) { setExMsg("select at least one study first"); return; }
     setExMsg(null);
-    addDefToAnalysis(cName.trim() || "explored cohort", d);
+    addDefToAnalysis(cName.trim() || barDefaultName(), d);
   };
   const saveDraftAsCohort = async () => {
-    const d = parseDraft();
-    if (!d) { setExMsg("add at least one filter first — click any facet below"); return; }
+    const d = barDef();
+    if (!d) { setExMsg("select at least one study first"); return; }
     if (!cName.trim()) { setExMsg("give the cohort a name first"); return; }
     setExMsg(null);
     await saveCohort();
@@ -523,34 +535,43 @@ export default function AnalysisPage() {
             // the top and stay there while you scroll the facets that build it.
             const d = parseDraft();
             const clauses = d && Array.isArray(d.all) ? d.all.length : 0;
-            const ready = clauses > 0;
+            const ready = exStudies.length > 0;      // a study alone is enough to analyse
             return (
               <div className="card exbar">
                 <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
                   <strong style={{ fontSize: "0.82rem" }}>
-                    {ready ? clauses + (clauses === 1 ? " filter" : " filters") : "No filters yet"}
+                    {!ready ? "No studies selected"
+                      : clauses ? clauses + (clauses === 1 ? " filter" : " filters")
+                      : "No filters"}
                   </strong>
                   <span className="meta">
-                    {ready
-                      ? (explore && explore.draftCount != null
-                          ? "· " + explore.draftCount.toLocaleString() + " patients match"
-                          : "· counting…")
-                      : "— click any facet below to start a cohort"}
+                    {!ready ? "— pick a study below"
+                      : clauses
+                        ? (explore && explore.draftCount != null
+                            ? "· " + explore.draftCount.toLocaleString() + " patients match"
+                            : "· counting…")
+                        : "· every patient in " + (exStudies.length === 1 ? exStudies[0] : exStudies.length + " selected studies") +
+                          (explore?.totals ? " (" + explore.totals.patients.toLocaleString() + ")" : "")}
                   </span>
                   {exploreBusy && <span className="spinner" />}
                   <span className="spacer" />
-                  <input placeholder="name this cohort…" value={cName} style={{ width: "12rem" }}
-                    onChange={e => setCName(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && ready) analyzeDraft(); }} />
                   <button className="primary" onClick={analyzeDraft} disabled={!ready}
-                    title={ready ? "add this cohort to the analysis document and run it" : "add at least one filter first"}>
+                    title={ready ? "add this cohort to the analysis document and run it" : "select a study first"}>
                     Analyze
                   </button>
-                  <button onClick={saveDraftAsCohort} disabled={!ready}
-                    title={ready ? "keep this definition in the Cohorts tab without running anything" : "add at least one filter first"}>
-                    Save as cohort
-                  </button>
-                  {ready && <button className="linklike" onClick={clearDraft}>clear</button>}
+                  <span className="meta">or</span>
+                  {/* the name belongs to Save — Analyze needs no name, and pairing the
+                      field with the button that consumes it says so without a label */}
+                  <span className="savegroup">
+                    <button onClick={saveDraftAsCohort} disabled={!ready}
+                      title={ready ? "keep this definition in the Cohorts tab without running anything" : "select a study first"}>
+                      Save as a Cohort
+                    </button>
+                    <input placeholder="name…" value={cName} style={{ width: "10rem" }} disabled={!ready}
+                      onChange={e => setCName(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && ready) saveDraftAsCohort(); }} />
+                  </span>
+                  {clauses > 0 && <button className="linklike" onClick={clearDraft}>clear</button>}
                 </div>
                 {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
               </div>

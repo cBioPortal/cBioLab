@@ -22,7 +22,7 @@ Sent to `POST /api/analysis`, edited by the in-app chat, and encoded in shareabl
 ## Cohort definitions
 
 ```
-cohortDef := { "all": [clause × 1-8],         // ANDed (INTERSECT DISTINCT)
+cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient in the study
                "study"?:   "<id>",            // evaluate in another study
                "studies"?: ["<id>", ...],     // union across studies (federated, no count limit)
                "lineGap"?: 90 }               // derived-treatment-line gap, days
