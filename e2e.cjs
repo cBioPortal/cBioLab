@@ -170,6 +170,23 @@ async function main() {
         }
         return { seen, missing };
       });
+      // and each must show the aggregate SQL that produced its numbers
+      const prov = await page.evaluate(() => {
+        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Hotspots"];
+        const missing = [], counts = [];
+        for (const card of document.querySelectorAll(".ana-grid .card")) {
+          const h = card.querySelector("h2");
+          if (!h) continue;
+          const name = KNOWN.find(k => h.textContent.trim().startsWith(k));
+          if (!name) continue;
+          const n = card.querySelectorAll(".provsql .provq").length;
+          if (!n) missing.push(name); else counts.push(name + ":" + n);
+        }
+        return { missing, counts };
+      });
+      ok("every view shows the SQL that produced its numbers", prov.missing.length === 0,
+        prov.missing.length ? "no query provenance on: " + prov.missing.join(", ") : prov.counts.join(" "));
+
       ok("every visualization carries a participation marker",
         marker.seen.length >= 5 && marker.missing.length === 0,
         marker.missing.length ? "missing on: " + marker.missing.join(", ") : marker.seen.length + " views marked");

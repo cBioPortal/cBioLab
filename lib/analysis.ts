@@ -133,10 +133,24 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
     return { studies: per, requiresPatientLevel, aggregateOnly: per.filter((x) => x.mode === "aggregate-only").map((x) => x.study) };
   };
 
+  // Provenance for the numbers, not just for the cohort: every resolver logs the
+  // aggregate SQL it runs, so each view can report exactly the queries that
+  // produced it — including, across the boundary, the ones a peer ran for us.
+  const queryMark = (): Record<string, number> =>
+    Object.fromEntries(Object.entries(resolvers).map(([s, r]) => [s, r.queries.length]));
+  const queriesSince = (mark: Record<string, number>) => {
+    const out: { study: string; label: string; sql: string; remote?: boolean }[] = [];
+    for (const [s, r] of Object.entries(resolvers))
+      for (const q of r.queries.slice(mark[s] ?? 0))
+        out.push({ study: s, label: q.label, sql: q.sql, ...(q.remote ? { remote: true } : {}) });
+    return out;
+  };
+
   const views: ViewResult[] = [];
   for (const view of (doc.views || []).slice(0, 6)) {
     const vNames = (view.cohorts && view.cohorts.length ? view.cohorts : names).filter((n) => cohorts[n]);
     const vStudies = [...new Set(vNames.flatMap((n) => cohorts[n].studies))];
+    const mark = queryMark(), pushedBefore = views.length;
 
     if (view.kind === "compare") {
       const genes = ((view as CompareView).genes || []).map((g) => String(g).toUpperCase().trim()).filter((g) => GENE_RE.test(g)).slice(0, 20);
@@ -557,6 +571,8 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       // JSON from clients/chat/MCP, so an unknown kind must still be reported
       views.push({ kind: String((view as { kind?: unknown }).kind ?? "unknown"), error: "unknown view kind" });
     }
+    const ran = queriesSince(mark);
+    for (let k = pushedBefore; k < views.length; k++) if (ran.length) views[k].queries = ran;
   }
 
   return {

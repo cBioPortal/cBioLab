@@ -12,7 +12,7 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, ExploreResult } from "./types.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, ProfileMoments } from "./federation.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, ProfileMoments, QueryLogEntry } from "./federation.ts";
 import { carriesPatientIds } from "./federation.ts";
 
 interface RemoteAggregates {
@@ -20,6 +20,8 @@ interface RemoteAggregates {
   geneCounts: GeneCounts[]; survivalCounts: SurvivalCount[]; pairCounts: PairCounts[]; attributeStats: AttrStats[]; pairMoments: PairMoments[]; variantCounts: VariantReport; profileMoments: ProfileMoments[];
   /** the SQL the peer compiled and ran, when it chooses to disclose it */
   cohortSql?: string | null;
+  /** and the aggregate queries it ran to answer this call */
+  queries?: QueryLogEntry[] | null;
   oncokbPin: string | null;
 }
 
@@ -104,13 +106,22 @@ export class RemoteAggregateResolver implements AggregateCapable {
    * statement that it ran remotely.
    */
   private peerSql: string | null = null;
+  /**
+   * What the peer reports having run. The peer logs its own queries through the
+   * same mechanism, so provenance survives the hop: the caller sees the actual
+   * aggregate SQL, marked as having executed on the peer rather than here.
+   */
+  readonly queries: QueryLogEntry[] = [];
   constructor(study: string, url: string, instance: Instance) {
     this.study = study;
     this.url = url;
     this.instance = instance;
   }
-  private remember(r: { cohortSql?: string | null }): void {
-    if (r && typeof r.cohortSql === "string" && r.cohortSql.trim()) this.peerSql = r.cohortSql;
+  private remember(r: { cohortSql?: string | null; queries?: QueryLogEntry[] | null }): void {
+    if (!r) return;
+    if (typeof r.cohortSql === "string" && r.cohortSql.trim()) this.peerSql = r.cohortSql;
+    if (Array.isArray(r.queries))
+      for (const q of r.queries) this.queries.push({ label: q.label, sql: q.sql, remote: true });
   }
   /** The peer compiles and runs its own SQL against its own schema. */
   cohortSql(): string {
@@ -133,39 +144,52 @@ export class RemoteAggregateResolver implements AggregateCapable {
   async geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]> {
     this.guard(def);
     if (!genes.length) return [];
-    return (await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, genes })).geneCounts;
+    const r = await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, genes });
+    this.remember(r);
+    return r.geneCounts;
   }
   async survivalCounts(def: CohortDef | null | undefined): Promise<SurvivalCount[]> {
     this.guard(def);
-    return (await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, survival: true })).survivalCounts;
+    const r = await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, survival: true });
+    this.remember(r);
+    return r.survivalCounts;
   }
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
     this.guard(def);
     if (!pairs.length) return [];
-    return (await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, pairs })).pairCounts || [];
+    const r = await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, pairs });
+    this.remember(r);
+    return r.pairCounts || [];
   }
   async attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]> {
     this.guard(def);
     if (!attributes.length) return [];
-    return (await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, attributes })).attributeStats || [];
+    const r = await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, attributes });
+    this.remember(r);
+    return r.attributeStats || [];
   }
   async profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]> {
     this.guard(def);
     if (!genes.length || !profileType) return [];
-    return (await mcpCall(this.url, "federated_aggregates",
-      { study: this.study, cohort: def || {}, momentGenes: genes, profileType })).profileMoments || [];
+    const r = await mcpCall(this.url, "federated_aggregates",
+      { study: this.study, cohort: def || {}, momentGenes: genes, profileType });
+    this.remember(r);
+    return r.profileMoments || [];
   }
   async variantCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1): Promise<VariantReport> {
     this.guard(def);
     if (!genes.length) return { variants: [], totals: [], minCount };
-    return (await mcpCall(this.url, "federated_aggregates",
-      { study: this.study, cohort: def || {}, variantGenes: genes, minCount })).variantCounts
-      || { variants: [], totals: [], minCount };
+    const r = await mcpCall(this.url, "federated_aggregates",
+      { study: this.study, cohort: def || {}, variantGenes: genes, minCount });
+    this.remember(r);
+    return r.variantCounts || { variants: [], totals: [], minCount };
   }
   async pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]> {
     this.guard(def);
     if (!pairs.length || !profileType) return [];
-    return (await mcpCall(this.url, "federated_aggregates",
-      { study: this.study, cohort: def || {}, pairs, profileType })).pairMoments || [];
+    const r = await mcpCall(this.url, "federated_aggregates",
+      { study: this.study, cohort: def || {}, pairs, profileType });
+    this.remember(r);
+    return r.pairMoments || [];
   }
 }

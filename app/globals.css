@@ -410,3 +410,20 @@ details.gearmenu > .gearmenu-items {
 .viewhead > .spacer { display: none; }
 .partwrap { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
 .viewhead > .partwrap { flex: 0 0 auto; margin-top: 0.1rem; }
+
+/* Per-view SQL provenance: how each NUMBER was computed, not just the cohort */
+.provsql { margin-top: 0.6rem; border-top: 1px solid var(--line); padding-top: 0.4rem; }
+.provsql > summary { cursor: pointer; font-size: 0.72rem; }
+.provq { margin-top: 0.5rem; }
+.provhead { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.72rem; }
+.provhead code { font-weight: 600; font-size: 0.72rem; }
+.provq pre {
+  max-height: 14rem; overflow: auto; margin: 0.2rem 0 0; padding: 0.5rem;
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+  font-size: 0.66rem; line-height: 1.45; white-space: pre;
+}
+.prem {
+  font-size: 0.66rem; padding: 0.05rem 0.4rem; border-radius: 999px; white-space: nowrap;
+  color: #B45309; background: color-mix(in oklab, #B45309 12%, transparent);
+  border: 1px solid color-mix(in oklab, #B45309 35%, transparent);
+}

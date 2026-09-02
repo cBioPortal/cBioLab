@@ -1383,6 +1383,24 @@ export default function AnalysisPage() {
                   </div>
                   <div style={{ overflowX: "auto", background: "#fff", borderRadius: 8, border: "1px solid var(--line)" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
+                {v.queries && v.queries.length > 0 && (
+                  <details className="provsql">
+                    <summary className="meta">
+                      how these numbers were computed — {v.queries.length} {v.queries.length === 1 ? "query" : "queries"}
+                      {v.queries.some(q => q.remote) && <> · <span className="prem">{v.queries.filter(q => q.remote).length} ran on a peer</span></>}
+                    </summary>
+                    {v.queries.map((q, qi) => (
+                      <div className="provq" key={qi}>
+                        <div className="provhead">
+                          <code>{q.label}</code>
+                          <span className="meta">{q.study}</span>
+                          {q.remote && <span className="prem" title="compiled and executed by the peer against its own schema; only aggregates came back">ran on peer</span>}
+                        </div>
+                        <pre>{q.sql}</pre>
+                      </div>
+                    ))}
+                  </details>
+                )}
                 {v.error && <div className="error">{v.kind}: {v.error}{v.participation ? <> <Participation p={v.participation} /></> : null}</div>}
               </div>
             ))}

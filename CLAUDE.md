@@ -46,7 +46,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
    (unsupported OQL token, unknown attribute/profile/study, VAF without allele counts) throws
    a specific error listing what IS available.
 2. **Provenance everywhere.** Every result carries its definition readback, compiled SQL, and a
-   shareable `?doc=`/`?spec=` link. OncoKB annotations are version-pinned (pin echoed in results).
+   shareable `?doc=`/`?spec=` link. Two levels: the document panel shows each cohort's compiled
+   SQL, and every view shows the aggregate queries that produced its numbers (resolvers log what
+   they run; a peer returns its own log, marked as having executed there). OncoKB annotations are version-pinned (pin echoed in results).
 3. **Compilers are single-study; federation happens at the analysis layer** with study-qualified
    ids. Cross-study: overlap is deliberately NOT deduplicated, vocabularies NOT harmonized —
    and views/captions must say so.
@@ -72,7 +74,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
 - Test: `npm test` — unit suites, no database needed (the patient-data boundary and the stats used by
   federated views;
-  62 checks across 2 suites). `node e2e.cjs` — 50 checks (Playwright + docs gate + the boundary suite).
+  62 checks across 2 suites). `node e2e.cjs` — 51 checks (Playwright + docs gate + the boundary suite).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push `analysis`. **Stop there.**

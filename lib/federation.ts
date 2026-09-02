@@ -497,7 +497,16 @@ export interface AggregateCapable {
   profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]>;
   /** the SQL this participant would run, for provenance */
   cohortSql(def: CohortDef | null | undefined): string;
+  /**
+   * Every aggregate query this resolver ran, in order. The document panel shows
+   * cohort SQL; this is how each NUMBER was computed, which is the part a reader
+   * checking a result actually needs.
+   */
+  readonly queries: QueryLogEntry[];
 }
+
+/** One query a resolver actually ran, for provenance. */
+export interface QueryLogEntry { label: string; sql: string; remote?: boolean }
 
 /** Additionally available when the instance permits patient-level access. */
 export interface PatientLevelCapable extends AggregateCapable {
@@ -517,7 +526,13 @@ export function isPatientLevel(r: Resolver): r is PatientLevelCapable {
 abstract class BaseResolver implements AggregateCapable {
   abstract readonly instance: Instance;
   readonly study: string;
+  readonly queries: QueryLogEntry[] = [];
   protected readonly ctx: Partial<CompileCtx>;
+  /** record what we are about to run, then hand it back for execution */
+  protected logged(label: string, sql: string): string {
+    this.queries.push({ label, sql });
+    return sql;
+  }
   constructor(study: string, ctx: Partial<CompileCtx>) {
     this.study = study;
     this.ctx = ctx;
@@ -532,19 +547,19 @@ abstract class BaseResolver implements AggregateCapable {
   }
   async geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]> {
     if (!genes.length) return [];
-    const sql = geneCountsSql(this.cohortSql(def), genes, this.study, this.ctx.oncokbPin ?? null, this.instance.conn.db);
+    const sql = this.logged("geneCounts", geneCountsSql(this.cohortSql(def), genes, this.study, this.ctx.oncokbPin ?? null, this.instance.conn.db));
     const r = await chQuery<ChRow>(sql, this.instance.conn);
     return r.data.map((x) => ({
       gene: x.gene, profiled: Number(x.profiled), altered: Number(x.altered), driver: Number(x.driver)
     }));
   }
   async survivalCounts(def: CohortDef | null | undefined): Promise<SurvivalCount[]> {
-    const r = await chQuery<ChRow>(survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
+    const r = await chQuery<ChRow>(this.logged("survivalCounts", survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db)), this.instance.conn);
     return r.data.map((x) => ({ months: Number(x.m), event: Number(x.ev), n: Number(x.n) }));
   }
   async profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]> {
     if (!genes.length || !profileType) return [];
-    const sql = profileMomentsSql(this.cohortSql(def), genes, profileType, this.study, this.instance.conn.db);
+    const sql = this.logged("profileMoments", profileMomentsSql(this.cohortSql(def), genes, profileType, this.study, this.instance.conn.db));
     const r = await chQuery<ChRow>(sql, this.instance.conn);
     return r.data.map((x) => ({ gene: x.gene, n: Number(x.n), sum: Number(x.sx), sumsq: Number(x.sxx) }));
   }
@@ -554,8 +569,8 @@ abstract class BaseResolver implements AggregateCapable {
     if (!genes.length) return empty;
     const cohort = this.cohortSql(def), db = this.instance.conn.db, conn = this.instance.conn;
     const [v, t] = await Promise.all([
-      chQuery<ChRow>(variantCountsSql(cohort, genes, this.study, minCount, db), conn),
-      chQuery<ChRow>(geneMutationTotalsSql(cohort, genes, this.study, db), conn)
+      chQuery<ChRow>(this.logged("variantCounts", variantCountsSql(cohort, genes, this.study, minCount, db)), conn),
+      chQuery<ChRow>(this.logged("geneMutationTotals", geneMutationTotalsSql(cohort, genes, this.study, db)), conn)
     ]);
     return {
       minCount,
@@ -569,7 +584,7 @@ abstract class BaseResolver implements AggregateCapable {
 
   async pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]> {
     if (!pairs.length || !profileType) return [];
-    const sql = momentPairsSql(this.cohortSql(def), pairs, profileType, this.study, this.instance.conn.db);
+    const sql = this.logged("pairMoments", momentPairsSql(this.cohortSql(def), pairs, profileType, this.study, this.instance.conn.db));
     const r = await chQuery<ChRow>(sql, this.instance.conn);
     return r.data.map((x) => ({
       a: x.ga, b: x.gb, n: Number(x.n),
@@ -601,8 +616,8 @@ abstract class BaseResolver implements AggregateCapable {
     const cohort = this.cohortSql(def);
     const empty = { data: [] as ChRow[] };
     const [cats, nums] = await Promise.all([
-      catAttrs.length ? chQuery<ChRow>(clinicalCountsSql(cohort, catAttrs, this.study, db), conn) : Promise.resolve(empty),
-      numAttrs.length ? chQuery<ChRow>(clinicalMomentsSql(cohort, numAttrs, this.study, db), conn) : Promise.resolve(empty)
+      catAttrs.length ? chQuery<ChRow>(this.logged("clinicalCounts", clinicalCountsSql(cohort, catAttrs, this.study, db)), conn) : Promise.resolve(empty),
+      numAttrs.length ? chQuery<ChRow>(this.logged("clinicalMoments", clinicalMomentsSql(cohort, numAttrs, this.study, db)), conn) : Promise.resolve(empty)
     ]);
     const out: AttrStats[] = [];
     const grouped = new Map<string, { per: string; values: { v: string; n: number }[] }>();
@@ -632,7 +647,7 @@ abstract class BaseResolver implements AggregateCapable {
 
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
     if (!pairs.length) return [];
-    const r = await chQuery<ChRow>(pairCountsSql(this.cohortSql(def), pairs, this.study, this.instance.conn.db), this.instance.conn);
+    const r = await chQuery<ChRow>(this.logged("pairCounts", pairCountsSql(this.cohortSql(def), pairs, this.study, this.instance.conn.db)), this.instance.conn);
     return r.data.map((x) => {
       const profiled = Number(x.profiled), both = Number(x.both), onlyA = Number(x.only_a), onlyB = Number(x.only_b);
       return { a: x.ga, b: x.gb, both, onlyA, onlyB, profiled, neither: profiled - both - onlyA - onlyB };

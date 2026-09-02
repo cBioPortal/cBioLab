@@ -117,8 +117,9 @@ export function registerTools(server: any): void {
         // refused, so disclosing what we ran restores end-to-end provenance for the
         // caller. A deployment that treats its schema as sensitive sets
         // FEDERATION_HIDE_SQL=1 and the caller degrades gracefully.
-        const cohortSql = process.env.FEDERATION_HIDE_SQL === "1" ? null : res.cohortSql(cohort);
-        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, cohortSql, oncokbPin: pin };
+        const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
+        const cohortSql = hideSql ? null : res.cohortSql(cohort);
+        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, cohortSql, queries: hideSql ? null : res.queries, oncokbPin: pin };
         return {
           content: [{ type: "text" as const, text: `aggregates for ${s}: ${count.toLocaleString()} patients` +
             (geneCounts.length ? `, ${geneCounts.length} gene counts` : "") +
