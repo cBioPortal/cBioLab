@@ -179,6 +179,25 @@ async function main() {
       ok("a second Analyze resets the analysis instead of accumulating", replaced,
         replaced ? "document holds only the new cohort" : "document holds: " + (after.join(", ") || "?"));
 
+      // Tabs are deep-linked: a refresh must land you where you were.
+      await page.goto(BASE + "/analysis");
+      await page.waitForSelector(".tabs button", { timeout: 120000 });
+      await page.locator(".tabs button:has-text('Explore')").click();
+      await page.waitForTimeout(400);
+      const urlHasTab = /tab=explore/.test(await page.evaluate(() => location.search));
+      await page.reload();
+      await page.waitForSelector(".tabs button.active", { timeout: 120000 });
+      const stayed = (await page.locator(".tabs button.active").innerText()).trim();
+      ok("tabs survive a refresh", urlHasTab && stayed === "Explore", "?tab written: " + urlHasTab + ", after reload: " + stayed);
+
+      // A ?doc= link still implies the analysis, but an explicit ?tab= wins.
+      const linkDoc = { study: "msk_chord_2024", cohorts: { X: { all: [{ kind: "oql", q: "TP53: MUT" }] } }, views: [{ kind: "survival" }] };
+      const enc = Buffer.from(JSON.stringify(linkDoc)).toString("base64url");
+      await page.goto(BASE + "/analysis?tab=examples&doc=" + enc);
+      await page.waitForTimeout(1800);
+      ok("an explicit ?tab= beats the document's default tab",
+        (await page.locator(".tabs button.active").innerText()).trim() === "Examples");
+
       // Cohorts tab: tick cohorts, submit them together. No per-row "add" links.
       await page.goto(BASE + "/analysis");
       await page.waitForSelector(".pick input", { timeout: 240000 });
@@ -226,6 +245,20 @@ async function main() {
         }
         return { found: false };
       });
+      // Views can be removed one at a time, and the document follows.
+      let beforeN = 0, afterKinds = [];
+      try {
+        beforeN = (JSON.parse(await page.locator("textarea").first().inputValue()).views || []).length;
+        await page.locator(".viewcard").first().locator(".removeview").click();
+        await page.waitForFunction((n) => {
+          try { return (JSON.parse(document.querySelector("textarea").value).views || []).length === n - 1; }
+          catch { return false; }
+        }, beforeN, { timeout: 300000 });
+        afterKinds = (JSON.parse(await page.locator("textarea").first().inputValue()).views || []).map(v => v.kind);
+      } catch { /* left empty */ }
+      ok("a single view can be removed", beforeN > 0 && afterKinds.length === beforeN - 1,
+        beforeN ? beforeN + " → " + afterKinds.length + " views (" + afterKinds.join(", ") + ")" : "no views to remove");
+
       ok("the oncoprint reports its own queries and separates draw time",
         onco.found && onco.queries > 0 && onco.split,
         onco.found ? onco.queries + " queries · " + onco.chip : "no oncoprint view on the page");

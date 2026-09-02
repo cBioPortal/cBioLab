@@ -457,3 +457,15 @@ details.gearmenu > .gearmenu-items {
   cursor: help;
 }
 .lat .latsplit { opacity: 0.75; }
+
+/* Analysis: remove a single view; the card is the positioning context, and it
+   reserves the corner so the control never lands on the participation marker */
+.viewcard { position: relative; padding-right: 2.1rem; }
+.removeview {
+  position: absolute; top: 0.35rem; right: 0.45rem; z-index: 2;
+  width: 1.35rem; height: 1.35rem; line-height: 1; padding: 0;
+  border: 1px solid var(--line); border-radius: 50%; background: var(--bg);
+  color: var(--muted); font-size: 0.9rem; cursor: pointer;
+}
+.viewcard:hover .removeview { color: var(--ink); border-color: var(--muted); }
+.removeview:hover { background: var(--code-bg); color: #D55E00; border-color: #D55E00; }

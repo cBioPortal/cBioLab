@@ -135,6 +135,7 @@ export default function AnalysisPage() {
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   const [copied, setCopied] = useState<string | null>(null);
   const [exMsg, setExMsg] = useState<string | null>(null);   // Explore action-bar feedback
+  const tabRef = useRef<string>("cohorts");                  // the tab syncUrl should record
   const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>"
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
@@ -183,7 +184,7 @@ export default function AnalysisPage() {
       const j = await res.json();
       if (j.error) throw new Error(j.error);
       setResult(j);
-      try { history.replaceState(null, "", "?doc=" + btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")); } catch {}
+      syncUrl(undefined, d);
     } catch (e) { setError(String((e as Error)?.message || e)); }
     setBusy(false);
   };
@@ -203,14 +204,45 @@ export default function AnalysisPage() {
       if (list.length && next.join(",") !== exSel.current.join(",")) setExploreStudies(next);
     }).catch(() => {});
     try {
-      const b64 = new URLSearchParams(window.location.search).get("doc");
+      const params = new URLSearchParams(window.location.search);
+      const wanted = params.get("tab");
+      const b64 = params.get("doc");
+      if (wanted && (TABS as readonly string[]).includes(wanted)) {
+        tabRef.current = wanted;
+        setTab(wanted as typeof TABS[number]);
+        if (wanted === "explore") fetchExplore();
+      }
       if (b64) {
         const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0))));
         if (d.study) { setStudy(d.study); setExStudies([d.study]); exSel.current = [d.study]; }
-        setDoc(d); setDocText(JSON.stringify(d, null, 2)); setTab("analysis"); run(d);
+        setDoc(d); setDocText(JSON.stringify(d, null, 2));
+        // an explicit ?tab= wins; otherwise a shared document means the analysis
+        if (!wanted) goTab("analysis");
+        run(d);
       }
     } catch (e) { setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
   }, []); // eslint-disable-line
+
+  /**
+   * Keep the URL describing where you are, so a refresh (or a shared link)
+   * lands on the same tab. `doc` and `tab` are written together — writing one
+   * with a bare "?tab=…" would drop the other.
+   */
+  const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
+  // run() writes the URL too, and during the mount effect its closure still
+  // holds the initial tab — so the current tab is read from a ref, never from
+  // the render closure, or a shared ?doc= link would record the wrong tab.
+  const syncUrl = (nextTab?: string, d?: AnalysisDoc | null) => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      q.set("tab", nextTab || tabRef.current);
+      if (d) q.set("doc", btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d))))
+        .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
+      history.replaceState(null, "", "?" + q.toString());
+    } catch { /* URL state is a convenience, never a failure */ }
+  };
+  /** every tab switch goes through here so the URL cannot drift from the UI */
+  const goTab = (t: typeof TABS[number]) => { tabRef.current = t; setTab(t); syncUrl(t); };
 
   const applyText = () => {
     try { const d = JSON.parse(docText); setDoc(d); run(d); }
@@ -276,7 +308,7 @@ export default function AnalysisPage() {
     setStudy(nextStudy);
     setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
     setResult(null); setError(null);     // never leave the previous run's numbers on screen
-    setTab("analysis");
+    goTab("analysis");
     run(nd);
   };
   const saveDraftAsCohort = async () => {
@@ -321,6 +353,15 @@ export default function AnalysisPage() {
     { kind: "coexpression", label: "Co-expression",
       why: () => contProfile() ? null : "this study has no continuous molecular profile (mRNA z-scores) to correlate" }
   ];
+
+  /** Drop one view from the document and re-run what is left. */
+  const removeView = (i: number) => {
+    const views = (doc.views || []).filter((_: any, j: number) => j !== i);
+    const d = { ...doc, views };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    if (views.length) run(d);
+    else { setResult(null); syncUrl(undefined, d); }   // nothing left to run
+  };
 
   const addView = (kind: string) => {
     const genes = viewGenes();
@@ -485,6 +526,7 @@ export default function AnalysisPage() {
   const clearAnalysis = () => {
     const d = { ...EMPTY_DOC, study };
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setError(null);
+    syncUrl(undefined, d);   // the shared link should describe the empty document too
   };
 
   /**
@@ -505,7 +547,7 @@ export default function AnalysisPage() {
     const nd: AnalysisDoc = { study, cohorts: Object.fromEntries(chosen.slice(0, 6)), views: DEFAULT_VIEWS };
     setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
     setResult(null); setError(null);
-    setTab("analysis");
+    goTab("analysis");
     run(nd);
   };
   const togglePick = (key: string) =>
@@ -517,7 +559,7 @@ export default function AnalysisPage() {
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
     setStudy(d.study || study);
     setResult(null); setError(null);
-    setTab("analysis");
+    goTab("analysis");
     run(d);
   };
 
@@ -566,7 +608,7 @@ export default function AnalysisPage() {
       if (j.error) throw new Error(j.error);
       setChat([...msgs, { role: "assistant", text: j.reply }]);
       if (j.doc) {
-        setDoc(j.doc); setDocText(JSON.stringify(j.doc, null, 2)); setTab("analysis"); run(j.doc);
+        setDoc(j.doc); setDocText(JSON.stringify(j.doc, null, 2)); goTab("analysis"); run(j.doc);
       }
     } catch (e) { setChat([...msgs, { role: "assistant", text: "⚠ " + String((e as Error)?.message || e) }]); }
     setChatBusy(false);
@@ -602,10 +644,10 @@ export default function AnalysisPage() {
         </div>
 
         <div className="tabs">
-          <button className={tab === "explore" ? "active" : ""} onClick={() => { setTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
-          <button className={tab === "cohorts" ? "active" : ""} onClick={() => setTab("cohorts")}>Cohorts</button>
-          <button className={tab === "analysis" ? "active" : ""} onClick={() => setTab("analysis")}>Analysis</button>
-          <button className={tab === "examples" ? "active" : ""} onClick={() => setTab("examples")}>Examples</button>
+          <button className={tab === "explore" ? "active" : ""} onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
+          <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Cohorts</button>
+          <button className={tab === "analysis" ? "active" : ""} onClick={() => goTab("analysis")}>Analysis</button>
+          <button className={tab === "examples" ? "active" : ""} onClick={() => goTab("examples")}>Examples</button>
         </div>
         {error && <div className="error">{error}</div>}
 
@@ -1234,6 +1276,7 @@ export default function AnalysisPage() {
                 {doc.cohorts && Object.keys(doc.cohorts).length > 0 &&
                   <button disabled={busy} title="empty the document — removes all cohorts and views" onClick={clearAnalysis}>Clear analysis</button>}
                 {result && <span className="meta">{result.stats.ms}ms · OncoKB {result.oncokbPin}</span>}
+
               </div>
               <p className="note">Views: <code>{`{"kind":"compare","genes":[…]}`}</code> · <code>{`{"kind":"survival"}`}</code> · <code>{`{"kind":"oncoprint","genes":[…],"clinical":[attrs…]}`}</code></p>
               {result && (
@@ -1256,7 +1299,7 @@ export default function AnalysisPage() {
               <div className="card">
                 <h2>Nothing here yet</h2>
                 <p className="note" style={{ fontSize: "0.85rem" }}>
-                  The analysis document is empty. Add cohorts from the <button className="linklike" onClick={() => setTab("cohorts")}>Cohorts tab</button>,
+                  The analysis document is empty. Add cohorts from the <button className="linklike" onClick={() => goTab("cohorts")}>Cohorts tab</button>,
                   ask chat above (e.g. “compare STK11-driver vs wild-type immunotherapy patients”), or paste a document on the left and run it.
                 </p>
               </div>
@@ -1291,7 +1334,9 @@ export default function AnalysisPage() {
               </div>
             )}
             {result && result.views.map((v, vi) => (
-              <div className="card" key={vi}>
+              <div className="card viewcard" key={vi}>
+                <button className="removeview" title="remove this view from the document"
+                  aria-label="remove this view" onClick={() => removeView(vi)}>×</button>
                 {v.kind === "compare" && v.rows && <>
                   <div className="viewhead"><h2 style={{ margin: 0 }}>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2><span className="spacer" /><>{v.ms != null && (
                       <span className="lat" title={
