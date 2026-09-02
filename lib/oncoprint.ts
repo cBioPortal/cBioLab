@@ -68,8 +68,13 @@ export function cohortPatientsSql(dsl: PidsCarrier | null | undefined, study: st
   return patientsSql;
 }
 
-async function cohortPatients(dsl: PidsCarrier | null | undefined, study: string): Promise<string[]> {
-  const r = await chQuery<ChRow>(cohortPatientsSql(dsl, study));
+async function cohortPatients(dsl: PidsCarrier | null | undefined, study: string,
+  log?: ContractOpts["log"], label = "oncoprint:columns"): Promise<string[]> {
+  const sql = cohortPatientsSql(dsl, study);
+  const entry = { label, sql, study } as { label: string; sql: string; ms?: number; study?: string };
+  if (log) log.push(entry);
+  const r = await chQuery<ChRow>(sql);
+  entry.ms = r._ms;
   return r.data.map((x) => x.pid);
 }
 
@@ -192,8 +197,20 @@ export function specToQueries(spec: OncoprintSpec) {
   return { genes, clinical, lineGap, queries };
 }
 
-export async function buildContract(spec: OncoprintSpec): Promise<Contract> {
+/** Optional per-call sink so the analysis layer can report what this view ran. */
+export interface ContractOpts { log?: { label: string; sql: string; ms?: number; study?: string }[] }
+
+export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}): Promise<Contract> {
   const t0 = Date.now();
+  // Record a query the same way the resolvers do: pushed before the await and
+  // stamped after, so concurrent fetches each update their own entry.
+  const lq = async <R = ChRow>(label: string, sql: string, study?: string) => {
+    const entry = { label, sql, ...(study ? { study } : {}) } as { label: string; sql: string; ms?: number; study?: string };
+    if (opts.log) opts.log.push(entry);
+    const r = await chQuery<R>(sql);
+    entry.ms = r._ms;
+    return r;
+  };
   const study = (spec.study || STUDY).replace(/[^A-Za-z0-9._-]/g, "");
   // Federation: spec.studies = [..] makes this a multi-study contract. Columns are
   // then keyed by qualified ids ("<study>_<pid>") so id collisions across studies
@@ -220,11 +237,11 @@ export async function buildContract(spec: OncoprintSpec): Promise<Contract> {
         // federated group: {study: sql} map from analysis.js — fetch per study in
         // parallel, merge in study order (deterministic column order)
         const fetched = await Promise.all(studies.filter((s) => typeof (v as Record<string, string>)[s] === "string").map(async (s) =>
-          ({ s, r: await chQuery<ChRow>("SELECT pid FROM (\n" + (v as Record<string, string>)[s] + "\n)") })));
+          ({ s, r: await lq<ChRow>("oncoprint:columns", "SELECT pid FROM (\n" + (v as Record<string, string>)[s] + "\n)", s) })));
         for (const { s, r } of fetched)
           for (const x of r.data) { const id = qual(s, x.pid); raw.push(id); studyOf.set(id, s); }
       } else {
-        for (const p of await cohortPatients({ ...g.dsl, lineGap }, studies[0])) {
+        for (const p of await cohortPatients({ ...g.dsl, lineGap }, studies[0], opts.log)) {
           const id = qual(studies[0], p); raw.push(id); studyOf.set(id, studies[0]);
         }
       }
@@ -234,7 +251,7 @@ export async function buildContract(spec: OncoprintSpec): Promise<Contract> {
     }
   } else {
     if (multi) throw new Error("multi-study oncoprint requires cohort groups");
-    const pids = await cohortPatients(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study);
+    const pids = await cohortPatients(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, opts.log);
     for (const p of pids) studyOf.set(p, study);
     groups = [{ name: "cohort", pids }];
   }
@@ -245,7 +262,8 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   // ---- genomic events for the gene set (whole study; intersect in JS) ---
   const ev: { data: any[] } = { data: [] }, cov: { data: any[] } = { data: [] };
   const evFetched = await Promise.all(studies.map(s =>
-    Promise.all([chQuery(genomicEventsSql(genes, s)), chQuery(coverageSql(genes, s))]).then(([e, c]) => ({ s, e, c }))));
+    Promise.all([lq("oncoprint:alterations", genomicEventsSql(genes, s), s),
+                 lq("oncoprint:coverage", coverageSql(genes, s), s)]).then(([e, c]) => ({ s, e, c }))));
   for (const { s, e, c } of evFetched) {
     for (const r of e.data) ev.data.push(multi ? { ...r, pid: qual(s, r.pid) } : r);
     // panel coverage per (patient, gene) — the NOT_PROFILED source
@@ -291,7 +309,7 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   }
   if (clinical.length) {
     const cd: { data: any[] } = { data: [] };
-    const cdFetched = await Promise.all(studies.map(async (s) => ({ s, r: await chQuery(clinicalSql(clinical, s)) })));
+    const cdFetched = await Promise.all(studies.map(async (s) => ({ s, r: await lq("oncoprint:clinicalTracks", clinicalSql(clinical, s), s) })));
     for (const { s, r } of cdFetched)
       for (const x of r.data) cd.data.push(multi ? { ...x, pid: qual(s, x.pid) } : x);
     for (const attr of clinical) {
@@ -346,7 +364,7 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
           " (available: " + ([...(await studyProfileTypes(studies[0]))].join(", ") || "none") + ", VAF)");
     const valByKey = new Map<string, number>(); // columnId|gene -> value
     const hFetched = await Promise.all(okStudies.map(async (s) =>
-      ({ s, r: await chQuery(isVaf ? vafSql(h.genes, s) : heatmapSql(h.profileType, h.genes, s)) })));
+      ({ s, r: await lq(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s) : heatmapSql(h.profileType, h.genes, s), s) })));
     for (const { s, r } of hFetched)
       for (const row of r.data) valByKey.set(qual(s, row.pid) + "|" + row.gene, Number(row.v));
     const isZ = /zscore/i.test(h.profileType);
@@ -392,7 +410,7 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   // ---- derived-event tracks (cohort-DSL expressions as phenotypes) ------
   const devTracks: Track[] = [];
   for (const de of derivedEvents) {
-    const pids = new Set<string>(await cohortPatients({ ...de.expression, lineGap }, study));
+    const pids = new Set<string>(await cohortPatients({ ...de.expression, lineGap }, study, opts.log, "oncoprint:derivedEvent"));
     const cells = new Int32Array(allPids.length);
     allPids.forEach((p, i) => { cells[i] = pids.has(p) ? 1 : 0; });
     devTracks.push({ kind: "derivedEvent", label: String(de.label || "derived event").slice(0, 60), cells });

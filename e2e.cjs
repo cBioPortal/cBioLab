@@ -209,6 +209,27 @@ async function main() {
       ok("a lollipop view can be added from the UI", added.includes("hotspots") && dots > 0,
         added.length ? added.join(", ") + " · " + dots + " dots" : "view was not added");
 
+      // The oncoprint does not go through a resolver, so its provenance and its
+      // query/render split are a separate code path — and the one most likely to
+      // be left behind. This document (default views) actually contains one.
+      const onco = await page.evaluate(() => {
+        for (const card of document.querySelectorAll(".ana-grid .card")) {
+          const h = card.querySelector("h2");
+          if (!h || !h.textContent.trim().startsWith("Oncoprint")) continue;
+          const chip = card.querySelector(".lat");
+          return {
+            found: true,
+            queries: card.querySelectorAll(".provsql .provq").length,
+            chip: chip ? chip.textContent.trim() : null,
+            split: !!(chip && /draw\)/.test(chip.textContent))
+          };
+        }
+        return { found: false };
+      });
+      ok("the oncoprint reports its own queries and separates draw time",
+        onco.found && onco.queries > 0 && onco.split,
+        onco.found ? onco.queries + " queries · " + onco.chip : "no oncoprint view on the page");
+
       // Examples tab: the documented analysis documents, rendered as a gallery.
       // The docs gate already proves each one RUNS; this proves the app can
       // launch them and that the federated views actually paint something.
@@ -266,7 +287,7 @@ async function main() {
       });
       // and each must show the aggregate SQL that produced its numbers
       const prov = await page.evaluate(() => {
-        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Hotspots"];
+        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Hotspots", "Oncoprint"];
         const missing = [], counts = [];
         for (const card of document.querySelectorAll(".ana-grid .card")) {
           const h = card.querySelector("h2");
@@ -280,7 +301,7 @@ async function main() {
       });
       // ...and what it cost, at every level: per view, per query, and in total
       const lat = await page.evaluate(() => {
-        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Hotspots"];
+        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Hotspots", "Oncoprint"];
         const per = [], missing = [];
         for (const card of document.querySelectorAll(".ana-grid .card")) {
           const h = card.querySelector("h2");

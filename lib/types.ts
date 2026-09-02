@@ -235,6 +235,8 @@ export interface ViewResult {
   participation?: ViewParticipation;
   /** wall-clock for this view alone, in ms (its queries run concurrently) */
   ms?: number;
+  /** of that, time spent rendering on the SERVER (the oncoprint's SVG) */
+  renderMs?: number;
   /** the aggregate queries that produced THIS view's numbers, in order */
   queries?: { study: string; label: string; sql: string; ms?: number; remote?: boolean }[];
   cohorts?: string[]; annotation?: string;

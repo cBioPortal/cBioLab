@@ -536,6 +536,8 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       }
       // federated: each group carries a {study: sql} map; each cohort contributes
       // only the studies it was actually evaluated in
+      const oncoLog: { label: string; sql: string; ms?: number; study?: string }[] = [];
+      const tQuery = Date.now();
       const contract = await buildContract({
         study: okStudies[0],
         studies: okStudies,
@@ -551,9 +553,15 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
             : cohorts[n].perStudy[okStudies[0]].sql
         } as PidsCarrier })) } },
         conventions: { lineGap: 90 }
-      });
-      views.push({ kind: "oncoprint", cohorts: vNames, svg: contractToSvg(contract, 1200),
+      }, { log: oncoLog });
+      const oncoQueryMs = Date.now() - tQuery;
+      const tRender = Date.now();
+      const oncoSvg = contractToSvg(contract, 1200);
+      const oncoRenderMs = Date.now() - tRender;
+      views.push({ kind: "oncoprint", cohorts: vNames, svg: oncoSvg,
         participation: participationFor(vStudies, true),
+        renderMs: oncoRenderMs,
+        queries: oncoLog.map((q) => ({ study: q.study || okStudies[0], label: q.label, sql: q.sql, ...(q.ms != null ? { ms: q.ms } : {}) })),
         genes: contract.tracks.filter((t) => t.kind === "gene").map((t) => ({ gene: t.label, driverPct: t.driverPct ?? null, anyPct: t.freqPct ?? null })),
         nColumns: contract.stats.nColumns, annotation: contract.conventions.annotation,
         ...(multi || withheld.length ? { studies: okStudies,
@@ -576,7 +584,8 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
     const ran = queriesSince(mark), viewMs = Date.now() - viewT0;
     for (let k = pushedBefore; k < views.length; k++) {
       views[k].ms = viewMs;
-      if (ran.length) views[k].queries = ran;
+      // the oncoprint reports its own queries (it does not go through a resolver)
+      if (ran.length && !views[k].queries) views[k].queries = ran;
     }
   }
 
