@@ -427,3 +427,10 @@ details.gearmenu > .gearmenu-items {
   color: #B45309; background: color-mix(in oklab, #B45309 12%, transparent);
   border: 1px solid color-mix(in oklab, #B45309 35%, transparent);
 }
+
+/* Explore: the action bar stays put while you scroll the facets that build the draft */
+.exbar {
+  position: sticky; top: 0; z-index: 6;
+  padding-top: 0.6rem; padding-bottom: 0.6rem;
+  box-shadow: 0 6px 12px -10px rgba(0, 0, 0, 0.45);
+}

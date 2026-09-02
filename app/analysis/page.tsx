@@ -134,6 +134,7 @@ export default function AnalysisPage() {
   const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">("cohorts");
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   const [copied, setCopied] = useState<string | null>(null);
+  const [exMsg, setExMsg] = useState<string | null>(null);   // Explore action-bar feedback
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -242,6 +243,23 @@ export default function AnalysisPage() {
     const r = await previewCohort();
     if (!r) return;
     persist({ ...saved, [name]: { def: r.def, savedAt: new Date().toISOString().slice(0, 16).replace("T", " "), lastEval: r.ev } });
+  };
+
+  /** Explore's top action bar: acting on the draft you have built by clicking facets. */
+  const analyzeDraft = () => {
+    const d = parseDraft();
+    if (!d) { setExMsg("add at least one filter first — click any facet below"); return; }
+    setExMsg(null);
+    addDefToAnalysis(cName.trim() || "explored cohort", d);
+  };
+  const saveDraftAsCohort = async () => {
+    const d = parseDraft();
+    if (!d) { setExMsg("add at least one filter first — click any facet below"); return; }
+    if (!cName.trim()) { setExMsg("give the cohort a name first"); return; }
+    setExMsg(null);
+    await saveCohort();
+    setExMsg("saved \u201c" + cName.trim() + "\u201d to Cohorts");
+    setTimeout(() => setExMsg(null), 2600);
   };
 
   const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
@@ -501,6 +519,44 @@ export default function AnalysisPage() {
         {/* ================= Explore tab ================= */}
         {tab === "explore" && <div>
           {(() => {
+            // Acting on the draft is the point of this page, so the actions live at
+            // the top and stay there while you scroll the facets that build it.
+            const d = parseDraft();
+            const clauses = d && Array.isArray(d.all) ? d.all.length : 0;
+            const ready = clauses > 0;
+            return (
+              <div className="card exbar">
+                <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <strong style={{ fontSize: "0.82rem" }}>
+                    {ready ? clauses + (clauses === 1 ? " filter" : " filters") : "No filters yet"}
+                  </strong>
+                  <span className="meta">
+                    {ready
+                      ? (explore && explore.draftCount != null
+                          ? "· " + explore.draftCount.toLocaleString() + " patients match"
+                          : "· counting…")
+                      : "— click any facet below to start a cohort"}
+                  </span>
+                  {exploreBusy && <span className="spinner" />}
+                  <span className="spacer" />
+                  <input placeholder="name this cohort…" value={cName} style={{ width: "12rem" }}
+                    onChange={e => setCName(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && ready) analyzeDraft(); }} />
+                  <button className="primary" onClick={analyzeDraft} disabled={!ready}
+                    title={ready ? "add this cohort to the analysis document and run it" : "add at least one filter first"}>
+                    Analyze
+                  </button>
+                  <button onClick={saveDraftAsCohort} disabled={!ready}
+                    title={ready ? "keep this definition in the Cohorts tab without running anything" : "add at least one filter first"}>
+                    Save as cohort
+                  </button>
+                  {ready && <button className="linklike" onClick={clearDraft}>clear</button>}
+                </div>
+                {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
+              </div>
+            );
+          })()}
+          {(() => {
             const CAP_FILTERS: [string, string, (s: any) => boolean][] = [
               ["timeline", "timeline events", (s: any) => s.timelinePatients > 0],
               ["mrna", "mRNA", (s: any) => s.caps && s.caps.mrna],
@@ -584,10 +640,7 @@ export default function AnalysisPage() {
               {exploreBusy && <span className="spinner" />}
             </div>
             <div className="row" style={{ marginTop: "0.5rem" }}>
-              <input placeholder="name this cohort…" value={cName} onChange={e => setCName(e.target.value)} />
-              <button className="primary" onClick={saveCohort}>Save</button>
-              <button className="primary" onClick={() => { const d = parseDraft(); if (d) addDefToAnalysis(cName.trim() || "explored cohort", d); }}>Add to analysis</button>
-              <button onClick={clearDraft}>Clear</button>
+              <span className="meta">Analyze / Save as cohort are at the top of the page.</span>
               <span className="spacer" />
               <input placeholder="find a gene…" value={geneSearch} style={{ width: "9rem", fontSize: "0.78rem" }}
                 onChange={e => setGeneSearch(e.target.value.toUpperCase())}

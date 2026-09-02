@@ -115,6 +115,34 @@ async function main() {
       const canvasH = await page.locator("#oncoCanvas").evaluate(c => c.height);
       ok("oncoprint canvas painted", canvasH > 100, "canvas height " + canvasH);
 
+      // Explore's top action bar: build a draft by clicking a facet, then Analyze.
+      // This is the main path from browsing to an analysis, so it is gated.
+      await page.goto(BASE + "/analysis");
+      await page.locator("button:has-text('Explore')").first().click();
+      await page.waitForSelector(".exbar", { timeout: 120000 });
+      const barEmpty = await page.locator(".exbar button:has-text('Analyze')").isDisabled();
+      ok("Analyze is refused until the draft has a filter", barEmpty);
+      await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
+      await page.locator(".valrow, .slice").first().click();
+      let drafted = true;
+      try {
+        await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""),
+          null, { timeout: 240000 });
+      } catch { drafted = false; }
+      ok("clicking a facet builds a draft and counts it", drafted,
+        drafted ? (await page.locator(".exbar").innerText()).replace(/\s+/g, " ").split(" Analyze")[0] : "no count appeared");
+      await page.locator(".exbar input").fill("e2e explored cohort");
+      await page.locator(".exbar button:has-text('Analyze')").click();
+      let landed = false, views = [];
+      try {
+        await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 1, null, { timeout: 300000 });
+        views = (await page.locator(".ana-grid h2").allTextContents()).map(t => t.split("\u2014")[0].trim());
+        const docText = await page.locator("textarea").first().inputValue();
+        landed = Object.keys(JSON.parse(docText).cohorts || {}).includes("e2e explored cohort");
+      } catch { /* landed stays false */ }
+      ok("Analyze carries the cohort into a running analysis", landed && views.length > 1,
+        landed ? views.join(" + ") : "cohort did not reach the document");
+
       // Examples tab: the documented analysis documents, rendered as a gallery.
       // The docs gate already proves each one RUNS; this proves the app can
       // launch them and that the federated views actually paint something.
