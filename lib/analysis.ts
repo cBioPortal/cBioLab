@@ -561,7 +561,8 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
     cohorts: Object.fromEntries(names.map((n) => [n, {
       count: cohorts[n].count, text: cohorts[n].text,
       studies: cohorts[n].studies,
-      sql: Object.entries(cohorts[n].perStudy).map(([s, x]) => "-- " + s + "\n" + x.sql).join("\n\n-- UNION (federated at the analysis layer)\n\n")
+      sql: Object.entries(cohorts[n].perStudy).map(([s, x]) => "-- " + s + "\n" + x.sql).join("\n\n-- combined at the analysis layer: each study is evaluated separately against its own\n" +
+        "-- instance and the counts are ADDED; patient overlap across studies is not deduplicated.\n\n")
     }])),
     views,
     stats: { ms: Date.now() - t0 }
