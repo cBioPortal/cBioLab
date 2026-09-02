@@ -136,6 +136,7 @@ export default function AnalysisPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [exMsg, setExMsg] = useState<string | null>(null);   // Explore action-bar feedback
   const tabRef = useRef<string>("cohorts");                  // the tab syncUrl should record
+  const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
   const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>"
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
@@ -381,18 +382,31 @@ export default function AnalysisPage() {
   const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
 
   const fetchExplore = async (draftOverride?: CohortDef | null, studiesOverride?: string[] | string) => {
+    // Several independent triggers can ask for the same facets at once (a
+    // ?tab=explore deep link, the tab button, and the catalog resolving the
+    // default study selection all fire on load). exFetchSeq supersedes stale
+    // RESULTS but does not stop duplicate REQUESTS, and each one is a full
+    // faceting pass over ClickHouse — so identical work already in flight is
+    // skipped rather than run twice and thrown away.
+    const inflightKey = JSON.stringify([
+      studiesOverride ?? exSel.current,
+      draftOverride !== undefined ? draftOverride : parseDraft(),
+      geneSearch || null
+    ]);
+    if (exInflight.current === inflightKey) return;
+    exInflight.current = inflightKey;
     const seq = ++exFetchSeq.current; // a later call (or an emptied selection) supersedes this one
     setExploreBusy(true);
     try {
       const list = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current;
-      if (!list.length) { setExplore(null); setExploreBusy(false); return; }
+      if (!list.length) { setExplore(null); exInflight.current = null; setExploreBusy(false); return; }
       const res = await fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ studies: list, draft: draftOverride !== undefined ? draftOverride : parseDraft(), geneSearch: geneSearch || undefined }) });
       const j = await res.json();
       if (seq !== exFetchSeq.current) return; // superseded while in flight — discard
       if (!j.error) setExplore(j); else setError(j.error);
     } catch (e) { if (seq === exFetchSeq.current) setError(String((e as Error)?.message || e)); }
-    if (seq === exFetchSeq.current) setExploreBusy(false);
+    if (seq === exFetchSeq.current) exInflight.current = null; setExploreBusy(false);
   };
 
   const addClause = (clause: any) => {
