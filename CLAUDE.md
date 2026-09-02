@@ -33,7 +33,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   molecular tracks incl. synthetic `VAF`). Renderers are dumb: **`lib/oncoprint-svg.ts`**
   (server), `app/oncoprint/page.tsx` (canvas), `mcp/apps/oncoprint-html.ts` (MCP App iframe).
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
-- **`app/analysis/page.tsx`** — the app: Explore (study checkboxes + facets) / Cohorts / Analysis.
+- **`app/analysis/page.tsx`** — the app: Explore (study checkboxes + facets) / Cohorts / Analysis / Examples.
 - **`app/api/chat/route.ts`** — Claude tool-use loop (`update_document`, `get_catalog`).
 - **`mcp/tools.ts`** — MCP registry: `describe_dsl`, `run_analysis`, `render_oncoprint` (+v1
   event tools); `mcp/apps/` = optional MCP-Apps interactive oncoprint (additive; user considers
@@ -51,7 +51,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
    ids. Cross-study: overlap is deliberately NOT deduplicated, vocabularies NOT harmonized —
    and views/captions must say so.
 4. **Docs are generated.** Never hand-edit `docs/dsl.md`. Change `lib/dsl-reference.ts`, run
-   `npm run docs:gen`, commit both. `npm run docs:check` (part of e2e) fails on drift and
+   `npm run docs:gen`, commit both. `EXAMPLES` there is also what the app's **Examples tab**
+   renders, so one edit updates the doc, the MCP `describe_dsl` tool, and the gallery at once —
+   and the docs gate already proves every gallery entry runs. `npm run docs:check` (part of e2e) fails on drift and
    EXECUTES every documented example against the live compiler. The chat prompt grammar and the
    MCP `describe_dsl` tool render from the same module.
 5. **SQL injection surface**: cohort SQL passes between modules only via the `PIDS_SQL` Symbol
@@ -70,7 +72,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
 - Test: `npm test` — unit suites, no database needed (the patient-data boundary and the stats used by
   federated views;
-  62 checks across 2 suites). `node e2e.cjs` — 35 checks (Playwright + docs gate + the boundary suite).
+  62 checks across 2 suites). `node e2e.cjs` — 41 checks (Playwright + docs gate + the boundary suite).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push `analysis`. **Stop there.**

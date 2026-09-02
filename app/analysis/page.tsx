@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
 import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
+import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
 
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
 /** beyond this many distinct values a pie is unreadable — the portal shows a table */
@@ -88,7 +89,9 @@ const DEFAULT_VIEWS: View[] = [
 ];
 
 export default function AnalysisPage() {
-  const [tab, setTab] = useState<"explore" | "cohorts" | "analysis">("cohorts");
+  const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">("cohorts");
+  const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
+  const [copied, setCopied] = useState<string | null>(null);
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -355,6 +358,26 @@ export default function AnalysisPage() {
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); setTab("analysis"); run(d);
   };
 
+  /** Load a documented example into the Analysis tab and run it. */
+  const runDocExample = (ex: DslExample) => {
+    const d = JSON.parse(JSON.stringify(ex.doc)) as AnalysisDoc;   // never hand the shared object to the editor
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    setStudy(d.study || study);
+    setResult(null); setError(null);
+    setTab("analysis");
+    run(d);
+  };
+
+  const docLink = (d: AnalysisDoc): string =>
+    location.origin + location.pathname + "?doc=" +
+    btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d))))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+  const copyDocLink = async (ex: DslExample) => {
+    try { await navigator.clipboard.writeText(docLink(ex.doc)); setCopied(ex.title); setTimeout(() => setCopied(null), 1800); }
+    catch { setError("could not copy to clipboard"); }
+  };
+
   const previewExample = async (ex: any) => {
     setExEvals(s => ({ ...s, [ex.name]: { busy: true } }));
     try { const ev = await evalDef(ex.name, ex.def); setExEvals(s => ({ ...s, [ex.name]: ev })); }
@@ -429,6 +452,7 @@ export default function AnalysisPage() {
           <button className={tab === "explore" ? "active" : ""} onClick={() => { setTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
           <button className={tab === "cohorts" ? "active" : ""} onClick={() => setTab("cohorts")}>Cohorts</button>
           <button className={tab === "analysis" ? "active" : ""} onClick={() => setTab("analysis")}>Analysis</button>
+          <button className={tab === "examples" ? "active" : ""} onClick={() => setTab("examples")}>Examples</button>
         </div>
         {error && <div className="error">{error}</div>}
 
@@ -907,6 +931,72 @@ export default function AnalysisPage() {
             ))}
           </div>
         </div>}
+
+        {/* ================= Examples tab ================= */}
+        {tab === "examples" && (() => {
+          const tags = [...new Set(DOC_EXAMPLES.flatMap(e => e.tags || []))].sort();
+          const shown = exTag === "all" ? DOC_EXAMPLES : DOC_EXAMPLES.filter(e => (e.tags || []).includes(exTag));
+          const viewKinds = (ex: DslExample): string[] => [...new Set((ex.doc.views || []).map(v => String(v.kind)))];
+          return (
+            <div>
+              <div className="card">
+                <h2>Examples <span className="plain">— every one of these is executed by the test gate</span></h2>
+                <p className="note" style={{ marginTop: "0.2rem" }}>
+                  These are the same analysis documents that <code>docs/dsl.md</code> is generated from, and{" "}
+                  <code>npm run docs:check</code> runs each of them against the live compiler on every build — so an
+                  example that stopped working would fail the suite rather than sit here broken. Running one loads it
+                  into the Analysis tab, where you can edit the JSON and re-run.
+                </p>
+                <div className="extags">
+                  <button className={exTag === "all" ? "extag on" : "extag"} onClick={() => setExTag("all")}>
+                    all <span className="meta">{DOC_EXAMPLES.length}</span>
+                  </button>
+                  {tags.map(t => (
+                    <button key={t} className={exTag === t ? "extag on" : "extag"} onClick={() => setExTag(t)}>
+                      {t} <span className="meta">{DOC_EXAMPLES.filter(e => (e.tags || []).includes(t)).length}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="exgrid">
+                {shown.map(ex => {
+                  const cohortNames = Object.keys(ex.doc.cohorts || {});
+                  const studies = [...new Set(Object.values(ex.doc.cohorts || {})
+                    .flatMap((c: any) => (c && c.studies) || (c && c.study ? [c.study] : []))
+                    .concat(ex.doc.study ? [ex.doc.study] : []))];
+                  return (
+                    <div className="card excard" key={ex.title}>
+                      <h3>{ex.title}</h3>
+                      <div className="extags small">
+                        {viewKinds(ex).map(k => <span key={k} className="vkind">{k}</span>)}
+                        {(ex.tags || []).filter(t => !viewKinds(ex).includes(t)).map(t => <span key={t} className="extag static">{t}</span>)}
+                      </div>
+                      {ex.demonstrates && <p className="exdem">{ex.demonstrates}</p>}
+                      <p className="exnote">{ex.note}</p>
+                      <div className="exmeta">
+                        <span title={studies.join(", ")}>
+                          {studies.length === 1 ? studies[0] : studies.length + " studies"}
+                        </span>
+                        <span>{cohortNames.length} cohort{cohortNames.length === 1 ? "" : "s"}: {cohortNames.join(", ")}</span>
+                      </div>
+                      <details>
+                        <summary className="meta">document</summary>
+                        <pre className="exjson">{JSON.stringify(ex.doc, null, 2)}</pre>
+                      </details>
+                      <div className="row" style={{ marginTop: "auto", paddingTop: "0.5rem", gap: "0.4rem" }}>
+                        <button onClick={() => runDocExample(ex)} disabled={busy}>Run</button>
+                        <button className="ghost" onClick={() => copyDocLink(ex)}>
+                          {copied === ex.title ? "copied" : "copy link"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ================= Analysis tab ================= */}
         {tab === "analysis" && <div className="ana-grid">

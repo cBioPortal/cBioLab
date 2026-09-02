@@ -114,6 +114,38 @@ async function main() {
       ok("oncoprint contract built (2,946 patients)", oncoHeader.includes("2,946 patients"), oncoHeader.slice(0, 80));
       const canvasH = await page.locator("#oncoCanvas").evaluate(c => c.height);
       ok("oncoprint canvas painted", canvasH > 100, "canvas height " + canvasH);
+
+      // Examples tab: the documented analysis documents, rendered as a gallery.
+      // The docs gate already proves each one RUNS; this proves the app can
+      // launch them and that the federated views actually paint something.
+      await page.goto(BASE + "/analysis");
+      await page.locator("button:has-text('Examples')").first().click();
+      await page.waitForSelector(".excard", { timeout: 120000 });
+      const nCards = await page.locator(".excard").count();
+      const { EXAMPLES } = await import("./lib/dsl-reference.ts");
+      ok("examples gallery lists every documented example",
+        nCards === EXAMPLES.length, nCards + " cards vs " + EXAMPLES.length + " examples");
+
+      // one launch per federated view kind, asserting the view's own markup appears
+      const launches = [
+        ["Co-occurrence and mutual exclusivity in NSCLC", ".tend", "cooccurrence"],
+        ["Co-expression from sums alone", ".rbar", "coexpression"],
+        ["Recurrent protein changes, with a suppression floor", ".lolli svg circle", "hotspots"],
+        ["Study-stratified survival across two studies", ".logrank", "survival log-rank"],
+        ["Clinical attributes compared between cohorts", "h2:has-text('Clinical comparison')", "clinical"]
+      ];
+      for (const [title, sel, label] of launches) {
+        await page.goto(BASE + "/analysis");
+        await page.locator("button:has-text('Examples')").first().click();
+        await page.waitForSelector(".excard", { timeout: 120000 });
+        const card = page.locator(".excard").filter({ hasText: title }).first();
+        await card.locator("button:has-text('Run')").click();
+        let shown = true;
+        try { await page.waitForSelector(sel, { timeout: 240000 }); }
+        catch { shown = false; }
+        ok("example runs and renders: " + label, shown,
+          shown ? "" : "no " + sel + " after running “" + title + "”");
+      }
     } else {
       await page.screenshot({ path: "shot-next-dark.png", fullPage: false });
     }

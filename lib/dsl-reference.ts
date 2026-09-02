@@ -19,12 +19,20 @@ import type { AnalysisDoc } from "./types.ts";
 
 export const DSL_VERSION = "2.2";
 
-export interface DslExample { title: string; note: string; doc: AnalysisDoc }
+export interface DslExample {
+  title: string; note: string; doc: AnalysisDoc;
+  /** one line on WHY this example exists — rendered by the app's Examples tab */
+  demonstrates?: string;
+  /** view kinds / themes exercised, for grouping in the app */
+  tags?: string[];
+}
 
 // ---- runnable examples (rendered into the doc AND executed by docs:check) --
 export const EXAMPLES: DslExample[] = [
   {
     title: "Genomic status via OQL, compared",
+    demonstrates: "The base case the others build on: two cohorts defined genomically, compared gene by gene with panel-aware denominators, then followed to death.",
+    tags: ["compare", "survival", "OQL"],
     note: "STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it includes not-profiled unless you add a profiled clause). Two views: co-alteration frequencies and overall survival.",
     doc: {
       study: "msk_chord_2024",
@@ -37,6 +45,8 @@ export const EXAMPLES: DslExample[] = [
   },
   {
     title: "Clinical + timeline event composition",
+    demonstrates: "A cohort no attribute filter could express \u2014 it depends on the ORDER of events in a patient's timeline.",
+    tags: ["compare", "timeline"],
     note: "Never-smokers whose timeline shows progression within 180 days after first immunotherapy. The event leaf is the v1 timeline sub-DSL embedded as a clause.",
     doc: {
       study: "msk_chord_2024",
@@ -54,6 +64,8 @@ export const EXAMPLES: DslExample[] = [
   },
   {
     title: "any / not / genomicData",
+    demonstrates: "Boolean structure: OR inside a clause, NOT around a leaf, and a copy-number threshold expressed as a continuous range.",
+    tags: ["compare", "boolean"],
     note: "Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep deletions expressed as a continuous copy-number threshold.",
     doc: {
       study: "msk_chord_2024",
@@ -71,6 +83,8 @@ export const EXAMPLES: DslExample[] = [
   },
   {
     title: "Cross-study federation with an oncoprint",
+    demonstrates: "One cohort spanning two studies. Overlap is NOT deduplicated and vocabularies are NOT harmonized \u2014 the view says so rather than hiding it.",
+    tags: ["oncoprint", "federation"],
     note: "One cohort unioned across two studies (members are study-qualified; overlap is NOT deduplicated), rendered as a federated oncoprint with a categorical and a numeric clinical track, columns sorted by cancer type then descending age. The Study track is added automatically.",
     doc: {
       study: "msk_chord_2024",
@@ -83,6 +97,8 @@ export const EXAMPLES: DslExample[] = [
 ,
   {
     title: "Molecular heatmap tracks, sorted by expression",
+    demonstrates: "Continuous molecular values as tracks, with the track label doubling as the sort key.",
+    tags: ["oncoprint", "heatmap"],
     note: "ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene tracks, columns sorted by descending ERBB2 expression. Z-scores render on a fixed diverging \u00b13 ramp; the track label (gene + short profile name) is the sort key.",
     doc: {
       study: "brca_tcga_pan_can_atlas_2018",
@@ -96,6 +112,8 @@ export const EXAMPLES: DslExample[] = [
   },
   {
     title: "A federated z-score reference on an oncoprint",
+    demonstrates: "The sharpest form of the argument: a site that discloses no patients \u2014 and so draws no columns \u2014 still defines the scale those columns are read against, from three totals per gene.",
+    tags: ["oncoprint", "federation", "z-reference"],
     note: "A heatmap track with reference:\"federation\" is scored against a distribution pooled from EVERY participating study, including instances that disclose no patients and therefore contribute no columns — each returns three totals per gene (n, sum, sum of squares), which is enough to define the reference. Run with luad_tcga_pan_can_atlas_2018 aggregate-only, its patients are absent from the columns while its 510 patients still shape what the drawn columns mean.",
     doc: {
       study: "brca_tcga_pan_can_atlas_2018",
@@ -109,6 +127,8 @@ export const EXAMPLES: DslExample[] = [
   },
   {
     title: "Recurrent protein changes, with a suppression floor",
+    demonstrates: "Lollipop data, and the one place small cells genuinely bite: minCount is applied by each site BEFORE anything is returned, because a coordinator filtering what it already received is theatre.",
+    tags: ["hotspots", "suppression"],
     note: "Hotspots in colorectal cancer. Percentages are of the patients carrying any mutation in that gene, so BRAF V600E accounts for roughly 70% of BRAF-mutant cases. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.",
     doc: {
       study: "msk_chord_2024",
@@ -120,6 +140,8 @@ export const EXAMPLES: DslExample[] = [
   },
   {
     title: "Co-expression from sums alone",
+    demonstrates: "A correlation depends on the data only through six running totals, so it federates exactly \u2014 the pooled answer equals the centralized one rather than approximating it.",
+    tags: ["coexpression", "federation"],
     note: "Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.",
     doc: {
       study: "brca_tcga_pan_can_atlas_2018",
@@ -130,6 +152,8 @@ export const EXAMPLES: DslExample[] = [
   },
   {
     title: "Clinical attributes compared between cohorts",
+    demonstrates: "Welch's t from (n, sum, sum of squares): three additive totals per site, so pooled mean and variance are exact and no individual value is transmitted.",
+    tags: ["clinical", "federation"],
     note: "How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.",
     doc: {
       study: "msk_chord_2024",
@@ -142,6 +166,8 @@ export const EXAMPLES: DslExample[] = [
   },
   {
     title: "Co-occurrence and mutual exclusivity in NSCLC",
+    demonstrates: "Four counts per gene pair per site. Denominators are the patients each site's OWN panels profiled for both genes \u2014 something pooled exports get wrong.",
+    tags: ["cooccurrence", "federation"],
     note: "Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.",
     doc: {
       study: "msk_chord_2024",
@@ -153,6 +179,8 @@ export const EXAMPLES: DslExample[] = [
   },
   {
     title: "Study-stratified survival across two studies",
+    demonstrates: "The log-rank statistic is a sum over strata, so sites can BE the strata \u2014 which is better methodology than pooling, not merely more private.",
+    tags: ["survival", "log-rank", "federation"],
     note: "TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.",
     doc: {
       study: "msk_chord_2024",
