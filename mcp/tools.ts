@@ -113,7 +113,12 @@ export function registerTools(server: any): void {
           momentGenes && momentGenes.length && profileType
             ? res.profileMoments(cohort, momentGenes, profileType) : Promise.resolve([])
         ]);
-        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, oncokbPin: pin };
+        // SQL text carries no patient data, and an id-carrying definition was already
+        // refused, so disclosing what we ran restores end-to-end provenance for the
+        // caller. A deployment that treats its schema as sensitive sets
+        // FEDERATION_HIDE_SQL=1 and the caller degrades gracefully.
+        const cohortSql = process.env.FEDERATION_HIDE_SQL === "1" ? null : res.cohortSql(cohort);
+        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, cohortSql, oncokbPin: pin };
         return {
           content: [{ type: "text" as const, text: `aggregates for ${s}: ${count.toLocaleString()} patients` +
             (geneCounts.length ? `, ${geneCounts.length} gene counts` : "") +

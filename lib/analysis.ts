@@ -99,7 +99,10 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       const { profiles, gaProfiles } = await studyProfiles(s);
       const res = await resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
       resolvers[s] = res;
-      return { s, res, sql: res.cohortSql(def), count: await res.count(def) };
+      // count() first: a remote peer only learns its own SQL by answering, and
+      // cohortSql() reads what it reported.
+      const count = await res.count(def);
+      return { s, res, sql: res.cohortSql(def), count };
     }));
     for (const { s, res, sql, count } of evals) {
       perStudy[s] = { sql, count, mode: res.instance.mode };

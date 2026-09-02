@@ -18,6 +18,8 @@ import { carriesPatientIds } from "./federation.ts";
 interface RemoteAggregates {
   study: string; instance: string; count: number;
   geneCounts: GeneCounts[]; survivalCounts: SurvivalCount[]; pairCounts: PairCounts[]; attributeStats: AttrStats[]; pairMoments: PairMoments[]; variantCounts: VariantReport; profileMoments: ProfileMoments[];
+  /** the SQL the peer compiled and ran, when it chooses to disclose it */
+  cohortSql?: string | null;
   oncokbPin: string | null;
 }
 
@@ -94,15 +96,28 @@ export class RemoteAggregateResolver implements AggregateCapable {
   readonly instance: Instance;
   readonly study: string;
   private readonly url: string;
+  /**
+   * What the peer said it ran, learned from any answered call. SQL text carries
+   * no patient data — and an id-carrying definition is refused before a request
+   * is ever made — so a peer may disclose it without weakening the boundary.
+   * A peer that declines simply does not send it, and provenance degrades to a
+   * statement that it ran remotely.
+   */
+  private peerSql: string | null = null;
   constructor(study: string, url: string, instance: Instance) {
     this.study = study;
     this.url = url;
     this.instance = instance;
   }
-  /** The peer compiles and runs its own SQL; we never see it (or its data). */
+  private remember(r: { cohortSql?: string | null }): void {
+    if (r && typeof r.cohortSql === "string" && r.cohortSql.trim()) this.peerSql = r.cohortSql;
+  }
+  /** The peer compiles and runs its own SQL against its own schema. */
   cohortSql(): string {
-    return "-- evaluated remotely by " + this.instance.label + " (" + this.url + ")\n" +
-      "-- this instance receives aggregates only; the peer's SQL and rows stay there";
+    const head = "-- evaluated remotely by " + this.instance.label + " (" + this.url + ")\n";
+    return this.peerSql
+      ? head + "-- compiled and run BY THE PEER, against its own schema; only counts came back\n" + this.peerSql
+      : head + "-- this instance receives aggregates only; the peer did not disclose its SQL";
   }
   /** nothing carrying identifiers is allowed to leave for a remote peer */
   private guard(def: CohortDef | null | undefined): void {
@@ -111,7 +126,9 @@ export class RemoteAggregateResolver implements AggregateCapable {
   }
   async count(def: CohortDef | null | undefined): Promise<number> {
     this.guard(def);
-    return (await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {} })).count;
+    const r = await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {} });
+    this.remember(r);
+    return r.count;
   }
   async geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]> {
     this.guard(def);
