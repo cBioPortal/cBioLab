@@ -168,7 +168,255 @@ Shareable links: `/oncoprint?spec=<base64url>`.
 Every example below is executed against the live compiler by `npm run docs:check`
 (part of the e2e suite) — if one breaks, the build fails.
 
-### Example 1: Genomic status via OQL, compared
+### Example 1: Lung adenocarcinoma: a four-view workup
+
+EGFR-mutant versus KRAS-mutant lung adenocarcinoma — the two dominant, mutually exclusive driver classes. Co-alteration frequencies, how the groups differ clinically, how they differ in survival (with a log-rank test), and which driver pairs co-occur within the EGFR arm. Every view is computed from aggregates each site could return without disclosing a patient.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "EGFR-mutant NSCLC": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ],
+          "per": "sample"
+        },
+        {
+          "kind": "oql",
+          "q": "EGFR: MUT"
+        }
+      ]
+    },
+    "KRAS-mutant NSCLC": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ],
+          "per": "sample"
+        },
+        {
+          "kind": "oql",
+          "q": "KRAS: MUT"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "genes": [
+        "TP53",
+        "STK11",
+        "KEAP1",
+        "RBM10",
+        "ERBB2",
+        "MET"
+      ]
+    },
+    {
+      "kind": "clinical",
+      "attributes": [
+        "SMOKING_PREDICTIONS_3_CLASSES",
+        "CURRENT_AGE_DEID",
+        "TMB_NONSYNONYMOUS",
+        "FRACTION_GENOME_ALTERED"
+      ]
+    },
+    {
+      "kind": "survival"
+    },
+    {
+      "kind": "cooccurrence",
+      "genes": [
+        "EGFR",
+        "TP53",
+        "STK11",
+        "KEAP1",
+        "RBM10"
+      ]
+    }
+  ]
+}
+```
+
+### Example 2: One cohort, five ways: the colorectal hotspot workup
+
+Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 12/13, BRAF V600E, PIK3CA E545K/H1047R), which pairs co-occur or exclude each other, how the mutated and wild-type groups differ clinically, and an oncoprint of the same patients. minCount is set so no site returns a change carried by fewer than three patients.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "CRC, KRAS-mutant": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Colorectal Cancer"
+          ],
+          "per": "sample"
+        },
+        {
+          "kind": "oql",
+          "q": "KRAS: MUT"
+        }
+      ]
+    },
+    "CRC, KRAS wild-type": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Colorectal Cancer"
+          ],
+          "per": "sample"
+        },
+        {
+          "not": {
+            "kind": "oql",
+            "q": "KRAS:"
+          }
+        },
+        {
+          "kind": "profiled",
+          "type": "MUTATION"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "hotspots",
+      "genes": [
+        "KRAS",
+        "BRAF",
+        "PIK3CA",
+        "TP53"
+      ],
+      "minCount": 3
+    },
+    {
+      "kind": "cooccurrence",
+      "genes": [
+        "KRAS",
+        "BRAF",
+        "NRAS",
+        "PIK3CA",
+        "TP53",
+        "APC",
+        "SMAD4"
+      ]
+    },
+    {
+      "kind": "compare",
+      "genes": [
+        "BRAF",
+        "NRAS",
+        "PIK3CA",
+        "APC",
+        "SMAD4"
+      ]
+    },
+    {
+      "kind": "clinical",
+      "attributes": [
+        "CURRENT_AGE_DEID",
+        "MSI_SCORE",
+        "TMB_NONSYNONYMOUS"
+      ]
+    },
+    {
+      "kind": "survival"
+    }
+  ]
+}
+```
+
+### Example 3: Federated end to end: two studies, four views
+
+TP53-mutant versus wild-type across MSK-CHORD and MSK-MET. The log-rank is stratified by study, the co-occurrence test is Cochran–Mantel–Haenszel across the two sites, and the clinical comparison pools counts and moments — all from per-site aggregates. Run with either study aggregate-only and the numbers do not change.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "TP53 mut": {
+      "studies": [
+        "msk_chord_2024",
+        "msk_met_2021"
+      ],
+      "all": [
+        {
+          "kind": "oql",
+          "q": "TP53: MUT"
+        }
+      ]
+    },
+    "TP53 wt": {
+      "studies": [
+        "msk_chord_2024",
+        "msk_met_2021"
+      ],
+      "all": [
+        {
+          "not": {
+            "kind": "oql",
+            "q": "TP53:"
+          }
+        },
+        {
+          "kind": "profiled",
+          "type": "MUTATION"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "genes": [
+        "KRAS",
+        "PIK3CA",
+        "APC",
+        "EGFR",
+        "CDKN2A"
+      ]
+    },
+    {
+      "kind": "survival"
+    },
+    {
+      "kind": "clinical",
+      "attributes": [
+        "CURRENT_AGE_DEID",
+        "TMB_NONSYNONYMOUS",
+        "FRACTION_GENOME_ALTERED"
+      ]
+    },
+    {
+      "kind": "cooccurrence",
+      "genes": [
+        "TP53",
+        "KRAS",
+        "PIK3CA",
+        "APC"
+      ]
+    }
+  ]
+}
+```
+
+### Example 4: Genomic status via OQL, compared
 
 STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it includes not-profiled unless you add a profiled clause). Two views: co-alteration frequencies and overall survival.
 
@@ -215,7 +463,7 @@ STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it
 }
 ```
 
-### Example 2: Clinical + timeline event composition
+### Example 5: Clinical + timeline event composition
 
 Never-smokers whose timeline shows progression within 180 days after first immunotherapy. The event leaf is the v1 timeline sub-DSL embedded as a clause.
 
@@ -274,7 +522,7 @@ Never-smokers whose timeline shows progression within 180 days after first immun
 }
 ```
 
-### Example 3: any / not / genomicData
+### Example 6: any / not / genomicData
 
 Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep deletions expressed as a continuous copy-number threshold.
 
@@ -331,7 +579,7 @@ Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep 
 }
 ```
 
-### Example 4: Cross-study federation with an oncoprint
+### Example 7: Cross-study federation with an oncoprint
 
 One cohort unioned across two studies (members are study-qualified; overlap is NOT deduplicated), rendered as a federated oncoprint with a categorical and a numeric clinical track, columns sorted by cancer type then descending age. The Study track is added automatically.
 
@@ -373,7 +621,7 @@ One cohort unioned across two studies (members are study-qualified; overlap is N
 }
 ```
 
-### Example 5: Molecular heatmap tracks, sorted by expression
+### Example 8: Molecular heatmap tracks, sorted by expression
 
 ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene tracks, columns sorted by descending ERBB2 expression. Z-scores render on a fixed diverging ±3 ramp; the track label (gene + short profile name) is the sort key.
 
@@ -411,7 +659,7 @@ ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene t
 }
 ```
 
-### Example 6: A federated z-score reference on an oncoprint
+### Example 9: A federated z-score reference on an oncoprint
 
 A heatmap track with reference:"federation" is scored against a distribution pooled from EVERY participating study, including instances that disclose no patients and therefore contribute no columns — each returns three totals per gene (n, sum, sum of squares), which is enough to define the reference. Run with luad_tcga_pan_can_atlas_2018 aggregate-only, its patients are absent from the columns while its 510 patients still shape what the drawn columns mean.
 
@@ -450,7 +698,7 @@ A heatmap track with reference:"federation" is scored against a distribution poo
 }
 ```
 
-### Example 7: Recurrent protein changes, with a suppression floor
+### Example 10: Lollipop plot: recurrent protein changes, with a suppression floor
 
 Hotspots in colorectal cancer. Percentages are of the patients carrying any mutation in that gene, so BRAF V600E accounts for roughly 70% of BRAF-mutant cases. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.
 
@@ -486,7 +734,7 @@ Hotspots in colorectal cancer. Percentages are of the patients carrying any muta
 }
 ```
 
-### Example 8: Co-expression from sums alone
+### Example 11: Co-expression from sums alone
 
 Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.
 
@@ -519,7 +767,7 @@ Pearson correlation between gene pairs in TCGA breast cancer. A correlation depe
 }
 ```
 
-### Example 9: Clinical attributes compared between cohorts
+### Example 12: Clinical attributes compared between cohorts
 
 How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.
 
@@ -565,7 +813,7 @@ How TP53-mutant and wild-type tumors differ clinically. Categorical attributes a
 }
 ```
 
-### Example 10: Co-occurrence and mutual exclusivity in NSCLC
+### Example 13: Co-occurrence and mutual exclusivity in NSCLC
 
 Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.
 
@@ -602,7 +850,7 @@ Pairwise associations among lung cancer driver genes. Each site returns four cou
 }
 ```
 
-### Example 11: Study-stratified survival across two studies
+### Example 14: Study-stratified survival across two studies
 
 TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.
 

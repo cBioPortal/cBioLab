@@ -326,10 +326,34 @@ details.gearmenu > .gearmenu-items {
 .rbar::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muted); opacity: 0.5; }
 .rbar i { display: block; height: 100%; min-width: 1px; opacity: 0.8; }
 
-/* Hotspots: compact lollipop per gene */
+/* Hotspots: lollipop per gene. Laid out in HTML so dots stay circular and the
+   codon axis stays legible at any width — an SVG scaled with
+   preserveAspectRatio="none" shears both. */
 .lolli { border-top: 1px solid var(--line); padding: 0.5rem 0 0.35rem; }
-.lolli svg { display: block; overflow: visible; }
-.lollilist { display: flex; flex-wrap: wrap; gap: 0 0.9rem; font-size: 0.74rem; margin-top: 0.15rem; }
+.lolliplot { position: relative; height: 72px; margin: 0.2rem 8px 0; }
+.lolliplot .stem {
+  position: absolute; bottom: 0; width: 1px;
+  background: var(--muted); opacity: 0.45;
+}
+.lolliplot .dot {
+  position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%);
+  display: block; border-radius: 50%; opacity: 0.9;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--bg) 70%, transparent);
+}
+.lolliplot .stem:hover { opacity: 1; background: var(--ink); }
+.lolliplot .stem:hover .dot { opacity: 1; }
+.lolliplot .axis {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  background: var(--line); border-radius: 1px;
+}
+.lolliaxis {
+  position: relative; height: 1.05rem; margin: 0 8px; font-size: 0.66rem;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.lolliaxis span { position: absolute; transform: translateX(-50%); top: 1px; }
+.lolliaxis span:first-child { transform: none; }
+.lolliaxis span.last { transform: translateX(-100%); }
+.lollilist { display: flex; flex-wrap: wrap; gap: 0 0.9rem; font-size: 0.74rem; margin-top: 0.2rem; }
 .lollilist b { font-weight: 600; }
 
 /* ---------------- Examples tab ---------------- */

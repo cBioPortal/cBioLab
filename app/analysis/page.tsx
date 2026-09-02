@@ -1085,39 +1085,53 @@ export default function AnalysisPage() {
                   {v.note && <p className="note">{v.note}</p>}
                   {v.hotspots.map(h => {
                     const positioned = h.variants.filter(x => x.pos != null);
-                    const maxPos = Math.max(1, ...positioned.map(x => x.pos!)) * 1.06;
+                    const maxPos = Math.max(1, ...positioned.map(x => x.pos!));
                     const maxN = Math.max(1, ...h.variants.map(x => x.n));
-                    const H = 74, PAD = 6;
+                    // axis ticks on round codon numbers rather than fractions of the max
+                    const rawStep = maxPos / 4;
+                    const mag = Math.pow(10, Math.floor(Math.log10(Math.max(1, rawStep))));
+                    const step = Math.max(1, [1, 2, 2.5, 5, 10].map(m => m * mag).find(v2 => v2 >= rawStep) ?? mag * 10);
+                    const axisMax = Math.ceil(maxPos / step) * step;
+                    const ticks: number[] = [];
+                    for (let t = 0; t <= axisMax + 1e-9; t += step) ticks.push(Math.round(t));
                     return (
                       <div key={h.gene} className="lolli">
                         <div className="row" style={{ alignItems: "baseline" }}>
                           <strong style={{ fontSize: "0.82rem" }}>{h.gene}</strong>
                           <span className="meta">{h.mutated.toLocaleString()} mutated patients · {h.variants.length} shown
                             {h.withheld ? " of " + (h.variants.length + h.withheld) + " distinct changes" : ""}</span>
+                          <span className="spacer" />
+                          <span className="meta">by codon · tallest = {maxN.toLocaleString()} patients</span>
                         </div>
-                        <svg viewBox={"0 0 600 " + H} preserveAspectRatio="none" style={{ width: "100%", height: H }} role="img"
-                          aria-label={h.gene + " protein changes by codon position"}>
-                          <line x1="0" y1={H - PAD} x2="600" y2={H - PAD} stroke="var(--line)" strokeWidth="2" />
-                          {positioned.map((x, i) => {
-                            const cx = (x.pos! / maxPos) * 600;
-                            const cy = (H - PAD) - PAD - ((H - 3 * PAD) * x.n) / maxN;
-                            return (
-                              <g key={i}>
-                                <line x1={cx} y1={H - PAD} x2={cx} y2={cy} stroke="var(--muted)" strokeWidth="1" opacity="0.55" />
-                                <circle cx={cx} cy={cy} r={Math.max(2.5, Math.min(6, 2 + 4 * x.n / maxN))}
-                                  fill={x.type && x.type.startsWith("Missense") ? "#0072B2" : "#D55E00"} opacity="0.85">
-                                  <title>{x.variant + " · " + x.n.toLocaleString() + " patients (" + x.pct + "% of mutated) · codon " + x.pos + " · " + x.type}</title>
-                                </circle>
-                              </g>
-                            );
-                          })}
-                        </svg>
+                        {/* laid out in HTML, not a stretched SVG: a viewBox scaled to the
+                            container turns circles into ellipses and shears any label */}
+                        <div className="lolliplot">
+                          {positioned.map((x, i2) => (
+                            <span key={i2} className="stem"
+                              style={{ left: (100 * x.pos!) / axisMax + "%", height: (12 + 52 * x.n / maxN) + "px" }}
+                              title={x.variant + " · " + x.n.toLocaleString() + " patients (" + x.pct + "% of those mutated in " + h.gene + ") · codon " + x.pos + " · " + x.type}>
+                              <i className="dot" style={{
+                                width: Math.max(6, Math.min(13, 5 + 9 * x.n / maxN)) + "px",
+                                height: Math.max(6, Math.min(13, 5 + 9 * x.n / maxN)) + "px",
+                                background: x.type && x.type.startsWith("Missense") ? "#0072B2" : "#D55E00" }} />
+                            </span>
+                          ))}
+                          <div className="axis" />
+                        </div>
+                        <div className="lolliaxis">
+                          {ticks.map((t, ti) => (
+                            <span key={t} className={ti === ticks.length - 1 ? "last" : undefined}
+                              style={{ left: (100 * t) / axisMax + "%" }}>{t || "1"}</span>
+                          ))}
+                        </div>
                         <div className="lollilist">
-                          {h.variants.slice(0, 6).map((x, i) => (
-                            <span key={i} title={x.type + (x.pos == null ? " · no parseable codon" : " · codon " + x.pos)}>
+                          {h.variants.slice(0, 6).map((x, i2) => (
+                            <span key={i2} title={x.type + (x.pos == null ? " · no parseable codon" : " · codon " + x.pos)}>
                               <b>{x.variant}</b> {x.n.toLocaleString()} <span className="meta">({x.pct}%)</span>
                             </span>
                           ))}
+                          {h.variants.some(x => x.pos == null) &&
+                            <span className="meta">{h.variants.filter(x => x.pos == null).length} change(s) with no parseable codon, not plotted</span>}
                         </div>
                       </div>
                     );

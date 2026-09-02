@@ -30,6 +30,78 @@ export interface DslExample {
 // ---- runnable examples (rendered into the doc AND executed by docs:check) --
 export const EXAMPLES: DslExample[] = [
   {
+    title: "Lung adenocarcinoma: a four-view workup",
+    demonstrates: "One document, four views: the same two cohorts asked genomically, clinically, temporally and structurally. This is what the analysis document is FOR \u2014 not one chart, but a whole workup that travels as a single object.",
+    tags: ["multi-view", "compare", "clinical", "survival", "cooccurrence"],
+    note: "EGFR-mutant versus KRAS-mutant lung adenocarcinoma \u2014 the two dominant, mutually exclusive driver classes. Co-alteration frequencies, how the groups differ clinically, how they differ in survival (with a log-rank test), and which driver pairs co-occur within the EGFR arm. Every view is computed from aggregates each site could return without disclosing a patient.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "EGFR-mutant NSCLC": { all: [
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "oql", q: "EGFR: MUT" }
+        ] },
+        "KRAS-mutant NSCLC": { all: [
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "oql", q: "KRAS: MUT" }
+        ] }
+      },
+      views: [
+        { kind: "compare", genes: ["TP53", "STK11", "KEAP1", "RBM10", "ERBB2", "MET"] },
+        { kind: "clinical", attributes: ["SMOKING_PREDICTIONS_3_CLASSES", "CURRENT_AGE_DEID", "TMB_NONSYNONYMOUS", "FRACTION_GENOME_ALTERED"] },
+        { kind: "survival" },
+        { kind: "cooccurrence", genes: ["EGFR", "TP53", "STK11", "KEAP1", "RBM10"] }
+      ]
+    }
+  },
+  {
+    title: "One cohort, five ways: the colorectal hotspot workup",
+    demonstrates: "A single cohort put through five different views at once \u2014 including the lollipop \u2014 to show that the views compose rather than compete. Nothing here is re-queried per chart; each view asks its own aggregate of the same compiled cohort.",
+    tags: ["multi-view", "lollipop", "hotspots", "cooccurrence", "clinical", "oncoprint"],
+    note: "Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 12/13, BRAF V600E, PIK3CA E545K/H1047R), which pairs co-occur or exclude each other, how the mutated and wild-type groups differ clinically, and an oncoprint of the same patients. minCount is set so no site returns a change carried by fewer than three patients.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "CRC, KRAS-mutant": { all: [
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" },
+          { kind: "oql", q: "KRAS: MUT" }
+        ] },
+        "CRC, KRAS wild-type": { all: [
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" },
+          { not: { kind: "oql", q: "KRAS:" } },
+          { kind: "profiled", type: "MUTATION" }
+        ] }
+      },
+      views: [
+        { kind: "hotspots", genes: ["KRAS", "BRAF", "PIK3CA", "TP53"], minCount: 3 },
+        { kind: "cooccurrence", genes: ["KRAS", "BRAF", "NRAS", "PIK3CA", "TP53", "APC", "SMAD4"] },
+        { kind: "compare", genes: ["BRAF", "NRAS", "PIK3CA", "APC", "SMAD4"] },
+        { kind: "clinical", attributes: ["CURRENT_AGE_DEID", "MSI_SCORE", "TMB_NONSYNONYMOUS"] },
+        { kind: "survival" }
+      ]
+    }
+  },
+  {
+    title: "Federated end to end: two studies, four views",
+    demonstrates: "The full federated story in one document \u2014 cohorts spanning two studies, with every view falling back on aggregates that each site can compute in its own database: pooled gene counts, additive moments, per-site survival triples and per-site 2\u00d72 tables.",
+    tags: ["multi-view", "federation", "survival", "log-rank", "cooccurrence", "clinical"],
+    note: "TP53-mutant versus wild-type across MSK-CHORD and MSK-MET. The log-rank is stratified by study, the co-occurrence test is Cochran\u2013Mantel\u2013Haenszel across the two sites, and the clinical comparison pools counts and moments \u2014 all from per-site aggregates. Run with either study aggregate-only and the numbers do not change.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "TP53 mut": { studies: ["msk_chord_2024", "msk_met_2021"], all: [{ kind: "oql", q: "TP53: MUT" }] },
+        "TP53 wt": { studies: ["msk_chord_2024", "msk_met_2021"],
+          all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] }
+      },
+      views: [
+        { kind: "compare", genes: ["KRAS", "PIK3CA", "APC", "EGFR", "CDKN2A"] },
+        { kind: "survival" },
+        { kind: "clinical", attributes: ["CURRENT_AGE_DEID", "TMB_NONSYNONYMOUS", "FRACTION_GENOME_ALTERED"] },
+        { kind: "cooccurrence", genes: ["TP53", "KRAS", "PIK3CA", "APC"] }
+      ]
+    }
+  },
+  {
     title: "Genomic status via OQL, compared",
     demonstrates: "The base case the others build on: two cohorts defined genomically, compared gene by gene with panel-aware denominators, then followed to death.",
     tags: ["compare", "survival", "OQL"],
@@ -126,9 +198,9 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
-    title: "Recurrent protein changes, with a suppression floor",
+    title: "Lollipop plot: recurrent protein changes, with a suppression floor",
     demonstrates: "Lollipop data, and the one place small cells genuinely bite: minCount is applied by each site BEFORE anything is returned, because a coordinator filtering what it already received is theatre.",
-    tags: ["hotspots", "suppression"],
+    tags: ["hotspots", "lollipop", "suppression"],
     note: "Hotspots in colorectal cancer. Percentages are of the patients carrying any mutation in that gene, so BRAF V600E accounts for roughly 70% of BRAF-mutant cases. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.",
     doc: {
       study: "msk_chord_2024",

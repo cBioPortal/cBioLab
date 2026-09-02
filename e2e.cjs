@@ -130,10 +130,29 @@ async function main() {
       const launches = [
         ["Co-occurrence and mutual exclusivity in NSCLC", ".tend", "cooccurrence"],
         ["Co-expression from sums alone", ".rbar", "coexpression"],
-        ["Recurrent protein changes, with a suppression floor", ".lolli svg circle", "hotspots"],
+        ["Lollipop plot: recurrent protein changes", ".lolliplot .dot", "hotspots lollipop"],
         ["Study-stratified survival across two studies", ".logrank", "survival log-rank"],
         ["Clinical attributes compared between cohorts", "h2:has-text('Clinical comparison')", "clinical"]
       ];
+      // a multi-view document must render EVERY one of its views, not just the first
+      await page.goto(BASE + "/analysis");
+      await page.locator("button:has-text('Examples')").first().click();
+      await page.waitForSelector(".excard", { timeout: 120000 });
+      await page.locator(".excard").filter({ hasText: "One cohort, five ways" }).first()
+        .locator("button:has-text('Run')").click();
+      const multiWanted = [
+        [".lolliplot .dot", "hotspots"], [".tend", "cooccurrence"],
+        [".logrank", "survival log-rank"], ["h2:has-text('Clinical comparison')", "clinical"],
+        ["h2:has-text('Compare')", "compare"]
+      ];
+      const multiMissing = [];
+      for (const [sel, label] of multiWanted) {
+        try { await page.waitForSelector(sel, { timeout: 240000 }); }
+        catch { multiMissing.push(label); }
+      }
+      ok("multi-view example renders all 5 views", multiMissing.length === 0,
+        multiMissing.length ? "missing: " + multiMissing.join(", ") : "hotspots + cooccurrence + compare + clinical + survival");
+
       for (const [title, sel, label] of launches) {
         await page.goto(BASE + "/analysis");
         await page.locator("button:has-text('Examples')").first().click();
