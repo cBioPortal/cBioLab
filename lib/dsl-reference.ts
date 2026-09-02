@@ -135,6 +135,106 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "Progression on immunotherapy: during, versus absent",
+    demonstrates: "Two temporal relations that look similar and mean opposite things. DURING asks whether progression was recorded inside a treatment interval; NOT_FOLLOWED_BY asks whether it was absent for a year afterwards \u2014 and only counts patients whose follow-up actually covers that year.",
+    tags: ["timeline", "temporal", "compare", "clinical", "survival"],
+    note: "Patients who progressed while on immunotherapy (1,423) versus those with no progression recorded in the year after starting it (534). The second cohort sets observed:true, so \"no progression\" means the follow-up was there and nothing was recorded \u2014 not that the patient was lost to follow-up. Without that guard the cohort would be far larger and largely meaningless.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "progressed on immunotherapy": { all: [{ kind: "event",
+          a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] },
+          b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] },
+          rel: { type: "DURING" } }] },
+        "no progression within a year": { all: [{ kind: "event",
+          a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }], occurrence: "FIRST" },
+          b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] },
+          rel: { type: "NOT_FOLLOWED_BY", withinDays: 365, observed: true } }] }
+      },
+      views: [
+        { kind: "compare", genes: ["STK11", "KEAP1", "TP53", "EGFR", "SMARCA4"] },
+        { kind: "clinical", attributes: ["TMB_NONSYNONYMOUS", "CURRENT_AGE_DEID", "SMOKING_PREDICTIONS_3_CLASSES"] },
+        { kind: "survival" }
+      ]
+    }
+  },
+  {
+    title: "Derived treatment lines: who reaches a third line?",
+    demonstrates: "Treatment lines are not a column in the data \u2014 they are synthesised at query time by interval-merging systemic therapy with a gap rule. The line number is then an ordinary attribute you can filter on, and NOT around a line selector expresses \"never got that far\".",
+    tags: ["timeline", "temporal", "treatment-lines", "survival", "clinical"],
+    note: "Patients who reached a third line of therapy (3,088) versus those who had a first line and never a second (13,620), with lines derived on a 90-day gap. Changing lineGap changes both cohorts \u2014 the line boundary is a modelling choice, made explicit rather than baked into the data. READ THE SURVIVAL CURVE WITH CARE: reaching a third line requires surviving long enough to receive one, so this comparison carries immortal time bias and the modest separation it shows (medians 48.1 vs 43.1 months) is not evidence that more lines help. The engine cannot detect this \u2014 it is a property of how the cohorts were defined, not of the data, which is exactly why the definition travels with the result.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "reached 3rd line": { all: [{ kind: "event",
+          a: { eventType: "Treatment line (derived)", attrs: [{ key: "LINE_NO", value: "3" }] },
+          rel: { type: "NONE" }, lineGap: 90 }] },
+        "first line only": { all: [
+          { kind: "event", a: { eventType: "Treatment line (derived)", attrs: [{ key: "LINE_NO", value: "1" }] },
+            rel: { type: "NONE" }, lineGap: 90 },
+          { not: { kind: "event", a: { eventType: "Treatment line (derived)", attrs: [{ key: "LINE_NO", value: "2" }] },
+            rel: { type: "NONE" }, lineGap: 90 } }
+        ] }
+      },
+      views: [
+        { kind: "survival" },
+        { kind: "clinical", attributes: ["CURRENT_AGE_DEID", "CANCER_TYPE", "TMB_NONSYNONYMOUS"] },
+        { kind: "compare", genes: ["TP53", "KRAS", "PIK3CA", "APC"] }
+      ]
+    }
+  },
+  {
+    title: "True first line: fast progression versus durable control",
+    demonstrates: "The prior-treatment guard. \"First line\" ordinarily means first line OBSERVED HERE \u2014 about a fifth of these patients were treated elsewhere first. priorGuard restricts to those flagged treatment-naive, which is the difference between a real first-line claim and an artefact of where the patient was referred from.",
+    tags: ["timeline", "temporal", "prior-guard", "survival", "compare"],
+    note: "Among treatment-naive patients starting first-line chemotherapy: progression recorded within 180 days (3,319) versus none in that window with follow-up to prove it (6,584). BEFORE takes a window; NOT_FOLLOWED_BY takes the same window and asks for its absence. Drop priorGuard and both cohorts grow by roughly the share of patients pre-treated elsewhere.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "progressed within 180d of 1L chemo": { all: [{ kind: "event",
+          a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Chemo" }], occurrence: "FIRST" },
+          b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] },
+          rel: { type: "BEFORE", maxDays: 180 }, priorGuard: true }] },
+        "no progression within 180d": { all: [{ kind: "event",
+          a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Chemo" }], occurrence: "FIRST" },
+          b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] },
+          rel: { type: "NOT_FOLLOWED_BY", withinDays: 180, observed: true }, priorGuard: true }] }
+      },
+      views: [
+        { kind: "survival" },
+        { kind: "compare", genes: ["TP53", "KRAS", "SMAD4", "CDKN2A", "MYC"] },
+        { kind: "clinical", attributes: ["CANCER_TYPE", "FRACTION_GENOME_ALTERED", "CURRENT_AGE_DEID"] }
+      ]
+    }
+  },
+  {
+    title: "Lab thresholds over time: PSA above 100",
+    demonstrates: "A numeric predicate on a repeated measurement. The cohort is defined by a lab value ever crossing a threshold, and its complement is built by wrapping the same selector in NOT alongside \"was measured at all\" \u2014 so the comparison is against patients genuinely tested, not against patients with no PSA record.",
+    tags: ["timeline", "temporal", "lab-values", "compare", "survival"],
+    note: "PSA recorded above 100 ng/ml at any point (879) versus PSA measured but never above 100 (3,250). The second cohort deliberately requires a PSA test to exist: comparing against everyone else would silently contrast the tested with the untested, which is a selection effect rather than a finding.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "PSA above 100": { all: [{ kind: "event",
+          a: { eventType: "Lab_Test", attrs: [{ key: "TEST", value: "PSA" }],
+            numeric: { key: "RESULT", op: ">", value: 100 } },
+          rel: { type: "NONE" } }] },
+        "PSA measured, never above 100": { all: [
+          { kind: "event", a: { eventType: "Lab_Test", attrs: [{ key: "TEST", value: "PSA" }] }, rel: { type: "NONE" } },
+          { not: { kind: "event",
+            a: { eventType: "Lab_Test", attrs: [{ key: "TEST", value: "PSA" }],
+              numeric: { key: "RESULT", op: ">", value: 100 } },
+            rel: { type: "NONE" } } }
+        ] }
+      },
+      views: [
+        { kind: "compare", genes: ["AR", "TP53", "PTEN", "SPOP", "RB1"] },
+        { kind: "survival" },
+        { kind: "clinical", attributes: ["CURRENT_AGE_DEID", "FRACTION_GENOME_ALTERED", "CANCER_TYPE"] }
+      ]
+    }
+  },
+  {
     title: "any / not / genomicData",
     demonstrates: "Boolean structure: OR inside a clause, NOT around a leaf, and a copy-number threshold expressed as a continuous range.",
     tags: ["compare", "boolean"],

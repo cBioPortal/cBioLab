@@ -522,7 +522,391 @@ Never-smokers whose timeline shows progression within 180 days after first immun
 }
 ```
 
-### Example 6: any / not / genomicData
+### Example 6: Progression on immunotherapy: during, versus absent
+
+Patients who progressed while on immunotherapy (1,423) versus those with no progression recorded in the year after starting it (534). The second cohort sets observed:true, so "no progression" means the follow-up was there and nothing was recorded — not that the patient was lost to follow-up. Without that guard the cohort would be far larger and largely meaningless.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "progressed on immunotherapy": {
+      "all": [
+        {
+          "kind": "event",
+          "a": {
+            "eventType": "Treatment",
+            "attrs": [
+              {
+                "key": "SUBTYPE",
+                "value": "Immuno"
+              }
+            ]
+          },
+          "b": {
+            "eventType": "Diagnosis",
+            "attrs": [
+              {
+                "key": "PROGRESSION",
+                "value": "Y"
+              }
+            ]
+          },
+          "rel": {
+            "type": "DURING"
+          }
+        }
+      ]
+    },
+    "no progression within a year": {
+      "all": [
+        {
+          "kind": "event",
+          "a": {
+            "eventType": "Treatment",
+            "attrs": [
+              {
+                "key": "SUBTYPE",
+                "value": "Immuno"
+              }
+            ],
+            "occurrence": "FIRST"
+          },
+          "b": {
+            "eventType": "Diagnosis",
+            "attrs": [
+              {
+                "key": "PROGRESSION",
+                "value": "Y"
+              }
+            ]
+          },
+          "rel": {
+            "type": "NOT_FOLLOWED_BY",
+            "withinDays": 365,
+            "observed": true
+          }
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "genes": [
+        "STK11",
+        "KEAP1",
+        "TP53",
+        "EGFR",
+        "SMARCA4"
+      ]
+    },
+    {
+      "kind": "clinical",
+      "attributes": [
+        "TMB_NONSYNONYMOUS",
+        "CURRENT_AGE_DEID",
+        "SMOKING_PREDICTIONS_3_CLASSES"
+      ]
+    },
+    {
+      "kind": "survival"
+    }
+  ]
+}
+```
+
+### Example 7: Derived treatment lines: who reaches a third line?
+
+Patients who reached a third line of therapy (3,088) versus those who had a first line and never a second (13,620), with lines derived on a 90-day gap. Changing lineGap changes both cohorts — the line boundary is a modelling choice, made explicit rather than baked into the data. READ THE SURVIVAL CURVE WITH CARE: reaching a third line requires surviving long enough to receive one, so this comparison carries immortal time bias and the modest separation it shows (medians 48.1 vs 43.1 months) is not evidence that more lines help. The engine cannot detect this — it is a property of how the cohorts were defined, not of the data, which is exactly why the definition travels with the result.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "reached 3rd line": {
+      "all": [
+        {
+          "kind": "event",
+          "a": {
+            "eventType": "Treatment line (derived)",
+            "attrs": [
+              {
+                "key": "LINE_NO",
+                "value": "3"
+              }
+            ]
+          },
+          "rel": {
+            "type": "NONE"
+          },
+          "lineGap": 90
+        }
+      ]
+    },
+    "first line only": {
+      "all": [
+        {
+          "kind": "event",
+          "a": {
+            "eventType": "Treatment line (derived)",
+            "attrs": [
+              {
+                "key": "LINE_NO",
+                "value": "1"
+              }
+            ]
+          },
+          "rel": {
+            "type": "NONE"
+          },
+          "lineGap": 90
+        },
+        {
+          "not": {
+            "kind": "event",
+            "a": {
+              "eventType": "Treatment line (derived)",
+              "attrs": [
+                {
+                  "key": "LINE_NO",
+                  "value": "2"
+                }
+              ]
+            },
+            "rel": {
+              "type": "NONE"
+            },
+            "lineGap": 90
+          }
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "survival"
+    },
+    {
+      "kind": "clinical",
+      "attributes": [
+        "CURRENT_AGE_DEID",
+        "CANCER_TYPE",
+        "TMB_NONSYNONYMOUS"
+      ]
+    },
+    {
+      "kind": "compare",
+      "genes": [
+        "TP53",
+        "KRAS",
+        "PIK3CA",
+        "APC"
+      ]
+    }
+  ]
+}
+```
+
+### Example 8: True first line: fast progression versus durable control
+
+Among treatment-naive patients starting first-line chemotherapy: progression recorded within 180 days (3,319) versus none in that window with follow-up to prove it (6,584). BEFORE takes a window; NOT_FOLLOWED_BY takes the same window and asks for its absence. Drop priorGuard and both cohorts grow by roughly the share of patients pre-treated elsewhere.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "progressed within 180d of 1L chemo": {
+      "all": [
+        {
+          "kind": "event",
+          "a": {
+            "eventType": "Treatment",
+            "attrs": [
+              {
+                "key": "SUBTYPE",
+                "value": "Chemo"
+              }
+            ],
+            "occurrence": "FIRST"
+          },
+          "b": {
+            "eventType": "Diagnosis",
+            "attrs": [
+              {
+                "key": "PROGRESSION",
+                "value": "Y"
+              }
+            ]
+          },
+          "rel": {
+            "type": "BEFORE",
+            "maxDays": 180
+          },
+          "priorGuard": true
+        }
+      ]
+    },
+    "no progression within 180d": {
+      "all": [
+        {
+          "kind": "event",
+          "a": {
+            "eventType": "Treatment",
+            "attrs": [
+              {
+                "key": "SUBTYPE",
+                "value": "Chemo"
+              }
+            ],
+            "occurrence": "FIRST"
+          },
+          "b": {
+            "eventType": "Diagnosis",
+            "attrs": [
+              {
+                "key": "PROGRESSION",
+                "value": "Y"
+              }
+            ]
+          },
+          "rel": {
+            "type": "NOT_FOLLOWED_BY",
+            "withinDays": 180,
+            "observed": true
+          },
+          "priorGuard": true
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "survival"
+    },
+    {
+      "kind": "compare",
+      "genes": [
+        "TP53",
+        "KRAS",
+        "SMAD4",
+        "CDKN2A",
+        "MYC"
+      ]
+    },
+    {
+      "kind": "clinical",
+      "attributes": [
+        "CANCER_TYPE",
+        "FRACTION_GENOME_ALTERED",
+        "CURRENT_AGE_DEID"
+      ]
+    }
+  ]
+}
+```
+
+### Example 9: Lab thresholds over time: PSA above 100
+
+PSA recorded above 100 ng/ml at any point (879) versus PSA measured but never above 100 (3,250). The second cohort deliberately requires a PSA test to exist: comparing against everyone else would silently contrast the tested with the untested, which is a selection effect rather than a finding.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "PSA above 100": {
+      "all": [
+        {
+          "kind": "event",
+          "a": {
+            "eventType": "Lab_Test",
+            "attrs": [
+              {
+                "key": "TEST",
+                "value": "PSA"
+              }
+            ],
+            "numeric": {
+              "key": "RESULT",
+              "op": ">",
+              "value": 100
+            }
+          },
+          "rel": {
+            "type": "NONE"
+          }
+        }
+      ]
+    },
+    "PSA measured, never above 100": {
+      "all": [
+        {
+          "kind": "event",
+          "a": {
+            "eventType": "Lab_Test",
+            "attrs": [
+              {
+                "key": "TEST",
+                "value": "PSA"
+              }
+            ]
+          },
+          "rel": {
+            "type": "NONE"
+          }
+        },
+        {
+          "not": {
+            "kind": "event",
+            "a": {
+              "eventType": "Lab_Test",
+              "attrs": [
+                {
+                  "key": "TEST",
+                  "value": "PSA"
+                }
+              ],
+              "numeric": {
+                "key": "RESULT",
+                "op": ">",
+                "value": 100
+              }
+            },
+            "rel": {
+              "type": "NONE"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "genes": [
+        "AR",
+        "TP53",
+        "PTEN",
+        "SPOP",
+        "RB1"
+      ]
+    },
+    {
+      "kind": "survival"
+    },
+    {
+      "kind": "clinical",
+      "attributes": [
+        "CURRENT_AGE_DEID",
+        "FRACTION_GENOME_ALTERED",
+        "CANCER_TYPE"
+      ]
+    }
+  ]
+}
+```
+
+### Example 10: any / not / genomicData
 
 Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep deletions expressed as a continuous copy-number threshold.
 
@@ -579,7 +963,7 @@ Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep 
 }
 ```
 
-### Example 7: Cross-study federation with an oncoprint
+### Example 11: Cross-study federation with an oncoprint
 
 One cohort unioned across two studies (members are study-qualified; overlap is NOT deduplicated), rendered as a federated oncoprint with a categorical and a numeric clinical track, columns sorted by cancer type then descending age. The Study track is added automatically.
 
@@ -621,7 +1005,7 @@ One cohort unioned across two studies (members are study-qualified; overlap is N
 }
 ```
 
-### Example 8: Molecular heatmap tracks, sorted by expression
+### Example 12: Molecular heatmap tracks, sorted by expression
 
 ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene tracks, columns sorted by descending ERBB2 expression. Z-scores render on a fixed diverging ±3 ramp; the track label (gene + short profile name) is the sort key.
 
@@ -659,7 +1043,7 @@ ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene t
 }
 ```
 
-### Example 9: A federated z-score reference on an oncoprint
+### Example 13: A federated z-score reference on an oncoprint
 
 A heatmap track with reference:"federation" is scored against a distribution pooled from EVERY participating study, including instances that disclose no patients and therefore contribute no columns — each returns three totals per gene (n, sum, sum of squares), which is enough to define the reference. Run with luad_tcga_pan_can_atlas_2018 aggregate-only, its patients are absent from the columns while its 510 patients still shape what the drawn columns mean.
 
@@ -698,7 +1082,7 @@ A heatmap track with reference:"federation" is scored against a distribution poo
 }
 ```
 
-### Example 10: Lollipop plot: recurrent protein changes, with a suppression floor
+### Example 14: Lollipop plot: recurrent protein changes, with a suppression floor
 
 Hotspots in colorectal cancer. Percentages are of the patients carrying any mutation in that gene, so BRAF V600E accounts for roughly 70% of BRAF-mutant cases. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.
 
@@ -734,7 +1118,7 @@ Hotspots in colorectal cancer. Percentages are of the patients carrying any muta
 }
 ```
 
-### Example 11: Co-expression from sums alone
+### Example 15: Co-expression from sums alone
 
 Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.
 
@@ -767,7 +1151,7 @@ Pearson correlation between gene pairs in TCGA breast cancer. A correlation depe
 }
 ```
 
-### Example 12: Clinical attributes compared between cohorts
+### Example 16: Clinical attributes compared between cohorts
 
 How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.
 
@@ -813,7 +1197,7 @@ How TP53-mutant and wild-type tumors differ clinically. Categorical attributes a
 }
 ```
 
-### Example 13: Co-occurrence and mutual exclusivity in NSCLC
+### Example 17: Co-occurrence and mutual exclusivity in NSCLC
 
 Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.
 
@@ -850,7 +1234,7 @@ Pairwise associations among lung cancer driver genes. Each site returns four cou
 }
 ```
 
-### Example 14: Study-stratified survival across two studies
+### Example 18: Study-stratified survival across two studies
 
 TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.
 

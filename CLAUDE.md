@@ -72,7 +72,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
 - Test: `npm test` — unit suites, no database needed (the patient-data boundary and the stats used by
   federated views;
-  62 checks across 2 suites). `node e2e.cjs` — 46 checks (Playwright + docs gate + the boundary suite).
+  62 checks across 2 suites). `node e2e.cjs` — 50 checks (Playwright + docs gate + the boundary suite).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push `analysis`. **Stop there.**
