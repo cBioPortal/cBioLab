@@ -233,8 +233,10 @@ export interface LogRank {
 export interface ViewResult {
   kind: string; error?: string; note?: string; studies?: string[];
   participation?: ViewParticipation;
+  /** wall-clock for this view alone, in ms (its queries run concurrently) */
+  ms?: number;
   /** the aggregate queries that produced THIS view's numbers, in order */
-  queries?: { study: string; label: string; sql: string; remote?: boolean }[];
+  queries?: { study: string; label: string; sql: string; ms?: number; remote?: boolean }[];
   cohorts?: string[]; annotation?: string;
   rows?: CompareRow[];                      // compare
   curves?: KmCurve[]; caveat?: string;      // survival

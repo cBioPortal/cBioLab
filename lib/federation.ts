@@ -23,7 +23,7 @@ import { chQuery, DB, PRIMARY, connections, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { genomicEventsSql, coverageSql } from "./oncoprint.ts";
-import type { CohortDef, CompileCtx, ChRow } from "./types.ts";
+import type { CohortDef, CompileCtx, ChRow, ChResult } from "./types.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -506,7 +506,7 @@ export interface AggregateCapable {
 }
 
 /** One query a resolver actually ran, for provenance. */
-export interface QueryLogEntry { label: string; sql: string; remote?: boolean }
+export interface QueryLogEntry { label: string; sql: string; ms?: number; remote?: boolean }
 
 /** Additionally available when the instance permits patient-level access. */
 export interface PatientLevelCapable extends AggregateCapable {
@@ -528,10 +528,17 @@ abstract class BaseResolver implements AggregateCapable {
   readonly study: string;
   readonly queries: QueryLogEntry[] = [];
   protected readonly ctx: Partial<CompileCtx>;
-  /** record what we are about to run, then hand it back for execution */
-  protected logged(label: string, sql: string): string {
-    this.queries.push({ label, sql });
-    return sql;
+  /**
+   * Run a query and record it with what it cost. The entry is pushed BEFORE the
+   * await and stamped after, so concurrent queries each update their own entry
+   * rather than racing for "the last one".
+   */
+  protected async runLogged<R = ChRow>(label: string, sql: string, conn: ChConn): Promise<ChResult<R>> {
+    const entry: QueryLogEntry = { label, sql };
+    this.queries.push(entry);
+    const r = await chQuery<R>(sql, conn);
+    entry.ms = r._ms;
+    return r;
   }
   constructor(study: string, ctx: Partial<CompileCtx>) {
     this.study = study;
@@ -547,20 +554,21 @@ abstract class BaseResolver implements AggregateCapable {
   }
   async geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]> {
     if (!genes.length) return [];
-    const sql = this.logged("geneCounts", geneCountsSql(this.cohortSql(def), genes, this.study, this.ctx.oncokbPin ?? null, this.instance.conn.db));
-    const r = await chQuery<ChRow>(sql, this.instance.conn);
+    const r = await this.runLogged<ChRow>("geneCounts",
+      geneCountsSql(this.cohortSql(def), genes, this.study, this.ctx.oncokbPin ?? null, this.instance.conn.db), this.instance.conn);
     return r.data.map((x) => ({
       gene: x.gene, profiled: Number(x.profiled), altered: Number(x.altered), driver: Number(x.driver)
     }));
   }
   async survivalCounts(def: CohortDef | null | undefined): Promise<SurvivalCount[]> {
-    const r = await chQuery<ChRow>(this.logged("survivalCounts", survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db)), this.instance.conn);
+    const r = await this.runLogged<ChRow>("survivalCounts",
+      survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
     return r.data.map((x) => ({ months: Number(x.m), event: Number(x.ev), n: Number(x.n) }));
   }
   async profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]> {
     if (!genes.length || !profileType) return [];
-    const sql = this.logged("profileMoments", profileMomentsSql(this.cohortSql(def), genes, profileType, this.study, this.instance.conn.db));
-    const r = await chQuery<ChRow>(sql, this.instance.conn);
+    const r = await this.runLogged<ChRow>("profileMoments",
+      profileMomentsSql(this.cohortSql(def), genes, profileType, this.study, this.instance.conn.db), this.instance.conn);
     return r.data.map((x) => ({ gene: x.gene, n: Number(x.n), sum: Number(x.sx), sumsq: Number(x.sxx) }));
   }
 
@@ -569,8 +577,8 @@ abstract class BaseResolver implements AggregateCapable {
     if (!genes.length) return empty;
     const cohort = this.cohortSql(def), db = this.instance.conn.db, conn = this.instance.conn;
     const [v, t] = await Promise.all([
-      chQuery<ChRow>(this.logged("variantCounts", variantCountsSql(cohort, genes, this.study, minCount, db)), conn),
-      chQuery<ChRow>(this.logged("geneMutationTotals", geneMutationTotalsSql(cohort, genes, this.study, db)), conn)
+      this.runLogged<ChRow>("variantCounts", variantCountsSql(cohort, genes, this.study, minCount, db), conn),
+      this.runLogged<ChRow>("geneMutationTotals", geneMutationTotalsSql(cohort, genes, this.study, db), conn)
     ]);
     return {
       minCount,
@@ -584,8 +592,8 @@ abstract class BaseResolver implements AggregateCapable {
 
   async pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]> {
     if (!pairs.length || !profileType) return [];
-    const sql = this.logged("pairMoments", momentPairsSql(this.cohortSql(def), pairs, profileType, this.study, this.instance.conn.db));
-    const r = await chQuery<ChRow>(sql, this.instance.conn);
+    const r = await this.runLogged<ChRow>("pairMoments",
+      momentPairsSql(this.cohortSql(def), pairs, profileType, this.study, this.instance.conn.db), this.instance.conn);
     return r.data.map((x) => ({
       a: x.ga, b: x.gb, n: Number(x.n),
       sx: Number(x.sx), sy: Number(x.sy), sxy: Number(x.sxy), sxx: Number(x.sxx), syy: Number(x.syy)
@@ -616,8 +624,8 @@ abstract class BaseResolver implements AggregateCapable {
     const cohort = this.cohortSql(def);
     const empty = { data: [] as ChRow[] };
     const [cats, nums] = await Promise.all([
-      catAttrs.length ? chQuery<ChRow>(this.logged("clinicalCounts", clinicalCountsSql(cohort, catAttrs, this.study, db)), conn) : Promise.resolve(empty),
-      numAttrs.length ? chQuery<ChRow>(this.logged("clinicalMoments", clinicalMomentsSql(cohort, numAttrs, this.study, db)), conn) : Promise.resolve(empty)
+      catAttrs.length ? this.runLogged<ChRow>("clinicalCounts", clinicalCountsSql(cohort, catAttrs, this.study, db), conn) : Promise.resolve(empty),
+      numAttrs.length ? this.runLogged<ChRow>("clinicalMoments", clinicalMomentsSql(cohort, numAttrs, this.study, db), conn) : Promise.resolve(empty)
     ]);
     const out: AttrStats[] = [];
     const grouped = new Map<string, { per: string; values: { v: string; n: number }[] }>();
@@ -647,7 +655,8 @@ abstract class BaseResolver implements AggregateCapable {
 
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
     if (!pairs.length) return [];
-    const r = await chQuery<ChRow>(this.logged("pairCounts", pairCountsSql(this.cohortSql(def), pairs, this.study, this.instance.conn.db)), this.instance.conn);
+    const r = await this.runLogged<ChRow>("pairCounts",
+      pairCountsSql(this.cohortSql(def), pairs, this.study, this.instance.conn.db), this.instance.conn);
     return r.data.map((x) => {
       const profiled = Number(x.profiled), both = Number(x.both), onlyA = Number(x.only_a), onlyB = Number(x.only_b);
       return { a: x.ga, b: x.gb, both, onlyA, onlyB, profiled, neither: profiled - both - onlyA - onlyB };

@@ -1293,7 +1293,7 @@ export default function AnalysisPage() {
             {result && result.views.map((v, vi) => (
               <div className="card" key={vi}>
                 {v.kind === "compare" && v.rows && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2><span className="spacer" /><Participation p={v.participation} /></div>
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2><span className="spacer" /><>{v.ms != null && <span className="lat" title="wall-clock for this view — its queries run concurrently, so this is not their sum">{v.ms.toLocaleString()}ms</span>}<Participation p={v.participation} /></></div>
                   {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                     style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
@@ -1314,7 +1314,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Hotspots <span className="plain">— recurrent protein changes, counted per patient</span></h2><span className="spacer" /><Participation p={v.participation} /></div>
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Hotspots <span className="plain">— recurrent protein changes, counted per patient</span></h2><span className="spacer" /><>{v.ms != null && <span className="lat" title="wall-clock for this view — its queries run concurrently, so this is not their sum">{v.ms.toLocaleString()}ms</span>}<Participation p={v.participation} /></></div>
                   {v.note && <p className="note">{v.note}</p>}
                   {v.hotspots.map(h => {
                     const positioned = h.variants.filter(x => x.pos != null);
@@ -1371,7 +1371,7 @@ export default function AnalysisPage() {
                   })}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-expression <span className="plain">— Pearson correlation from per-site sums</span></h2><span className="spacer" /><Participation p={v.participation} /></div>
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-expression <span className="plain">— Pearson correlation from per-site sums</span></h2><span className="spacer" /><>{v.ms != null && <span className="lat" title="wall-clock for this view — its queries run concurrently, so this is not their sum">{v.ms.toLocaleString()}ms</span>}<Participation p={v.participation} /></></div>
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
@@ -1405,7 +1405,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "clinical" && v.clinical && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Clinical comparison <span className="plain">— attribute distributions across cohorts</span></h2><span className="spacer" /><Participation p={v.participation} /></div>
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Clinical comparison <span className="plain">— attribute distributions across cohorts</span></h2><span className="spacer" /><>{v.ms != null && <span className="lat" title="wall-clock for this view — its queries run concurrently, so this is not their sum">{v.ms.toLocaleString()}ms</span>}<Participation p={v.participation} /></></div>
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
@@ -1444,7 +1444,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-occurrence <span className="plain">— pairwise, among patients profiled for both genes</span></h2><span className="spacer" /><Participation p={v.participation} /></div>
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-occurrence <span className="plain">— pairwise, among patients profiled for both genes</span></h2><span className="spacer" /><>{v.ms != null && <span className="lat" title="wall-clock for this view — its queries run concurrently, so this is not their sum">{v.ms.toLocaleString()}ms</span>}<Participation p={v.participation} /></></div>
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
@@ -1483,7 +1483,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "survival" && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Survival <span className="plain">— Kaplan–Meier, overall survival</span></h2><span className="spacer" /><Participation p={v.participation} /></div>
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Survival <span className="plain">— Kaplan–Meier, overall survival</span></h2><span className="spacer" /><>{v.ms != null && <span className="lat" title="wall-clock for this view — its queries run concurrently, so this is not their sum">{v.ms.toLocaleString()}ms</span>}<Participation p={v.participation} /></></div>
                   <KMChart curves={v.curves!} />
                   <div style={{ display: "flex", gap: "1.2rem", fontSize: "0.76rem", color: "var(--muted)", marginTop: "0.4rem", flexWrap: "wrap" }}>
                     {v.curves!.map((c, i: number) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: median {c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}
@@ -1506,7 +1506,7 @@ export default function AnalysisPage() {
                   <div className="row" style={{ alignItems: "baseline" }}>
                     <h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {v.nColumns!.toLocaleString()} patients · {v.annotation}</span></h2>
                     <span className="spacer" />
-                    <Participation p={v.participation} />
+                    <>{v.ms != null && <span className="lat" title="wall-clock for this view — its queries run concurrently, so this is not their sum">{v.ms.toLocaleString()}ms</span>}<Participation p={v.participation} /></>
                     <details className="gearmenu">
                       <summary title="oncoprint options">⚙</summary>
                       <div className="gearmenu-items">
@@ -1578,6 +1578,7 @@ export default function AnalysisPage() {
                   <details className="provsql">
                     <summary className="meta">
                       how these numbers were computed — {v.queries.length} {v.queries.length === 1 ? "query" : "queries"}
+                      {v.ms != null && <> in {v.ms.toLocaleString()}ms</>}
                       {v.queries.some(q => q.remote) && <> · <span className="prem">{v.queries.filter(q => q.remote).length} ran on a peer</span></>}
                     </summary>
                     {v.queries.map((q, qi) => (
@@ -1585,6 +1586,7 @@ export default function AnalysisPage() {
                         <div className="provhead">
                           <code>{q.label}</code>
                           <span className="meta">{q.study}</span>
+                          {q.ms != null && <span className="meta">{q.ms.toLocaleString()}ms</span>}
                           {q.remote && <span className="prem" title="compiled and executed by the peer against its own schema; only aggregates came back">ran on peer</span>}
                         </div>
                         <pre>{q.sql}</pre>
@@ -1592,7 +1594,7 @@ export default function AnalysisPage() {
                     ))}
                   </details>
                 )}
-                {v.error && <div className="error">{v.kind}: {v.error}{v.participation ? <> <Participation p={v.participation} /></> : null}</div>}
+                {v.error && <div className="error">{v.kind}: {v.error}{v.participation ? <> <>{v.ms != null && <span className="lat" title="wall-clock for this view — its queries run concurrently, so this is not their sum">{v.ms.toLocaleString()}ms</span>}<Participation p={v.participation} /></></> : null}</div>}
               </div>
             ))}
           </div>

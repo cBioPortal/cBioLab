@@ -278,6 +278,26 @@ async function main() {
         }
         return { missing, counts };
       });
+      // ...and what it cost, at every level: per view, per query, and in total
+      const lat = await page.evaluate(() => {
+        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Hotspots"];
+        const per = [], missing = [];
+        for (const card of document.querySelectorAll(".ana-grid .card")) {
+          const h = card.querySelector("h2");
+          if (!h) continue;
+          const name = KNOWN.find(k => h.textContent.trim().startsWith(k));
+          if (!name) continue;
+          const chip = card.querySelector(".lat");
+          if (!chip || !/^\d[\d,]*ms$/.test(chip.textContent.trim())) missing.push(name);
+          else per.push(name + " " + chip.textContent.trim());
+        }
+        const totalEl = [...document.querySelectorAll(".meta")].map(e => e.textContent).find(t => /ms · OncoKB/.test(t));
+        return { per, missing, total: totalEl || null };
+      });
+      ok("every view reports its own latency, and the run reports a total",
+        lat.missing.length === 0 && lat.per.length >= 5 && !!lat.total,
+        lat.missing.length ? "no latency on: " + lat.missing.join(", ") : lat.per.join(" · ") + " | total " + lat.total);
+
       ok("every view shows the SQL that produced its numbers", prov.missing.length === 0,
         prov.missing.length ? "no query provenance on: " + prov.missing.join(", ") : prov.counts.join(" "));
 

@@ -121,7 +121,7 @@ export class RemoteAggregateResolver implements AggregateCapable {
     if (!r) return;
     if (typeof r.cohortSql === "string" && r.cohortSql.trim()) this.peerSql = r.cohortSql;
     if (Array.isArray(r.queries))
-      for (const q of r.queries) this.queries.push({ label: q.label, sql: q.sql, remote: true });
+      for (const q of r.queries) this.queries.push({ label: q.label, sql: q.sql, ms: q.ms, remote: true });
   }
   /** The peer compiles and runs its own SQL against its own schema. */
   cohortSql(): string {

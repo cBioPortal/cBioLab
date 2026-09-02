@@ -139,10 +139,10 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
   const queryMark = (): Record<string, number> =>
     Object.fromEntries(Object.entries(resolvers).map(([s, r]) => [s, r.queries.length]));
   const queriesSince = (mark: Record<string, number>) => {
-    const out: { study: string; label: string; sql: string; remote?: boolean }[] = [];
+    const out: { study: string; label: string; sql: string; ms?: number; remote?: boolean }[] = [];
     for (const [s, r] of Object.entries(resolvers))
       for (const q of r.queries.slice(mark[s] ?? 0))
-        out.push({ study: s, label: q.label, sql: q.sql, ...(q.remote ? { remote: true } : {}) });
+        out.push({ study: s, label: q.label, sql: q.sql, ...(q.ms != null ? { ms: q.ms } : {}), ...(q.remote ? { remote: true } : {}) });
     return out;
   };
 
@@ -150,7 +150,7 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
   for (const view of (doc.views || []).slice(0, 6)) {
     const vNames = (view.cohorts && view.cohorts.length ? view.cohorts : names).filter((n) => cohorts[n]);
     const vStudies = [...new Set(vNames.flatMap((n) => cohorts[n].studies))];
-    const mark = queryMark(), pushedBefore = views.length;
+    const mark = queryMark(), pushedBefore = views.length, viewT0 = Date.now();
 
     if (view.kind === "compare") {
       const genes = ((view as CompareView).genes || []).map((g) => String(g).toUpperCase().trim()).filter((g) => GENE_RE.test(g)).slice(0, 20);
@@ -571,8 +571,13 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       // JSON from clients/chat/MCP, so an unknown kind must still be reported
       views.push({ kind: String((view as { kind?: unknown }).kind ?? "unknown"), error: "unknown view kind" });
     }
-    const ran = queriesSince(mark);
-    for (let k = pushedBefore; k < views.length; k++) if (ran.length) views[k].queries = ran;
+    // Wall-clock for the view, not the sum of its queries — they run
+    // concurrently across cohorts and studies, so summing would overstate it.
+    const ran = queriesSince(mark), viewMs = Date.now() - viewT0;
+    for (let k = pushedBefore; k < views.length; k++) {
+      views[k].ms = viewMs;
+      if (ran.length) views[k].queries = ran;
+    }
   }
 
   return {

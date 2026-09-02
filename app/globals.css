@@ -449,3 +449,10 @@ details.gearmenu > .gearmenu-items {
 /* Cohorts tab: tick-to-select */
 .pick { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
 .pick input { margin: 0; cursor: pointer; }
+
+/* Per-view latency, beside the participation marker */
+.lat {
+  font-size: 0.68rem; padding: 0.1rem 0.45rem; border-radius: 999px; white-space: nowrap;
+  color: var(--muted); border: 1px solid var(--line); font-variant-numeric: tabular-nums;
+  cursor: help;
+}
