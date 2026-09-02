@@ -135,6 +135,7 @@ export default function AnalysisPage() {
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   const [copied, setCopied] = useState<string | null>(null);
   const [exMsg, setExMsg] = useState<string | null>(null);   // Explore action-bar feedback
+  const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>"
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -262,7 +263,8 @@ export default function AnalysisPage() {
    * Analyze starts a FRESH analysis of the explored cohort: it replaces the
    * document rather than merging into it, because that is what the word means —
    * you asked to analyse this, not to add it to whatever was there before.
-   * Building a multi-cohort comparison is the Cohorts tab's "add to analysis".
+   * Build a multi-cohort comparison by ticking cohorts in the Cohorts tab and
+   * hitting "Analyze selected".
    */
   const analyzeDraft = () => {
     const d = barDef();
@@ -285,6 +287,54 @@ export default function AnalysisPage() {
     await saveCohort();
     setExMsg("saved \u201c" + cName.trim() + "\u201d to Cohorts");
     setTimeout(() => setExMsg(null), 2600);
+  };
+
+  // ---- composing views without editing JSON --------------------------------
+  /** Genes to prefill a new view with: whatever the document already studies,
+   *  else the most-altered genes from the current exploration. */
+  const viewGenes = (): string[] => {
+    const inDoc = (doc.views || []).flatMap((v: any) => v.genes || []).map(String);
+    if (inDoc.length) return [...new Set(inDoc)].slice(0, 6);
+    if (explore && explore.genes && explore.genes.length) return explore.genes.slice(0, 6).map((g: any) => g.gene);
+    return ["TP53", "KRAS", "EGFR", "PIK3CA"];
+  };
+  const viewAttrs = (): string[] => {
+    const inDoc = (doc.views || []).flatMap((v: any) => v.attributes || []).map(String);
+    if (inDoc.length) return [...new Set(inDoc)].slice(0, 5);
+    if (explore && explore.clinical) return explore.clinical.slice(0, 4).map((c: any) => c.attribute);
+    return [];
+  };
+  /** a continuous profile for co-expression / heatmaps, if this study has one */
+  const contProfile = (): string | null => {
+    const ps = (explore && explore.profiles) || [];
+    return ps.find((p: string) => /zscore/i.test(p)) || ps.find((p: string) => /mrna|rna_seq/i.test(p)) || null;
+  };
+
+  const VIEW_KINDS: { kind: string; label: string; why?: () => string | null }[] = [
+    { kind: "compare", label: "Compare genes" },
+    { kind: "survival", label: "Survival" },
+    { kind: "oncoprint", label: "Oncoprint" },
+    { kind: "hotspots", label: "Lollipop (hotspots)" },
+    { kind: "cooccurrence", label: "Co-occurrence" },
+    { kind: "clinical", label: "Clinical comparison",
+      why: () => viewAttrs().length ? null : "no clinical attributes known yet — open Explore once so the app can read this study's attributes" },
+    { kind: "coexpression", label: "Co-expression",
+      why: () => contProfile() ? null : "this study has no continuous molecular profile (mRNA z-scores) to correlate" }
+  ];
+
+  const addView = (kind: string) => {
+    const genes = viewGenes();
+    const v: any =
+      kind === "survival" ? { kind }
+      : kind === "clinical" ? { kind, attributes: viewAttrs() }
+      : kind === "coexpression" ? { kind, genes: genes.slice(0, 5), profileType: contProfile() }
+      : kind === "hotspots" ? { kind, genes: genes.slice(0, 4), minCount: 1 }
+      : kind === "cooccurrence" ? { kind, genes: genes.slice(0, 6) }
+      : kind === "oncoprint" ? { kind, genes: genes.slice(0, 5) }
+      : { kind, genes };
+    const d = { ...doc, views: [...(doc.views || []), v] };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    run(d);
   };
 
   const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
@@ -437,11 +487,29 @@ export default function AnalysisPage() {
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setError(null);
   };
 
-  const addDefToAnalysis = (name: string, def: CohortDef) => {
-    const d = { ...doc, study, cohorts: { ...doc.cohorts, [name]: def } };
-    if (!d.views || !d.views.length) d.views = DEFAULT_VIEWS; // a cohort with nothing to look at is a blank page
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); setTab("analysis"); run(d);
+  /**
+   * Cohorts tab: analyse the ticked cohorts together. Like Explore's Analyze it
+   * REPLACES the document — the selection is the analysis, not an addition to
+   * whatever was there before.
+   */
+  const analyzePicked = () => {
+    const chosen: [string, CohortDef][] = [];
+    for (const key of picked) {
+      const name = key.slice(key.indexOf(":") + 1);
+      const def = key.startsWith("ex:")
+        ? (EXAMPLES.find((e) => e.name === name) || {}).def
+        : (saved[name] || {}).def;
+      if (def) chosen.push([name, def]);
+    }
+    if (!chosen.length) return;
+    const nd: AnalysisDoc = { study, cohorts: Object.fromEntries(chosen.slice(0, 6)), views: DEFAULT_VIEWS };
+    setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
+    setResult(null); setError(null);
+    setTab("analysis");
+    run(nd);
   };
+  const togglePick = (key: string) =>
+    setPicked((p) => p.includes(key) ? p.filter((x) => x !== key) : [...p, key]);
 
   /** Load a documented example into the Analysis tab and run it. */
   const runDocExample = (ex: DslExample) => {
@@ -1022,13 +1090,29 @@ export default function AnalysisPage() {
             <p className="note">Clause kinds: <code>oql</code> (genomic status, portal OQL syntax), <code>clinical</code> (attribute/op/value), <code>event</code> (timeline), <code>patients</code>; composed with <code>all</code> / <code>any</code> / <code>not</code>. Start from an example on the right, or ask chat above.</p>
           </div>
           <div className="card">
-            <h2>Examples</h2>
+            <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.2rem" }}>
+              <h2 style={{ margin: 0 }}>Cohorts <span className="plain">— tick any, then analyse them together</span></h2>
+              <span className="spacer" />
+              <span className="meta">
+                {picked.length === 0 ? "none selected"
+                  : picked.length + " selected" + (picked.length > 6 ? " — only the first 6 are analysed" : "")}
+              </span>
+              <button className="primary" disabled={!picked.length} onClick={analyzePicked}
+                title={picked.length ? "analyse the ticked cohorts together (replaces the current document)" : "tick at least one cohort"}>
+                Analyze selected
+              </button>
+              {picked.length > 0 && <button className="linklike" onClick={() => setPicked([])}>clear</button>}
+            </div>
+            <h2 style={{ marginTop: "0.6rem" }}>Examples</h2>
             {EXAMPLES.map(ex => {
               const ev = exEvals[ex.name];
               return (
                 <div key={ex.name} style={{ borderTop: "1px solid var(--line)", padding: "0.5rem 0" }}>
                   <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                    <strong>{ex.name}</strong>
+                    <label className="pick">
+                      <input type="checkbox" checked={picked.includes("ex:" + ex.name)} onChange={() => togglePick("ex:" + ex.name)} />
+                      <strong>{ex.name}</strong>
+                    </label>
                     <span className="meta">{ex.desc}</span>
                     {ev && ev.count != null && <span className="meta"><strong>{ev.count.toLocaleString()}</strong> pts</span>}
                     {ev && ev.busy && <span className="spinner" />}
@@ -1036,7 +1120,6 @@ export default function AnalysisPage() {
                     <button className="linklike" onClick={() => previewExample(ex)}>preview</button>
                     <button className="linklike" onClick={() => { setCName(ex.name); setCDefText(JSON.stringify(ex.def, null, 2)); setCPreview(null); }}>open in editor</button>
                     <button className="linklike" onClick={() => saveExample(ex)}>save</button>
-                    <button className="linklike" onClick={() => addDefToAnalysis(ex.name, ex.def)}>add to analysis</button>
                   </div>
                   {ev && ev.error && <div className="error">{ev.error}</div>}
                 </div>
@@ -1047,11 +1130,13 @@ export default function AnalysisPage() {
             {Object.entries(saved).map(([n, s2]) => (
               <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
                 <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                  <strong>{n}</strong>
+                  <label className="pick">
+                    <input type="checkbox" checked={picked.includes("saved:" + n)} onChange={() => togglePick("saved:" + n)} />
+                    <strong>{n}</strong>
+                  </label>
                   {s2.lastEval && <span className="meta">{s2.lastEval.count.toLocaleString()} pts</span>}
                   <span className="meta">saved {s2.savedAt}</span>
                   <span className="spacer" />
-                  <button className="linklike" onClick={() => addDefToAnalysis(n, s2.def)}>add to analysis</button>
                   <button className="linklike" onClick={() => { setCName(n); setCDefText(JSON.stringify(s2.def, null, 2)); setCPreview(s2.lastEval || null); }}>edit</button>
                   <button className="linklike" onClick={() => { const nx = { ...saved }; delete nx[n]; persist(nx); }}>delete</button>
                 </div>
@@ -1184,6 +1269,25 @@ export default function AnalysisPage() {
                   Add a views array to the document (e.g. <code>{`{"kind":"survival"}`}</code>),{" "}
                   <button className="linklike" onClick={() => { const d = { ...doc, views: DEFAULT_VIEWS }; setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d); }}>add the default views</button>, or ask chat.
                 </p>
+              </div>
+            )}
+            {Object.keys(doc.cohorts || {}).length > 0 && (
+              <div className="card addview">
+                <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.4rem" }}>
+                  <strong style={{ fontSize: "0.8rem" }}>Add a view</strong>
+                  <span className="meta">{(doc.views || []).length} of 6 in this document</span>
+                  <span className="spacer" />
+                  {VIEW_KINDS.map(({ kind, label, why }) => {
+                    const blocked = (doc.views || []).length >= 6
+                      ? "this document already has the maximum of 6 views"
+                      : (why ? why() : null);
+                    return (
+                      <button key={kind} className="facet" disabled={!!blocked}
+                        title={blocked || ("add a " + label.toLowerCase() + " view and run it")}
+                        onClick={() => addView(kind)}>+ {label}</button>
+                    );
+                  })}
+                </div>
               </div>
             )}
             {result && result.views.map((v, vi) => (

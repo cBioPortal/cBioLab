@@ -441,3 +441,11 @@ details.gearmenu > .gearmenu-items {
 .savegroup > input {
   border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: none;
 }
+
+/* Analysis: compose views without hand-editing the document JSON */
+.addview { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.addview .facet { font-size: 0.74rem; }
+
+/* Cohorts tab: tick-to-select */
+.pick { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+.pick input { margin: 0; cursor: pointer; }

@@ -179,6 +179,36 @@ async function main() {
       ok("a second Analyze resets the analysis instead of accumulating", replaced,
         replaced ? "document holds only the new cohort" : "document holds: " + (after.join(", ") || "?"));
 
+      // Cohorts tab: tick cohorts, submit them together. No per-row "add" links.
+      await page.goto(BASE + "/analysis");
+      await page.waitForSelector(".pick input", { timeout: 240000 });
+      ok("cohort rows use checkboxes, not per-row add links",
+        (await page.locator("button:has-text('add to analysis')").count()) === 0,
+        (await page.locator(".pick input").count()) + " selectable cohorts");
+      ok("submit is refused with nothing ticked",
+        await page.locator("button:has-text('Analyze selected')").isDisabled());
+      await page.locator(".pick input").nth(0).check();
+      await page.locator(".pick input").nth(1).check();
+      await page.locator("button:has-text('Analyze selected')").click();
+      let together = [];
+      try {
+        await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 1, null, { timeout: 300000 });
+        together = Object.keys(JSON.parse(await page.locator("textarea").first().inputValue()).cohorts || {});
+      } catch { /* left empty */ }
+      ok("ticked cohorts are analysed together", together.length === 2, together.join(" + ") || "no document");
+
+      // ...and a view can be added without editing the document JSON.
+      let added = [], dots = 0;
+      try {
+        await page.waitForSelector(".addview", { timeout: 120000 });
+        await page.locator(".addview button:has-text('Lollipop')").click();
+        await page.waitForSelector(".lolliplot .dot", { timeout: 300000 });
+        added = (JSON.parse(await page.locator("textarea").first().inputValue()).views || []).map(v => v.kind);
+        dots = await page.locator(".lolliplot .dot").count();
+      } catch { /* left empty */ }
+      ok("a lollipop view can be added from the UI", added.includes("hotspots") && dots > 0,
+        added.length ? added.join(", ") + " · " + dots + " dots" : "view was not added");
+
       // Examples tab: the documented analysis documents, rendered as a gallery.
       // The docs gate already proves each one RUNS; this proves the app can
       // launch them and that the federated views actually paint something.
