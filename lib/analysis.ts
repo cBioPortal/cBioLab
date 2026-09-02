@@ -1,8 +1,10 @@
 // Analysis-document engine: evaluate named cohorts (DSL v2) and produce view results.
 // Document: { study: "<default>", cohorts: {name: def}, views: [{kind, ...}] }
 // A cohort may override with "study" or "studies": [...] — it is evaluated per study
-// (compilers stay single-study) and members are unioned as fully-qualified patient ids
-// ("<study>_<patient>"). Views fetch data per involved study and join on those ids.
+// (compilers stay single-study) and its size is the SUM of per-study counts. No
+// patient identifier is fetched here: views ask each study for aggregates, and the
+// oncoprint — the one view whose output is patients — carries the cohort SQL and
+// re-derives its columns inside the owning database.
 // Deliberately deferred: cross-study patient dedup and attribute harmonization.
 import { chQuery, DB, STUDY, PRIMARY } from "./ch.ts";
 import { sq } from "./compiler.ts";
@@ -80,31 +82,30 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
   const names = Object.keys(doc.cohorts || {}).slice(0, 6);
   if (!names.length) throw new Error("document has no cohorts");
 
-  // ---- evaluate cohorts: per study, union fully-qualified members ---------
-  const cohorts: Record<string, { studies: string[]; members: Set<string>; perStudy: Record<string, { sql: string; count: number; mode: string }>; count: number; text: string }> = {};
+  // ---- evaluate cohorts: per study, sum the counts ------------------------
+  const cohorts: Record<string, { studies: string[]; perStudy: Record<string, { sql: string; count: number; mode: string }>; count: number; text: string }> = {};
   const resolvers: Record<string, Resolver> = {}; // study -> its instance's resolver
   for (const name of names) {
     const def = doc.cohorts[name];
     const studies = [];
     for (const s of cohortStudies(def, docStudy)) studies.push(await resolveStudy(s, docStudy));
-    const members = new Set<string>(); // "<study>_<pid>" — patient-level instances only
     const perStudy: Record<string, { sql: string; count: number; mode: string }> = {};
-    // per-study evaluation in parallel; each study is answered by its instance's
-    // resolver, which may or may not be permitted to return member ids
+    // Every instance is asked for a COUNT, including the patient-level ones.
+    // Cohort evaluation has no use for identities: the size is a count, and the
+    // oncoprint — the only view whose output is patients — carries the cohort SQL
+    // (PIDS_SQL) and re-derives membership inside the owning database. So no
+    // identifier crosses an instance boundary here for any analysis.
     const evals = await Promise.all(studies.map(async (s) => {
       const { profiles, gaProfiles } = await studyProfiles(s);
       const res = await resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
       resolvers[s] = res;
-      const sql = res.cohortSql(def);
-      if (isPatientLevel(res)) return { s, res, sql, pids: await res.members(def), count: -1 };
-      return { s, res, sql, pids: null, count: await res.count(def) };
+      return { s, res, sql: res.cohortSql(def), count: await res.count(def) };
     }));
-    for (const { s, res, sql, pids, count } of evals) {
-      if (pids) for (const p of pids) members.add(s + "_" + p);
-      perStudy[s] = { sql, count: pids ? pids.length : count, mode: res.instance.mode };
+    for (const { s, res, sql, count } of evals) {
+      perStudy[s] = { sql, count, mode: res.instance.mode };
     }
     cohorts[name] = {
-      studies, members, perStudy,
+      studies, perStudy,
       count: Object.values(perStudy).reduce((n, x) => n + x.count, 0),
       text: describeCohortDef(def) +
         (studies.length > 1 ? " — across " + studies.length + " studies" :

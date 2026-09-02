@@ -399,9 +399,8 @@ details.gearmenu > .gearmenu-items {
 .partbadge.agg { color: #0072B2; border-color: color-mix(in oklab, #0072B2 40%, transparent);
                  background: color-mix(in oklab, #0072B2 10%, transparent); }
 .partbadge.agg i { background: #0072B2; }
-.partbadge.mix { color: #B45309; border-color: color-mix(in oklab, #B45309 40%, transparent);
+.partbadge.src { color: #B45309; border-color: color-mix(in oklab, #B45309 40%, transparent);
                  background: color-mix(in oklab, #B45309 10%, transparent); }
-.partbadge.mix i { background: #B45309; }
 .partbadge.pl { color: var(--muted); }
 .partbadge.pl i { background: var(--muted); }
 
@@ -409,4 +408,5 @@ details.gearmenu > .gearmenu-items {
 .viewhead { display: flex; align-items: flex-start; gap: 0.6rem; flex-wrap: nowrap; }
 .viewhead > h2 { flex: 1 1 auto; min-width: 0; }
 .viewhead > .spacer { display: none; }
-.viewhead > .partbadge { flex: 0 0 auto; margin-top: 0.1rem; }
+.partwrap { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
+.viewhead > .partwrap { flex: 0 0 auto; margin-top: 0.1rem; }

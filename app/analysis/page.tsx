@@ -22,20 +22,36 @@ const fmtP = (p: number): string =>
  */
 function Participation({ p }: { p?: ViewParticipation }) {
   if (!p || !p.studies.length) return null;
-  const agg = p.aggregateOnly.length, tot = p.studies.length;
-  const kind = agg === 0 ? "pl" : agg === tot ? "agg" : "mix";
-  const label = kind === "agg" ? "aggregate-only"
-    : kind === "mix" ? "mixed · " + agg + " of " + tot + " aggregate-only"
-    : "patient-level";
-  const title =
-    p.studies.map(x => x.study + " — " + x.mode + (x.remote ? " (remote MCP peer)" : "")).join("\n") +
-    "\n\n" + (p.requiresPatientLevel
-      ? "This view's output IS patients, so an aggregate-only participant cannot contribute columns to it."
-      : "This view is computed entirely from aggregates: no participant needs to return a patient identifier for it.") +
-    (agg ? "\nNo patient identifier left " + p.aggregateOnly.join(", ") + "." : "");
+  // Two ORTHOGONAL facts, deliberately not merged into one word. The method is
+  // uniform — every view but the oncoprint is computed from aggregates no matter
+  // who answers — so a label like "mixed" would wrongly suggest the feature
+  // itself varies. What can vary is the SOURCES: whether some study was answered
+  // by an instance that will not disclose patients, or by a remote peer.
+  const restricted = p.studies.filter(x => x.mode === "aggregate-only");
+  const remotes = restricted.filter(x => x.remote);
+  const method = p.requiresPatientLevel ? "patient-level" : "aggregate-only";
+  const methodTitle = p.requiresPatientLevel
+    ? "This view's output IS patients, so it needs identities from each contributing instance; an aggregate-only participant cannot contribute columns."
+    : "Computed entirely from aggregates. Every participant answered with counts — no identifier was needed from any of them, whatever each instance would have permitted.";
+  const srcTitle = p.studies.map(x =>
+    x.study + " — " + x.mode + (x.remote ? " (remote MCP peer)" : "")).join("\n");
+  const srcLabel = !restricted.length ? null
+    : remotes.length === restricted.length
+      ? restricted.length + (restricted.length === 1 ? " source via MCP peer" : " sources via MCP peers")
+      : restricted.length + (restricted.length === 1 ? " aggregate-only source" : " aggregate-only sources");
   return (
-    <span className={"partbadge " + kind} title={title}>
-      <i aria-hidden="true" />{label}
+    <span className="partwrap">
+      <span className={"partbadge " + (p.requiresPatientLevel ? "pl" : "agg")}
+        title={methodTitle + "\n\n" + srcTitle}>
+        <i aria-hidden="true" />{method}
+      </span>
+      {srcLabel && (
+        <span className="partbadge src"
+          title={srcTitle + "\n\nNo patient identifier left " +
+            restricted.map(x => x.study).join(", ") + "."}>
+          {srcLabel}
+        </span>
+      )}
     </span>
   );
 }

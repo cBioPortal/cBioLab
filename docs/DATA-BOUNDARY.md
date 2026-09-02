@@ -47,14 +47,36 @@ aggregate-only participants — checked in the resolver, again in the remote
 client *before any network call*, and independently by the peer's own MCP tool,
 which does not trust the caller to have checked.
 
-**4. Every visualization states its own provenance.** Each view result carries a
-`participation` record — which studies answered it, in what mode, and whether
-the view kind needs identities at all — rendered as a marker on the chart:
-`aggregate-only`, `mixed · n of m aggregate-only`, or `patient-level`. A reader
-never has to infer from prose whether patient-level data was involved, and a new
-view kind that omits the marker fails the e2e gate.
+**4. Cohort evaluation fetches no identifiers at all.** A cohort's size is a
+count, asked of every instance including the patient-level ones, and the
+oncoprint re-derives its columns inside the owning database from the cohort SQL
+it carries (`PIDS_SQL`). So for a document with no oncoprint view, *no patient
+identifier crosses any instance boundary* — not because the deployment is
+restricted, but because nothing needs one. `PatientLevelResolver.members()` is
+retained deliberately as the structural marker of the entitlement, so that a
+future feature genuinely needing identities is routed by the type system to an
+instance permitted to give them.
 
-**5. Views degrade rather than quietly narrowing.** An oncoprint's columns *are*
+**5. Every visualization states its own provenance.** Each view result carries a
+`participation` record — which studies answered it, in what mode, whether any
+was a remote peer, and whether the view kind needs identities at all. It renders
+as two markers, kept deliberately separate:
+
+- **the method** — `aggregate-only` for every view but the oncoprint, whose
+  output *is* patients. This does not vary with the deployment: the arithmetic
+  is identical whether a participant is local patient-level, local
+  aggregate-only, or a remote peer.
+- **the sources** — `1 aggregate-only source` / `2 sources via MCP peers`, shown
+  only when some study was answered by an instance that will not disclose
+  patients.
+
+They are two markers rather than one word because a single label like "mixed"
+would suggest the *feature* varies by participant, which is exactly what this
+architecture prevents. What varies is who answered, never how.
+
+A new view kind that omits the marker fails the e2e gate.
+
+**6. Views degrade rather than quietly narrowing.** An oncoprint's columns *are*
 patients, so a participant that will not disclose ids cannot contribute columns.
 The view renders what is permitted and states the covered fraction; if no
 participant permits patient-level access it errors with an explanation. It never

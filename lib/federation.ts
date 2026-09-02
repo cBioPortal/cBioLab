@@ -641,6 +641,13 @@ abstract class BaseResolver implements AggregateCapable {
 }
 
 /** Full access: may return member ids, so every view is answerable. */
+/**
+ * Full access. Note that runAnalysis does NOT call members() — cohort sizes are
+ * counts, and the oncoprint re-derives its columns inside the owning database
+ * from the cohort SQL. The method is kept deliberately: it is the structural
+ * marker of the entitlement, and the type system routes any future feature that
+ * genuinely needs identities to an instance permitted to give them.
+ */
 export class PatientLevelResolver extends BaseResolver implements PatientLevelCapable {
   readonly instance: Instance & { mode: "patient-level" };
   constructor(study: string, ctx: Partial<CompileCtx>, instance: Instance) {
