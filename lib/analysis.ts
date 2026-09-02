@@ -12,7 +12,7 @@ import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, fisherZMeta } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting, restrictedStudies,
@@ -114,6 +114,21 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
   const involved = [...new Set(Object.values(cohorts).flatMap((c) => c.studies))];
 
   // ---- views --------------------------------------------------------------
+  // Every view records which studies answered it and in what mode, so a reader
+  // never has to infer from prose whether patient-level data was involved.
+  const participationFor = (studies: string[], requiresPatientLevel: boolean): ViewParticipation => {
+    const per = studies.map((s) => {
+      const inst = resolvers[s] ? resolvers[s].instance : null;
+      return {
+        study: s,
+        mode: (inst ? inst.mode : "patient-level") as "patient-level" | "aggregate-only",
+        instance: inst ? inst.label : "unknown",
+        ...(inst && inst.id === "peer" ? { remote: true } : {})
+      };
+    });
+    return { studies: per, requiresPatientLevel, aggregateOnly: per.filter((x) => x.mode === "aggregate-only").map((x) => x.study) };
+  };
+
   const views: ViewResult[] = [];
   for (const view of (doc.views || []).slice(0, 6)) {
     const vNames = (view.cohorts && view.cohorts.length ? view.cohorts : names).filter((n) => cohorts[n]);
@@ -159,6 +174,7 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       });
       if (vNames.length === 2) rows.sort((a, b) => (a.pAny ?? 1) - (b.pAny ?? 1));
       views.push({ kind: "compare", cohorts: vNames, annotation: annSource, rows,
+        participation: participationFor(vStudies, false),
         ...(vStudies.length > 1 ? { studies: vStudies,
           note: "cross-study comparison" + (vStudies.length <= 2 ? " (" + vStudies.join(", ") + ")" : " across " + vStudies.length + " studies") +
             ": denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated" +
@@ -199,6 +215,7 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
         }
       }
       views.push({ kind: "survival", cohorts: vNames, curves,
+        participation: participationFor(vStudies, false),
         ...(logrank ? { logrank } : {}), ...(logrankPooled ? { logrankPooled } : {}),
         caveat: "OS from each study's own baseline (left truncation applies" +
           (vStudies.length > 1 ? "; baselines are NOT harmonized across studies" : "") + "); status '0:...' treated as censored." +
@@ -240,6 +257,7 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       }).filter((h) => h.mutated > 0);
       const unpositioned = hotspots.reduce((n, h) => n + h.variants.filter((v) => v.pos == null).length, 0);
       views.push({ kind: "hotspots", cohorts: [cn], hotspots, studies: cohorts[cn].studies,
+        participation: participationFor(cohorts[cn].studies, false),
         note: "Recurrent protein changes in “" + cn + "”, counted per patient. Percentages are of the patients" +
           " carrying ANY mutation in that gene, not of the cohort." +
           " The codon is parsed from the protein-change string (the schema stores no position), so " +
@@ -290,6 +308,7 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       benjaminiHochberg(tested.map((r) => r.pMeta ?? r.p)).forEach((q, i) => { tested[i].q = q; });
       rows.sort((x, y) => Math.abs(y.r ?? 0) - Math.abs(x.r ?? 0));
       views.push({ kind: "coexpression", cohorts: [cn], coexpression: rows, studies: cohorts[cn].studies,
+        participation: participationFor(cohorts[cn].studies, false),
         note: "Pearson correlation on “" + profileType + "” within “" + cn + "”, over the patients with BOTH values" +
           " (values averaged per patient, matching the heatmap convention). Each site reports six sums — n, Σx, Σy," +
           " Σxy, Σx², Σy² — and nothing else; those sums are additive, so the pooled correlation is EXACT rather than" +
@@ -372,6 +391,7 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       benjaminiHochberg(tested.map((r) => r.p!)).forEach((q, i) => { tested[i].q = q; });
       rows.sort((a, b) => (a.p ?? 2) - (b.p ?? 2));
       views.push({ kind: "clinical", cohorts: vNames, clinical: rows, studies: vStudies,
+        participation: participationFor(vStudies, false),
         note: "Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary;" +
           " numeric ones with Welch's unequal-variance t-test computed from (n, Σx, Σx²) — those three totals are" +
           " ADDITIVE across sites, so the pooled mean and variance are exact from per-site aggregates and no" +
@@ -430,6 +450,7 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       rows.length = 0; rows.push(...assessable);
       views.push({ kind: "cooccurrence", cohorts: [cn], rows: undefined, pairs: rows,
         studies: cohorts[cn].studies,
+        participation: participationFor(cohorts[cn].studies, false),
         note: "Pairwise co-occurrence within “" + cn + "”" +
           (vNames.length > 1 ? " (the first cohort in this view; co-occurrence describes one cohort, not a contrast)" : "") +
           ". Denominators are the patients profiled for BOTH genes, computed per study against that study's own panels" +
@@ -460,6 +481,7 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
         n + okStudies.reduce((m, st) => m + (cohorts[cn].perStudy[st]?.count || 0), 0), 0);
       if (!okStudies.length) {
         views.push({ kind: "oncoprint", cohorts: vNames, studies: vStudies,
+          participation: participationFor(vStudies, true),
           error: "no participating instance permits patient-level access, and an oncoprint's columns are patients — " +
             withheld.join(", ") + " answer with aggregates only. Compare and survival still cover all " +
             (shownPts + withheldPts).toLocaleString() + " patients." });
@@ -513,6 +535,7 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
         conventions: { lineGap: 90 }
       });
       views.push({ kind: "oncoprint", cohorts: vNames, svg: contractToSvg(contract, 1200),
+        participation: participationFor(vStudies, true),
         genes: contract.tracks.filter((t) => t.kind === "gene").map((t) => ({ gene: t.label, driverPct: t.driverPct ?? null, anyPct: t.freqPct ?? null })),
         nColumns: contract.stats.nColumns, annotation: contract.conventions.annotation,
         ...(multi || withheld.length ? { studies: okStudies,

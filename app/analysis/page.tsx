@@ -4,6 +4,7 @@ import CohortPills, { normalizeDef } from "./pills";
 import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
 import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
+import type { ViewParticipation } from "../../lib/types.ts";
 
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
 /** beyond this many distinct values a pie is unreadable — the portal shows a table */
@@ -14,6 +15,31 @@ const PIE_MAX_SLICES = 8;
  *  whole "p=..." / "p<..." label so the relation stays attached to the number. */
 const fmtP = (p: number): string =>
   p === 0 ? "p < 1e-300" : p < 1e-4 ? "p=" + p.toExponential(1) : "p=" + p.toFixed(4);
+/**
+ * Says, on every visualization, whether patient-level data was involved in
+ * producing it. "aggregate-only" means no participant returned an identifier —
+ * the chart was built from counts computed inside each owning database.
+ */
+function Participation({ p }: { p?: ViewParticipation }) {
+  if (!p || !p.studies.length) return null;
+  const agg = p.aggregateOnly.length, tot = p.studies.length;
+  const kind = agg === 0 ? "pl" : agg === tot ? "agg" : "mix";
+  const label = kind === "agg" ? "aggregate-only"
+    : kind === "mix" ? "mixed · " + agg + " of " + tot + " aggregate-only"
+    : "patient-level";
+  const title =
+    p.studies.map(x => x.study + " — " + x.mode + (x.remote ? " (remote MCP peer)" : "")).join("\n") +
+    "\n\n" + (p.requiresPatientLevel
+      ? "This view's output IS patients, so an aggregate-only participant cannot contribute columns to it."
+      : "This view is computed entirely from aggregates: no participant needs to return a patient identifier for it.") +
+    (agg ? "\nNo patient identifier left " + p.aggregateOnly.join(", ") + "." : "");
+  return (
+    <span className={"partbadge " + kind} title={title}>
+      <i aria-hidden="true" />{label}
+    </span>
+  );
+}
+
 /** the same value for a table cell, where the column header already says "p" */
 const pCell = (p: number): string =>
   p === 0 ? "< 1e-300" : p < 1e-4 ? p.toExponential(1) : p.toFixed(4);
@@ -1060,7 +1086,7 @@ export default function AnalysisPage() {
             {result && result.views.map((v, vi) => (
               <div className="card" key={vi}>
                 {v.kind === "compare" && v.rows && <>
-                  <h2>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2>
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2><span className="spacer" /><Participation p={v.participation} /></div>
                   {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                     style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
@@ -1081,7 +1107,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <h2>Hotspots <span className="plain">— recurrent protein changes, counted per patient</span></h2>
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Hotspots <span className="plain">— recurrent protein changes, counted per patient</span></h2><span className="spacer" /><Participation p={v.participation} /></div>
                   {v.note && <p className="note">{v.note}</p>}
                   {v.hotspots.map(h => {
                     const positioned = h.variants.filter(x => x.pos != null);
@@ -1138,7 +1164,7 @@ export default function AnalysisPage() {
                   })}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <h2>Co-expression <span className="plain">— Pearson correlation from per-site sums</span></h2>
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-expression <span className="plain">— Pearson correlation from per-site sums</span></h2><span className="spacer" /><Participation p={v.participation} /></div>
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
@@ -1172,7 +1198,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "clinical" && v.clinical && <>
-                  <h2>Clinical comparison <span className="plain">— attribute distributions across cohorts</span></h2>
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Clinical comparison <span className="plain">— attribute distributions across cohorts</span></h2><span className="spacer" /><Participation p={v.participation} /></div>
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
@@ -1211,7 +1237,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <h2>Co-occurrence <span className="plain">— pairwise, among patients profiled for both genes</span></h2>
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-occurrence <span className="plain">— pairwise, among patients profiled for both genes</span></h2><span className="spacer" /><Participation p={v.participation} /></div>
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
@@ -1250,7 +1276,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "survival" && <>
-                  <h2>Survival <span className="plain">— Kaplan–Meier, overall survival</span></h2>
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Survival <span className="plain">— Kaplan–Meier, overall survival</span></h2><span className="spacer" /><Participation p={v.participation} /></div>
                   <KMChart curves={v.curves!} />
                   <div style={{ display: "flex", gap: "1.2rem", fontSize: "0.76rem", color: "var(--muted)", marginTop: "0.4rem", flexWrap: "wrap" }}>
                     {v.curves!.map((c, i: number) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: median {c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}
@@ -1273,6 +1299,7 @@ export default function AnalysisPage() {
                   <div className="row" style={{ alignItems: "baseline" }}>
                     <h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {v.nColumns!.toLocaleString()} patients · {v.annotation}</span></h2>
                     <span className="spacer" />
+                    <Participation p={v.participation} />
                     <details className="gearmenu">
                       <summary title="oncoprint options">⚙</summary>
                       <div className="gearmenu-items">
@@ -1340,7 +1367,7 @@ export default function AnalysisPage() {
                   </div>
                   <div style={{ overflowX: "auto", background: "#fff", borderRadius: 8, border: "1px solid var(--line)" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
-                {v.error && <div className="error">{v.kind}: {v.error}</div>}
+                {v.error && <div className="error">{v.kind}: {v.error}{v.participation ? <> <Participation p={v.participation} /></> : null}</div>}
               </div>
             ))}
           </div>

@@ -47,7 +47,14 @@ aggregate-only participants — checked in the resolver, again in the remote
 client *before any network call*, and independently by the peer's own MCP tool,
 which does not trust the caller to have checked.
 
-**4. Views degrade rather than quietly narrowing.** An oncoprint's columns *are*
+**4. Every visualization states its own provenance.** Each view result carries a
+`participation` record — which studies answered it, in what mode, and whether
+the view kind needs identities at all — rendered as a marker on the chart:
+`aggregate-only`, `mixed · n of m aggregate-only`, or `patient-level`. A reader
+never has to infer from prose whether patient-level data was involved, and a new
+view kind that omits the marker fails the e2e gate.
+
+**5. Views degrade rather than quietly narrowing.** An oncoprint's columns *are*
 patients, so a participant that will not disclose ids cannot contribute columns.
 The view renders what is permitted and states the covered fraction; if no
 participant permits patient-level access it errors with an explanation. It never

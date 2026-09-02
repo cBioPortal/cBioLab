@@ -388,3 +388,25 @@ details.gearmenu > .gearmenu-items {
   font-size: 0.7rem; padding: 0.1rem 0.45rem; border-radius: 999px; white-space: nowrap;
   background: color-mix(in oklab, var(--accent-ink) 16%, transparent); color: var(--accent-ink);
 }
+
+/* Participation marker: was patient-level data involved in this visualization? */
+.partbadge {
+  display: inline-flex; align-items: center; gap: 0.32rem; white-space: nowrap;
+  font-size: 0.68rem; letter-spacing: 0.02em; padding: 0.1rem 0.5rem;
+  border-radius: 999px; border: 1px solid var(--line); cursor: help;
+}
+.partbadge i { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.partbadge.agg { color: #0072B2; border-color: color-mix(in oklab, #0072B2 40%, transparent);
+                 background: color-mix(in oklab, #0072B2 10%, transparent); }
+.partbadge.agg i { background: #0072B2; }
+.partbadge.mix { color: #B45309; border-color: color-mix(in oklab, #B45309 40%, transparent);
+                 background: color-mix(in oklab, #B45309 10%, transparent); }
+.partbadge.mix i { background: #B45309; }
+.partbadge.pl { color: var(--muted); }
+.partbadge.pl i { background: var(--muted); }
+
+/* View header: title may wrap; the participation marker stays pinned top-right */
+.viewhead { display: flex; align-items: flex-start; gap: 0.6rem; flex-wrap: nowrap; }
+.viewhead > h2 { flex: 1 1 auto; min-width: 0; }
+.viewhead > .spacer { display: none; }
+.viewhead > .partbadge { flex: 0 0 auto; margin-top: 0.1rem; }

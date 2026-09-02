@@ -153,6 +153,27 @@ async function main() {
       ok("multi-view example renders all 5 views", multiMissing.length === 0,
         multiMissing.length ? "missing: " + multiMissing.join(", ") : "hotspots + cooccurrence + compare + clinical + survival");
 
+      // Every visualization must say whether patient-level data was involved.
+      // A new view kind that forgets the marker fails here rather than shipping
+      // a chart whose provenance the reader has to guess at.
+      const marker = await page.evaluate(() => {
+        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Hotspots", "Oncoprint"];
+        const missing = [], seen = [];
+        for (const card of document.querySelectorAll(".ana-grid .card")) {
+          const h = card.querySelector("h2");
+          if (!h) continue;
+          const name = KNOWN.find(k => h.textContent.trim().startsWith(k));
+          if (!name) continue;                       // "The document" and other non-view cards
+          seen.push(name);
+          const b = card.querySelector(".partbadge");
+          if (!b || !b.getAttribute("title")) missing.push(name);
+        }
+        return { seen, missing };
+      });
+      ok("every visualization carries a participation marker",
+        marker.seen.length >= 5 && marker.missing.length === 0,
+        marker.missing.length ? "missing on: " + marker.missing.join(", ") : marker.seen.length + " views marked");
+
       for (const [title, sel, label] of launches) {
         await page.goto(BASE + "/analysis");
         await page.locator("button:has-text('Examples')").first().click();

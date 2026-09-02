@@ -210,6 +210,18 @@ export interface ClinicalRow {
   /** why this attribute was not tested — stated, never silently omitted */
   skipped?: string;
 }
+/**
+ * How each study behind a view answered. The distinction the whole system turns
+ * on: an aggregate-only participant returns counts and never an identifier, so a
+ * view built entirely from such participants moved no patient-level data at all.
+ */
+export interface ViewParticipation {
+  studies: { study: string; mode: "patient-level" | "aggregate-only"; instance: string; remote?: boolean }[];
+  /** true only for views whose output IS patients (the oncoprint's columns) */
+  requiresPatientLevel: boolean;
+  /** the studies that answered with aggregates only */
+  aggregateOnly: string[];
+}
 export interface LogRank {
   chi2: number; p: number; df: number;
   /** total events in each group, then the expected counts under the null */
@@ -220,6 +232,7 @@ export interface LogRank {
 }
 export interface ViewResult {
   kind: string; error?: string; note?: string; studies?: string[];
+  participation?: ViewParticipation;
   cohorts?: string[]; annotation?: string;
   rows?: CompareRow[];                      // compare
   curves?: KmCurve[]; caveat?: string;      // survival
