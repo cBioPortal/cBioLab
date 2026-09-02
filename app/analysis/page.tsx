@@ -258,11 +258,24 @@ export default function AnalysisPage() {
   const barDefaultName = () =>
     parseDraft() ? "explored cohort"
       : exSel.current.length === 1 ? "all of " + exSel.current[0] : "all selected studies";
+  /**
+   * Analyze starts a FRESH analysis of the explored cohort: it replaces the
+   * document rather than merging into it, because that is what the word means —
+   * you asked to analyse this, not to add it to whatever was there before.
+   * Building a multi-cohort comparison is the Cohorts tab's "add to analysis".
+   */
   const analyzeDraft = () => {
     const d = barDef();
     if (!d) { setExMsg("select at least one study first"); return; }
     setExMsg(null);
-    addDefToAnalysis(cName.trim() || barDefaultName(), d);
+    const name = cName.trim() || barDefaultName();
+    const nextStudy = exSel.current[0] || study;
+    const nd: AnalysisDoc = { study: nextStudy, cohorts: { [name]: d }, views: DEFAULT_VIEWS };
+    setStudy(nextStudy);
+    setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
+    setResult(null); setError(null);     // never leave the previous run's numbers on screen
+    setTab("analysis");
+    run(nd);
   };
   const saveDraftAsCohort = async () => {
     const d = barDef();
@@ -556,7 +569,7 @@ export default function AnalysisPage() {
                   {exploreBusy && <span className="spinner" />}
                   <span className="spacer" />
                   <button className="primary" onClick={analyzeDraft} disabled={!ready}
-                    title={ready ? "add this cohort to the analysis document and run it" : "select a study first"}>
+                    title={ready ? "start a fresh analysis of this cohort (replaces the current document)" : "select a study first"}>
                     Analyze
                   </button>
                   <span className="meta">or</span>

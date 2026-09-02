@@ -151,6 +151,34 @@ async function main() {
       ok("Analyze carries the cohort into a running analysis", landed && views.length > 1,
         landed ? views.join(" + ") : "cohort did not reach the document");
 
+      // Analyze REPLACES the document rather than merging into it — a second
+      // Analyze must not leave the first cohort behind.
+      await page.locator(".tabs button:has-text('Explore')").click();
+      await page.waitForSelector(".exbar", { timeout: 120000 });
+      await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
+      await page.locator(".valrow, .slice").nth(2).click();
+      try {
+        await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""),
+          null, { timeout: 240000 });
+      } catch { /* count may already be shown */ }
+      await page.locator(".exbar input").fill("e2e second cohort");
+      await page.locator(".exbar button:has-text('Analyze')").click();
+      let replaced = false, after = [];
+      try {
+        await page.waitForFunction(() => {
+          const ta = document.querySelector("textarea");
+          if (!ta) return false;
+          try { return Object.keys(JSON.parse(ta.value).cohorts || {}).join() === "e2e second cohort"; }
+          catch { return false; }
+        }, null, { timeout: 300000 });
+        after = Object.keys(JSON.parse(await page.locator("textarea").first().inputValue()).cohorts || {});
+        replaced = after.length === 1 && after[0] === "e2e second cohort";
+      } catch {
+        try { after = Object.keys(JSON.parse(await page.locator("textarea").first().inputValue()).cohorts || {}); } catch {}
+      }
+      ok("a second Analyze resets the analysis instead of accumulating", replaced,
+        replaced ? "document holds only the new cohort" : "document holds: " + (after.join(", ") || "?"));
+
       // Examples tab: the documented analysis documents, rendered as a gallery.
       // The docs gate already proves each one RUNS; this proves the app can
       // launch them and that the federated views actually paint something.
