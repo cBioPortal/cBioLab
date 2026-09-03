@@ -40,6 +40,14 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   it premature — don't invest further without being asked).
 - **`lib/dsl-reference.ts`** — **THE single source of truth for DSL documentation.**
 
+## Docs worth reading before changing things
+
+- [`docs/DATA-BOUNDARY.md`](docs/DATA-BOUNDARY.md) — the patient-data rule and how it is enforced.
+- [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) — measured comparison against cbioportal.org.
+  Read before claiming this project is "fast": on a cached single chart the portal is ~20x
+  quicker, we have no application cache, and our advantage is data movement (36x less to the
+  browser), not speed. Also records the ~20,000-id ceiling on explicit patient lists.
+
 ## Invariants — do not break these
 
 1. **Loud rejection, never silent approximation.** Anything the data can't honestly answer
