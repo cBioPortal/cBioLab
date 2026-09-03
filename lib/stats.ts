@@ -25,27 +25,54 @@ export function fisherExact(a: number, b: number, c: number, d: number): number 
   return Math.min(1, p);
 }
 
-// Kaplan-Meier product-limit estimator.
-// data: [{t: months, event: 0|1}] -> { points: [{t, s}], median, n, events }
-export function kaplanMeier(data: { t: number; event: number }[]): Omit<KmCurve, "cohort"> {
+/**
+ * One subject's follow-up. `entry` is the time at which they became observable;
+ * omit it (or pass -Infinity) when observation starts at time zero for everyone,
+ * which is the ordinary untruncated case.
+ *
+ * LEFT TRUNCATION matters whenever the clock starts before the subject could be
+ * observed — survival measured from diagnosis while patients only enter the
+ * cohort at sequencing, say. Ignoring it manufactures immortal time: everyone
+ * appears to survive from the anchor to their entry, because surviving that long
+ * is what got them into the data at all.
+ */
+export interface SurvRecord { t: number; event: number; entry?: number }
+
+/** Number at risk just before `t`: entered strictly before it, not yet left. */
+function riskSweep(recs: SurvRecord[]) {
+  const entries = recs.map(r => (r.entry == null ? -Infinity : r.entry)).sort((a, b) => a - b);
+  const exits = recs.map(r => r.t).sort((a, b) => a - b);
+  let ei = 0, xi = 0, entered = 0, exited = 0;
+  // advance() is called with non-decreasing t, so the sweep is O(n log n) overall
+  return (t: number) => {
+    while (ei < entries.length && entries[ei] < t) { entered++; ei++; }
+    while (xi < exits.length && exits[xi] < t) { exited++; xi++; }
+    return entered - exited;
+  };
+}
+
+// Kaplan-Meier product-limit estimator, with optional delayed entry.
+// data: [{t: months, event: 0|1, entry?}] -> { points: [{t, s}], median, n, events }
+export function kaplanMeier(data: SurvRecord[]): Omit<KmCurve, "cohort"> {
   const clean = data.filter(d => Number.isFinite(d.t) && d.t >= 0).sort((x, y) => x.t - y.t);
   const n0 = clean.length;
-  let atRisk = n0, s = 1;
+  const atRiskAt = riskSweep(clean);
+  let s = 1;
   let median: number | null = null;
   const points: KmPoint[] = [{ t: 0, s: 1 }];
   let events = 0;
   let i = 0;
   while (i < clean.length) {
     const t = clean[i].t;
-    let d = 0, c = 0;
-    while (i < clean.length && clean[i].t === t) { clean[i].event ? d++ : c++; i++; }
+    let d = 0;
+    while (i < clean.length && clean[i].t === t) { if (clean[i].event) d++; i++; }
+    const atRisk = atRiskAt(t);
     if (d > 0 && atRisk > 0) {
       s *= 1 - d / atRisk;
       points.push({ t, s: Math.round(s * 10000) / 10000 });
       if (median === null && s <= 0.5) median = t;
       events += d;
     }
-    atRisk -= d + c;
   }
   return { points, median, n: n0, events };
 }
@@ -89,20 +116,23 @@ export function chiSquareP1df(x: number): number {
   return Math.min(1, erfc(Math.sqrt(x / 2)));
 }
 
-export interface SurvPoint { t: number; event: number }
+export type SurvPoint = SurvRecord;
 
 /** One stratum's contribution: observed and expected events in group A, and the variance. */
 function stratumTerms(a: SurvPoint[], b: SurvPoint[]): { o1: number; e1: number; v: number; o2: number } {
   const ok = (d: SurvPoint) => Number.isFinite(d.t) && d.t >= 0;
   const A = a.filter(ok).slice().sort((x, y) => x.t - y.t);
   const B = b.filter(ok).slice().sort((x, y) => x.t - y.t);
-  let i = 0, j = 0, n1 = A.length, n2 = B.length;
+  const riskA = riskSweep(A), riskB = riskSweep(B);
+  let i = 0, j = 0;
   let o1 = 0, e1 = 0, v = 0, o2 = 0;
   while (i < A.length || j < B.length) {
     const t = Math.min(i < A.length ? A[i].t : Infinity, j < B.length ? B[j].t : Infinity);
-    let d1 = 0, c1 = 0, d2 = 0, c2 = 0;
-    while (i < A.length && A[i].t === t) { A[i].event ? d1++ : c1++; i++; }
-    while (j < B.length && B[j].t === t) { B[j].event ? d2++ : c2++; j++; }
+    let d1 = 0, d2 = 0;
+    while (i < A.length && A[i].t === t) { if (A[i].event) d1++; i++; }
+    while (j < B.length && B[j].t === t) { if (B[j].event) d2++; j++; }
+    // risk sets honour delayed entry: a subject not yet observable is not at risk
+    const n1 = riskA(t), n2 = riskB(t);
     const d = d1 + d2, n = n1 + n2;
     if (d > 0 && n > 1) {
       o1 += d1; o2 += d2;
@@ -110,7 +140,6 @@ function stratumTerms(a: SurvPoint[], b: SurvPoint[]): { o1: number; e1: number;
       // hypergeometric variance; zero when every at-risk subject fails at t
       v += (d * n1 * n2 * (n - d)) / (n * n * (n - 1));
     }
-    n1 -= d1 + c1; n2 -= d2 + c2;
   }
   return { o1, e1, v, o2 };
 }

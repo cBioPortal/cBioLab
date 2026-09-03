@@ -310,3 +310,54 @@ describe("normal tail and Fisher-z meta-analysis", () => {
     assert.equal(fisherZMeta([{ r: null, n: 50 }, { r: 1, n: 50 }, { r: 0.3, n: 3 }]).sites, 0);
   });
 });
+
+describe("left truncation (delayed entry)", () => {
+  // Immortal time, constructed so the two answers are far apart and hand-checkable.
+  // Group A is observed from time 0 and dies at 1..5. Group B only becomes
+  // observable at time 10 and dies at 11..15 — B could not have been seen dying
+  // before 10, because surviving to 10 is what put them in the data.
+  const A = [1, 2, 3, 4, 5].map((t) => ({ t, event: 1, entry: 0 }));
+  const B = [11, 12, 13, 14, 15].map((t) => ({ t, event: 1, entry: 10 }));
+
+  test("ignoring entry overstates early survival", () => {
+    // all ten treated as observed from 0: 1 death out of 10, then 9, then 8...
+    const naive = kaplanMeier([...A, ...B].map(({ t, event }) => ({ t, event })));
+    const at5 = naive.points.filter((p) => p.t <= 5).pop()!;
+    assert.equal(at5.s, 0.5, "naive S(5) = 0.9*0.888*0.875*0.857*0.833 = 0.5");
+  });
+
+  test("honouring entry gives the correct, much lower curve", () => {
+    const truncated = kaplanMeier([...A, ...B]);
+    const at5 = truncated.points.filter((p) => p.t <= 5).pop()!;
+    // before t=10 only A is at risk: 1/5, then 1/4, 1/3, 1/2, 1/1 -> everyone gone
+    assert.equal(at5.s, 0, "with delayed entry the survivors at 5 are only A, and all of A has died");
+  });
+
+  test("an absent entry means the same as entering before time zero", () => {
+    const withZero = kaplanMeier(A.map((r) => ({ ...r, entry: -Infinity })));
+    const without = kaplanMeier(A.map(({ t, event }) => ({ t, event })));
+    assert.deepEqual(withZero.points, without.points);
+    assert.equal(withZero.median, without.median);
+  });
+
+  test("the log-rank risk sets honour entry too", () => {
+    // A vs B compared naively looks like a colossal difference (they never overlap
+    // in time); with delayed entry there is no period in which both are at risk,
+    // so there is nothing to compare and the test must not claim significance.
+    const naive = logRank([{ a: A.map(({ t, event }) => ({ t, event })), b: B.map(({ t, event }) => ({ t, event })) }]);
+    const honest = logRank([{ a: A, b: B }]);
+    assert.ok(naive.p < 0.01, "ignoring entry claims significance: chi2=" + naive.chi2 + " p=" + naive.p);
+    // The two groups are never simultaneously at risk, so there is no comparison
+    // to make. The variance of the statistic is zero and the honest answer is
+    // "these data say nothing", not "these groups differ".
+    assert.equal(honest.chi2, 0);
+    assert.equal(honest.p, 1);
+    assert.equal(honest.variance, 0, "no overlapping risk set means no information");
+  });
+
+  test("truncation never invents survivors: n and events are unchanged", () => {
+    const t = kaplanMeier([...A, ...B]);
+    assert.equal(t.n, 10);
+    assert.equal(t.events, 10);
+  });
+});
