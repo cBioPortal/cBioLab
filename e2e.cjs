@@ -263,6 +263,33 @@ async function main() {
         onco.found && onco.queries > 0 && onco.split,
         onco.found ? onco.queries + " queries · " + onco.chip : "no oncoprint view on the page");
 
+      // The survival basis (endpoint + what the clock starts from) is a control,
+      // not a JSON edit — and changing it must actually change the analysis.
+      const survDoc = { study: "msk_chord_2024",
+        cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] },
+                   "TP53 wt": { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] } },
+        views: [{ kind: "survival" }] };
+      await page.goto(BASE + "/analysis?tab=analysis&doc=" + Buffer.from(JSON.stringify(survDoc)).toString("base64url"));
+      let basis = { types: 0, changed: false, truncated: false, anchor: null };
+      try {
+        await page.waitForSelector(".basis", { timeout: 300000 });
+        await page.waitForFunction(() => document.querySelectorAll(".basis select")[1]?.options.length > 2, null, { timeout: 180000 });
+        basis.types = await page.locator(".basis select").nth(1).locator("option").count();
+        const before = await page.locator(".logrank").innerText();
+        await page.locator(".basis select").nth(1).selectOption("Treatment");
+        await page.waitForFunction(() => document.querySelector(".trunc") !== null, null, { timeout: 300000 });
+        await page.waitForFunction((b) => {
+          const el = document.querySelector(".logrank");
+          return el && el.textContent.trim() !== b;
+        }, before.trim(), { timeout: 300000 });
+        basis.truncated = (await page.locator(".trunc").count()) > 0;
+        basis.anchor = JSON.parse(await page.locator("textarea").first().inputValue()).views[0].anchor;
+        basis.changed = true;
+      } catch { /* left as-is */ }
+      ok("survival basis is changeable from a control", basis.changed && basis.truncated && !!basis.anchor,
+        basis.changed ? basis.types + " anchor options · became " + JSON.stringify(basis.anchor) + " · left-truncated"
+                      : "control did not drive a re-run");
+
       // Examples tab: the documented analysis documents, rendered as a gallery.
       // The docs gate already proves each one RUNS; this proves the app can
       // launch them and that the federated views actually paint something.

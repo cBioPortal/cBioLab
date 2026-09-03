@@ -476,3 +476,12 @@ details.gearmenu > .gearmenu-items {
   color: #B45309; background: color-mix(in oklab, #B45309 12%, transparent);
   border: 1px solid color-mix(in oklab, #B45309 35%, transparent);
 }
+
+/* Survival: the basis control (endpoint + what the clock starts from) */
+.basis {
+  display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
+  margin: 0.5rem 0 0.6rem; padding: 0.4rem 0.5rem;
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+  font-size: 0.76rem;
+}
+.basis select { font-size: 0.76rem; padding: 0.1rem 0.3rem; max-width: 14rem; }

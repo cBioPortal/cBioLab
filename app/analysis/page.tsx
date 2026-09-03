@@ -137,6 +137,7 @@ export default function AnalysisPage() {
   const [exMsg, setExMsg] = useState<string | null>(null);   // Explore action-bar feedback
   const tabRef = useRef<string>("cohorts");                  // the tab syncUrl should record
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
+  const [cat, setCat] = useState<any>(null);                 // event/endpoint catalog for the survival control
   const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>"
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
@@ -487,6 +488,25 @@ export default function AnalysisPage() {
           profiles: [...profs].sort() });
       });
   }, [result]); // eslint-disable-line
+
+  // the survival "measured from" control needs this study's event types,
+  // their attributes, and the endpoints it declares
+  useEffect(() => {
+    if (!study) return;
+    let dead = false;
+    fetch("/api/catalog?study=" + encodeURIComponent(study))
+      .then(r => r.json()).then(j => { if (!dead && !j.error) setCat(j); }).catch(() => {});
+    return () => { dead = true; };
+  }, [study]);
+
+  /** Rewrite one view in the document and re-run. */
+  const patchView = (i: number, patch: Record<string, unknown>) => {
+    const views = (doc.views || []).map((v: any, j: number) => j === i ? { ...v, ...patch } : v);
+    for (const v of views as any[]) if (v.anchor == null) delete v.anchor;   // null means "study baseline"
+    const d = { ...doc, views };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    run(d);
+  };
 
   // the creator's quick-add row needs the study catalog even before Explore is visited
   useEffect(() => {
@@ -1590,6 +1610,57 @@ export default function AnalysisPage() {
                         {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
                       </span>
                     )}<Participation p={v.participation} /></></div>
+                  {(() => {
+                    // The basis of a survival analysis — which endpoint, and what
+                    // the clock starts from — is the thing people most want to
+                    // change, so it is a control rather than a JSON edit.
+                    const sv: any = (doc.views || [])[vi] || {};
+                    const a = sv.anchor || null;
+                    const eps: string[] = (cat && cat.survivalEndpoints) || [];
+                    const types: string[] = ((cat && cat.types) || []).map((t: any) => t.t);
+                    const keys: string[] = (cat && a && cat.keys && cat.keys[a.eventType]) || [];
+                    const vals: string[] = (cat && a && a.key && cat.values && cat.values[a.eventType]
+                      && cat.values[a.eventType][a.key]) || [];
+                    return (
+                      <div className="basis">
+                        <span className="meta">endpoint</span>
+                        <select value={sv.endpoint || "OS"} disabled={busy}
+                          onChange={e => patchView(vi, { endpoint: e.target.value })}>
+                          {(eps.length ? eps : [sv.endpoint || "OS"]).map(x => <option key={x} value={x}>{x}</option>)}
+                        {!cat && <option disabled>loading…</option>}
+                        </select>
+                        <span className="meta">measured from</span>
+                        <select value={a ? a.eventType : ""} disabled={busy}
+                          onChange={e => patchView(vi, { anchor: e.target.value
+                            ? { eventType: e.target.value, occurrence: "FIRST" } : null })}>
+                          <option value="">study baseline (day 0)</option>
+                          {!cat && <option disabled>loading this study's events…</option>}
+                          {types.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        {a && <>
+                          <select value={a.occurrence || "FIRST"} disabled={busy}
+                            onChange={e => patchView(vi, { anchor: { ...a, occurrence: e.target.value } })}>
+                            <option value="FIRST">first</option><option value="LAST">last</option>
+                          </select>
+                          <span className="meta">where</span>
+                          <select value={a.key || ""} disabled={busy}
+                            onChange={e => patchView(vi, { anchor: e.target.value
+                              ? { ...a, key: e.target.value, value: (cat.values[a.eventType] || {})[e.target.value]?.[0] ?? "" }
+                              : { eventType: a.eventType, occurrence: a.occurrence || "FIRST" } })}>
+                            <option value="">(any)</option>
+                            {keys.map(k => <option key={k} value={k}>{k}</option>)}
+                          </select>
+                          {a.key && (
+                            <select value={a.value ?? ""} disabled={busy}
+                              onChange={e => patchView(vi, { anchor: { ...a, value: e.target.value } })}>
+                              {vals.map(x => <option key={x} value={x}>{x}</option>)}
+                            </select>
+                          )}
+                        </>}
+                        {busy && <span className="spinner" />}
+                      </div>
+                    );
+                  })()}
                   <KMChart curves={v.curves!} />
                   <div style={{ display: "flex", gap: "1.2rem", fontSize: "0.76rem", color: "var(--muted)", marginTop: "0.4rem", flexWrap: "wrap" }}>
                     {v.curves!.map((c, i: number) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: median {c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}

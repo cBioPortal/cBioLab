@@ -1,5 +1,6 @@
 import { chQuery, DB, STUDY, PORTAL } from "../../../lib/ch";
 import { catalogSqls, lineCatalogSqls, LINE_TYPE } from "../../../lib/compiler";
+import { survivalEndpointsSql } from "../../../lib/federation";
 
 const cache = new Map<string, unknown>(); // per-study, per server process
 
@@ -20,6 +21,10 @@ export async function GET(req: Request) {
         const pc = await chQuery("SELECT uniqExact(patient_unique_id) AS n FROM " + DB + ".sample_derived WHERE cancer_study_identifier = " + "'" + study.replace(/'/g, "") + "'");
         totalPatients = Number(pc.data[0].n);
       }
+      // which time-to-event endpoints this study declares, so the survival
+      // control can offer only what exists rather than a fixed OS/PFS list
+      const epRes = await chQuery(survivalEndpointsSql(study, DB)).catch(() => ({ data: [] as { endpoint: string }[] }));
+      const survivalEndpoints = (epRes.data as { endpoint: string }[]).map((r) => String(r.endpoint));
       const hasPriorMedFlag = Object.keys(values["Treatment"] || {}).includes("PRIOR_MED_TO_MSK");
       // synthetic event type: derived treatment lines (default gap 90d), queryable like any other event
       const lSqls = lineCatalogSqls(DB, study);
@@ -30,7 +35,7 @@ export async function GET(req: Request) {
         COMPOSITION: lCombos.data.map(r => r.combo)
       };
       keys[LINE_TYPE] = ["LINE_NO", "COMPOSITION"];
-      cache.set(study, { study, portal: PORTAL, totalPatients, hasPriorMedFlag, types, values, keys });
+      cache.set(study, { study, portal: PORTAL, totalPatients, hasPriorMedFlag, types, values, keys, survivalEndpoints });
     }
     return Response.json(cache.get(study));
   } catch (e) {
