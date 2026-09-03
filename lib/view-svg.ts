@@ -127,8 +127,13 @@ function hotspotsSvg(v: ViewResult, o: SvgOpts): string {
     const L = 10, Rr = 10, base = top + 62;
     const xx = (pos: number) => L + (W - L - Rr) * pos / axisMax;
     out.push(`<text x="8" y="${top + 12}" font-size="11" font-weight="600" fill="${p.ink}">${esc(g.gene)}</text>`);
+    // The variant count is capped at the aggregate layer (VARIANT_LIMIT), not
+    // here, so a gene with more positions than the cap loses long-tail variants
+    // silently unless this says so — matching the disclosure the web app already
+    // gives for the same data (a chat/MCP client must not see a quieter figure).
     out.push(`<text x="${8 + esc(g.gene).length * 7 + 8}" y="${top + 12}" font-size="10" fill="${p.muted}">` +
-      `${fmt(g.mutated)} mutated patients · ${g.variants.length} shown</text>`);
+      `${fmt(g.mutated)} mutated patients · ${g.variants.length} shown` +
+      (g.withheld ? ` of ${fmt(g.variants.length + g.withheld)} distinct changes` : "") + `</text>`);
     out.push(`<line x1="${L}" y1="${base}" x2="${W - Rr}" y2="${base}" stroke="${p.line}" stroke-width="2"/>`);
     for (const x2 of positioned) {
       const cx = xx(x2.pos!), h = 10 + 40 * x2.n / maxN, r = Math.max(2.5, Math.min(6, 2 + 4 * x2.n / maxN));

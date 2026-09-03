@@ -60,3 +60,22 @@ describe("figures scale uniformly", () => {
     assert.equal(viewTitle(survival("TP53 mut")), "OS survival — TP53 mut");
   });
 });
+
+describe("hotspots figures disclose the same caps the app UI does", () => {
+  test("a gene at the variant cap says so, matching the app's own wording", () => {
+    const v = { kind: "hotspots", cohorts: ["A"],
+      hotspots: [{ gene: "TP53", mutated: 4080, distinctVariants: 867,
+        withheld: 100,
+        variants: Array.from({ length: 100 }, (_, i) => ({ variant: "V" + i, type: "Missense_Mutation", pos: i + 1, n: 5, pct: 1 })) }] };
+    const svg = viewToSvg(v as any)!;
+    assert.ok(svg.includes("100 shown of 200 distinct changes"),
+      "must disclose the withheld count the same way the app UI does, not silently show a capped list");
+  });
+  test("a gene under the cap says nothing extra", () => {
+    const v = { kind: "hotspots", cohorts: ["A"],
+      hotspots: [{ gene: "KRAS", mutated: 10, distinctVariants: 2,
+        variants: [{ variant: "G12D", type: "Missense_Mutation", pos: 12, n: 6, pct: 60 }] }] };
+    const svg = viewToSvg(v as any)!;
+    assert.equal(svg.includes("distinct changes"), false);
+  });
+});
