@@ -39,7 +39,15 @@ export interface Instance {
 /** per (cohort, gene) alteration tallies — the compare view's atom */
 export interface GeneCounts { gene: string; profiled: number; altered: number; driver: number }
 /** (months, event) multiset — pools exactly across instances, carries no ids */
-export interface SurvivalCount { months: number; event: number; n: number }
+export interface SurvivalCount {
+  months: number; event: number; n: number;
+  /** delayed-entry time; absent means observed from time zero */
+  entry?: number;
+}
+/** How to re-anchor survival to a timeline event. */
+export interface SurvivalAnchor {
+  eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST";
+}
 /** Additive moments for one gene on a continuous profile. */
 export interface ProfileMoments { gene: string; n: number; sum: number; sumsq: number }
 /** One protein change and how many patients carry it. */
@@ -470,6 +478,65 @@ export function survivalCountsSql(cohortSql: string, study: string, db: string =
   );
 }
 
+/**
+ * Survival re-anchored to a timeline event, with the delayed entry that implies.
+ *
+ * The study's <X>_MONTHS is measured from the timeline's day 0 (in MSK-CHORD
+ * that is first sequencing). Anchoring at an earlier event — initial diagnosis,
+ * first treatment — moves the clock back by `-anchorDay` and makes the patient
+ * UNOBSERVABLE until day 0. Reporting that without also reporting the entry time
+ * would manufacture immortal time: every patient would appear to survive from
+ * the anchor to their sequencing, which is exactly what got them into the study.
+ *
+ * So this returns (entry, months, event, n): entry is the anchor-to-day-0 gap,
+ * months is anchor-to-outcome. Still four numbers and a count — no identifiers,
+ * still additive across sites.
+ */
+export function anchoredSurvivalSql(
+  cohortSql: string, study: string, db: string, endpoint: string,
+  anchor: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" }
+): string {
+  if (!ENDPOINT_RE.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
+  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  const months = endpoint + "_MONTHS", status = endpoint + "_STATUS";
+  const pick = anchor.occurrence === "LAST" ? "max" : "min";
+  const attrCond = anchor.key
+    ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data\n" +
+      "        WHERE key = " + sq(anchor.key) + " AND value = " + sq(String(anchor.value ?? "")) + ")\n"
+    : "";
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "os AS (\n" +
+    "  SELECT " + pid + " AS pid,\n" +
+    "         toFloat64OrNull(anyIf(attribute_value, attribute_name=" + sq(months) + ")) AS months,\n" +
+    "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
+    "  FROM " + db + ".clinical_data_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
+    "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    "),\n" +
+    "anch AS (\n" +
+    "  SELECT p.stable_id AS pid, " + pick + "(ce.start_date) AS day\n" +
+    "  FROM " + db + ".clinical_event ce\n" +
+    "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND ce.event_type = " + sq(anchor.eventType) + "\n" + attrCond +
+    "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    ")\n" +
+    // offset = months from anchor to day 0; only anchors at or before day 0 make
+    // sense as a start of follow-up, so later ones are dropped and counted.
+    "SELECT round(-anch.day / 30.4375, 4) AS entry,\n" +
+    "       round(os.months - anch.day / 30.4375, 4) AS m,\n" +
+    "       if(os.status LIKE '1%', 1, 0) AS ev, count() AS n\n" +
+    "FROM os INNER JOIN anch USING (pid)\n" +
+    "WHERE os.months IS NOT NULL AND anch.day <= 0\n" +
+    "GROUP BY entry, m, ev ORDER BY m"
+  );
+}
+
 /** Which (<X>_MONTHS, <X>_STATUS) pairs a study actually declares. Metadata only. */
 export function survivalEndpointsSql(study: string, db: string = DB): string {
   return (
@@ -519,7 +586,7 @@ export interface AggregateCapable {
   /** cohort size — a count, not a roster */
   count(def: CohortDef | null | undefined): Promise<number>;
   geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]>;
-  survivalCounts(def: CohortDef | null | undefined, endpoint?: string): Promise<SurvivalCount[]>;
+  survivalCounts(def: CohortDef | null | undefined, endpoint?: string, anchor?: SurvivalAnchor | null): Promise<SurvivalCount[]>;
   /** endpoints this participant can answer for; [] when it cannot say */
   survivalEndpoints(): Promise<string[]>;
   pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
@@ -592,10 +659,15 @@ abstract class BaseResolver implements AggregateCapable {
       gene: x.gene, profiled: Number(x.profiled), altered: Number(x.altered), driver: Number(x.driver)
     }));
   }
-  async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS"): Promise<SurvivalCount[]> {
-    const r = await this.runLogged<ChRow>("survivalCounts:" + endpoint,
-      survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db, endpoint), this.instance.conn);
-    return r.data.map((x) => ({ months: Number(x.m), event: Number(x.ev), n: Number(x.n) }));
+  async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS", anchor?: SurvivalAnchor | null): Promise<SurvivalCount[]> {
+    const sql = anchor
+      ? anchoredSurvivalSql(this.cohortSql(def), this.study, this.instance.conn.db, endpoint, anchor)
+      : survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db, endpoint);
+    const r = await this.runLogged<ChRow>("survivalCounts:" + endpoint + (anchor ? "@" + anchor.eventType : ""), sql, this.instance.conn);
+    return r.data.map((x) => ({
+      months: Number(x.m), event: Number(x.ev), n: Number(x.n),
+      ...(anchor ? { entry: Number(x.entry) } : {})
+    }));
   }
   async survivalEndpoints(): Promise<string[]> {
     const r = await chQuery<ChRow>(survivalEndpointsSql(this.study, this.instance.conn.db), this.instance.conn)
@@ -755,8 +827,10 @@ export async function resolverFor(study: string, ctx: Partial<CompileCtx>): Prom
 }
 
 /** Expand pooled (months, event, n) triples into KM input records. */
-export function expandSurvivalCounts(counts: SurvivalCount[]): { t: number; event: number }[] {
-  const out: { t: number; event: number }[] = [];
-  for (const c of counts) for (let i = 0; i < c.n; i++) out.push({ t: c.months, event: c.event });
+export function expandSurvivalCounts(counts: SurvivalCount[]): { t: number; event: number; entry?: number }[] {
+  const out: { t: number; event: number; entry?: number }[] = [];
+  for (const c of counts)
+    for (let i = 0; i < c.n; i++)
+      out.push(c.entry == null ? { t: c.months, event: c.event } : { t: c.months, event: c.event, entry: c.entry });
   return out;
 }

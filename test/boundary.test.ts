@@ -21,7 +21,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
-  carriesPatientIds, geneCountsSql, survivalCountsSql, survivalEndpointsSql, pairCountsSql,
+  carriesPatientIds, geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
   clinicalCountsSql, clinicalMomentsSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
@@ -182,6 +182,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "survivalCountsSql": () => survivalCountsSql(cohortSql, "x", "db"),
     "survivalCountsSql:PFS": () => survivalCountsSql(cohortSql, "x", "db", "PFS"),
     "survivalEndpointsSql": () => survivalEndpointsSql("x", "db"),
+    "anchoredSurvivalSql": () => anchoredSurvivalSql(cohortSql, "x", "db", "OS", { eventType: "Treatment", key: "SUBTYPE", value: "Chemo", occurrence: "FIRST" }),
     "pairCountsSql": () => pairCountsSql(cohortSql, [["TP53", "KRAS"], ["EGFR", "ALK"]], "x", "db"),
     "clinicalCountsSql": () => clinicalCountsSql(cohortSql, ["SEX", "CANCER_TYPE"], "x", "db"),
     "clinicalMomentsSql": () => clinicalMomentsSql(cohortSql, ["CURRENT_AGE_DEID"], "x", "db"),

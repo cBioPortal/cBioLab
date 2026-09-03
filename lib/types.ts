@@ -113,6 +113,12 @@ export interface SurvivalView {
   kind: "survival"; cohorts?: string[];
   /** endpoint prefix: OS (default), PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS */
   endpoint?: string;
+  /**
+   * Re-anchor the clock to a timeline event instead of the study's day 0.
+   * Delayed entry is applied automatically — without it, anchoring earlier than
+   * day 0 manufactures immortal time.
+   */
+  anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
 }
 export interface CooccurrenceView { kind: "cooccurrence"; genes: string[]; cohorts?: string[] }
 export interface ClinicalView { kind: "clinical"; attributes: string[]; cohorts?: string[] }
@@ -247,6 +253,10 @@ export interface ViewResult {
   rows?: CompareRow[];                      // compare
   curves?: KmCurve[]; caveat?: string;      // survival
   endpoint?: string;                        // survival: which endpoint was used
+  anchoredTo?: string;                      // survival: the event the clock was reset to
+  truncated?: boolean;                      // survival: delayed entry was applied
+  /** survival: how long after the anchor patients became observable */
+  entryMonths?: { median: number; p90: number; max: number };
   logrank?: LogRank; logrankPooled?: LogRank;
   pairs?: CooccurRow[];                     // cooccurrence
   clinical?: ClinicalRow[];                 // clinical comparison

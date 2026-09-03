@@ -209,11 +209,17 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) {
         views.push({ kind: "survival", error: "bad survival endpoint '" + endpoint.slice(0, 40) + "'" }); continue;
       }
+      const rawAnchor = (view as SurvivalView).anchor;
+      const anchor = rawAnchor && rawAnchor.eventType
+        ? { eventType: String(rawAnchor.eventType).slice(0, 120),
+            ...(rawAnchor.key ? { key: String(rawAnchor.key).slice(0, 120), value: String(rawAnchor.value ?? "") } : {}),
+            ...(rawAnchor.occurrence === "LAST" ? { occurrence: "LAST" as const } : { occurrence: "FIRST" as const }) }
+        : null;
       const perSite = new Map<string, Map<string, SurvivalCount[]>>(); // cohort -> study -> triples
       for (const n of vNames) perSite.set(n, new Map());
       await Promise.all(vNames.flatMap((n) =>
         cohorts[n].studies.map(async (st) => {
-          perSite.get(n)!.set(st, await resolvers[st].survivalCounts(doc.cohorts[n], endpoint));
+          perSite.get(n)!.set(st, await resolvers[st].survivalCounts(doc.cohorts[n], endpoint, anchor));
         })));
       // A study with nothing for this endpoint must be named, not silently
       // dropped from a curve — its patients would otherwise just be missing.
@@ -252,11 +258,41 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
           logrank = pooledTest;
         }
       }
+      // How long after the anchor patients actually became observable. A long
+      // tail here is a warning about the anchor itself — "first Diagnosis" in a
+      // study that records prior unrelated cancers can sit decades back.
+      let entryMonths: { median: number; p90: number; max: number } | undefined;
+      if (anchor) {
+        const es: number[] = [];
+        for (const byStudy of perSite.values())
+          for (const rows of byStudy.values())
+            for (const r of rows) if (r.entry != null) for (let i = 0; i < r.n; i++) es.push(r.entry);
+        if (es.length) {
+          es.sort((x, y) => x - y);
+          const at = (q: number) => Math.round(es[Math.floor(q * (es.length - 1))] * 10) / 10;
+          entryMonths = { median: at(0.5), p90: at(0.9), max: at(1) };
+        }
+      }
       views.push({ kind: "survival", cohorts: vNames, curves, endpoint,
+        ...(entryMonths ? { entryMonths } : {}),
+        ...(anchor ? { anchoredTo: anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : ""), truncated: true } : {}),
         participation: participationFor(vStudies, false),
         ...(logrank ? { logrank } : {}), ...(logrankPooled ? { logrankPooled } : {}),
-        caveat: endpoint + " from each study's own baseline (left truncation applies" +
-          (vStudies.length > 1 ? "; baselines are NOT harmonized across studies" : "") + "); status '0:...' treated as censored." +
+        caveat: (anchor
+          ? endpoint + " re-anchored to " + anchor.occurrence!.toLowerCase() + " " + anchor.eventType +
+            (anchor.key ? " where " + anchor.key + "=" + anchor.value : "") +
+            ". LEFT TRUNCATION IS APPLIED: each patient enters the risk set only when the study could first observe them" +
+            " (its timeline day 0), not at the anchor — without that, everyone would appear to survive from the anchor to" +
+            " their entry, which is exactly what put them in the study. Patients whose anchor event falls after day 0," +
+            " or who have no such event, are excluded rather than given a negative follow-up time" +
+            (entryMonths
+              ? ". Patients became observable a median of " + entryMonths.median + " months after the anchor" +
+                " (90th percentile " + entryMonths.p90 + ", longest " + entryMonths.max + ") — a long tail here means the" +
+                " anchor is matching earlier events than you may intend"
+              : "")
+          : endpoint + " from each study's own baseline (left truncation applies") +
+          (anchor ? "" : (vStudies.length > 1 ? "; baselines are NOT harmonized across studies" : "") + ")") +
+          " Status '0:...' treated as censored." +
           endpointHelp +
           (logrankPooled
             ? " The log-rank test is STRATIFIED by study (" + logrank!.strata + " strata contributed events): each study is" +

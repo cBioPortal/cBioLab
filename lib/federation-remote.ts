@@ -12,7 +12,7 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, ExploreResult } from "./types.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, ProfileMoments, QueryLogEntry } from "./federation.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, ProfileMoments, QueryLogEntry, SurvivalAnchor } from "./federation.ts";
 import { carriesPatientIds } from "./federation.ts";
 
 interface RemoteAggregates {
@@ -148,10 +148,10 @@ export class RemoteAggregateResolver implements AggregateCapable {
     this.remember(r);
     return r.geneCounts;
   }
-  async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS"): Promise<SurvivalCount[]> {
+  async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS", anchor?: SurvivalAnchor | null): Promise<SurvivalCount[]> {
     this.guard(def);
     const r = await mcpCall(this.url, "federated_aggregates",
-      { study: this.study, cohort: def || {}, survival: true, endpoint });
+      { study: this.study, cohort: def || {}, survival: true, endpoint, ...(anchor ? { anchor } : {}) });
     this.remember(r);
     return r.survivalCounts;
   }

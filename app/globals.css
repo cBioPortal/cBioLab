@@ -469,3 +469,10 @@ details.gearmenu > .gearmenu-items {
 }
 .viewcard:hover .removeview { color: var(--ink); border-color: var(--muted); }
 .removeview:hover { background: var(--code-bg); color: #D55E00; border-color: #D55E00; }
+
+/* Survival: delayed-entry marker */
+.trunc {
+  font-size: 0.68rem; padding: 0.1rem 0.5rem; border-radius: 999px; white-space: nowrap; cursor: help;
+  color: #B45309; background: color-mix(in oklab, #B45309 12%, transparent);
+  border: 1px solid color-mix(in oklab, #B45309 35%, transparent);
+}
