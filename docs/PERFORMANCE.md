@@ -220,3 +220,16 @@ on.
   target.
 - **The 20 k id ceiling** should be lifted before anyone tries a real
   sample-list workflow.
+
+## Clinical course (`course` view)
+
+Measured on `msk_chord_2024`, 24,950 patients, two cohorts, two event types, 3-month bins over
+−12…60 months: **~700–900ms** server wall-clock, of which under 25ms is drawing the SVG. That is
+two queries per cohort (a structural `timelineSpan` probe and the binned `eventCourse`), run
+concurrently.
+
+The first prototype cross-joined every patient against every bin and took **881ms for one
+cohort**. Computing each span's bin range arithmetically instead — `floor((day - anchor) / w)`,
+clamped to the window — brought the same query to **277ms**, because the bin range is derived per
+row rather than materialized as a product. The clamp matters for more than speed: `msk_met_2021`
+anchors ~6,266 days from day 0, which without clamping is a 2,000-bin range per patient.

@@ -1,0 +1,96 @@
+// Canonical names for timeline events (`clinical_event.event_type`) and their
+// attribute keys. Shared by the server engine and the client UI — keep this
+// module dependency-free so both can import it, and never fork the logic
+// (same rule as lib/profile-names.ts).
+//
+// WHY THIS EXISTS, and why it does so little.
+//
+// Study curators spell the same concept differently: `Treatment` appears in 87
+// studies and `TREATMENT` in 10; `Sample acquisition`, `Sample Acquisition` and
+// `SAMPLE ACQUISITION` are three spellings of one thing; even the attribute key
+// is written both `TREATMENT_TYPE` and `Treatment_TYPE`. A chart that treats
+// those as different event types silently splits a cohort in half.
+//
+// Measured against the live database, case-folding alone is *sufficient* for
+// the names this engine keys off:
+//
+//            distinct   case-folded   merges   residual separator-only pairs
+//   event_type     38            25       13                            0
+//   attribute keys 240          231        9                            0
+//   attr. values   212          193       19                            5
+//
+// Zero residual collisions for event types and keys means no pair of names
+// differs only by a separator, space or punctuation — so case-folding catches
+// every duplicate that normalization can detect at all, and there is nothing
+// left for a cleverer rule to find.
+//
+// Whitespace is trimmed too, because values like "xrt" and "xrt " differ by a
+// data-entry artifact rather than a naming convention.
+//
+// NOTHING BEYOND CASE AND TRIM. The next rule up — folding hyphens, commas or
+// internal spaces — would merge `beta blocker` with `beta-blocker` (fine) and
+// is one short step from deciding `Targeted Therapy` and `Targeted Molecular
+// Therapy` name the same class (they do not: one is a category, the other a
+// member of it). Where two spellings survive, they stay visible and the reader
+// decides. Guessing here does not crash anything; it draws a believable, wrong
+// chart, which is worse.
+//
+// This is a GROUPING AND DISPLAY concept, not a query rewrite. The database
+// stores the variants as distinct literals, so SQL matching a canonical name
+// must match every variant — see `eventTypeMatchSql` in lib/federation.ts.
+
+/** The grouping key for an event type or attribute key. Case + whitespace only. */
+export function canonicalEventName(raw: string): string {
+  return String(raw ?? "").trim().toLowerCase();
+}
+
+/** One canonical event name and the spellings that folded into it. */
+export interface FoldedName {
+  /** the grouping key — lowercase, trimmed */
+  canonical: string;
+  /** what to show a human: the most frequent original spelling */
+  label: string;
+  /** every original spelling seen, most frequent first; length > 1 means a fold happened */
+  variants: string[];
+  /** summed weight across the variants (patients, events — the caller decides) */
+  n: number;
+}
+
+/**
+ * Group raw spellings under their canonical form, keeping the variants so the
+ * fold can be disclosed rather than hidden. The display label is the most
+ * frequent spelling, so a chart says "Treatment", not "treatment".
+ */
+export function foldEventNames(rows: { name: string; n: number }[]): FoldedName[] {
+  const by = new Map<string, { name: string; n: number }[]>();
+  for (const r of rows) {
+    const c = canonicalEventName(r.name);
+    if (!c) continue;
+    const list = by.get(c);
+    if (list) list.push(r); else by.set(c, [r]);
+  }
+  return [...by.entries()]
+    .map(([canonical, list]) => {
+      const sorted = [...list].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+      return {
+        canonical,
+        label: sorted[0].name,
+        variants: sorted.map((x) => x.name),
+        n: sorted.reduce((t, x) => t + x.n, 0)
+      };
+    })
+    .sort((a, b) => b.n - a.n || a.canonical.localeCompare(b.canonical));
+}
+
+/**
+ * Human-readable note naming the spellings folded together, or "" when nothing
+ * folded. Goes into the caveat so a reader can see the merge and undo it
+ * mentally — the difference between this and a silent harmonization.
+ */
+export function foldNote(folded: FoldedName[]): string {
+  const merged = folded.filter((f) => f.variants.length > 1);
+  if (!merged.length) return "";
+  return "Event names differing only in case were treated as one: " +
+    merged.map((f) => f.variants.join(" = ")).join("; ") +
+    ". No other spelling differences were merged.";
+}

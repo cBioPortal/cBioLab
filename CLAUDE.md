@@ -35,6 +35,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   iframe). **`lib/view-svg.ts`** — the same contract for every other view kind (survival,
   hotspots, compare, cooccurrence, coexpression, clinical); used by the in-app chat today and
   by MCP `run_analysis` for the oncoprint image.
+- **`lib/event-names.ts`** — **THE only place timeline event names are normalized.** Case-fold and
+  trim, nothing else; measured to be complete for event types and attribute keys (zero residual
+  collisions). Folds are disclosed in the caveat, never silent. Do not fork it.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
 - **`app/analysis/page.tsx`** — the app: Chat / Explore (study checkboxes + facets) / Cohorts /
   Analysis / Examples. The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
@@ -86,8 +89,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
 - Test: `npm test` — unit suites, no database needed (the patient-data boundary, the stats used by
-  federated views, cohort-definition semantics, and the SVG figure renderers;
-  86 checks across 5 suites). `node e2e.cjs` — 61 checks (Playwright + docs gate + the boundary suite).
+  federated views, cohort-definition semantics, clinical-course semantics, and the SVG figure
+  renderers; 116 checks across 6 suites). `node e2e.cjs` — 62 checks (Playwright + docs gate + the
+  boundary suite).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push `analysis`. **Stop there.**

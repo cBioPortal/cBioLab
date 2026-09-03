@@ -344,6 +344,23 @@ export default function AnalysisPage() {
     if (explore && explore.clinical) return explore.clinical.slice(0, 4).map((c: any) => c.attribute);
     return [];
   };
+  /**
+   * Timeline event types this study actually has, most common first, folded by
+   * case so `Treatment` and `TREATMENT` offer one choice — the same fold the
+   * engine applies (lib/event-names.ts).
+   */
+  const viewEvents = (): { canonical: string; label: string; n: number }[] => {
+    const raw: { type: string; n: number }[] = (explore && explore.events) || [];
+    const by = new Map<string, { canonical: string; label: string; n: number }>();
+    for (const e of raw) {
+      const c = String(e.type).trim().toLowerCase();
+      if (!c) continue;
+      const cur = by.get(c);
+      if (cur) { cur.n += e.n; if (e.n > 0 && e.type.length < cur.label.length) cur.label = e.type; }
+      else by.set(c, { canonical: c, label: e.type, n: e.n });
+    }
+    return [...by.values()].sort((a, b) => b.n - a.n);
+  };
   /** a continuous profile for co-expression / heatmaps, if this study has one */
   const contProfile = (): string | null => {
     const ps = (explore && explore.profiles) || [];
@@ -359,7 +376,10 @@ export default function AnalysisPage() {
     { kind: "clinical", label: "Clinical comparison",
       why: () => viewAttrs().length ? null : "no clinical attributes known yet — open Explore once so the app can read this study's attributes" },
     { kind: "coexpression", label: "Co-expression",
-      why: () => contProfile() ? null : "this study has no continuous molecular profile (mRNA z-scores) to correlate" }
+      why: () => contProfile() ? null : "this study has no continuous molecular profile (mRNA z-scores) to correlate" },
+    { kind: "course", label: "Clinical course",
+      why: () => viewEvents().length ? null
+        : "no timeline events known yet — open Explore once so the app can read this study's event types (only 131 of 545 studies have any)" }
   ];
 
   /** Drop one view from the document and re-run what is left. */
@@ -378,6 +398,15 @@ export default function AnalysisPage() {
       : kind === "clinical" ? { kind, attributes: viewAttrs() }
       : kind === "coexpression" ? { kind, genes: genes.slice(0, 5), profileType: contProfile() }
       : kind === "hotspots" ? { kind, genes: genes.slice(0, 4), minCount: 1 }
+      : kind === "course" ? (() => {
+          const evs = viewEvents();
+          // Anchor on treatment when the study has it — a real clinical landmark
+          // — otherwise on its commonest event, so the axis means something.
+          const anchorOn = evs.find(e => /treat/.test(e.canonical)) || evs[0];
+          return { kind, eventTypes: evs.slice(0, 2).map(e => e.canonical),
+                   ...(anchorOn ? { anchor: { eventType: anchorOn.label, occurrence: "FIRST" } } : {}),
+                   binMonths: 3, fromMonths: -12, toMonths: 60 };
+        })()
       : kind === "cooccurrence" ? { kind, genes: genes.slice(0, 6) }
       : kind === "oncoprint" ? { kind, genes: genes.slice(0, 5) }
       : { kind, genes };
@@ -1756,6 +1785,25 @@ export default function AnalysisPage() {
                     </div>
                   )}
                   <p className="note">{v.caveat}</p>
+                </>}
+                {v.kind === "course" && v.svg && <>
+                  <div className="row" style={{ alignItems: "baseline" }}>
+                    <h2 style={{ margin: 0 }}>Clinical course <span className="plain">
+                      — {[...new Set((v.course || []).map(c => c.eventType))].join(", ")}
+                      {v.anchoredTo ? "" : ""} · {v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
+                    <span className="spacer" />
+                    <>{v.ms != null && (
+                      <span className="lat" title={
+                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
+                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying \u00b7 " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
+                        {v.ms.toLocaleString()}ms
+                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
+                      </span>
+                    )}<Participation p={v.participation} /></>
+                  </div>
+                  {/* The same SVG the chat and MCP clients receive \u2014 one renderer,
+                      so the figure cannot differ between surfaces. */}
+                  <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
                 {v.kind === "oncoprint" && v.svg && <>
                   <div className="row" style={{ alignItems: "baseline" }}>

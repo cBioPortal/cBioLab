@@ -21,6 +21,7 @@
 // (document-level federation) behind the same interface.
 import { chQuery, DB, PRIMARY, connections, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
+import { canonicalEventName } from "./event-names.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { genomicEventsSql, coverageSql } from "./oncoprint.ts";
 import type { CohortDef, CompileCtx, ChRow, ChResult } from "./types.ts";
@@ -553,6 +554,192 @@ export function survivalEndpointsSql(study: string, db: string = DB): string {
 }
 
 // ---------------------------------------------------------------------------
+// Timeline: alignment and the clinical course
+// ---------------------------------------------------------------------------
+
+/** Days per month, matching the constant survival already uses. */
+const DAYS_PER_MONTH = 30.4375;
+
+/**
+ * Match an event type by CANONICAL name. Curators spell one concept several
+ * ways (`Treatment` / `TREATMENT`), and the database stores those as distinct
+ * literals, so a canonical name has to match case-insensitively at the column.
+ * See lib/event-names.ts for why case+trim is the whole rule.
+ */
+function eventTypeMatchSql(col: string, canonical: string): string {
+  return "lower(trim(" + col + ")) = " + sq(canonicalEventName(canonical));
+}
+
+/**
+ * What a cohort's timeline looks like STRUCTURALLY, per event type: how many
+ * patients, how many distinct days it spans, and how many of its events carry a
+ * real duration (`stop_date` beyond `start_date`).
+ *
+ * Two jobs. It powers the degenerate-timeline gate — 17 of the 131 studies with
+ * timeline rows put every event on a single day, and without this they render an
+ * empty chart instead of an error. And `interval_events` is how the course view
+ * decides to draw a band rather than a mark, WITHOUT consulting the event's
+ * name: empirically only treatments carry duration, but that is a fact to be
+ * read off the data, not hardcoded from a spelling.
+ */
+export function timelineSpanSql(cohortSql: string, study: string, db: string = DB): string {
+  const pid = "p.stable_id";
+  return (
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT ce.event_type AS et,\n" +
+    "       uniqExact(" + pid + ") AS pts,\n" +
+    "       count() AS events,\n" +
+    "       uniqExact(ce.start_date) AS days,\n" +
+    "       min(ce.start_date) AS first_day,\n" +
+    "       max(ce.start_date) AS last_day,\n" +
+    "       countIf(ce.stop_date IS NOT NULL AND ce.stop_date != ce.start_date) AS interval_events\n" +
+    "FROM " + db + ".clinical_event ce\n" +
+    "JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+    "  AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "GROUP BY et ORDER BY pts DESC"
+  );
+}
+
+/** One event type's structural footprint in a cohort's timeline. */
+export interface TimelineSpan {
+  /** the spelling as stored; fold with canonicalEventName for grouping */
+  eventType: string;
+  patients: number; events: number;
+  /** distinct days — 1 means the study records no temporal information at all */
+  days: number;
+  firstDay: number; lastDay: number;
+  /** events with a real duration; >0 means draw a band, not a mark */
+  intervalEvents: number;
+}
+
+/** One (bin, state) cell. `eventType: ''` is the at-risk denominator. */
+export interface CourseCount { bin: number; eventType: string; n: number }
+
+export interface CourseOpts {
+  /** align on this event; null aligns on the study's own day 0 (single study only) */
+  anchor: SurvivalAnchor | null;
+  /** canonical event names to measure */
+  eventTypes: string[];
+  /** bin width in months */
+  binMonths: number;
+  /** inclusive bin index range, relative to the anchor */
+  from: number;
+  to: number;
+}
+
+/**
+ * The clinical course: for each time bin relative to the anchor, how many
+ * patients were still observable and how many were in each event state.
+ *
+ * BIN ARITHMETIC. Bins are half-open, `[anchor + b*w, anchor + (b+1)*w)`, and a
+ * span `[s, e]` occupies every bin from `floor((s-anchor)/w)` to
+ * `floor((e-anchor)/w)`. Half-open matters: with closed bins the anchoring
+ * treatment itself spills into the bin *before* the anchor and reports 100% of
+ * the cohort already on treatment before their first treatment. Point events
+ * (`stop_date` null or equal) fall out of the same formula with s == e, so
+ * there is one code path, not two.
+ *
+ * DENOMINATOR. Not the whole cohort — the patients still under observation in
+ * that bin, which is the at-risk logic Kaplan-Meier uses. Without it a curve
+ * decays merely because follow-up ran out. Observation runs from the patient's
+ * first recorded event (the same left-truncation notion `anchoredSurvivalSql`
+ * applies) to their last contact: the later of their last recorded event and
+ * their OS follow-up where the study declares one.
+ *
+ * Rows come back as (bin, et, n); `et = ''` carries the at-risk denominator.
+ */
+export function eventCourseSql(
+  cohortSql: string, study: string, db: string, opts: CourseOpts
+): string {
+  const w = Math.max(1, Number(opts.binMonths) || 3) * DAYS_PER_MONTH;
+  const lo = Math.floor(Number(opts.from)), hi = Math.floor(Number(opts.to));
+  if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi < lo) throw new Error("bad course window");
+  const types = [...new Set((opts.eventTypes || []).map(canonicalEventName).filter(Boolean))].slice(0, 8);
+  if (!types.length) throw new Error("course view needs at least one event type");
+  const anchor = opts.anchor;
+  const pid = "p.stable_id";
+  const studyWhere =
+    "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n";
+
+  // Anchor day per patient. Without an anchor every patient aligns on day 0,
+  // which is only meaningful inside one study — the caller enforces that.
+  const anchCte = anchor
+    ? "anch AS (\n" +
+      "  SELECT " + pid + " AS pid, " + (anchor.occurrence === "LAST" ? "max" : "min") + "(ce.start_date) AS day\n" +
+      "  FROM " + db + ".clinical_event ce\n" + studyWhere +
+      "    AND " + eventTypeMatchSql("ce.event_type", anchor.eventType) + "\n" +
+      (anchor.key
+        ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data\n" +
+          "        WHERE lower(trim(key)) = " + sq(canonicalEventName(anchor.key)) +
+          " AND value = " + sq(String(anchor.value ?? "")) + ")\n"
+        : "") +
+      "  GROUP BY pid\n" +
+      ")"
+    : "anch AS (\n" +
+      "  SELECT DISTINCT " + pid + " AS pid, CAST(0 AS Int64) AS day\n" +
+      "  FROM " + db + ".clinical_event ce\n" + studyWhere +
+      ")";
+
+  // Bins a [s,e] span occupies, clamped to the window so an anchor far from
+  // day 0 (birth-anchored studies sit ~6000 days out) cannot explode the range.
+  const binsOf = (s: string, e: string) =>
+    "range(\n" +
+    "    toInt32(greatest(floor((" + s + " - a.day) / " + w + "), " + lo + ")),\n" +
+    "    toInt32(least(floor((" + e + " - a.day) / " + w + "), " + hi + ")) + 1)";
+
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" + anchCte + ",\n" +
+    // Observation window: first recorded event to last contact.
+    "os AS (\n" +
+    "  SELECT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid,\n" +
+    "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) * " + DAYS_PER_MONTH + " AS os_day\n" +
+    "  FROM " + db + ".clinical_data_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient'\n" +
+    "    AND attribute_name = 'OS_MONTHS'\n" +
+    "  GROUP BY pid\n" +
+    "),\n" +
+    "span AS (\n" +
+    "  SELECT " + pid + " AS pid, min(ce.start_date) AS entry,\n" +
+    "         max(coalesce(ce.stop_date, ce.start_date)) AS last_ev\n" +
+    "  FROM " + db + ".clinical_event ce\n" + studyWhere +
+    "  GROUP BY pid\n" +
+    "),\n" +
+    // last_ev is Int64 and os_day Float64; cast so greatest() has a supertype.
+    "obs AS (\n" +
+    "  SELECT sp.pid AS pid, toFloat64(sp.entry) AS entry,\n" +
+    "         greatest(toFloat64(sp.last_ev), coalesce(os.os_day, toFloat64(sp.last_ev))) AS last_day\n" +
+    "  FROM span sp LEFT JOIN os ON os.pid = sp.pid\n" +
+    "),\n" +
+    // Denominator: one row per (patient, bin) they were observable in.
+    "denom AS (\n" +
+    "  SELECT arrayJoin(" + binsOf("o.entry", "o.last_day") + ") AS bin, o.pid AS pid, '' AS et\n" +
+    "  FROM obs o JOIN anch a ON a.pid = o.pid\n" +
+    "),\n" +
+    // Numerator: one row per (patient, bin, event type) the patient was in that
+    // state. Half-open bins via floor() — see the note above.
+    "numer AS (\n" +
+    "  SELECT arrayJoin(" + binsOf("ce.start_date", "coalesce(ce.stop_date, ce.start_date)") + ") AS bin,\n" +
+    "         " + pid + " AS pid, lower(trim(ce.event_type)) AS et\n" +
+    "  FROM " + db + ".clinical_event ce\n" +
+    "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "  JOIN anch a ON a.pid = " + pid + "\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND lower(trim(ce.event_type)) IN (" + types.map(sq).join(", ") + ")\n" +
+    ")\n" +
+    "SELECT bin, et, uniqExact(pid) AS n\n" +
+    "FROM (SELECT bin, pid, et FROM denom UNION ALL SELECT bin, pid, et FROM numer)\n" +
+    "GROUP BY bin, et ORDER BY bin, et"
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Resolvers
 // ---------------------------------------------------------------------------
 
@@ -589,6 +776,10 @@ export interface AggregateCapable {
   survivalCounts(def: CohortDef | null | undefined, endpoint?: string, anchor?: SurvivalAnchor | null): Promise<SurvivalCount[]>;
   /** endpoints this participant can answer for; [] when it cannot say */
   survivalEndpoints(): Promise<string[]>;
+  /** structural shape of this cohort's timeline, per event type */
+  timelineSpan(def: CohortDef | null | undefined): Promise<TimelineSpan[]>;
+  /** per-bin clinical course; `et: ''` rows carry the at-risk denominator */
+  eventCourse(def: CohortDef | null | undefined, opts: CourseOpts): Promise<CourseCount[]>;
   pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
   attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]>;
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
@@ -673,6 +864,22 @@ abstract class BaseResolver implements AggregateCapable {
     const r = await chQuery<ChRow>(survivalEndpointsSql(this.study, this.instance.conn.db), this.instance.conn)
       .catch(() => ({ data: [] as ChRow[] }));
     return r.data.map((x) => String(x.endpoint));
+  }
+  async timelineSpan(def: CohortDef | null | undefined): Promise<TimelineSpan[]> {
+    const sql = timelineSpanSql(this.cohortSql(def), this.study, this.instance.conn.db);
+    const r = await this.runLogged<ChRow>("timelineSpan", sql, this.instance.conn);
+    return r.data.map((x) => ({
+      eventType: String(x.et), patients: Number(x.pts), events: Number(x.events),
+      days: Number(x.days), firstDay: Number(x.first_day), lastDay: Number(x.last_day),
+      intervalEvents: Number(x.interval_events)
+    }));
+  }
+  async eventCourse(def: CohortDef | null | undefined, opts: CourseOpts): Promise<CourseCount[]> {
+    const sql = eventCourseSql(this.cohortSql(def), this.study, this.instance.conn.db, opts);
+    const label = "eventCourse:" + (opts.anchor ? "@" + opts.anchor.eventType : "day0") +
+      "/" + opts.binMonths + "mo";
+    const r = await this.runLogged<ChRow>(label, sql, this.instance.conn);
+    return r.data.map((x) => ({ bin: Number(x.bin), eventType: String(x.et), n: Number(x.n) }));
   }
   async profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]> {
     if (!genes.length || !profileType) return [];

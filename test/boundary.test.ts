@@ -23,6 +23,7 @@ import { readFileSync } from "node:fs";
 import {
   carriesPatientIds, geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
   clinicalCountsSql, clinicalMomentsSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
+  timelineSpanSql, eventCourseSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
 import * as federation from "../lib/federation.ts";
@@ -190,7 +191,15 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "variantCountsSql": () => variantCountsSql(cohortSql, ["KRAS", "BRAF"], "x", 1, "db"),
     "variantCountsSql:suppressed": () => variantCountsSql(cohortSql, ["KRAS"], "x", 5, "db"),
     "geneMutationTotalsSql": () => geneMutationTotalsSql(cohortSql, ["KRAS"], "x", "db"),
-    "profileMomentsSql": () => profileMomentsSql(cohortSql, ["ERBB2"], "rna_seq_v2_mrna_median_Zscores", "x", "db")
+    "profileMomentsSql": () => profileMomentsSql(cohortSql, ["ERBB2"], "rna_seq_v2_mrna_median_Zscores", "x", "db"),
+    "timelineSpanSql": () => timelineSpanSql(cohortSql, "x", "db"),
+    // A course aligned on an event, and one aligned on the study's own day 0 —
+    // structurally different SQL (the anchor CTE differs), so cover both.
+    "eventCourseSql": () => eventCourseSql(cohortSql, "x", "db", {
+      anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Chemo", occurrence: "FIRST" },
+      eventTypes: ["treatment", "surgery"], binMonths: 3, from: -4, to: 20 }),
+    "eventCourseSql:day0": () => eventCourseSql(cohortSql, "x", "db", {
+      anchor: null, eventTypes: ["treatment"], binMonths: 1, from: 0, to: 12 })
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

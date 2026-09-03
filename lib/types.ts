@@ -134,6 +134,26 @@ export interface CooccurrenceView { kind: "cooccurrence"; genes: string[]; cohor
 export interface ClinicalView { kind: "clinical"; attributes: string[]; cohorts?: string[] }
 export interface CoexpressionView { kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[] }
 export interface HotspotsView { kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number }
+/**
+ * The clinical course: what fraction of the still-observable cohort is in each
+ * event state, over time relative to an anchor.
+ *
+ * `anchor` is optional for a single study (its own day 0 is a consistent
+ * baseline) but REQUIRED once more than one study participates: day 0 means
+ * different things in different studies — birth in one, first sequencing in
+ * another — and the database records nowhere which it is, so aligning on raw
+ * day 0 across studies compares incomparable clocks.
+ */
+export interface CourseView {
+  kind: "course"; cohorts?: string[];
+  /** canonical event names to measure; case is folded (lib/event-names.ts) */
+  eventTypes: string[];
+  anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
+  /** bin width in months (default 3) */
+  binMonths?: number;
+  /** window in months relative to the anchor (default -12 to 60) */
+  fromMonths?: number; toMonths?: number;
+}
 export interface HeatmapSpec {
   profileType: string; genes?: string[];
   /**
@@ -150,7 +170,7 @@ export interface OncoprintView {
   kind: "oncoprint"; genes: string[]; cohorts?: string[];
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: string[];
 }
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView;
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView;
 
 export interface AnalysisDoc {
   study?: string;
@@ -272,8 +292,30 @@ export interface ViewResult {
   clinical?: ClinicalRow[];                 // clinical comparison
   coexpression?: CoexprRow[];               // co-expression
   hotspots?: HotspotGene[];                 // hotspots / lollipop
+  course?: CourseSeries[];                  // clinical course
+  /** course: bin width and window actually used, in months */
+  courseAxis?: { binMonths: number; from: number; to: number };
   svg?: string; nColumns?: number;          // oncoprint
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
+}
+/** One cohort x event-type line of the clinical course. */
+export interface CourseSeries {
+  cohort: string;
+  /** display spelling of the event type; `variants` records what folded into it */
+  eventType: string; variants: string[];
+  /** true when this event type carries real durations, so it reads as a state */
+  isInterval: boolean;
+  points: CoursePoint[];
+}
+export interface CoursePoint {
+  /** months from the anchor at the START of the half-open bin */
+  t: number;
+  /** patients still under observation in this bin — the denominator */
+  atRisk: number;
+  /** patients in this state during the bin */
+  n: number;
+  /** n / atRisk as a percentage, null when nobody was observable */
+  pct: number | null;
 }
 export interface AnalysisResult {
   study: string; involvedStudies: string[]; oncokbPin: string | null;

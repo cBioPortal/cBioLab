@@ -315,6 +315,26 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "The clinical course: who is still on treatment, and when",
+    demonstrates: "Timeline data finally DRAWN rather than only filtered on. The two things that make a temporal chart honest are both enforced by the engine: every patient is lined up on a real clinical landmark rather than a study-specific day 0, and the denominator is who was still under observation \u2014 not the whole cohort.",
+    tags: ["course", "temporal", "timeline", "anchor", "at-risk"],
+    note: "MSK-CHORD, aligned on each patient's FIRST treatment, split by TP53 status. Treatment carries real start/stop dates so it is drawn as a state patients are IN; surgery has no duration, so it is the share with a surgery in that bin \u2014 a distinction read from the data's shape, not from the event's name. Note surgery peaking BEFORE time zero: resection typically precedes first systemic therapy. The at-risk row under the axis is the denominator, and it falls steeply \u2014 a curve read without it would be badly misleading.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] },
+        // "wild-type" means PROFILED for mutation and not altered \u2014 without the
+        // profiled guard, patients never tested land in the wild-type arm.
+        "TP53 wt": { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] }
+      },
+      views: [{
+        kind: "course", eventTypes: ["treatment", "surgery"],
+        anchor: { eventType: "Treatment", occurrence: "FIRST" },
+        binMonths: 3, fromMonths: -12, toMonths: 60
+      }]
+    }
+  },
+  {
     title: "Lollipop plot: recurrent protein changes, with a suppression floor",
     demonstrates: "Lollipop data, and the one place small cells genuinely bite: minCount is applied by each site BEFORE anything is returned, because a coordinator filtering what it already received is theatre.",
     tags: ["hotspots", "lollipop", "suppression"],
@@ -504,6 +524,7 @@ rel      := { "type": "NONE" }                                                 /
 | \`clinical\` | \`attributes:[\u22641-20], cohorts?:[names]\` | compares clinical attribute distributions across cohorts. Categorical: Pearson chi-squared over the **full** value vocabulary. Numeric: Welch's t from (n, \u03a3x, \u03a3x\u00b2) \u2014 additive across sites, so pooled mean/variance are exact and no individual value is transmitted. BH q across attributes. Each site types its own attributes from \`clinical_attribute_meta\`; disagreements are refused, not merged |
 | \`cooccurrence\` | \`genes:[2-12], cohorts?:[names]\` | pairwise co-occurrence / mutual exclusivity **within one cohort** (the first named). Each pair's 2×2 is counted among patients profiled for **both** genes, per study against that study's own panels; log₂ odds ratio, two-sided Fisher, Benjamini–Hochberg q across pairs. Across studies the test is **stratified by study** (Cochran–Mantel–Haenszel). Pairs no panel covers are reported as not assessable, never as a null result |
 | \`survival\` | \`endpoint?:"OS"|"PFS"|…, anchor?:{eventType,key?,value?,occurrence?}, cohorts?:[names]\` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts. Across studies the test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. \`anchor\` resets the clock to a timeline event (first chemotherapy, initial diagnosis) instead of the study's day 0, and **applies left truncation automatically**: a patient joins the risk set when the study could first observe them, never at the anchor \u2014 otherwise everyone appears to survive from the anchor to their own entry, which is exactly what put them in the study. The reported entry distribution warns when an anchor is matching earlier events than intended. Cross-study baselines are not harmonized |
+| \`course\` | \`eventTypes:[\u22646], anchor?:{eventType,key?,value?,occurrence?}, binMonths?:3, fromMonths?:-12, toMonths?:60, cohorts?:[names]\` | the **clinical course**: per time bin, the share of the cohort in each event state. Two things it refuses to fake. (1) The denominator is the patients still under observation in that bin \u2014 first recorded event to last contact (the later of their last event and their OS follow-up) \u2014 never the whole cohort, which would make a curve fall merely because follow-up ran out. (2) \`anchor\` is optional for one study but **required across studies**: day 0 is birth in some studies and first sequencing in others, and nothing in the schema records which, so raw day 0 compares incomparable clocks. Event types that carry real durations are drawn as a state the patient is IN; the rest as an event that HAPPENED \u2014 read from the data, not from the name. Bins are half-open [t, t+w). Event-name spellings differing only in case are folded (\`Treatment\`/\`TREATMENT\`) and the fold is named in the caveat; nothing else is merged |
 | \`oncoprint\` | \`genes:[≤12], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], cohorts?:[names]\` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 \`views[].cohorts\` defaults to all cohorts. Oncoprints federate across studies: columns are
@@ -590,6 +611,8 @@ export const CHAT_GRAMMAR = `Document shape:
              {"kind":"clinical","attributes":[...(1-20)],"cohorts":[names?]},
              {"kind":"coexpression","genes":[...(2-12)],"profileType":"<mrna profile>","cohorts":[names?]},
              {"kind":"hotspots","genes":[...(max 12)],"cohorts":[names?],"minCount":1},
+             {"kind":"course","eventTypes":[...(max 6)],"anchor":{"eventType":"Treatment","occurrence":"FIRST"},
+              "binMonths":3,"fromMonths":-12,"toMonths":60,"cohorts":[names?]},
              {"kind":"oncoprint","genes":[...(max 12)],"clinical":["<attribute>", ...(max 8)]?,
               "heatmap":[{"profileType":"<profile>","genes":[...]?}, ...(max 4)]?,
               "sort":["<track>"|"-<track>"|"genomic", ...(max 4)]?,"cohorts":[names?]} ] }

@@ -12,12 +12,13 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, ExploreResult } from "./types.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, ProfileMoments, QueryLogEntry, SurvivalAnchor } from "./federation.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, TimelineSpan, CourseCount, CourseOpts } from "./federation.ts";
 import { carriesPatientIds } from "./federation.ts";
 
 interface RemoteAggregates {
   study: string; instance: string; count: number;
   geneCounts: GeneCounts[]; survivalCounts: SurvivalCount[]; survivalEndpoints?: string[] | null; pairCounts: PairCounts[]; attributeStats: AttrStats[]; pairMoments: PairMoments[]; variantCounts: VariantReport; profileMoments: ProfileMoments[];
+  timelineSpan?: TimelineSpan[] | null; eventCourse?: CourseCount[] | null;
   /** the SQL the peer compiled and ran, when it chooses to disclose it */
   cohortSql?: string | null;
   /** and the aggregate queries it ran to answer this call */
@@ -160,6 +161,20 @@ export class RemoteAggregateResolver implements AggregateCapable {
     const r = await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: {}, survivalEndpoints: true })
       .catch(() => ({ survivalEndpoints: [] as string[] }));
     return (r as { survivalEndpoints?: string[] }).survivalEndpoints || [];
+  }
+  async timelineSpan(def: CohortDef | null | undefined): Promise<TimelineSpan[]> {
+    this.guard(def);
+    const r = await mcpCall(this.url, "federated_aggregates",
+      { study: this.study, cohort: def || {}, timelineSpan: true });
+    this.remember(r);
+    return r.timelineSpan || [];
+  }
+  async eventCourse(def: CohortDef | null | undefined, opts: CourseOpts): Promise<CourseCount[]> {
+    this.guard(def);
+    const r = await mcpCall(this.url, "federated_aggregates",
+      { study: this.study, cohort: def || {}, course: opts });
+    this.remember(r);
+    return r.eventCourse || [];
   }
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
     this.guard(def);

@@ -79,3 +79,56 @@ describe("hotspots figures disclose the same caps the app UI does", () => {
     assert.equal(svg.includes("distinct changes"), false);
   });
 });
+
+describe("clinical course figures show the denominator, not just the curve", () => {
+  const mk = (over: Record<string, unknown> = {}) => ({
+    kind: "course", cohorts: ["A", "B"],
+    courseAxis: { binMonths: 3, from: -12, to: 24 },
+    caveat: "Aligned on first Treatment.",
+    course: [
+      { cohort: "A", eventType: "Treatment", variants: ["Treatment", "TREATMENT"], isInterval: true,
+        points: [-12, 0, 12, 24].map((t) => ({ t, atRisk: 1000, n: 500, pct: 50 })) },
+      { cohort: "B", eventType: "Treatment", variants: ["Treatment"], isInterval: true,
+        points: [-12, 0, 12, 24].map((t) => ({ t, atRisk: 800, n: 200, pct: 25 })) }
+    ], ...over
+  });
+
+  test("the at-risk row is printed — a curve over 40 must not look like one over 24,000", () => {
+    const svg = viewToSvg(mk() as any)!;
+    assert.match(svg, /patients still observable/);
+    assert.ok(svg.includes("1,000") && svg.includes("800"), "risk counts belong in the figure");
+  });
+
+  test("an interval event reads as a state, a point event as an occurrence", () => {
+    assert.match(viewToSvg(mk() as any)!, /% in this state/);
+    const point = mk({ course: [{ cohort: "A", eventType: "Surgery", variants: ["Surgery"], isInterval: false,
+      points: [{ t: 0, atRisk: 10, n: 3, pct: 30 }] }] });
+    assert.match(viewToSvg(point as any)!, /% with an event/);
+  });
+
+  test("the line stops where too few remain observable, and says so", () => {
+    const thin = mk({ course: [{ cohort: "A", eventType: "Treatment", variants: ["Treatment"], isInterval: true,
+      points: [{ t: 0, atRisk: 900, n: 450, pct: 50 }, { t: 12, atRisk: 3, n: 3, pct: 100 }] }] });
+    const svg = viewToSvg(thin as any)!;
+    assert.match(svg, /fewer than 10 patients remain observable/,
+      "truncation must be disclosed, not left to be inferred from a line that just ends");
+  });
+
+  test("cohort names are escaped — they reach <text> and are user input", () => {
+    const evil = mk({ cohorts: ["<script>x</script>"],
+      course: [{ cohort: "<script>x</script>", eventType: "Treatment", variants: ["Treatment"], isInterval: true,
+        points: [{ t: 0, atRisk: 50, n: 25, pct: 50 }] }] });
+    const svg = viewToSvg(evil as any)!;
+    assert.equal(svg.includes("<script>"), false);
+    assert.match(svg, /&lt;script&gt;/);
+  });
+
+  test("a course with no series renders nothing rather than an empty frame", () => {
+    assert.equal(viewToSvg({ kind: "course", course: [] } as any), null);
+    assert.equal(viewToSvg({ kind: "course", error: "no temporal information" } as any), null);
+  });
+
+  test("the title names the event types", () => {
+    assert.equal(viewTitle(mk() as any), "Clinical course — Treatment — A vs B");
+  });
+});

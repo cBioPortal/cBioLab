@@ -14,12 +14,15 @@ import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, fisherZMeta } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation } from "./types.ts";
+import { viewToSvg } from "./view-svg.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting, restrictedStudies,
-  type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments
+  type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments,
+  type TimelineSpan, type CourseCount, type CourseOpts
 } from "./federation.ts";
+import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -314,6 +317,141 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
             : logrank
               ? " Log-rank on a single study, so no stratification applies."
               : " Log-rank needs exactly two cohorts.") });
+
+    } else if (view.kind === "course") {
+      const cv = view as CourseView;
+      const binMonths = Math.max(1, Math.min(24, Math.floor(Number(cv.binMonths) || 3)));
+      const from = Math.max(-240, Math.min(0, Math.floor(Number(cv.fromMonths ?? -12))));
+      const to = Math.max(1, Math.min(600, Math.floor(Number(cv.toMonths ?? 60))));
+      const anchor = cv.anchor && cv.anchor.eventType
+        ? { ...cv.anchor, occurrence: cv.anchor.occurrence === "LAST" ? "LAST" as const : "FIRST" as const }
+        : null;
+
+      // Day 0 is not a shared baseline across studies — it is birth in one study
+      // and first sequencing in another, and nothing in the schema says which.
+      // Refuse rather than draw a confident average of incomparable clocks.
+      if (!anchor && vStudies.length > 1) {
+        views.push({ kind: "course", cohorts: vNames, studies: vStudies,
+          error: "aligning on day 0 is only meaningful within a single study, and this view spans " +
+            vStudies.length + " (" + vStudies.join(", ") + "). Day 0 is a different moment in each — " +
+            "birth in some studies, first sequencing in others — and the database does not record which. " +
+            "Set an anchor event (e.g. {\"eventType\":\"Treatment\",\"occurrence\":\"FIRST\"}) so every patient " +
+            "is lined up on the same clinical landmark." });
+        continue;
+      }
+
+      // Structural probe: powers the degenerate gate AND decides band-vs-mark
+      // without consulting any event NAME.
+      const spans = new Map<string, TimelineSpan[]>();
+      await Promise.all(vStudies.map(async (st) => {
+        spans.set(st, await resolvers[st].timelineSpan(doc.cohorts[vNames[0]]).catch(() => [] as TimelineSpan[]));
+      }));
+      const allSpans = [...spans.values()].flat();
+
+      // 17 of the 131 studies with timeline rows put every event on one day.
+      // Those must say so, not render an empty chart.
+      const usable = vStudies.filter((st) => (spans.get(st) || []).some((s) => s.days > 1));
+      if (!usable.length) {
+        const what = allSpans.length
+          ? " The timeline holds " + allSpans.map((s) => s.eventType + " (" + s.patients + " patients)").join(", ") +
+            ", but every event sits on a single day, so there is no course to plot."
+          : " No timeline events were found for this cohort at all.";
+        views.push({ kind: "course", cohorts: vNames, studies: vStudies,
+          error: "this cohort's timeline carries no temporal information." + what });
+        continue;
+      }
+
+      // Fold spellings, and let structure pick the measure.
+      const folded = foldEventNames(allSpans.map((s) => ({ name: s.eventType, n: s.patients })));
+      const wanted = [...new Set((cv.eventTypes || []).map(canonicalEventName).filter(Boolean))].slice(0, 6);
+      if (!wanted.length) {
+        views.push({ kind: "course", cohorts: vNames, studies: vStudies,
+          error: "a course view needs at least one event type. This cohort has: " +
+            (folded.map((f) => f.label).join(", ") || "no timeline events") });
+        continue;
+      }
+      const unknown = wanted.filter((w) => !folded.some((f) => f.canonical === w));
+      if (unknown.length === wanted.length) {
+        views.push({ kind: "course", cohorts: vNames, studies: vStudies,
+          error: "none of these event types occur in this cohort: " + unknown.join(", ") +
+            ". Available: " + (folded.map((f) => f.label).join(", ") || "none") });
+        continue;
+      }
+      const measured = wanted.filter((w) => folded.some((f) => f.canonical === w));
+      const intervalOf = new Map(folded.map((f) => [f.canonical,
+        allSpans.filter((s) => canonicalEventName(s.eventType) === f.canonical)
+          .reduce((n, s) => n + s.intervalEvents, 0) > 0]));
+
+      const opts: CourseOpts = { anchor, eventTypes: measured, binMonths, from: Math.floor(from / binMonths), to: Math.floor(to / binMonths) };
+      const per = new Map<string, CourseCount[]>();   // cohort -> merged counts
+      await Promise.all(vNames.map(async (n) => {
+        const useStudies = cohorts[n].studies.filter((st) => usable.includes(st));
+        const parts = await Promise.all(useStudies.map((st) =>
+          resolvers[st].eventCourse(doc.cohorts[n], opts).catch(() => [] as CourseCount[])));
+        per.set(n, parts.flat());
+      }));
+
+      // Merge by summing per (bin, state) — each study contributes its own
+      // observable patients and its own events, so sums are exact.
+      const course: CourseSeries[] = [];
+      for (const n of vNames) {
+        const rows = per.get(n) || [];
+        const risk = new Map<number, number>(), hit = new Map<string, number>();
+        for (const r of rows) {
+          if (r.eventType === "") risk.set(r.bin, (risk.get(r.bin) || 0) + r.n);
+          else { const k = r.eventType + " " + r.bin; hit.set(k, (hit.get(k) || 0) + r.n); }
+        }
+        for (const et of measured) {
+          const f = folded.find((x) => x.canonical === et)!;
+          const points: CoursePoint[] = [];
+          for (let b = opts.from; b <= opts.to; b++) {
+            const atRisk = risk.get(b) || 0;
+            const nn = hit.get(et + " " + b) || 0;
+            points.push({ t: b * binMonths, atRisk, n: nn,
+              pct: atRisk > 0 ? Math.round((1000 * nn) / atRisk) / 10 : null });
+          }
+          course.push({ cohort: n, eventType: f.label, variants: f.variants,
+            isInterval: !!intervalOf.get(et), points });
+        }
+      }
+
+      const note = foldNote(folded.filter((f) => measured.includes(f.canonical)));
+      const dropped = vStudies.filter((st) => !usable.includes(st));
+      const courseResult: ViewResult = { kind: "course", cohorts: vNames, studies: vStudies, course,
+        courseAxis: { binMonths, from: opts.from * binMonths, to: opts.to * binMonths },
+        participation: participationFor(vStudies, false),
+        caveat:
+          (anchor
+            ? "Aligned on " + (anchor.occurrence === "LAST" ? "last " : "first ") + anchor.eventType +
+              (anchor.key ? " where " + anchor.key + "=" + anchor.value : "") +
+              " — time 0 is that event, so every patient is lined up on the same clinical landmark." +
+              " Patients with no such event are absent from every bin."
+            : "Aligned on " + vStudies[0] + "'s own day 0, which is that study's baseline and is NOT" +
+              " comparable to any other study's.") +
+          " THE DENOMINATOR IS NOT THE WHOLE COHORT: each bin is over the patients still under observation" +
+          " in it, from their first recorded event to their last contact (the later of their last recorded" +
+          " event and their OS follow-up where the study declares one). Without that, a curve would fall" +
+          " simply because follow-up ran out." +
+          " Follow-up ending at the last recorded event biases the tail upward — by construction a patient" +
+          " has an event on their last observed day." +
+          " Bins are half-open [t, t+" + binMonths + "mo)." +
+          (measured.some((et) => intervalOf.get(et))
+            ? " Event types carrying real durations are drawn as a state the patient is IN during the bin;" +
+              " the rest as an event that HAPPENED in it. That is read off the data, not the event's name."
+            : " These event types carry no durations, so each point is the share with such an event in that bin.") +
+          (note ? " " + note : "") +
+          (unknown.length ? " Not found in this cohort, so not plotted: " + unknown.join(", ") + "." : "") +
+          (dropped.length ? " Excluded for having no temporal information: " + dropped.join(", ") + "." : "") +
+          (vStudies.length > 1 ? " Event vocabularies are NOT harmonized across studies beyond case." : "") };
+      // Rendered here, by the SAME renderer the chat and MCP use, so the web app
+      // cannot drift into showing a second, subtly different figure — the debt
+      // the survival and lollipop views still carry.
+      const tCourse = Date.now();
+      // 720 is the module default and close to the app column width, so the
+      // caption renders near 1:1 rather than being scaled down to unreadable.
+      courseResult.svg = viewToSvg(courseResult) || undefined;
+      courseResult.renderMs = Date.now() - tCourse;
+      views.push(courseResult);
 
     } else if (view.kind === "hotspots") {
       const hv = view as HotspotsView;
