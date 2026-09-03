@@ -69,9 +69,19 @@ export interface EventLeafFields {
 }
 export interface EventLeaf extends EventLeafFields { kind: "event" }
 
+/**
+ * A filter on a value computed from the shape of the data — dates, gene symbols
+ * — rather than on a study's own event names or attribute keys, which vary from
+ * study to study and so cannot be relied on.
+ */
+export interface DerivedLeaf {
+  kind: "derived";
+  metric: "followupMonths" | "historyMonths" | "alteredGenes";
+  range: { gte?: number; gt?: number; lte?: number; lt?: number };
+}
 export type Leaf =
   | OqlLeaf | ClinicalLeaf | EventLeaf | PatientsLeaf | ProfiledLeaf
-  | CaseListLeaf | GenomicDataLeaf | GenericAssayLeaf | AlterationLeaf
+  | CaseListLeaf | GenomicDataLeaf | GenericAssayLeaf | AlterationLeaf | DerivedLeaf
   /** back-compat: the flat v1 event shape, accepted without a `kind` */
   | EventLeafFields;
 
@@ -372,11 +382,23 @@ export interface StudyBreakdownRow {
   /** which instance holds it (federation) */
   instance: string; instanceLabel: string;
 }
+/**
+ * A filter computed from the SHAPE of the data rather than a study's vocabulary,
+ * so it means the same thing in every study that has the underlying table.
+ */
+export interface DerivedFacet {
+  metric: "followupMonths" | "historyMonths" | "alteredGenes";
+  label: string; unit: string; note: string;
+  /** how many patients the metric could be computed for at all */
+  covered: number;
+  buckets: { label: string; n: number; gte?: number; lt?: number }[];
+}
 export interface ExploreResult {
   study: string; studies?: string[]; draftCount: number | null;
   studyBreakdown?: StudyBreakdownRow[];
   clinical: ClinicalFacet[];
   events: { type: string; n: number }[];
+  derived?: DerivedFacet[];
   /** legacy combined list — kept so existing consumers keep working */
   genes: { gene: string; n: number }[];
   /** portal-equivalent gene tables (samples, panel-aware denominators) */

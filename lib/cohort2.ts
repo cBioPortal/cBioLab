@@ -84,6 +84,60 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
 
 const PROFILED_TYPE: Record<string, string> = { MUTATION: "MUTATION_EXTENDED", CNA: "COPY_NUMBER_ALTERATION", SV: "STRUCTURAL_VARIANT" };
 
+/**
+ * Metrics derived from the SHAPE of a study's data rather than from its
+ * vocabulary. Event type names and attribute keys are study-specific — this
+ * database spells the same concept "Treatment" in 87 studies and "TREATMENT" in
+ * 10, and the key MSK-CHORD calls SUBTYPE exists in only 27 of 131 timeline
+ * studies — so anything keyed on those names works nowhere in particular.
+ * These read dates and gene symbols, which every study that has them has, and
+ * so mean the same thing everywhere.
+ *
+ *   followupMonths  how long the timeline runs after its own day 0
+ *   historyMonths   how much of the timeline predates day 0
+ *   alteredGenes    distinct genes altered in the patient
+ */
+export const DERIVED_METRICS = ["followupMonths", "historyMonths", "alteredGenes"] as const;
+export type DerivedMetric = typeof DERIVED_METRICS[number];
+
+/** Per-patient value for a derived metric, as SQL yielding (pid, v). */
+export function derivedMetricSql(metric: DerivedMetric, study: string, db: string): string {
+  const evJoin =
+    "  FROM " + db + ".clinical_event ce\n" +
+    "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+    "  GROUP BY pid";
+  if (metric === "followupMonths")
+    return "SELECT p.stable_id AS pid, max(ce.start_date) / 30.4375 AS v\n" + evJoin;
+  if (metric === "historyMonths")
+    return "SELECT p.stable_id AS pid, greatest(0, -min(ce.start_date)) / 30.4375 AS v\n" + evJoin;
+  // alteredGenes — high-level CNA only, matching the rest of the engine
+  return "SELECT " + PID("patient_unique_id", study) + " AS pid, uniqExact(hugo_gene_symbol) AS v\n" +
+    "  FROM " + db + ".genomic_event_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND (variant_type != 'cna' OR abs(cna_alteration) >= 2)\n" +
+    "  GROUP BY pid";
+}
+
+function derivedLeafSql(leaf: any, ctx: Ctx): string {
+  const metric = String(leaf.metric || "");
+  if (!(DERIVED_METRICS as readonly string[]).includes(metric))
+    throw new Error("derived clause: metric must be one of " + DERIVED_METRICS.join(", ") +
+      " (got '" + metric.slice(0, 40) + "')");
+  const r = leaf.range || {};
+  const conds: string[] = [];
+  for (const [op, sqlOp] of [["gte", ">="], ["gt", ">"], ["lte", "<="], ["lt", "<"]] as const)
+    if (r[op] != null) {
+      const num = Number(r[op]);
+      if (!Number.isFinite(num)) throw new Error("derived clause: range." + op + " must be a number");
+      conds.push("v " + sqlOp + " " + num);
+    }
+  if (!conds.length) throw new Error("derived clause: needs a range, e.g. {\"gte\":24,\"lt\":60}");
+  return "SELECT pid FROM (\n" + derivedMetricSql(metric as DerivedMetric, ctx.study, dbOf(ctx)) + "\n)\n" +
+    "  WHERE " + conds.join(" AND ");
+}
+
 function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): string {
   const t = PROFILED_TYPE[String(leaf.type || "").toUpperCase()];
   if (!t) throw new Error("profiled clause: type must be MUTATION, CNA, or SV");
@@ -176,6 +230,7 @@ function leafSql(leaf: any, ctx: Ctx): string {
   if (leaf.kind === "genomicData") return genomicDataLeafSql(leaf, ctx);
   if (leaf.kind === "genericAssay") return genericAssayLeafSql(leaf, ctx);
   if (leaf.kind === "event") return eventLeafSql(leaf, ctx);
+  if (leaf.kind === "derived") return derivedLeafSql(leaf, ctx);
   if (leaf.kind === "patients") return patientsLeafSql(leaf, ctx);
   // v1 flat event shape without kind
   if (leaf.a && leaf.rel) return eventLeafSql(leaf, ctx);
@@ -231,6 +286,13 @@ function leafText(leaf: any): string {
     return leaf.attribute + " " + bits.join(" ") + (leaf.per === "sample" ? " (any sample)" : "");
   }
   if (leaf.kind === "profiled") return "profiled for " + leaf.type;
+  if (leaf.kind === "derived") {
+    const r = (leaf as any).range || {};
+    const parts = [r.gte != null ? "\u2265 " + r.gte : null, r.gt != null ? "> " + r.gt : null,
+                   r.lte != null ? "\u2264 " + r.lte : null, r.lt != null ? "< " + r.lt : null].filter(Boolean);
+    const unit = (leaf as any).metric === "alteredGenes" ? " genes" : " months";
+    return (leaf as any).metric + " " + parts.join(" and ") + unit;
+  }
   if (leaf.kind === "caseList") return "in case list " + leaf.id;
   if (leaf.kind === "genomicData") return leaf.gene + " " + leaf.profileType + " " + JSON.stringify(leaf.range || leaf.values);
   if (leaf.kind === "genericAssay") return leaf.entity + " " + JSON.stringify(leaf.range || leaf.values);

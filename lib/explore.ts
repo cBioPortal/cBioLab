@@ -3,9 +3,10 @@
 // Everything returned is designed to be clickable into a DSL clause.
 import { chQuery, DB, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
+import { derivedMetricSql, basePatientsSql } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
-import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, NumericBin } from "./types.ts";
+import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, NumericBin, DerivedFacet } from "./types.ts";
 
 /**
  * cBioPortal's linear bin intervals (LinearDataBinner). The binner picks the
@@ -124,6 +125,11 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     const c = await chQuery("SELECT uniqExact(pid) AS n FROM (" + dsql + ")", conn);
     draftCount = Number(c.data[0].n);
   }
+  // Derived facets are independent of everything below, so start them here and
+  // collect at the end — serially they cost ~400ms on a ~600ms page, overlapped
+  // they cost almost nothing.
+  const derivedP = buildDerivedFacets(db, study, conn, cond);
+
   // how many patients this study contributes under the current draft (or in total)
   const studyN = draftCount ?? Number((await chQuery<ChRow>(
     "SELECT uniqExact(patient_unique_id) AS n FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + sq(study), conn
@@ -369,9 +375,16 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     (dsql ? "\n  AND p.stable_id IN (SELECT pid FROM (" + dsql + "))" : "") + "\n" +
     "GROUP BY id ORDER BY n DESC LIMIT 10", conn);
 
+  // ---- derived facets ------------------------------------------------------
+  // Computed from dates and gene symbols, never from a study's event-type names
+  // or attribute keys, which vary study to study (this database spells the same
+  // concept "Treatment" in 87 studies and "TREATMENT" in 10). A study without
+  // the underlying table simply yields no buckets and the facet is omitted.
+  const derived = await derivedP;
+
   return {
     study, draftCount, studyBreakdown,
-    clinical,
+    clinical, derived,
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
     genes: genes.data.map((r) => ({ gene: r.g, n: Number(r.n) })),
     caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
@@ -380,6 +393,58 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     profiles: profiles || [], gaProfiles: gaProfiles || [],
     stats: { ms: Date.now() - t0 }
   };
+}
+
+/** Bucket edges are ours, not the study's — stated in each facet's note. */
+const DERIVED_SPECS: {
+  metric: "followupMonths" | "historyMonths" | "alteredGenes";
+  label: string; unit: string; note: string;
+  cuts: { label: string; gte?: number; lt?: number }[];
+}[] = [
+  { metric: "followupMonths", label: "Follow-up after day 0", unit: "months",
+    note: "how far the timeline runs past its own day 0 — the observability an outcome or absence question depends on",
+    cuts: [{ label: "< 6mo", lt: 6 }, { label: "6–12mo", gte: 6, lt: 12 }, { label: "1–2y", gte: 12, lt: 24 },
+           { label: "2–5y", gte: 24, lt: 60 }, { label: "> 5y", gte: 60 }] },
+  { metric: "historyMonths", label: "History before day 0", unit: "months",
+    note: "how much of the disease course predates the study's own clock — large values mean much of the patient's course is unobserved here",
+    cuts: [{ label: "none", lt: 0.5 }, { label: "< 6mo", gte: 0.5, lt: 6 }, { label: "6–24mo", gte: 6, lt: 24 },
+           { label: "2–5y", gte: 24, lt: 60 }, { label: "> 5y", gte: 60 }] },
+  { metric: "alteredGenes", label: "Distinct altered genes", unit: "genes",
+    note: "genes with a mutation, high-level CNA or fusion in this patient; panel size bounds it, so it is not comparable across studies with different panels",
+    cuts: [{ label: "1", lt: 2 }, { label: "2", gte: 2, lt: 3 }, { label: "3–5", gte: 3, lt: 6 },
+           { label: "6–10", gte: 6, lt: 11 }, { label: "> 10", gte: 11 }] }
+];
+
+async function buildDerivedFacets(db: string, study: string, conn: ChConn, cond: string): Promise<DerivedFacet[]> {
+  const out: DerivedFacet[] = [];
+  await Promise.all(DERIVED_SPECS.map(async (spec) => {
+    const per = derivedMetricSql(spec.metric, study, db);
+    const cases = spec.cuts.map((c, i) => {
+      const t: string[] = [];
+      if (c.gte != null) t.push("v >= " + c.gte);
+      if (c.lt != null) t.push("v < " + c.lt);
+      return "    " + (t.length ? t.join(" AND ") : "1") + ", " + i;
+    }).join(",\n");
+    // the draft narrows derived facets exactly as it narrows every other one
+    const gate = cond
+      ? "  WHERE pid IN (SELECT pid FROM (" + basePatientsSql(study, db) + cond + "))\n"
+      : "";
+    const sql =
+      "SELECT b, count() AS n FROM (\n" +
+      "  SELECT pid, multiIf(\n" + cases + ",\n    " + spec.cuts.length + ") AS b\n" +
+      "  FROM (\n" + per + "\n  )\n" + gate +
+      ")\nGROUP BY b ORDER BY b";
+    try {
+      const r = await chQuery<ChRow>(sql, conn);
+      const byIdx = new Map(r.data.map((x) => [Number(x.b), Number(x.n)]));
+      const buckets = spec.cuts.map((c, i) => ({ label: c.label, n: byIdx.get(i) || 0,
+        ...(c.gte != null ? { gte: c.gte } : {}), ...(c.lt != null ? { lt: c.lt } : {}) }))
+        .filter((b) => b.n > 0);
+      const covered = buckets.reduce((s2, b) => s2 + b.n, 0);
+      if (covered > 0) out.push({ metric: spec.metric, label: spec.label, unit: spec.unit, note: spec.note, covered, buckets });
+    } catch { /* a study without the underlying table contributes no facet */ }
+  }));
+  return DERIVED_SPECS.map((s2) => out.find((o) => o.metric === s2.metric)).filter((x): x is DerivedFacet => !!x);
 }
 
 // ---- federated explore: several studies at once ---------------------------
@@ -512,6 +577,20 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     for (const r of arrs.flat()) m.set(r[key], (m.get(r[key]) || 0) + r.n);
     return m;
   };
+  // derived facets merge by summing bucket counts — the metric means the same
+  // thing in every study, which is the point of deriving it from shape
+  const derivedMerged: DerivedFacet[] = [];
+  for (const spec of DERIVED_SPECS) {
+    const mine = parts.map((p) => (p.derived || []).find((d) => d.metric === spec.metric)).filter((d): d is DerivedFacet => !!d);
+    if (!mine.length) continue;
+    const counts = new Map<string, number>();
+    for (const d of mine) for (const b of d.buckets) counts.set(b.label, (counts.get(b.label) || 0) + b.n);
+    const buckets = spec.cuts.map((c) => ({ label: c.label, n: counts.get(c.label) || 0,
+      ...(c.gte != null ? { gte: c.gte } : {}), ...(c.lt != null ? { lt: c.lt } : {}) })).filter((b) => b.n > 0);
+    if (buckets.length) derivedMerged.push({ metric: spec.metric, label: spec.label, unit: spec.unit, note: spec.note,
+      covered: mine.reduce((n, d) => n + d.covered, 0), buckets });
+  }
+
   const evm = sumBy(parts.map(p => p.events), "type");
   const gm = sumBy(parts.map(p => p.genes), "gene");
   // gene tables: sum altered/events/profiled per (gene, cna) across participants
@@ -541,6 +620,7 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     draftCount: draft ? parts.reduce((s, p) => s + (p.draftCount || 0), 0) : null,
     studyBreakdown: parts.flatMap((p) => p.studyBreakdown || []).sort((a, b) => b.n - a.n),
     clinical,
+    ...(derivedMerged.length ? { derived: derivedMerged } : {}),
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
     genes: [...gm.entries()].map(([gene, n]) => ({ gene, n })).sort((x, y) => y.n - x.n).slice(0, 15),
     caseLists: [...lm.values()].sort((x, y) => y.n - x.n).slice(0, 10),

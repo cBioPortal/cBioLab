@@ -485,3 +485,6 @@ details.gearmenu > .gearmenu-items {
   font-size: 0.76rem;
 }
 .basis select { font-size: 0.76rem; padding: 0.1rem 0.3rem; max-width: 14rem; }
+
+/* Explore: derived facets sit in their own row above the study's own attributes */
+.derivedgrid { display: grid; gap: 0.6rem 1.4rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }

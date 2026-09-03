@@ -115,6 +115,28 @@ async function main() {
       const canvasH = await page.locator("#oncoCanvas").evaluate(c => c.height);
       ok("oncoprint canvas painted", canvasH > 100, "canvas height " + canvasH);
 
+      // Derived facets: computed from the data's shape, so they must appear for a
+      // study regardless of how it names its events, and clicking must filter.
+      await page.goto(BASE + "/analysis?tab=explore");
+      await page.waitForSelector(".exbar", { timeout: 120000 });
+      let der = { facets: 0, filtered: false };
+      try {
+        await page.waitForFunction(() => [...document.querySelectorAll("h2")].some(h => h.textContent.startsWith("Derived")),
+          null, { timeout: 240000 });
+        der.facets = await page.locator(".derivedgrid > div").count();
+        const before = (await page.locator(".exbar").innerText()).trim();
+        await page.locator(".derivedgrid .valrow").first().click();
+        await page.waitForFunction((b) => (document.querySelector(".exbar")?.textContent || "").trim() !== b,
+          before, { timeout: 240000 });
+        // the draft JSON lives on the Cohorts tab; here the observable effects are
+        // the filter count in the action bar and the bucket showing as selected
+        const barSaysFiltered = /\d+ filter/.test(await page.locator(".exbar").innerText());
+        const bucketSelected = (await page.locator(".derivedgrid .valrow.on").count()) > 0;
+        der.filtered = barSaysFiltered && bucketSelected;
+      } catch { /* left as-is */ }
+      ok("derived facets appear and filter", der.facets >= 2 && der.filtered,
+        der.facets + " derived facets" + (der.filtered ? ", click added a derived clause" : ", click did not filter"));
+
       // Explore's top action bar: build a draft by clicking a facet, then Analyze.
       // This is the main path from browsing to an analysis, so it is gated.
       await page.goto(BASE + "/analysis");

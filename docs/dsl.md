@@ -43,6 +43,7 @@ say so in their captions.
 | `hotspots` | `genes:[≤12], cohorts?:[names], minCount?` | recurrent protein changes per gene (the lollipop's data): patients carrying each change, as a share of those with ANY mutation in that gene. The codon is parsed from the change string, since the schema stores no position. `minCount` is a suppression floor each site applies **before returning anything** — a variant carried by one patient is the most disclosive aggregate here |
 | `coexpression` | `genes:[2-12], profileType, cohorts?:[names]` | Pearson correlation between gene pairs on a continuous molecular profile, **within one cohort** (the first named). Each site reports only six sums (n, Σx, Σy, Σxy, Σx², Σy²), which are additive — so the federated correlation is exact, not approximate. Across studies a Fisher-z meta-analysis of per-study correlations is reported alongside the pooled one |
 | `clinical` | `{"kind":"clinical","attribute":A, ...predicate, "per"?:"sample"}` | clinical attribute; predicate is `values:[≤50]` (OR), `range:{gt,gte,lt,lte}` (numeric via toFloat64OrNull), or `op`(`= != > >= < <=`)+`value`; `per:"sample"` = patient matches if ANY sample matches |
+| `derived` | `{"kind":"derived","metric":"followupMonths"|"historyMonths"|"alteredGenes","range":{gte?,gt?,lte?,lt?}}` | filters on a value computed from the **shape** of the data rather than a study's vocabulary. Event-type names and attribute keys are study-specific — this database spells one concept `Treatment` in 87 studies and `TREATMENT` in 10, and the key MSK-CHORD calls `SUBTYPE` exists in only 27 of 131 timeline studies — so these read dates and gene symbols instead and mean the same thing everywhere. `followupMonths`: how far the timeline runs past its own day 0. `historyMonths`: how much predates it. `alteredGenes`: distinct genes altered (panel size bounds it, so not comparable across studies with different panels) |
 | `event` | `{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}` | timeline sub-DSL (below) |
 | `patients` | `{"kind":"patients","ids":[≤50000]}` | explicit list, intersected with the study |
 | `profiled` | `{"kind":"profiled","type":"MUTATION"\|"CNA"\|"SV"}` | patient has a sample on a gene panel for that data type — combine with `not` to separate wild-type from not-profiled |
@@ -522,7 +523,59 @@ Never-smokers whose timeline shows progression within 180 days after first immun
 }
 ```
 
-### Example 6: Progression on immunotherapy: during, versus absent
+### Example 6: Derived filters: enough follow-up to answer the question
+
+Any question about an outcome is only honest among patients observed long enough to have one. This contrasts patients with at least two years of follow-up past the study's own day 0 against those with under six months — a distinction no clinical attribute in this study records, and one that needs no knowledge of how this study names its events.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "followed 2y+": {
+      "all": [
+        {
+          "kind": "derived",
+          "metric": "followupMonths",
+          "range": {
+            "gte": 24
+          }
+        }
+      ]
+    },
+    "followed < 6mo": {
+      "all": [
+        {
+          "kind": "derived",
+          "metric": "followupMonths",
+          "range": {
+            "lt": 6
+          }
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "clinical",
+      "attributes": [
+        "CANCER_TYPE",
+        "CURRENT_AGE_DEID",
+        "TMB_NONSYNONYMOUS"
+      ]
+    },
+    {
+      "kind": "compare",
+      "genes": [
+        "TP53",
+        "KRAS",
+        "PIK3CA"
+      ]
+    }
+  ]
+}
+```
+
+### Example 7: Progression on immunotherapy: during, versus absent
 
 Patients who progressed while on immunotherapy (1,423) versus those with no progression recorded in the year after starting it (534). The second cohort sets observed:true, so "no progression" means the follow-up was there and nothing was recorded — not that the patient was lost to follow-up. Without that guard the cohort would be far larger and largely meaningless.
 
@@ -616,7 +669,7 @@ Patients who progressed while on immunotherapy (1,423) versus those with no prog
 }
 ```
 
-### Example 7: Derived treatment lines: who reaches a third line?
+### Example 8: Derived treatment lines: who reaches a third line?
 
 Patients who reached a third line of therapy (3,088) versus those who had a first line and never a second (13,620), with lines derived on a 90-day gap. Changing lineGap changes both cohorts — the line boundary is a modelling choice, made explicit rather than baked into the data. READ THE SURVIVAL CURVE WITH CARE: reaching a third line requires surviving long enough to receive one, so this comparison carries immortal time bias and the modest separation it shows (medians 48.1 vs 43.1 months) is not evidence that more lines help. The engine cannot detect this — it is a property of how the cohorts were defined, not of the data, which is exactly why the definition travels with the result.
 
@@ -708,7 +761,7 @@ Patients who reached a third line of therapy (3,088) versus those who had a firs
 }
 ```
 
-### Example 8: True first line: fast progression versus durable control
+### Example 9: True first line: fast progression versus durable control
 
 Among treatment-naive patients starting first-line chemotherapy: progression recorded within 180 days (3,319) versus none in that window with follow-up to prove it (6,584). BEFORE takes a window; NOT_FOLLOWED_BY takes the same window and asks for its absence. Drop priorGuard and both cohorts grow by roughly the share of patients pre-treated elsewhere.
 
@@ -806,7 +859,7 @@ Among treatment-naive patients starting first-line chemotherapy: progression rec
 }
 ```
 
-### Example 9: Lab thresholds over time: PSA above 100
+### Example 10: Lab thresholds over time: PSA above 100
 
 PSA recorded above 100 ng/ml at any point (879) versus PSA measured but never above 100 (3,250). The second cohort deliberately requires a PSA test to exist: comparing against everyone else would silently contrast the tested with the untested, which is a selection effect rather than a finding.
 
@@ -906,7 +959,7 @@ PSA recorded above 100 ng/ml at any point (879) versus PSA measured but never ab
 }
 ```
 
-### Example 10: any / not / genomicData
+### Example 11: any / not / genomicData
 
 Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep deletions expressed as a continuous copy-number threshold.
 
@@ -963,7 +1016,7 @@ Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep 
 }
 ```
 
-### Example 11: Cross-study federation with an oncoprint
+### Example 12: Cross-study federation with an oncoprint
 
 One cohort unioned across two studies (members are study-qualified; overlap is NOT deduplicated), rendered as a federated oncoprint with a categorical and a numeric clinical track, columns sorted by cancer type then descending age. The Study track is added automatically.
 
@@ -1005,7 +1058,7 @@ One cohort unioned across two studies (members are study-qualified; overlap is N
 }
 ```
 
-### Example 12: Molecular heatmap tracks, sorted by expression
+### Example 13: Molecular heatmap tracks, sorted by expression
 
 ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene tracks, columns sorted by descending ERBB2 expression. Z-scores render on a fixed diverging ±3 ramp; the track label (gene + short profile name) is the sort key.
 
@@ -1043,7 +1096,7 @@ ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene t
 }
 ```
 
-### Example 13: A federated z-score reference on an oncoprint
+### Example 14: A federated z-score reference on an oncoprint
 
 A heatmap track with reference:"federation" is scored against a distribution pooled from EVERY participating study, including instances that disclose no patients and therefore contribute no columns — each returns three totals per gene (n, sum, sum of squares), which is enough to define the reference. Run with luad_tcga_pan_can_atlas_2018 aggregate-only, its patients are absent from the columns while its 510 patients still shape what the drawn columns mean.
 
@@ -1082,7 +1135,7 @@ A heatmap track with reference:"federation" is scored against a distribution poo
 }
 ```
 
-### Example 14: Lollipop plot: recurrent protein changes, with a suppression floor
+### Example 15: Lollipop plot: recurrent protein changes, with a suppression floor
 
 Hotspots in colorectal cancer. Percentages are of the patients carrying any mutation in that gene, so BRAF V600E accounts for roughly 70% of BRAF-mutant cases. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.
 
@@ -1118,7 +1171,7 @@ Hotspots in colorectal cancer. Percentages are of the patients carrying any muta
 }
 ```
 
-### Example 15: Co-expression from sums alone
+### Example 16: Co-expression from sums alone
 
 Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.
 
@@ -1151,7 +1204,7 @@ Pearson correlation between gene pairs in TCGA breast cancer. A correlation depe
 }
 ```
 
-### Example 16: Clinical attributes compared between cohorts
+### Example 17: Clinical attributes compared between cohorts
 
 How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.
 
@@ -1197,7 +1250,7 @@ How TP53-mutant and wild-type tumors differ clinically. Categorical attributes a
 }
 ```
 
-### Example 17: Co-occurrence and mutual exclusivity in NSCLC
+### Example 18: Co-occurrence and mutual exclusivity in NSCLC
 
 Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.
 
@@ -1234,7 +1287,7 @@ Pairwise associations among lung cancer driver genes. Each site returns four cou
 }
 ```
 
-### Example 18: Survival from first chemotherapy, left-truncated
+### Example 19: Survival from first chemotherapy, left-truncated
 
 TP53-mutant vs wild-type, overall survival measured from each patient's first chemotherapy rather than from sequencing. Patients whose first chemotherapy falls after day 0, or who never had chemotherapy, are excluded rather than given negative follow-up. The result reports how long after the anchor patients became observable, so an anchor that is matching earlier events than intended shows up as a long tail.
 
@@ -1279,7 +1332,7 @@ TP53-mutant vs wild-type, overall survival measured from each patient's first ch
 }
 ```
 
-### Example 19: Study-stratified survival across two studies
+### Example 20: Study-stratified survival across two studies
 
 TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.
 

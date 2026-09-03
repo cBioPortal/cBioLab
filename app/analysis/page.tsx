@@ -830,6 +830,40 @@ export default function AnalysisPage() {
           {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "0.85rem", margin: 0 }}>
             No studies selected — check one or more above to explore.</p></div>}
           {!explore && exStudies.length > 0 && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
+          {explore && explore.derived && explore.derived.length > 0 && (
+            <div className="card">
+              <h2>Derived <span className="plain">— computed from the data's shape, so these mean the same thing in any study</span></h2>
+              <div className="derivedgrid">
+                {explore.derived.map(d => {
+                  const max = Math.max(...d.buckets.map(b => b.n), 1);
+                  const picked = (b: { gte?: number; lt?: number }) => {
+                    const dr = parseDraft();
+                    return !!(dr && (dr.all || []).some((c: any) => c.kind === "derived" && c.metric === d.metric
+                      && (c.range || {}).gte === b.gte && (c.range || {}).lt === b.lt));
+                  };
+                  return (
+                    <div key={d.metric}>
+                      <div style={{ fontSize: "0.78rem", fontWeight: 600 }} title={d.note}>
+                        {d.label} <span className="meta">· {d.covered.toLocaleString()} patients</span>
+                      </div>
+                      <div className="vallist">
+                        {d.buckets.map(b => (
+                          <button key={b.label} className={picked(b) ? "valrow on" : "valrow"}
+                            title={d.note + " — click to filter"}
+                            onClick={() => addClause({ kind: "derived", metric: d.metric,
+                              range: { ...(b.gte != null ? { gte: b.gte } : {}), ...(b.lt != null ? { lt: b.lt } : {}) } })}>
+                            <span className="vname">{b.label}</span>
+                            <span className="vbar"><i style={{ width: Math.max(1, Math.round(100 * b.n / max)) + "%" }} /></span>
+                            <span className="vn">{b.n.toLocaleString()}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {explore && <div className="two-col" style={{ alignItems: "start" }}>
             <div>
               <div className="card">

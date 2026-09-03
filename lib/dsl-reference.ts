@@ -135,6 +135,23 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "Derived filters: enough follow-up to answer the question",
+    demonstrates: "Filters computed from the SHAPE of the data instead of a study's own words. Event-type names and attribute keys differ study to study, so anything keyed on them works nowhere in particular; dates and gene symbols are the same everywhere.",
+    tags: ["derived", "timeline", "temporal", "survival", "clinical"],
+    note: "Any question about an outcome is only honest among patients observed long enough to have one. This contrasts patients with at least two years of follow-up past the study's own day 0 against those with under six months — a distinction no clinical attribute in this study records, and one that needs no knowledge of how this study names its events.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "followed 2y+": { all: [{ kind: "derived", metric: "followupMonths", range: { gte: 24 } }] },
+        "followed < 6mo": { all: [{ kind: "derived", metric: "followupMonths", range: { lt: 6 } }] }
+      },
+      views: [
+        { kind: "clinical", attributes: ["CANCER_TYPE", "CURRENT_AGE_DEID", "TMB_NONSYNONYMOUS"] },
+        { kind: "compare", genes: ["TP53", "KRAS", "PIK3CA"] }
+      ]
+    }
+  },
+  {
     title: "Progression on immunotherapy: during, versus absent",
     demonstrates: "Two temporal relations that look similar and mean opposite things. DURING asks whether progression was recorded inside a treatment interval; NOT_FOLLOWED_BY asks whether it was absent for a year afterwards \u2014 and only counts patients whose follow-up actually covers that year.",
     tags: ["timeline", "temporal", "compare", "clinical", "survival"],
@@ -431,6 +448,7 @@ say so in their captions.
 | \`hotspots\` | \`genes:[\u226412], cohorts?:[names], minCount?\` | recurrent protein changes per gene (the lollipop's data): patients carrying each change, as a share of those with ANY mutation in that gene. The codon is parsed from the change string, since the schema stores no position. \`minCount\` is a suppression floor each site applies **before returning anything** \u2014 a variant carried by one patient is the most disclosive aggregate here |
 | \`coexpression\` | \`genes:[2-12], profileType, cohorts?:[names]\` | Pearson correlation between gene pairs on a continuous molecular profile, **within one cohort** (the first named). Each site reports only six sums (n, \u03a3x, \u03a3y, \u03a3xy, \u03a3x\u00b2, \u03a3y\u00b2), which are additive \u2014 so the federated correlation is exact, not approximate. Across studies a Fisher-z meta-analysis of per-study correlations is reported alongside the pooled one |
 | \`clinical\` | \`{"kind":"clinical","attribute":A, ...predicate, "per"?:"sample"}\` | clinical attribute; predicate is \`values:[≤50]\` (OR), \`range:{gt,gte,lt,lte}\` (numeric via toFloat64OrNull), or \`op\`(\`= != > >= < <=\`)+\`value\`; \`per:"sample"\` = patient matches if ANY sample matches |
+| \`derived\` | \`{"kind":"derived","metric":"followupMonths"|"historyMonths"|"alteredGenes","range":{gte?,gt?,lte?,lt?}}\` | filters on a value computed from the **shape** of the data rather than a study's vocabulary. Event-type names and attribute keys are study-specific \u2014 this database spells one concept \`Treatment\` in 87 studies and \`TREATMENT\` in 10, and the key MSK-CHORD calls \`SUBTYPE\` exists in only 27 of 131 timeline studies \u2014 so these read dates and gene symbols instead and mean the same thing everywhere. \`followupMonths\`: how far the timeline runs past its own day 0. \`historyMonths\`: how much predates it. \`alteredGenes\`: distinct genes altered (panel size bounds it, so not comparable across studies with different panels) |
 | \`event\` | \`{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}\` | timeline sub-DSL (below) |
 | \`patients\` | \`{"kind":"patients","ids":[≤50000]}\` | explicit list, intersected with the study |
 | \`profiled\` | \`{"kind":"profiled","type":"MUTATION"\\|"CNA"\\|"SV"}\` | patient has a sample on a gene panel for that data type — combine with \`not\` to separate wild-type from not-profiled |
@@ -595,6 +613,7 @@ columns are qualified per study (duplicates appear twice) and a Study track show
 clause = leaf | {"any":[leaf,...]} | {"not":leaf}.
 Leaf kinds:
 - {"kind":"oql","q":"STK11: DRIVER"} — genomic status in cBioPortal OQL (preferred; full notes below).
+- {"kind":"derived","metric":"followupMonths","range":{"gte":24}} (also historyMonths, alteredGenes \u2014 computed from data shape, not study vocabulary)
 - {"kind":"clinical","attribute":"GENDER","op":"=","value":"Male"} (ops = != > >= < <=; numeric values compare numerically).
   Useful attributes: OS_STATUS (0:LIVING/1:DECEASED), OS_MONTHS, GENDER, RACE, CURRENT_AGE_DEID,
   SMOKING_PREDICTIONS_3_CLASSES (Former/Current Smoker, Never, Unknown), CANCER_TYPE-site flags (LUNG, LIVER, BONE... values Yes/No).
