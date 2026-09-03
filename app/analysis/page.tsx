@@ -172,7 +172,6 @@ export default function AnalysisPage() {
   const [geneSearch, setGeneSearch] = useState("");                     // server-side gene filter for the three tables
   const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
   const [attrLimit, setAttrLimit] = useState(20);                       // clinical attributes shown
-  const valueLimit = 10;                                                // values per ranked-list facet
 
   const LS_KEY = "cohortlab.savedCohorts";
   const persist = (next: typeof saved) => { setSaved(next); try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {} };
@@ -853,7 +852,7 @@ export default function AnalysisPage() {
                             onClick={() => addClause({ kind: "derived", metric: d.metric,
                               range: { ...(b.gte != null ? { gte: b.gte } : {}), ...(b.lt != null ? { lt: b.lt } : {}) } })}>
                             <span className="vname">{b.label}</span>
-                            <span className="vbar"><i style={{ width: Math.max(1, Math.round(100 * b.n / max)) + "%" }} /></span>
+                            <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * b.n / max)) + "%" }} /></span>
                             <span className="vn">{b.n.toLocaleString()}</span>
                           </button>
                         ))}
@@ -930,17 +929,17 @@ export default function AnalysisPage() {
                         const max = Math.max(...c.values.map((v: any) => v.n), 1);
                         return (
                           <div className="vallist">
-                            {c.values.slice(0, valueLimit).map((v: any, i: number) => (
+                            {c.values.map((v: any, i: number) => (
                               <button key={i} className={isSel(v) ? "valrow on" : "valrow"} onClick={() => addClause(clause(v))}
                                 title={v.v + " — " + v.n.toLocaleString() + " (click to filter)"}>
                                 <span className="vname">{v.v}</span>
-                                <span className="vbar"><i style={{ width: Math.max(1, Math.round(100 * v.n / max)) + "%" }} /></span>
+                                <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * v.n / max)) + "%" }} /></span>
                                 <span className="vn">{v.n.toLocaleString()}</span>
                               </button>
                             ))}
-                            {(c.distinct ?? 0) > Math.min(c.values.length, valueLimit) && (
+                            {(c.distinct ?? 0) > c.values.length && (
                               <span className="meta" style={{ padding: "0.1rem 0.3rem" }}>
-                                showing {Math.min(c.values.length, valueLimit)} of {c.distinct!.toLocaleString()} values
+                                showing {c.values.length.toLocaleString()} of {c.distinct!.toLocaleString()} values
                               </span>
                             )}
                           </div>

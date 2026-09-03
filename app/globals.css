@@ -295,18 +295,25 @@ details.gearmenu > .gearmenu-items {
 .generow .dtlabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Explore: high-cardinality categorical facets as a ranked list (portal table) */
-.vallist { display: flex; flex-direction: column; margin-top: 0.25rem; }
+.vallist {
+  display: flex; flex-direction: column; margin-top: 0.25rem;
+  /* every value is present; the list scrolls rather than being trimmed */
+  max-height: 13.5rem; overflow-y: auto; overscroll-behavior: contain;
+}
 .valrow {
-  display: grid; grid-template-columns: minmax(6rem, 1.6fr) minmax(3rem, 1fr) 5rem;
-  gap: 0 0.5rem; align-items: center; width: 100%;
+  /* name · a thin proportion rule · count — the bar is a hint at relative size,
+     deliberately small so the label and the number stay the content */
+  display: grid; grid-template-columns: 1fr 3rem auto;
+  gap: 0 0.6rem; align-items: center; width: 100%;
   background: none; border: none; padding: 0.12rem 0.3rem; border-radius: 4px;
   font: inherit; font-size: 0.74rem; color: var(--ink); text-align: left; cursor: pointer;
 }
 .valrow:hover { background: var(--code-bg); }
 .valrow.on { background: var(--code-bg); outline: 1px solid var(--accent-ink); }
 .valrow .vname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.valrow .vbar { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; }
-.valrow .vbar i { display: block; height: 100%; min-width: 2px; background: var(--accent-ink); opacity: 0.75; }
+.valrow .vbar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.valrow .vbar i { display: block; height: 100%; min-width: 2px; background: var(--accent-ink); opacity: 0.55; }
+.valrow:hover .vbar i, .valrow.on .vbar i { opacity: 0.9; }
 .valrow .vn { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 
 /* Survival: log-rank readout under the KM chart */

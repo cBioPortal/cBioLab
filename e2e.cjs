@@ -144,6 +144,31 @@ async function main() {
         return { inCard: true, clinical: /counted in each attribute/.test(card.textContent),
           within: br.left >= cr.left && br.right <= cr.right && br.bottom <= cr.bottom + 1 };
       });
+      // Categorical values are shown in full and scrolled, not trimmed to a few;
+      // and the ranked lists carry no inline bar charts.
+      const vals = await page.evaluate(() => {
+        const lists = [...document.querySelectorAll(".vallist")];
+        const big = lists.map(l => ({
+          rows: l.querySelectorAll(".valrow").length,
+          scrolls: l.scrollHeight > l.clientHeight + 2,
+          capped: [...l.querySelectorAll("span")].some(s2 => /showing .* of .* values/.test(s2.textContent || ""))
+        })).sort((a, b) => b.rows - a.rows)[0];
+        return { lists: lists.length, big, bars: document.querySelectorAll(".vbar").length };
+      });
+      ok("categorical values are shown in full, scrolled rather than trimmed",
+        !!vals.big && vals.big.rows > 20 && vals.big.scrolls,
+        vals.big ? vals.big.rows + " values in the largest list, scrolls=" + vals.big.scrolls +
+          (vals.big.capped ? ", cap disclosed" : "") : "no value lists");
+      // the proportion rules are a hint, not a chart — guard against them growing
+      const barBox = await page.evaluate(() => {
+        const b2 = document.querySelector(".valrow .vbar");
+        if (!b2) return null;
+        const r = b2.getBoundingClientRect();
+        return { h: Math.round(r.height), w: Math.round(r.width) };
+      });
+      ok("value bars stay small", !!vals.bars && !!barBox && barBox.h <= 5 && barBox.w <= 80,
+        barBox ? vals.bars + " bars, " + barBox.w + "x" + barBox.h + "px" : "no bars found");
+
       ok("the attribute expander sits inside the Clinical card",
         !expanderPlaced || (expanderPlaced.inCard && expanderPlaced.clinical && expanderPlaced.within),
         expanderPlaced ? JSON.stringify(expanderPlaced) : "no expander (all attributes shown)");

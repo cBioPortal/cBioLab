@@ -19,7 +19,16 @@ const TARGET_BINS = 20;
 /** how many numeric attributes get a histogram (each costs two grouped queries per study) */
 const NUM_HISTOGRAM_LIMIT = 14;
 /** values returned per categorical facet (a pie shows a few; a ranked list more) */
-const FACET_VALUE_LIMIT = 20;
+/**
+ * Safety bound on values per facet, NOT a display choice — the UI scrolls, so
+ * there is no reason to trim for the screen. Measured on MSK-CHORD: fetching
+ * every categorical value is 78ms vs 89ms capped at 20 (LIMIT n BY costs more
+ * than it saves) and 47KB vs 20KB, against a page that already ships 165KB.
+ * Only 6 of 41 categorical attributes exceed 20 values and the largest is 189.
+ * The bound exists so one pathological free-text attribute cannot blow up the
+ * payload; a facet that hits it says so.
+ */
+const FACET_VALUE_LIMIT = 200;
 
 /**
  * Bin edges for a numeric attribute, reproducing the portal's algorithm:
