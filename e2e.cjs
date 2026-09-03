@@ -191,6 +191,14 @@ async function main() {
       } catch { /* left empty */ }
       const canAnalyseUnfiltered = !(await page.locator(".exbar button:has-text('Analyze')").isDisabled());
       ok("a study with no filters is analysable", canAnalyseUnfiltered && !!unfiltered, unfiltered || "bar never offered the unfiltered cohort");
+
+      // The separate "Draft cohort" card was folded into the sticky bar: no
+      // second card, but its two real features (clause pills, gene search)
+      // must still exist somewhere.
+      const noDraftCard = (await page.locator("h2:has-text('Draft cohort')").count()) === 0;
+      const geneSearchPresent = (await page.locator("input[placeholder='gene symbol…']").count()) > 0;
+      ok("the Draft cohort card is gone, folded into the action bar",
+        noDraftCard && geneSearchPresent, "no card: " + noDraftCard + ", gene search present: " + geneSearchPresent);
       await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
       await page.locator(".valrow, .slice").first().click();
       let drafted = true;
@@ -200,7 +208,7 @@ async function main() {
       } catch { drafted = false; }
       ok("clicking a facet builds a draft and counts it", drafted,
         drafted ? (await page.locator(".exbar").innerText()).replace(/\s+/g, " ").split(" Analyze")[0] : "no count appeared");
-      await page.locator(".exbar input").fill("e2e explored cohort");
+      await page.locator('.exbar input[placeholder="name…"]').fill("e2e explored cohort");
       await page.locator(".exbar button:has-text('Analyze')").click();
       let landed = false, views = [];
       try {
@@ -222,7 +230,7 @@ async function main() {
         await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 240000 });
       } catch { /* count may already be shown */ }
-      await page.locator(".exbar input").fill("e2e second cohort");
+      await page.locator('.exbar input[placeholder="name…"]').fill("e2e second cohort");
       await page.locator(".exbar button:has-text('Analyze')").click();
       let replaced = false, after = [];
       try {

@@ -780,6 +780,19 @@ export default function AnalysisPage() {
                   </span>
                   {clauses > 0 && <button className="linklike" onClick={clearDraft}>clear</button>}
                 </div>
+                {clauses > 0 && (
+                  <div className="row" style={{ marginTop: "0.4rem" }}>
+                    {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} />; })()}
+                  </div>
+                )}
+                <div className="row" style={{ marginTop: "0.4rem" }}>
+                  <span className="meta">find a gene:</span>
+                  <input placeholder="gene symbol…" value={geneSearch} style={{ width: "9rem", fontSize: "0.78rem" }}
+                    onChange={e => setGeneSearch(e.target.value.toUpperCase())}
+                    onKeyDown={e => { if (e.key === "Enter") fetchExplore(); }} />
+                  <button className="facet" onClick={() => fetchExplore()} title="filter the gene tables (searches all genes, not just those shown)">search</button>
+                  {geneSearch && <button className="linklike" onClick={() => { setGeneSearch(""); setTimeout(() => fetchExplore(), 0); }}>clear</button>}
+                </div>
                 {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
               </div>
             );
@@ -858,25 +871,6 @@ export default function AnalysisPage() {
               </div>
             );
           })()}
-          <div className="card">
-            <h2>Draft cohort <span className="plain">— click anything below to add a clause; counts narrow to your draft</span></h2>
-            <div className="row" style={{ alignItems: "center" }}>
-              {(() => { const d = parseDraft(); return d
-                ? <CohortPills def={d} onRemoveClause={removeDraftClause} />
-                : <span className="meta">no clauses yet — the numbers below describe the whole study</span>; })()}
-              {explore && explore.draftCount != null && <strong style={{ marginLeft: "0.5rem" }}>{explore.draftCount.toLocaleString()} patients</strong>}
-              {exploreBusy && <span className="spinner" />}
-            </div>
-            <div className="row" style={{ marginTop: "0.5rem" }}>
-              <span className="meta">Analyze / Save as cohort are at the top of the page.</span>
-              <span className="spacer" />
-              <input placeholder="find a gene…" value={geneSearch} style={{ width: "9rem", fontSize: "0.78rem" }}
-                onChange={e => setGeneSearch(e.target.value.toUpperCase())}
-                onKeyDown={e => { if (e.key === "Enter") fetchExplore(); }} />
-              <button className="facet" onClick={() => fetchExplore()} title="filter the gene tables (searches all genes, not just those shown)">search</button>
-              {geneSearch && <button className="linklike" onClick={() => { setGeneSearch(""); setTimeout(() => fetchExplore(), 0); }}>clear</button>}
-            </div>
-          </div>
           {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "0.85rem", margin: 0 }}>
             No studies selected — check one or more above to explore.</p></div>}
           {!explore && exStudies.length > 0 && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
