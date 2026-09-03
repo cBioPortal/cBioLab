@@ -134,6 +134,20 @@ async function main() {
         const bucketSelected = (await page.locator(".derivedgrid .valrow.on").count()) > 0;
         der.filtered = barSaysFiltered && bucketSelected;
       } catch { /* left as-is */ }
+      // the attribute expander belongs to the Clinical card, not the gap between columns
+      const expanderPlaced = await page.evaluate(() => {
+        const btn = [...document.querySelectorAll("button")].find(b2 => /more attributes/.test(b2.textContent));
+        if (!btn) return null;
+        const card = btn.closest(".card");
+        if (!card) return { inCard: false };
+        const br = btn.getBoundingClientRect(), cr = card.getBoundingClientRect();
+        return { inCard: true, clinical: /counted in each attribute/.test(card.textContent),
+          within: br.left >= cr.left && br.right <= cr.right && br.bottom <= cr.bottom + 1 };
+      });
+      ok("the attribute expander sits inside the Clinical card",
+        !expanderPlaced || (expanderPlaced.inCard && expanderPlaced.clinical && expanderPlaced.within),
+        expanderPlaced ? JSON.stringify(expanderPlaced) : "no expander (all attributes shown)");
+
       ok("derived facets appear and filter", der.facets >= 2 && der.filtered,
         der.facets + " derived facets" + (der.filtered ? ", click added a derived clause" : ", click did not filter"));
 

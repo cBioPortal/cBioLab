@@ -998,13 +998,14 @@ export default function AnalysisPage() {
                     </div>}
                   </div>
                 ))}
+                {explore.clinical.length > attrLimit && (
+                  <button className="linklike" style={{ marginTop: "0.5rem" }}
+                    onClick={() => setAttrLimit(attrLimit + 20)}>
+                    show {Math.min(20, explore.clinical.length - attrLimit)} more attributes
+                  </button>
+                )}
               </div>
             </div>
-              {explore.clinical.length > attrLimit && (
-                <button className="linklike" onClick={() => setAttrLimit(attrLimit + 20)}>
-                  show {Math.min(20, explore.clinical.length - attrLimit)} more attributes
-                </button>
-              )}
             <div>
               {explore.studyBreakdown && explore.studyBreakdown.length > 0 && (
                 <div className="card">
