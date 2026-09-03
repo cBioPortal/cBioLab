@@ -14,7 +14,7 @@ import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, fisherZMeta } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting, restrictedStudies,
@@ -205,12 +205,32 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       // Triples are kept PER STUDY rather than merged on arrival, because the
       // log-rank statistic is additive over strata — keeping the site dimension
       // is what makes the stratified test available.
+      const endpoint = String((view as SurvivalView).endpoint || "OS").toUpperCase().trim();
+      if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) {
+        views.push({ kind: "survival", error: "bad survival endpoint '" + endpoint.slice(0, 40) + "'" }); continue;
+      }
       const perSite = new Map<string, Map<string, SurvivalCount[]>>(); // cohort -> study -> triples
       for (const n of vNames) perSite.set(n, new Map());
       await Promise.all(vNames.flatMap((n) =>
         cohorts[n].studies.map(async (st) => {
-          perSite.get(n)!.set(st, await resolvers[st].survivalCounts(doc.cohorts[n]));
+          perSite.get(n)!.set(st, await resolvers[st].survivalCounts(doc.cohorts[n], endpoint));
         })));
+      // A study with nothing for this endpoint must be named, not silently
+      // dropped from a curve — its patients would otherwise just be missing.
+      const silent = vStudies.filter((st) =>
+        vNames.every((n) => !(perSite.get(n)!.get(st) || []).length));
+      let endpointHelp = "";
+      if (silent.length) {
+        const avail = await Promise.all(silent.map(async (st) =>
+          st + ": " + ((await resolvers[st].survivalEndpoints().catch(() => [])).join(", ") || "none declared")));
+        endpointHelp = " " + silent.length + " of " + vStudies.length + " stud" + (silent.length === 1 ? "y has" : "ies have") +
+          " no " + endpoint + " data and contribute no patients here (" + avail.join("; ") + ").";
+        if (silent.length === vStudies.length) {
+          views.push({ kind: "survival", endpoint,
+            error: "no participating study defines " + endpoint + "_MONTHS/" + endpoint + "_STATUS." + endpointHelp });
+          continue;
+        }
+      }
       const pointsFor = (n: string, st?: string) => expandSurvivalCounts(
         st ? (perSite.get(n)!.get(st) || []) : [...perSite.get(n)!.values()].flat());
       const curves = vNames.map((n) => {
@@ -232,11 +252,12 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
           logrank = pooledTest;
         }
       }
-      views.push({ kind: "survival", cohorts: vNames, curves,
+      views.push({ kind: "survival", cohorts: vNames, curves, endpoint,
         participation: participationFor(vStudies, false),
         ...(logrank ? { logrank } : {}), ...(logrankPooled ? { logrankPooled } : {}),
-        caveat: "OS from each study's own baseline (left truncation applies" +
+        caveat: endpoint + " from each study's own baseline (left truncation applies" +
           (vStudies.length > 1 ? "; baselines are NOT harmonized across studies" : "") + "); status '0:...' treated as censored." +
+          endpointHelp +
           (logrankPooled
             ? " The log-rank test is STRATIFIED by study (" + logrank!.strata + " strata contributed events): each study is" +
               " compared only against itself, so a difference in case mix between studies cannot masquerade as a difference" +

@@ -17,7 +17,7 @@ import { carriesPatientIds } from "./federation.ts";
 
 interface RemoteAggregates {
   study: string; instance: string; count: number;
-  geneCounts: GeneCounts[]; survivalCounts: SurvivalCount[]; pairCounts: PairCounts[]; attributeStats: AttrStats[]; pairMoments: PairMoments[]; variantCounts: VariantReport; profileMoments: ProfileMoments[];
+  geneCounts: GeneCounts[]; survivalCounts: SurvivalCount[]; survivalEndpoints?: string[] | null; pairCounts: PairCounts[]; attributeStats: AttrStats[]; pairMoments: PairMoments[]; variantCounts: VariantReport; profileMoments: ProfileMoments[];
   /** the SQL the peer compiled and ran, when it chooses to disclose it */
   cohortSql?: string | null;
   /** and the aggregate queries it ran to answer this call */
@@ -148,11 +148,18 @@ export class RemoteAggregateResolver implements AggregateCapable {
     this.remember(r);
     return r.geneCounts;
   }
-  async survivalCounts(def: CohortDef | null | undefined): Promise<SurvivalCount[]> {
+  async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS"): Promise<SurvivalCount[]> {
     this.guard(def);
-    const r = await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, survival: true });
+    const r = await mcpCall(this.url, "federated_aggregates",
+      { study: this.study, cohort: def || {}, survival: true, endpoint });
     this.remember(r);
     return r.survivalCounts;
+  }
+  async survivalEndpoints(): Promise<string[]> {
+    // the peer reports what IT can answer; asking costs one call with no cohort
+    const r = await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: {}, survivalEndpoints: true })
+      .catch(() => ({ survivalEndpoints: [] as string[] }));
+    return (r as { survivalEndpoints?: string[] }).survivalEndpoints || [];
   }
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
     this.guard(def);

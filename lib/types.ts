@@ -109,7 +109,11 @@ export interface CompileCtx {
 export interface CompareView {
   kind: "compare"; genes: string[]; cohorts?: string[];
 }
-export interface SurvivalView { kind: "survival"; cohorts?: string[] }
+export interface SurvivalView {
+  kind: "survival"; cohorts?: string[];
+  /** endpoint prefix: OS (default), PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS */
+  endpoint?: string;
+}
 export interface CooccurrenceView { kind: "cooccurrence"; genes: string[]; cohorts?: string[] }
 export interface ClinicalView { kind: "clinical"; attributes: string[]; cohorts?: string[] }
 export interface CoexpressionView { kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[] }
@@ -242,6 +246,7 @@ export interface ViewResult {
   cohorts?: string[]; annotation?: string;
   rows?: CompareRow[];                      // compare
   curves?: KmCurve[]; caveat?: string;      // survival
+  endpoint?: string;                        // survival: which endpoint was used
   logrank?: LogRank; logrankPooled?: LogRank;
   pairs?: CooccurRow[];                     // cooccurrence
   clinical?: ClinicalRow[];                 // clinical comparison

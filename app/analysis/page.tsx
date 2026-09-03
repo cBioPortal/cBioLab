@@ -1577,7 +1577,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "survival" && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Survival <span className="plain">— Kaplan–Meier, overall survival</span></h2><span className="spacer" /><>{v.ms != null && (
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Survival <span className="plain">— Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}</span></h2><span className="spacer" /><>{v.ms != null && (
                       <span className="lat" title={
                         "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
                         (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>

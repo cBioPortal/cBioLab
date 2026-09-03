@@ -435,23 +435,53 @@ export function clinicalMomentsSql(cohortSql: string, attrs: string[], study: st
  * (months, event, n) triples for one cohort in one study. Aggregate — pools
  * exactly with other instances' triples to give a correct pooled KM curve.
  */
-export function survivalCountsSql(cohortSql: string, study: string, db: string = DB): string {
+/** Endpoint prefix -> the (<X>_MONTHS, <X>_STATUS) attribute pair cBioPortal stores. */
+export const ENDPOINT_RE = /^[A-Z][A-Z0-9_]{0,39}$/;
+
+/**
+ * (months, event, n) triples for one cohort in one study. Aggregate — pools
+ * exactly with other instances' triples to give a correct pooled KM curve.
+ *
+ * `endpoint` names the pair: "OS" reads OS_MONTHS/OS_STATUS, "PFS" reads
+ * PFS_MONTHS/PFS_STATUS, and so on. Studies carry wildly different sets (this
+ * database has 27 distinct pairs across 519 studies), so the caller must be
+ * told when a study has nothing for the endpoint asked for rather than seeing
+ * its patients quietly vanish from a curve.
+ */
+export function survivalCountsSql(cohortSql: string, study: string, db: string = DB, endpoint = "OS"): string {
+  if (!ENDPOINT_RE.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  const months = endpoint + "_MONTHS", status = endpoint + "_STATUS";
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         anyIf(attribute_value, attribute_name='OS_MONTHS') AS months,\n" +
-    "         anyIf(attribute_value, attribute_name='OS_STATUS') AS status\n" +
+    "         anyIf(attribute_value, attribute_name=" + sq(months) + ") AS months,\n" +
+    "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
     "  FROM " + db + ".clinical_data_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
-    "    AND attribute_name IN ('OS_MONTHS','OS_STATUS')\n" +
+    "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
     "  GROUP BY pid\n" +
     ")\n" +
     "SELECT toFloat64OrNull(months) AS m, if(status LIKE '1%', 1, 0) AS ev, count() AS n\n" +
     "FROM os WHERE toFloat64OrNull(months) IS NOT NULL\n" +
     "GROUP BY m, ev ORDER BY m"
+  );
+}
+
+/** Which (<X>_MONTHS, <X>_STATUS) pairs a study actually declares. Metadata only. */
+export function survivalEndpointsSql(study: string, db: string = DB): string {
+  return (
+    "SELECT replaceOne(cam.attr_id, '_MONTHS', '') AS endpoint\n" +
+    "FROM " + db + ".clinical_attribute_meta cam\n" +
+    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND cam.attr_id LIKE '%\\_MONTHS'\n" +
+    "  AND replaceOne(cam.attr_id, '_MONTHS', '_STATUS') IN (\n" +
+    "    SELECT cam2.attr_id FROM " + db + ".clinical_attribute_meta cam2\n" +
+    "    JOIN " + db + ".cancer_study cs2 ON cs2.cancer_study_id = cam2.cancer_study_id\n" +
+    "    WHERE cs2.cancer_study_identifier = " + sq(study) + ")\n" +
+    "ORDER BY endpoint"
   );
 }
 
@@ -489,7 +519,9 @@ export interface AggregateCapable {
   /** cohort size — a count, not a roster */
   count(def: CohortDef | null | undefined): Promise<number>;
   geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]>;
-  survivalCounts(def: CohortDef | null | undefined): Promise<SurvivalCount[]>;
+  survivalCounts(def: CohortDef | null | undefined, endpoint?: string): Promise<SurvivalCount[]>;
+  /** endpoints this participant can answer for; [] when it cannot say */
+  survivalEndpoints(): Promise<string[]>;
   pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
   attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]>;
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
@@ -560,10 +592,15 @@ abstract class BaseResolver implements AggregateCapable {
       gene: x.gene, profiled: Number(x.profiled), altered: Number(x.altered), driver: Number(x.driver)
     }));
   }
-  async survivalCounts(def: CohortDef | null | undefined): Promise<SurvivalCount[]> {
-    const r = await this.runLogged<ChRow>("survivalCounts",
-      survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
+  async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS"): Promise<SurvivalCount[]> {
+    const r = await this.runLogged<ChRow>("survivalCounts:" + endpoint,
+      survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db, endpoint), this.instance.conn);
     return r.data.map((x) => ({ months: Number(x.m), event: Number(x.ev), n: Number(x.n) }));
+  }
+  async survivalEndpoints(): Promise<string[]> {
+    const r = await chQuery<ChRow>(survivalEndpointsSql(this.study, this.instance.conn.db), this.instance.conn)
+      .catch(() => ({ data: [] as ChRow[] }));
+    return r.data.map((x) => String(x.endpoint));
   }
   async profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]> {
     if (!genes.length || !profileType) return [];

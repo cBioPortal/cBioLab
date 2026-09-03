@@ -80,6 +80,10 @@ export function registerTools(server: any): void {
         cohort: z.record(z.string(), z.any()).describe("Cohort definition (v2 DSL; see describe_dsl)"),
         genes: z.array(z.string()).max(20).nullish().describe("Genes for per-gene counts"),
         survival: z.boolean().nullish().describe("Also return (months, event, n) survival triples"),
+        endpoint: z.string().max(40).nullish()
+          .describe("Survival endpoint prefix for `survival` — OS, PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS (default OS)"),
+        survivalEndpoints: z.boolean().nullish()
+          .describe("Return the survival endpoints THIS study declares, so a caller can offer only what exists"),
         pairs: z.array(z.tuple([z.string(), z.string()])).max(66).nullish()
           .describe("Gene pairs for co-occurrence: returns each pair's 2x2 (both/onlyA/onlyB/neither) among patients profiled for BOTH genes"),
         attributes: z.array(z.string()).max(20).nullish()
@@ -94,16 +98,16 @@ export function registerTools(server: any): void {
           .describe("With `pairs`, a continuous molecular profile (e.g. an mRNA z-score profile): returns the six sums (n, Sx, Sy, Sxy, Sxx, Syy) per pair, which are sufficient for a correlation and carry no individual value")
       }
     },
-    async ({ study, cohort, genes, survival, pairs, attributes, profileType, variantGenes, minCount, momentGenes }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; profileType?: string | null; variantGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null }) => {
+    async ({ study, cohort, genes, survival, pairs, attributes, profileType, variantGenes, minCount, momentGenes, endpoint, survivalEndpoints }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; profileType?: string | null; variantGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; survivalEndpoints?: boolean | null }) => {
       try {
         const s = await resolveStudy(study);
         const { profiles, gaProfiles } = await studyProfiles(s);
         const pin = process.env.ONCOKB_PIN || null;
         const res = await resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
-        const [count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments] = await Promise.all([
+        const [count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, endpointList] = await Promise.all([
           res.count(cohort),
           genes && genes.length ? res.geneCounts(cohort, genes) : Promise.resolve([]),
-          survival ? res.survivalCounts(cohort) : Promise.resolve([]),
+          survival ? res.survivalCounts(cohort, endpoint || "OS") : Promise.resolve([]),
           pairs && pairs.length ? res.pairCounts(cohort, pairs) : Promise.resolve([]),
           attributes && attributes.length ? res.attributeStats(cohort, attributes) : Promise.resolve([]),
           pairs && pairs.length && profileType ? res.pairMoments(cohort, pairs, profileType) : Promise.resolve([]),
@@ -111,7 +115,8 @@ export function registerTools(server: any): void {
             ? res.variantCounts(cohort, variantGenes, minCount || 1)
             : Promise.resolve({ variants: [], totals: [], minCount: minCount || 1 }),
           momentGenes && momentGenes.length && profileType
-            ? res.profileMoments(cohort, momentGenes, profileType) : Promise.resolve([])
+            ? res.profileMoments(cohort, momentGenes, profileType) : Promise.resolve([]),
+          survivalEndpoints ? res.survivalEndpoints() : Promise.resolve([] as string[])
         ]);
         // SQL text carries no patient data, and an id-carrying definition was already
         // refused, so disclosing what we ran restores end-to-end provenance for the
@@ -119,7 +124,7 @@ export function registerTools(server: any): void {
         // FEDERATION_HIDE_SQL=1 and the caller degrades gracefully.
         const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
         const cohortSql = hideSql ? null : res.cohortSql(cohort);
-        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, cohortSql, queries: hideSql ? null : res.queries, oncokbPin: pin };
+        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, survivalEndpoints: endpointList, cohortSql, queries: hideSql ? null : res.queries, oncokbPin: pin };
         return {
           content: [{ type: "text" as const, text: `aggregates for ${s}: ${count.toLocaleString()} patients` +
             (geneCounts.length ? `, ${geneCounts.length} gene counts` : "") +
