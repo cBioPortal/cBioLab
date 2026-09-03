@@ -17,76 +17,16 @@ async function main() {
     page.on("pageerror", e => errors.push("pageerror: " + e.message));
     page.on("console", m => { if (m.type() === "error") errors.push("console: " + m.text()); });
 
-    await page.goto(BASE + "/");
-    await page.waitForSelector("#connPill.on", { timeout: 90000 });
-    ok(scheme + ": auto-connected pill", true, await page.textContent("#connText"));
-
-    const typeCount = await page.locator(".sel-card select option").count();
-    ok(scheme + ": event types loaded", typeCount >= 5, typeCount + " options");
+    // "/" no longer serves the standalone query-builder UI — it redirects into
+    // the Analysis app, which subsumes it. Verify the redirect itself once
+    // (scheme-independent) and use /analysis as the base for both passes below.
+    const rootResp = await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
+    ok(scheme + ": / redirects into the app", /\/analysis(\?|$)/.test(page.url()) && rootResp.ok(),
+      page.url() + " status " + rootResp.status());
+    await page.waitForSelector(".tabs button", { timeout: 90000 });
+    ok(scheme + ": app shell loads", (await page.locator(".tabs button").count()) >= 4);
 
     if (scheme === "light") {
-      const runDone = () => page.waitForFunction(
-        () => document.getElementById("runBtn") && !document.getElementById("runBtn").disabled &&
-              document.getElementById("rMatched"), null, { timeout: 120000 });
-
-      // Recipe 1 auto-runs on click
-      await page.click('#recipes button[data-i="0"]');
-      await runDone();
-      const m1 = (await page.textContent("#rMatched")).trim();
-      const d1 = (await page.textContent("#rDenom")).trim();
-      ok("recipe1 auto-ran, 2,024/3,341", m1 === "2,024" && d1 === "3,341", m1 + "/" + d1);
-      ok("gap histogram", await page.locator("#histChart .bar-row").count() >= 5);
-      const plinks = await page.locator("#rPatients a").count();
-      const phref = plinks ? await page.locator("#rPatients a").first().getAttribute("href") : "";
-      ok("patient links", plinks > 0 && phref.includes("/patient?studyId=msk_chord_2024"), plinks + " links");
-      const sql = await page.textContent("#rSql");
-      ok("SQL shown", sql.includes("uniqExact(sel_a.patient_id)"));
-
-      // Recipe 5 (absence)
-      await page.click('#recipes button[data-i="4"]');
-      await page.waitForFunction(t => document.getElementById("rMatched") &&
-        document.getElementById("rMatched").textContent.trim() !== t &&
-        !document.getElementById("runBtn").disabled, m1, { timeout: 120000 });
-      const m5 = (await page.textContent("#rMatched")).trim();
-      const d5 = (await page.textContent("#rDenom")).trim();
-      ok("recipe5 absence 7,028/17,010", m5 === "7,028" && d5 === "17,010", m5 + "/" + d5);
-      ok("histogram absent for absence rel", (await page.locator("#histChart").count()) === 0);
-
-      // Lines explorer with guard
-      await page.check("#lineGuard");
-      await page.click("#linesBtn");
-      await page.waitForFunction(() => document.querySelectorAll("#lineHist .bar-row").length > 0, null, { timeout: 120000 });
-      const l1 = await page.locator("#lineHist .bar-row .val").first().textContent();
-      ok("lines hist first bucket 9,047", l1.trim() === "9,047", l1.trim());
-      const t1 = await page.locator("#lineTrans .bar-row").first().getAttribute("title");
-      ok("top transition Chemo→Chemo 922", t1.includes("Chemo → Chemo") && t1.includes("922"), t1);
-
-      // Recipe 3 single-selector
-      await page.click('#recipes button[data-i="2"]');
-      await page.waitForFunction(t => document.getElementById("rMatched").textContent.trim() !== t &&
-        !document.getElementById("runBtn").disabled, m5, { timeout: 120000 });
-      const m3 = (await page.textContent("#rMatched")).trim();
-      ok("recipe3 single-selector 5,076", m3 === "5,076", m3);
-
-      // New guarded recipe: True 1L immuno, PFS 1y (guard auto-applied) — expect 417/2,392
-      await page.click('#recipes button[data-i="11"]');
-      await page.waitForFunction(t => document.getElementById("rMatched").textContent.trim() !== t &&
-        !document.getElementById("runBtn").disabled, m3, { timeout: 120000 });
-      const m11 = (await page.textContent("#rMatched")).trim();
-      const d11 = (await page.textContent("#rDenom")).trim();
-      ok("recipe12 guarded 417/2,392", m11 === "417" && d11 === "2,392", m11 + "/" + d11);
-      ok("guard checkbox auto-set", await page.isChecked(".chk input[type=checkbox]"));
-
-      // Derived-line recipe: Progression <=180d after starting 2L — expect 3,003/7,824
-      await page.click('#recipes button[data-i="12"]');
-      await page.waitForFunction(t => document.getElementById("rMatched").textContent.trim() !== t &&
-        !document.getElementById("runBtn").disabled, m11, { timeout: 120000 });
-      const m12 = (await page.textContent("#rMatched")).trim();
-      const d12 = (await page.textContent("#rDenom")).trim();
-      ok("line-event recipe 3,003/7,824", m12 === "3,003" && d12 === "7,824", m12 + "/" + d12);
-      const selHtml = await page.locator(".sel-card select").first().innerHTML();
-      ok("synthetic line type in dropdown", selHtml.includes("Treatment line (derived)"));
-
       // No credentials anywhere client-visible: check for env var names plus the
       // actual secrets read from .env.local at runtime (never hardcoded here)
       const pageContent = await page.content();
@@ -103,17 +43,38 @@ async function main() {
 
       await page.screenshot({ path: "shot-next-light.png", fullPage: true });
 
-      // Oncoprint page: default two-group preset auto-renders
-      await page.goto(BASE + "/oncoprint");
-      await page.waitForSelector("#oncoCanvas", { timeout: 180000 });
-      await page.waitForFunction(() => {
-        const h = [...document.querySelectorAll(".card h2")].map(e => e.textContent).join(" ");
-        return h.includes("patients");
-      }, null, { timeout: 180000 });
-      const oncoHeader = [...await page.locator(".card h2").allTextContents()].join(" ");
-      ok("oncoprint contract built (2,946 patients)", oncoHeader.includes("2,946 patients"), oncoHeader.slice(0, 80));
-      const canvasH = await page.locator("#oncoCanvas").evaluate(c => c.height);
-      ok("oncoprint canvas painted", canvasH > 100, "canvas height " + canvasH);
+      // The old routes stay gone rather than silently reappearing. Hitting a
+      // dead route deliberately logs its own 404 resource error — expected, not
+      // a regression — so it is filtered out of the shared error tally rather
+      // than polluting the "no JS errors" check below.
+      const errsBefore404 = errors.length;
+      const oldOnco = await page.goto(BASE + "/oncoprint", { waitUntil: "domcontentloaded" });
+      ok("deleted /oncoprint route stays gone", oldOnco.status() === 404, "status " + oldOnco.status());
+      errors.splice(errsBefore404, errors.length - errsBefore404,
+        ...errors.slice(errsBefore404).filter(e => !/404/.test(e)));
+
+      // /rationale renders RATIONALE.md, including its Mermaid architecture
+      // diagram as real SVG (not a leftover code fence — that would mean the
+      // client-side render failed and silently fell back). Console errors here
+      // are still caught by the scheme-wide "no JS errors" check below.
+      await page.goto(BASE + "/rationale");
+      let rationaleOk = false, rationaleInfo = "";
+      try {
+        await page.waitForSelector(".rationale-doc h1", { timeout: 60000 });
+        await page.waitForFunction(() => document.querySelector(".mermaid-diagram svg") !== null, null, { timeout: 30000 });
+        const svgCount = await page.locator(".mermaid-diagram svg").count();
+        const fallback = await page.locator(".mermaid-fallback").count();
+        const backLink = await page.locator(".rationale-nav a").getAttribute("href");
+        rationaleOk = svgCount > 0 && fallback === 0 && backLink === "/analysis";
+        rationaleInfo = "svg=" + svgCount + " fallback=" + fallback + " backLink=" + backLink;
+      } catch (e) { rationaleInfo = String(e.message || e).slice(0, 100); }
+      ok("/rationale renders with a live Mermaid diagram", rationaleOk, rationaleInfo);
+      await page.goto(BASE + "/analysis");
+      await page.waitForSelector("header a", { timeout: 60000 });
+      const headerLinks = await page.locator("header a").allTextContents();
+      ok("header nav points only at /rationale (oncoprint/builder links removed)",
+        headerLinks.some(t => /rationale/i.test(t)) && !headerLinks.some(t => /^oncoprint$|^builder$/i.test(t)),
+        headerLinks.join(", "));
 
       // Derived facets: computed from the data's shape, so they must appear for a
       // study regardless of how it names its events, and clicking must filter.

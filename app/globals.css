@@ -506,3 +506,53 @@ details.gearmenu > .gearmenu-items {
   background: var(--bg); padding: 0.3rem;
 }
 .chatfigbody svg { display: block; }
+
+/* ---------------- /rationale — RATIONALE.md rendered as a page ---------------- */
+.rationale-nav { margin-bottom: 1.2rem; }
+.rationale-nav a { color: var(--accent-ink); font-size: 0.8rem; text-decoration: none; }
+.rationale-nav a:hover { text-decoration: underline; }
+
+.rationale-doc { line-height: 1.65; }
+.rationale-doc h1 {
+  font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.65rem; font-weight: 600;
+  margin: 0 0 0.6rem;
+}
+.rationale-doc h2 {
+  font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.2rem; font-weight: 600;
+  margin: 2rem 0 0.7rem; padding-top: 0.9rem; border-top: 1px solid var(--line);
+}
+.rationale-doc h2:first-of-type { border-top: none; padding-top: 0; }
+.rationale-doc h3 { font-size: 1.02rem; font-weight: 600; margin: 1.4rem 0 0.5rem; }
+.rationale-doc p { margin: 0 0 0.9rem; max-width: 62rem; }
+.rationale-doc ul, .rationale-doc ol { margin: 0 0 0.9rem; padding-left: 1.4rem; max-width: 62rem; }
+.rationale-doc li { margin-bottom: 0.3rem; }
+.rationale-doc li > p { margin-bottom: 0.3rem; }
+.rationale-doc strong { font-weight: 600; }
+.rationale-doc em { color: var(--muted); }
+.rationale-doc code {
+  font-family: "IBM Plex Mono", monospace; font-size: 0.85em;
+  background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px;
+}
+.rationale-doc hr { border: none; border-top: 1px solid var(--line); margin: 1.6rem 0; }
+.rationale-doc a { color: var(--accent-ink); }
+.rationale-doc table {
+  border-collapse: collapse; width: 100%; margin: 0 0 1rem; font-size: 0.86rem;
+  display: block; overflow-x: auto;
+}
+.rationale-doc th, .rationale-doc td {
+  border: 1px solid var(--line); padding: 0.4rem 0.65rem; text-align: left; vertical-align: top;
+}
+.rationale-doc th { background: var(--code-bg); font-weight: 600; }
+.rationale-doc blockquote {
+  margin: 0 0 0.9rem; padding-left: 0.9rem; border-left: 3px solid var(--line); color: var(--muted);
+}
+
+.mermaid-diagram {
+  overflow-x: auto; margin: 1rem 0 1.4rem; padding: 0.8rem;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+}
+.mermaid-diagram svg { max-width: 100%; height: auto; }
+.mermaid-fallback {
+  overflow-x: auto; font-size: 0.72rem; padding: 0.8rem; margin: 1rem 0 1.4rem;
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+}

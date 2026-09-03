@@ -7,12 +7,13 @@ declarative object** — the Analysis document (cohorts defined by OQL / clinica
 clauses, plus views) — that a human, a chatbot, and an MCP client all read and write, with the
 server compiling it to ClickHouse SQL and every result carrying its own provenance.
 
-That one object also carries the project's future (roadmap sections at the end of this
-document): **saved**, it generalizes the portal's user state — virtual studies, groups,
-sessions — from frozen ID lists into living, diffable definitions with dynamic membership and
-versioned annotation; and being a **portable representation of the question** rather than of
-any backend, it extends naturally across portal instances — up to privacy-preserving
-federation where only documents and results cross institutional boundaries.
+That one object also carries the project's future: **saved**, it generalizes the portal's user
+state — virtual studies, groups, sessions — from frozen ID lists into living, diffable
+definitions with dynamic membership and versioned annotation (roadmap, below); and being a
+**portable representation of the question** rather than of any backend, it already extends
+across portal instances — **cross-instance federation is built**, in both a data-level and a
+document-level mode, verified to agree to the last digit against a real second ClickHouse
+instance reached both directly and as an MCP peer.
 
 **Key advantages at a glance:**
 
@@ -21,15 +22,17 @@ federation where only documents and results cross institutional boundaries.
 - **LLM-safe by construction** — models write the DSL, never SQL; the unanswerable is rejected
   loudly instead of approximated
 - **Full provenance** — every result links to its definition, its compiled SQL, and a live
-  re-runnable view
+  re-runnable view; federated results carry the *same* provenance across the instance boundary
+  (a peer discloses the SQL it ran and what it cost)
 - **Methodological honesty enforced by the engine** — panel-aware denominators, left-truncation
   and prior-treatment caveats, labeled non-deduplication
 - **One semantics owner, many cheap surfaces** — web UI, chat, and MCP all speak the same
   document; docs and grammars are generated from one source
+- **Cross-instance federation, built and verified** — one document fulfilled across ClickHouse
+  instances or over MCP to a peer, with every visualization stating which participants answered
+  and how (built-in, not roadmap)
 - **Living user state** *(roadmap)* — dynamic groups, versioned annotation, and membership
   diffs subsume virtual studies / groups / sessions
-- **Cross-instance federation** *(roadmap)* — one document fulfilled across many portal
-  databases, up to privacy-preserving results-only exchange
 
 ## The advantages of the approach
 
@@ -88,7 +91,7 @@ flowchart TB
     MCP <--> DOC
 
     subgraph ENGINE["Server engine — clients never send SQL"]
-        RA["runAnalysis — lib/analysis.js<br/>per-study evaluation · cross-study federation<br/>(study-qualified ids, no dedup, labeled)"]
+        RA["runAnalysis — lib/analysis.js<br/>per-study evaluation · federation by SUMMING aggregates<br/>(ids cross an instance boundary only for the oncoprint's own columns; no dedup, labeled)"]
         COMP["Cohort compilers<br/>lib/cohort2.js · lib/oql.js · lib/compiler.js<br/><i>loud rejection of anything unanswerable</i>"]
         VIEWS["Views<br/>compare (Fisher, panel-aware denominators)<br/>survival (KM + left-truncation caveat)<br/>oncoprint"]
         CONTRACT["Render contract — lib/oncoprint.js<br/>bitmask cells · NOT_PROFILED first-class<br/>declarative sort · clinical + heatmap tracks"]
@@ -254,57 +257,135 @@ as MCP tools and UI; `$ref` resolution in documents; and one staged demo — sav
 the OncoKB pin, show the diff explaining exactly which patients moved and why. That last
 screenshot is the whole pitch in one image.
 
-## Cross-instance federation
+## Cross-instance federation — built, and verified against a real second instance
 
-*(Proposed direction — not yet built. A long-standing community wish — GENIE + public portal +
-institutional private instances — that this architecture is accidentally already shaped for.)*
+*(This was the roadmap section. It is no longer proposed: both modes below are implemented,
+exercised against a genuinely separate ClickHouse database, and cross-checked against each
+other to the last digit — the strongest stress-test the project's central claim has had.)*
 
-The critical enabling fact: **no SQL in this engine ever crosses a study boundary.** The
-compilers are single-study by design, and all federation — cross-study cohorts, compare,
-survival, oncoprint, explore — happens in the application layer by merging study-qualified
-member ids in JS. Every SQL statement the engine emits is therefore already executable against
-*whichever database holds that study*. Fulfilling one analysis document from multiple
-ClickHouse instances is not a redesign; it is a **routing change**:
+The critical enabling fact, unchanged from the original proposal and now proven in practice:
+**no SQL in this engine ever crosses a study boundary.** The compilers are single-study by
+design, and federation — cross-study cohorts, compare, survival, cooccurrence, coexpression,
+clinical, hotspots, oncoprint — happens in the application layer, by summing per-instance
+*aggregates*, never by merging patient-level rows in JS. (An earlier version of this document
+described member ids being merged; that path was removed — see *Aggregation, not id-merging*,
+below.) Every SQL statement the engine emits is executable against *whichever database holds
+that study*, which is why extending from one connection to several was a routing change, not a
+redesign.
 
-- the connection layer grows a registry (`chQuery(sql, instance)` instead of one fixed
-  connection);
-- studies become instance-qualified (`genie:brca_...`), with explicit collision handling since
-  the same study id can exist on two instances;
-- member ids gain one more prefix (`instance:study_pid`) — and the standing no-deduplication
-  policy becomes *more* correct, since overlapping patients across institutions genuinely
-  cannot be linked;
-- per-study caches re-key by `instance:study`.
-
-The compilers, OQL parser, render contract, and view merge logic need zero changes — the
-payoff of having refused cross-study SQL from the start.
-
-### The honest hard parts
-
-1. **The OncoKB store**: `DRIVER` joins `oncokb_annotation` on the same connection, so the
-   store must be replicated per instance — small (≈135k variants), the sync pipeline is
-   idempotent, and replicating the *same pin* everywhere strengthens reproducibility (one pin
-   across the federation, or a loud label when pins diverge). License-as-GRANT scales
-   naturally: each instance grants or doesn't, and the engine already degrades loudly.
-2. **Partial availability**: per-instance timeouts and *labeled* partial results ("GENIE
-   unreachable; counts exclude it") — the caveat machinery already used everywhere else.
-3. **Schema drift**: instances on different portal versions need a schema-version handshake
-   and loud rejection below the floor.
-4. **Per-instance authorization**: real work, but it composes with the identity layer from the
-   user-state proposal above rather than adding a second system.
-
-### Two federation modes
-
-The DSL enables both, and they serve different trust models:
+### Two federation modes, both implemented
 
 | mode | instance is reached as | what crosses the wire | fits |
 |---|---|---|---|
-| **Data-level** | another ClickHouse connection | patient-level rows, merged by the one engine | instances under one trust umbrella |
-| **Document-level** | another Cohort Lab engine, over MCP | sub-documents out; *results* back | institutions that cannot share patient-level data |
+| **Data-level** | a second ClickHouse connection (`CLICKHOUSE2_*`) | aggregates, computed per-instance and summed by the one engine | instances under one trust umbrella |
+| **Document-level** | another Cohort Lab, over MCP (`PEER_MCP`) | a cohort definition out; *counts* back, never rows | institutions that cannot share patient-level data |
 
-Document-level federation is the deeper possibility: an institution could answer compare views
-with per-group aggregates and survival with computed KM curves while member ids never leave
-the building — privacy-preserving federated analysis. The community has wanted cross-instance
-analysis for years; the blocker was never plumbing but the absence of a **portable
-representation of the question**. That representation is precisely what the analysis document
-is — which makes federation the strongest stress-test of the project's central claim: one
-declarative document, many backends.
+Both were run against the same real second database (a separate ClickHouse instance holding a
+GENIE-derived study, `cbioportal_genie_green`) — once as a direct data-level connection, once
+fronted by a second Cohort Lab process reached purely over MCP — and the two were compared:
+
+- cohort sizes: **25,555 / 24,627** patients, identical on both paths
+- per-gene compare counts, identical
+- **stratified log-rank χ² = 1594.0863 over 2 strata**, identical
+- KM medians **30.641 / 68.449 months**, identical
+- co-occurrence 2×2 tables, identical
+
+That is not a claim the architecture *should* make aggregation exact — it is the result of
+actually running the same document two structurally different ways and diffing the output.
+
+### Aggregation, not id-merging — why the earlier plan was wrong
+
+The original version of this section proposed federating by having the engine fetch member ids
+from every instance and merge them. That was implemented, then found to be both **unnecessary**
+and **wasteful**: `runAnalysis` was calling every patient-level instance for its full id list
+purely so `list.length` could serve as a count — for a two-study TP53 cohort that is 25,555
+identifiers pulled across the wire and discarded; at the 32-study PanCan benchmark scale it was
+267,816. Cohort evaluation now asks every instance for a **count**, patient-level included; the
+one view whose output *is* patients (oncoprint) carries the compiled cohort SQL and re-derives
+its own columns inside the owning database. The consequence: for any document with no oncoprint
+view, **no patient identifier crosses an instance boundary at all** — not because the deployment
+restricts it, but because nothing in the computation needs one.
+
+### What actually federates, and why each one is a sufficient statistic
+
+Six views were built on top of this, and each is federatable for the same underlying reason:
+the statistic each computes decomposes into per-site sums that never need an individual's
+identity — the same argument the original proposal made in the abstract, now built out
+concretely for six different statistics:
+
+- **Survival — study-stratified log-rank.** The log-rank statistic is a sum over event times of
+  quantities built from at-risk and event counts, so each *site* can be its own stratum. That is
+  not merely more private than pooling — it is more correct: pooling risk sets across sites
+  assumes a common baseline hazard, and when case mix differs the pooled statistic can point the
+  wrong way (Simpson's paradox). Verified against the published Freireich 6-MP trial (χ²=16.79)
+  before ever touching federated data.
+- **Co-occurrence.** Four counts per gene pair per site — both altered, one, the other,
+  neither — nothing else. "Profiled for both" is computed *at* each site against its own gene
+  panels, which pooled exports cannot get right. Across sites the test is
+  Cochran–Mantel–Haenszel, the pairwise analogue of stratified log-rank.
+- **Clinical comparison.** A numeric attribute reports only `(n, Σx, Σx²)` per site — three
+  numbers — from which the pooled mean and variance are *exact*, not approximated, and no
+  individual value is ever transmitted.
+- **Co-expression.** Six sums per gene pair per site (`n, Σx, Σy, Σxy, Σx², Σy²`) are sufficient
+  for Pearson's r; the federated correlation is proven exact by construction, not estimated.
+  Where sites disagree, a Fisher-z meta-analysis of per-site correlations is reported alongside
+  the pooled figure, because pooling silently assumes the sites are exchangeable.
+- **Hotspots.** The one case where the aggregate itself is disclosive — a variant carried by one
+  patient is close to an identifier — so a `minCount` suppression floor is applied **by each
+  site, inside its own SQL, before anything is returned**. The coordinator never sees, and so
+  cannot leak, a value the site withheld.
+- **Oncoprint z-score reference.** The sharpest demonstration of the whole argument: a site that
+  discloses no patients contributes no columns, by the same rule that has always governed the
+  oncoprint — but it can still supply three totals per gene (`n, Σx, Σx²`) that widen the
+  reference distribution the *drawn* columns are scored against. A site can shape what a chart
+  means without appearing in it.
+
+### Provenance survives the boundary
+
+The provenance guarantee from the top of this document — every result links to its definition,
+its compiled SQL, a live re-runnable view — does not stop at an instance boundary. A remote peer
+now discloses the SQL it actually compiled and ran (`carriesPatientIds()` is checked before any
+request leaves, so there is nothing unsafe about disclosing the query itself; a deployment that
+treats its schema as sensitive can opt out). Query-level timing crosses too: a federated view's
+"how these numbers were computed" panel shows the peer's real query, marked as having executed
+*there*, with the latency it actually cost — the number that matters when deciding whether a
+remote participant belongs in an analysis at all.
+
+Every visualization also carries an explicit participation marker, deliberately split into two
+facts rather than one word: **method** (`aggregate-only` for every view but the oncoprint,
+*regardless of deployment* — the arithmetic never changes) and **sources** (how many
+participants were aggregate-only, or reached via an MCP peer). They are kept apart because a
+single label like "mixed" would wrongly suggest the *feature* varies by who answers, which is
+exactly what this architecture is built to prevent.
+
+### A bug this actually caught
+
+Running both modes side by side against the same data is not merely a demonstration — it is a
+working oracle, and it found a real defect. A `not` clause was compiling against the primary
+database regardless of which instance actually owned the study, so a GENIE wild-type cohort
+computed as 0 patients instead of 202,750. It surfaced because the data-level and document-level
+answers *disagreed with each other*; neither number alone would have looked wrong. That is the
+practical argument for building two federation modes rather than trusting one: they cross-check.
+
+### What is still open
+
+The honest remainder, unchanged in kind from the original plan:
+
+1. **OncoKB store replication.** `DRIVER` still joins `oncokb_annotation` on the primary
+   connection only; a genuinely multi-instance deployment needs the (small, ≈135k-variant,
+   already-idempotent) sync pipeline replicated per instance, with a loud label when pins
+   diverge across the federation rather than one assumed pin.
+2. **N-way instance registry.** The connection layer today is `PRIMARY` plus one optional
+   `secondary()` (`CLICKHOUSE2_*`) for data-level, and one `PEER_MCP` mapping per study for
+   document-level — proven correct at that scale, not yet generalized to an arbitrary list of
+   instances.
+3. **Partial availability inside a running analysis.** The study *catalog* already isolates a
+   failing instance (`studiesFor(c).catch(() => [])` — one unreachable peer cannot empty the
+   list), but a timeout mid-survival-view does not yet degrade to a labeled partial result the
+   way the catalog does.
+4. **Schema drift and per-instance authorization** remain exactly as scoped originally: a
+   version handshake with loud rejection below the floor, and an identity layer that composes
+   with the user-state proposal below rather than adding a second system.
+
+None of these change the shape of the answer above — they are hardening a mechanism already
+proven correct, not open design questions.

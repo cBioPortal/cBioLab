@@ -664,8 +664,7 @@ export default function AnalysisPage() {
         <h1>Cohort Lab</h1>
         <span className="sub">analysis documents — cohorts, views, and chat over one declarative object</span>
         <span className="spacer" />
-        <a href="/oncoprint" style={{ color: "var(--accent-ink)", fontSize: "0.8rem", marginRight: "0.8rem" }}>oncoprint</a>
-        <a href="/" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>builder</a>
+        <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>rationale</a>
       </header>
       <main style={{ maxWidth: "96rem" }}>
         <div className="tabs">

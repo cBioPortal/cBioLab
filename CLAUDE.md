@@ -16,7 +16,7 @@ A working demonstration that a cBioPortal-class tool can be rebuilt around **one
 JSON object** — the *Analysis document* (`{study, cohorts: {name: def}, views: [...]}`) — that
 the web UI, the in-app chat, and MCP clients all read and write. The server compiles it to
 ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (UI at
-`/analysis`, MCP at `/api/mcp`, oncoprint spec demo at `/oncoprint`).
+`/analysis`, MCP at `/api/mcp`, project rationale at `/rationale`).
 
 ## Architecture map
 
@@ -31,9 +31,14 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 - **`lib/oncoprint.ts`** — spec → render contract (bitmask cells, NOT_PROFILED=-1, panel-aware
   denominators, staircase + declarative `sort`, clinical tracks incl. numeric heat, `heatmap`
   molecular tracks incl. synthetic `VAF`). Renderers are dumb: **`lib/oncoprint-svg.ts`**
-  (server), `app/oncoprint/page.tsx` (canvas), `mcp/apps/oncoprint-html.ts` (MCP App iframe).
+  (server SVG, used by the web app and `/provenance`), `mcp/apps/oncoprint-html.ts` (MCP App
+  iframe). **`lib/view-svg.ts`** — the same contract for every other view kind (survival,
+  hotspots, compare, cooccurrence, coexpression, clinical); used by the in-app chat today and
+  by MCP `run_analysis` for the oncoprint image.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
-- **`app/analysis/page.tsx`** — the app: Explore (study checkboxes + facets) / Cohorts / Analysis / Examples.
+- **`app/analysis/page.tsx`** — the app: Chat / Explore (study checkboxes + facets) / Cohorts /
+  Analysis / Examples. The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
+  demo pages were retired once the Analysis app subsumed them; `/` now redirects to `/analysis`.
 - **`app/api/chat/route.ts`** — Claude tool-use loop (`update_document`, `get_catalog`).
 - **`mcp/tools.ts`** — MCP registry: `describe_dsl`, `run_analysis`, `render_oncoprint` (+v1
   event tools); `mcp/apps/` = optional MCP-Apps interactive oncoprint (additive; user considers
@@ -80,9 +85,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 ## Workflows
 
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
-- Test: `npm test` — unit suites, no database needed (the patient-data boundary and the stats used by
-  federated views;
-  68 checks across 3 suites). `node e2e.cjs` — 73 checks (Playwright + docs gate + the boundary suite).
+- Test: `npm test` — unit suites, no database needed (the patient-data boundary, the stats used by
+  federated views, cohort-definition semantics, and the SVG figure renderers;
+  86 checks across 5 suites). `node e2e.cjs` — 61 checks (Playwright + docs gate + the boundary suite).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push `analysis`. **Stop there.**
