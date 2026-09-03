@@ -138,57 +138,83 @@ describe("sequence Sankey keeps everyone accounted for", () => {
     kind: "sequence", cohorts: ["A"], caveat: "Lines of therapy.",
     sequence: {
       labelKey: "SUBTYPE", lineGap: 90, steps: 2, foldedLabels: 3, truncated: false,
-      nodes: [
-        { column: 1, label: "Chemo", n: 100 }, { column: 1, label: "Hormone", n: 40 },
-        { column: 2, label: "Chemo", n: 30 }, { column: 2, label: "", n: 110 }
-      ],
-      flows: [
-        { column: 1, from: "Chemo", to: "", n: 80 },
-        { column: 1, from: "Chemo", to: "Chemo", n: 20 },
-        { column: 1, from: "Hormone", to: "", n: 30 },
-        { column: 1, from: "Hormone", to: "Chemo", n: 10 }
-      ]
+      panels: [{
+        cohort: "A", started: 140, censored: 70,
+        nodes: [
+          { column: 1, label: "Chemo", n: 100, kind: "regimen" },
+          { column: 1, label: "Hormone", n: 40, kind: "regimen" },
+          { column: 2, label: "Chemo", n: 30, kind: "regimen" },
+          { column: 2, label: "", n: 40, kind: "stopped" },
+          { column: 2, label: "", n: 70, kind: "censored" }
+        ],
+        flows: [
+          { column: 1, from: "Chemo", to: "", n: 50, kind: "censored" },
+          { column: 1, from: "Chemo", to: "", n: 30, kind: "stopped" },
+          { column: 1, from: "Chemo", to: "Chemo", n: 20, kind: "regimen" },
+          { column: 1, from: "Hormone", to: "", n: 20, kind: "censored" },
+          { column: 1, from: "Hormone", to: "", n: 10, kind: "stopped" },
+          { column: 1, from: "Hormone", to: "Chemo", n: 10, kind: "regimen" }
+        ]
+      }]
     }
   });
 
-  test("the terminal 'no further line' node is drawn and named", () => {
-    // Attrition is usually the biggest flow. If it is not on the page, the
-    // diagram overstates how many patients go on to further therapy.
+  test("both terminals are drawn, and named differently", () => {
+    // The whole point of the split: censoring must not read as a clinical stop.
     const svg = viewToSvg(mk() as any)!;
     assert.match(svg, /no further line/);
-    assert.ok(svg.includes("110"), "the terminal node carries its count");
+    assert.match(svg, /record ends here/);
+    assert.ok(svg.includes("40") && svg.includes("70"), "each terminal carries its own count");
+  });
+
+  test("the legend explains the difference rather than leaving two greys", () => {
+    const svg = viewToSvg(mk() as any)!;
+    assert.match(svg, /watched, none started/);
+    assert.match(svg, /nothing can be concluded/);
   });
 
   test("every flow with a known source and target is drawn", () => {
     const svg = viewToSvg(mk() as any)!;
-    // 4 ribbons + 4 node rects; ribbons are the fill-opacity paths
-    assert.equal((svg.match(/fill-opacity="0\.32"/g) || []).length, 4);
+    assert.equal((svg.match(/fill-opacity="0\.(32|45)"/g) || []).length, 6);
   });
 
   test("one scale across columns, so attrition is visible as thinning", () => {
     const svg = viewToSvg(mk() as any)!;
     const rects = [...svg.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="13" height="([\d.]+)"/g)]
       .map((m) => ({ x: +m[1], h: +m[3] }));
-    const col1 = rects.filter((r) => r.x === Math.min(...rects.map((z) => z.x)));
-    const chemo1 = Math.max(...col1.map((r) => r.h));
-    const chemo2 = rects.filter((r) => r.x !== Math.min(...rects.map((z) => z.x)))
-      .map((r) => r.h).sort((a, b) => a - b)[0];
-    assert.ok(chemo1 > chemo2 * 2,
+    const minX = Math.min(...rects.map((z) => z.x));
+    const chemo1 = Math.max(...rects.filter((r) => r.x === minX).map((r) => r.h));
+    const smallest = Math.min(...rects.filter((r) => r.x !== minX).map((r) => r.h));
+    assert.ok(chemo1 > smallest * 2,
       "100 patients must draw taller than 30 — normalising per column would hide the drop-off");
+  });
+
+  test("two cohorts share one scale, so their sizes stay comparable", () => {
+    const v = mk() as any;
+    const small = JSON.parse(JSON.stringify(v.sequence.panels[0]));
+    small.cohort = "B";
+    small.nodes.forEach((n: any) => { n.n = Math.round(n.n / 4); });
+    small.flows.forEach((f: any) => { f.n = Math.round(f.n / 4); });
+    v.sequence.panels.push(small);
+    const svg = viewToSvg(v)!;
+    const heights = [...svg.matchAll(/<rect x="8" y="[\d.]+" width="13" height="([\d.]+)"/g)].map((m) => +m[1]);
+    const tallest = Math.max(...heights), shortest = Math.min(...heights);
+    assert.ok(tallest > shortest * 2,
+      "a cohort a quarter the size must draw a quarter the height, not be renormalised to match");
+    assert.match(svg, /B<\/tspan>|B</, "each panel is named");
   });
 
   test("labels are escaped — regimen names come from study data", () => {
     const v = mk() as any;
-    v.sequence.nodes[0].label = "<img src=x>";
-    v.sequence.flows[0].from = "<img src=x>";
-    v.sequence.flows[1].from = "<img src=x>";
+    v.sequence.panels[0].nodes[0].label = "<img src=x>";
+    v.sequence.panels[0].flows.forEach((f: any) => { if (f.from === "Chemo") f.from = "<img src=x>"; });
     const svg = viewToSvg(v)!;
     assert.equal(svg.includes("<img"), false);
     assert.match(svg, /&lt;img/);
   });
 
   test("no flows renders nothing rather than an empty frame", () => {
-    assert.equal(viewToSvg({ kind: "sequence", sequence: { flows: [], nodes: [] } } as any), null);
+    assert.equal(viewToSvg({ kind: "sequence", sequence: { panels: [] } } as any), null);
     assert.equal(viewToSvg({ kind: "sequence", error: "no therapy lines found" } as any), null);
   });
 

@@ -1794,6 +1794,17 @@ export default function AnalysisPage() {
                   )}
                   <p className="note">{v.caveat}</p>
                 </>}
+                {v.kind === "sequence" && !v.svg && v.error && v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
+                  <div className="basis">
+                    <span className="meta">label lines by</span>
+                    <select value={v.sequence.labelKey} disabled={busy}
+                      onChange={e => patchView(vi, { labelKey: e.target.value })}>
+                      {v.sequence.keyOptions.map(k => (
+                        <option key={k.key} value={k.label}>{k.label} — {k.values} value{k.values === 1 ? "" : "s"}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {v.kind === "sequence" && v.svg && <>
                   <div className="row" style={{ alignItems: "baseline" }}>
                     <h2 style={{ margin: 0 }}>Treatment sequence <span className="plain">
@@ -1809,6 +1820,30 @@ export default function AnalysisPage() {
                       </span>
                     )}<Participation p={v.participation} /></>
                   </div>
+                  {/* Label granularity is the choice that most changes this chart,
+                      and the keys behave wildly differently: in MSK-CHORD SUBTYPE
+                      has 10 values, AGENT has hundreds, TREATMENT_TYPE has one.
+                      So each option carries its value count rather than leaving
+                      the reader to discover a useless key by picking it. */}
+                  {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
+                    <div className="basis">
+                      <span className="meta">label lines by</span>
+                      <select value={v.sequence.labelKey} disabled={busy}
+                        onChange={e => patchView(vi, { labelKey: e.target.value })}>
+                        {v.sequence.keyOptions.map(k => (
+                          <option key={k.key} value={k.label}>
+                            {k.label} — {k.values} value{k.values === 1 ? "" : "s"}
+                            {k.values === 1 ? " (unusable)" : k.values > 60 ? " (very granular)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="meta">new line after</span>
+                      <select value={String(v.sequence.lineGap)} disabled={busy}
+                        onChange={e => patchView(vi, { lineGap: Number(e.target.value) })}>
+                        {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
+                      </select>
+                    </div>
+                  )}
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
                 {v.kind === "course" && v.svg && <>

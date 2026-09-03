@@ -236,7 +236,7 @@ anchors ~6,266 days from day 0, which without clamping is a 2,000-bin range per 
 
 ## Treatment sequences (`sequence` view)
 
-~600ms for 24,950 patients: one query that groups treatment records into lines with two window
+~600ms for one cohort of 24,950 patients (~1.5s for two cohorts plus the label-key probe): one query that groups treatment records into lines with two window
 functions, then reads each line's successor with `leadInFrame`. Cost is flat in the number of
 lines followed, since `maxSteps` only filters the final aggregation.
 

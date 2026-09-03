@@ -15,7 +15,7 @@ import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaen
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, fisherZMeta } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { viewToSvg } from "./view-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting, restrictedStudies,
@@ -460,101 +460,137 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
       const lineGap = Math.max(1, Math.min(3650, Math.floor(Number(sv.lineGap) || 90)));
       const maxSteps = Math.max(2, Math.min(6, Math.floor(Number(sv.maxSteps) || 3)));
       const topN = Math.max(2, Math.min(14, Math.floor(Number(sv.topN) || 8)));
-      // One cohort, as co-expression does: a Sankey of two cohorts overlaid is
-      // unreadable, and the honest comparison is two views side by side.
-      const cn = vNames[0];
-      const cStudies = cohorts[cn].studies;
+      // Two panels at most: a third Sankey shrinks every ribbon past reading.
+      const panelNames = vNames.slice(0, 2);
+      const allStudies = [...new Set(panelNames.flatMap((n) => cohorts[n].studies))];
       const opts: SequenceOpts = { eventType, labelKey, exclude: (sv.exclude || []).map(String), lineGap, maxSteps };
 
-      const parts = await Promise.all(cStudies.map((st) =>
-        resolvers[st].treatmentSequence(doc.cohorts[cn], opts).catch(() => [] as SequenceFlow[])));
-      const raw = parts.flat();
-      if (!raw.length) {
-        // Say WHICH of the two possible causes it is: no such event type, or the
-        // event type is there but carries no such label key.
-        const keys = (await Promise.all(cStudies.map((st) =>
-          resolvers[st].sequenceKeys(doc.cohorts[cn], eventType).catch(() => [])))).flat();
-        views.push({ kind: "sequence", cohorts: [cn], studies: cStudies,
-          error: keys.length
+      // What ELSE could label a line here, and how granular is each? Fetched
+      // alongside the data so the UI can offer the choice, and so a bad key can
+      // be diagnosed rather than just returning nothing.
+      const [rawByCohort, keyRows] = await Promise.all([
+        Promise.all(panelNames.map(async (n) => (await Promise.all(cohorts[n].studies.map((st) =>
+          resolvers[st].treatmentSequence(doc.cohorts[n], opts).catch(() => [] as SequenceFlow[])))).flat())),
+        Promise.all(allStudies.map((st) =>
+          resolvers[st].sequenceKeys(doc.cohorts[panelNames[0]], eventType).catch(() => []))).then((r) => r.flat())
+      ]);
+      const keyOptions = [...new Map(keyRows.map((k) => [k.key, k])).values()]
+        .sort((a, b) => b.patients - a.patients);
+      const chosen = keyOptions.find((k) => k.key === canonicalEventName(labelKey));
+
+      if (!rawByCohort.some((r) => r.length)) {
+        views.push({ kind: "sequence", cohorts: panelNames, studies: allStudies,
+          error: keyOptions.length
             ? "no therapy lines found: '" + eventType + "' events carry no attribute '" + labelKey +
               "'. Keys available on those events: " +
-              keys.slice(0, 8).map((k) => k.label + " (" + k.patients.toLocaleString() + " patients, " + k.values + " values)").join(", ")
-            : "no '" + eventType + "' events with attributes were found for this cohort, so there are no lines to sequence." });
+              keyOptions.slice(0, 8).map((k) => k.label + " (" + k.patients.toLocaleString() + " patients, " + k.values + " values)").join(", ")
+            : "no '" + eventType + "' events with attributes were found for this cohort, so there are no lines to sequence.",
+          ...(keyOptions.length ? { sequence: { labelKey, lineGap, steps: maxSteps, foldedLabels: 0, truncated: false, keyOptions, panels: [] } } : {}) });
         continue;
       }
-      const truncated = raw.length >= 2000;
+      // A key with one value cannot separate anything. Say so rather than
+      // drawing one enormous box: in MSK-CHORD, TREATMENT_TYPE is exactly this.
+      if (chosen && chosen.values <= 1) {
+        views.push({ kind: "sequence", cohorts: panelNames, studies: allStudies,
+          sequence: { labelKey, lineGap, steps: maxSteps, foldedLabels: 0, truncated: false, keyOptions, panels: [] },
+          error: "'" + labelKey + "' takes only one value in this cohort (" + chosen.label +
+            "), so every line would carry the same label and the diagram would say nothing. Try: " +
+            keyOptions.filter((k) => k.values > 1).slice(0, 5)
+              .map((k) => k.label + " (" + k.values + " values)").join(", ") });
+        continue;
+      }
+      const truncated = rawByCohort.some((r) => r.length >= 2000);
 
-      // Merge across studies, then fold to the commonest labels. Ranking is
-      // GLOBAL, not per column: a label must keep one identity (and one colour)
-      // across the whole diagram, or "Chemo" in column 2 would mean something
-      // different from "Chemo" in column 1.
-      const merged = new Map<string, number>();
-      for (const f of raw) merged.set(f.step + "\u0000" + f.from + "\u0000" + f.to,
-        (merged.get(f.step + "\u0000" + f.from + "\u0000" + f.to) || 0) + f.n);
+      // Merge per cohort, then rank labels ACROSS ALL PANELS so a regimen keeps
+      // one identity and one colour in both — the comparison is the point.
+      const mergedPer = rawByCohort.map((raw) => {
+        const m = new Map<string, number>();
+        for (const f of raw) {
+          const k = f.step + "\u0000" + f.from + "\u0000" + f.to + "\u0000" + f.fate;
+          m.set(k, (m.get(k) || 0) + f.n);
+        }
+        return m;
+      });
       const weight = new Map<string, number>();
-      for (const [k, n] of merged) {
-        const [, from] = k.split("\u0000");
+      for (const m of mergedPer) for (const [k, n] of m) {
+        const from = k.split("\u0000")[1];
         weight.set(from, (weight.get(from) || 0) + n);
       }
       const keep = new Set([...weight.entries()].sort((a, b) => b[1] - a[1]).slice(0, topN).map(([l]) => l));
       const foldedLabels = [...weight.keys()].filter((l) => !keep.has(l)).length;
-      const fold = (l: string) => l === "" ? "" : keep.has(l) ? l : "other";
+      const fold = (l: string) => keep.has(l) ? l : "other";
+      const kindOf = (fate: number): SequenceNodeKind =>
+        fate === 0 ? "regimen" : fate === 1 ? "stopped" : "censored";
+      const nodeKey = (column: number, kind: SequenceNodeKind, label: string) =>
+        column + "\u0000" + kind + "\u0000" + label;
 
-      const flowMap = new Map<string, number>();
-      for (const [k, n] of merged) {
-        const [step, from, to] = k.split("\u0000");
-        const key = step + "\u0000" + fold(from) + "\u0000" + fold(to);
-        flowMap.set(key, (flowMap.get(key) || 0) + n);
-      }
-      const flows = [...flowMap.entries()].map(([k, n]) => {
-        const [step, from, to] = k.split("\u0000");
-        return { column: Number(step), from, to, n };
-      }).sort((a, b) => a.column - b.column || b.n - a.n);
+      const panels: SequencePanel[] = panelNames.map((cohortName, pi) => {
+        const flowMap = new Map<string, number>();
+        for (const [k, n] of mergedPer[pi]) {
+          const [step, from, to, fate] = k.split("\u0000");
+          const kind = kindOf(Number(fate));
+          const target = kind === "regimen" ? fold(to) : "";
+          const key = step + "\u0000" + fold(from) + "\u0000" + target + "\u0000" + kind;
+          flowMap.set(key, (flowMap.get(key) || 0) + n);
+        }
+        const flows = [...flowMap.entries()].map(([k, n]) => {
+          const [step, from, to, kind] = k.split("\u0000");
+          return { column: Number(step), from, to, n, kind: kind as SequenceNodeKind };
+        }).sort((a, b) => a.column - b.column || b.n - a.n);
 
-      // Node sizes. A node is as big as what leaves it; a TERMINAL node — the
-      // last column, and every "no further line" — is as big as what arrives.
-      // The empty label must get a node like any other: those patients stopped,
-      // and a diagram that drops them understates attrition, which is the single
-      // thing this chart exists to show.
-      const outSum = new Map<string, number>(), inSum = new Map<string, number>();
-      for (const f of flows) {
-        const src = f.column + "\u0000" + f.from, dst = (f.column + 1) + "\u0000" + f.to;
-        outSum.set(src, (outSum.get(src) || 0) + f.n);
-        inSum.set(dst, (inSum.get(dst) || 0) + f.n);
-      }
-      const nodes = [...new Set([...outSum.keys(), ...inSum.keys()])].map((k) => {
-        const [column, label] = k.split("\u0000");
-        return { column: Number(column), label, n: outSum.get(k) ?? inSum.get(k) ?? 0 };
-      }).filter((x) => x.n > 0).sort((a, b) => a.column - b.column || b.n - a.n);
+        // A node is as big as what leaves it; a terminal is as big as what
+        // arrives. Both terminals get real nodes, so nobody leaves the diagram.
+        const outSum = new Map<string, number>(), inSum = new Map<string, number>();
+        for (const f of flows) {
+          const src = nodeKey(f.column, "regimen", f.from);
+          const dst = nodeKey(f.column + 1, f.kind, f.to);
+          outSum.set(src, (outSum.get(src) || 0) + f.n);
+          inSum.set(dst, (inSum.get(dst) || 0) + f.n);
+        }
+        const nodes = [...new Set([...outSum.keys(), ...inSum.keys()])].map((k) => {
+          const [column, kind, label] = k.split("\u0000");
+          return { column: Number(column), label, kind: kind as SequenceNodeKind,
+                   n: outSum.get(k) ?? inSum.get(k) ?? 0 };
+        }).filter((x) => x.n > 0).sort((a, b) => a.column - b.column || b.n - a.n);
 
-      const started = flows.filter((f) => f.column === 1).reduce((n, f) => n + f.n, 0);
-      // The count of folded regimens is not the useful number; the SHARE OF
-      // PATIENTS sitting in 'other' is, since that is what the reader cannot see.
-      const otherN = nodes.filter((n) => n.column === 1 && n.label === "other").reduce((t, n) => t + n.n, 0);
-      const otherPct = started ? Math.round((1000 * otherN) / started) / 10 : 0;
-      const sequence: SequenceResult = { labelKey, lineGap, steps: maxSteps, nodes, flows, foldedLabels, truncated };
-      const seqResult: ViewResult = { kind: "sequence", cohorts: [cn], studies: cStudies, sequence,
-        participation: participationFor(cStudies, false),
+        const started = flows.filter((f) => f.column === 1).reduce((n, f) => n + f.n, 0);
+        const censored = flows.filter((f) => f.kind === "censored").reduce((n, f) => n + f.n, 0);
+        return { cohort: cohortName, nodes, flows, started, censored };
+      });
+
+      const p0 = panels[0];
+      const censPct = p0.started ? Math.round((1000 * p0.censored) / p0.started) / 10 : 0;
+      const otherN = p0.nodes.filter((n) => n.column === 1 && n.label === "other").reduce((t, n) => t + n.n, 0);
+      const otherPct = p0.started ? Math.round((1000 * otherN) / p0.started) / 10 : 0;
+      const sequence: SequenceResult = { labelKey, lineGap, steps: maxSteps, foldedLabels, truncated, keyOptions, panels };
+      const seqResult: ViewResult = { kind: "sequence", cohorts: panelNames, studies: allStudies, sequence,
+        participation: participationFor(allStudies, false),
         caveat:
           "Therapies are grouped into LINES before being sequenced: records less than " + lineGap +
           " days apart belong to the same line, and a line is labelled by its whole combination" +
-          " (sorted, so 'A + B' and 'B + A' are one regimen). That grouping is the point — a patient" +
+          " (sorted, so 'A + B' and 'B + A' are one regimen). That grouping is the point \u2014 a patient" +
           " here has a median of 6 treatment records and 4 distinct agents, and combination therapy is" +
           " several records describing ONE decision, not several lines." +
           " Lines are labelled by " + labelKey + "." +
-          " Flows into 'no further line' are patients with no recorded next line — which may mean" +
-          " treatment ended, or only that the study's records do, so this is NOT a measure of outcome." +
+          " ENDING A PATH IS SPLIT IN TWO, because the difference matters more than anything else here:" +
+          " 'no further line' means the study kept watching for at least " + lineGap + " days (one line gap," +
+          " the same rule that defines a line) and saw no further therapy; 'record ends here' means it did not," +
+          " so nothing can be concluded about that patient. " + censPct + "% of paths end censored \u2014 reading" +
+          " those as patients who finished treatment would be a claim about the record-keeping dressed up as" +
+          " one about the patient. Neither terminal is an outcome measure." +
           (sv.exclude && sv.exclude.length
             ? " Excluded from every line, by this document rather than by the engine: " + sv.exclude.join(", ") + "."
             : "") +
           (foldedLabels ? " " + foldedLabels + " less common regimen" + (foldedLabels === 1 ? "" : "s") +
-            " folded into 'other', which is " + otherPct + "% of first-line patients — combination" +
-            " regimens have a genuinely long tail here, so 'other' is real diversity rather than a" +
+            " folded into 'other', which is " + otherPct + "% of first-line patients in the first panel \u2014" +
+            " combination regimens have a genuinely long tail, so 'other' is real diversity rather than a" +
             " rounding bucket. Raise topN to split it further." : "") +
           (truncated ? " The aggregate hit its row cap, so the rarest regimens are incomplete." : "") +
-          (cStudies.length > 1 ? " Regimen vocabularies are NOT harmonized across studies beyond case." : "") +
-          (vNames.length > 1 ? " Only cohort \u201c" + cn + "\u201d is shown; a sequence diagram overlaying two cohorts is unreadable." : "") +
-          " " + started.toLocaleString() + " patients had a first line." };
+          (allStudies.length > 1 ? " Regimen vocabularies are NOT harmonized across studies beyond case." : "") +
+          (panels.length > 1
+            ? " Both panels share one scale and one colour per regimen, so their heights are directly comparable."
+            : vNames.length > 1 ? " Only cohort \u201c" + panelNames[0] + "\u201d is shown." : "") +
+          " " + panels.map((x) => x.cohort + ": " + x.started.toLocaleString() + " with a first line").join("; ") + "." };
       const tSeq = Date.now();
       seqResult.svg = viewToSvg(seqResult) || undefined;
       seqResult.renderMs = Date.now() - tSeq;

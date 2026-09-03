@@ -752,8 +752,13 @@ export interface SequenceOpts {
   maxSteps: number;
 }
 
-/** One transition. `to: ''` means the patient began no further line. */
-export interface SequenceFlow { step: number; from: string; to: string; n: number }
+/**
+ * One transition. `to: ''` means no further line — and `fate` says whether that
+ * is a finding or an artefact: 1 = the study kept watching for at least one line
+ * gap and saw no further line; 2 = the record simply ends, so nothing can be
+ * concluded. (0 = the patient went on to another line.)
+ */
+export interface SequenceFlow { step: number; from: string; to: string; n: number; fate: 0 | 1 | 2 }
 
 /**
  * Treatment sequences: what follows what.
@@ -810,16 +815,56 @@ export function sequenceSql(
     "    PARTITION BY pid ORDER BY s, e, eid ROWS UNBOUNDED PRECEDING) AS line_no\n  FROM flagged\n),\n" +
     // A line's identity is its COMBINATION, sorted so ordering cannot split one
     // regimen into two apparent states.
+    // A line's identity is its COMBINATION, sorted so ordering cannot split one
+    // regimen into two apparent states. line_end is kept to judge the fate below.
     "lines AS (\n  SELECT pid, line_no,\n" +
-    "         arrayStringConcat(arraySort(groupUniqArray(lbl)), ' + ') AS combo\n" +
+    "         arrayStringConcat(arraySort(groupUniqArray(lbl)), ' + ') AS combo,\n" +
+    "         max(e) AS line_end\n" +
     "  FROM numbered GROUP BY pid, line_no\n),\n" +
-    "seq AS (\n  SELECT pid, line_no, combo,\n" +
+    // How long the study kept watching, from ANY event type plus OS follow-up.
+    // This is what separates "we saw them not start another line" from "the
+    // records simply stop" — see the fate expression below.
+    "os AS (\n" +
+    "  SELECT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid,\n" +
+    "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) * " + DAYS_PER_MONTH + " AS os_day\n" +
+    "  FROM " + db + ".clinical_data_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient'\n" +
+    "    AND attribute_name = 'OS_MONTHS'\n" +
+    "  GROUP BY pid\n" +
+    "),\n" +
+    "seen AS (\n" +
+    "  SELECT " + pid + " AS pid, max(coalesce(ce.stop_date, ce.start_date)) AS max_ev\n" +
+    "  FROM " + db + ".clinical_event ce\n" +
+    "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    "),\n" +
+    "obs AS (\n" +
+    "  SELECT sn.pid AS pid,\n" +
+    "         greatest(toFloat64(sn.max_ev), coalesce(os.os_day, toFloat64(sn.max_ev))) AS last_seen\n" +
+    "  FROM seen sn LEFT JOIN os ON os.pid = sn.pid\n" +
+    "),\n" +
+    "seq AS (\n  SELECT pid, line_no, combo, line_end,\n" +
     "         leadInFrame(combo) OVER (PARTITION BY pid ORDER BY line_no\n" +
     "           ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS nxt\n" +
-    "  FROM lines\n)\n" +
-    "SELECT line_no AS step, combo AS a, coalesce(nxt, '') AS b, uniqExact(pid) AS n\n" +
-    "FROM seq WHERE line_no <= " + steps + "\n" +
-    "GROUP BY step, a, b ORDER BY n DESC LIMIT 2000"
+    "  FROM lines\n),\n" +
+    "fated AS (\n" +
+    "  SELECT sq2.line_no AS line_no, sq2.combo AS combo, sq2.pid AS pid,\n" +
+    "         coalesce(sq2.nxt, '') AS nxt,\n" +
+    // 0 = went on to another line. Otherwise: did the study watch long enough to
+    // RULE ONE OUT? A new line needs a gap greater than `gap` days by definition,
+    // so ruling one out needs at least that much observation after the line ends.
+    // Anything less is censoring, and calling it "stopped treatment" would be a
+    // statement about the record-keeping dressed up as one about the patient.
+    "         if(coalesce(sq2.nxt, '') != '', 0,\n" +
+    "            if(coalesce(o.last_seen, toFloat64(sq2.line_end)) - sq2.line_end >= " + gap + ", 1, 2)) AS fate\n" +
+    "  FROM seq sq2 LEFT JOIN obs o ON o.pid = sq2.pid\n" +
+    ")\n" +
+    "SELECT line_no AS step, combo AS a, nxt AS b, fate, uniqExact(pid) AS n\n" +
+    "FROM fated WHERE line_no <= " + steps + "\n" +
+    "GROUP BY step, a, b, fate ORDER BY n DESC LIMIT 2000"
   );
 }
 
@@ -982,7 +1027,8 @@ abstract class BaseResolver implements AggregateCapable {
   async treatmentSequence(def: CohortDef | null | undefined, opts: SequenceOpts): Promise<SequenceFlow[]> {
     const sql = sequenceSql(this.cohortSql(def), this.study, this.instance.conn.db, opts);
     const r = await this.runLogged<ChRow>("treatmentSequence:" + opts.labelKey + "/gap" + opts.lineGap, sql, this.instance.conn);
-    return r.data.map((x) => ({ step: Number(x.step), from: String(x.a), to: String(x.b), n: Number(x.n) }));
+    return r.data.map((x) => ({ step: Number(x.step), from: String(x.a), to: String(x.b),
+      n: Number(x.n), fate: Number(x.fate) as 0 | 1 | 2 }));
   }
   async sequenceKeys(def: CohortDef | null | undefined, eventType: string): Promise<{ key: string; label: string; patients: number; values: number }[]> {
     const sql = sequenceKeysSql(this.cohortSql(def), this.study, this.instance.conn.db, eventType);

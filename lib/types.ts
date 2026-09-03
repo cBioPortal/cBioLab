@@ -322,17 +322,35 @@ export interface ViewResult {
   svg?: string; nColumns?: number;          // oncoprint
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
 }
-/** Therapy transitions, ready to draw: nodes in columns, flows between them. */
+/**
+ * Therapy transitions, ready to draw: nodes in columns, flows between them.
+ * One panel per cohort, sharing one scale and one colour assignment so two
+ * cohorts can be compared without re-reading the legend.
+ */
 export interface SequenceResult {
   labelKey: string; lineGap: number; steps: number;
-  /** column is the line number: 1 = first line, 2 = second, … */
-  nodes: { column: number; label: string; n: number }[];
-  /** `to: ""` is the terminal "no further line" */
-  flows: { column: number; from: string; to: string; n: number }[];
-  /** how many distinct labels were folded into "other" */
-  foldedLabels: number;
-  /** the aggregate hit its row cap, so the long tail is incomplete */
-  truncated: boolean;
+  foldedLabels: number; truncated: boolean;
+  /** other attribute keys that could label a line, with how granular each is */
+  keyOptions?: { key: string; label: string; patients: number; values: number }[];
+  panels: SequencePanel[];
+}
+/**
+ * `kind` distinguishes the two ways a path can end, which the label text alone
+ * cannot: a regimen name is study data and could say anything.
+ *   regimen  — a real line of therapy
+ *   stopped  — observed for at least one line gap and began no further line
+ *   censored — the record simply ends, so nothing can be concluded
+ */
+export type SequenceNodeKind = "regimen" | "stopped" | "censored";
+export interface SequencePanel {
+  cohort: string;
+  nodes: { column: number; label: string; n: number; kind: SequenceNodeKind }[];
+  /** `kind` describes the TARGET of the flow */
+  flows: { column: number; from: string; to: string; n: number; kind: SequenceNodeKind }[];
+  /** patients with a first line */
+  started: number;
+  /** of those, how many end in a censored terminal at any column */
+  censored: number;
 }
 
 /** One cohort x event-type line of the clinical course. */

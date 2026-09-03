@@ -181,7 +181,33 @@ describe("treatment sequences: lines, not records", () => {
     // Attrition is usually the LARGEST flow; a diagram that drops it lies.
     const sql = seq();
     assert.match(sql, /leadInFrame\(combo\)/);
-    assert.match(sql, /coalesce\(nxt, ''\) AS b/);
+    assert.match(sql, /nxt AS b/);
+  });
+
+  test("a path that ends is classified as observed-stop vs censored", () => {
+    // Measured on msk_chord_2024: 68% of patients have under 3 months of
+    // follow-up after their last therapy, median 15 days. Merging those with
+    // genuine stops turns record-keeping into an apparent clinical decision.
+    const sql = seq({ lineGap: 90 });
+    assert.match(sql, /AS fate/);
+    assert.match(sql, /last_seen[\s\S]*?- sq2\.line_end >= 90/,
+      "ruling out a further line needs at least one line gap of observation");
+    assert.match(sql, /GROUP BY step, a, b, fate/);
+  });
+
+  test("the censoring threshold follows lineGap, not a separate constant", () => {
+    // A new line is defined by a gap greater than lineGap, so ruling one out
+    // needs exactly that much watching. Two constants could disagree.
+    assert.match(seq({ lineGap: 45 }), /- sq2\.line_end >= 45/);
+    assert.match(seq({ lineGap: 180 }), /- sq2\.line_end >= 180/);
+  });
+
+  test("observation counts ANY event type, not just therapy", () => {
+    // A patient seen for imaging two years later was genuinely watched, even
+    // though they had no further treatment record.
+    const sql = seq();
+    assert.match(sql, /seen AS/);
+    assert.match(sql, /OS_MONTHS/, "and OS follow-up extends it further");
   });
 
   test("leadInFrame gets an explicit unbounded frame", () => {
