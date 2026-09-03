@@ -10,6 +10,13 @@ const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B
 /** beyond this many distinct values a pie is unreadable — the portal shows a table */
 const PIE_MAX_SLICES = 8;
 
+/** Prompts where a figure is the answer, not decoration. */
+const CHAT_STARTERS = [
+  "Do STK11-mutant lung cancers do worse on immunotherapy? Measure survival from when they started it, not from sequencing.",
+  "Which KRAS mutations actually occur in colorectal cancer here?",
+  "Are EGFR and KRAS mutually exclusive in lung cancer?"
+];
+
 /** p-values: exponent notation once fixed notation would round to zero, and an
  *  honest floor when the true value underflows double precision. Returns the
  *  whole "p=..." / "p<..." label so the relation stays attached to the number. */
@@ -131,7 +138,7 @@ const DEFAULT_VIEWS: View[] = [
 ];
 
 export default function AnalysisPage() {
-  const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">("cohorts");
+  const [tab, setTab] = useState<"chat" | "explore" | "cohorts" | "analysis" | "examples">("cohorts");
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   const [copied, setCopied] = useState<string | null>(null);
   const [exMsg, setExMsg] = useState<string | null>(null);   // Explore action-bar feedback
@@ -144,7 +151,7 @@ export default function AnalysisPage() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [chat, setChat] = useState<{ role: string; text: string }[]>([]);
+  const [chat, setChat] = useState<{ role: string; text: string; figures?: { kind: string; title: string; svg: string; caption: string; ms: number | null }[] }[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
   const [chatReady, setChatReady] = useState<boolean | null>(null);
@@ -229,7 +236,7 @@ export default function AnalysisPage() {
    * lands on the same tab. `doc` and `tab` are written together — writing one
    * with a bare "?tab=…" would drop the other.
    */
-  const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
+  const TABS = ["chat", "explore", "cohorts", "analysis", "examples"] as const;
   // run() writes the URL too, and during the mount effect its closure still
   // holds the initial tab — so the current tab is read from a ref, never from
   // the render closure, or a shared ?doc= link would record the wrong tab.
@@ -639,9 +646,13 @@ export default function AnalysisPage() {
         body: JSON.stringify({ messages: msgs.map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.text })), doc: { study, ...doc }, resultSummary: summarize(result) }) });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
-      setChat([...msgs, { role: "assistant", text: j.reply }]);
+      setChat([...msgs, { role: "assistant", text: j.reply, figures: j.figures || [] }]);
       if (j.doc) {
-        setDoc(j.doc); setDocText(JSON.stringify(j.doc, null, 2)); goTab("analysis"); run(j.doc);
+        setDoc(j.doc); setDocText(JSON.stringify(j.doc, null, 2));
+        // the reply already carries the figures, so stay in the conversation
+        // unless the user is not looking at it
+        if (tabRef.current !== "chat") goTab("analysis");
+        run(j.doc);
       }
     } catch (e) { setChat([...msgs, { role: "assistant", text: "⚠ " + String((e as Error)?.message || e) }]); }
     setChatBusy(false);
@@ -657,32 +668,72 @@ export default function AnalysisPage() {
         <a href="/" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>builder</a>
       </header>
       <main style={{ maxWidth: "96rem" }}>
-        {/* ---- Chat: always at the top ---- */}
-        <div className="card">
-          <h2>Chat <span className="plain">— define cohorts, add views, ask about results; it edits the document below</span></h2>
-          {chatReady === false && <p className="note">Chat needs <code>ANTHROPIC_API_KEY</code> (with API credits) in the server environment. Everything else works without it.</p>}
-          {(chat.length > 0 || chatBusy) && (
-            <div style={{ maxHeight: "14rem", overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "0.6rem" }}>
-              {chat.map((m, i) => (
-                <div key={i} style={{ fontSize: "0.82rem", background: m.role === "user" ? "var(--accent-soft)" : "var(--code-bg)", borderRadius: 8, padding: "0.45rem 0.65rem", whiteSpace: "pre-wrap" }}>{m.text}</div>
-              ))}
-              {chatBusy && <div className="loading-block" style={{ padding: "0.2rem 0" }}><span className="spinner" /> thinking…</div>}
-            </div>
-          )}
-          <div className="row">
-            <input style={{ flex: 1 }} placeholder="e.g. compare STK11-driver vs wild-type immunotherapy patients — survival and an oncoprint" value={chatInput}
-              onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendChat()} disabled={chatReady === false} />
-            <button className="primary" onClick={sendChat} disabled={chatBusy || chatReady === false}>Send</button>
-          </div>
-        </div>
-
         <div className="tabs">
+          <button className={tab === "chat" ? "active" : ""} onClick={() => goTab("chat")}>Chat</button>
           <button className={tab === "explore" ? "active" : ""} onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
           <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Cohorts</button>
           <button className={tab === "analysis" ? "active" : ""} onClick={() => goTab("analysis")}>Analysis</button>
           <button className={tab === "examples" ? "active" : ""} onClick={() => goTab("examples")}>Examples</button>
         </div>
         {error && <div className="error">{error}</div>}
+
+        {/* ================= Chat tab ================= */}
+        {tab === "chat" && <div>
+          <div className="card">
+            <h2>Chat <span className="plain">— the analysis, answered in the conversation</span></h2>
+            <p className="note" style={{ marginTop: "0.2rem" }}>
+              Every figure below was rendered by the same code the Analysis tab uses, from the same
+              analysis document — so a chart in a reply is not a screenshot of the app, it IS the app's
+              output. Each carries its own caveat, because an image separated from its method looks
+              more authoritative than the number it replaced.
+            </p>
+            {chatReady === false && <div className="error">Chat needs <code>ANTHROPIC_API_KEY</code> in the server environment. Everything else works without it.</div>}
+          </div>
+
+          {chat.length === 0 && chatReady !== false && (
+            <div className="card">
+              <p className="note" style={{ margin: 0 }}>Nothing asked yet. Try one where a picture is the answer rather than decoration:</p>
+              <div className="extags" style={{ marginTop: "0.5rem" }}>
+                {CHAT_STARTERS.map(q => (
+                  <button key={q} className="extag" onClick={() => { setChatInput(q); }}>{q}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {chat.map((m, i) => (
+            <div className={m.role === "user" ? "card chatturn user" : "card chatturn"} key={i}>
+              <div className="meta" style={{ marginBottom: "0.3rem" }}>{m.role === "user" ? "you" : "assistant"}</div>
+              <div style={{ whiteSpace: "pre-wrap", fontSize: "0.86rem", lineHeight: 1.5 }}>{m.text}</div>
+              {(m.figures || []).map((f, fi) => (
+                <figure className="chatfig" key={fi}>
+                  <figcaption>
+                    <strong>{f.title}</strong>
+                    {f.ms != null && <span className="meta"> · {f.ms.toLocaleString()}ms</span>}
+                  </figcaption>
+                  <div className="chatfigbody" dangerouslySetInnerHTML={{ __html: f.svg }} />
+                </figure>
+              ))}
+              {m.role === "assistant" && (m.figures || []).length > 0 && (
+                <div className="row" style={{ marginTop: "0.4rem" }}>
+                  <button className="linklike" onClick={() => goTab("analysis")}>open the full analysis</button>
+                  <span className="meta">· the document behind these figures is editable there</span>
+                </div>
+              )}
+            </div>
+          ))}
+          {chatBusy && <div className="card"><div className="loading-block"><span className="spinner" /> thinking…</div></div>}
+
+          <div className="card">
+            <div className="row">
+              <input style={{ flex: 1 }} placeholder="ask for an analysis — e.g. survival from first immunotherapy, STK11-mutant vs wild-type"
+                value={chatInput} onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && sendChat()} disabled={chatReady === false} />
+              <button className="primary" onClick={sendChat} disabled={chatBusy || chatReady === false}>Send</button>
+              {chat.length > 0 && <button className="linklike" onClick={() => setChat([])}>clear</button>}
+            </div>
+          </div>
+        </div>}
 
         {/* ================= Explore tab ================= */}
         {tab === "explore" && <div>

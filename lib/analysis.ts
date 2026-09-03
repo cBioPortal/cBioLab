@@ -221,9 +221,21 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
         cohorts[n].studies.map(async (st) => {
           perSite.get(n)!.set(st, await resolvers[st].survivalCounts(doc.cohorts[n], endpoint, anchor));
         })));
-      // A study with nothing for this endpoint must be named, not silently
-      // dropped from a curve — its patients would otherwise just be missing.
+      // An EMPTY COHORT also yields no rows, and must not be reported as a
+      // missing endpoint — that sends the reader (or a model) off to conclude the
+      // study lacks OS when it does not. Separate the two causes before blaming
+      // either.
+      const cohortTotal = vNames.reduce((n, cn) => n + cohorts[cn].count, 0);
+      if (cohortTotal === 0) {
+        views.push({ kind: "survival", endpoint, cohorts: vNames,
+          error: "nothing to plot: " + (vNames.length === 1 ? "cohort “" + vNames[0] + "” is" : "all cohorts are") +
+            " empty. The endpoint is not the problem — check the cohort definition." });
+        continue;
+      }
+      // A study with patients but nothing for this endpoint must be named, not
+      // silently dropped — its patients would otherwise just be missing.
       const silent = vStudies.filter((st) =>
+        vNames.some((n) => (cohorts[n].perStudy[st]?.count || 0) > 0) &&
         vNames.every((n) => !(perSite.get(n)!.get(st) || []).length));
       let endpointHelp = "";
       if (silent.length) {

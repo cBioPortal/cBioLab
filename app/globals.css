@@ -495,3 +495,14 @@ details.gearmenu > .gearmenu-items {
 
 /* Explore: derived facets sit in their own row above the study's own attributes */
 .derivedgrid { display: grid; gap: 0.6rem 1.4rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+
+/* ---------------- Chat tab ---------------- */
+.chatturn { padding-top: 0.6rem; padding-bottom: 0.7rem; }
+.chatturn.user { background: var(--accent-soft); }
+.chatfig { margin: 0.7rem 0 0; }
+.chatfig figcaption { font-size: 0.78rem; margin-bottom: 0.25rem; }
+.chatfigbody {
+  border: 1px solid var(--line); border-radius: 8px; overflow-x: auto;
+  background: var(--bg); padding: 0.3rem;
+}
+.chatfigbody svg { display: block; }

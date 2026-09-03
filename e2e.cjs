@@ -259,6 +259,21 @@ async function main() {
       ok("an explicit ?tab= beats the document's default tab",
         (await page.locator(".tabs button.active").innerText()).trim() === "Examples");
 
+      // Chat tab: figures are rendered server-side from the SAME renderer the
+      // Analysis tab uses, so a reply carries charts rather than describing them.
+      // The model call needs an API key, so this checks the surface, not the LLM.
+      await page.goto(BASE + "/analysis?tab=chat");
+      await page.waitForSelector(".tabs button.active", { timeout: 120000 });
+      const chatTab = {
+        active: (await page.locator(".tabs button.active").innerText()).trim(),
+        starters: await page.locator(".extag").count(),
+        input: await page.locator("input[placeholder^='ask for an analysis']").count(),
+        onlyOneSend: await page.locator("button:has-text('Send')").count()
+      };
+      ok("the chat tab is a self-contained surface",
+        chatTab.active === "Chat" && chatTab.starters >= 3 && chatTab.input === 1 && chatTab.onlyOneSend === 1,
+        JSON.stringify(chatTab));
+
       // Cohorts tab: tick cohorts, submit them together. No per-row "add" links.
       await page.goto(BASE + "/analysis");
       await page.waitForSelector(".pick input", { timeout: 240000 });
