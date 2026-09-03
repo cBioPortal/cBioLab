@@ -12,13 +12,15 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, ExploreResult } from "./types.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, TimelineSpan, CourseCount, CourseOpts } from "./federation.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow } from "./federation.ts";
 import { carriesPatientIds } from "./federation.ts";
 
 interface RemoteAggregates {
   study: string; instance: string; count: number;
   geneCounts: GeneCounts[]; survivalCounts: SurvivalCount[]; survivalEndpoints?: string[] | null; pairCounts: PairCounts[]; attributeStats: AttrStats[]; pairMoments: PairMoments[]; variantCounts: VariantReport; profileMoments: ProfileMoments[];
   timelineSpan?: TimelineSpan[] | null; eventCourse?: CourseCount[] | null;
+  treatmentSequence?: SequenceFlow[] | null;
+  sequenceKeys?: { key: string; label: string; patients: number; values: number }[] | null;
   /** the SQL the peer compiled and ran, when it chooses to disclose it */
   cohortSql?: string | null;
   /** and the aggregate queries it ran to answer this call */
@@ -168,6 +170,20 @@ export class RemoteAggregateResolver implements AggregateCapable {
       { study: this.study, cohort: def || {}, timelineSpan: true });
     this.remember(r);
     return r.timelineSpan || [];
+  }
+  async treatmentSequence(def: CohortDef | null | undefined, opts: SequenceOpts): Promise<SequenceFlow[]> {
+    this.guard(def);
+    const r = await mcpCall(this.url, "federated_aggregates",
+      { study: this.study, cohort: def || {}, sequence: opts });
+    this.remember(r);
+    return r.treatmentSequence || [];
+  }
+  async sequenceKeys(def: CohortDef | null | undefined, eventType: string): Promise<{ key: string; label: string; patients: number; values: number }[]> {
+    this.guard(def);
+    const r = await mcpCall(this.url, "federated_aggregates",
+      { study: this.study, cohort: def || {}, sequenceKeys: eventType });
+    this.remember(r);
+    return r.sequenceKeys || [];
   }
   async eventCourse(def: CohortDef | null | undefined, opts: CourseOpts): Promise<CourseCount[]> {
     this.guard(def);

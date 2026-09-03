@@ -379,7 +379,10 @@ export default function AnalysisPage() {
       why: () => contProfile() ? null : "this study has no continuous molecular profile (mRNA z-scores) to correlate" },
     { kind: "course", label: "Clinical course",
       why: () => viewEvents().length ? null
-        : "no timeline events known yet — open Explore once so the app can read this study's event types (only 131 of 545 studies have any)" }
+        : "no timeline events known yet — open Explore once so the app can read this study's event types (only 131 of 545 studies have any)" },
+    { kind: "sequence", label: "Treatment sequence",
+      why: () => viewEvents().some(e => /treat|therap|regimen|drug|medicat/.test(e.canonical)) ? null
+        : "this study records no treatment events, so there are no lines of therapy to sequence" }
   ];
 
   /** Drop one view from the document and re-run what is left. */
@@ -406,6 +409,11 @@ export default function AnalysisPage() {
           return { kind, eventTypes: evs.slice(0, 2).map(e => e.canonical),
                    ...(anchorOn ? { anchor: { eventType: anchorOn.label, occurrence: "FIRST" } } : {}),
                    binMonths: 3, fromMonths: -12, toMonths: 60 };
+        })()
+      : kind === "sequence" ? (() => {
+          const tx = viewEvents().find(e => /treat|therap|regimen|drug|medicat/.test(e.canonical));
+          return { kind, ...(tx ? { eventType: tx.canonical } : {}), labelKey: "SUBTYPE",
+                   lineGap: 90, maxSteps: 3, topN: 8 };
         })()
       : kind === "cooccurrence" ? { kind, genes: genes.slice(0, 6) }
       : kind === "oncoprint" ? { kind, genes: genes.slice(0, 5) }
@@ -1785,6 +1793,23 @@ export default function AnalysisPage() {
                     </div>
                   )}
                   <p className="note">{v.caveat}</p>
+                </>}
+                {v.kind === "sequence" && v.svg && <>
+                  <div className="row" style={{ alignItems: "baseline" }}>
+                    <h2 style={{ margin: 0 }}>Treatment sequence <span className="plain">
+                      — lines of therapy by {v.sequence ? v.sequence.labelKey : ""}
+                      {v.sequence ? " · " + v.sequence.lineGap + "-day line gap" : ""}</span></h2>
+                    <span className="spacer" />
+                    <>{v.ms != null && (
+                      <span className="lat" title={
+                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
+                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying \u00b7 " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
+                        {v.ms.toLocaleString()}ms
+                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
+                      </span>
+                    )}<Participation p={v.participation} /></>
+                  </div>
+                  <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
                 {v.kind === "course" && v.svg && <>
                   <div className="row" style={{ alignItems: "baseline" }}>

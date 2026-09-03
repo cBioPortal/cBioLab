@@ -233,3 +233,14 @@ cohort**. Computing each span's bin range arithmetically instead — `floor((day
 clamped to the window — brought the same query to **277ms**, because the bin range is derived per
 row rather than materialized as a product. The clamp matters for more than speed: `msk_met_2021`
 anchors ~6,266 days from day 0, which without clamping is a 2,000-bin range per patient.
+
+## Treatment sequences (`sequence` view)
+
+~600ms for 24,950 patients: one query that groups treatment records into lines with two window
+functions, then reads each line's successor with `leadInFrame`. Cost is flat in the number of
+lines followed, since `maxSteps` only filters the final aggregation.
+
+The row cap is 2,000 (was 500, which truncated real data): combination regimens have a long tail
+— 51 distinct regimens fold into "other" even at `topN: 8`, covering 24% of first-line patients.
+That is genuine regimen diversity, not a tuning artefact, and raising `topN` to 10 only moves it
+to 20%.

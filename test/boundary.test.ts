@@ -23,7 +23,7 @@ import { readFileSync } from "node:fs";
 import {
   carriesPatientIds, geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
   clinicalCountsSql, clinicalMomentsSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
-  timelineSpanSql, eventCourseSql,
+  timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
 import * as federation from "../lib/federation.ts";
@@ -199,7 +199,11 @@ describe("federation SQL returns aggregates, never identifiers", () => {
       anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Chemo", occurrence: "FIRST" },
       eventTypes: ["treatment", "surgery"], binMonths: 3, from: -4, to: 20 }),
     "eventCourseSql:day0": () => eventCourseSql(cohortSql, "x", "db", {
-      anchor: null, eventTypes: ["treatment"], binMonths: 1, from: 0, to: 12 })
+      anchor: null, eventTypes: ["treatment"], binMonths: 1, from: 0, to: 12 }),
+    "sequenceSql": () => sequenceSql(cohortSql, "x", "db", {
+      eventType: "Treatment", labelKey: "SUBTYPE", exclude: ["Prior Medications to MSK"],
+      lineGap: 90, maxSteps: 3 }),
+    "sequenceKeysSql": () => sequenceKeysSql(cohortSql, "x", "db", "Treatment")
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

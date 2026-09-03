@@ -3,7 +3,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { canonicalEventName, foldEventNames, foldNote } from "../lib/event-names.ts";
-import { eventCourseSql, timelineSpanSql } from "../lib/federation.ts";
+import { eventCourseSql, timelineSpanSql, sequenceSql, sequenceKeysSql } from "../lib/federation.ts";
 
 const cohortSql = "SELECT DISTINCT replaceOne(patient_unique_id, 'x_', '') AS pid FROM db.sample_derived";
 const course = (o: Partial<Parameters<typeof eventCourseSql>[3]> = {}) =>
@@ -156,5 +156,67 @@ describe("timelineSpan reports structure, which is what picks the measure", () =
   test("reports distinct days, which is what the degenerate gate tests", () => {
     // 17 of the 131 studies with timeline rows put every event on one day.
     assert.match(timelineSpanSql(cohortSql, "x", "db"), /uniqExact\(ce\.start_date\) AS days/);
+  });
+});
+
+describe("treatment sequences: lines, not records", () => {
+  const seq = (o: Partial<Parameters<typeof sequenceSql>[3]> = {}) =>
+    sequenceSql(cohortSql, "x", "db", {
+      eventType: "Treatment", labelKey: "SUBTYPE", exclude: [], lineGap: 90, maxSteps: 3, ...o
+    } as Parameters<typeof sequenceSql>[3]);
+
+  test("groups records into lines by a gap, not one line per record", () => {
+    // A patient has a median of 6 treatment records and 4 agents; combination
+    // therapy is several records describing ONE decision.
+    const sql = seq({ lineGap: 60 });
+    assert.match(sql, /s > pms \+ 60/, "the gap threshold starts a new line");
+    assert.match(sql, /line_no/);
+  });
+
+  test("a line is its sorted combination, so A+B and B+A are one regimen", () => {
+    assert.match(seq(), /arrayStringConcat\(arraySort\(groupUniqArray\(lbl\)\)/);
+  });
+
+  test("patients who start no further line are kept as an explicit terminal", () => {
+    // Attrition is usually the LARGEST flow; a diagram that drops it lies.
+    const sql = seq();
+    assert.match(sql, /leadInFrame\(combo\)/);
+    assert.match(sql, /coalesce\(nxt, ''\) AS b/);
+  });
+
+  test("leadInFrame gets an explicit unbounded frame", () => {
+    // The default window frame ends at the current row, so leadInFrame would
+    // return the default value and every patient would look like they stopped.
+    assert.match(seq(), /ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING/);
+  });
+
+  test("exclusions are applied, and are values rather than folded names", () => {
+    const sql = seq({ exclude: ["Prior Medications to MSK", "Bone Treatment"] });
+    assert.match(sql, /NOT IN \('Prior Medications to MSK', 'Bone Treatment'\)/,
+      "values keep their exact spelling — only NAMES are case-folded");
+  });
+
+  test("no exclusions means no exclusion clause at all", () => {
+    assert.equal(/NOT IN \(/.test(seq({ exclude: [] })), false);
+  });
+
+  test("the label key is folded like any other name, the event type too", () => {
+    const sql = seq({ labelKey: "SubType", eventType: "TREATMENT" });
+    assert.match(sql, /lower\(trim\(d\.key\)\) = 'subtype'/);
+    assert.match(sql, /lower\(trim\(ce\.event_type\)\) = 'treatment'/);
+  });
+
+  test("a missing labelKey is refused rather than guessed", () => {
+    assert.throws(() => seq({ labelKey: "" }), /needs a labelKey/);
+  });
+
+  test("empty labels are dropped — a blank regimen is not a regimen", () => {
+    assert.match(seq(), /trim\(d\.value\) != ''/);
+  });
+
+  test("sequenceKeys reports what COULD label a line, for the error path", () => {
+    const sql = sequenceKeysSql(cohortSql, "x", "db", "Treatment");
+    assert.match(sql, /uniqExact\(trim\(d\.value\)\) AS values/,
+      "the value count is what tells a reader whether a key is a usable granularity");
   });
 });

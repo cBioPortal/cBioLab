@@ -132,3 +132,67 @@ describe("clinical course figures show the denominator, not just the curve", () 
     assert.equal(viewTitle(mk() as any), "Clinical course — Treatment — A vs B");
   });
 });
+
+describe("sequence Sankey keeps everyone accounted for", () => {
+  const mk = () => ({
+    kind: "sequence", cohorts: ["A"], caveat: "Lines of therapy.",
+    sequence: {
+      labelKey: "SUBTYPE", lineGap: 90, steps: 2, foldedLabels: 3, truncated: false,
+      nodes: [
+        { column: 1, label: "Chemo", n: 100 }, { column: 1, label: "Hormone", n: 40 },
+        { column: 2, label: "Chemo", n: 30 }, { column: 2, label: "", n: 110 }
+      ],
+      flows: [
+        { column: 1, from: "Chemo", to: "", n: 80 },
+        { column: 1, from: "Chemo", to: "Chemo", n: 20 },
+        { column: 1, from: "Hormone", to: "", n: 30 },
+        { column: 1, from: "Hormone", to: "Chemo", n: 10 }
+      ]
+    }
+  });
+
+  test("the terminal 'no further line' node is drawn and named", () => {
+    // Attrition is usually the biggest flow. If it is not on the page, the
+    // diagram overstates how many patients go on to further therapy.
+    const svg = viewToSvg(mk() as any)!;
+    assert.match(svg, /no further line/);
+    assert.ok(svg.includes("110"), "the terminal node carries its count");
+  });
+
+  test("every flow with a known source and target is drawn", () => {
+    const svg = viewToSvg(mk() as any)!;
+    // 4 ribbons + 4 node rects; ribbons are the fill-opacity paths
+    assert.equal((svg.match(/fill-opacity="0\.32"/g) || []).length, 4);
+  });
+
+  test("one scale across columns, so attrition is visible as thinning", () => {
+    const svg = viewToSvg(mk() as any)!;
+    const rects = [...svg.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="13" height="([\d.]+)"/g)]
+      .map((m) => ({ x: +m[1], h: +m[3] }));
+    const col1 = rects.filter((r) => r.x === Math.min(...rects.map((z) => z.x)));
+    const chemo1 = Math.max(...col1.map((r) => r.h));
+    const chemo2 = rects.filter((r) => r.x !== Math.min(...rects.map((z) => z.x)))
+      .map((r) => r.h).sort((a, b) => a - b)[0];
+    assert.ok(chemo1 > chemo2 * 2,
+      "100 patients must draw taller than 30 — normalising per column would hide the drop-off");
+  });
+
+  test("labels are escaped — regimen names come from study data", () => {
+    const v = mk() as any;
+    v.sequence.nodes[0].label = "<img src=x>";
+    v.sequence.flows[0].from = "<img src=x>";
+    v.sequence.flows[1].from = "<img src=x>";
+    const svg = viewToSvg(v)!;
+    assert.equal(svg.includes("<img"), false);
+    assert.match(svg, /&lt;img/);
+  });
+
+  test("no flows renders nothing rather than an empty frame", () => {
+    assert.equal(viewToSvg({ kind: "sequence", sequence: { flows: [], nodes: [] } } as any), null);
+    assert.equal(viewToSvg({ kind: "sequence", error: "no therapy lines found" } as any), null);
+  });
+
+  test("the title names the labelling key", () => {
+    assert.equal(viewTitle(mk() as any), "Treatment sequence by SUBTYPE — A");
+  });
+});

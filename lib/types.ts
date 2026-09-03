@@ -170,7 +170,30 @@ export interface OncoprintView {
   kind: "oncoprint"; genes: string[]; cohorts?: string[];
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: string[];
 }
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView;
+/**
+ * Treatment sequences: what follows what, as lines of therapy.
+ *
+ * `exclude` drops label values that are not therapies. It is a parameter rather
+ * than an engine rule because such markers are not structurally distinguishable
+ * from real treatments — in MSK-CHORD the SUBTYPE `Prior Medications to MSK`
+ * carries no duration, but neither do `Radiation Therapy` or `Investigational`.
+ * Putting the choice in the document keeps it visible to whoever reads the result.
+ */
+export interface SequenceView {
+  kind: "sequence"; cohorts?: string[];
+  /** event type carrying therapies (default: treatment) */
+  eventType?: string;
+  /** attribute key labelling each therapy (default: SUBTYPE) */
+  labelKey?: string;
+  exclude?: string[];
+  /** days with no therapy that begin a new line (default 90) */
+  lineGap?: number;
+  /** lines to follow (default 3) */
+  maxSteps?: number;
+  /** distinct labels kept before the rest fold into "other" (default 6) */
+  topN?: number;
+}
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView;
 
 export interface AnalysisDoc {
   study?: string;
@@ -293,11 +316,25 @@ export interface ViewResult {
   coexpression?: CoexprRow[];               // co-expression
   hotspots?: HotspotGene[];                 // hotspots / lollipop
   course?: CourseSeries[];                  // clinical course
+  sequence?: SequenceResult;                // treatment sequences
   /** course: bin width and window actually used, in months */
   courseAxis?: { binMonths: number; from: number; to: number };
   svg?: string; nColumns?: number;          // oncoprint
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
 }
+/** Therapy transitions, ready to draw: nodes in columns, flows between them. */
+export interface SequenceResult {
+  labelKey: string; lineGap: number; steps: number;
+  /** column is the line number: 1 = first line, 2 = second, … */
+  nodes: { column: number; label: string; n: number }[];
+  /** `to: ""` is the terminal "no further line" */
+  flows: { column: number; from: string; to: string; n: number }[];
+  /** how many distinct labels were folded into "other" */
+  foldedLabels: number;
+  /** the aggregate hit its row cap, so the long tail is incomplete */
+  truncated: boolean;
+}
+
 /** One cohort x event-type line of the clinical course. */
 export interface CourseSeries {
   cohort: string;

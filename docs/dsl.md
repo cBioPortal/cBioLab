@@ -100,6 +100,7 @@ rel      := { "type": "NONE" }                                                 /
 | `cooccurrence` | `genes:[2-12], cohorts?:[names]` | pairwise co-occurrence / mutual exclusivity **within one cohort** (the first named). Each pair's 2×2 is counted among patients profiled for **both** genes, per study against that study's own panels; log₂ odds ratio, two-sided Fisher, Benjamini–Hochberg q across pairs. Across studies the test is **stratified by study** (Cochran–Mantel–Haenszel). Pairs no panel covers are reported as not assessable, never as a null result |
 | `survival` | `endpoint?:"OS"|"PFS"|…, anchor?:{eventType,key?,value?,occurrence?}, cohorts?:[names]` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts. Across studies the test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. `anchor` resets the clock to a timeline event (first chemotherapy, initial diagnosis) instead of the study's day 0, and **applies left truncation automatically**: a patient joins the risk set when the study could first observe them, never at the anchor — otherwise everyone appears to survive from the anchor to their own entry, which is exactly what put them in the study. The reported entry distribution warns when an anchor is matching earlier events than intended. Cross-study baselines are not harmonized |
 | `course` | `eventTypes:[≤6], anchor?:{eventType,key?,value?,occurrence?}, binMonths?:3, fromMonths?:-12, toMonths?:60, cohorts?:[names]` | the **clinical course**: per time bin, the share of the cohort in each event state. Two things it refuses to fake. (1) The denominator is the patients still under observation in that bin — first recorded event to last contact (the later of their last event and their OS follow-up) — never the whole cohort, which would make a curve fall merely because follow-up ran out. (2) `anchor` is optional for one study but **required across studies**: day 0 is birth in some studies and first sequencing in others, and nothing in the schema records which, so raw day 0 compares incomparable clocks. Event types that carry real durations are drawn as a state the patient is IN; the rest as an event that HAPPENED — read from the data, not from the name. Bins are half-open [t, t+w). Event-name spellings differing only in case are folded (`Treatment`/`TREATMENT`) and the fold is named in the caveat; nothing else is merged |
+| `sequence` | `labelKey?:"SUBTYPE", eventType?:"treatment", exclude?:[values], lineGap?:90, maxSteps?:3, topN?:8, cohorts?:[names]` | **what follows what**: therapy transitions as lines, drawn as a Sankey. Records are first grouped into LINES — therapies less than `lineGap` days apart are one line, labelled by their whole combination (sorted, so `A + B` and `B + A` are one regimen). That grouping is the point: a patient has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision. Patients who begin no further line flow into an explicit terminal node, so flows out of a node sum to it and attrition — usually the largest flow — cannot vanish. `exclude` drops label values that are not therapies; it is a parameter and not an engine rule because such markers are **not structurally distinguishable** (MSK’s `Prior Medications to MSK` carries no duration, but neither do `Radiation Therapy` or `Investigational`), so the choice belongs in the document where a reader can see it. One cohort only |
 | `oncoprint` | `genes:[≤12], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], cohorts?:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 `views[].cohorts` defaults to all cohorts. Oncoprints federate across studies: columns are
@@ -1186,7 +1187,37 @@ MSK-CHORD, aligned on each patient's FIRST treatment, split by TP53 status. Trea
 }
 ```
 
-### Example 16: Lollipop plot: recurrent protein changes, with a suppression floor
+### Example 16: What comes after what: lines of therapy as a Sankey
+
+MSK-CHORD therapy lines, 90-day gap. Read the grey blocks first: of 21,444 patients with a first line, 13,620 never start a second. Chemo dominates first line; hormone therapy holds its share far better across lines, which is what maintenance endocrine therapy looks like. The four excluded SUBTYPE values are a judgement made HERE, in the document, not hidden in the engine — 'Prior Medications to MSK' is a provenance marker rather than a therapy, and radiation and bone treatment co-occur with almost everything, so leaving them in explodes the combination space. Nothing in the data structure distinguishes them from real treatments, which is exactly why the choice is visible.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "MSK-CHORD": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "sequence",
+      "labelKey": "SUBTYPE",
+      "exclude": [
+        "Prior Medications to MSK",
+        "Radiation Therapy",
+        "Bone Treatment",
+        "Other"
+      ],
+      "lineGap": 90,
+      "maxSteps": 3,
+      "topN": 8
+    }
+  ]
+}
+```
+
+### Example 17: Lollipop plot: recurrent protein changes, with a suppression floor
 
 Hotspots in colorectal cancer. Percentages are of the patients carrying any mutation in that gene, so BRAF V600E accounts for roughly 70% of BRAF-mutant cases. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.
 
@@ -1222,7 +1253,7 @@ Hotspots in colorectal cancer. Percentages are of the patients carrying any muta
 }
 ```
 
-### Example 17: Co-expression from sums alone
+### Example 18: Co-expression from sums alone
 
 Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.
 
@@ -1255,7 +1286,7 @@ Pearson correlation between gene pairs in TCGA breast cancer. A correlation depe
 }
 ```
 
-### Example 18: Clinical attributes compared between cohorts
+### Example 19: Clinical attributes compared between cohorts
 
 How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.
 
@@ -1301,7 +1332,7 @@ How TP53-mutant and wild-type tumors differ clinically. Categorical attributes a
 }
 ```
 
-### Example 19: Co-occurrence and mutual exclusivity in NSCLC
+### Example 20: Co-occurrence and mutual exclusivity in NSCLC
 
 Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.
 
@@ -1338,7 +1369,7 @@ Pairwise associations among lung cancer driver genes. Each site returns four cou
 }
 ```
 
-### Example 20: Survival from first chemotherapy, left-truncated
+### Example 21: Survival from first chemotherapy, left-truncated
 
 TP53-mutant vs wild-type, overall survival measured from each patient's first chemotherapy rather than from sequencing. Patients whose first chemotherapy falls after day 0, or who never had chemotherapy, are excluded rather than given negative follow-up. The result reports how long after the anchor patients became observable, so an anchor that is matching earlier events than intended shows up as a long tail.
 
@@ -1383,7 +1414,7 @@ TP53-mutant vs wild-type, overall survival measured from each patient's first ch
 }
 ```
 
-### Example 21: Study-stratified survival across two studies
+### Example 22: Study-stratified survival across two studies
 
 TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.
 

@@ -739,6 +739,107 @@ export function eventCourseSql(
   );
 }
 
+export interface SequenceOpts {
+  /** canonical event type carrying the therapies */
+  eventType: string;
+  /** attribute key labelling each therapy (SUBTYPE, TREATMENT_TYPE, AGENT…) */
+  labelKey: string;
+  /** label values to drop — a DOCUMENT-level choice, see the note below */
+  exclude: string[];
+  /** days with no therapy that begin a new line */
+  lineGap: number;
+  /** how many lines to follow */
+  maxSteps: number;
+}
+
+/** One transition. `to: ''` means the patient began no further line. */
+export interface SequenceFlow { step: number; from: string; to: string; n: number }
+
+/**
+ * Treatment sequences: what follows what.
+ *
+ * LINES, NOT RECORDS. A patient has a median of 6 treatment records and 4
+ * distinct agents, often overlapping — combination therapy is several records
+ * describing ONE decision. So records are first grouped into *lines*: therapies
+ * separated by less than `lineGap` days of no treatment belong to the same line,
+ * and a line's label is its combination, sorted so `A + B` and `B + A` are one
+ * thing. This is the window-function scheme lib/compiler.ts already uses for its
+ * derived treatment lines, generalised off MSK's fixed SUBTYPE allowlist.
+ *
+ * WHY `exclude` IS A PARAMETER AND NOT A RULE. In MSK-CHORD the SUBTYPE value
+ * `Prior Medications to MSK` is a data-provenance marker, not a therapy — but it
+ * is NOT structurally distinguishable: it carries no duration, and neither do
+ * `Radiation Therapy` or `Investigational`, which are real treatments. There is
+ * no honest way for the engine to tell them apart, so the choice belongs in the
+ * document where a reader can see it, not buried in a hardcoded list here.
+ *
+ * Rows are (step, from, to, n) with `to = ''` for "no further line", so the
+ * flows out of a node sum to that node's size and nobody is silently dropped.
+ */
+export function sequenceSql(
+  cohortSql: string, study: string, db: string, opts: SequenceOpts
+): string {
+  const gap = Math.max(1, Math.min(3650, Math.floor(Number(opts.lineGap) || 90)));
+  const steps = Math.max(2, Math.min(8, Math.floor(Number(opts.maxSteps) || 3)));
+  const et = canonicalEventName(opts.eventType || "treatment");
+  const key = canonicalEventName(opts.labelKey || "");
+  if (!key) throw new Error("a sequence view needs a labelKey (e.g. SUBTYPE)");
+  const drop = [...new Set((opts.exclude || []).map((x) => String(x).trim()).filter(Boolean))].slice(0, 40);
+  const pid = "p.stable_id";
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "tx AS (\n" +
+    "  SELECT ce.clinical_event_id AS eid, " + pid + " AS pid, ce.start_date AS s,\n" +
+    "         coalesce(ce.stop_date, ce.start_date) AS e, trim(d.value) AS lbl\n" +
+    "  FROM " + db + ".clinical_event ce\n" +
+    "  JOIN " + db + ".clinical_event_data d ON d.clinical_event_id = ce.clinical_event_id\n" +
+    "    AND lower(trim(d.key)) = " + sq(key) + "\n" +
+    "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND " + eventTypeMatchSql("ce.event_type", et) + "\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND trim(d.value) != ''\n" +
+    (drop.length ? "    AND trim(d.value) NOT IN (" + drop.map(sq).join(", ") + ")\n" : "") +
+    "),\n" +
+    // toNullable: over an empty frame max() on a non-nullable column returns 0,
+    // which corrupts first-row detection because day offsets are often <= 0.
+    "flagged AS (\n  SELECT *, max(toNullable(e)) OVER (PARTITION BY pid\n" +
+    "    ORDER BY s, e, eid ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS pms\n  FROM tx\n),\n" +
+    "numbered AS (\n  SELECT *, sum(if(pms IS NULL OR s > pms + " + gap + ", 1, 0)) OVER (\n" +
+    "    PARTITION BY pid ORDER BY s, e, eid ROWS UNBOUNDED PRECEDING) AS line_no\n  FROM flagged\n),\n" +
+    // A line's identity is its COMBINATION, sorted so ordering cannot split one
+    // regimen into two apparent states.
+    "lines AS (\n  SELECT pid, line_no,\n" +
+    "         arrayStringConcat(arraySort(groupUniqArray(lbl)), ' + ') AS combo\n" +
+    "  FROM numbered GROUP BY pid, line_no\n),\n" +
+    "seq AS (\n  SELECT pid, line_no, combo,\n" +
+    "         leadInFrame(combo) OVER (PARTITION BY pid ORDER BY line_no\n" +
+    "           ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS nxt\n" +
+    "  FROM lines\n)\n" +
+    "SELECT line_no AS step, combo AS a, coalesce(nxt, '') AS b, uniqExact(pid) AS n\n" +
+    "FROM seq WHERE line_no <= " + steps + "\n" +
+    "GROUP BY step, a, b ORDER BY n DESC LIMIT 2000"
+  );
+}
+
+/** Which label keys a study's therapy events actually carry, and how varied. */
+export function sequenceKeysSql(cohortSql: string, study: string, db: string, eventType: string): string {
+  return (
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT lower(trim(d.key)) AS k, any(trim(d.key)) AS label,\n" +
+    "       uniqExact(p.stable_id) AS pts, uniqExact(trim(d.value)) AS values\n" +
+    "FROM " + db + ".clinical_event ce\n" +
+    "JOIN " + db + ".clinical_event_data d ON d.clinical_event_id = ce.clinical_event_id\n" +
+    "JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+    "  AND " + eventTypeMatchSql("ce.event_type", eventType) + "\n" +
+    "  AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+    "GROUP BY k ORDER BY pts DESC LIMIT 25"
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Resolvers
 // ---------------------------------------------------------------------------
@@ -780,6 +881,10 @@ export interface AggregateCapable {
   timelineSpan(def: CohortDef | null | undefined): Promise<TimelineSpan[]>;
   /** per-bin clinical course; `et: ''` rows carry the at-risk denominator */
   eventCourse(def: CohortDef | null | undefined, opts: CourseOpts): Promise<CourseCount[]>;
+  /** line-to-line therapy transitions; `to: ''` means no further line */
+  treatmentSequence(def: CohortDef | null | undefined, opts: SequenceOpts): Promise<SequenceFlow[]>;
+  /** which attribute keys could label a therapy line here */
+  sequenceKeys(def: CohortDef | null | undefined, eventType: string): Promise<{ key: string; label: string; patients: number; values: number }[]>;
   pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
   attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]>;
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
@@ -873,6 +978,16 @@ abstract class BaseResolver implements AggregateCapable {
       days: Number(x.days), firstDay: Number(x.first_day), lastDay: Number(x.last_day),
       intervalEvents: Number(x.interval_events)
     }));
+  }
+  async treatmentSequence(def: CohortDef | null | undefined, opts: SequenceOpts): Promise<SequenceFlow[]> {
+    const sql = sequenceSql(this.cohortSql(def), this.study, this.instance.conn.db, opts);
+    const r = await this.runLogged<ChRow>("treatmentSequence:" + opts.labelKey + "/gap" + opts.lineGap, sql, this.instance.conn);
+    return r.data.map((x) => ({ step: Number(x.step), from: String(x.a), to: String(x.b), n: Number(x.n) }));
+  }
+  async sequenceKeys(def: CohortDef | null | undefined, eventType: string): Promise<{ key: string; label: string; patients: number; values: number }[]> {
+    const sql = sequenceKeysSql(this.cohortSql(def), this.study, this.instance.conn.db, eventType);
+    const r = await this.runLogged<ChRow>("sequenceKeys", sql, this.instance.conn).catch(() => ({ data: [] as ChRow[] }));
+    return r.data.map((x) => ({ key: String(x.k), label: String(x.label), patients: Number(x.pts), values: Number(x.values) }));
   }
   async eventCourse(def: CohortDef | null | undefined, opts: CourseOpts): Promise<CourseCount[]> {
     const sql = eventCourseSql(this.cohortSql(def), this.study, this.instance.conn.db, opts);

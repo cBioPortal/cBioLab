@@ -304,10 +304,106 @@ function courseSvg(v: ViewResult, o: SvgOpts): string {
   return frame(W, H, out.join(""), p.bg);
 }
 
+/**
+ * Treatment sequences as a Sankey: columns are lines of therapy, ribbons are
+ * patients moving between them.
+ *
+ * ONE SCALE ACROSS ALL COLUMNS. Each column is drawn at the same patients-per-
+ * pixel, so the second line being visibly thinner than the first is the point —
+ * most patients never start one. Normalising each column to full height would
+ * hide exactly the attrition the chart exists to show.
+ *
+ * Ribbons are coloured by their SOURCE, so a regimen can be followed forward,
+ * and "no further line" is an explicit terminal node rather than a flow that
+ * quietly disappears — the flows out of a node sum to that node.
+ */
+function sequenceSvg(v: ViewResult, o: SvgOpts): string {
+  const p = palette(o.theme), W = o.width || 720;
+  const sq = v.sequence!;
+  const cols = [...new Set(sq.nodes.map((n) => n.column))].sort((a, b) => a - b);
+  const L = 8, R = 8, T = 26, PLOT = 300, NODE_W = 13, GAP = 6;
+  const cap = caption(v.caveat || "", W, T + PLOT + 26, p.muted, 96, 12);
+  const H = T + PLOT + 26 + cap.height + 12;
+
+  // Same scale everywhere: the tallest column fills the plot, the rest shrink.
+  const colTotal = (c: number) => sq.nodes.filter((n) => n.column === c).reduce((t, n) => t + n.n, 0);
+  const maxTotal = Math.max(1, ...cols.map(colTotal));
+  const maxCount = Math.max(1, ...cols.map((c) => sq.nodes.filter((n) => n.column === c).length));
+  const scale = (PLOT - GAP * (maxCount - 1)) / maxTotal;
+
+  // Colour follows the LABEL, not its rank in a column, so identity is stable.
+  const ranked = [...new Set(sq.nodes.filter((n) => n.label !== "" && n.label !== "other")
+    .sort((a, b) => b.n - a.n).map((n) => n.label))];
+  const colourOf = (label: string) =>
+    label === "" ? "var(--line, #dde4e8)" : label === "other" ? "#9aa7b0"
+      : SERIES[ranked.indexOf(label) % SERIES.length];
+
+  const colX = (c: number) => cols.length < 2 ? L
+    : L + (W - L - R - NODE_W) * (cols.indexOf(c) / (cols.length - 1));
+
+  // Lay out each column top-down, biggest first.
+  const box = new Map<string, { x: number; y: number; h: number; label: string }>();
+  for (const c of cols) {
+    // Biggest first, EXCEPT the terminal "no further line", which always sits at
+    // the bottom. It is usually the largest node, and putting it on top would
+    // shove every continuing regimen down and cross most of the ribbons; letting
+    // attrition fall out of the bottom is both tidier and how the eye reads it.
+    const list = sq.nodes.filter((n) => n.column === c)
+      .sort((a, b) => (a.label === "" ? 1 : 0) - (b.label === "" ? 1 : 0) || b.n - a.n);
+    let y = T;
+    for (const n of list) {
+      const h = Math.max(1, n.n * scale);
+      box.set(c + "\u0000" + n.label, { x: colX(c), y, h, label: n.label });
+      y += h + GAP;
+    }
+  }
+
+  const out: string[] = [];
+  for (const c of cols) {
+    const last = c === cols[cols.length - 1];
+    out.push(`<text x="${num(last ? colX(c) + NODE_W : colX(c))}" y="${T - 12}" font-size="10" ` +
+      `font-weight="600" text-anchor="${last ? "end" : "start"}" fill="${p.muted}">` +
+      (c <= sq.steps ? `line ${c}` : `line ${c}+`) + `</text>`);
+  }
+
+  // Ribbons first, so nodes and labels sit on top of them.
+  const outOff = new Map<string, number>(), inOff = new Map<string, number>();
+  for (const f of [...sq.flows].sort((a, b) => a.column - b.column || b.n - a.n)) {
+    const a = box.get(f.column + "\u0000" + f.from);
+    const b = box.get((f.column + 1) + "\u0000" + f.to);
+    if (!a || !b) continue;
+    const h = Math.max(0.6, f.n * scale);
+    const ka = f.column + "\u0000" + f.from, kb = (f.column + 1) + "\u0000" + f.to;
+    const y0 = a.y + (outOff.get(ka) || 0), y1 = b.y + (inOff.get(kb) || 0);
+    outOff.set(ka, (outOff.get(ka) || 0) + h);
+    inOff.set(kb, (inOff.get(kb) || 0) + h);
+    const x0 = a.x + NODE_W, x1 = b.x, xm = (x0 + x1) / 2;
+    out.push(`<path d="M ${num(x0)} ${num(y0)} C ${num(xm)} ${num(y0)}, ${num(xm)} ${num(y1)}, ${num(x1)} ${num(y1)} ` +
+      `L ${num(x1)} ${num(y1 + h)} C ${num(xm)} ${num(y1 + h)}, ${num(xm)} ${num(y0 + h)}, ${num(x0)} ${num(y0 + h)} Z" ` +
+      `fill="${colourOf(f.from)}" fill-opacity="0.32"/>`);
+  }
+
+  for (const [k, bx] of box) {
+    const n = sq.nodes.find((z) => z.column + "\u0000" + z.label === k)!;
+    out.push(`<rect x="${num(bx.x)}" y="${num(bx.y)}" width="${NODE_W}" height="${num(bx.h)}" rx="2" ` +
+      `fill="${colourOf(bx.label)}"/>`);
+    // Label only where there is room, so the diagram cannot become a wall of text.
+    if (bx.h >= 11) {
+      const last = bx.x + NODE_W > W - 140;
+      const text = (bx.label === "" ? "no further line" : bx.label) + " " + fmt(n.n);
+      out.push(`<text x="${num(last ? bx.x - 5 : bx.x + NODE_W + 5)}" y="${num(bx.y + bx.h / 2 + 3)}" ` +
+        `font-size="9.5" text-anchor="${last ? "end" : "start"}" fill="${p.ink}">${esc(text)}</text>`);
+    }
+  }
+  out.push(cap.svg);
+  return frame(W, H, out.join(""), p.bg);
+}
+
 export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {
   if (!v || v.error) return null;
   if (v.kind === "oncoprint") return v.svg || null;   // already rendered by the contract
   if (v.kind === "course" && v.course && v.course.length) return courseSvg(v, o);
+  if (v.kind === "sequence" && v.sequence && v.sequence.flows.length) return sequenceSvg(v, o);
   if (v.kind === "survival" && v.curves && v.curves.length) return survivalSvg(v, o);
   if (v.kind === "hotspots" && v.hotspots && v.hotspots.length) return hotspotsSvg(v, o);
   if (v.kind === "cooccurrence" && v.pairs && v.pairs.length) return cooccurrenceSvg(v, o);
@@ -325,6 +421,8 @@ export function viewTitle(v: ViewResult): string {
     : v.kind === "cooccurrence" ? "Co-occurrence and mutual exclusivity"
     : v.kind === "coexpression" ? "Co-expression"
     : v.kind === "clinical" ? "Clinical comparison"
+    : v.kind === "sequence" ? "Treatment sequence" +
+        (v.sequence ? " by " + v.sequence.labelKey : "")
     : v.kind === "course" ? "Clinical course" +
         (v.course && v.course.length ? " — " + [...new Set(v.course.map((z) => z.eventType))].join(", ") : "")
     : v.kind === "compare" ? "Alteration frequencies"
