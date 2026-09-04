@@ -614,6 +614,67 @@ export default function AnalysisPage() {
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
   };
 
+  /**
+   * The gene list of a view, editable in place.
+   *
+   * Genes used to be settable only by hand-editing the document JSON: addView
+   * seeded them from the most-altered genes in Explore (or a hardcoded fallback)
+   * and nothing could change them afterwards. Five view kinds take genes, so
+   * this is one control rendered in each one's settings panel rather than five
+   * near-identical ones.
+   */
+  const GENE_VIEWS = ["compare", "oncoprint", "cooccurrence", "coexpression", "hotspots"];
+  /** the most-altered genes this exploration found, for the suggestion list */
+  const geneChoices = (): string[] => {
+    const fromExplore = (explore?.mutatedGenes || []).map((g: any) => String(g.gene));
+    const legacy = (explore?.genes || []).map((g: any) => String(g.gene));
+    return [...new Set([...fromExplore, ...legacy])].slice(0, 60);
+  };
+  const setViewGenes = (vi: number, genes: string[]) =>
+    updateView(vi, v => pruneSort({ ...v, genes }));
+
+  function GeneEditor({ vi }: { vi: number }) {
+    const [add, setAdd] = useState("");
+    // Read the DOCUMENT's view, never the result. A ViewResult also has a
+    // `genes` field, but it holds {gene, driverPct, anyPct} objects for the
+    // oncoprint and nothing at all for compare — reading it left the editor
+    // empty and made "add" replace the real list rather than extend it.
+    const spec: any = (doc.views || [])[vi] || {};
+    const genes: string[] = (spec.genes || []).map(String);
+    // Co-occurrence and co-expression are pairwise: one gene yields no pairs, so
+    // the last two cannot be removed without the view becoming an error.
+    const floor = (spec.kind === "cooccurrence" || spec.kind === "coexpression") ? 2 : 1;
+    const commit = () => {
+      const g = add.trim().toUpperCase();
+      if (!g || genes.includes(g)) { setAdd(""); return; }
+      setViewGenes(vi, [...genes, g].slice(0, 12));
+      setAdd("");
+    };
+    return (
+      <div className="setcol">
+        <span className="meta">genes ({genes.length}/12)</span>
+        <div className="pillwrap">
+          {genes.map(g => (
+            <button key={g} type="button" className="pill" disabled={busy || genes.length <= floor}
+              title={genes.length <= floor
+                ? (floor === 2 ? "this view compares pairs, so it needs at least two genes" : "a view needs at least one gene")
+                : "remove " + g}
+              onClick={() => setViewGenes(vi, genes.filter(x => x !== g))}>
+              {g} <span aria-hidden="true">×</span>
+            </button>
+          ))}
+        </div>
+        <div className="setrow">
+          <input list="view-genes" placeholder="add a gene…" value={add} disabled={busy || genes.length >= 12}
+            onChange={e => setAdd(e.target.value.toUpperCase())}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); } }} />
+          <button type="button" className="facet" disabled={busy || !add.trim() || genes.length >= 12}
+            onClick={commit}>add</button>
+        </div>
+      </div>
+    );
+  }
+
   /** the view at index vi, read as an oncoprint view (its editor only renders there) */
   const ocView = (vi: number): OncoprintView => ((doc.views || [])[vi] || {}) as OncoprintView;
 
@@ -735,6 +796,12 @@ export default function AnalysisPage() {
         <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>rationale</a>
       </header>
       <main style={{ maxWidth: "96rem" }}>
+        {/* Suggestions for every view's gene editor: the most-altered genes this
+            exploration found. Typing any symbol is still allowed — the list is a
+            shortcut, not a whitelist. */}
+        <datalist id="view-genes">
+          {geneChoices().map(g => <option key={g} value={g} />)}
+        </datalist>
         <div className="tabs">
           <button className={tab === "explore" ? "active" : ""} onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
           <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Cohorts</button>
@@ -1484,7 +1551,7 @@ export default function AnalysisPage() {
                 <button className="removeview" title="remove this view from the document"
                   aria-label="remove this view" onClick={() => removeView(vi)}>×</button>
                 {v.kind === "compare" && v.rows && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2><span className="spacer" /><>{v.ms != null && (
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2><details className="gearmenu inline"><summary title="compare options">settings</summary><div className="gearmenu-items wide"><GeneEditor vi={vi} /></div></details><span className="spacer" /><>{v.ms != null && (
                       <span className="lat" title={
                         "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
                         (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
@@ -1512,7 +1579,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Hotspots <span className="plain">— recurrent protein changes, counted per patient</span></h2><span className="spacer" /><>{v.ms != null && (
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Hotspots <span className="plain">— recurrent protein changes, counted per patient</span></h2><details className="gearmenu inline"><summary title="hotspots options">settings</summary><div className="gearmenu-items wide"><GeneEditor vi={vi} /></div></details><span className="spacer" /><>{v.ms != null && (
                       <span className="lat" title={
                         "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
                         (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
@@ -1576,7 +1643,7 @@ export default function AnalysisPage() {
                   })}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-expression <span className="plain">— Pearson correlation from per-site sums</span></h2><span className="spacer" /><>{v.ms != null && (
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-expression <span className="plain">— Pearson correlation from per-site sums</span></h2><details className="gearmenu inline"><summary title="coexpression options">settings</summary><div className="gearmenu-items wide"><GeneEditor vi={vi} /></div></details><span className="spacer" /><>{v.ms != null && (
                       <span className="lat" title={
                         "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
                         (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
@@ -1663,7 +1730,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-occurrence <span className="plain">— pairwise, among patients profiled for both genes</span></h2><span className="spacer" /><>{v.ms != null && (
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-occurrence <span className="plain">— pairwise, among patients profiled for both genes</span></h2><details className="gearmenu inline"><summary title="cooccurrence options">settings</summary><div className="gearmenu-items wide"><GeneEditor vi={vi} /></div></details><span className="spacer" /><>{v.ms != null && (
                       <span className="lat" title={
                         "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
                         (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
@@ -1959,6 +2026,8 @@ export default function AnalysisPage() {
                     <details className="gearmenu">
                       <summary title="oncoprint options">⚙</summary>
                       <div className="gearmenu-items">
+                        <GeneEditor vi={vi} />
+                        <hr />
                         {(() => {
                           const vNames = ocView(vi).cohorts || Object.keys(result.cohorts);
                           const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];

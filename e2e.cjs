@@ -314,6 +314,51 @@ async function main() {
         replaced ? "replaced \u201c" + seeded[0] + "\u201d with \u201c" + after[0] + "\u201d"
                  : "seeded: " + (seeded.join(", ") || "?") + " -> document holds: " + (after.join(", ") || "?"));
 
+      // A view's genes are editable in the app. They used to be settable only by
+      // hand-editing the document JSON — addView seeded them and nothing could
+      // change them afterwards — which made "pick genes on the Analysis page"
+      // untrue for every gene-bearing view.
+      let geneEdit = "no compare view rendered", geneOk = false;
+      try {
+        await page.goto(BASE + "/analysis?doc=" + encodeURIComponent(Buffer.from(JSON.stringify({
+          study: "msk_chord_2024",
+          cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
+          views: [{ kind: "compare", genes: ["TP53", "KRAS", "EGFR"] }]
+        })).toString("base64")));
+        await page.waitForSelector('summary[title="compare options"]', { timeout: 300000 });
+        await page.locator('summary[title="compare options"]').click();
+        const panel = page.locator('details:has(summary[title="compare options"]) .gearmenu-items');
+        const before = await panel.locator(".pill").count();
+        await panel.locator("input[list=view-genes]").fill("PIK3CA");
+        await panel.locator('button:has-text("add")').click();
+        const genesNow = async () => page.evaluate(() => {
+          const v = (JSON.parse(document.querySelector("textarea").value).views || [])
+            .find((x) => x.kind === "compare");
+          return (v && v.genes) || [];
+        });
+        await page.waitForFunction(() => {
+          const ta = document.querySelector("textarea"); if (!ta) return false;
+          try { return (JSON.parse(ta.value).views || [])
+            .some((v) => v.kind === "compare" && (v.genes || []).includes("PIK3CA")); }
+          catch { return false; }
+        }, null, { timeout: 300000 });
+        const added = await genesNow();
+        // appended, not replaced — reading the RESULT's `genes` field instead of
+        // the document's once wiped the list down to the one just typed
+        const appended = added.length === before + 1 && added.includes("TP53");
+        await panel.locator(".pill", { hasText: "KRAS" }).first().click();
+        await page.waitForFunction(() => {
+          const ta = document.querySelector("textarea"); if (!ta) return false;
+          try { return !(JSON.parse(ta.value).views || [])
+            .some((v) => v.kind === "compare" && (v.genes || []).includes("KRAS")); }
+          catch { return false; }
+        }, null, { timeout: 300000 });
+        const afterRemove = await genesNow();
+        geneOk = appended && !afterRemove.includes("KRAS") && afterRemove.includes("PIK3CA");
+        geneEdit = before + " genes -> " + added.join(",") + " -> " + afterRemove.join(",");
+      } catch (e) { geneEdit = String(e.message).split("\n")[0]; }
+      ok("a view's genes can be changed without editing JSON", geneOk, geneEdit);
+
       // Tabs are deep-linked: a refresh must land you where you were.
       await page.goto(BASE + "/analysis");
       await page.waitForSelector(".tabs button", { timeout: 120000 });
