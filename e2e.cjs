@@ -325,9 +325,10 @@ async function main() {
           cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
           views: [{ kind: "compare", genes: ["TP53", "KRAS", "EGFR"] }]
         })).toString("base64")));
-        await page.waitForSelector('summary[title="compare options"]', { timeout: 300000 });
-        await page.locator('summary[title="compare options"]').click();
-        const panel = page.locator('details:has(summary[title="compare options"]) .gearmenu-items');
+        await page.waitForSelector("button.genesbtn", { timeout: 300000 });
+        await page.locator("button.genesbtn").first().click();
+        await page.waitForSelector("dialog.genedialog[open]", { timeout: 30000 });
+        const panel = page.locator("dialog.genedialog");
         const before = await panel.locator(".pill").count();
         await panel.locator("input[list=view-genes]").fill("PIK3CA");
         await panel.locator('button:has-text("add")').click();
@@ -358,6 +359,27 @@ async function main() {
         geneEdit = before + " genes -> " + added.join(",") + " -> " + afterRemove.join(",");
       } catch (e) { geneEdit = String(e.message).split("\n")[0]; }
       ok("a view's genes can be changed without editing JSON", geneOk, geneEdit);
+
+      // The oncoprint's gear keeps ONLY the link out to cBioPortal; genes moved
+      // to a named button and a modal, so the gear is not where editing hides.
+      let gearSplit = "no oncoprint rendered", gearOk = false;
+      try {
+        await page.goto(BASE + "/analysis?doc=" + encodeURIComponent(Buffer.from(JSON.stringify({
+          study: "msk_chord_2024",
+          cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
+          views: [{ kind: "oncoprint", genes: ["TP53", "KRAS"] }]
+        })).toString("base64")));
+        await page.waitForSelector('summary[title="oncoprint options"]', { timeout: 300000 });
+        const namedButton = await page.locator("button.genesbtn").first().innerText();
+        await page.locator('summary[title="oncoprint options"]').click();
+        const gear = page.locator('details:has(summary[title="oncoprint options"]) .gearmenu-items');
+        const gearHasEditor = (await gear.locator(".pillwrap").count()) > 0;
+        const gearHasLink = (await gear.locator('a:has-text("cBioPortal")').count()) > 0;
+        gearOk = namedButton.trim() === "genes" && !gearHasEditor && gearHasLink;
+        gearSplit = "button '" + namedButton.trim() + "', gear has editor: " + gearHasEditor +
+          ", gear has portal link: " + gearHasLink;
+      } catch (e) { gearSplit = String(e.message).split("\n")[0]; }
+      ok("genes are a named button; the gear keeps only the cBioPortal link", gearOk, gearSplit);
 
       // Tabs are deep-linked: a refresh must land you where you were.
       await page.goto(BASE + "/analysis");

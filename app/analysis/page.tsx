@@ -143,6 +143,8 @@ export default function AnalysisPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [exMsg, setExMsg] = useState<string | null>(null);
   const [saveName, setSaveName] = useState("");
+  const [genesFor, setGenesFor] = useState<number | null>(null);
+  const genesDialog = useRef<HTMLDialogElement | null>(null);
   const saveDialog = useRef<HTMLDialogElement | null>(null);   // Explore action-bar feedback
   const tabRef = useRef<string>("cohorts");                  // the tab syncUrl should record
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
@@ -630,6 +632,7 @@ export default function AnalysisPage() {
     const legacy = (explore?.genes || []).map((g: any) => String(g.gene));
     return [...new Set([...fromExplore, ...legacy])].slice(0, 60);
   };
+  const openGenes = (vi: number) => { setGenesFor(vi); genesDialog.current?.showModal(); };
   const setViewGenes = (vi: number, genes: string[]) =>
     updateView(vi, v => pruneSort({ ...v, genes }));
 
@@ -652,7 +655,7 @@ export default function AnalysisPage() {
     };
     return (
       <div className="setcol">
-        <span className="meta">genes ({genes.length}/12)</span>
+        <span className="meta">{genes.length} of 12 — click one to remove it</span>
         <div className="pillwrap">
           {genes.map(g => (
             <button key={g} type="button" className="pill" disabled={busy || genes.length <= floor}
@@ -802,6 +805,22 @@ export default function AnalysisPage() {
         <datalist id="view-genes">
           {geneChoices().map(g => <option key={g} value={g} />)}
         </datalist>
+        {/* One popup shared by every gene-bearing view — a modal rather than a
+            dropdown, because picking several genes is a task you settle into,
+            and a menu that closes on an outside click fights that. */}
+        <dialog ref={genesDialog} className="genedialog"
+          onClose={() => setGenesFor(null)}
+          onClick={e => { if (e.target === genesDialog.current) genesDialog.current?.close(); }}>
+          {genesFor != null && (
+            <>
+              <h3>Genes <span className="plain">— {String(((doc.views || [])[genesFor] as any)?.kind || "view")}</span></h3>
+              <GeneEditor vi={genesFor} />
+              <div className="row" style={{ marginTop: "0.8rem", justifyContent: "flex-end" }}>
+                <button className="primary" onClick={() => genesDialog.current?.close()}>Done</button>
+              </div>
+            </>
+          )}
+        </dialog>
         <div className="tabs">
           <button className={tab === "explore" ? "active" : ""} onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
           <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Cohorts</button>
@@ -1551,7 +1570,7 @@ export default function AnalysisPage() {
                 <button className="removeview" title="remove this view from the document"
                   aria-label="remove this view" onClick={() => removeView(vi)}>×</button>
                 {v.kind === "compare" && v.rows && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2><details className="gearmenu inline"><summary title="compare options">settings</summary><div className="gearmenu-items wide"><GeneEditor vi={vi} /></div></details><span className="spacer" /><>{v.ms != null && (
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
                       <span className="lat" title={
                         "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
                         (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
@@ -1579,7 +1598,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Hotspots <span className="plain">— recurrent protein changes, counted per patient</span></h2><details className="gearmenu inline"><summary title="hotspots options">settings</summary><div className="gearmenu-items wide"><GeneEditor vi={vi} /></div></details><span className="spacer" /><>{v.ms != null && (
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Hotspots <span className="plain">— recurrent protein changes, counted per patient</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
                       <span className="lat" title={
                         "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
                         (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
@@ -1643,7 +1662,7 @@ export default function AnalysisPage() {
                   })}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-expression <span className="plain">— Pearson correlation from per-site sums</span></h2><details className="gearmenu inline"><summary title="coexpression options">settings</summary><div className="gearmenu-items wide"><GeneEditor vi={vi} /></div></details><span className="spacer" /><>{v.ms != null && (
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-expression <span className="plain">— Pearson correlation from per-site sums</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
                       <span className="lat" title={
                         "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
                         (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
@@ -1730,7 +1749,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-occurrence <span className="plain">— pairwise, among patients profiled for both genes</span></h2><details className="gearmenu inline"><summary title="cooccurrence options">settings</summary><div className="gearmenu-items wide"><GeneEditor vi={vi} /></div></details><span className="spacer" /><>{v.ms != null && (
+                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-occurrence <span className="plain">— pairwise, among patients profiled for both genes</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
                       <span className="lat" title={
                         "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
                         (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
@@ -2023,11 +2042,12 @@ export default function AnalysisPage() {
                         {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
                       </span>
                     )}<Participation p={v.participation} /></>
+                    <button className="linklike genesbtn" disabled={busy}
+                      title="choose the genes this oncoprint draws"
+                      onClick={() => openGenes(vi)}>genes</button>
                     <details className="gearmenu">
                       <summary title="oncoprint options">⚙</summary>
                       <div className="gearmenu-items">
-                        <GeneEditor vi={vi} />
-                        <hr />
                         {(() => {
                           const vNames = ocView(vi).cohorts || Object.keys(result.cohorts);
                           const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];
