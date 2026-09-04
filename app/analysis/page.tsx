@@ -1827,7 +1827,7 @@ export default function AnalysisPage() {
                       {v.sequence ? " · " + v.sequence.lineGap + "-day line gap" : ""}</span></h2>
                     {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
                       <details className="gearmenu inline">
-                        <summary title="treatment sequence options">⚙</summary>
+                        <summary title="treatment sequence options">settings</summary>
                         {/* Label granularity is the choice that most changes this chart, and
                             the keys are not interchangeable: in MSK-CHORD SUBTYPE has 10
                             values, AGENT hundreds, TREATMENT_TYPE exactly one. So each option
@@ -1881,7 +1881,7 @@ export default function AnalysisPage() {
                       — {[...new Set((v.course || []).map(c => c.eventType))].join(", ")}
                       {v.anchoredTo ? "" : ""} · {v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
                     <details className="gearmenu inline">
-                      <summary title="clinical course options">⚙</summary>
+                      <summary title="clinical course options">settings</summary>
                       {/* Every parameter of this chart is a choice, and the defaults are only a
                         guess at a good one — so all of them are settable. They live behind
                         the gear rather than above the figure because they are read when

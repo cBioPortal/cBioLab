@@ -579,3 +579,19 @@ details.gearmenu > .gearmenu-items {
    would open it leftward, off the side of the card. */
 .gearmenu.inline { margin-left: 0.4rem; }
 .gearmenu.inline > .gearmenu-items { right: auto; left: 0; top: 1.9rem; }
+
+/* The inline gear reads as a text link rather than an icon: it sits in the
+   run of the card title, where a lone glyph is easy to miss and says nothing
+   about what it opens. Sized and baselined to sit quietly beside the heading,
+   not to compete with it. */
+.gearmenu.inline > summary {
+  font-size: 0.78rem; font-weight: 500; letter-spacing: 0.01em;
+  color: var(--accent-ink); padding: 0 0.1rem;
+  text-decoration: underline; text-decoration-style: dotted;
+  text-underline-offset: 0.18em;
+}
+.gearmenu.inline > summary:hover,
+details.gearmenu.inline[open] > summary {
+  color: var(--accent-ink); background: none;
+  text-decoration-style: solid;
+}
