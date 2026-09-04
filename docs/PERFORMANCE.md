@@ -244,3 +244,14 @@ The row cap is 2,000 (was 500, which truncated real data): combination regimens 
 — 51 distinct regimens fold into "other" even at `topN: 8`, covering 24% of first-line patients.
 That is genuine regimen diversity, not a tuning artefact, and raising `topN` to 10 only moves it
 to 20%.
+
+## Derived facet OR groups
+
+Ticking several buckets of one derived metric ORs them into `{any:[...]}`. The generic `any` path
+unions its leaves, and every derived leaf recomputes its metric from scratch — a `GROUP BY` over
+the study's whole `clinical_event` — so each extra bucket added a full scan. Federated over two
+studies, Explore went **4.7s for one bucket to 13.3s for four**, which is slow enough that each
+answer was superseded by the next click and the draft count never caught up.
+
+Buckets of one metric now share a single scan with the ranges OR'd in the `WHERE`. Same counts,
+**4.6s for four buckets and flat** in the number of buckets (3.7 / 3.2 / 4.6 for 1 / 2 / 4).

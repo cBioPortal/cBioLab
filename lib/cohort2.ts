@@ -120,7 +120,8 @@ export function derivedMetricSql(metric: DerivedMetric, study: string, db: strin
     "  GROUP BY pid";
 }
 
-function derivedLeafSql(leaf: any, ctx: Ctx): string {
+/** Validate a derived leaf and return its range predicate over `v`. */
+function derivedConds(leaf: any): { metric: DerivedMetric; conds: string } {
   const metric = String(leaf.metric || "");
   if (!(DERIVED_METRICS as readonly string[]).includes(metric))
     throw new Error("derived clause: metric must be one of " + DERIVED_METRICS.join(", ") +
@@ -134,6 +135,30 @@ function derivedLeafSql(leaf: any, ctx: Ctx): string {
       conds.push("v " + sqlOp + " " + num);
     }
   if (!conds.length) throw new Error("derived clause: needs a range, e.g. {\"gte\":24,\"lt\":60}");
+  return { metric: metric as DerivedMetric, conds: conds.join(" AND ") };
+}
+
+/**
+ * Several buckets of ONE derived metric, OR'd — computed in a SINGLE pass.
+ *
+ * The generic `any` path unions the leaves, and every derived leaf recomputes
+ * its metric from scratch (a GROUP BY over the whole study's clinical_event), so
+ * ticking four follow-up buckets meant four full scans. Measured federated over
+ * two studies, Explore went 4.7s for one bucket to 13.3s for four — slow enough
+ * that each answer was superseded by the next click and the draft count never
+ * caught up, which reads as a frozen UI. Buckets of one metric are exactly the
+ * case where the scan can be shared.
+ */
+function derivedAnySql(leaves: any[], ctx: Ctx): string {
+  const parts = leaves.map(derivedConds);
+  const metric = parts[0].metric;
+  return "SELECT pid FROM (\n" + derivedMetricSql(metric, ctx.study, dbOf(ctx)) + "\n)\n" +
+    "  WHERE " + parts.map((p) => "(" + p.conds + ")").join(" OR ");
+}
+
+function derivedLeafSql(leaf: any, ctx: Ctx): string {
+  const { metric, conds: condStr } = derivedConds(leaf);
+  const conds = [condStr];
   return "SELECT pid FROM (\n" + derivedMetricSql(metric as DerivedMetric, ctx.study, dbOf(ctx)) + "\n)\n" +
     "  WHERE " + conds.join(" AND ");
 }
@@ -240,6 +265,10 @@ function leafSql(leaf: any, ctx: Ctx): string {
 function clauseSql(clause: any, ctx: Ctx): string {
   if (clause.any) {
     if (!Array.isArray(clause.any) || !clause.any.length || clause.any.length > 8) throw new Error("any: 1-8 leaves");
+    // Buckets of one derived metric share a single scan — see derivedAnySql.
+    const ls = clause.any;
+    if (ls.length > 1 && ls.every((l: any) => l && l.kind === "derived" && l.metric === ls[0].metric))
+      return derivedAnySql(ls, ctx);
     return clause.any.map((l: any) => "(" + leafSql(l, ctx) + ")").join("\nUNION DISTINCT\n");
   }
   if (clause.not) {

@@ -137,7 +137,8 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
   // Derived facets are independent of everything below, so start them here and
   // collect at the end — serially they cost ~400ms on a ~600ms page, overlapped
   // they cost almost nothing.
-  const derivedP = buildDerivedFacets(db, study, conn, cond);
+  const derivedP = buildDerivedFacets(db, study, conn, cond, draft,
+    { oncokbPin, profiles, gaProfiles });
 
   // how many patients this study contributes under the current draft (or in total)
   const studyN = draftCount ?? Number((await chQuery<ChRow>(
@@ -458,7 +459,29 @@ const DERIVED_SPECS: {
            { label: "6–10", gte: 6, lt: 11 }, { label: "> 10", gte: 11 }] }
 ];
 
-async function buildDerivedFacets(db: string, study: string, conn: ChConn, cond: string): Promise<DerivedFacet[]> {
+/**
+ * Does this top-level clause constrain the given derived metric — either as a
+ * bare leaf, or as an `any` group of buckets of that one metric?
+ *
+ * The group form matters: clicking two buckets of one metric ORs them into
+ * `{any:[...]}`, and a check that only recognised the bare leaf treated that as
+ * somebody else's clause, applied it, and collapsed the facet to the two chosen
+ * buckets — the disappearing-options bug, back again by another route.
+ */
+function isDerivedClauseFor(c: unknown, metric: string): boolean {
+  const l = c as { kind?: string; metric?: string; any?: unknown[] };
+  if (!l) return false;
+  if (l.kind === "derived" && l.metric === metric) return true;
+  return Array.isArray(l.any) && l.any.length > 0 &&
+    l.any.every((x) => { const y = x as { kind?: string; metric?: string };
+      return !!y && y.kind === "derived" && y.metric === metric; });
+}
+
+async function buildDerivedFacets(
+  db: string, study: string, conn: ChConn, cond: string,
+  draft?: CohortDef | null,
+  ctx?: { oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[] }
+): Promise<DerivedFacet[]> {
   const out: DerivedFacet[] = [];
   await Promise.all(DERIVED_SPECS.map(async (spec) => {
     const per = derivedMetricSql(spec.metric, study, db);
@@ -468,9 +491,25 @@ async function buildDerivedFacets(db: string, study: string, conn: ChConn, cond:
       if (c.lt != null) t.push("v < " + c.lt);
       return "    " + (t.length ? t.join(" AND ") : "1") + ", " + i;
     }).join(",\n");
-    // the draft narrows derived facets exactly as it narrows every other one
-    const gate = cond
-      ? "  WHERE pid IN (SELECT pid FROM (" + basePatientsSql(study, db) + cond + "))\n"
+    // Disjunctive faceting, as the clinical facets get: a metric already
+    // constrained in the draft is counted against the draft MINUS its own
+    // clauses. Without this, selecting "2y+ follow-up" re-counts every bucket
+    // under that very filter, the other four come back empty, and the zero-count
+    // filter below then deletes them — so the options vanish and the selection
+    // cannot be widened or changed without clearing it.
+    const ownClauses = (draft && Array.isArray(draft.all))
+      ? draft.all.filter((c) => isDerivedClauseFor(c, spec.metric)) : [];
+    let gateCond = cond, disjunctive = false;
+    if (ownClauses.length) {
+      disjunctive = true;
+      const rest: CohortDef = { ...draft!, all: (draft!.all || []).filter((c) => !isDerivedClauseFor(c, spec.metric)) };
+      gateCond = rest.all!.length
+        ? "\n  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" +
+          compileCohortDef(rest, { ...(ctx || {}), study, db }) + "))"
+        : "";
+    }
+    const gate = gateCond
+      ? "  WHERE pid IN (SELECT pid FROM (" + basePatientsSql(study, db) + gateCond + "))\n"
       : "";
     const sql =
       "SELECT b, count() AS n FROM (\n" +
@@ -484,7 +523,8 @@ async function buildDerivedFacets(db: string, study: string, conn: ChConn, cond:
         ...(c.gte != null ? { gte: c.gte } : {}), ...(c.lt != null ? { lt: c.lt } : {}) }))
         .filter((b) => b.n > 0);
       const covered = buckets.reduce((s2, b) => s2 + b.n, 0);
-      if (covered > 0) out.push({ metric: spec.metric, label: spec.label, unit: spec.unit, note: spec.note, covered, buckets });
+      if (covered > 0) out.push({ metric: spec.metric, label: spec.label, unit: spec.unit, note: spec.note,
+        covered, buckets, ...(disjunctive ? { disjunctive: true as const } : {}) });
     } catch { /* a study without the underlying table contributes no facet */ }
   }));
   return DERIVED_SPECS.map((s2) => out.find((o) => o.metric === s2.metric)).filter((x): x is DerivedFacet => !!x);
@@ -639,8 +679,12 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     for (const d of mine) for (const b of d.buckets) counts.set(b.label, (counts.get(b.label) || 0) + b.n);
     const buckets = spec.cuts.map((c) => ({ label: c.label, n: counts.get(c.label) || 0,
       ...(c.gte != null ? { gte: c.gte } : {}), ...(c.lt != null ? { lt: c.lt } : {}) })).filter((b) => b.n > 0);
+    // Carry the disjunctive marker through the merge, as the clinical facets do:
+    // if any participant counted this metric without its own clauses, the merged
+    // total is on that basis and the UI has to say so.
+    const disjunctive = mine.some((d) => d.disjunctive) || undefined;
     if (buckets.length) derivedMerged.push({ metric: spec.metric, label: spec.label, unit: spec.unit, note: spec.note,
-      covered: mine.reduce((n, d) => n + d.covered, 0), buckets });
+      covered: mine.reduce((n, d) => n + d.covered, 0), buckets, ...(disjunctive ? { disjunctive } : {}) });
   }
 
   const evm = sumBy(parts.map(p => p.events), "type");

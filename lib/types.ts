@@ -497,6 +497,12 @@ export interface DerivedFacet {
   /** how many patients the metric could be computed for at all */
   covered: number;
   buckets: { label: string; n: number; gte?: number; lt?: number }[];
+  /**
+   * Counted against the draft MINUS this metric's own clauses, so the buckets
+   * you did not pick stay visible and selectable. The total therefore does not
+   * match the draft total — the UI says so, as it does for clinical facets.
+   */
+  disjunctive?: true;
 }
 export interface ExploreResult {
   /**

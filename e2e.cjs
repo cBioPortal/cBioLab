@@ -182,6 +182,38 @@ async function main() {
       } catch (e) { shapeDetail = String(e.message).split("\n")[0]; }
       ok("clicking a facet value never changes another attribute's shape", shapeChanges === 0, shapeDetail);
 
+      // Derived facets must stay fully selectable after a pick. A metric already
+      // in the draft is counted WITHOUT its own clauses (disjunctive faceting, as
+      // the clinical facets get); without that, choosing one bucket re-counted
+      // every bucket under that very filter, the rest came back empty, and the
+      // zero-count filter deleted them — so the options vanished and the choice
+      // could not be widened or changed.
+      let derivedDetail = "no derived facets rendered", derivedOk = false;
+      try {
+        await page.waitForSelector("[data-derived]", { timeout: 60000 });
+        const snap = () => page.evaluate(() => [...document.querySelectorAll("[data-derived]")]
+          .map(el => el.getAttribute("data-derived") + ":" + el.getAttribute("data-buckets")));
+        const before = await snap();
+        const row = page.locator("[data-derived] .valrow").first();
+        if (await row.count()) {
+          await row.click();
+          await page.waitForTimeout(9000);
+          const after = await snap();
+          // ...and a SECOND bucket of the same metric must OR, not AND: two
+          // mutually exclusive ranges ANDed give 0 patients, which empties every
+          // other facet too.
+          await page.locator("[data-derived] .valrow").nth(1).click();
+          await page.waitForTimeout(9000);
+          const after2 = await snap();
+          const sel = await page.locator("[data-derived] .valrow.on").count();
+          const kept = JSON.stringify(before) === JSON.stringify(after) &&
+                       JSON.stringify(before) === JSON.stringify(after2);
+          derivedOk = kept && sel === 2;
+          derivedDetail = "buckets " + before.join(" ") + " -> " + after2.join(" ") + ", " + sel + " selected";
+        }
+      } catch (e) { derivedDetail = String(e.message).split("\n")[0]; }
+      ok("picking a derived bucket keeps the other buckets selectable", derivedOk, derivedDetail);
+
       // The separate "Draft cohort" card was folded into the sticky bar: no
       // second card, but its two real features (clause pills, gene search)
       // must still exist somewhere.

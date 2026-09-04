@@ -479,6 +479,25 @@ export default function AnalysisPage() {
         const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d); return;
       }
     }
+    // Buckets of ONE derived metric are alternatives, not conjuncts: clicking a
+    // second bucket used to AND two mutually exclusive ranges, giving 0 patients
+    // — which then emptied every other facet, since a bucket with no patients is
+    // dropped. Same click also toggles a chosen bucket back off.
+    if (clause.kind === "derived") {
+      const sameRange = (a: any, b: any) =>
+        (a.range || {}).gte === (b.range || {}).gte && (a.range || {}).lt === (b.range || {}).lt;
+      const isMine = (l: any) => l && l.kind === "derived" && l.metric === clause.metric;
+      const idx = d.all.findIndex((c: any) => isMine(c) || (Array.isArray(c.any) && c.any.every(isMine) && c.any.length));
+      if (idx >= 0) {
+        const cur = d.all[idx];
+        const leaves: any[] = Array.isArray(cur.any) ? [...cur.any] : [cur];
+        const at = leaves.findIndex((l) => sameRange(l, clause));
+        if (at >= 0) leaves.splice(at, 1); else leaves.push(clause);
+        if (!leaves.length) d.all.splice(idx, 1);
+        else d.all[idx] = leaves.length === 1 ? leaves[0] : { any: leaves };
+        const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d.all.length ? d : null); return;
+      }
+    }
     if (clause.kind === "oql") {
       const same = d.all.find((c: any) => c.kind === "oql");
       if (same) { same.q += "; " + clause.q; const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d); return; }
@@ -933,13 +952,22 @@ export default function AnalysisPage() {
                   const max = Math.max(...d.buckets.map(b => b.n), 1);
                   const picked = (b: { gte?: number; lt?: number }) => {
                     const dr = parseDraft();
-                    return !!(dr && (dr.all || []).some((c: any) => c.kind === "derived" && c.metric === d.metric
-                      && (c.range || {}).gte === b.gte && (c.range || {}).lt === b.lt));
+                    // Buckets OR together into an `any` group, so look inside one
+                    // as well as at top level or a second pick never highlights.
+                    const leaves = ((dr && dr.all) || []).flatMap((c: any) => Array.isArray(c.any) ? c.any : [c]);
+                    return leaves.some((c: any) => c && c.kind === "derived" && c.metric === d.metric
+                      && (c.range || {}).gte === b.gte && (c.range || {}).lt === b.lt);
                   };
                   return (
-                    <div key={d.metric}>
+                    <div key={d.metric} data-derived={d.metric} data-buckets={d.buckets.length}>
+                      {/* A metric already in the draft is counted WITHOUT its own
+                          clauses so its other buckets stay selectable, which means
+                          its total is the draft-minus-itself total. Say so, exactly
+                          as the clinical facets do, rather than show a number that
+                          cannot be reconciled with the draft. */}
                       <div style={{ fontSize: "0.78rem", fontWeight: 600 }} title={d.note}>
-                        {d.label} <span className="meta">· {d.covered.toLocaleString()} patients</span>
+                        {d.label} <span className="meta">· {d.covered.toLocaleString()} patients
+                          {(d as any).disjunctive ? " · not narrowed by its own filter" : ""}</span>
                       </div>
                       <div className="vallist">
                         {d.buckets.map(b => (

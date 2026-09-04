@@ -34,3 +34,43 @@ describe("clause-count bounds are still enforced", () => {
     assert.throws(() => compileCohortDef({ all: "nope" } as never, ctx), /0-8 clauses/);
   });
 });
+
+describe("derived buckets OR into one scan", () => {
+  const ctx = { study: "x", db: "db" };
+  const leaf = (range: Record<string, number>) => ({ kind: "derived", metric: "followupMonths", range });
+
+  test("buckets of one metric compile to a single pass with OR'd ranges", () => {
+    // The generic `any` path unions the leaves, and each derived leaf recomputes
+    // the metric over the whole study — four buckets meant four scans, and
+    // Explore went 4.7s -> 13.3s as buckets were ticked.
+    const sql = compileCohortDef({ all: [{ any: [leaf({ lt: 6 }), leaf({ gte: 6, lt: 12 }), leaf({ gte: 12 })] }] }, ctx);
+    assert.equal((sql.match(/clinical_event/g) || []).length, 1, "the metric must be computed once, not per bucket");
+    assert.equal(/UNION DISTINCT/.test(sql), false);
+    assert.match(sql, /\(v < 6\) OR \(v >= 6 AND v < 12\) OR \(v >= 12\)/);
+  });
+
+  test("a single bucket still compiles as before", () => {
+    const sql = compileCohortDef({ all: [leaf({ gte: 24 })] }, ctx);
+    assert.match(sql, /v >= 24/);
+    assert.equal(/ OR /.test(sql), false);
+  });
+
+  test("different metrics in one group keep the union — they cannot share a scan", () => {
+    const sql = compileCohortDef({ all: [{ any: [
+      leaf({ gte: 24 }), { kind: "derived", metric: "alteredGenes", range: { gte: 6 } }] }] }, ctx);
+    assert.match(sql, /UNION DISTINCT/);
+  });
+
+  test("a mixed group is untouched by the shortcut", () => {
+    const sql = compileCohortDef({ all: [{ any: [
+      leaf({ gte: 24 }), { kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] }] }, ctx);
+    assert.match(sql, /UNION DISTINCT/);
+  });
+
+  test("validation still applies inside a group", () => {
+    assert.throws(() => compileCohortDef({ all: [{ any: [leaf({ gte: 1 }), { kind: "derived", metric: "bogus", range: { gte: 1 } }] }] }, ctx),
+      /metric must be one of/);
+    assert.throws(() => compileCohortDef({ all: [{ any: [leaf({ gte: 1 }), { kind: "derived", metric: "followupMonths" }] }] }, ctx),
+      /needs a range/);
+  });
+});

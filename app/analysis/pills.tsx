@@ -13,7 +13,8 @@ const KIND_META: Record<string, { label: string; color: string }> = {
   profiled: { label: "profiled", color: "#56B4E9" },
   caseList: { label: "case list", color: "#999999" },
   genomicData: { label: "data", color: "#CC79A7" },
-  genericAssay: { label: "assay", color: "#CC79A7" }
+  genericAssay: { label: "assay", color: "#CC79A7" },
+  derived: { label: "derived", color: "#D55E00" }
 };
 
 function leafKind(leaf: any) {
@@ -46,6 +47,15 @@ function leafText(leaf: any) {
     if (leaf.range) bits.push(Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" "));
     if (leaf.op != null) bits.push(`${leaf.op} ${leaf.value}`);
     return `${leaf.attribute} ${bits.join(" ")}` + (leaf.per === "sample" ? " ·any sample" : "");
+  }
+  if (k === "derived") {
+    // Without this a derived leaf fell through to the clinical branch, which
+    // reads `attribute` and `op` — neither of which it has — and rendered the
+    // meaningless pill "CLINICAL ?".
+    const r = leaf.range || {};
+    const bits = Object.entries(r).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ");
+    const unit = leaf.metric === "alteredGenes" ? " genes" : "mo";
+    return String(leaf.metric || "derived").replace(/Months$/, "") + " " + bits + unit;
   }
   if (k === "profiled") return "profiled: " + leaf.type;
   if (k === "caseList") return leaf.id;
