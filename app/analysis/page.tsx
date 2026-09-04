@@ -138,10 +138,12 @@ const DEFAULT_VIEWS: View[] = [
 ];
 
 export default function AnalysisPage() {
-  const [tab, setTab] = useState<"chat" | "explore" | "cohorts" | "analysis" | "examples">("cohorts");
+  const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">("cohorts");
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   const [copied, setCopied] = useState<string | null>(null);
-  const [exMsg, setExMsg] = useState<string | null>(null);   // Explore action-bar feedback
+  const [exMsg, setExMsg] = useState<string | null>(null);
+  const [saveName, setSaveName] = useState("");
+  const saveDialog = useRef<HTMLDialogElement | null>(null);   // Explore action-bar feedback
   const tabRef = useRef<string>("cohorts");                  // the tab syncUrl should record
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
   const [cat, setCat] = useState<any>(null);                 // event/endpoint catalog for the survival control
@@ -151,10 +153,6 @@ export default function AnalysisPage() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [chat, setChat] = useState<{ role: string; text: string; figures?: { kind: string; title: string; svg: string; caption: string; ms: number | null }[] }[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatBusy, setChatBusy] = useState(false);
-  const [chatReady, setChatReady] = useState<boolean | null>(null);
   const [saved, setSaved] = useState<Record<string, { def: CohortDef; savedAt: string; lastEval?: { count: number; text: string } | null }>>({});
   const [cName, setCName] = useState("");
   const [cDefText, setCDefText] = useState(JSON.stringify({ studies: [...DEFAULT_EXPLORE_STUDIES], all: [] }, null, 2));
@@ -176,7 +174,6 @@ export default function AnalysisPage() {
   const [qaAttr, setQaAttr] = useState("");                             // creator quick-add: attribute
   const [qaVal, setQaVal] = useState("");                               // creator quick-add: numeric threshold
   const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
-  const [geneSearch, setGeneSearch] = useState("");                     // server-side gene filter for the three tables
   const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
   const [attrLimit, setAttrLimit] = useState(20);                       // clinical attributes shown
 
@@ -199,7 +196,6 @@ export default function AnalysisPage() {
 
   useEffect(() => {
     try { setSaved(JSON.parse(localStorage.getItem(LS_KEY) || "{}")); } catch {}
-    fetch("/api/chat").then(r => setChatReady(r.status !== 501)).catch(() => setChatReady(false));
     fetch("/api/studies").then(r => r.json()).then(j => {
       const list = j.studies || [];
       setStudies(list);
@@ -236,7 +232,7 @@ export default function AnalysisPage() {
    * lands on the same tab. `doc` and `tab` are written together — writing one
    * with a bare "?tab=…" would drop the other.
    */
-  const TABS = ["chat", "explore", "cohorts", "analysis", "examples"] as const;
+  const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
   // run() writes the URL too, and during the mount effect its closure still
   // holds the initial tab — so the current tab is read from a ref, never from
   // the render closure, or a shared ?doc= link would record the wrong tab.
@@ -310,7 +306,10 @@ export default function AnalysisPage() {
     const d = barDef();
     if (!d) { setExMsg("select at least one study first"); return; }
     setExMsg(null);
-    const name = cName.trim() || barDefaultName();
+    // Named from the draft, not from cName: that field lives on the Cohorts tab
+    // and is invisible here, so inheriting it made the analysis arrive under a
+    // name with no on-screen explanation.
+    const name = barDefaultName();
     const nextStudy = exSel.current[0] || study;
     const nd: AnalysisDoc = { study: nextStudy, cohorts: { [name]: d }, views: DEFAULT_VIEWS };
     setStudy(nextStudy);
@@ -319,14 +318,33 @@ export default function AnalysisPage() {
     goTab("analysis");
     run(nd);
   };
-  const saveDraftAsCohort = async () => {
-    const d = barDef();
-    if (!d) { setExMsg("select at least one study first"); return; }
-    if (!cName.trim()) { setExMsg("give the cohort a name first"); return; }
+  /**
+   * Saving asks for a name when you ask to save, rather than keeping a field in
+   * the bar. The bar's job is Analyze; a permanent name box next to it implied
+   * Analyze wanted one too.
+   */
+  const openSaveDialog = () => {
+    if (!barDef()) { setExMsg("select at least one study first"); return; }
     setExMsg(null);
-    await saveCohort();
-    setExMsg("saved \u201c" + cName.trim() + "\u201d to Cohorts");
-    setTimeout(() => setExMsg(null), 2600);
+    setSaveName(cName.trim() || barDefaultName());
+    saveDialog.current?.showModal();
+  };
+  const confirmSave = async () => {
+    const name = saveName.trim();
+    const def = barDef();
+    if (!name || !def) return;
+    saveDialog.current?.close();
+    // Evaluated with the name and definition in hand rather than through the
+    // shared cName/cDefText state, which React would not have flushed yet.
+    try {
+      const ev = await evalDef(name, def);
+      setCName(name);
+      persist({ ...saved, [name]: { def, savedAt: new Date().toISOString().slice(0, 16).replace("T", " "), lastEval: ev } });
+      setExMsg("saved \u201c" + name + "\u201d to Cohorts \u2014 " + ev.count.toLocaleString() + " patients");
+    } catch (e) {
+      setExMsg("could not save: " + String((e as Error)?.message || e));
+    }
+    setTimeout(() => setExMsg(null), 3200);
   };
 
   // ---- composing views without editing JSON --------------------------------
@@ -450,7 +468,7 @@ export default function AnalysisPage() {
     const inflightKey = JSON.stringify([
       studiesOverride ?? exSel.current,
       draftOverride !== undefined ? draftOverride : parseDraft(),
-      geneSearch || null
+      null
     ]);
     if (exInflight.current === inflightKey) return;
     exInflight.current = inflightKey;
@@ -460,7 +478,7 @@ export default function AnalysisPage() {
       const list = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current;
       if (!list.length) { setExplore(null); exInflight.current = null; setExploreBusy(false); return; }
       const res = await fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studies: list, draft: draftOverride !== undefined ? draftOverride : parseDraft(), geneSearch: geneSearch || undefined }) });
+        body: JSON.stringify({ studies: list, draft: draftOverride !== undefined ? draftOverride : parseDraft() }) });
       const j = await res.json();
       if (seq !== exFetchSeq.current) return; // superseded while in flight — discard
       if (!j.error) setExplore(j); else setError(j.error);
@@ -707,103 +725,23 @@ export default function AnalysisPage() {
     return parts.join(" | ");
   };
 
-  const sendChat = async () => {
-    const msg = chatInput.trim(); if (!msg || chatBusy) return;
-    setChatInput(""); setChatBusy(true);
-    const msgs = [...chat, { role: "user", text: msg }];
-    setChat(msgs);
-    try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: msgs.map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.text })), doc: { study, ...doc }, resultSummary: summarize(result) }) });
-      const j = await res.json();
-      if (j.error) throw new Error(j.error);
-      setChat([...msgs, { role: "assistant", text: j.reply, figures: j.figures || [] }]);
-      if (j.doc) {
-        setDoc(j.doc); setDocText(JSON.stringify(j.doc, null, 2));
-        // the reply already carries the figures, so stay in the conversation
-        // unless the user is not looking at it
-        if (tabRef.current !== "chat") goTab("analysis");
-        run(j.doc);
-      }
-    } catch (e) { setChat([...msgs, { role: "assistant", text: "⚠ " + String((e as Error)?.message || e) }]); }
-    setChatBusy(false);
-  };
 
   return (
     <>
       <header>
         <h1>Cohort Lab</h1>
-        <span className="sub">analysis documents — cohorts, views, and chat over one declarative object</span>
+        <span className="sub">analysis documents — cohorts and views over one declarative object</span>
         <span className="spacer" />
         <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>rationale</a>
       </header>
       <main style={{ maxWidth: "96rem" }}>
         <div className="tabs">
-          <button className={tab === "chat" ? "active" : ""} onClick={() => goTab("chat")}>Chat</button>
           <button className={tab === "explore" ? "active" : ""} onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
           <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Cohorts</button>
           <button className={tab === "analysis" ? "active" : ""} onClick={() => goTab("analysis")}>Analysis</button>
           <button className={tab === "examples" ? "active" : ""} onClick={() => goTab("examples")}>Examples</button>
         </div>
         {error && <div className="error">{error}</div>}
-
-        {/* ================= Chat tab ================= */}
-        {tab === "chat" && <div>
-          <div className="card">
-            <h2>Chat <span className="plain">— the analysis, answered in the conversation</span></h2>
-            <p className="note" style={{ marginTop: "0.2rem" }}>
-              Every figure below was rendered by the same code the Analysis tab uses, from the same
-              analysis document — so a chart in a reply is not a screenshot of the app, it IS the app's
-              output. Each carries its own caveat, because an image separated from its method looks
-              more authoritative than the number it replaced.
-            </p>
-            {chatReady === false && <div className="error">Chat needs <code>ANTHROPIC_API_KEY</code> in the server environment. Everything else works without it.</div>}
-          </div>
-
-          {chat.length === 0 && chatReady !== false && (
-            <div className="card">
-              <p className="note" style={{ margin: 0 }}>Nothing asked yet. Try one where a picture is the answer rather than decoration:</p>
-              <div className="extags" style={{ marginTop: "0.5rem" }}>
-                {CHAT_STARTERS.map(q => (
-                  <button key={q} className="extag" onClick={() => { setChatInput(q); }}>{q}</button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {chat.map((m, i) => (
-            <div className={m.role === "user" ? "card chatturn user" : "card chatturn"} key={i}>
-              <div className="meta" style={{ marginBottom: "0.3rem" }}>{m.role === "user" ? "you" : "assistant"}</div>
-              <div style={{ whiteSpace: "pre-wrap", fontSize: "0.86rem", lineHeight: 1.5 }}>{m.text}</div>
-              {(m.figures || []).map((f, fi) => (
-                <figure className="chatfig" key={fi}>
-                  <figcaption>
-                    <strong>{f.title}</strong>
-                    {f.ms != null && <span className="meta"> · {f.ms.toLocaleString()}ms</span>}
-                  </figcaption>
-                  <div className="chatfigbody" dangerouslySetInnerHTML={{ __html: f.svg }} />
-                </figure>
-              ))}
-              {m.role === "assistant" && (m.figures || []).length > 0 && (
-                <div className="row" style={{ marginTop: "0.4rem" }}>
-                  <button className="linklike" onClick={() => goTab("analysis")}>open the full analysis</button>
-                  <span className="meta">· the document behind these figures is editable there</span>
-                </div>
-              )}
-            </div>
-          ))}
-          {chatBusy && <div className="card"><div className="loading-block"><span className="spinner" /> thinking…</div></div>}
-
-          <div className="card">
-            <div className="row">
-              <input style={{ flex: 1 }} placeholder="ask for an analysis — e.g. survival from first immunotherapy, STK11-mutant vs wild-type"
-                value={chatInput} onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && sendChat()} disabled={chatReady === false} />
-              <button className="primary" onClick={sendChat} disabled={chatBusy || chatReady === false}>Send</button>
-              {chat.length > 0 && <button className="linklike" onClick={() => setChat([])}>clear</button>}
-            </div>
-          </div>
-        </div>}
 
         {/* ================= Explore tab ================= */}
         {tab === "explore" && <div>
@@ -837,17 +775,13 @@ export default function AnalysisPage() {
                     Analyze
                   </button>
                   <span className="meta">or</span>
-                  {/* the name belongs to Save — Analyze needs no name, and pairing the
-                      field with the button that consumes it says so without a label */}
-                  <span className="savegroup">
-                    <button onClick={saveDraftAsCohort} disabled={!ready}
-                      title={ready ? "keep this definition in the Cohorts tab without running anything" : "select a study first"}>
-                      Save as a Cohort
-                    </button>
-                    <input placeholder="name…" value={cName} style={{ width: "10rem" }} disabled={!ready}
-                      onChange={e => setCName(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter" && ready) saveDraftAsCohort(); }} />
-                  </span>
+                  {/* Naming is asked for on demand rather than sitting in the bar:
+                      Analyze needs no name, so a permanent field implied one was
+                      required for both. */}
+                  <button onClick={openSaveDialog} disabled={!ready}
+                    title={ready ? "keep this definition in the Cohorts tab without running anything" : "select a study first"}>
+                    Save as a Cohort
+                  </button>
                   {clauses > 0 && <button className="linklike" onClick={clearDraft}>clear</button>}
                 </div>
                 {clauses > 0 && (
@@ -855,15 +789,23 @@ export default function AnalysisPage() {
                     {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} />; })()}
                   </div>
                 )}
-                <div className="row" style={{ marginTop: "0.4rem" }}>
-                  <span className="meta">find a gene:</span>
-                  <input placeholder="gene symbol…" value={geneSearch} style={{ width: "9rem", fontSize: "0.78rem" }}
-                    onChange={e => setGeneSearch(e.target.value.toUpperCase())}
-                    onKeyDown={e => { if (e.key === "Enter") fetchExplore(); }} />
-                  <button className="facet" onClick={() => fetchExplore()} title="filter the gene tables (searches all genes, not just those shown)">search</button>
-                  {geneSearch && <button className="linklike" onClick={() => { setGeneSearch(""); setTimeout(() => fetchExplore(), 0); }}>clear</button>}
-                </div>
                 {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
+                {/* A native <dialog> so Esc, focus trapping and the backdrop come
+                    from the platform rather than being re-implemented. */}
+                <dialog ref={saveDialog} className="namedialog"
+                  onClose={() => setSaveName("")}
+                  onClick={e => { if (e.target === saveDialog.current) saveDialog.current?.close(); }}>
+                  <form method="dialog" onSubmit={e => { e.preventDefault(); confirmSave(); }}>
+                    <h3>Save as a cohort</h3>
+                    <p className="meta">{clauses ? clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies") : "every patient in " + (exStudies.length === 1 ? exStudies[0] : exStudies.length + " selected studies")}</p>
+                    <input autoFocus placeholder="cohort name…" value={saveName}
+                      onChange={e => setSaveName(e.target.value)} />
+                    <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", gap: "0.4rem" }}>
+                      <button type="button" className="linklike" onClick={() => saveDialog.current?.close()}>cancel</button>
+                      <button className="primary" type="submit" disabled={!saveName.trim()}>Save</button>
+                    </div>
+                  </form>
+                </dialog>
               </div>
             );
           })()}
@@ -1206,7 +1148,7 @@ export default function AnalysisPage() {
                   sv:      { title: "SV Genes",      rows: explore.svGenes,      total: explore.geneTotals?.sv,      oql: (g: any) => g.gene + ": FUSION" }
                 }[kind];
                 const rows = meta.rows || [];
-                if (!rows.length && !geneSearch) return null;
+                if (!rows.length) return null;
                 return (
                   <div className="card" key={kind}>
                     <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
@@ -1214,7 +1156,7 @@ export default function AnalysisPage() {
                       <span className="spacer" />
                       <span className="meta">{"showing " + Math.min(rows.length, geneRowLimit).toLocaleString() +
                         " of " + (meta.total || rows.length).toLocaleString() +
-                        (geneSearch ? " matching “" + geneSearch + "”" : "")}</span>
+                        ""}</span>
                     </div>
                     <div className="generows">
                       {rows.slice(0, geneRowLimit).map((g) => (

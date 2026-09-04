@@ -595,3 +595,15 @@ details.gearmenu.inline[open] > summary {
   color: var(--accent-ink); background: none;
   text-decoration-style: solid;
 }
+
+/* Name-a-cohort dialog. Native <dialog>, so Esc, focus trapping and the
+   backdrop are the platform's rather than ours. */
+.namedialog {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card);
+  color: var(--ink); padding: 1rem 1.1rem; min-width: 20rem; max-width: 26rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+}
+.namedialog::backdrop { background: rgba(0, 0, 0, 0.32); }
+.namedialog h3 { margin: 0 0 0.15rem; font-size: 0.95rem; }
+.namedialog .meta { display: block; margin-bottom: 0.6rem; }
+.namedialog input { width: 100%; box-sizing: border-box; }

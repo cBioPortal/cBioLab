@@ -14,7 +14,7 @@
 
 A working demonstration that a cBioPortal-class tool can be rebuilt around **one declarative
 JSON object** — the *Analysis document* (`{study, cohorts: {name: def}, views: [...]}`) — that
-the web UI, the in-app chat, and MCP clients all read and write. The server compiles it to
+the web UI and MCP clients all read and write. The server compiles it to
 ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (UI at
 `/analysis`, MCP at `/api/mcp`, project rationale at `/rationale`).
 
@@ -39,7 +39,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   trim, nothing else; measured to be complete for event types and attribute keys (zero residual
   collisions). Folds are disclosed in the caveat, never silent. Do not fork it.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
-- **`app/analysis/page.tsx`** — the app: Chat / Explore (study checkboxes + facets) / Cohorts /
+- **`app/analysis/page.tsx`** — the app: Explore (study checkboxes + facets) / Cohorts /
   Analysis / Examples. The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
   demo pages were retired once the Analysis app subsumed them; `/` now redirects to `/analysis`.
 - **`app/api/chat/route.ts`** — Claude tool-use loop (`update_document`, `get_catalog`).

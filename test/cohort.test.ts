@@ -37,7 +37,7 @@ describe("clause-count bounds are still enforced", () => {
 
 describe("derived buckets OR into one scan", () => {
   const ctx = { study: "x", db: "db" };
-  const leaf = (range: Record<string, number>) => ({ kind: "derived", metric: "followupMonths", range });
+  const leaf = (range: Record<string, number>) => ({ kind: "derived" as const, metric: "followupMonths" as const, range });
 
   test("buckets of one metric compile to a single pass with OR'd ranges", () => {
     // The generic `any` path unions the leaves, and each derived leaf recomputes
@@ -57,20 +57,20 @@ describe("derived buckets OR into one scan", () => {
 
   test("different metrics in one group keep the union — they cannot share a scan", () => {
     const sql = compileCohortDef({ all: [{ any: [
-      leaf({ gte: 24 }), { kind: "derived", metric: "alteredGenes", range: { gte: 6 } }] }] }, ctx);
+      leaf({ gte: 24 }), { kind: "derived" as const, metric: "alteredGenes" as const, range: { gte: 6 } }] }] } as any, ctx);
     assert.match(sql, /UNION DISTINCT/);
   });
 
   test("a mixed group is untouched by the shortcut", () => {
     const sql = compileCohortDef({ all: [{ any: [
-      leaf({ gte: 24 }), { kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] }] }, ctx);
+      leaf({ gte: 24 }), { kind: "clinical" as const, attribute: "SEX", op: "=" as const, value: "Female" }] }] } as any, ctx);
     assert.match(sql, /UNION DISTINCT/);
   });
 
   test("validation still applies inside a group", () => {
-    assert.throws(() => compileCohortDef({ all: [{ any: [leaf({ gte: 1 }), { kind: "derived", metric: "bogus", range: { gte: 1 } }] }] }, ctx),
+    assert.throws(() => compileCohortDef({ all: [{ any: [leaf({ gte: 1 }), { kind: "derived", metric: "bogus", range: { gte: 1 } }] }] } as any, ctx),
       /metric must be one of/);
-    assert.throws(() => compileCohortDef({ all: [{ any: [leaf({ gte: 1 }), { kind: "derived", metric: "followupMonths" }] }] }, ctx),
+    assert.throws(() => compileCohortDef({ all: [{ any: [leaf({ gte: 1 }), { kind: "derived", metric: "followupMonths" }] }] } as any, ctx),
       /needs a range/);
   });
 });

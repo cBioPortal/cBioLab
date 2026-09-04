@@ -214,13 +214,15 @@ async function main() {
       } catch (e) { derivedDetail = String(e.message).split("\n")[0]; }
       ok("picking a derived bucket keeps the other buckets selectable", derivedOk, derivedDetail);
 
-      // The separate "Draft cohort" card was folded into the sticky bar: no
-      // second card, but its two real features (clause pills, gene search)
-      // must still exist somewhere.
+      // The bar is deliberately spare: no Draft-cohort card, no gene finder, and
+      // no name box — naming is asked for when you save, so nothing in the bar
+      // suggests Analyze needs a name too.
       const noDraftCard = (await page.locator("h2:has-text('Draft cohort')").count()) === 0;
-      const geneSearchPresent = (await page.locator("input[placeholder='gene symbol…']").count()) > 0;
-      ok("the Draft cohort card is gone, folded into the action bar",
-        noDraftCard && geneSearchPresent, "no card: " + noDraftCard + ", gene search present: " + geneSearchPresent);
+      const noGeneFinder = (await page.locator("input[placeholder='gene symbol…']").count()) === 0;
+      const noNameBox = (await page.locator('.exbar input[placeholder="name…"]').count()) === 0;
+      ok("the explore bar carries only its two actions",
+        noDraftCard && noGeneFinder && noNameBox,
+        "no card: " + noDraftCard + ", no gene finder: " + noGeneFinder + ", no name box: " + noNameBox);
       await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
       await page.locator(".valrow, .slice").first().click();
       let drafted = true;
@@ -230,20 +232,60 @@ async function main() {
       } catch { drafted = false; }
       ok("clicking a facet builds a draft and counts it", drafted,
         drafted ? (await page.locator(".exbar").innerText()).replace(/\s+/g, " ").split(" Analyze")[0] : "no count appeared");
-      await page.locator('.exbar input[placeholder="name…"]').fill("e2e explored cohort");
       await page.locator(".exbar button:has-text('Analyze')").click();
       let landed = false, views = [];
       try {
         await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 1, null, { timeout: 300000 });
         views = (await page.locator(".ana-grid h2").allTextContents()).map(t => t.split("\u2014")[0].trim());
         const docText = await page.locator("textarea").first().inputValue();
-        landed = Object.keys(JSON.parse(docText).cohorts || {}).includes("e2e explored cohort");
+        // Named from the draft itself now that the bar has no name field.
+        landed = Object.keys(JSON.parse(docText).cohorts || {}).length === 1;
       } catch { /* landed stays false */ }
       ok("Analyze carries the cohort into a running analysis", landed && views.length > 1,
         landed ? views.join(" + ") : "cohort did not reach the document");
 
-      // Analyze REPLACES the document rather than merging into it — a second
-      // Analyze must not leave the first cohort behind.
+      // Saving asks for the name when you ask to save. The dialog is native
+      // <dialog>, so Esc and the backdrop come from the platform.
+      await page.locator(".tabs button:has-text('Explore')").click();
+      await page.waitForSelector(".exbar", { timeout: 120000 });
+      await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
+      let saveFlow = "dialog never opened";
+      let savedOk = false;
+      try {
+        await page.locator(".exbar button:has-text('Save as a Cohort')").click();
+        await page.waitForSelector("dialog.namedialog[open]", { timeout: 30000 });
+        const prefilled = await page.locator("dialog.namedialog input").inputValue();
+        // Esc must dismiss without saving
+        await page.keyboard.press("Escape");
+        await page.waitForTimeout(400);
+        const closedOnEsc = (await page.locator("dialog.namedialog[open]").count()) === 0;
+        await page.locator(".exbar button:has-text('Save as a Cohort')").click();
+        await page.waitForSelector("dialog.namedialog[open]", { timeout: 30000 });
+        await page.locator("dialog.namedialog input").fill("e2e dialog cohort");
+        await page.locator("dialog.namedialog button:has-text('Save')").click();
+        await page.waitForFunction(() => /saved/.test(document.querySelector(".exbar")?.textContent || ""),
+          null, { timeout: 120000 });
+        await page.locator(".tabs button:has-text('Cohorts')").click();
+        await page.waitForTimeout(1500);
+        const inList = await page.locator("text=e2e dialog cohort").count();
+        savedOk = !!prefilled && closedOnEsc && inList > 0;
+        saveFlow = "prefilled '" + prefilled + "', esc closed: " + closedOnEsc + ", in Cohorts: " + (inList > 0);
+      } catch (e) { saveFlow = String(e.message).split("\n")[0]; }
+      ok("Save asks for a name in a dialog and stores the cohort", savedOk, saveFlow);
+
+      // Analyze REPLACES the document rather than merging into it. Load a
+      // DIFFERENTLY-named cohort first, so replacement is provable: the bar now
+      // derives the name from the draft, so two Analyze runs share a name and
+      // counting cohorts could not tell replace from overwrite.
+      await page.locator(".tabs button:has-text('Cohorts')").click();
+      await page.waitForSelector(".pick input", { timeout: 240000 });
+      let seeded = [];
+      try {
+        await page.locator(".pick input").nth(0).check();
+        await page.locator("button:has-text('Analyze selected')").click();
+        await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 0, null, { timeout: 300000 });
+        seeded = Object.keys(JSON.parse(await page.locator("textarea").first().inputValue()).cohorts || {});
+      } catch { /* left empty */ }
       await page.locator(".tabs button:has-text('Explore')").click();
       await page.waitForSelector(".exbar", { timeout: 120000 });
       await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
@@ -252,23 +294,25 @@ async function main() {
         await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 240000 });
       } catch { /* count may already be shown */ }
-      await page.locator('.exbar input[placeholder="name…"]').fill("e2e second cohort");
       await page.locator(".exbar button:has-text('Analyze')").click();
       let replaced = false, after = [];
       try {
-        await page.waitForFunction(() => {
+        await page.waitForFunction((gone) => {
           const ta = document.querySelector("textarea");
           if (!ta) return false;
-          try { return Object.keys(JSON.parse(ta.value).cohorts || {}).join() === "e2e second cohort"; }
-          catch { return false; }
-        }, null, { timeout: 300000 });
+          try {
+            const names = Object.keys(JSON.parse(ta.value).cohorts || {});
+            return names.length === 1 && !names.includes(gone);
+          } catch { return false; }
+        }, seeded[0] || "", { timeout: 300000 });
         after = Object.keys(JSON.parse(await page.locator("textarea").first().inputValue()).cohorts || {});
-        replaced = after.length === 1 && after[0] === "e2e second cohort";
+        replaced = after.length === 1 && !after.includes(seeded[0]);
       } catch {
         try { after = Object.keys(JSON.parse(await page.locator("textarea").first().inputValue()).cohorts || {}); } catch {}
       }
-      ok("a second Analyze resets the analysis instead of accumulating", replaced,
-        replaced ? "document holds only the new cohort" : "document holds: " + (after.join(", ") || "?"));
+      ok("a second Analyze resets the analysis instead of accumulating", replaced && seeded.length === 1,
+        replaced ? "replaced \u201c" + seeded[0] + "\u201d with \u201c" + after[0] + "\u201d"
+                 : "seeded: " + (seeded.join(", ") || "?") + " -> document holds: " + (after.join(", ") || "?"));
 
       // Tabs are deep-linked: a refresh must land you where you were.
       await page.goto(BASE + "/analysis");
@@ -288,21 +332,6 @@ async function main() {
       await page.waitForTimeout(1800);
       ok("an explicit ?tab= beats the document's default tab",
         (await page.locator(".tabs button.active").innerText()).trim() === "Examples");
-
-      // Chat tab: figures are rendered server-side from the SAME renderer the
-      // Analysis tab uses, so a reply carries charts rather than describing them.
-      // The model call needs an API key, so this checks the surface, not the LLM.
-      await page.goto(BASE + "/analysis?tab=chat");
-      await page.waitForSelector(".tabs button.active", { timeout: 120000 });
-      const chatTab = {
-        active: (await page.locator(".tabs button.active").innerText()).trim(),
-        starters: await page.locator(".extag").count(),
-        input: await page.locator("input[placeholder^='ask for an analysis']").count(),
-        onlyOneSend: await page.locator("button:has-text('Send')").count()
-      };
-      ok("the chat tab is a self-contained surface",
-        chatTab.active === "Chat" && chatTab.starters >= 3 && chatTab.input === 1 && chatTab.onlyOneSend === 1,
-        JSON.stringify(chatTab));
 
       // Cohorts tab: tick cohorts, submit them together. No per-row "add" links.
       await page.goto(BASE + "/analysis");
