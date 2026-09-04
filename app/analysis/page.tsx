@@ -1834,31 +1834,45 @@ export default function AnalysisPage() {
                         {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
                       </span>
                     )}<Participation p={v.participation} /></>
+                    {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
+                      <details className="gearmenu">
+                        <summary title="treatment sequence options">⚙</summary>
+                        {/* Label granularity is the choice that most changes this chart, and
+                            the keys are not interchangeable: in MSK-CHORD SUBTYPE has 10
+                            values, AGENT hundreds, TREATMENT_TYPE exactly one. So each option
+                            carries its value count rather than leaving the reader to discover
+                            a useless key by picking it. */}
+                        <div className="gearmenu-items wide">
+                          <div className="setrow">
+                            <span className="meta">label lines by</span>
+                            <select value={v.sequence.labelKey} disabled={busy}
+                              onChange={e => patchView(vi, { labelKey: e.target.value })}>
+                              {v.sequence.keyOptions.map(k => (
+                                <option key={k.key} value={k.label}>
+                                  {k.label} — {k.values} value{k.values === 1 ? "" : "s"}
+                                  {k.values === 1 ? " (unusable)" : k.values > 60 ? " (very granular)" : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="setrow">
+                            <span className="meta">new line after</span>
+                            <select value={String(v.sequence.lineGap)} disabled={busy}
+                              onChange={e => patchView(vi, { lineGap: Number(e.target.value) })}>
+                              {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
+                            </select>
+                          </div>
+                          <div className="setrow">
+                            <span className="meta">lines shown</span>
+                            <select value={String(v.sequence.steps)} disabled={busy}
+                              onChange={e => patchView(vi, { maxSteps: Number(e.target.value) })}>
+                              {[2, 3, 4, 5].map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      </details>
+                    )}
                   </div>
-                  {/* Label granularity is the choice that most changes this chart,
-                      and the keys behave wildly differently: in MSK-CHORD SUBTYPE
-                      has 10 values, AGENT has hundreds, TREATMENT_TYPE has one.
-                      So each option carries its value count rather than leaving
-                      the reader to discover a useless key by picking it. */}
-                  {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
-                    <div className="basis">
-                      <span className="meta">label lines by</span>
-                      <select value={v.sequence.labelKey} disabled={busy}
-                        onChange={e => patchView(vi, { labelKey: e.target.value })}>
-                        {v.sequence.keyOptions.map(k => (
-                          <option key={k.key} value={k.label}>
-                            {k.label} — {k.values} value{k.values === 1 ? "" : "s"}
-                            {k.values === 1 ? " (unusable)" : k.values > 60 ? " (very granular)" : ""}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="meta">new line after</span>
-                      <select value={String(v.sequence.lineGap)} disabled={busy}
-                        onChange={e => patchView(vi, { lineGap: Number(e.target.value) })}>
-                        {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
-                      </select>
-                    </div>
-                  )}
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
                 {v.kind === "course" && v.svg && <>
@@ -1875,11 +1889,14 @@ export default function AnalysisPage() {
                         {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
                       </span>
                     )}<Participation p={v.participation} /></>
-                  </div>
-                  {/* Every parameter of this chart is a choice, and the defaults
-                      are only a guess at a good one. Each event type shows the two
-                      structural facts that decide whether it is worth plotting:
-                      how often it recurs, and whether it carries a duration. */}
+                    <details className="gearmenu">
+                      <summary title="clinical course options">⚙</summary>
+                      {/* Every parameter of this chart is a choice, and the defaults are only a
+                        guess at a good one — so all of them are settable. They live behind
+                        the gear rather than above the figure because they are read when
+                        setting a chart up and rarely after. Each event type shows the two
+                        structural facts that decide whether it is worth plotting: how often
+                        it recurs, and whether it carries a duration. */}
                   {v.eventOptions && v.eventOptions.length > 0 && (() => {
                     const cv: any = (doc.views || [])[vi] || {};
                     const chosen: string[] = (cv.eventTypes || []).map((x: string) => String(x).trim().toLowerCase());
@@ -1889,8 +1906,8 @@ export default function AnalysisPage() {
                       if (next.length) patchView(vi, { eventTypes: next.slice(0, 6) });
                     };
                     return (
-                      <div className="basis" style={{ flexWrap: "wrap" }}>
-                        <span className="meta">measuring</span>
+                      <div className="gearmenu-items wide">
+                        <div className="setcol"><span className="meta">measuring</span><div className="pillwrap">
                         {v.eventOptions.map(e => (
                           <button key={e.canonical} type="button" disabled={busy}
                             className={"pill" + (chosen.includes(e.canonical) ? " on" : "")}
@@ -1902,7 +1919,9 @@ export default function AnalysisPage() {
                             {e.label}{e.hasDurations ? " ⏱" : ""}
                           </button>
                         ))}
-                        <span className="meta">aligned on</span>
+                        </div></div>
+                        <hr />
+                        <div className="setrow"><span className="meta">aligned on</span>
                         <select value={anchor ? String(anchor.eventType).trim().toLowerCase() : ""} disabled={busy}
                           onChange={e => patchView(vi, { anchor: e.target.value
                             ? { eventType: e.target.value, occurrence: anchor ? anchor.occurrence || "FIRST" : "FIRST" } : null })}>
@@ -1910,30 +1929,35 @@ export default function AnalysisPage() {
                           {v.eventOptions.map(e => <option key={e.canonical} value={e.canonical}>{e.label}</option>)}
                         </select>
                         {anchor && (
-                          <select value={anchor.occurrence || "FIRST"} disabled={busy}
+                          <select style={{ flex: "none" }} value={anchor.occurrence || "FIRST"} disabled={busy}
                             onChange={e => patchView(vi, { anchor: { ...anchor, occurrence: e.target.value } })}>
                             <option value="FIRST">first</option>
                             <option value="LAST">last</option>
                           </select>
                         )}
-                        <span className="meta">bins</span>
+                        </div>
+                        <div className="setrow"><span className="meta">bins</span>
                         <select value={String(v.courseAxis ? v.courseAxis.binMonths : 3)} disabled={busy}
                           onChange={e => patchView(vi, { binMonths: Number(e.target.value) })}>
                           {[1, 3, 6, 12].map(b => <option key={b} value={b}>{b} month{b === 1 ? "" : "s"}</option>)}
                         </select>
-                        <span className="meta">from</span>
+                        </div>
+                        <div className="setrow"><span className="meta">window</span>
                         <select value={String(v.courseAxis ? v.courseAxis.from : -12)} disabled={busy}
                           onChange={e => patchView(vi, { fromMonths: Number(e.target.value) })}>
                           {[0, -6, -12, -24, -60].map(f => <option key={f} value={f}>{f === 0 ? "the anchor" : f + "mo"}</option>)}
                         </select>
-                        <span className="meta">to</span>
+                        <span className="meta" style={{ minWidth: 0 }}>to</span>
                         <select value={String(v.courseAxis ? v.courseAxis.to : 60)} disabled={busy}
                           onChange={e => patchView(vi, { toMonths: Number(e.target.value) })}>
                           {[12, 24, 60, 120, 240].map(t => <option key={t} value={t}>+{t}mo</option>)}
                         </select>
+                        </div>
                       </div>
                     );
                   })()}
+                    </details>
+                    </div>
                   {/* The same SVG the chat and MCP clients receive \u2014 one renderer,
                       so the figure cannot differ between surfaces. */}
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
