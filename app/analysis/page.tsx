@@ -1825,17 +1825,8 @@ export default function AnalysisPage() {
                     <h2 style={{ margin: 0 }}>Treatment sequence <span className="plain">
                       — lines of therapy by {v.sequence ? v.sequence.labelKey : ""}
                       {v.sequence ? " · " + v.sequence.lineGap + "-day line gap" : ""}</span></h2>
-                    <span className="spacer" />
-                    <>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying \u00b7 " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></>
                     {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
-                      <details className="gearmenu">
+                      <details className="gearmenu inline">
                         <summary title="treatment sequence options">⚙</summary>
                         {/* Label granularity is the choice that most changes this chart, and
                             the keys are not interchangeable: in MSK-CHORD SUBTYPE has 10
@@ -1872,14 +1863,6 @@ export default function AnalysisPage() {
                         </div>
                       </details>
                     )}
-                  </div>
-                  <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
-                </>}
-                {v.kind === "course" && v.svg && <>
-                  <div className="row" style={{ alignItems: "baseline" }}>
-                    <h2 style={{ margin: 0 }}>Clinical course <span className="plain">
-                      — {[...new Set((v.course || []).map(c => c.eventType))].join(", ")}
-                      {v.anchoredTo ? "" : ""} · {v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
                     <span className="spacer" />
                     <>{v.ms != null && (
                       <span className="lat" title={
@@ -1889,7 +1872,15 @@ export default function AnalysisPage() {
                         {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
                       </span>
                     )}<Participation p={v.participation} /></>
-                    <details className="gearmenu">
+                  </div>
+                  <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
+                </>}
+                {v.kind === "course" && v.svg && <>
+                  <div className="row" style={{ alignItems: "baseline" }}>
+                    <h2 style={{ margin: 0 }}>Clinical course <span className="plain">
+                      — {[...new Set((v.course || []).map(c => c.eventType))].join(", ")}
+                      {v.anchoredTo ? "" : ""} · {v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
+                    <details className="gearmenu inline">
                       <summary title="clinical course options">⚙</summary>
                       {/* Every parameter of this chart is a choice, and the defaults are only a
                         guess at a good one — so all of them are settable. They live behind
@@ -1957,6 +1948,15 @@ export default function AnalysisPage() {
                     );
                   })()}
                     </details>
+                    <span className="spacer" />
+                    <>{v.ms != null && (
+                      <span className="lat" title={
+                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
+                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying \u00b7 " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
+                        {v.ms.toLocaleString()}ms
+                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
+                      </span>
+                    )}<Participation p={v.participation} /></>
                     </div>
                   {/* The same SVG the chat and MCP clients receive \u2014 one renderer,
                       so the figure cannot differ between surfaces. */}

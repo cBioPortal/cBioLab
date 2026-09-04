@@ -203,7 +203,7 @@ button.facet.on { border-color: var(--accent); background: var(--accent-soft); c
 
 /* gear menu (oncoprint card options) */
 details.gearmenu { position: relative; }
-details.gearmenu > summary { list-style: none; cursor: pointer; color: var(--muted); font-size: 1rem; line-height: 1; padding: 0.15rem 0.35rem; border-radius: 5px; user-select: none; }
+details.gearmenu > summary { list-style: none; cursor: pointer; color: var(--muted); font-size: 1.35rem; line-height: 1; padding: 0.1rem 0.3rem; border-radius: 5px; user-select: none; }
 details.gearmenu > summary::-webkit-details-marker { display: none; }
 details.gearmenu > summary:hover, details.gearmenu[open] > summary { color: var(--ink); background: var(--code-bg); }
 details.gearmenu > .gearmenu-items {
@@ -573,3 +573,9 @@ details.gearmenu > .gearmenu-items {
 .gearmenu-items .pillwrap { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .gearmenu-items .pillwrap .pill { font-size: 0.72rem; padding: 0.15rem 0.5rem; cursor: pointer; }
 .gearmenu-items hr { border: none; border-top: 1px solid var(--line); margin: 0.35rem 0 0.1rem; }
+
+/* A gear that sits next to the card title rather than at the far right of the
+   header. The panel is anchored to the LEFT edge here — the default right:0
+   would open it leftward, off the side of the card. */
+.gearmenu.inline { margin-left: 0.4rem; }
+.gearmenu.inline > .gearmenu-items { right: auto; left: 0; top: 1.9rem; }
