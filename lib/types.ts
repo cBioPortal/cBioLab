@@ -319,6 +319,14 @@ export interface ViewResult {
   sequence?: SequenceResult;                // treatment sequences
   /** course: bin width and window actually used, in months */
   courseAxis?: { binMonths: number; from: number; to: number };
+  /**
+   * course: every event type this cohort's timeline actually holds, so the UI
+   * can offer the choice without a round trip. `perPatient` and `hasDurations`
+   * are what separate a clinical event from an administrative marker — a type
+   * with exactly one event per patient and no duration (Sequencing, Sample
+   * acquisition) is a filing record, not a course.
+   */
+  eventOptions?: { canonical: string; label: string; patients: number; perPatient: number; hasDurations: boolean }[];
   svg?: string; nColumns?: number;          // oncoprint
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
 }

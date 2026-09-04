@@ -417,8 +417,19 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
 
       const note = foldNote(folded.filter((f) => measured.includes(f.canonical)));
       const dropped = vStudies.filter((st) => !usable.includes(st));
+      // Offer every event type the cohort actually has, with the two structural
+      // facts that decide whether it is worth plotting.
+      const eventOptions = folded.map((f) => {
+        const mine = allSpans.filter((s2) => canonicalEventName(s2.eventType) === f.canonical);
+        const pts = mine.reduce((n, s2) => n + s2.patients, 0);
+        const evs = mine.reduce((n, s2) => n + s2.events, 0);
+        return { canonical: f.canonical, label: f.label, patients: pts,
+                 perPatient: pts ? Math.round((10 * evs) / pts) / 10 : 0,
+                 hasDurations: !!intervalOf.get(f.canonical) };
+      });
       const courseResult: ViewResult = { kind: "course", cohorts: vNames, studies: vStudies, course,
         courseAxis: { binMonths, from: opts.from * binMonths, to: opts.to * binMonths },
+        eventOptions,
         participation: participationFor(vStudies, false),
         caveat:
           (anchor

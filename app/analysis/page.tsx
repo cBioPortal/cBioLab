@@ -349,7 +349,12 @@ export default function AnalysisPage() {
    * case so `Treatment` and `TREATMENT` offer one choice — the same fold the
    * engine applies (lib/event-names.ts).
    */
-  const viewEvents = (): { canonical: string; label: string; n: number }[] => {
+  const viewEvents = (): { canonical: string; label: string; n: number; perPatient?: number; hasDurations?: boolean }[] => {
+    // A course result knows this cohort's OWN timeline, including which types
+    // carry durations; Explore only knows the study's. Prefer the former.
+    const fromResult = (result && result.views || []).find((v: any) => v.eventOptions && v.eventOptions.length);
+    if (fromResult) return (fromResult as any).eventOptions.map((e: any) =>
+      ({ canonical: e.canonical, label: e.label, n: e.patients, perPatient: e.perPatient, hasDurations: e.hasDurations }));
     const raw: { type: string; n: number }[] = (explore && explore.events) || [];
     const by = new Map<string, { canonical: string; label: string; n: number }>();
     for (const e of raw) {
@@ -403,10 +408,20 @@ export default function AnalysisPage() {
       : kind === "hotspots" ? { kind, genes: genes.slice(0, 4), minCount: 1 }
       : kind === "course" ? (() => {
           const evs = viewEvents();
-          // Anchor on treatment when the study has it — a real clinical landmark
-          // — otherwise on its commonest event, so the axis means something.
-          const anchorOn = evs.find(e => /treat/.test(e.canonical)) || evs[0];
-          return { kind, eventTypes: evs.slice(0, 2).map(e => e.canonical),
+          // Rank by STRUCTURE, not by how common the type is. Picking the two
+          // commonest gives Sequencing and Sample acquisition on MSK-CHORD —
+          // exactly one event per patient and no duration, i.e. filing records
+          // that draw a spike and nothing else. A type that carries durations is
+          // a state worth plotting; one that recurs is an event worth counting;
+          // one that happens once per patient is neither.
+          const tier = (e: any) => e.hasDurations ? 2 : (e.perPatient || 0) >= 1.5 ? 1 : 0;
+          const ranked = [...evs].sort((a, b) => tier(b) - tier(a) || b.n - a.n);
+          // The anchor wants the opposite property: a landmark nearly everyone
+          // has. A therapy start is the classic one; failing that, the most
+          // universal event.
+          const anchorOn = evs.find(e => e.hasDurations)
+            || [...evs].sort((a, b) => b.n - a.n)[0];
+          return { kind, eventTypes: ranked.slice(0, 2).map(e => e.canonical),
                    ...(anchorOn ? { anchor: { eventType: anchorOn.label, occurrence: "FIRST" } } : {}),
                    binMonths: 3, fromMonths: -12, toMonths: 60 };
         })()
@@ -1861,6 +1876,64 @@ export default function AnalysisPage() {
                       </span>
                     )}<Participation p={v.participation} /></>
                   </div>
+                  {/* Every parameter of this chart is a choice, and the defaults
+                      are only a guess at a good one. Each event type shows the two
+                      structural facts that decide whether it is worth plotting:
+                      how often it recurs, and whether it carries a duration. */}
+                  {v.eventOptions && v.eventOptions.length > 0 && (() => {
+                    const cv: any = (doc.views || [])[vi] || {};
+                    const chosen: string[] = (cv.eventTypes || []).map((x: string) => String(x).trim().toLowerCase());
+                    const anchor = cv.anchor || null;
+                    const toggle = (canon: string) => {
+                      const next = chosen.includes(canon) ? chosen.filter(x => x !== canon) : [...chosen, canon];
+                      if (next.length) patchView(vi, { eventTypes: next.slice(0, 6) });
+                    };
+                    return (
+                      <div className="basis" style={{ flexWrap: "wrap" }}>
+                        <span className="meta">measuring</span>
+                        {v.eventOptions.map(e => (
+                          <button key={e.canonical} type="button" disabled={busy}
+                            className={"pill" + (chosen.includes(e.canonical) ? " on" : "")}
+                            onClick={() => toggle(e.canonical)}
+                            title={e.patients.toLocaleString() + " patients · " + e.perPatient + " events each · " +
+                              (e.hasDurations ? "carries durations, so it is drawn as a state patients are IN"
+                                : e.perPatient < 1.5 ? "about one per patient and no duration — likely a filing record rather than a clinical course"
+                                : "no durations, so it is drawn as an event that HAPPENED")}>
+                            {e.label}{e.hasDurations ? " ⏱" : ""}
+                          </button>
+                        ))}
+                        <span className="meta">aligned on</span>
+                        <select value={anchor ? String(anchor.eventType).trim().toLowerCase() : ""} disabled={busy}
+                          onChange={e => patchView(vi, { anchor: e.target.value
+                            ? { eventType: e.target.value, occurrence: anchor ? anchor.occurrence || "FIRST" : "FIRST" } : null })}>
+                          <option value="">study day 0 (single study only)</option>
+                          {v.eventOptions.map(e => <option key={e.canonical} value={e.canonical}>{e.label}</option>)}
+                        </select>
+                        {anchor && (
+                          <select value={anchor.occurrence || "FIRST"} disabled={busy}
+                            onChange={e => patchView(vi, { anchor: { ...anchor, occurrence: e.target.value } })}>
+                            <option value="FIRST">first</option>
+                            <option value="LAST">last</option>
+                          </select>
+                        )}
+                        <span className="meta">bins</span>
+                        <select value={String(v.courseAxis ? v.courseAxis.binMonths : 3)} disabled={busy}
+                          onChange={e => patchView(vi, { binMonths: Number(e.target.value) })}>
+                          {[1, 3, 6, 12].map(b => <option key={b} value={b}>{b} month{b === 1 ? "" : "s"}</option>)}
+                        </select>
+                        <span className="meta">from</span>
+                        <select value={String(v.courseAxis ? v.courseAxis.from : -12)} disabled={busy}
+                          onChange={e => patchView(vi, { fromMonths: Number(e.target.value) })}>
+                          {[0, -6, -12, -24, -60].map(f => <option key={f} value={f}>{f === 0 ? "the anchor" : f + "mo"}</option>)}
+                        </select>
+                        <span className="meta">to</span>
+                        <select value={String(v.courseAxis ? v.courseAxis.to : 60)} disabled={busy}
+                          onChange={e => patchView(vi, { toMonths: Number(e.target.value) })}>
+                          {[12, 24, 60, 120, 240].map(t => <option key={t} value={t}>+{t}mo</option>)}
+                        </select>
+                      </div>
+                    );
+                  })()}
                   {/* The same SVG the chat and MCP clients receive \u2014 one renderer,
                       so the figure cannot differ between surfaces. */}
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
