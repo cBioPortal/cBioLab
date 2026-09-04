@@ -499,6 +499,15 @@ export interface DerivedFacet {
   buckets: { label: string; n: number; gte?: number; lt?: number }[];
 }
 export interface ExploreResult {
+  /**
+   * Distinct values per "per|attribute", computed over the SELECTED studies with
+   * no draft applied — so it does not move as the user filters. This is what
+   * decides whether a categorical attribute is drawn as a pie or a list: keying
+   * that off the filtered count made attributes change shape on an unrelated
+   * click, with the page rearranging itself while being read.
+   */
+  attributeCardinality?: Record<string, number>;
+
   study: string; studies?: string[]; draftCount: number | null;
   studyBreakdown?: StudyBreakdownRow[];
   clinical: ClinicalFacet[];

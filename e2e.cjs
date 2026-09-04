@@ -153,6 +153,35 @@ async function main() {
       const canAnalyseUnfiltered = !(await page.locator(".exbar button:has-text('Analyze')").isDisabled());
       ok("a study with no filters is analysable", canAnalyseUnfiltered && !!unfiltered, unfiltered || "bar never offered the unfiltered cohort");
 
+      // A facet's SHAPE must not depend on the draft. Narrowing a cohort drops an
+      // attribute's distinct-value count, so keying pie-vs-list off it made
+      // attributes flip shape on an unrelated click and the page rearrange itself
+      // while being read. The basis is now the cardinality over the SELECTED
+      // studies with no draft applied, carried at the top level of the result
+      // rather than per facet — a facet vanishes from the merge once the draft
+      // empties its study, which made the per-facet value move too.
+      const facetShapes = async () => page.evaluate(() => Object.fromEntries(
+        [...document.querySelectorAll("[data-attr]")].map(el =>
+          [el.getAttribute("data-attr"), el.getAttribute("data-shape")])));
+      let shapeChanges = -1, shapeDetail = "no facets rendered";
+      try {
+        await page.waitForSelector("[data-attr]", { timeout: 120000 });
+        await page.waitForTimeout(1500);
+        const before = await facetShapes();
+        const key = page.locator(".pielegend .pikey").first();
+        if (await key.count()) {
+          await key.click();
+          await page.waitForTimeout(6000);
+          const after = await facetShapes();
+          const common = Object.keys(before).filter(k => k in after);
+          const moved = common.filter(k => before[k] !== after[k]);
+          shapeChanges = moved.length;
+          shapeDetail = common.length + " attributes compared" +
+            (moved.length ? ", changed: " + moved.map(k => k + " " + before[k] + "->" + after[k]).join(", ") : "");
+        }
+      } catch (e) { shapeDetail = String(e.message).split("\n")[0]; }
+      ok("clicking a facet value never changes another attribute's shape", shapeChanges === 0, shapeDetail);
+
       // The separate "Draft cohort" card was folded into the sticky bar: no
       // second card, but its two real features (clause pills, gene search)
       // must still exist somewhere.

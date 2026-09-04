@@ -975,7 +975,14 @@ export default function AnalysisPage() {
                   );
                 })()}
                 {explore.clinical.slice(0, attrLimit).map(c => (
-                  <div key={c.per + c.attribute} style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0" }}>
+                  /* data-attr / data-shape make the facet identifiable from outside
+                     React — the e2e suite asserts that an attribute's shape does not
+                     change when the draft does. */
+                  <div key={c.per + c.attribute} data-attr={c.per + "|" + c.attribute}
+                    data-shape={c.kind === "cat"
+                      ? ((explore.attributeCardinality?.[c.per + "|" + c.attribute] ?? (c as any).distinct ?? c.values.length) > PIE_MAX_SLICES ? "list" : "pie")
+                      : c.kind}
+                    style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0" }}>
                     {(() => {
                       // A facet already in the draft is re-queried WITHOUT its own
                       // clauses (disjunctive faceting) so its other values stay
@@ -1004,8 +1011,13 @@ export default function AnalysisPage() {
                         ((cl.values || []).includes(v.v) || cl.value === v.v)));
                       const clause = (v: any) => ({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v,
                         ...(c.per === "sample" ? { per: "sample" } : {}) });
-                      // slice geometry: cumulative angles over the returned values
-                      const asList = (c.distinct ?? c.values.length) > PIE_MAX_SLICES;
+                      // slice geometry: cumulative angles over the returned values.
+                      // The shape is decided by the attribute's cardinality IN THE
+                      // STUDY, never by how many values survive the current draft.
+                      // The filtered count drops as you narrow a cohort, so keying
+                      // off it made attributes flip from list to pie on an unrelated
+                      // click and the page change shape while being read.
+                      const asList = (explore.attributeCardinality?.[c.per + "|" + c.attribute] ?? c.distinct ?? c.values.length) > PIE_MAX_SLICES;
                       let acc = 0;
                       const R = 34, CX = 36, CY = 36;
                       const arcs = c.values.map((v: any, i: number) => {

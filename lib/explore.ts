@@ -157,6 +157,33 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
   // ---- attribute metadata: the portal's own declarations -----------------
   // datatype here is DECLARED, not sniffed from values, which is what the study
   // view uses to decide pie-vs-histogram. priority drives chart ordering, and
+
+/**
+ * How many distinct values each attribute has IN THE STUDY, with no draft
+ * applied. Cached per (study, db) because it cannot change as the user filters.
+ *
+ * The filtered count (`distinct`, below) is the wrong basis for a rendering
+ * decision: narrowing a cohort drops it, so an attribute drawn as a list flips
+ * to a pie mid-session and the page changes shape under the reader. Measured on
+ * msk_chord_2024, clicking a single CANCER_TYPE value flips DIAGNOSIS_DESCRIPTION
+ * (17 -> 7 distinct) and MSI_COMMENT (13 -> 7). Cardinality is a property of the
+ * attribute, so the shape of its chart should be too.
+ */
+const _cardCache = new Map<string, Map<string, number>>();
+async function studyCardinality(study: string, conn: ChConn): Promise<Map<string, number>> {
+  const key = conn.id + "|" + conn.db + "|" + study;
+  const hit = _cardCache.get(key);
+  if (hit) return hit;
+  const r = await chQuery<ChRow>(
+    "SELECT type, attribute_name AS a, uniqExact(attribute_value) AS nv\n" +
+    "FROM " + conn.db + ".clinical_data_derived\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
+    "GROUP BY type, a", conn).catch(() => ({ data: [] as ChRow[] }));
+  const m = new Map(r.data.map((x) => [String(x.type) + "|" + String(x.a), Number(x.nv)]));
+  _cardCache.set(key, m);
+  return m;
+}
+
   // priority 0 means "available but hidden by default" in the portal.
   const metaRows = await chQuery<ChRow>(
     "SELECT cam.attr_id AS a, cam.datatype AS datatype, cam.display_name AS display_name,\n" +
@@ -165,6 +192,7 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study), conn).catch(() => ({ data: [] as ChRow[] }));
   const meta = new Map(metaRows.data.map((r) => [r.a, r]));
+  const cardinality = await studyCardinality(study, conn);
 
   // ---- clinical attributes: classify categorical vs numeric --------------
   const cls = await chQuery(
@@ -393,6 +421,12 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
 
   return {
     study, draftCount, studyBreakdown,
+    // Attached at the top level, not per facet: an attribute's facet disappears
+    // from the merge once the draft empties its study, and a per-facet value
+    // would then be a max over fewer studies — moving with the draft, which is
+    // exactly what this exists to avoid. Every SELECTED study contributes its
+    // map whether or not it still has rows.
+    attributeCardinality: Object.fromEntries(cardinality),
     clinical, derived,
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
     genes: genes.data.map((r) => ({ gene: r.g, n: Number(r.n) })),
@@ -542,6 +576,14 @@ function sharedBinEdges(parts: ExploreResult[]): Record<string, { edges: number[
  * from a remote peer over MCP.
  */
 export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): ExploreResult {
+
+  // Union the per-study cardinality maps. Every selected study contributes its
+  // own regardless of whether the draft left it any rows, so the union does not
+  // move as the user filters.
+  const attributeCardinality: Record<string, number> = {};
+  for (const pt of parts)
+    for (const [k, n] of Object.entries(pt.attributeCardinality || {}))
+      attributeCardinality[k] = Math.max(attributeCardinality[k] ?? 0, n);
   const t0 = Date.now();
   if (parts.length === 1) return parts[0];
   const draft = hasDraft ?? parts.some((p) => p.draftCount != null);
@@ -575,7 +617,8 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     // preserve the disjunctive marker: if any participant re-queried this
     // attribute without its own clauses, the merged totals are on that basis
     const disjunctive = cats.some((i) => i.disjunctive) || undefined;
-    return { ...base, kind: "cat" as const, ...(disjunctive ? { disjunctive } : {}), values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n).slice(0, FACET_VALUE_LIMIT) };
+    return { ...base, kind: "cat" as const, ...(disjunctive ? { disjunctive } : {}),
+      values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n).slice(0, FACET_VALUE_LIMIT) };
   }).sort((x, y) => {
     const pd = (y.priority ?? 0) - (x.priority ?? 0);
     return pd !== 0 ? pd : y.patients - x.patients;
@@ -628,6 +671,7 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     studies,
     draftCount: draft ? parts.reduce((s, p) => s + (p.draftCount || 0), 0) : null,
     studyBreakdown: parts.flatMap((p) => p.studyBreakdown || []).sort((a, b) => b.n - a.n),
+    attributeCardinality,
     clinical,
     ...(derivedMerged.length ? { derived: derivedMerged } : {}),
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
