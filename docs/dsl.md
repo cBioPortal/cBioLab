@@ -166,6 +166,40 @@ Shareable links: `/oncoprint?spec=<base64url>`.
 | `GET /api/catalog?study=` | event-type / attribute vocabulary for the event sub-DSL |
 | `GET /api/studies` | all loadable studies |
 
+## Templates: `params`, and `notes`
+
+A document may declare **parameters** and refer to them anywhere:
+
+```json
+{ "params": { "study": "msk_chord_2024", "genes": ["TP53", "KRAS"] },
+  "study": "$study",
+  "cohorts": { "cohort": { "all": [] } },
+  "views": [ { "kind": "oncoprint", "genes": "$genes" },
+             { "kind": "compare",   "genes": "$genes" } ] }
+```
+
+A saved workup can then be re-pointed at a different gene panel or a different
+study in ONE edit rather than five, which is the difference between an analysis
+you ran once and one you keep.
+
+The rule is deliberately tiny: **a value that is exactly `"$name"` is replaced by
+that parameter, whatever its type** — so `"$genes"` becomes a real array. There is
+no interpolation inside a longer string (`"$gene mutations"` stays literal), no
+expressions, no defaults, and no chaining. Every resolved document is an ordinary
+analysis document, checked by the same validators and compiling to the same SQL as
+if the values had been typed in.
+
+- Only **values** are substituted, never object keys: a cohort named `"$name"` stays literally that.
+- Substitution happens only when `params` is present, so no existing document changes meaning.
+- An unknown `$name` is a **loud error** naming the path and listing what IS declared.
+- Parameters declared but never referenced are reported in the result (`unusedParams`) — the run
+  still succeeds, so nothing else would tell you a rename missed a reference.
+- The parameters that produced a result are echoed back in it, the same way the OncoKB pin is.
+
+`notes` is the analyst's prose about the whole document; each view may carry its own
+`note`. Both are stored with the document and travel in a `?doc=` link, so they are
+rendered as **plain text, never markdown** — a shared link is untrusted input.
+
 ## Examples
 
 Every example below is executed against the live compiler by `npm run docs:check`
@@ -1187,7 +1221,59 @@ MSK-CHORD, aligned on each patient's FIRST treatment, split by TP53 status. Trea
 }
 ```
 
-### Example 16: What comes after what: lines of therapy, and what ending a path means
+### Example 16: A reusable workup: one template, retargeted in a single edit
+
+The gene list appears once, in `params`, and every view refers to it as `$genes`; the study likewise. Change either and all three figures follow. The rule is only that a value which is exactly "$name" is replaced by that parameter — no interpolation, no expressions — so the resolved document is an ordinary one and compiles to exactly the SQL you would get by typing the values in. A `$name` with no declaration is a loud error naming the path, and a parameter declared but never referenced is reported back, which is what catches a rename that missed a reference. `notes` and each view’s `note` travel with the document.
+
+```json
+{
+  "params": {
+    "study": "msk_chord_2024",
+    "genes": [
+      "TP53",
+      "KRAS",
+      "STK11",
+      "KEAP1",
+      "EGFR"
+    ]
+  },
+  "study": "$study",
+  "title": "NSCLC driver workup",
+  "notes": "Standard first pass at a driver panel: how often each gene is altered, whether the alterations travel together, and who carries them. Retarget by editing $genes.",
+  "cohorts": {
+    "NSCLC": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ],
+          "per": "sample"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "genes": "$genes",
+      "note": "Frequencies first — the headline numbers."
+    },
+    {
+      "kind": "cooccurrence",
+      "genes": "$genes",
+      "note": "Do these drivers co-occur, or exclude one another?"
+    },
+    {
+      "kind": "oncoprint",
+      "genes": "$genes"
+    }
+  ]
+}
+```
+
+### Example 17: What comes after what: lines of therapy, and what ending a path means
 
 MSK-CHORD therapy lines by TP53 status, 90-day gap, two panels on one scale. Read the grey blocks first, and read them as TWO things: the darker terminal is patients the study watched for at least a line gap who began no further therapy; the lighter one is patients whose records simply stop, about whom nothing can be concluded. Over half of all paths end censored — collapsing them together (as a plain Sankey does) would turn record-keeping into an apparent clinical decision. The real signal is in first line: TP53 wild-type receives far more hormone therapy than TP53-mutant, which is what hormone-receptor-positive disease looks like. The four excluded SUBTYPE values are a judgement made HERE, in the document, not hidden in the engine — 'Prior Medications to MSK' is a provenance marker rather than a therapy, and radiation and bone treatment co-occur with almost everything, so leaving them in explodes the combination space. Nothing in the data structure distinguishes them from real treatments, which is exactly why the choice is visible.
 
@@ -1236,7 +1322,7 @@ MSK-CHORD therapy lines by TP53 status, 90-day gap, two panels on one scale. Rea
 }
 ```
 
-### Example 17: Lollipop plot: recurrent protein changes, with a suppression floor
+### Example 18: Lollipop plot: recurrent protein changes, with a suppression floor
 
 Hotspots in colorectal cancer. Percentages are of the patients carrying any mutation in that gene, so BRAF V600E accounts for roughly 70% of BRAF-mutant cases. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.
 
@@ -1272,7 +1358,7 @@ Hotspots in colorectal cancer. Percentages are of the patients carrying any muta
 }
 ```
 
-### Example 18: Co-expression from sums alone
+### Example 19: Co-expression from sums alone
 
 Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.
 
@@ -1305,7 +1391,7 @@ Pearson correlation between gene pairs in TCGA breast cancer. A correlation depe
 }
 ```
 
-### Example 19: Clinical attributes compared between cohorts
+### Example 20: Clinical attributes compared between cohorts
 
 How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.
 
@@ -1351,7 +1437,7 @@ How TP53-mutant and wild-type tumors differ clinically. Categorical attributes a
 }
 ```
 
-### Example 20: Co-occurrence and mutual exclusivity in NSCLC
+### Example 21: Co-occurrence and mutual exclusivity in NSCLC
 
 Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.
 
@@ -1388,7 +1474,7 @@ Pairwise associations among lung cancer driver genes. Each site returns four cou
 }
 ```
 
-### Example 21: Survival from first chemotherapy, left-truncated
+### Example 22: Survival from first chemotherapy, left-truncated
 
 TP53-mutant vs wild-type, overall survival measured from each patient's first chemotherapy rather than from sequencing. Patients whose first chemotherapy falls after day 0, or who never had chemotherapy, are excluded rather than given negative follow-up. The result reports how long after the anchor patients became observable, so an anchor that is matching earlier events than intended shows up as a long tail.
 
@@ -1433,7 +1519,7 @@ TP53-mutant vs wild-type, overall survival measured from each patient's first ch
 }
 ```
 
-### Example 22: Study-stratified survival across two studies
+### Example 23: Study-stratified survival across two studies
 
 TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.
 

@@ -15,7 +15,7 @@ import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaen
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, fisherZMeta } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { viewToSvg } from "./view-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting, restrictedStudies,
@@ -23,6 +23,7 @@ import {
   type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow
 } from "./federation.ts";
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
+import { resolveParams } from "./params.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -78,8 +79,12 @@ function cohortStudies(def: CohortDef | undefined, docStudy: string): string[] {
   return [docStudy];
 }
 
-export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
+export async function runAnalysis(template: AnalysisDoc | TemplateDoc): Promise<AnalysisResult> {
   const t0 = Date.now();
+  // Parameters are resolved FIRST, so everything downstream — compilers,
+  // validators, provenance — sees an ordinary document and cannot tell a
+  // template from one written out by hand.
+  const { doc, params: usedParams, unused: unusedParams } = resolveParams(template);
   const docStudy = await resolveStudy(doc.study);
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
   const names = Object.keys(doc.cohorts || {}).slice(0, 6);
@@ -950,8 +955,20 @@ export async function runAnalysis(doc: AnalysisDoc): Promise<AnalysisResult> {
     }
   }
 
+  // An author's note belongs to the VIEW, not to the run, so it is copied across
+  // by position rather than being threaded through every branch above.
+  (doc.views || []).slice(0, 6).forEach((v, i) => {
+    const note = (v as { note?: unknown }).note;
+    if (views[i] && typeof note === "string" && note.trim()) views[i].annotationNote = note.trim();
+  });
+
   return {
     study: docStudy, involvedStudies: involved, oncokbPin: pin,
+    // Echoed so a reader can see WHICH values produced these numbers, the same
+    // reason the OncoKB pin is echoed. `unusedParams` catches a rename that
+    // missed a reference: the run succeeds, so nothing else would say so.
+    ...(Object.keys(usedParams).length ? { params: usedParams } : {}),
+    ...(unusedParams.length ? { unusedParams } : {}),
     cohorts: Object.fromEntries(names.map((n) => [n, {
       count: cohorts[n].count, text: cohorts[n].text,
       studies: cohorts[n].studies,

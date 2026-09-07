@@ -15,12 +15,17 @@
 // commit and run `npm run docs:gen`.
 // ============================================================================
 
-import type { AnalysisDoc } from "./types.ts";
+import type { AnalysisDoc, TemplateDoc } from "./types.ts";
 
 export const DSL_VERSION = "2.2";
 
 export interface DslExample {
-  title: string; note: string; doc: AnalysisDoc;
+  title: string; note: string;
+  /**
+   * Authored form: a value may be a "$name" reference, which the engine resolves
+   * before anything downstream sees the document.
+   */
+  doc: TemplateDoc;
   /** one line on WHY this example exists — rendered by the app's Examples tab */
   demonstrates?: string;
   /** view kinds / themes exercised, for grouping in the app */
@@ -335,6 +340,26 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "A reusable workup: one template, retargeted in a single edit",
+    demonstrates: "The document as a SAVED WORKSPACE rather than a one-off query. Several figures, the analyst's own notes, and the gene panel and study lifted into parameters \u2014 so running the same workup on a different panel is one edit instead of the same list retyped in every view.",
+    tags: ["template", "params", "workspace", "notes", "multi-view"],
+    note: "The gene list appears once, in `params`, and every view refers to it as `$genes`; the study likewise. Change either and all three figures follow. The rule is only that a value which is exactly \"$name\" is replaced by that parameter \u2014 no interpolation, no expressions \u2014 so the resolved document is an ordinary one and compiles to exactly the SQL you would get by typing the values in. A `$name` with no declaration is a loud error naming the path, and a parameter declared but never referenced is reported back, which is what catches a rename that missed a reference. `notes` and each view\u2019s `note` travel with the document.",
+    doc: {
+      params: { study: "msk_chord_2024", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR"] },
+      study: "$study",
+      title: "NSCLC driver workup",
+      notes: "Standard first pass at a driver panel: how often each gene is altered, whether the alterations travel together, and who carries them. Retarget by editing $genes.",
+      cohorts: {
+        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] }
+      },
+      views: [
+        { kind: "compare", genes: "$genes", note: "Frequencies first \u2014 the headline numbers." },
+        { kind: "cooccurrence", genes: "$genes", note: "Do these drivers co-occur, or exclude one another?" },
+        { kind: "oncoprint", genes: "$genes" }
+      ]
+    }
+  },
+  {
     title: "What comes after what: lines of therapy, and what ending a path means",
     demonstrates: "The question the clinical-course view CANNOT answer \u2014 that chart asks 'on treatment, yes or no', so a seamless switch between drugs never moves the line. And the reason a sequence diagram usually misleads: most paths end because the RECORD ends, not because the patient stopped, so the two endings are drawn as separate terminals.",
     tags: ["sequence", "sankey", "temporal", "lines-of-therapy", "censoring", "attrition"],
@@ -609,6 +634,40 @@ Shareable links: \`/oncoprint?spec=<base64url>\`.
 | \`GET /api/catalog?study=\` | event-type / attribute vocabulary for the event sub-DSL |
 | \`GET /api/studies\` | all loadable studies |
 
+## Templates: \`params\`, and \`notes\`
+
+A document may declare **parameters** and refer to them anywhere:
+
+\`\`\`json
+{ "params": { "study": "msk_chord_2024", "genes": ["TP53", "KRAS"] },
+  "study": "$study",
+  "cohorts": { "cohort": { "all": [] } },
+  "views": [ { "kind": "oncoprint", "genes": "$genes" },
+             { "kind": "compare",   "genes": "$genes" } ] }
+\`\`\`
+
+A saved workup can then be re-pointed at a different gene panel or a different
+study in ONE edit rather than five, which is the difference between an analysis
+you ran once and one you keep.
+
+The rule is deliberately tiny: **a value that is exactly \`"$name"\` is replaced by
+that parameter, whatever its type** — so \`"$genes"\` becomes a real array. There is
+no interpolation inside a longer string (\`"$gene mutations"\` stays literal), no
+expressions, no defaults, and no chaining. Every resolved document is an ordinary
+analysis document, checked by the same validators and compiling to the same SQL as
+if the values had been typed in.
+
+- Only **values** are substituted, never object keys: a cohort named \`"$name"\` stays literally that.
+- Substitution happens only when \`params\` is present, so no existing document changes meaning.
+- An unknown \`$name\` is a **loud error** naming the path and listing what IS declared.
+- Parameters declared but never referenced are reported in the result (\`unusedParams\`) — the run
+  still succeeds, so nothing else would tell you a rename missed a reference.
+- The parameters that produced a result are echoed back in it, the same way the OncoKB pin is.
+
+\`notes\` is the analyst's prose about the whole document; each view may carry its own
+\`note\`. Both are stored with the document and travel in a \`?doc=\` link, so they are
+rendered as **plain text, never markdown** — a shared link is untrusted input.
+
 ## Examples
 
 Every example below is executed against the live compiler by \`npm run docs:check\`
@@ -623,6 +682,9 @@ ${EXAMPLES.map(exampleBlock).join("\n")}
 // they are reviewed together. Behavioral guidance stays in the chat route.
 export const CHAT_GRAMMAR = `Document shape:
 { "study": "<default study id>",
+  "params"?: { "<name>": <any JSON> },   // optional; a value that is EXACTLY "$name" is replaced by it
+  "notes"?: "<the analyst's own prose about this workspace>",
+  "title"?: "<name, when saved as a workspace>",
   "cohorts": { "<name>": <cohortDef>, ... (max 6) },
   "views": [ {"kind":"compare","genes":[...(max 20)],"cohorts":[names?]},
              {"kind":"survival","endpoint":"OS|PFS|DFS|…","anchor":{"eventType":"Treatment","key":"SUBTYPE","value":"Chemo","occurrence":"FIRST"},"cohorts":[names?]},

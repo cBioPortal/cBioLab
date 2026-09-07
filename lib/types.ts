@@ -195,10 +195,34 @@ export interface SequenceView {
 }
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView;
 
+/**
+ * A document AS AUTHORED, before parameters are resolved. Any value in it may be
+ * the string "$name" instead of the type the engine will eventually see — a
+ * `genes` field really can hold `"$genes"` until lib/params.ts substitutes it.
+ *
+ * `AnalysisDoc` deliberately describes the RESOLVED document, so that everything
+ * downstream of resolveParams() is typed as tightly as before and cannot quietly
+ * accept a reference where a value is required.
+ */
+export type TemplateDoc = Omit<AnalysisDoc, "views"> & {
+  views?: Array<View | Record<string, unknown>>;
+};
+
 export interface AnalysisDoc {
   study?: string;
   cohorts: Record<string, CohortDef>;
   views?: View[];
+  /**
+   * Template parameters. A value anywhere in the document that is exactly
+   * "$name" is replaced by the value declared here — see lib/params.ts. Lets one
+   * saved workspace be re-pointed at different genes or a different study
+   * without editing the same list in five places.
+   */
+  params?: Record<string, unknown>;
+  /** the analyst's own prose about this workspace: what it is for, what to read */
+  notes?: string;
+  /** a name, when this document has been saved as a workspace */
+  title?: string;
 }
 
 // ---------- results ---------------------------------------------------------
@@ -295,6 +319,8 @@ export interface LogRank {
 }
 export interface ViewResult {
   kind: string; error?: string; note?: string; studies?: string[];
+  /** the analyst's own annotation, carried through from the view spec */
+  annotationNote?: string;
   participation?: ViewParticipation;
   /** wall-clock for this view alone, in ms (its queries run concurrently) */
   ms?: number;
@@ -382,6 +408,9 @@ export interface CoursePoint {
 }
 export interface AnalysisResult {
   study: string; involvedStudies: string[]; oncokbPin: string | null;
+  /** the parameters this run resolved, and any declared but never referenced */
+  params?: Record<string, unknown>;
+  unusedParams?: string[];
   cohorts: Record<string, CohortResult>;
   views: ViewResult[];
   stats: { ms: number };

@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
 import { heatmapTrackLabel } from "../../lib/profile-names.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
+import { parameterize } from "../../lib/params.ts";
+import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
 import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
 import type { ViewParticipation } from "../../lib/types.ts";
 
@@ -137,6 +138,58 @@ const DEFAULT_VIEWS: View[] = [
   { kind: "oncoprint", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR"] }
 ];
 
+/**
+ * One editable template parameter. The control follows the value's TYPE, so a
+ * gene list edits as chips and a study edits as text — the point of a template
+ * is that retargeting is a normal edit, not JSON surgery.
+ */
+function ParamRow({ name, value, busy, onChange }:
+  { name: string; value: unknown; busy: boolean; onChange: (v: unknown) => void }) {
+  const [add, setAdd] = useState("");
+  if (Array.isArray(value)) {
+    const items = value.map(String);
+    return (
+      <div className="paramrow">
+        <code>${name}</code>
+        <div className="pillwrap">
+          {items.map(x => (
+            <button key={x} type="button" className="pill" disabled={busy}
+              title={"remove " + x} onClick={() => onChange(items.filter(y => y !== x))}>
+              {x} <span aria-hidden="true">×</span>
+            </button>
+          ))}
+          <input list="view-genes" placeholder="add…" value={add} disabled={busy}
+            style={{ width: "7rem" }}
+            onChange={e => setAdd(e.target.value.toUpperCase())}
+            onKeyDown={e => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              const v = add.trim().toUpperCase();
+              if (v && !items.includes(v)) onChange([...items, v]);
+              setAdd("");
+            }} />
+        </div>
+      </div>
+    );
+  }
+  if (typeof value === "number") {
+    return (
+      <div className="paramrow">
+        <code>${name}</code>
+        <input type="number" value={value} disabled={busy}
+          onChange={e => onChange(Number(e.target.value))} />
+      </div>
+    );
+  }
+  return (
+    <div className="paramrow">
+      <code>${name}</code>
+      <input value={String(value ?? "")} disabled={busy}
+        onChange={e => onChange(e.target.value)} />
+    </div>
+  );
+}
+
 export default function AnalysisPage() {
   const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">("cohorts");
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
@@ -179,6 +232,24 @@ export default function AnalysisPage() {
   const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
   const [attrLimit, setAttrLimit] = useState(20);                       // clinical attributes shown
 
+  /**
+   * Saved workspaces. A workspace IS the analysis document — several views,
+   * their notes, and any template parameters — so persistence is deliberately
+   * schemaless: the whole document is stored verbatim under a name, exactly as
+   * saved cohorts already are. Nothing is normalised, so a document written by a
+   * newer build still loads, and anything the app cannot interpret survives a
+   * round trip instead of being dropped.
+   */
+  const WS_KEY = "cohortlab.workspaces";
+  type Workspace = { doc: AnalysisDoc; savedAt: string };
+  const [spaces, setSpaces] = useState<Record<string, Workspace>>({});
+  const [wsName, setWsName] = useState("");
+  const wsDialog = useRef<HTMLDialogElement | null>(null);
+  const persistSpaces = (next: Record<string, Workspace>) => {
+    setSpaces(next);
+    try { localStorage.setItem(WS_KEY, JSON.stringify(next)); } catch {}
+  };
+
   const LS_KEY = "cohortlab.savedCohorts";
   const persist = (next: typeof saved) => { setSaved(next); try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {} };
 
@@ -198,6 +269,7 @@ export default function AnalysisPage() {
 
   useEffect(() => {
     try { setSaved(JSON.parse(localStorage.getItem(LS_KEY) || "{}")); } catch {}
+    try { setSpaces(JSON.parse(localStorage.getItem(WS_KEY) || "{}")); } catch {}
     fetch("/api/studies").then(r => r.json()).then(j => {
       const list = j.studies || [];
       setStudies(list);
@@ -632,6 +704,54 @@ export default function AnalysisPage() {
     const legacy = (explore?.genes || []).map((g: any) => String(g.gene));
     return [...new Set([...fromExplore, ...legacy])].slice(0, 60);
   };
+  // ---- workspaces ----------------------------------------------------------
+  const openWorkspaceSave = () => {
+    setWsName(doc.title || Object.keys(doc.cohorts || {})[0] || "workspace");
+    wsDialog.current?.showModal();
+  };
+  const confirmWorkspaceSave = () => {
+    const name = wsName.trim();
+    if (!name) return;
+    wsDialog.current?.close();
+    const d = { ...doc, title: name };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    persistSpaces({ ...spaces, [name]: { doc: d, savedAt: new Date().toISOString().slice(0, 16).replace("T", " ") } });
+  };
+  const openWorkspace = (name: string) => {
+    const w = spaces[name];
+    if (!w) return;
+    const d = w.doc;
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    setResult(null); setError(null);
+    if (d.study) setStudy(d.study);
+    goTab("analysis");
+    run(d);
+  };
+  const deleteWorkspace = (name: string) => {
+    const next = { ...spaces }; delete next[name];
+    persistSpaces(next);
+  };
+  /** Lift the study and a shared gene list into parameters — see lib/params.ts. */
+  const makeTemplate = () => {
+    // parameterize returns the AUTHORED form, where a `genes` field may hold
+    // "$genes". The editor state is typed as the resolved document because
+    // every other reader wants that; this is the one place a reference enters,
+    // so it is the one place that says so.
+    const d = parameterize(doc) as AnalysisDoc;
+    if (d === doc) { setError("nothing to lift: a template needs a study, or a gene list that every gene view shares"); return; }
+    setError(null);
+    setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
+  };
+  /** Change one parameter and re-run — the whole point of a template. */
+  const setParam = (key: string, value: unknown) => {
+    const d = { ...doc, params: { ...(doc.params || {}), [key]: value } };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
+  };
+  const setNotes = (text: string) => {
+    const d = { ...doc, notes: text };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));   // no re-run: prose changes no numbers
+  };
+
   const openGenes = (vi: number) => { setGenesFor(vi); genesDialog.current?.showModal(); };
   const setViewGenes = (vi: number, genes: string[]) =>
     updateView(vi, v => pruneSort({ ...v, genes }));
@@ -756,7 +876,9 @@ export default function AnalysisPage() {
     run(d);
   };
 
-  const docLink = (d: AnalysisDoc): string =>
+  // Accepts the authored form: this only serialises, and a template is exactly
+  // what you want to share when the point is that it can be re-pointed.
+  const docLink = (d: AnalysisDoc | TemplateDoc): string =>
     location.origin + location.pathname + "?doc=" +
     btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d))))
       .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -808,6 +930,24 @@ export default function AnalysisPage() {
         {/* One popup shared by every gene-bearing view — a modal rather than a
             dropdown, because picking several genes is a task you settle into,
             and a menu that closes on an outside click fights that. */}
+        <dialog ref={wsDialog} className="namedialog wsdialog"
+          onClose={() => setWsName("")}
+          onClick={e => { if (e.target === wsDialog.current) wsDialog.current?.close(); }}>
+          <form method="dialog" onSubmit={e => { e.preventDefault(); confirmWorkspaceSave(); }}>
+            <h3>Save workspace</h3>
+            <p className="meta">
+              {(doc.views || []).length} view{(doc.views || []).length === 1 ? "" : "s"}
+              {doc.params ? " · " + Object.keys(doc.params).length + " parameter" + (Object.keys(doc.params).length === 1 ? "" : "s") : ""}
+              {doc.notes ? " · with notes" : ""}
+            </p>
+            <input autoFocus placeholder="workspace name…" value={wsName}
+              onChange={e => setWsName(e.target.value)} />
+            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", gap: "0.4rem" }}>
+              <button type="button" className="linklike" onClick={() => wsDialog.current?.close()}>cancel</button>
+              <button className="primary" type="submit" disabled={!wsName.trim()}>Save</button>
+            </div>
+          </form>
+        </dialog>
         <dialog ref={genesDialog} className="genedialog"
           onClose={() => setGenesFor(null)}
           onClick={e => { if (e.target === genesDialog.current) genesDialog.current?.close(); }}>
@@ -1501,7 +1641,65 @@ export default function AnalysisPage() {
                   {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} />}
                 </div>
               ))}
-              <textarea value={docText} onChange={e => setDocText(e.target.value)} spellCheck={false}
+              {/* ---- workspace bar: save this document, or reopen a saved one ---- */}
+              <div className="wsbar">
+                <strong>{doc.title || "Untitled workspace"}</strong>
+                <button className="linklike" disabled={busy} onClick={openWorkspaceSave}
+                  title="save this whole document — views, notes and parameters — under a name">save</button>
+                {Object.keys(spaces).length > 0 && (
+                  <select value="" disabled={busy}
+                    onChange={e => { if (e.target.value) openWorkspace(e.target.value); }}>
+                    <option value="">open…</option>
+                    {Object.entries(spaces)
+                      .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
+                      .map(([n, w]) => <option key={n} value={n}>{n} — {w.savedAt}</option>)}
+                  </select>
+                )}
+                {doc.title && spaces[doc.title] && (
+                  <button className="linklike" disabled={busy}
+                    title={"delete the saved workspace \u201c" + doc.title + "\u201d"}
+                    onClick={() => deleteWorkspace(doc.title!)}>delete</button>
+                )}
+                <span className="spacer" />
+                {!doc.params && (doc.views || []).length > 0 && (
+                  <button className="linklike" disabled={busy} onClick={makeTemplate}
+                    title="lift the study and a shared gene list into parameters, so this can be re-pointed in one edit">
+                    make a template
+                  </button>
+                )}
+              </div>
+
+              {/* ---- parameters: the template control ---- */}
+              {doc.params && Object.keys(doc.params).length > 0 && (
+                <div className="params">
+                  <div className="row" style={{ alignItems: "baseline" }}>
+                    <strong style={{ fontSize: "0.78rem" }}>Parameters</strong>
+                    <span className="meta">— change one here and every view that uses it re-runs</span>
+                  </div>
+                  {Object.entries(doc.params).map(([k, v]) => (
+                    <ParamRow key={k} name={k} value={v} busy={busy} onChange={val => setParam(k, val)} />
+                  ))}
+                  {result?.unusedParams?.length ? (
+                    <p className="note" style={{ margin: "0.3rem 0 0" }}>
+                      Declared but never used: {result.unusedParams.map(x => "$" + x).join(", ")} — usually a
+                      rename that missed a reference.
+                    </p>
+                  ) : null}
+                </div>
+              )}
+
+              {/* ---- notes: the analyst's own prose, stored with the document ---- */}
+              <details className="notes" open={!!doc.notes}>
+                <summary>Notes{doc.notes ? "" : " — what this workspace is for"}</summary>
+                <textarea value={doc.notes || ""} placeholder="What is this analysis for? What should a reader look at first?"
+                  onChange={e => setNotes(e.target.value)} spellCheck
+                  style={{ width: "100%", height: "5rem" }} />
+              </details>
+
+              {/* id, because the notes textarea above it also matches "textarea" —
+                  anything reading the document from outside React needs to be
+                  able to say WHICH one. */}
+              <textarea id="docjson" value={docText} onChange={e => setDocText(e.target.value)} spellCheck={false}
                 style={{ width: "100%", height: "20rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
               <div className="row" style={{ marginTop: "0.6rem" }}>
                 <button className="primary" disabled={busy} onClick={applyText}>{busy && <span className="spinner onprimary" />}{busy ? "Running…" : "Run document"}</button>
@@ -1569,6 +1767,9 @@ export default function AnalysisPage() {
               <div className="card viewcard" key={vi}>
                 <button className="removeview" title="remove this view from the document"
                   aria-label="remove this view" onClick={() => removeView(vi)}>×</button>
+                {/* The author's own note about this figure, plain text by design —
+                    see .viewnote in globals.css for why it is never markdown. */}
+                {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
                 {v.kind === "compare" && v.rows && <>
                   <div className="viewhead"><h2 style={{ margin: 0 }}>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
                       <span className="lat" title={

@@ -38,6 +38,11 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 - **`lib/event-names.ts`** — **THE only place timeline event names are normalized.** Case-fold and
   trim, nothing else; measured to be complete for event types and attribute keys (zero residual
   collisions). Folds are disclosed in the caveat, never silent. Do not fork it.
+- **`lib/params.ts`** — template parameters. A value that is EXACTLY `"$name"` is replaced by
+  `doc.params.name`; no interpolation, no expressions, no chaining, keys never substituted. The
+  resolved document is an ordinary one, so everything downstream stays as strictly typed as
+  before (`AnalysisDoc` = resolved, `TemplateDoc` = as authored). `runAnalysis` is the boundary.
+  Also `parameterize()`, the one-click lift of study + a shared gene list.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
 - **`app/analysis/page.tsx`** — the app: Explore (study checkboxes + facets) / Cohorts /
   Analysis / Examples. The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
@@ -90,7 +95,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
 - Test: `npm test` — unit suites, no database needed (the patient-data boundary, the stats used by
   federated views, cohort-definition semantics, clinical-course semantics, and the SVG figure
-  renderers; 144 checks across 6 suites). `node e2e.cjs` — 67 checks (Playwright + docs gate + the
+  renderers, and template parameters; 158 checks across 7 suites). `node e2e.cjs` — 69 checks (Playwright + docs gate + the
   boundary suite).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check

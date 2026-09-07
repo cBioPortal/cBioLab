@@ -237,7 +237,7 @@ async function main() {
       try {
         await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 1, null, { timeout: 300000 });
         views = (await page.locator(".ana-grid h2").allTextContents()).map(t => t.split("\u2014")[0].trim());
-        const docText = await page.locator("textarea").first().inputValue();
+        const docText = await page.locator("#docjson").inputValue();
         // Named from the draft itself now that the bar has no name field.
         landed = Object.keys(JSON.parse(docText).cohorts || {}).length === 1;
       } catch { /* landed stays false */ }
@@ -253,16 +253,16 @@ async function main() {
       let savedOk = false;
       try {
         await page.locator(".exbar button:has-text('Save as a Cohort')").click();
-        await page.waitForSelector("dialog.namedialog[open]", { timeout: 30000 });
-        const prefilled = await page.locator("dialog.namedialog input").inputValue();
+        await page.waitForSelector("dialog.namedialog:not(.wsdialog)[open]", { timeout: 30000 });
+        const prefilled = await page.locator("dialog.namedialog:not(.wsdialog) input").inputValue();
         // Esc must dismiss without saving
         await page.keyboard.press("Escape");
         await page.waitForTimeout(400);
-        const closedOnEsc = (await page.locator("dialog.namedialog[open]").count()) === 0;
+        const closedOnEsc = (await page.locator("dialog.namedialog:not(.wsdialog)[open]").count()) === 0;
         await page.locator(".exbar button:has-text('Save as a Cohort')").click();
-        await page.waitForSelector("dialog.namedialog[open]", { timeout: 30000 });
-        await page.locator("dialog.namedialog input").fill("e2e dialog cohort");
-        await page.locator("dialog.namedialog button:has-text('Save')").click();
+        await page.waitForSelector("dialog.namedialog:not(.wsdialog)[open]", { timeout: 30000 });
+        await page.locator("dialog.namedialog:not(.wsdialog) input").fill("e2e dialog cohort");
+        await page.locator("dialog.namedialog:not(.wsdialog) button:has-text('Save')").click();
         await page.waitForFunction(() => /saved/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 120000 });
         await page.locator(".tabs button:has-text('Cohorts')").click();
@@ -284,7 +284,7 @@ async function main() {
         await page.locator(".pick input").nth(0).check();
         await page.locator("button:has-text('Analyze selected')").click();
         await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 0, null, { timeout: 300000 });
-        seeded = Object.keys(JSON.parse(await page.locator("textarea").first().inputValue()).cohorts || {});
+        seeded = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {});
       } catch { /* left empty */ }
       await page.locator(".tabs button:has-text('Explore')").click();
       await page.waitForSelector(".exbar", { timeout: 120000 });
@@ -298,17 +298,17 @@ async function main() {
       let replaced = false, after = [];
       try {
         await page.waitForFunction((gone) => {
-          const ta = document.querySelector("textarea");
+          const ta = document.querySelector("#docjson");
           if (!ta) return false;
           try {
             const names = Object.keys(JSON.parse(ta.value).cohorts || {});
             return names.length === 1 && !names.includes(gone);
           } catch { return false; }
         }, seeded[0] || "", { timeout: 300000 });
-        after = Object.keys(JSON.parse(await page.locator("textarea").first().inputValue()).cohorts || {});
+        after = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {});
         replaced = after.length === 1 && !after.includes(seeded[0]);
       } catch {
-        try { after = Object.keys(JSON.parse(await page.locator("textarea").first().inputValue()).cohorts || {}); } catch {}
+        try { after = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {}); } catch {}
       }
       ok("a second Analyze resets the analysis instead of accumulating", replaced && seeded.length === 1,
         replaced ? "replaced \u201c" + seeded[0] + "\u201d with \u201c" + after[0] + "\u201d"
@@ -333,12 +333,12 @@ async function main() {
         await panel.locator("input[list=view-genes]").fill("PIK3CA");
         await panel.locator('button:has-text("add")').click();
         const genesNow = async () => page.evaluate(() => {
-          const v = (JSON.parse(document.querySelector("textarea").value).views || [])
+          const v = (JSON.parse(document.querySelector("#docjson").value).views || [])
             .find((x) => x.kind === "compare");
           return (v && v.genes) || [];
         });
         await page.waitForFunction(() => {
-          const ta = document.querySelector("textarea"); if (!ta) return false;
+          const ta = document.querySelector("#docjson"); if (!ta) return false;
           try { return (JSON.parse(ta.value).views || [])
             .some((v) => v.kind === "compare" && (v.genes || []).includes("PIK3CA")); }
           catch { return false; }
@@ -349,7 +349,7 @@ async function main() {
         const appended = added.length === before + 1 && added.includes("TP53");
         await panel.locator(".pill", { hasText: "KRAS" }).first().click();
         await page.waitForFunction(() => {
-          const ta = document.querySelector("textarea"); if (!ta) return false;
+          const ta = document.querySelector("#docjson"); if (!ta) return false;
           try { return !(JSON.parse(ta.value).views || [])
             .some((v) => v.kind === "compare" && (v.genes || []).includes("KRAS")); }
           catch { return false; }
@@ -380,6 +380,72 @@ async function main() {
           ", gear has portal link: " + gearHasLink;
       } catch (e) { gearSplit = String(e.message).split("\n")[0]; }
       ok("genes are a named button; the gear keeps only the cBioPortal link", gearOk, gearSplit);
+
+      // A workspace is the whole document — figures, notes and parameters — saved
+      // under a name and reopened after a full reload. And a template retargets
+      // in ONE edit: change $genes and every view that refers to it follows.
+      let wsFlow = "workspace bar never rendered", wsOk = false;
+      try {
+        await page.goto(BASE + "/analysis?doc=" + encodeURIComponent(Buffer.from(JSON.stringify({
+          study: "msk_chord_2024",
+          cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
+          views: [{ kind: "compare", genes: ["TP53", "KRAS"], note: "Frequencies first." },
+                  { kind: "cooccurrence", genes: ["TP53", "KRAS"] }]
+        })).toString("base64")));
+        await page.waitForSelector(".wsbar", { timeout: 300000 });
+        await page.waitForSelector(".viewnote", { timeout: 300000 });
+        const noteShown = (await page.locator(".viewnote").first().innerText()).includes("Frequencies first");
+
+        // lift study + the shared gene list into parameters
+        await page.locator('button:has-text("make a template")').click();
+        await page.waitForSelector(".params", { timeout: 300000 });
+        const readDoc = () => page.evaluate(() => JSON.parse(document.querySelector("#docjson").value));
+        await page.waitForFunction(() => {
+          const t = document.querySelector("#docjson"); if (!t) return false;
+          try { const d = JSON.parse(t.value); return !!(d.params && d.params.genes); } catch { return false; }
+        }, null, { timeout: 300000 });
+        const templated = await readDoc();
+        const lifted = templated.study === "$study" &&
+          templated.views.every((v) => v.genes === "$genes");
+
+        // retarget through the parameter control
+        const genesRow = page.locator(".paramrow", { hasText: "$genes" });
+        await genesRow.locator("input").fill("BRAF");
+        await genesRow.locator("input").press("Enter");
+        await page.waitForFunction(() => {
+          const t = document.querySelector("#docjson"); if (!t) return false;
+          try { return (JSON.parse(t.value).params.genes || []).includes("BRAF"); } catch { return false; }
+        }, null, { timeout: 300000 });
+        // every view followed the one edit
+        await page.waitForFunction(() => {
+          const tds = [...document.querySelectorAll(".ana-grid table tbody tr td:first-child")];
+          return tds.some((td) => (td.textContent || "").trim() === "BRAF");
+        }, null, { timeout: 300000 });
+
+        await page.locator(".notes summary").click();
+        await page.locator(".notes textarea").fill("e2e workspace notes");
+        await page.locator('.wsbar button:has-text("save")').click();
+        await page.waitForSelector("dialog.wsdialog[open]", { timeout: 30000 });
+        await page.locator("dialog.wsdialog input").fill("e2e workspace");
+        await page.locator('dialog.wsdialog button:has-text("Save")').click();
+        await page.waitForTimeout(2000);
+
+        // a FULL reload, then reopen it
+        await page.goto(BASE + "/analysis?tab=analysis");
+        await page.waitForSelector(".wsbar select", { timeout: 300000 });
+        await page.locator(".wsbar select").selectOption("e2e workspace");
+        await page.waitForFunction(() => {
+          const t = document.querySelector("#docjson"); if (!t) return false;
+          try { return JSON.parse(t.value).title === "e2e workspace"; } catch { return false; }
+        }, null, { timeout: 300000 });
+        const reopened = await readDoc();
+        const restored = reopened.notes === "e2e workspace notes" &&
+          (reopened.params.genes || []).includes("BRAF") &&
+          reopened.views.length === 2;
+        wsOk = noteShown && lifted && restored;
+        wsFlow = "note: " + noteShown + ", lifted: " + lifted + ", restored after reload: " + restored;
+      } catch (e) { wsFlow = String(e.message).split("\n")[0]; }
+      ok("a workspace saves, retargets by one parameter, and survives a reload", wsOk, wsFlow);
 
       // Tabs are deep-linked: a refresh must land you where you were.
       await page.goto(BASE + "/analysis");
@@ -414,7 +480,7 @@ async function main() {
       let together = [];
       try {
         await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 1, null, { timeout: 300000 });
-        together = Object.keys(JSON.parse(await page.locator("textarea").first().inputValue()).cohorts || {});
+        together = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {});
       } catch { /* left empty */ }
       ok("ticked cohorts are analysed together", together.length === 2, together.join(" + ") || "no document");
 
@@ -424,7 +490,7 @@ async function main() {
         await page.waitForSelector(".addview", { timeout: 120000 });
         await page.locator(".addview button:has-text('Lollipop')").click();
         await page.waitForSelector(".lolliplot .dot", { timeout: 300000 });
-        added = (JSON.parse(await page.locator("textarea").first().inputValue()).views || []).map(v => v.kind);
+        added = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).map(v => v.kind);
         dots = await page.locator(".lolliplot .dot").count();
       } catch { /* left empty */ }
       ok("a lollipop view can be added from the UI", added.includes("hotspots") && dots > 0,
@@ -450,13 +516,13 @@ async function main() {
       // Views can be removed one at a time, and the document follows.
       let beforeN = 0, afterKinds = [];
       try {
-        beforeN = (JSON.parse(await page.locator("textarea").first().inputValue()).views || []).length;
+        beforeN = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).length;
         await page.locator(".viewcard").first().locator(".removeview").click();
         await page.waitForFunction((n) => {
-          try { return (JSON.parse(document.querySelector("textarea").value).views || []).length === n - 1; }
+          try { return (JSON.parse(document.querySelector("#docjson").value).views || []).length === n - 1; }
           catch { return false; }
         }, beforeN, { timeout: 300000 });
-        afterKinds = (JSON.parse(await page.locator("textarea").first().inputValue()).views || []).map(v => v.kind);
+        afterKinds = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).map(v => v.kind);
       } catch { /* left empty */ }
       ok("a single view can be removed", beforeN > 0 && afterKinds.length === beforeN - 1,
         beforeN ? beforeN + " → " + afterKinds.length + " views (" + afterKinds.join(", ") + ")" : "no views to remove");
@@ -485,7 +551,7 @@ async function main() {
           return el && el.textContent.trim() !== b;
         }, before.trim(), { timeout: 300000 });
         basis.truncated = (await page.locator(".trunc").count()) > 0;
-        basis.anchor = JSON.parse(await page.locator("textarea").first().inputValue()).views[0].anchor;
+        basis.anchor = JSON.parse(await page.locator("#docjson").inputValue()).views[0].anchor;
         basis.changed = true;
       } catch { /* left as-is */ }
       ok("survival basis is changeable from a control", basis.changed && basis.truncated && !!basis.anchor,
