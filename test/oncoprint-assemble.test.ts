@@ -90,9 +90,9 @@ test("declarative sort by a clinical track, missing values last, then the stairc
 });
 
 test("the contract carries resolved viewing options, defaulted when the caller gives none", () => {
-  assert.deepEqual(assembleContract(input()).display, { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb" });
+  assert.deepEqual(assembleContract(input()).display, { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false });
   const d = { showUnaltered: false, whitespace: true, gaps: "pct" as const, clinicalLegends: "none" as const,
-    colorByType: true, hideVUS: false, annotate: "oncokb" as const };
+    colorByType: true, hideVUS: false, annotate: "oncokb" as const, whiteBackground: false };
   assert.deepEqual(assembleContract({ ...input(), display: d }).display, d);
 });
 

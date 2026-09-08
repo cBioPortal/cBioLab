@@ -21,6 +21,11 @@ export const PALETTE = {
 };
 export type Palette = typeof PALETTE;
 
+/**
+ * Drawing geometry. Mutable on purpose: the minimap draws the same figure at three pixels a
+ * row with no gutter by swapping these for one call and putting them back, rather than
+ * threading a geometry argument through every function for one caller.
+ */
 export const GEOM = { header: STYLE.geometry.header, rowH: STYLE.geometry.rowH, rowGap: STYLE.geometry.rowGap, gutter: STYLE.geometry.gutter, groupGap: STYLE.geometry.groupGap };
 
 export interface VisibleGroup {

@@ -192,12 +192,14 @@ export interface DisplaySpec {
   hideVUS?: boolean;
   /** driver calls: the pinned OncoKB store, or none at all (default "oncokb") */
   annotate?: "oncokb" | "none";
+  /** unaltered cells drawn white rather than grey, for print (default false) */
+  whiteBackground?: boolean;
   /** partial override of lib/oncoprint-style.ts (Phase 1b) */
   style?: Record<string, unknown>;
   /** per-track, per-category colours: {trackLabel: {value: "#rrggbb"}} (Phase 1b) */
   colors?: Record<string, Record<string, string>>;
 }
-export type ResolvedDisplay = Required<Pick<DisplaySpec, "showUnaltered" | "whitespace" | "gaps" | "clinicalLegends" | "colorByType" | "hideVUS" | "annotate">>
+export type ResolvedDisplay = Required<Pick<DisplaySpec, "showUnaltered" | "whitespace" | "gaps" | "clinicalLegends" | "colorByType" | "hideVUS" | "annotate" | "whiteBackground">>
   & Pick<DisplaySpec, "style" | "colors">;
 export interface OncoprintView {
   kind: "oncoprint"; genes: string[]; cohorts?: string[];

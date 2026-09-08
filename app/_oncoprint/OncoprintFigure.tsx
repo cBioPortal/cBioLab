@@ -16,6 +16,13 @@ import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 
 const MAX_ZOOM = 24;
 
+/** unaltered cells drawn white; not-profiled keeps its stripe, which is what still tells them apart */
+function withBackground(S: ReturnType<typeof resolveStyle>, white?: boolean) {
+  if (!white) return S;
+  return { ...S, palette: { ...S.palette, unaltered: "#ffffff" },
+    glyph: { ...S.glyph, notProfiled: { ...S.glyph.notProfiled, fill: "#ffffff" } } };
+}
+
 /**
  * The viewing options the BROWSER can apply to a decoded contract: they change the picture,
  * never a number, so they never need a refetch. Options that change numbers — hideVUS,
@@ -25,6 +32,11 @@ export interface FigureDisplay {
   showUnaltered: boolean; whitespace: boolean; gaps: "none" | "gaps" | "pct"; colorByType: boolean;
   /** per track, per value: the portal's Edit Colors, applied in the browser */
   colors?: Record<string, Record<string, string>>;
+  /**
+   * Draw unaltered cells white instead of grey. The portal offers this for printing and warns
+   * about it, because profiled and unprofiled then look alike — so the legend says so too.
+   */
+  whiteBackground?: boolean;
 }
 export const DEFAULT_FIGURE_DISPLAY: FigureDisplay = { showUnaltered: true, whitespace: true, gaps: "none", colorByType: true };
 
@@ -79,6 +91,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const [cssW, setCssW] = useState(1200);
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const miniRef = useRef<HTMLCanvasElement>(null);
+  const [showMini, setShowMini] = useState(false);
   const drag = useRef<{ x: number; scrollX: number } | null>(null);
   const perfRef = useRef<Perf>({ frames: 0 });
   const bump = (p: Partial<Perf>) => {
@@ -194,13 +208,49 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     cv.style.width = cssW + "px"; cv.style.height = H + "px";
     const ctx = cv.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const S = styleForDisplay(resolveStyle(data.display?.style), display);
+    const S = withBackground(styleForDisplay(resolveStyle(data.display?.style), display), display.whiteBackground);
     const r = draw(ctx, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, Math.max(0, view.scrollX)) },
       cssW, paletteOf(S), { gap: gapPx, pctLabels: gapMode === "pct", style: S, colors: display.colors ?? data.display?.colors });
     const mem = (performance as any).memory;
     bump({ drawMs: r.ms, cellsDrawn: r.cellsDrawn, bucketsDrawn: r.bucketsDrawn, frames: perfRef.current.frames + 1, heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : undefined });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, visible, view, cssW, maxScroll, gapPx, gapMode, display.colorByType, display.colors]);
+
+  // ---- minimap: the whole figure at two pixels a row, with the viewport on it -----
+  const MINI_ROW = 3;
+  useEffect(() => {
+    const cv = miniRef.current; if (!cv || !data || !visible || !showMini) return;
+    const dpr = window.devicePixelRatio || 1;
+    const H = data.tracks.length * MINI_ROW + 2;
+    cv.width = Math.round(cssW * dpr); cv.height = Math.round(H * dpr);
+    cv.style.width = cssW + "px"; cv.style.height = H + "px";
+    const ctx = cv.getContext("2d")!;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const S = styleForDisplay(resolveStyle(data.display?.style), display);
+    // the same renderer at row height 3 and no gutter: an overview, not a second drawing
+    const saved = { ...GEOM };
+    Object.assign(GEOM, { rowH: MINI_ROW - 1, rowGap: 1, gutter: 0, header: 0 });
+    try {
+      draw(ctx, data, visible.order, visible.groups, { zoom: fitZoom(visible.groups, cssW, gapPx), scrollX: 0, whitespace: false },
+        cssW, paletteOf(S), { gap: gapPx, style: S, colors: display.colors ?? data.display?.colors });
+    } finally { Object.assign(GEOM, saved); }
+    // the viewport
+    const vw = virtualWidth(visible.groups, view.zoom, gapPx) || 1;
+    const x0 = cssW * Math.min(maxScroll, view.scrollX) / vw, w = Math.max(2, cssW * plotW / vw);
+    ctx.strokeStyle = "#1f2933"; ctx.lineWidth = 1;
+    ctx.strokeRect(x0 + 0.5, 0.5, Math.min(w, cssW - x0) - 1, H - 1);
+    ctx.fillStyle = "rgba(31,41,51,0.10)";
+    ctx.fillRect(0, 0, x0, H); ctx.fillRect(x0 + w, 0, cssW - x0 - w, H);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, visible, view, cssW, gapPx, showMini, display]);
+
+  const miniScroll = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!visible) return;
+    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
+    const frac = (e.clientX - rect.left) / Math.max(1, rect.width);
+    const vw = virtualWidth(visible.groups, view.zoom, gapPx);
+    setView((v) => ({ ...v, scrollX: Math.max(0, Math.min(maxScroll, frac * vw - plotW / 2)) }));
+  };
 
   // ---- interactions ---------------------------------------------------------
   const zoomAt = (factor: number, px?: number) => setView((v) => {
@@ -352,6 +402,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           <label className="meta"><input type="checkbox" checked={display.showUnaltered} disabled={busy} onChange={(e) => set({ showUnaltered: e.target.checked })} /> show unaltered</label>
           <label className="meta"><input type="checkbox" checked={display.whitespace} disabled={busy} onChange={(e) => set({ whitespace: e.target.checked })} /> whitespace</label>
           <label className="meta" title="colour each mutation class separately, or draw them all as one"><input type="checkbox" checked={display.colorByType} disabled={busy} onChange={(e) => set({ colorByType: e.target.checked })} /> colour by type</label>
+          <label className="meta" title="white instead of grey for unaltered cells — for print; profiled and unprofiled then look alike, apart from the stripe">
+            <input type="checkbox" checked={!!display.whiteBackground} disabled={busy} onChange={(e) => set({ whiteBackground: e.target.checked || undefined })} /> white background</label>
           <label className="meta">sort <select value={sortKeys[0] || ""} disabled={busy}
             onChange={(e) => onSortKeys(e.target.value ? [e.target.value, ...sortKeys.slice(1)].slice(0, 4) : sortKeys.slice(1))} style={{ fontSize: "0.78rem" }}>
             <option value="">engine order ({data.conventions.sort.join(", ")})</option>
@@ -380,8 +432,10 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           <button className="linklike" onClick={() => zoomAt(1.4)} title="zoom in">+</button>
           <span className="meta" style={{ minWidth: 84 }}>{view.zoom >= 1 ? view.zoom.toFixed(1) + " px/col" : (1 / view.zoom).toFixed(0) + " cols/px"}</span>
           <button className="linklike" onClick={() => setView((v) => ({ ...v, zoom: minZoom, scrollX: 0 }))}>fit</button>
+          <label className="meta" title="an overview of the whole figure, with the part you are looking at marked">
+            <input type="checkbox" checked={showMini} onChange={(e) => setShowMini(e.target.checked)} /> minimap</label>
           <details className="gearmenu">
-            <summary title="download this figure">{saving ? "…" : "download"}</summary>
+            <summary className="textual" title="download this figure">{saving ? "saving…" : "download"}</summary>
             <div className="gearmenu-items">
               <button className="linklike" onClick={() => download("png")}>PNG — the whole figure at 4000px</button>
               <button className="linklike" onClick={() => download("svg")}>SVG — re-rendered on the server from this spec</button>
@@ -470,7 +524,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             </div>
           )}
         </div>
-        <Legend data={data} colorByType={display.colorByType} colors={display.colors ?? data.display?.colors} />
+        {showMini && (
+          <canvas ref={miniRef} onMouseDown={miniScroll} onMouseMove={(e) => { if (e.buttons === 1) miniScroll(e); }}
+            style={{ display: "block", marginTop: "0.35rem", border: "1px solid var(--line)", borderRadius: 4, cursor: "col-resize", background: "#fff" }} />
+        )}
+        <Legend data={data} colorByType={display.colorByType} colors={display.colors ?? data.display?.colors} white={display.whiteBackground} />
         {props.footer}
         {props.timings && (
           <details style={{ marginTop: "0.5rem" }} open>
@@ -489,7 +547,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   );
 }
 
-function Legend({ data, colorByType, colors }: { data: UnpackedContract; colorByType: boolean; colors?: Record<string, Record<string, string>> }) {
+function Legend({ data, colorByType, colors, white }: { data: UnpackedContract; colorByType: boolean; colors?: Record<string, Record<string, string>>; white?: boolean }) {
   const S = styleForDisplay(resolveStyle(data.display?.style), { colorByType });
   const P = paletteOf(S);
   let bitsPresent = 0;
@@ -504,6 +562,7 @@ function Legend({ data, colorByType, colors }: { data: UnpackedContract; colorBy
         : sw(it.color)}{it.label}</span>)}
       {data.tracks.some((t) => t.kind === "derivedEvent") && <span>{sw(P.derived)}Derived event</span>}
       <span>{S.glyph.driverNote} · % = driver / any</span>
+      {white && <span className="mark">white background: unaltered and not-profiled differ only by the stripe</span>}
       {data.stats.hiddenVus != null && <span className="mark">{data.stats.hiddenVus.toLocaleString()} alterations of unknown significance hidden — the percentages are over drivers alone</span>}
       {data.display?.annotate === "none" && <span className="mark">driver annotation off: nothing is called a driver</span>}
       {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (

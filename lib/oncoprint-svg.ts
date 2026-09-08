@@ -22,7 +22,10 @@ function wrap(text: string, perLine: number): string[] {
 
 export function contractToSvg(contract: Contract, width = 1200, style?: Style): string {
   // the figure's own style: an override travels in the contract, so callers need pass nothing
-  const S = styleForDisplay(style ?? resolveStyle(contract.display?.style), contract.display);
+  const S0 = styleForDisplay(style ?? resolveStyle(contract.display?.style), contract.display);
+  const S = contract.display?.whiteBackground
+    ? { ...S0, palette: { ...S0.palette, unaltered: "#ffffff" }, glyph: { ...S0.glyph, notProfiled: { ...S0.glyph.notProfiled, fill: "#ffffff" } } }
+    : S0;
   const colors = contract.display?.colors;
   const P = S.palette, G = S.geometry;
   const { rowH: ROW_H, rowGap: ROW_GAP, gutter: GUTTER, groupGap: GROUP_GAP, header: HEADER_H } = G;

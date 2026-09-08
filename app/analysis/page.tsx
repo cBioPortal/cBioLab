@@ -901,7 +901,7 @@ export default function AnalysisPage() {
   /** viewing options as the figure wants them, defaulted from the document */
   const figureDisplay = (v: any): FigureDisplay => ({ ...DEFAULT_FIGURE_DISPLAY, ...(v.display || {}) });
   /** which display keys the figure owns, and therefore writes back without a re-run */
-  const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colors"]);
+  const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colors", "whiteBackground"]);
   const setViewDisplay = (vi: number, d: FigureDisplay) => updateViewLocal(vi, v => {
     // keep the document tidy: only options that differ from the default are written down
     const display: any = { ...(v.display || {}) };
@@ -2510,7 +2510,7 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
   };
   return (
     <details className="gearmenu">
-      <summary title="add or remove tracks">tracks {chosen.length ? "(" + chosen.length + ")" : ""}</summary>
+      <summary className="textual" title="add or remove tracks">tracks {chosen.length ? "(" + chosen.length + ")" : ""}</summary>
       <div className="gearmenu-items wide" style={{ minWidth: 340 }}>
         <div className="row" style={{ gap: "0.5rem", alignItems: "center" }}>
           <button className="linklike" style={{ fontWeight: tab === "clinical" ? 600 : 400 }} onClick={() => setTab("clinical")}>Clinical {attrs.length ? "(" + attrs.length + ")" : ""}</button>

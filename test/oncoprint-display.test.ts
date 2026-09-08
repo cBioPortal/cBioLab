@@ -6,9 +6,9 @@ import assert from "node:assert/strict";
 import { normalizeDisplay, normalizeSort } from "../lib/oncoprint-assemble.ts";
 
 test("display defaults", () => {
-  assert.deepEqual(normalizeDisplay(undefined), { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb" });
+  assert.deepEqual(normalizeDisplay(undefined), { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false });
   assert.deepEqual(normalizeDisplay({ showUnaltered: false, gaps: "pct" }),
-    { showUnaltered: false, whitespace: true, gaps: "pct", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb" });
+    { showUnaltered: false, whitespace: true, gaps: "pct", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false });
   assert.equal(normalizeDisplay({ annotate: "none" }).annotate, "none");
   assert.throws(() => normalizeDisplay({ annotate: "hotspots" } as never), /annotate.*oncokb, none/);
 });

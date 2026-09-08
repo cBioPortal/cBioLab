@@ -14,7 +14,7 @@ from typing import Any, Iterable
 import numpy as np
 
 DEFAULT_DISPLAY: dict[str, Any] = {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all",
-                                   "colorByType": True, "hideVUS": False, "annotate": "oncokb"}
+                                   "colorByType": True, "hideVUS": False, "annotate": "oncokb", "whiteBackground": False}
 BITS = {"MISSENSE": 1, "TRUNCATING": 2, "INFRAME": 4, "SPLICE": 8, "OTHER_MUT": 16, "SV": 32, "AMP": 64, "HOMDEL": 128, "DRIVER": 256}
 NOT_PROFILED = -1
 _MAGIC = 0x4F504231  # "OPB1"

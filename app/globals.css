@@ -679,3 +679,6 @@ details.gearmenu.inline[open] > summary {
 .readme p, .readme li { font-size: 0.82rem; max-width: 74ch; }
 .readme code { font-size: 0.78rem; }
 .readme pre { margin: 0.4rem 0; }
+
+/* a gear menu whose summary is a word rather than the ⚙ glyph */
+details.gearmenu > summary.textual { font-size: 0.78rem; color: var(--accent-ink); text-decoration: underline; }

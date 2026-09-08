@@ -45,7 +45,7 @@ export function normalizeSort(sort: SortKeySpec[] | undefined): { track: string;
   });
 }
 
-const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "hideVUS", "annotate", "style", "colors"] as const;
+const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "hideVUS", "annotate", "whiteBackground", "style", "colors"] as const;
 const GAP_MODES = ["none", "gaps", "pct"] as const;
 const LEGEND_MODES = ["all", "none"] as const;
 const ANNOTATE_MODES = ["oncokb", "none"] as const;
@@ -56,7 +56,7 @@ export function normalizeDisplay(d: DisplaySpec | undefined): ResolvedDisplay {
   for (const k of Object.keys(src))
     if (!(DISPLAY_KEYS as readonly string[]).includes(k))
       throw new Error("display: unknown option '" + k + "' (accepted: " + DISPLAY_KEYS.join(", ") + ")");
-  const bool = (k: "showUnaltered" | "whitespace" | "colorByType" | "hideVUS", dflt: boolean): boolean => {
+  const bool = (k: "showUnaltered" | "whitespace" | "colorByType" | "hideVUS" | "whiteBackground", dflt: boolean): boolean => {
     const v = src[k];
     if (v === undefined) return dflt;
     if (typeof v !== "boolean") throw new Error("display." + k + " must be true or false");
@@ -87,6 +87,7 @@ export function normalizeDisplay(d: DisplaySpec | undefined): ResolvedDisplay {
     colorByType: bool("colorByType", true),
     hideVUS: bool("hideVUS", false),
     annotate: oneOf("annotate", ANNOTATE_MODES, "oncokb"),
+    whiteBackground: bool("whiteBackground", false),
     ...(src.style !== undefined ? { style: src.style as Record<string, unknown> } : {}),
     ...(colors !== undefined ? { colors } : {})
   };
@@ -455,7 +456,7 @@ export function assembleContract(input: AssembleInput): Contract {
         : "one patient; a patient's samples are collapsed (clinical: patient rows win, else one sample's value; heatmap: mean across samples; VAF: max)",
       annotation: input.annotationSource, lineGap,
       sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track) },
-    display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb" },
+    display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false },
     stats: { nColumns: columns.length, ms: Date.now() - t0, ...(input.display?.hideVUS ? { hiddenVus } : {}) }
   };
 }

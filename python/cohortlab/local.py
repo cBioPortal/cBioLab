@@ -104,7 +104,7 @@ def parse_sort(spec: str | list[str] | None) -> list[dict[str, str]]:
     return [{"track": s[1:], "dir": "desc"} if s.startswith("-") else {"track": s, "dir": "asc"} for s in items]
 
 
-DISPLAY_KEYS = ("showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "hideVUS", "annotate", "style", "colors")
+DISPLAY_KEYS = ("showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "hideVUS", "annotate", "whiteBackground", "style", "colors")
 _GAP_MODES = ("none", "gaps", "pct")
 _LEGEND_MODES = ("all", "none")
 _ANNOTATE_MODES = ("oncokb", "none")
@@ -151,6 +151,7 @@ def normalize_display(d: dict[str, Any] | None) -> dict[str, Any]:
         "colorByType": boolean("colorByType", True),
         "hideVUS": boolean("hideVUS", False),
         "annotate": one_of("annotate", _ANNOTATE_MODES, "oncokb"),
+        "whiteBackground": boolean("whiteBackground", False),
     }
     if src.get("style") is not None:
         out["style"] = src["style"]
