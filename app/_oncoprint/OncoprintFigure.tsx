@@ -11,12 +11,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, hitTest, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Hit, type View, type VisibleGroup } from "./canvas.ts";
-import { geneLegend, resolveStyle } from "../../lib/oncoprint-style.ts";
+import { geneLegendFor, resolveStyle, styleForDisplay } from "../../lib/oncoprint-style.ts";
 
 const MAX_ZOOM = 24;
 
-export interface FigureDisplay { showUnaltered: boolean; whitespace: boolean; gaps: "none" | "gaps" | "pct" }
-export const DEFAULT_FIGURE_DISPLAY: FigureDisplay = { showUnaltered: true, whitespace: true, gaps: "none" };
+/**
+ * The viewing options the BROWSER can apply to a decoded contract: they change the picture,
+ * never a number, so they never need a refetch. Options that change numbers — hideVUS,
+ * annotate — live in the spec and are the page's business.
+ */
+export interface FigureDisplay { showUnaltered: boolean; whitespace: boolean; gaps: "none" | "gaps" | "pct"; colorByType: boolean }
+export const DEFAULT_FIGURE_DISPLAY: FigureDisplay = { showUnaltered: true, whitespace: true, gaps: "none", colorByType: true };
 
 export interface Perf { fetchMs?: number; bytes?: number; engineMs?: number; packMs?: number; decodeMs?: number; drawMs?: number;
   cellsDrawn?: number; bucketsDrawn?: number; sortMs?: number; hideMs?: number; gapMs?: number; frames: number; heapMB?: number;
@@ -168,7 +173,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     cv.style.width = cssW + "px"; cv.style.height = H + "px";
     const ctx = cv.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const S = resolveStyle(data.display?.style);
+    const S = styleForDisplay(resolveStyle(data.display?.style), display);
     const r = draw(ctx, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, Math.max(0, view.scrollX)) },
       cssW, paletteOf(S), { gap: gapPx, pctLabels: gapMode === "pct", style: S });
     const mem = (performance as any).memory;
@@ -298,6 +303,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           {props.controls}
           <label className="meta"><input type="checkbox" checked={display.showUnaltered} disabled={busy} onChange={(e) => set({ showUnaltered: e.target.checked })} /> show unaltered</label>
           <label className="meta"><input type="checkbox" checked={display.whitespace} disabled={busy} onChange={(e) => set({ whitespace: e.target.checked })} /> whitespace</label>
+          <label className="meta" title="colour each mutation class separately, or draw them all as one"><input type="checkbox" checked={display.colorByType} disabled={busy} onChange={(e) => set({ colorByType: e.target.checked })} /> colour by type</label>
           <label className="meta">sort <select value={sortKey} disabled={busy} onChange={(e) => onSortKey(e.target.value)} style={{ fontSize: "0.78rem" }}>
             <option value="">engine order ({data.conventions.sort.join(", ")})</option>
             <option value="genomic">genomic staircase</option>
@@ -343,7 +349,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             </div>
           )}
         </div>
-        <Legend data={data} />
+        <Legend data={data} colorByType={display.colorByType} />
         {props.footer}
         {props.timings && (
           <details style={{ marginTop: "0.5rem" }} open>
@@ -362,18 +368,24 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   );
 }
 
-function Legend({ data }: { data: UnpackedContract }) {
-  const S = resolveStyle(data.display?.style);
+function Legend({ data, colorByType }: { data: UnpackedContract; colorByType: boolean }) {
+  const S = styleForDisplay(resolveStyle(data.display?.style), { colorByType });
   const P = paletteOf(S);
+  let bitsPresent = 0;
+  for (const t of data.tracks) if (t.kind === "gene") for (let i = 0; i < t.cells.length; i++) if (t.cells[i] > 0) bitsPresent |= t.cells[i];
   const sw = (c: string, w = 10) => <span style={{ display: "inline-block", width: w, height: 10, background: c, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />;
   const np = <span style={{ display: "inline-block", width: 10, height: 10, background: `linear-gradient(${P.np} 45%, ${P.npStripe} 45%, ${P.npStripe} 55%, ${P.np} 55%)`, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />;
   const colors = data.display?.colors;
   if (data.display?.clinicalLegends === "none") return null;
   return (
     <div className="meta" style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem 0.9rem", marginTop: "0.4rem" }}>
-      {geneLegend(S).map((it) => <span key={it.label}>{it.kind === "notProfiled" ? np : sw(it.color)}{it.label}</span>)}
+      {geneLegendFor(bitsPresent, S).map((it) => <span key={it.label}>{it.kind === "notProfiled" ? np
+        : it.kind === "outline" ? <span style={{ display: "inline-block", width: 10, height: 10, border: "2px solid " + it.color, background: P.unaltered, marginRight: 4, verticalAlign: -1, borderRadius: 2, boxSizing: "border-box" }} />
+        : sw(it.color)}{it.label}</span>)}
       {data.tracks.some((t) => t.kind === "derivedEvent") && <span>{sw(P.derived)}Derived event</span>}
       <span>{S.glyph.driverNote} · % = driver / any</span>
+      {data.stats.hiddenVus != null && <span className="mark">{data.stats.hiddenVus.toLocaleString()} alterations of unknown significance hidden — the percentages are over drivers alone</span>}
+      {data.display?.annotate === "none" && <span className="mark">driver annotation off: nothing is called a driver</span>}
       {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (
         <span key={t.label}>{t.label}: {t.numeric
           ? <>{sw(t.center != null ? "linear-gradient(90deg,#2166ac,#fff,#b2182b)" : "linear-gradient(90deg,#deebf7,#084887)", 44)}{t.min} → {t.max}</>

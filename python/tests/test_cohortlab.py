@@ -156,7 +156,7 @@ class StyleOverrides(unittest.TestCase):
 
     def test_display_validation_matches_typescript(self):
         from cohortlab import normalize_display
-        self.assertEqual(normalize_display(None), {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all"})
+        self.assertEqual(normalize_display(None), {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all", "colorByType": True, "hideVUS": False, "annotate": "oncokb"})
         with self.assertRaisesRegex(ValueError, "unknown option 'showUnalterd'"):
             normalize_display({"showUnalterd": True})
         with self.assertRaisesRegex(ValueError, "is not one of none, gaps, pct"):

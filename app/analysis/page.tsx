@@ -849,6 +849,15 @@ export default function AnalysisPage() {
     return { ...v, sort: [key] };
   });
 
+  /** set or clear one display option on a view, keeping the document free of defaults */
+  const setDisplayKey = (v: any, key: string, value: unknown) => {
+    const display: any = { ...(v.display || {}) };
+    if (value === undefined) delete display[key]; else display[key] = value;
+    const next = { ...v };
+    if (Object.keys(display).length) next.display = display; else delete next.display;
+    return next;
+  };
+
   /** viewing options as the figure wants them, defaulted from the document */
   const figureDisplay = (v: any): FigureDisplay => ({ ...DEFAULT_FIGURE_DISPLAY, ...(v.display || {}) });
   const setViewDisplay = (vi: number, d: FigureDisplay) => updateViewLocal(vi, v => {
@@ -2325,6 +2334,15 @@ export default function AnalysisPage() {
                         {c && <span className="lat" title="Server-side wall-clock for this figure's queries and contract assembly; drawing happens in your browser.">{(c.stats.ms || 0).toLocaleString()}ms</span>}</>}
                       controls={<>
                         <Participation p={v.participation} />
+                        <label className="meta" title="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
+                          <input type="checkbox" checked={!!(ocView(vi).display as any)?.hideVUS} disabled={busy}
+                            onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "hideVUS", e.target.checked || undefined))} /> drivers only</label>
+                        <label className="meta" title="driver calls come from the version-pinned OncoKB store">annotate <select
+                          value={(ocView(vi).display as any)?.annotate || "oncokb"} disabled={busy}
+                          onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "annotate", e.target.value === "none" ? "none" : undefined))}
+                          style={{ fontSize: "0.78rem" }}>
+                          <option value="oncokb">OncoKB</option><option value="none">none</option>
+                        </select></label>
                         <label className="meta" title="a cohort selects patients; sample mode draws every sample of those patients">columns <select
                           value={ocView(vi).unit || "patient"} disabled={busy}
                           onChange={(e) => updateView(vi, (vv: any) => { const n = { ...vv }; if (e.target.value === "sample") n.unit = "sample"; else delete n.unit; return n; })}

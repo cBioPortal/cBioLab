@@ -188,3 +188,17 @@ def track_category_color(track: Any, code: int, S: dict[str, Any] = STYLE, color
         if override:
             return override
     return category_color(code, S)
+
+
+def style_for_display(S: dict[str, Any], display: dict[str, Any] | None) -> dict[str, Any]:
+    """The style a figure draws with, given its viewing options (port of styleForDisplay)."""
+    if not display or display.get("colorByType") is not False:
+        return S
+    one = S["glyph"]["mutation"]["single"]
+    out = dict(S)
+    glyph = dict(S["glyph"])
+    mut = dict(glyph["mutation"])
+    mut["priority"] = [{**m, "color": one["color"], "vus": one["vus"], "label": one["label"]} for m in mut["priority"]]
+    glyph["mutation"] = mut
+    out["glyph"] = glyph
+    return out

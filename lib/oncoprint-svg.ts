@@ -2,7 +2,7 @@
 // Zero data logic and zero style of its own: cells come from the contract, level of detail
 // from lib/oncoprint-lod.ts, every colour, band and label from lib/oncoprint-style.ts.
 import type { Contract, Track } from "./types.ts";
-import { STYLE, cellLayers, numericColor, trackCategoryColor, formatGutterPct, truncateLabel, geneLegendFor, resolveStyle, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
+import { STYLE, cellLayers, numericColor, trackCategoryColor, formatGutterPct, truncateLabel, geneLegendFor, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
 import { aggregate, bucketEdges } from "./oncoprint-lod.ts";
 
 const esc = (s: unknown): string => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -22,7 +22,7 @@ function wrap(text: string, perLine: number): string[] {
 
 export function contractToSvg(contract: Contract, width = 1200, style?: Style): string {
   // the figure's own style: an override travels in the contract, so callers need pass nothing
-  const S = style ?? resolveStyle(contract.display?.style);
+  const S = styleForDisplay(style ?? resolveStyle(contract.display?.style), contract.display);
   const colors = contract.display?.colors;
   const P = S.palette, G = S.geometry;
   const { rowH: ROW_H, rowGap: ROW_GAP, gutter: GUTTER, groupGap: GROUP_GAP, header: HEADER_H } = G;
@@ -110,7 +110,10 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style): 
   }
   ly -= 16;
   const partial = contract.tracks.some((t) => t.kind === "gene" && t.profiled != null && t.profiled > 0 && t.profiled < contract.columns.length);
-  const caption = S.glyph.driverNote + "; gene %: driver / any" + (partial ? "; " + PARTIAL_PROFILE_NOTE : "") +
+  const hidden = contract.stats.hiddenVus;
+  const caption = S.glyph.driverNote + "; gene %: driver / any" +
+    (hidden != null ? "; " + hidden.toLocaleString("en-US") + " alterations of unknown significance are hidden and are not in the %" : "") +
+    (contract.display?.annotate === "none" ? "; no driver calls were made" : "") + (partial ? "; " + PARTIAL_PROFILE_NOTE : "") +
     " — annotation: " + (contract.conventions ? contract.conventions.annotation || "none" : "none");
   // wrap rather than run off the edge: annotation notes name every unsynced study and get long
   const perLine = Math.max(20, Math.floor((width - GUTTER - 8) / 6.2));

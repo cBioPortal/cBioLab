@@ -160,7 +160,12 @@
           "vus": "#c9b3de",
           "label": "Other Mutation"
         }
-      ]
+      ],
+      "single": {
+        "color": "#008000",
+        "vus": "#53d400",
+        "label": "Mutation"
+      }
     },
     "vusStyle": "pair",
     "vusAlpha": 0.35,

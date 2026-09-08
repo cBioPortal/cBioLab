@@ -50,7 +50,9 @@ export const STYLE = {
       { bit: "PROMOTER", color: "#00b7ce", vus: "#8cedf9", label: "Promoter Mutation" },
       { bit: "MISSENSE", color: "#2e7d32", vus: "#8bc98e", label: "Missense Mutation" },
       { bit: "OTHER_MUT", color: "#9467bd", vus: "#c9b3de", label: "Other Mutation" }
-    ] },
+    ],
+    /** one colour for every class, used when a figure turns colour-by-type off */
+    single: { color: "#008000", vus: "#53d400", label: "Mutation" } },
     /** how a cell with no DRIVER bit is drawn: "pair" uses each entry's `vus` colour, "fade" its alpha */
     vusStyle: "pair",
     vusAlpha: 0.35,
@@ -161,7 +163,10 @@ export function geneLegendFor(bitsPresent: number, S: Style = STYLE): ReturnType
     for (const o of S.glyph.protein.options) if (o.label === label) return B[o.bit];
     return 0;
   };
-  return geneLegend(S).filter((it) => it.kind === "notProfiled" || (bitsPresent & bitOf(it.label)) !== 0);
+  const kept = geneLegend(S).filter((it) => it.kind === "notProfiled" || (bitsPresent & bitOf(it.label)) !== 0);
+  // colour-by-type off collapses every mutation class to one label; show it once
+  const seen = new Set<string>();
+  return kept.filter((it) => (seen.has(it.label) ? false : (seen.add(it.label), true)));
 }
 
 // ---- user overrides ---------------------------------------------------------
@@ -232,4 +237,18 @@ export function trackCategoryColor(track: { label: string; categories?: string[]
   const value = track.categories && track.categories[code];
   const override = value != null && colors && colors[track.label] ? colors[track.label][value] : undefined;
   return override || categoryColor(code, S);
+}
+
+
+/**
+ * The style a figure draws with, given its viewing options. Colour-by-type is a style question
+ * — it changes no number — so it is applied here rather than threaded through every renderer:
+ * with it off, every mutation class takes the single colour and the legend collapses to one
+ * entry, exactly as the portal does.
+ */
+export function styleForDisplay(S: Style, display?: { colorByType?: boolean }): Style {
+  if (display?.colorByType !== false) return S;
+  const one = S.glyph.mutation.single;
+  return { ...S, glyph: { ...S.glyph, mutation: { ...S.glyph.mutation,
+    priority: S.glyph.mutation.priority.map((m) => ({ ...m, color: one.color, vus: one.vus, label: one.label })) } } };
 }

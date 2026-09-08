@@ -15,7 +15,7 @@ const contract = (cells: number[][]): Contract => ({
     { kind: "clinical", label: "TYPE", categories: ["x", "y"], cells: cells[2] }
   ],
   conventions: { cna: "c", notProfiled: "n", frequencyDenominator: "profiled", annotation: "OncoKB", lineGap: 90, sort: ["genomic"] },
-  display: { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all" },
+  display: { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb" as const },
   stats: { nColumns: 3, ms: 1 }
 });
 

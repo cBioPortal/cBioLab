@@ -338,7 +338,11 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
     for (const r of e.rows) events.push({ pid: pref + (r[0] as string), gene: r[1] as string, vt: r[2] as string, mt: r[3] as string, mv: r[4] as string, cna: r[5] as string });
     for (const r of c.rows) coverage.push({ pid: pref + (r[0] as string), mask: Number(r[1]) });
   }
-  const annotation = await buildAnnotationIndex(events as Parameters<typeof buildAnnotationIndex>[0], genes, multi ? studies : study);
+  // "annotate: none" is a deliberate choice to draw without driver calls; say so rather than
+  // letting the figure look as though nothing was annotated
+  const annotation = display.annotate === "none"
+    ? { isDriver: () => false, source: "none — driver annotation turned off for this figure" }
+    : await buildAnnotationIndex(events as Parameters<typeof buildAnnotationIndex>[0], genes, multi ? studies : study);
 
   // ---- clinical values per attribute -------------------------------------
   const clinicalIn: AssembleInput["clinical"] = [];

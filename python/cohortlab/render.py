@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 
 from .contract import Contract, Track
-from .style import STYLE, cell_layers, format_gutter_pct, gene_legend, numeric_rgb, resolve_style, track_category_color, truncate_label
+from .style import STYLE, cell_layers, format_gutter_pct, gene_legend, numeric_rgb, resolve_style, style_for_display, track_category_color, truncate_label
 
 _G = STYLE["geometry"]
 ROW_H, ROW_GAP, GROUP_GAP = _G["rowH"], _G["rowGap"], _G["groupGap"]
@@ -70,7 +70,7 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
 
     The figure's own style travels in the contract (`display.style`), so callers pass nothing.
     """
-    S = style or resolve_style((c.display or {}).get("style"))
+    S = style_for_display(style or resolve_style((c.display or {}).get("style")), c.display)
     colors = (c.display or {}).get("colors")
     P = S["palette"]
     paper, unaltered, derived = _rgb(P["paper"]), _rgb(P["unaltered"]), _rgb(P["derived"])
@@ -125,7 +125,7 @@ def figure(c: Contract, width: int = 1200, gutter: int | None = None, dpi: int =
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
 
-    S = style or resolve_style((c.display or {}).get("style"))
+    S = style_for_display(style or resolve_style((c.display or {}).get("style")), c.display)
     gutter = S["geometry"]["gutter"] if gutter is None else gutter
     P = S["palette"]
     img, extents = raster(c, width=width, gutter=gutter, style=S)

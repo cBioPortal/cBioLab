@@ -182,12 +182,22 @@ export interface DisplaySpec {
   gaps?: "none" | "gaps" | "pct";
   /** category keys under the figure (default "all") */
   clinicalLegends?: "all" | "none";
+  /** colour each mutation class separately (default true); off draws them all as one */
+  colorByType?: boolean;
+  /**
+   * Drop alterations the annotation source does not call drivers (default false). This changes
+   * the NUMBERS, not only the picture: the hidden alterations leave the altered fraction too,
+   * which is why it lives in the spec and the contract reports how many went.
+   */
+  hideVUS?: boolean;
+  /** driver calls: the pinned OncoKB store, or none at all (default "oncokb") */
+  annotate?: "oncokb" | "none";
   /** partial override of lib/oncoprint-style.ts (Phase 1b) */
   style?: Record<string, unknown>;
   /** per-track, per-category colours: {trackLabel: {value: "#rrggbb"}} (Phase 1b) */
   colors?: Record<string, Record<string, string>>;
 }
-export type ResolvedDisplay = Required<Pick<DisplaySpec, "showUnaltered" | "whitespace" | "gaps" | "clinicalLegends">>
+export type ResolvedDisplay = Required<Pick<DisplaySpec, "showUnaltered" | "whitespace" | "gaps" | "clinicalLegends" | "colorByType" | "hideVUS" | "annotate">>
   & Pick<DisplaySpec, "style" | "colors">;
 export interface OncoprintView {
   kind: "oncoprint"; genes: string[]; cohorts?: string[];
@@ -476,7 +486,9 @@ export interface Contract {
   /** resolved viewing options — renderers read these, never their own defaults */
   display: ResolvedDisplay;
   /** ms: total; queryMs: fetching rows; assembleMs: turning them into this contract */
-  stats: { nColumns: number; ms: number; queryMs?: number; assembleMs?: number };
+  stats: { nColumns: number; ms: number; queryMs?: number; assembleMs?: number;
+    /** cells whose only alterations were of unknown significance, dropped by display.hideVUS */
+    hiddenVus?: number };
   /** the SQL this contract was built from, when the caller asked for provenance */
   queries?: { label: string; sql: string; ms?: number; study?: string }[];
   /** set by the MCP app's display-resolution downsampler */
