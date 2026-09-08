@@ -124,7 +124,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   }, [data]);
 
   // gaps follow the primary sort key, and only when it is categorical (runs are contiguous only then)
-  const primaryKey = data ? ((sortKeys[0] || data.conventions.sort[0] || "genomic")).replace(/^-/, "") : "";
+  const primaryKey = data ? (((sortKeys[0] || "").startsWith("cluster:") ? data.conventions.sort[0] : sortKeys[0]) || data.conventions.sort[0] || "genomic").replace(/^-/, "") : "";
   const gapTrack = data ? data.tracks.find((t) => t.label === primaryKey && t.categories && t.categories.length) : undefined;
   const gapMode = gapTrack ? display.gaps : "none";
   const gapPx = gapMode === "none" ? GEOM.groupGap : gapMode === "pct" ? 40 : 8;
@@ -149,7 +149,10 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       order = new Uint32Array(keep); groups = ng;
       bump({ hideMs: performance.now() - t0 });
     }
-    if (sortKeys.length) {
+    // A clustering is computed in the engine from values the browser never receives, so a
+    // figure sorted that way keeps the order it was given rather than trying to redo it.
+    const engineSorted = sortKeys.some((k) => k.replace(/^-/, "").startsWith("cluster:"));
+    if (sortKeys.length && !engineSorted) {
       const t0 = performance.now();
       order = sortColumns(data, order, groups, sortKeys.map((k) => k.startsWith("-")
         ? { track: k.slice(1), dir: "desc" as const } : { track: k, dir: "asc" as const }));
@@ -349,8 +352,13 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           <label className="meta">sort <select value={sortKeys[0] || ""} disabled={busy}
             onChange={(e) => onSortKeys(e.target.value ? [e.target.value, ...sortKeys.slice(1)].slice(0, 4) : sortKeys.slice(1))} style={{ fontSize: "0.78rem" }}>
             <option value="">engine order ({data.conventions.sort.join(", ")})</option>
+            {sortKeys[0]?.startsWith("cluster:") && !data.tracks.some((t) => t.profileType === sortKeys[0].slice(8)) &&
+              <option value={sortKeys[0]}>{sortKeys[0]}</option>}
             <option value="genomic">genomic staircase</option>
-            <option value="id">patient id</option>
+            <option value="id">{data.unit} id</option>
+            {[...new Set(data.tracks.filter((t) => t.kind === "heatmap" && t.profileType).map((t) => t.profileType!))].map((pt) => (
+              <option key={"cluster:" + pt} value={"cluster:" + pt}>cluster by {pt}</option>
+            ))}
             {data.tracks.filter((t) => t.kind !== "gene" && !/\(no data\)$/.test(t.label)).flatMap((t) => [
               <option key={t.label} value={t.label}>{t.label} ↑</option>,
               <option key={"-" + t.label} value={"-" + t.label}>{t.label} ↓</option>])}
