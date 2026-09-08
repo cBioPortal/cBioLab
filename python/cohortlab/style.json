@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "bits": {
+    "MISSENSE": 1,
+    "TRUNCATING": 2,
+    "INFRAME": 4,
+    "SPLICE": 8,
+    "OTHER_MUT": 16,
+    "SV": 32,
+    "AMP": 64,
+    "HOMDEL": 128,
+    "DRIVER": 256
+  },
+  "palette": {
+    "paper": "#ffffff",
+    "unaltered": "#e8ecee",
+    "derived": "#0f86a1",
+    "text": "#1f2933",
+    "muted": "#5b6b76",
+    "groupLine": "#c9d2d8",
+    "categorical": [
+      "#0072B2",
+      "#E69F00",
+      "#009E73",
+      "#CC79A7",
+      "#D55E00",
+      "#56B4E9",
+      "#F0E442",
+      "#999999"
+    ]
+  },
+  "glyph": {
+    "cna": {
+      "band": [
+        0,
+        1
+      ],
+      "options": [
+        {
+          "bit": "AMP",
+          "color": "#e41a1c",
+          "label": "Amplification",
+          "order": 10
+        },
+        {
+          "bit": "HOMDEL",
+          "color": "#2166ac",
+          "label": "Deep Deletion",
+          "order": 12
+        }
+      ]
+    },
+    "sv": {
+      "band": [
+        0.15,
+        0.85
+      ],
+      "bit": "SV",
+      "color": "#8e24aa",
+      "label": "Structural Variant",
+      "order": 1
+    },
+    "mutation": {
+      "band": [
+        0.3,
+        0.7
+      ],
+      "order": 0,
+      "priority": [
+        {
+          "bit": "TRUNCATING",
+          "color": "#111111",
+          "label": "Truncating Mutation"
+        },
+        {
+          "bit": "SPLICE",
+          "color": "#ff8c00",
+          "label": "Splice Mutation"
+        },
+        {
+          "bit": "INFRAME",
+          "color": "#b8860b",
+          "label": "Inframe Mutation"
+        },
+        {
+          "bit": "MISSENSE",
+          "color": "#2e7d32",
+          "label": "Missense Mutation"
+        },
+        {
+          "bit": "OTHER_MUT",
+          "color": "#9467bd",
+          "label": "Other Mutation"
+        }
+      ]
+    },
+    "vusAlpha": 0.35,
+    "notProfiled": {
+      "fill": "#f4f6f7",
+      "stripe": {
+        "color": "#dfe4e7",
+        "band": [
+          0.45,
+          0.55
+        ]
+      },
+      "label": "Not profiled"
+    },
+    "unalteredLabel": "No alterations",
+    "driverNote": "solid = putative driver, faded = unknown significance"
+  },
+  "ramps": {
+    "sequential": {
+      "from": [
+        222,
+        235,
+        247
+      ],
+      "to": [
+        8,
+        72,
+        135
+      ]
+    },
+    "diverging": {
+      "low": [
+        33,
+        102,
+        172
+      ],
+      "mid": [
+        255,
+        255,
+        255
+      ],
+      "high": [
+        178,
+        24,
+        43
+      ]
+    }
+  },
+  "geometry": {
+    "rowH": 20,
+    "rowGap": 3,
+    "gutter": 168,
+    "groupGap": 10,
+    "header": 22,
+    "labelMaxChars": 17,
+    "cellPadMax": 3,
+    "padMinZoom": 3,
+    "padFraction": 0.3
+  },
+  "percent": {
+    "gutterDecimals": 1,
+    "runRule": "portal"
+  }
+}

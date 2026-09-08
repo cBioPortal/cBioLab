@@ -116,7 +116,37 @@ class Conformance(unittest.TestCase):
                 self.assertEqual(json.dumps(py, sort_keys=True), json.dumps(ts, sort_keys=True))
 
 
+class LevelOfDetailConformance(unittest.TestCase):
+    """Bucket codes must match lib/oncoprint-lod.ts at several widths, including the 400k-style case."""
+
+    @unittest.skipUnless(shutil.which("node"), "node not on PATH")
+    def test_bucket_codes_match_typescript(self):
+        from cohortlab.render import bucket_codes
+        op = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), os.path.join(FIX, "clinical.tsv"), os.path.join(FIX, "coverage.tsv"), group_by="CANCER_TYPE")
+        with tempfile.TemporaryDirectory() as d:
+            cpath = os.path.join(d, "c.json")
+            op.to_json(cpath)
+            for buckets in (1, 2, 3, 5, 12, 50):
+                with self.subTest(buckets=buckets):
+                    r = subprocess.run(["node", os.path.join(ROOT, "scripts", "oncoprint-cli.ts"), "--contract", cpath, "--lod", str(buckets)],
+                                       check=True, cwd=ROOT, capture_output=True, text=True)
+                    self.assertEqual(json.loads(r.stdout), bucket_codes(op.contract, buckets))
+
+
 class Raster(unittest.TestCase):
+    def test_golden_raster(self):
+        """The fixture's raster is pinned; set UPDATE_GOLDEN=1 to accept an intentional style change."""
+        from cohortlab.render import raster
+        op = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), os.path.join(FIX, "clinical.tsv"), os.path.join(FIX, "coverage.tsv"), group_by="CANCER_TYPE", sort="STAGE")
+        img, _ = raster(op.contract, width=600, gutter=0)
+        golden = os.path.join(FIX, "golden-raster.npz")
+        if os.environ.get("UPDATE_GOLDEN") or not os.path.exists(golden):
+            np.savez_compressed(golden, img=img)
+        want = np.load(golden)["img"]
+        self.assertEqual(img.shape, want.shape)
+        diff = int((img != want).any(axis=2).sum())
+        self.assertEqual(diff, 0, f"{diff} pixels differ from the golden raster")
+
     def test_level_of_detail_raster_is_bounded_by_pixels(self):
         from cohortlab.render import raster
         op = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), os.path.join(FIX, "clinical.tsv"))

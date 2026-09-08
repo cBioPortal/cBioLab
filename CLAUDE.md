@@ -28,11 +28,17 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   observability guard, priorGuard, derived treatment lines).
 - **`lib/analysis.ts`** — `runAnalysis(doc)`: evaluates cohorts (per-study; cross-study
   federation via study-qualified member ids), runs views (compare/survival/oncoprint).
-- **`lib/oncoprint.ts`** — spec → render contract (bitmask cells, NOT_PROFILED=-1, panel-aware
-  denominators, staircase + declarative `sort`, clinical tracks incl. numeric heat, `heatmap`
-  molecular tracks incl. synthetic `VAF`). Renderers are dumb: **`lib/oncoprint-svg.ts`**
-  (server SVG, used by the web app and `/provenance`), `mcp/apps/oncoprint-html.ts` (MCP App
-  iframe). **`lib/view-svg.ts`** — the same contract for every other view kind (survival,
+- **`lib/oncoprint.ts`** — spec → rows (ClickHouse fetch); **`lib/oncoprint-assemble.ts`** — rows →
+  render contract, pure (bitmask cells, NOT_PROFILED=-1, panel-aware denominators, staircase +
+  declarative `sort`, clinical tracks incl. numeric heat, `heatmap` molecular tracks incl. synthetic
+  `VAF`). `lib/oncoprint-local.ts` builds assembler input from Oncoprinter-style TSVs;
+  `lib/oncoprint-binary.ts` is the OPB1 wire format. Renderers are dumb and share
+  **`lib/oncoprint-style.ts`** (THE visual decisions: palette, glyph bands, mutation priority, legend,
+  `cellLayers`) and **`lib/oncoprint-lod.ts`** (level-of-detail bucketing): `lib/oncoprint-svg.ts`
+  (server SVG: web app, `/provenance`, CLI), `app/oncoprint-lab/canvas.ts` (browser canvas),
+  `mcp/apps/oncoprint-html.ts` (MCP App iframe, style embedded), `python/cohortlab` (numpy/matplotlib,
+  reads the generated `style.json`; `npm run style:gen`, drift fails `npm test`).
+  `scripts/oncoprint-cli.ts` and `python -m cohortlab` wrap all of this for local tables. **`lib/view-svg.ts`** — the same contract for every other view kind (survival,
   hotspots, compare, cooccurrence, coexpression, clinical); used by the in-app chat today and
   by MCP `run_analysis` for the oncoprint image.
 - **`lib/event-names.ts`** — **THE only place timeline event names are normalized.** Case-fold and
@@ -85,7 +91,11 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
    `lib/profile-names.ts`; never fork that logic.
 7. Methodology caveats (panel-aware denominators, left truncation, prior-treatment guard,
    `observed:true` on absence queries) are attached by the engine, not left to prose.
-8. **The patient-data boundary** (`docs/DATA-BOUNDARY.md`) — aggregate-only and remote
+8. **Renderers read `lib/oncoprint-style.ts`; they never define a colour, band, priority or legend
+   label of their own.** The Python port is pinned by conformance tests (contract JSON, bucket
+   codes) and golden snapshots (`test/fixtures/oncoprint/golden.svg`, `golden-raster.npz`;
+   `UPDATE_GOLDEN=1` to accept an intentional change).
+9. **The patient-data boundary** (`docs/DATA-BOUNDARY.md`) — aggregate-only and remote
    participants never emit or receive patient identifiers, and the guarantee is a *missing
    method* rather than a flag. Views degrade and say so rather than silently narrowing.
    Never add an id-returning path to `AggregateResolver` / `RemoteAggregateResolver`.

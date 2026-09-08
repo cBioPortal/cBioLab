@@ -9,17 +9,18 @@
 // hiding unaltered columns or re-sorting on the client never touches the data.
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 
-export const BITS = { MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16, SV: 32, AMP: 64, HOMDEL: 128, DRIVER: 256 };
-export const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#999999"];
+import { STYLE, cellLayers, numericColor as styleNumericColor, categoryColor, formatPct, formatGutterPct, truncateLabel } from "../../lib/oncoprint-style.ts";
+import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
+
+export const BITS = STYLE.bits;
+export const CAT_COLORS = STYLE.palette.categorical;
 export const PALETTE = {
-  paper: "#ffffff", unaltered: "#e8ecee", np: "#f4f6f7", npStripe: "#dfe4e7",
-  amp: "#e41a1c", homdel: "#2166ac", sv: "#8e24aa",
-  missense: "#2e7d32", truncating: "#111111", inframe: "#b8860b", splice: "#ff8c00", otherMut: "#9467bd",
-  derived: "#0f86a1", text: "#1f2933", muted: "#5b6b76", groupLine: "#c9d2d8"
+  paper: STYLE.palette.paper, unaltered: STYLE.palette.unaltered, np: STYLE.glyph.notProfiled.fill, npStripe: STYLE.glyph.notProfiled.stripe.color,
+  derived: STYLE.palette.derived, text: STYLE.palette.text, muted: STYLE.palette.muted, groupLine: STYLE.palette.groupLine
 };
 export type Palette = typeof PALETTE;
 
-export const GEOM = { header: 22, rowH: 20, rowGap: 3, gutter: 168, groupGap: 10 };
+export const GEOM = { header: STYLE.geometry.header, rowH: STYLE.geometry.rowH, rowGap: STYLE.geometry.rowGap, gutter: STYLE.geometry.gutter, groupGap: STYLE.geometry.groupGap };
 
 export interface VisibleGroup {
   name: string; start: number; count: number; patients: number;
@@ -44,11 +45,7 @@ export function fitZoom(groups: VisibleGroup[], plotW: number, gap: number = GEO
   return n ? Math.max(1e-6, (plotW - gaps) / n) : 1;
 }
 
-/** The portal's percent format: integer at 3 % and above, one decimal below, N/P when nothing is profiled. */
-export function formatPct(p: number | null): string {
-  if (p == null) return "N/P";
-  return (p < 3 ? Math.round(p * 10) / 10 : Math.round(p)) + "%";
-}
+export { formatPct };
 
 /**
  * Split each group into runs of one categorical track's value (the columns must already be
@@ -82,72 +79,27 @@ export function segmentByTrack(data: UnpackedContract, order: Uint32Array, group
 }
 export function canvasHeight(nTracks: number): number { return GEOM.header + nTracks * (GEOM.rowH + GEOM.rowGap); }
 
-function mutColor(code: number, P: Palette): string | null {
-  if (code & BITS.MISSENSE) return P.missense;
-  if (code & BITS.TRUNCATING) return P.truncating;
-  if (code & BITS.INFRAME) return P.inframe;
-  if (code & BITS.SPLICE) return P.splice;
-  if (code & BITS.OTHER_MUT) return P.otherMut;
-  return null;
-}
-function heat(v: number): string {
-  const t = Math.max(0, Math.min(1, v / 255)), mix = (a: number, b: number) => Math.round(a + (b - a) * t);
-  return "rgb(" + mix(222, 8) + "," + mix(235, 72) + "," + mix(247, 135) + ")";
-}
-function diverging(v: number, c: number): string {
-  const lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
-  if (v <= c) { const t = c ? v / c : 1; return "rgb(" + lerp(33, 255, t) + "," + lerp(102, 255, t) + "," + lerp(172, 255, t) + ")"; }
-  const t = (v - c) / (255 - c || 1);
-  return "rgb(" + lerp(255, 178, t) + "," + lerp(255, 24, t) + "," + lerp(255, 43, t) + ")";
-}
-export function numericColor(t: { center?: number | null }, v: number): string { return t.center != null ? diverging(v, t.center) : heat(v); }
+export function numericColor(t: { center?: number | null }, v: number): string { return styleNumericColor(v, t.center, STYLE); }
 
 type TrackLike = UnpackedContract["tracks"][number];
 
-/** Aggregate cells[order[k0..k1)] into one display code, per track kind. */
+/** Aggregate cells[order[k0..k1)] into one display code (shared level-of-detail rule). */
 export function aggregate(t: TrackLike, order: Uint32Array, k0: number, k1: number, scratch: Int32Array): number {
-  const cells = t.cells;
-  if (t.numeric) {
-    let sum = 0, n = 0;
-    for (let k = k0; k < k1; k++) { const c = cells[order[k]]; if (c !== -1) { sum += c; n++; } }
-    return n ? Math.round(sum / n) : -1;
-  }
-  if (t.kind === "clinical" && t.categories) {
-    const m = t.categories.length + 1; // + Other
-    for (let i = 0; i < m; i++) scratch[i] = 0;
-    let saw = false;
-    for (let k = k0; k < k1; k++) { const c = cells[order[k]]; if (c >= 0 && c < m) { scratch[c]++; saw = true; } }
-    if (!saw) return -1;
-    let best = 0; for (let i = 1; i < m; i++) if (scratch[i] > scratch[best]) best = i;
-    return best;
-  }
-  let code = -1;
-  for (let k = k0; k < k1; k++) { const c = cells[order[k]]; if (c === -1) continue; code = (code === -1 ? 0 : code) | (c > 0 ? c : 0); }
-  return code;
+  return lodAggregate(t, t.cells, order, k0, k1, scratch);
 }
 
 function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: number, y: number, w: number, h: number, P: Palette): void {
   if (t.kind === "gene") {
-    if (code === -1) {
-      ctx.fillStyle = P.np; ctx.fillRect(x, y, w, h);
-      ctx.fillStyle = P.npStripe; ctx.fillRect(x, y + h * 0.45, w, h * 0.1);
-      return;
+    for (const l of cellLayers(code, STYLE)) {
+      if (l.alpha < 1) ctx.globalAlpha = l.alpha;
+      ctx.fillStyle = l.color; ctx.fillRect(x, y + h * l.band[0], w, h * (l.band[1] - l.band[0]));
+      if (l.alpha < 1) ctx.globalAlpha = 1;
     }
-    ctx.fillStyle = P.unaltered; ctx.fillRect(x, y, w, h);
-    if (code <= 0) return;
-    const vus = !(code & BITS.DRIVER);
-    if (vus) ctx.globalAlpha = 0.35;
-    if (code & BITS.AMP) { ctx.fillStyle = P.amp; ctx.fillRect(x, y, w, h); }
-    else if (code & BITS.HOMDEL) { ctx.fillStyle = P.homdel; ctx.fillRect(x, y, w, h); }
-    if (code & BITS.SV) { ctx.fillStyle = P.sv; ctx.fillRect(x, y + h * 0.15, w, h * 0.7); }
-    const mc = mutColor(code, P);
-    if (mc) { ctx.fillStyle = mc; ctx.fillRect(x, y + h * 0.3, w, h * 0.4); }
-    if (vus) ctx.globalAlpha = 1;
     return;
   }
   if (t.kind === "derivedEvent") { ctx.fillStyle = code > 0 ? P.derived : P.unaltered; ctx.fillRect(x, y, w, h); return; }
   if (t.numeric) { ctx.fillStyle = code === -1 ? P.np : numericColor(t, code); ctx.fillRect(x, y, w, h); return; }
-  ctx.fillStyle = code === -1 ? P.np : CAT_COLORS[code % CAT_COLORS.length]; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = code === -1 ? P.np : categoryColor(code, STYLE); ctx.fillRect(x, y, w, h);
 }
 
 export interface DrawResult { ms: number; cellsDrawn: number; bucketsDrawn: number }
@@ -166,7 +118,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   ctx.textBaseline = "alphabetic";
   const zoom = view.zoom, sx = view.scrollX;
   const offs = groupOffsets(groups, zoom, gap);
-  const pad = view.whitespace && zoom >= 3 ? Math.min(3, Math.floor(zoom * 0.3)) : 0;
+  const pad = view.whitespace && zoom >= STYLE.geometry.padMinZoom ? Math.min(STYLE.geometry.cellPadMax, Math.floor(zoom * STYLE.geometry.padFraction)) : 0;
   let cellsDrawn = 0, bucketsDrawn = 0;
   const scratch = new Int32Array(64);
 
@@ -217,11 +169,10 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   data.tracks.forEach((t, ti) => {
     const y = header + ti * (rowH + rowGap);
     ctx.fillStyle = P.text; ctx.textAlign = "left";
-    const label = t.label.length > 17 ? t.label.slice(0, 16) + "…" : t.label;
-    ctx.fillText(label, 4, y + 14);
+    ctx.fillText(truncateLabel(t.label, STYLE), 4, y + 14);
     if (t.freqPct != null) {
       ctx.fillStyle = P.muted; ctx.textAlign = "right";
-      ctx.fillText(t.driverPct != null ? t.driverPct + "% / " + t.freqPct + "%" : t.freqPct + "%", gutter - 8, y + 14);
+      ctx.fillText(formatGutterPct(t.driverPct, t.freqPct), gutter - 8, y + 14);
       ctx.textAlign = "left";
     }
   });
@@ -256,14 +207,9 @@ export function decodeGene(code: number): string {
   if (code === -1) return "not profiled";
   if (code === 0) return "no alteration";
   const parts: string[] = [];
-  if (code & BITS.MISSENSE) parts.push("missense");
-  if (code & BITS.TRUNCATING) parts.push("truncating");
-  if (code & BITS.INFRAME) parts.push("in-frame");
-  if (code & BITS.SPLICE) parts.push("splice");
-  if (code & BITS.OTHER_MUT) parts.push("other mutation");
-  if (code & BITS.SV) parts.push("structural variant");
-  if (code & BITS.AMP) parts.push("amplification");
-  if (code & BITS.HOMDEL) parts.push("deep deletion");
+  for (const m of STYLE.glyph.mutation.priority) if (code & BITS[m.bit as keyof typeof BITS]) parts.push(m.label.toLowerCase());
+  if (code & BITS.SV) parts.push(STYLE.glyph.sv.label.toLowerCase());
+  for (const o of STYLE.glyph.cna.options) if (code & BITS[o.bit as keyof typeof BITS]) parts.push(o.label.toLowerCase());
   parts.push(code & BITS.DRIVER ? "putative driver" : "unknown significance");
   return parts.join(" · ");
 }

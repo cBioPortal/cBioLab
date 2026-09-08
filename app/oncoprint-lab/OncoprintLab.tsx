@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, hitTest, segmentByTrack, sortColumns, virtualWidth,
   type Hit, type View, type VisibleGroup } from "./canvas.ts";
+import { STYLE, geneLegend } from "../../lib/oncoprint-style.ts";
 
 const MAX_ZOOM = 24;
 
@@ -251,13 +252,13 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
 function Legend({ data }: { data: UnpackedContract }) {
   const P = PALETTE;
   const sw = (c: string, w = 10) => <span style={{ display: "inline-block", width: w, height: 10, background: c, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />;
-  const items: [string, string][] = [[P.amp, "Amp"], [P.homdel, "Deep Del"], [P.sv, "SV"], [P.missense, "Missense"], [P.truncating, "Truncating"], [P.inframe, "In-frame"], [P.splice, "Splice"], [P.otherMut, "Other"]];
+  const np = <span style={{ display: "inline-block", width: 10, height: 10, background: `linear-gradient(${P.np} 45%, ${P.npStripe} 45%, ${P.npStripe} 55%, ${P.np} 55%)`, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />;
   return (
     <div className="meta" style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem 0.9rem", marginTop: "0.4rem" }}>
-      {items.map(([c, l]) => <span key={l}>{sw(c)}{l}</span>)}
-      <span>{sw(P.npStripe)}Not profiled</span>
-      <span>solid = putative driver, faded = unknown significance · % = driver / any</span>
-      {data.tracks.filter((t) => t.kind !== "gene").map((t) => (
+      {geneLegend(STYLE).map((it) => <span key={it.label}>{it.kind === "notProfiled" ? np : sw(it.color)}{it.label}</span>)}
+      {data.tracks.some((t) => t.kind === "derivedEvent") && <span>{sw(P.derived)}Derived event</span>}
+      <span>{STYLE.glyph.driverNote} · % = driver / any</span>
+      {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (
         <span key={t.label}>{t.label}: {t.numeric
           ? <>{sw(t.center != null ? "linear-gradient(90deg,#2166ac,#fff,#b2182b)" : "linear-gradient(90deg,#deebf7,#084887)", 44)}{t.min} → {t.max}</>
           : (t.categories || []).slice(0, 8).map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw(CAT_COLORS[i % CAT_COLORS.length])}{c}</span>)}</span>

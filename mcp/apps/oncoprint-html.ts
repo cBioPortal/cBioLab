@@ -6,6 +6,12 @@
 // and calls render_oncoprint_app back through the host to re-sort.
 // Zero network access — works under the extension's restrictive default CSP.
 
+import { STYLE, cellLayers } from "../../lib/oncoprint-style.ts";
+
+// The shared style and the cell->layers rule are embedded verbatim so this document has no
+// imports at runtime (the MCP Apps CSP allows none) yet draws exactly what the other renderers draw.
+const STYLE_JS = "var STYLE = " + JSON.stringify(STYLE) + ";\n" + "var cellLayers = " + cellLayers.toString() + ";\n";
+
 export const ONCOPRINT_APP_HTML = String.raw`<!DOCTYPE html>
 <html>
 <head>
@@ -37,6 +43,7 @@ export const ONCOPRINT_APP_HTML = String.raw`<!DOCTYPE html>
 <div id="err"></div>
 <div id="tip"></div>
 <script>
+${STYLE_JS}
 (function () {
   "use strict";
   // ---- MCP Apps bridge -----------------------------------------------------
@@ -81,39 +88,23 @@ export const ONCOPRINT_APP_HTML = String.raw`<!DOCTYPE html>
   function setTheme(t) { theme = t; document.documentElement.className = t === "dark" ? "dark" : ""; if (contract) render(); }
   function showErr(t) { var e = document.getElementById("err"); e.textContent = t; e.style.display = "block"; }
 
-  // ---- contract rendering (same cell semantics as the web renderers) -------
-  var BITS = { MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16, SV: 32, AMP: 64, HOMDEL: 128, DRIVER: 256 };
-  var CAT = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#999999"];
+  // ---- contract rendering: colours, bands and priorities come from STYLE ----
+  var BITS = STYLE.bits;
+  var CAT = STYLE.palette.categorical;
   function pal() {
     var dark = theme === "dark";
     return {
-      unaltered: dark ? "#2a333b" : "#e8ecee", np: dark ? "#20262c" : "#f4f6f7",
-      np2: dark ? "#2c353d" : "#dfe4e7",
-      amp: "#e41a1c", homdel: dark ? "#5b8fd4" : "#2166ac", sv: dark ? "#b45ecf" : "#8e24aa",
-      missense: dark ? "#4caf50" : "#2e7d32", truncating: dark ? "#e7edf2" : "#111111",
-      inframe: dark ? "#d4a017" : "#b8860b", splice: "#ff8c00", otherMut: "#9467bd",
-      derived: "#0f86a1", ink: dark ? "#e7edf2" : "#1f2933", muted: dark ? "#93a4b0" : "#5b6b76"
+      unaltered: dark ? "#2a333b" : STYLE.palette.unaltered, np: dark ? "#20262c" : STYLE.glyph.notProfiled.fill,
+      derived: STYLE.palette.derived, ink: dark ? "#e7edf2" : STYLE.palette.text, muted: dark ? "#93a4b0" : STYLE.palette.muted
     };
   }
-  function heat(v) {
-    var t = Math.max(0, Math.min(1, v / 255));
-    function mix(a, b) { return Math.round(a + (b - a) * t); }
-    return "rgb(" + mix(222, 8) + "," + mix(235, 72) + "," + mix(247, 135) + ")";
-  }
-  function diverging(v, c) {
-    function lerp(a, b, t) { return Math.round(a + (b - a) * t); }
-    if (v <= c) { var t0 = c ? v / c : 1; return "rgb(" + lerp(33, 255, t0) + "," + lerp(102, 255, t0) + "," + lerp(172, 255, t0) + ")"; }
-    var t1 = (v - c) / (255 - c || 1);
-    return "rgb(" + lerp(255, 178, t1) + "," + lerp(255, 24, t1) + "," + lerp(255, 43, t1) + ")";
-  }
-  function numColor(t, v) { return t.center != null ? diverging(v, t.center) : heat(v); }
-  function mutColor(code, P) {
-    if (code & BITS.MISSENSE) return P.missense;
-    if (code & BITS.TRUNCATING) return P.truncating;
-    if (code & BITS.INFRAME) return P.inframe;
-    if (code & BITS.SPLICE) return P.splice;
-    if (code & BITS.OTHER_MUT) return P.otherMut;
-    return null;
+  function lerp(a, b, t) { return Math.round(a + (b - a) * t); }
+  function rgb(c) { return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")"; }
+  function numColor(t, v) {
+    if (t.center == null) { var s = STYLE.ramps.sequential, tt = Math.max(0, Math.min(1, v / 255)); return rgb([lerp(s.from[0], s.to[0], tt), lerp(s.from[1], s.to[1], tt), lerp(s.from[2], s.to[2], tt)]); }
+    var d = STYLE.ramps.diverging, c = t.center;
+    if (v <= c) { var t0 = c ? v / c : 1; return rgb([lerp(d.low[0], d.mid[0], t0), lerp(d.low[1], d.mid[1], t0), lerp(d.low[2], d.mid[2], t0)]); }
+    var t1 = (v - c) / (255 - c || 1); return rgb([lerp(d.mid[0], d.high[0], t1), lerp(d.mid[1], d.high[1], t1), lerp(d.mid[2], d.high[2], t1)]);
   }
   var HEADER = 20, ROW_H = 18, GAP = 3, GUTTER = 150, GROUP_GAP = 8;
   var geom = null;
@@ -174,20 +165,13 @@ export const ONCOPRINT_APP_HTML = String.raw`<!DOCTYPE html>
         buckets(t.cells, g.start, g.count, pxW, colW, !!t.numeric).forEach(function (b) {
           var x = x0 + b.x0, w = Math.max(b.w, 0.5);
           if (t.kind === "gene") {
-            if (b.code === -1) {
-              ctx.fillStyle = P.np; ctx.fillRect(x, y, w, ROW_H);
-              ctx.fillStyle = P.np2; ctx.fillRect(x, y + ROW_H * 0.4, w, ROW_H * 0.2);
-            } else {
-              var vus = b.code > 0 && !(b.code & BITS.DRIVER);
-              ctx.fillStyle = P.unaltered; ctx.fillRect(x, y, w, ROW_H);
-              if (vus) ctx.globalAlpha = 0.4;
-              if ((b.code & BITS.AMP) || (b.code & BITS.HOMDEL)) {
-                ctx.fillStyle = (b.code & BITS.AMP) ? P.amp : P.homdel; ctx.fillRect(x, y, w, ROW_H);
-              }
-              if (b.code & BITS.SV) { ctx.fillStyle = P.sv; ctx.fillRect(x, y + ROW_H * 0.15, w, ROW_H * 0.7); }
-              var mc = mutColor(b.code, P);
-              if (mc) { ctx.fillStyle = mc; ctx.fillRect(x, y + ROW_H * 0.3, w, ROW_H * 0.4); }
-              ctx.globalAlpha = 1;
+            var layers = cellLayers(b.code, STYLE);
+            for (var li = 0; li < layers.length; li++) {
+              var L = layers[li];
+              if (theme === "dark" && li === 0) ctx.fillStyle = b.code === -1 ? P.np : P.unaltered; else ctx.fillStyle = L.color;
+              if (L.alpha < 1) ctx.globalAlpha = L.alpha;
+              ctx.fillRect(x, y + ROW_H * L.band[0], w, ROW_H * (L.band[1] - L.band[0]));
+              if (L.alpha < 1) ctx.globalAlpha = 1;
             }
           } else if (t.kind === "derivedEvent") {
             ctx.fillStyle = b.code > 0 ? P.derived : P.unaltered; ctx.fillRect(x, y, w, ROW_H);
@@ -226,10 +210,11 @@ export const ONCOPRINT_APP_HTML = String.raw`<!DOCTYPE html>
       var sw = document.createElement("span"); sw.className = "sw"; sw.style.background = color;
       s.appendChild(sw); s.appendChild(document.createTextNode(label)); lg.appendChild(s);
     }
-    chip(P.amp, "Amp"); chip(P.homdel, "DeepDel"); chip(P.sv, "SV"); chip(P.missense, "Missense");
-    chip(P.truncating, "Truncating"); chip(P.inframe, "In-frame"); chip(P.splice, "Splice");
+    STYLE.glyph.mutation.priority.forEach(function (m) { chip(m.color, m.label); });
+    chip(STYLE.glyph.sv.color, STYLE.glyph.sv.label);
+    STYLE.glyph.cna.options.forEach(function (o) { chip(o.color, o.label); });
     var note = document.createElement("span");
-    note.textContent = "solid = putative driver, faded = VUS; striped/pale = not profiled; % = driver/any";
+    note.textContent = STYLE.glyph.driverNote + "; pale with a stripe = " + STYLE.glyph.notProfiled.label.toLowerCase() + "; % = driver / any";
     lg.appendChild(note);
     contract.tracks.forEach(function (t) {
       if (t.kind !== "clinical" && t.kind !== "heatmap") return;
@@ -288,16 +273,11 @@ export const ONCOPRINT_APP_HTML = String.raw`<!DOCTYPE html>
     if (code === -1) return "not profiled";
     if (code === 0) return "no alteration";
     var parts = [];
-    if (code & BITS.MISSENSE) parts.push("missense");
-    if (code & BITS.TRUNCATING) parts.push("truncating");
-    if (code & BITS.INFRAME) parts.push("in-frame");
-    if (code & BITS.SPLICE) parts.push("splice");
-    if (code & BITS.OTHER_MUT) parts.push("other mut");
-    if (code & BITS.SV) parts.push("SV");
-    if (code & BITS.AMP) parts.push("amp");
-    if (code & BITS.HOMDEL) parts.push("deep del");
-    parts.push((code & BITS.DRIVER) ? "driver" : "VUS");
-    return parts.join(" + ");
+    STYLE.glyph.mutation.priority.forEach(function (m) { if (code & BITS[m.bit]) parts.push(m.label.toLowerCase()); });
+    if (code & BITS.SV) parts.push(STYLE.glyph.sv.label.toLowerCase());
+    STYLE.glyph.cna.options.forEach(function (o) { if (code & BITS[o.bit]) parts.push(o.label.toLowerCase()); });
+    parts.push((code & BITS.DRIVER) ? "putative driver" : "unknown significance");
+    return parts.join(" · ");
   }
   var cvEl = document.getElementById("cv"), tip = document.getElementById("tip");
   cvEl.addEventListener("mousemove", function (ev) {

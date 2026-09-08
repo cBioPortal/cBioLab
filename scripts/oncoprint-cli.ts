@@ -14,13 +14,14 @@ import { localInput, parseTsv } from "../lib/oncoprint-local.ts";
 import { contractToSvg } from "../lib/oncoprint-svg.ts";
 import { contractToTsv } from "../lib/oncoprint-tabular.ts";
 import { packContract, unpackContract } from "../lib/oncoprint-binary.ts";
+import { bucketCodes, bucketEdges } from "../lib/oncoprint-lod.ts";
 import type { Contract } from "../lib/types.ts";
 
 const { values: a } = parseArgs({ options: {
   spec: { type: "string" }, events: { type: "string" }, clinical: { type: "string" }, coverage: { type: "string" },
   contract: { type: "string" }, genes: { type: "string" }, "group-by": { type: "string" }, sort: { type: "string" },
   patients: { type: "string" }, study: { type: "string" },
-  out: { type: "string" }, width: { type: "string", default: "1200" }, quiet: { type: "boolean", default: false }, help: { type: "boolean", default: false }
+  out: { type: "string" }, width: { type: "string", default: "1200" }, lod: { type: "string" }, quiet: { type: "boolean", default: false }, help: { type: "boolean", default: false }
 } });
 
 if (a.help || (!a.spec && !a.events && !a.contract)) {
@@ -49,6 +50,15 @@ if (a.contract) {
     groupBy: a["group-by"], sort: a.sort, study: a.study,
     patients: a.patients ? readFileSync(a.patients, "utf8").split(/\r?\n/).map((s) => s.trim()).filter(Boolean) : undefined
   }));
+}
+
+// --lod N: print the level-of-detail bucket codes per group and track (what a renderer draws at N pixels)
+if (a.lod) {
+  const buckets = Number(a.lod);
+  const lod = contract.groups.map((g) => ({ name: g.name, edges: bucketEdges(g.count, buckets),
+    tracks: Object.fromEntries(contract.tracks.map((t) => [t.label, bucketCodes(t, t.cells, g.start, g.count, buckets)])) }));
+  process.stdout.write(JSON.stringify(lod) + "\n");
+  process.exit(0);
 }
 
 const out = a.out;
