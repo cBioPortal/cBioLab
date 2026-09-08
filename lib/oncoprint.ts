@@ -21,6 +21,7 @@ export const PIDS_SQL: unique symbol = Symbol("pidsSql");
  */
 export type PidsCarrier = CohortDef & { [PIDS_SQL]?: string | Record<string, string> };
 import { buildAnnotationIndex } from "./annotation.ts";
+import { compileCohortDef } from "./cohort2.ts";
 
 // gene-track cell bitmask
 export const BITS = {
@@ -57,13 +58,15 @@ export function cohortPatientsSql(dsl: PidsCarrier | null | undefined, study: st
       "  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (" + ids.map(sq).join(",") + ")\n" +
       "ORDER BY pid";
   }
+  // DSL v2 definition ({all: [...]}) — the analysis document's cohort language
+  if (dsl && Array.isArray((dsl as { all?: unknown }).all)) return compileCohortDef(dsl as CohortDef, { study });
   if (!dsl) {
     return "SELECT DISTINCT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid\n" +
       "FROM " + DB + ".sample_derived WHERE cancer_study_identifier = " + sq(study) + " ORDER BY pid";
   }
   const { patientsSql } = compileCohort({
     db: DB, study, a: dsl.a!, b: dsl.b, rel: dsl.rel,
-    priorGuard: !!dsl.priorGuard, lineGap: dsl.lineGap, patientsLimit: 100000
+    priorGuard: !!dsl.priorGuard, lineGap: dsl.lineGap, patientsLimit: 1000000
   });
   return patientsSql;
 }
@@ -87,13 +90,15 @@ export function genomicEventsSql(genes: string[], study: string = STUDY): string
     "WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")";
 }
 
+// one row per patient: the queried genes any of the patient's panels cover
 export function coverageSql(genes: string[], study: string = STUDY): string {
   const puidPrefix = study + "_";
-  return "SELECT DISTINCT replaceOne(sd.patient_unique_id, " + sq(puidPrefix) + ", '') AS pid, pg.gene AS gene\n" +
+  return "SELECT replaceOne(sd.patient_unique_id, " + sq(puidPrefix) + ", '') AS pid, groupUniqArray(pg.gene) AS genes\n" +
     "FROM " + DB + ".sample_to_gene_panel_derived sp\n" +
     "JOIN " + DB + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + genes.map(sq).join(",") + ")\n" +
     "JOIN " + DB + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
-    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'";
+    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
+    "GROUP BY pid";
 }
 
 export function clinicalSql(attrs: string[], study: string = STUDY): string {
@@ -249,8 +254,15 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
       pids.forEach(p => seen.add(p));
       groups.push({ name: g.name || "group " + (groups.length + 1), pids });
     }
+  } else if (multi) {
+    // no groups: every patient of every study, one column group, study order
+    if (spec.cohort) throw new Error("multi-study oncoprint with a cohort requires cohort groups (layout.groupBy)");
+    const fetched = await Promise.all(studies.map(async (s) =>
+      ({ s, r: await lq<ChRow>("oncoprint:columns", cohortPatientsSql(null, s), s) })));
+    const pids: string[] = [];
+    for (const { s, r } of fetched) for (const x of r.data) { const id = qual(s, x.pid); pids.push(id); studyOf.set(id, s); }
+    groups = [{ name: "all patients", pids }];
   } else {
-    if (multi) throw new Error("multi-study oncoprint requires cohort groups");
     const pids = await cohortPatients(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, opts.log);
     for (const p of pids) studyOf.set(p, study);
     groups = [{ name: "cohort", pids }];
@@ -260,29 +272,24 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
 const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // provisional index
 
   // ---- genomic events for the gene set (whole study; intersect in JS) ---
-  const ev: { data: any[] } = { data: [] }, cov: { data: any[] } = { data: [] };
+  const ev: { data: any[] } = { data: [] };
+  const geneCells = new Map<string, Int32Array>(genes.map((g) => [g, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
   const evFetched = await Promise.all(studies.map(s =>
     Promise.all([lq("oncoprint:alterations", genomicEventsSql(genes, s), s),
-                 lq("oncoprint:coverage", coverageSql(genes, s), s)]).then(([e, c]) => ({ s, e, c }))));
+                 lq<{ pid: string; genes: string[] }>("oncoprint:coverage", coverageSql(genes, s), s)]).then(([e, c]) => ({ s, e, c }))));
   for (const { s, e, c } of evFetched) {
-    for (const r of e.data) ev.data.push(multi ? { ...r, pid: qual(s, r.pid) } : r);
-    // panel coverage per (patient, gene) — the NOT_PROFILED source
-    for (const r of c.data) cov.data.push(multi ? { ...r, pid: qual(s, r.pid) } : r);
+    const pref = multi ? s + "_" : "";
+    for (const r of e.data) { if (multi) r.pid = pref + r.pid; ev.data.push(r); }
+    // panel coverage: a patient's covered genes become 0 (profiled, unaltered) instead of NOT_PROFILED
+    for (const r of c.data) {
+      const i = pidIndex.get(pref + r.pid);
+      if (i === undefined) continue;
+      for (const g of r.genes) { const cells = geneCells.get(g); if (cells && cells[i] === NOT_PROFILED) cells[i] = 0; }
+    }
   }
   const annotation = await buildAnnotationIndex(ev.data, genes, multi ? studies : study);
 
   // ---- assemble gene-track cell maps ------------------------------------
-  const geneCells = new Map<string, Int32Array>(genes.map((g) => [g, new Int32Array(allPids.length).fill(0)]));
-  for (const g of genes) {
-    const cells = geneCells.get(g)!;
-    cells.fill(NOT_PROFILED);
-  }
-  for (const r of cov.data) {
-    const i = pidIndex.get(r.pid);
-    if (i === undefined) continue;
-    const cells = geneCells.get(r.gene);
-    if (cells && cells[i] === NOT_PROFILED) cells[i] = 0;
-  }
   for (const r of ev.data) {
     const i = pidIndex.get(r.pid);
     if (i === undefined) continue;
