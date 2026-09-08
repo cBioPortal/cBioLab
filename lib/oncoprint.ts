@@ -24,7 +24,6 @@ import { buildAnnotationIndex } from "./annotation.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
 import { assembleContract, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
-export { BITS, NOT_PROFILED, mutClassBit } from "./oncoprint-assemble.ts";
 
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
 
