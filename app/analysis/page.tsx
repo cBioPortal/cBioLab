@@ -844,9 +844,45 @@ export default function AnalysisPage() {
   });
 
   /** the figure sorts in the browser, so this records the choice without re-running */
-  const setViewSort = (vi: number, key: string) => updateViewLocal(vi, v => {
-    if (!key) { const { sort, ...rest } = v; return rest; }
-    return { ...v, sort: [key] };
+  const setViewSort = (vi: number, keys: string[]) => updateViewLocal(vi, v => {
+    if (!keys.length) { const { sort, ...rest } = v; return rest; }
+    return { ...v, sort: keys.slice(0, 4) };
+  });
+
+  /**
+   * A track's label back to the thing that produced it. Gene tracks are the view's genes,
+   * heatmap tracks belong to a profile, everything else is a clinical attribute.
+   */
+  const trackOwner = (v: any, label: string): "genes" | "clinical" | "heatmap" | null => {
+    if ((v.genes || []).some((g: string) => String(g).toUpperCase() === label)) return "genes";
+    if ((v.clinical || []).includes(label)) return "clinical";
+    if (heatmapLabels(v).includes(label)) return "heatmap";
+    return null;
+  };
+  const moveTrack = (vi: number, label: string, dir: -1 | 1) => updateView(vi, (v: any) => {
+    const owner = trackOwner(v, label);
+    if (!owner) return v;
+    const list = owner === "genes" ? (v.genes || []).map((g: string) => String(g)) : owner === "clinical" ? [...(v.clinical || [])] : null;
+    if (!list) return v;   // heatmap tracks follow their profile's gene list
+    const i = list.findIndex((x: string) => (owner === "genes" ? x.toUpperCase() : x) === label);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= list.length) return v;
+    [list[i], list[j]] = [list[j], list[i]];
+    return owner === "genes" ? { ...v, genes: list } : { ...v, clinical: list };
+  });
+  const removeTrack = (vi: number, label: string) => updateView(vi, (v: any) => {
+    const owner = trackOwner(v, label);
+    if (owner === "genes") {
+      const genes = (v.genes || []).filter((g: string) => String(g).toUpperCase() !== label);
+      return genes.length ? pruneSort({ ...v, genes }) : v;   // a figure needs at least one gene
+    }
+    if (owner === "clinical") return pruneSort({ ...v, clinical: (v.clinical || []).filter((a: string) => a !== label) });
+    if (owner === "heatmap") {
+      const heatmap = (v.heatmap || []).filter((h: any) => !heatmapLabels({ ...v, heatmap: [h] }).includes(label));
+      const next = { ...v }; if (heatmap.length) next.heatmap = heatmap; else delete next.heatmap;
+      return pruneSort(next);
+    }
+    return v;
   });
 
   /** set or clear one display option on a view, keeping the document free of defaults */
@@ -2325,9 +2361,11 @@ export default function AnalysisPage() {
                     <OncoprintFigure
                       spec={v.spec}
                       display={figureDisplay(ocView(vi))}
-                      sortKey={sortKeyText(ocView(vi).sort?.[0]) === "genomic" && !ocView(vi).sort ? "" : sortKeyText(ocView(vi).sort?.[0])}
+                      sortKeys={(ocView(vi).sort || []).map(sortKeyText)}
                       onDisplay={(d) => setViewDisplay(vi, d)}
-                      onSortKey={(k) => setViewSort(vi, k)}
+                      onSortKeys={(keys) => setViewSort(vi, keys)}
+                      onMoveTrack={(label, dir) => moveTrack(vi, label, dir)}
+                      onRemoveTrack={(label) => removeTrack(vi, label)}
                       onContract={(ct) => setContracts((m: Record<number, UnpackedContract>) => m[vi] === ct ? m : { ...m, [vi]: ct })}
                       busy={busy}
                       heading={<><h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {(c ? c.stats.nColumns : 0).toLocaleString()} {c ? c.unit : "patient"}s · {c ? c.conventions.annotation : ""}</span></h2>

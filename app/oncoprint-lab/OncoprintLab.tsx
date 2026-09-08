@@ -6,10 +6,10 @@ import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type FigureDisplay } from "../
 
 export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }) {
   const [display, setDisplay] = useState<FigureDisplay>(DEFAULT_FIGURE_DISPLAY);
-  const [sortKey, setSortKey] = useState("");
+  const [sortKeys, setSortKeys] = useState<string[]>([]);
   return (
     <div className="card" style={{ position: "relative" }}>
-      <OncoprintFigure spec={spec} display={display} sortKey={sortKey} onDisplay={setDisplay} onSortKey={setSortKey} timings instrument />
+      <OncoprintFigure spec={spec} display={display} sortKeys={sortKeys} onDisplay={setDisplay} onSortKeys={setSortKeys} timings instrument />
     </div>
   );
 }

@@ -32,10 +32,15 @@ export interface Perf { fetchMs?: number; bytes?: number; engineMs?: number; pac
 export interface OncoprintFigureProps {
   /** POSTed to /api/oncoprint?format=bin; a change of value (by JSON) refetches */
   spec: unknown;
-  /** "" = the engine's own order; otherwise "genomic" | "id" | "[-]<track label>" */
-  sortKey: string;
+  /** ordered sort keys: "genomic" | "id" | "[-]<track label>"; empty = the engine's own order */
+  sortKeys: string[];
   display: FigureDisplay;
-  onSortKey: (key: string) => void;
+  onSortKeys: (keys: string[]) => void;
+  /** move a track within its kind, or drop it; absent means the page cannot edit tracks */
+  onMoveTrack?: (label: string, dir: -1 | 1) => void;
+  onRemoveTrack?: (label: string) => void;
+  /** the Tracks menu's contents — the page owns what can be added */
+  tracksMenu?: React.ReactNode;
   onDisplay: (d: FigureDisplay) => void;
   /** left of the toolbar; defaults to a heading describing the contract */
   heading?: React.ReactNode;
@@ -53,7 +58,7 @@ export interface OncoprintFigureProps {
 }
 
 export default function OncoprintFigure(props: OncoprintFigureProps) {
-  const { spec, sortKey, display, onSortKey, onDisplay, busy } = props;
+  const { spec, sortKeys, display, onSortKeys, onDisplay, busy } = props;
   const [data, setData] = useState<UnpackedContract | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,6 +68,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   // per-column specifics, fetched only for the column under the pointer and remembered
   const [detail, setDetail] = useState<Record<string, ColumnDetail | "loading">>({});
   const detailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** the track whose menu is open, and where to put it */
+  const [trackMenu, setTrackMenu] = useState<{ ti: number; x: number; y: number } | null>(null);
   const [cssW, setCssW] = useState(1200);
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -113,7 +120,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   }, [data]);
 
   // gaps follow the primary sort key, and only when it is categorical (runs are contiguous only then)
-  const primaryKey = data ? (sortKey || data.conventions.sort[0] || "genomic").replace(/^-/, "") : "";
+  const primaryKey = data ? ((sortKeys[0] || data.conventions.sort[0] || "genomic")).replace(/^-/, "") : "";
   const gapTrack = data ? data.tracks.find((t) => t.label === primaryKey && t.categories && t.categories.length) : undefined;
   const gapMode = gapTrack ? display.gaps : "none";
   const gapPx = gapMode === "none" ? GEOM.groupGap : gapMode === "pct" ? 40 : 8;
@@ -138,10 +145,10 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       order = new Uint32Array(keep); groups = ng;
       bump({ hideMs: performance.now() - t0 });
     }
-    if (sortKey) {
+    if (sortKeys.length) {
       const t0 = performance.now();
-      const desc = sortKey.startsWith("-");
-      order = sortColumns(data, order, groups, [{ track: desc ? sortKey.slice(1) : sortKey, dir: desc ? "desc" : "asc" }]);
+      order = sortColumns(data, order, groups, sortKeys.map((k) => k.startsWith("-")
+        ? { track: k.slice(1), dir: "desc" as const } : { track: k, dir: "asc" as const }));
       bump({ sortMs: performance.now() - t0 });
     }
     if (gapMode !== "none" && gapTrack) {
@@ -151,7 +158,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     }
     return { order, groups };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, base, display.showUnaltered, sortKey, gapMode, gapTrack]);
+  }, [data, base, display.showUnaltered, sortKeys.join("\u0000"), gapMode, gapTrack]);
 
   // ---- sizing ---------------------------------------------------------------
   useEffect(() => {
@@ -212,7 +219,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       setShowUnaltered: (b: boolean) => onDisplay({ ...display, showUnaltered: b }),
       setWhitespace: (b: boolean) => onDisplay({ ...display, whitespace: b }),
       setGapMode: (g: FigureDisplay["gaps"]) => onDisplay({ ...display, gaps: g }),
-      setSortKey: onSortKey, view, minZoom, maxScroll, ready: !!visible };
+      setSortKey: (k: string) => onSortKeys(k ? [k] : []), setSortKeys: onSortKeys, view, minZoom, maxScroll, ready: !!visible };
   });
 
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -284,7 +291,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const specOnScreen = (): unknown => {
     const base = (typeof spec === "object" && spec !== null ? spec : {}) as Record<string, unknown>;
     const d = (base.display || {}) as Record<string, unknown>;
-    return { ...base, ...(sortKey ? { sort: [sortKey] } : {}), display: { ...d, ...display } };
+    return { ...base, ...(sortKeys.length ? { sort: sortKeys } : {}), display: { ...d, ...display } };
   };
   const save = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);
@@ -334,7 +341,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           <label className="meta"><input type="checkbox" checked={display.showUnaltered} disabled={busy} onChange={(e) => set({ showUnaltered: e.target.checked })} /> show unaltered</label>
           <label className="meta"><input type="checkbox" checked={display.whitespace} disabled={busy} onChange={(e) => set({ whitespace: e.target.checked })} /> whitespace</label>
           <label className="meta" title="colour each mutation class separately, or draw them all as one"><input type="checkbox" checked={display.colorByType} disabled={busy} onChange={(e) => set({ colorByType: e.target.checked })} /> colour by type</label>
-          <label className="meta">sort <select value={sortKey} disabled={busy} onChange={(e) => onSortKey(e.target.value)} style={{ fontSize: "0.78rem" }}>
+          <label className="meta">sort <select value={sortKeys[0] || ""} disabled={busy}
+            onChange={(e) => onSortKeys(e.target.value ? [e.target.value, ...sortKeys.slice(1)].slice(0, 4) : sortKeys.slice(1))} style={{ fontSize: "0.78rem" }}>
             <option value="">engine order ({data.conventions.sort.join(", ")})</option>
             <option value="genomic">genomic staircase</option>
             <option value="id">patient id</option>
@@ -342,6 +350,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               <option key={t.label} value={t.label}>{t.label} ↑</option>,
               <option key={"-" + t.label} value={"-" + t.label}>{t.label} ↓</option>])}
           </select></label>
+          {sortKeys.length > 1 && <span className="meta" title="ties in the first key are broken by these, in order">
+            then {sortKeys.slice(1).map((k) => (
+              <button key={k} className="linklike" disabled={busy} title="drop this tiebreaker"
+                onClick={() => onSortKeys(sortKeys.filter((x) => x !== k))}>{k.startsWith("-") ? k.slice(1) + " ↓" : k + " ↑"} ✕</button>
+            ))}</span>}
           <label className="meta" title={gapTrack ? "split each cohort into runs of " + gapTrack.label : "choose a categorical track as the sort key first"}>gaps <select
             value={display.gaps} disabled={busy || !gapTrack} onChange={(e) => set({ gaps: e.target.value as FigureDisplay["gaps"] })} style={{ fontSize: "0.78rem" }}>
             <option value="none">none</option><option value="gaps">gaps</option><option value="pct">gaps with %</option></select></label>
@@ -365,7 +378,48 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           <canvas ref={canvasRef} style={{ display: "block", cursor: view.zoom > minZoom ? "grab" : "crosshair" }}
             onMouseMove={onMove} onMouseLeave={() => { setHover(null); drag.current = null; }}
             onMouseDown={(e) => { drag.current = { x: e.clientX, scrollX: view.scrollX }; }}
-            onMouseUp={() => { drag.current = null; }} />
+            onMouseUp={() => { drag.current = null; }}
+            onClick={(e) => {
+              // a click on a track's label opens that track's menu, like the portal's three dots
+              const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
+              const x = e.clientX - rect.left, y = e.clientY - rect.top;
+              if (x >= GEOM.gutter) { setTrackMenu(null); return; }
+              const ti = Math.floor((y - GEOM.header) / (GEOM.rowH + GEOM.rowGap));
+              setTrackMenu(ti >= 0 && ti < data.tracks.length ? { ti, x, y } : null);
+            }} />
+          {trackMenu && (() => {
+            const t = data.tracks[trackMenu.ti];
+            // gene tracks set the staircase, and a track with no values sorts nothing
+            const sortable = t.kind !== "gene" && !/\(no data\)$/.test(t.label);
+            const key = (dir: "" | "-") => dir + t.label;
+            const isKey = (dir: "" | "-") => sortKeys[0] === key(dir);
+            const setPrimary = (k: string | null) => onSortKeys(k ? [k, ...sortKeys.filter((x) => x.replace(/^-/, "") !== t.label)].slice(0, 4)
+              : sortKeys.filter((x) => x.replace(/^-/, "") !== t.label));
+            const item = (label: string, on: boolean, act: () => void, enabled = true) => (
+              <button className="linklike" disabled={!enabled || busy} style={{ fontWeight: on ? 600 : 400, textAlign: "left" }}
+                onClick={() => { act(); setTrackMenu(null); }}>{label}</button>
+            );
+            return (
+              <div style={{ position: "absolute", left: Math.min(trackMenu.x, cssW - 210), top: trackMenu.y + 6, zIndex: 4,
+                background: "var(--card)", border: "1px solid var(--line)", borderRadius: 6, boxShadow: "0 6px 18px rgba(0,0,0,.16)",
+                padding: "0.35rem", display: "flex", flexDirection: "column", gap: "0.1rem", minWidth: 190 }}
+                onMouseLeave={() => setTrackMenu(null)}>
+                <span className="meta" style={{ padding: "0 0.3rem 0.2rem" }}>{t.label}</span>
+                {props.onMoveTrack && item("Move up", false, () => props.onMoveTrack!(t.label, -1))}
+                {props.onMoveTrack && item("Move down", false, () => props.onMoveTrack!(t.label, 1))}
+                {props.onRemoveTrack && item("Remove track", false, () => props.onRemoveTrack!(t.label))}
+                {item("Sort a-Z", isKey(""), () => setPrimary(key("")), sortable)}
+                {item("Sort Z-a", isKey("-"), () => setPrimary(key("-")), sortable)}
+                {item("Don't sort by this", sortable && !isKey("") && !isKey("-"), () => setPrimary(null), sortable)}
+                {t.categories && t.categories.length > 0 && primaryKey === t.label &&
+                  item(display.gaps === "none" ? "Show gaps" : "Hide gaps", display.gaps !== "none", () => set({ gaps: display.gaps === "none" ? "gaps" : "none" }))}
+                {t.categories && t.categories.length > 0 && primaryKey === t.label &&
+                  item("Show gaps (w/%)", display.gaps === "pct", () => set({ gaps: "pct" }))}
+                {!sortable && <span className="meta" style={{ padding: "0.2rem 0.3rem" }}>
+                  {t.kind === "gene" ? "gene tracks set the staircase; use the sort menu" : "no values to sort by"}</span>}
+              </div>
+            );
+          })()}
           {maxScroll > 0 && (
             <div style={{ position: "absolute", left: GEOM.gutter, right: 0, bottom: 0, height: 6, background: "var(--code-bg)" }}>
               <div style={{ position: "absolute", height: 6, background: "var(--accent)", opacity: 0.6, borderRadius: 3,
