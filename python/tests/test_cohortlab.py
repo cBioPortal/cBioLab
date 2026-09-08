@@ -148,7 +148,7 @@ class StyleOverrides(unittest.TestCase):
         self.assertEqual(STYLE["palette"]["unaltered"], "#e8ecee", "the defaults are not mutated")
         for bad, msg in [({"palete": {}}, "not a style key"), ({"palette": {"unaltered": "red"}}, "#rrggbb"),
                          ({"bits": {"AMP": 1}}, "read-only"), ({"glyph": {"vusAlpha": "half"}}, "must be a number"),
-                         ({"glyph": {"mutation": {"priority": [{"bit": "MISSENSE"}, {}, {}, {}, {}]}}}, "read-only"),
+                         ({"glyph": {"mutation": {"priority": [{"bit": "MISSENSE"}, {}, {}, {}, {}, {}]}}}, "read-only"),
                          ({"glyph": {"notProfiled": {"fill": "#e8ecee", "stripe": {"color": "#e8ecee"}}}}, "indistinguishable")]:
             with self.subTest(bad=bad):
                 with self.assertRaisesRegex(ValueError, msg):

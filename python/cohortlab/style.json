@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "bits": {
     "MISSENSE": 1,
     "TRUNCATING": 2,
@@ -9,7 +9,12 @@
     "SV": 32,
     "AMP": 64,
     "HOMDEL": 128,
-    "DRIVER": 256
+    "DRIVER": 256,
+    "PROMOTER": 512,
+    "MRNA_HIGH": 1024,
+    "MRNA_LOW": 2048,
+    "PROT_HIGH": 4096,
+    "PROT_LOW": 8192
   },
   "palette": {
     "paper": "#ffffff",
@@ -39,14 +44,65 @@
         {
           "bit": "AMP",
           "color": "#e41a1c",
+          "vus": "#f6a6a5",
           "label": "Amplification",
           "order": 10
         },
         {
           "bit": "HOMDEL",
           "color": "#2166ac",
+          "vus": "#a6c4de",
           "label": "Deep Deletion",
           "order": 12
+        }
+      ]
+    },
+    "mrna": {
+      "band": [
+        0,
+        1
+      ],
+      "stroke": 2,
+      "options": [
+        {
+          "bit": "MRNA_HIGH",
+          "color": "#c0392b",
+          "vus": "#c0392b",
+          "label": "mRNA High",
+          "order": 20
+        },
+        {
+          "bit": "MRNA_LOW",
+          "color": "#2c6fbb",
+          "vus": "#2c6fbb",
+          "label": "mRNA Low",
+          "order": 21
+        }
+      ]
+    },
+    "protein": {
+      "options": [
+        {
+          "bit": "PROT_HIGH",
+          "band": [
+            0,
+            0.18
+          ],
+          "color": "#ff3df8",
+          "vus": "#ff3df8",
+          "label": "Protein High",
+          "order": 30
+        },
+        {
+          "bit": "PROT_LOW",
+          "band": [
+            0.82,
+            1
+          ],
+          "color": "#00b8d4",
+          "vus": "#00b8d4",
+          "label": "Protein Low",
+          "order": 31
         }
       ]
     },
@@ -57,6 +113,7 @@
       ],
       "bit": "SV",
       "color": "#8e24aa",
+      "vus": "#ce92e8",
       "label": "Structural Variant",
       "order": 1
     },
@@ -70,30 +127,42 @@
         {
           "bit": "TRUNCATING",
           "color": "#111111",
+          "vus": "#7c8794",
           "label": "Truncating Mutation"
         },
         {
           "bit": "SPLICE",
           "color": "#ff8c00",
+          "vus": "#f5c88f",
           "label": "Splice Mutation"
         },
         {
           "bit": "INFRAME",
           "color": "#b8860b",
+          "vus": "#dcc37e",
           "label": "Inframe Mutation"
+        },
+        {
+          "bit": "PROMOTER",
+          "color": "#00b7ce",
+          "vus": "#8cedf9",
+          "label": "Promoter Mutation"
         },
         {
           "bit": "MISSENSE",
           "color": "#2e7d32",
+          "vus": "#8bc98e",
           "label": "Missense Mutation"
         },
         {
           "bit": "OTHER_MUT",
           "color": "#9467bd",
+          "vus": "#c9b3de",
           "label": "Other Mutation"
         }
       ]
     },
+    "vusStyle": "pair",
     "vusAlpha": 0.35,
     "notProfiled": {
       "fill": "#f4f6f7",
@@ -107,7 +176,7 @@
       "label": "Not profiled"
     },
     "unalteredLabel": "No alterations",
-    "driverNote": "solid = putative driver, faded = unknown significance"
+    "driverNote": "paler = unknown significance"
   },
   "ramps": {
     "sequential": {

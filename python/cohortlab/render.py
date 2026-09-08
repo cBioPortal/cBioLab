@@ -96,9 +96,16 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
                 x0, x1 = int(xs[bi]), int(xs[bi] + bw[bi])
                 code = int(codes[bi])
                 if t.kind == "gene":
-                    for color, (b0, b1), alpha in cell_layers(code, S):
-                        ya, yb = y0 + int(ROW_H * b0), y0 + int(ROW_H * b1)
+                    for color, (b0, b1), alpha, stroke in cell_layers(code, S):
                         col = _rgb(color)
+                        if stroke:
+                            sw = max(1, int(min(stroke, max(1, (x1 - x0) // 2))))
+                            img[y0:y0 + sw, x0:x1] = col
+                            img[y0 + ROW_H - sw:y0 + ROW_H, x0:x1] = col
+                            img[y0:y0 + ROW_H, x0:x0 + sw] = col
+                            img[y0:y0 + ROW_H, max(x0, x1 - sw):x1] = col
+                            continue
+                        ya, yb = y0 + int(ROW_H * b0), y0 + int(ROW_H * b1)
                         img[ya:yb, x0:x1] = col if alpha >= 1 else img[ya:yb, x0:x1] + (col - img[ya:yb, x0:x1]) * alpha
                 elif t.kind == "derivedEvent":
                     img[y0:y0 + ROW_H, x0:x1] = derived if code > 0 else unaltered
@@ -137,7 +144,7 @@ def figure(c: Contract, width: int = 1200, gutter: int | None = None, dpi: int =
         y = ti * (ROW_H + ROW_GAP) + ROW_H / 2
         ax.text(4, y, truncate_label(t.label, S), fontsize=8, color=P["text"], va="center")
         if t.meta.get("freqPct") is not None:
-            ax.text(gutter - 8, y, format_gutter_pct(t.meta.get("driverPct"), t.meta.get("freqPct")), fontsize=7.5, color=P["muted"], va="center", ha="right")
+            ax.text(gutter - 8, y, format_gutter_pct(t.meta.get("driverPct"), t.meta.get("freqPct"), t.meta.get("profiled"), c.n), fontsize=7.5, color=P["muted"], va="center", ha="right")
     handles = [Patch(color=color, label=label) for label, color, kind in gene_legend(S)]
     if any(t.kind == "derivedEvent" for t in c.tracks):
         handles.append(Patch(color=P["derived"], label="Derived event"))

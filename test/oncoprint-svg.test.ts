@@ -35,7 +35,7 @@ test("a figure's style override and per-track colours reach the SVG", () => {
   const c = fixture();
   const plain = contractToSvg(c, 800);
   const themed = contractToSvg({ ...c, display: { ...c.display,
-    style: { palette: { unaltered: "#f0f0f0" }, glyph: { mutation: { priority: [{ color: "#abcdef" }, {}, {}, {}, {}] } } },
+    style: { palette: { unaltered: "#f0f0f0" }, glyph: { mutation: { priority: [{ color: "#abcdef" }, {}, {}, {}, {}, {}] } } },
     colors: { CANCER_TYPE: { Lung: "#123456" } } } }, 800);
   assert.ok(!plain.includes("#f0f0f0") && themed.includes("#f0f0f0"), "the unaltered fill follows the override");
   assert.ok(themed.includes("#abcdef"), "truncating mutations and their legend swatch follow the override");

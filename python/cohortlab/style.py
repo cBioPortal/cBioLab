@@ -15,25 +15,38 @@ with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.json")
 BITS: dict[str, int] = STYLE["bits"]
 
 
-def cell_layers(code: int, S: dict[str, Any] = STYLE) -> list[tuple[str, tuple[float, float], float]]:
-    """Fills for one gene cell, bottom to top: (colour, (band from, band to), alpha)."""
+def cell_layers(code: int, S: dict[str, Any] = STYLE) -> list[tuple[str, tuple[float, float], float, float]]:
+    """Fills for one gene cell, bottom to top: (colour, (band from, band to), alpha, stroke px)."""
     G, B = S["glyph"], S["bits"]
     if code == -1:
         npf = G["notProfiled"]
-        return [(npf["fill"], (0.0, 1.0), 1.0), (npf["stripe"]["color"], tuple(npf["stripe"]["band"]), 1.0)]
-    out = [(S["palette"]["unaltered"], (0.0, 1.0), 1.0)]
+        return [(npf["fill"], (0.0, 1.0), 1.0, 0.0), (npf["stripe"]["color"], tuple(npf["stripe"]["band"]), 1.0, 0.0)]
+    out = [(S["palette"]["unaltered"], (0.0, 1.0), 1.0, 0.0)]
     if code <= 0:
         return out
-    alpha = 1.0 if code & B["DRIVER"] else G["vusAlpha"]
+    driver = bool(code & B["DRIVER"])
+    pair = G.get("vusStyle") == "pair"
+    alpha = 1.0 if driver or pair else G["vusAlpha"]
+
+    def paint(e: dict[str, Any]) -> str:
+        return e["color"] if driver or not pair else e.get("vus", e["color"])
+
     for o in G["cna"]["options"]:
         if code & B[o["bit"]]:
-            out.append((o["color"], tuple(G["cna"]["band"]), alpha))
+            out.append((paint(o), tuple(G["cna"]["band"]), alpha, 0.0))
             break
+    for o in G["mrna"]["options"]:
+        if code & B[o["bit"]]:
+            out.append((paint(o), tuple(G["mrna"]["band"]), 1.0, float(G["mrna"]["stroke"])))
+            break
+    for o in G["protein"]["options"]:
+        if code & B[o["bit"]]:
+            out.append((paint(o), tuple(o["band"]), 1.0, 0.0))
     if code & B[G["sv"]["bit"]]:
-        out.append((G["sv"]["color"], tuple(G["sv"]["band"]), alpha))
+        out.append((paint(G["sv"]), tuple(G["sv"]["band"]), alpha, 0.0))
     for m in G["mutation"]["priority"]:
         if code & B[m["bit"]]:
-            out.append((m["color"], tuple(G["mutation"]["band"]), alpha))
+            out.append((paint(m), tuple(G["mutation"]["band"]), alpha, 0.0))
             break
     return out
 
@@ -75,10 +88,11 @@ def format_pct(p: float | None) -> str:
     return (str(v) if p < 3 else str(int(v))) + "%"
 
 
-def format_gutter_pct(driver_pct: float | None, freq_pct: float | None) -> str:
+def format_gutter_pct(driver_pct: float | None, freq_pct: float | None, profiled: int | None = None, columns: int | None = None) -> str:
     if freq_pct is None:
         return "N/P"
-    return f"{driver_pct}% / {freq_pct}%" if driver_pct is not None else f"{freq_pct}%"
+    star = "*" if profiled is not None and columns is not None and 0 < profiled < columns else ""
+    return (f"{driver_pct}% / {freq_pct}%" if driver_pct is not None else f"{freq_pct}%") + star
 
 
 def truncate_label(label: str, S: dict[str, Any] = STYLE) -> str:
@@ -87,11 +101,13 @@ def truncate_label(label: str, S: dict[str, Any] = STYLE) -> str:
 
 
 def gene_legend(S: dict[str, Any] = STYLE) -> list[tuple[str, str, str]]:
-    """(label, colour, kind) in display order: mutations by priority, SV, CNA, not profiled."""
+    """(label, colour, kind) in display order: mutations by priority, SV, CNA, mRNA, protein, not profiled."""
     G = S["glyph"]
     items = [(m["label"], m["color"], "swatch") for m in G["mutation"]["priority"]]
     items.append((G["sv"]["label"], G["sv"]["color"], "swatch"))
     items += [(o["label"], o["color"], "swatch") for o in G["cna"]["options"]]
+    items += [(o["label"], o["color"], "outline") for o in G["mrna"]["options"]]
+    items += [(o["label"], o["color"], "swatch") for o in G["protein"]["options"]]
     items.append((G["notProfiled"]["label"], G["notProfiled"]["stripe"]["color"], "notProfiled"))
     return items
 

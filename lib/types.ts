@@ -194,6 +194,8 @@ export interface OncoprintView {
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
   /** what a column is (default "patient"); "sample" draws every sample of the cohort's patients */
   unit?: "patient" | "sample";
+  /** mRNA / protein evidence drawn into the gene cells (see OncoprintSpec.overlays) */
+  overlays?: { kind: "mrna" | "protein"; profileType: string; threshold?: number }[];
 }
 /**
  * Treatment sequences: what follows what, as lines of therapy.
@@ -486,6 +488,12 @@ export interface OncoprintSpec {
   genes: string[]; clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
   /** what a column is (default "patient") */
   unit?: "patient" | "sample";
+  /**
+   * Molecular evidence drawn INTO the gene cells rather than as tracks: mRNA as an outline,
+   * protein as thin bars. Values at or beyond ±threshold (default 2, the portal's z-score rule)
+   * set the high/low bit. Expression is not an alteration, so it never enters the altered %.
+   */
+  overlays?: { kind: "mrna" | "protein"; profileType: string; threshold?: number }[];
   derivedEvents?: { label: string; expression: CohortDef }[];
   cohort?: { dsl: CohortDef } | null;
   layout?: { groupBy: { kind: "cohorts"; groups: { name: string; dsl: CohortDef }[] } } | null;

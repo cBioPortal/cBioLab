@@ -7,34 +7,56 @@
 // everywhere at once. `npm run style:gen` regenerates the Python copy; a unit test fails on drift.
 
 export const STYLE = {
-  version: 1,
-  bits: { MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16, SV: 32, AMP: 64, HOMDEL: 128, DRIVER: 256 },
+  version: 2,
+  bits: {
+    MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16,
+    SV: 32, AMP: 64, HOMDEL: 128,
+    DRIVER: 256,      // any alteration in the cell is annotated (putative) driver
+    PROMOTER: 512,    // 5'Flank / promoter mutations, which the portal colours separately
+    MRNA_HIGH: 1024, MRNA_LOW: 2048, PROT_HIGH: 4096, PROT_LOW: 8192
+  },
   palette: {
     paper: "#ffffff", unaltered: "#e8ecee", derived: "#0f86a1",
     text: "#1f2933", muted: "#5b6b76", groupLine: "#c9d2d8",
     categorical: ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#999999"]
   },
-  // A gene cell is drawn as layers, bottom to top: base, CNA (full height), SV (inset band),
-  // one mutation (centre band, chosen by priority). Alteration layers of a cell with no
-  // DRIVER bit are drawn at vusAlpha over whatever is beneath them.
+  // A gene cell is drawn as layers, bottom to top: base, CNA (full height), mRNA (an outline
+  // around the whole cell), protein (thin bars at top and bottom), SV (inset band), one
+  // mutation (centre band, chosen by priority). That is the portal's stacking order, so a cell
+  // carrying several kinds of evidence reads the same way in both tools.
+  //
+  // Each alteration has a driver colour and a paler one for unknown significance: `color` and
+  // `vus`. A cell without the DRIVER bit draws the pale colour.
   glyph: {
     cna: { band: [0, 1] as [number, number], options: [
-      { bit: "AMP", color: "#e41a1c", label: "Amplification", order: 10 },
-      { bit: "HOMDEL", color: "#2166ac", label: "Deep Deletion", order: 12 }
+      { bit: "AMP", color: "#e41a1c", vus: "#f6a6a5", label: "Amplification", order: 10 },
+      { bit: "HOMDEL", color: "#2166ac", vus: "#a6c4de", label: "Deep Deletion", order: 12 }
     ] },
-    sv: { band: [0.15, 0.85] as [number, number], bit: "SV", color: "#8e24aa", label: "Structural Variant", order: 1 },
+    // mRNA is an outline rather than a fill so it can coexist with a CNA colour underneath
+    mrna: { band: [0, 1] as [number, number], stroke: 2, options: [
+      { bit: "MRNA_HIGH", color: "#c0392b", vus: "#c0392b", label: "mRNA High", order: 20 },
+      { bit: "MRNA_LOW", color: "#2c6fbb", vus: "#2c6fbb", label: "mRNA Low", order: 21 }
+    ] },
+    protein: { options: [
+      { bit: "PROT_HIGH", band: [0, 0.18] as [number, number], color: "#ff3df8", vus: "#ff3df8", label: "Protein High", order: 30 },
+      { bit: "PROT_LOW", band: [0.82, 1] as [number, number], color: "#00b8d4", vus: "#00b8d4", label: "Protein Low", order: 31 }
+    ] },
+    sv: { band: [0.15, 0.85] as [number, number], bit: "SV", color: "#8e24aa", vus: "#ce92e8", label: "Structural Variant", order: 1 },
     // display priority when a cell carries several mutation classes (the portal's rule)
     mutation: { band: [0.3, 0.7] as [number, number], order: 0, priority: [
-      { bit: "TRUNCATING", color: "#111111", label: "Truncating Mutation" },
-      { bit: "SPLICE", color: "#ff8c00", label: "Splice Mutation" },
-      { bit: "INFRAME", color: "#b8860b", label: "Inframe Mutation" },
-      { bit: "MISSENSE", color: "#2e7d32", label: "Missense Mutation" },
-      { bit: "OTHER_MUT", color: "#9467bd", label: "Other Mutation" }
+      { bit: "TRUNCATING", color: "#111111", vus: "#7c8794", label: "Truncating Mutation" },
+      { bit: "SPLICE", color: "#ff8c00", vus: "#f5c88f", label: "Splice Mutation" },
+      { bit: "INFRAME", color: "#b8860b", vus: "#dcc37e", label: "Inframe Mutation" },
+      { bit: "PROMOTER", color: "#00b7ce", vus: "#8cedf9", label: "Promoter Mutation" },
+      { bit: "MISSENSE", color: "#2e7d32", vus: "#8bc98e", label: "Missense Mutation" },
+      { bit: "OTHER_MUT", color: "#9467bd", vus: "#c9b3de", label: "Other Mutation" }
     ] },
+    /** how a cell with no DRIVER bit is drawn: "pair" uses each entry's `vus` colour, "fade" its alpha */
+    vusStyle: "pair",
     vusAlpha: 0.35,
     notProfiled: { fill: "#f4f6f7", stripe: { color: "#dfe4e7", band: [0.45, 0.55] as [number, number] }, label: "Not profiled" },
     unalteredLabel: "No alterations",
-    driverNote: "solid = putative driver, faded = unknown significance"
+    driverNote: "paler = unknown significance"
   },
   ramps: {
     sequential: { from: [222, 235, 247], to: [8, 72, 135] },            // #deebf7 -> #084887
@@ -48,7 +70,11 @@ export const STYLE = {
 // so the type has to admit any colour, not only the default one.
 export type Style = typeof STYLE;
 export type Rgb = readonly [number, number, number];
-export interface Layer { color: string; band: readonly [number, number]; alpha: number }
+export interface Layer {
+  color: string; band: readonly [number, number]; alpha: number;
+  /** when set, draw an outline of this many pixels instead of a filled band */
+  stroke?: number;
+}
 
 /**
  * Fills for one gene cell, bottom to top, as fractions of the row height.
@@ -60,10 +86,15 @@ export function cellLayers(code: number, S: Style): Layer[] {
   if (code === -1) return [{ color: G.notProfiled.fill, band: [0, 1], alpha: 1 }, { color: G.notProfiled.stripe.color, band: G.notProfiled.stripe.band, alpha: 1 }];
   const out: Layer[] = [{ color: S.palette.unaltered, band: [0, 1], alpha: 1 }];
   if (code <= 0) return out;
-  const alpha = (code & B.DRIVER) ? 1 : G.vusAlpha;
-  for (const o of G.cna.options) if (code & B[o.bit]) { out.push({ color: o.color, band: G.cna.band, alpha }); break; }
-  if (code & B[G.sv.bit]) out.push({ color: G.sv.color, band: G.sv.band, alpha });
-  for (const m of G.mutation.priority) if (code & B[m.bit]) { out.push({ color: m.color, band: G.mutation.band, alpha }); break; }
+  const driver = !!(code & B.DRIVER);
+  const pair = G.vusStyle === "pair";
+  const alpha = driver || pair ? 1 : G.vusAlpha;
+  const paint = (e: { color: string; vus?: string }): string => (driver || !pair ? e.color : (e.vus || e.color));
+  for (const o of G.cna.options) if (code & B[o.bit]) { out.push({ color: paint(o), band: G.cna.band, alpha }); break; }
+  for (const o of G.mrna.options) if (code & B[o.bit]) { out.push({ color: paint(o), band: G.mrna.band, alpha: 1, stroke: G.mrna.stroke }); break; }
+  for (const o of G.protein.options) if (code & B[o.bit]) out.push({ color: paint(o), band: o.band, alpha: 1 });
+  if (code & B[G.sv.bit]) out.push({ color: paint(G.sv), band: G.sv.band, alpha });
+  for (const m of G.mutation.priority) if (code & B[m.bit]) { out.push({ color: paint(m), band: G.mutation.band, alpha }); break; }
   return out;
 }
 
@@ -89,11 +120,18 @@ export function formatPct(p: number | null | undefined): string {
   if (p == null) return "N/P";
   return (p < 3 ? Math.round(p * 10) / 10 : Math.round(p)) + "%";
 }
-/** Gutter frequency: "driver% / any%" at one decimal (what the engine reports). */
-export function formatGutterPct(driverPct: number | null | undefined, freqPct: number | null | undefined): string {
+/**
+ * Gutter frequency: "driver% / any%" at one decimal, N/P when nothing was profiled, and the
+ * portal's asterisk when the denominator is smaller than the number of columns — a reader
+ * should not have to work out that a percentage was taken over part of the cohort.
+ */
+export function formatGutterPct(driverPct: number | null | undefined, freqPct: number | null | undefined,
+  profiled?: number, columns?: number): string {
   if (freqPct == null) return "N/P";
-  return driverPct != null ? driverPct + "% / " + freqPct + "%" : freqPct + "%";
+  const star = profiled != null && columns != null && profiled > 0 && profiled < columns ? "*" : "";
+  return (driverPct != null ? driverPct + "% / " + freqPct + "%" : freqPct + "%") + star;
 }
+export const PARTIAL_PROFILE_NOTE = "* = % over the columns profiled for that gene";
 
 export function truncateLabel(label: string, S: Style = STYLE): string {
   const n = S.geometry.labelMaxChars;
@@ -101,15 +139,30 @@ export function truncateLabel(label: string, S: Style = STYLE): string {
 }
 
 /** Gene-legend entries in display order, shared by every renderer. */
-export function geneLegend(S: Style = STYLE): { label: string; color: string; kind: "swatch" | "notProfiled" }[] {
-  const items: { label: string; color: string; kind: "swatch" | "notProfiled" }[] = [];
+export function geneLegend(S: Style = STYLE): { label: string; color: string; kind: "swatch" | "outline" | "notProfiled" }[] {
+  const items: { label: string; color: string; kind: "swatch" | "outline" | "notProfiled" }[] = [];
   for (const m of S.glyph.mutation.priority) items.push({ label: m.label, color: m.color, kind: "swatch" });
   items.push({ label: S.glyph.sv.label, color: S.glyph.sv.color, kind: "swatch" });
   for (const o of S.glyph.cna.options) items.push({ label: o.label, color: o.color, kind: "swatch" });
+  for (const o of S.glyph.mrna.options) items.push({ label: o.label, color: o.color, kind: "outline" });
+  for (const o of S.glyph.protein.options) items.push({ label: o.label, color: o.color, kind: "swatch" });
   items.push({ label: S.glyph.notProfiled.label, color: S.glyph.notProfiled.stripe.color, kind: "notProfiled" });
   return items;
 }
 
+/** Legend entries a contract actually needs: only the alterations its cells carry. */
+export function geneLegendFor(bitsPresent: number, S: Style = STYLE): ReturnType<typeof geneLegend> {
+  const B = S.bits as Record<string, number>;
+  const bitOf = (label: string): number => {
+    for (const m of S.glyph.mutation.priority) if (m.label === label) return B[m.bit];
+    if (label === S.glyph.sv.label) return B[S.glyph.sv.bit];
+    for (const o of S.glyph.cna.options) if (o.label === label) return B[o.bit];
+    for (const o of S.glyph.mrna.options) if (o.label === label) return B[o.bit];
+    for (const o of S.glyph.protein.options) if (o.label === label) return B[o.bit];
+    return 0;
+  };
+  return geneLegend(S).filter((it) => it.kind === "notProfiled" || (bitsPresent & bitOf(it.label)) !== 0);
+}
 
 // ---- user overrides ---------------------------------------------------------
 // A figure may carry a partial style in its spec (`display.style`). It is merged onto the

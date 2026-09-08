@@ -920,6 +920,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         sort: (view as OncoprintView).sort,
         display: (view as OncoprintView).display,
         unit: (view as OncoprintView).unit,
+        overlays: (view as OncoprintView).overlays,
         ...(Object.keys(zReference).length ? { zReference } : {}),
         derivedEvents: [],
         conventions: { lineGap: 90 }

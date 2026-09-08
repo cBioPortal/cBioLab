@@ -94,7 +94,11 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
   if (t.kind === "gene") {
     for (const l of cellLayers(code, S)) {
       if (l.alpha < 1) ctx.globalAlpha = l.alpha;
-      ctx.fillStyle = l.color; ctx.fillRect(x, y + h * l.band[0], w, h * (l.band[1] - l.band[0]));
+      if (l.stroke) {
+        const sw = Math.min(l.stroke, w / 2 || l.stroke);
+        ctx.strokeStyle = l.color; ctx.lineWidth = sw;
+        ctx.strokeRect(x + sw / 2, y + sw / 2, Math.max(0, w - sw), h - sw);
+      } else { ctx.fillStyle = l.color; ctx.fillRect(x, y + h * l.band[0], w, h * (l.band[1] - l.band[0])); }
       if (l.alpha < 1) ctx.globalAlpha = 1;
     }
     return;
@@ -182,7 +186,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
     ctx.fillText(truncateLabel(t.label, S), 4, y + 14);
     if (t.freqPct != null) {
       ctx.fillStyle = P.muted; ctx.textAlign = "right";
-      ctx.fillText(formatGutterPct(t.driverPct, t.freqPct), gutter - 8, y + 14);
+      ctx.fillText(formatGutterPct(t.driverPct, t.freqPct, t.profiled, data.n), gutter - 8, y + 14);
       ctx.textAlign = "left";
     }
   });
@@ -216,11 +220,15 @@ export function hitTest(x: number, y: number, data: UnpackedContract, order: Uin
 export function decodeGene(code: number): string {
   if (code === -1) return "not profiled";
   if (code === 0) return "no alteration";
+  const B = BITS as Record<string, number>;
   const parts: string[] = [];
-  for (const m of STYLE.glyph.mutation.priority) if (code & BITS[m.bit as keyof typeof BITS]) parts.push(m.label.toLowerCase());
+  for (const m of STYLE.glyph.mutation.priority) if (code & B[m.bit]) parts.push(m.label.toLowerCase());
   if (code & BITS.SV) parts.push(STYLE.glyph.sv.label.toLowerCase());
-  for (const o of STYLE.glyph.cna.options) if (code & BITS[o.bit as keyof typeof BITS]) parts.push(o.label.toLowerCase());
-  parts.push(code & BITS.DRIVER ? "putative driver" : "unknown significance");
+  for (const o of STYLE.glyph.cna.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase());
+  for (const o of STYLE.glyph.mrna.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase());
+  for (const o of STYLE.glyph.protein.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase());
+  const ALT = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
+  if (code & ALT) parts.push(code & BITS.DRIVER ? "putative driver" : "unknown significance");
   return parts.join(" · ");
 }
 

@@ -13,7 +13,9 @@ import type { Contract, Track, GroupRange, ZReference, ResolvedDisplay, DisplayS
 export const BITS = {
   MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16,
   SV: 32, AMP: 64, HOMDEL: 128,
-  DRIVER: 256   // any alteration in the cell is annotated (putative) driver
+  DRIVER: 256,      // any alteration in the cell is annotated (putative) driver
+  PROMOTER: 512,    // 5'Flank / promoter mutations
+  MRNA_HIGH: 1024, MRNA_LOW: 2048, PROT_HIGH: 4096, PROT_LOW: 8192
 };
 export const NOT_PROFILED = -1;
 
@@ -24,6 +26,8 @@ export function mutClassBit(mt: string | undefined): number {
   if (t.startsWith("nonsense") || t.startsWith("frame_shift") || t.startsWith("nonstop")) return BITS.TRUNCATING;
   if (t.startsWith("in_frame")) return BITS.INFRAME;
   if (t.startsWith("splice")) return BITS.SPLICE;
+  // the portal calls these promoter mutations; the warehouse spells them 5'Flank
+  if (t.startsWith("5'flank") || t.startsWith("5_flank") || t.includes("promoter")) return BITS.PROMOTER;
   return BITS.OTHER_MUT;
 }
 
@@ -111,6 +115,12 @@ export interface AssembleInput {
   heatmap: { profileType: string; genes: string[]; isVaf: boolean; values: Map<string, number> }[];
   /** "<profileType>|<gene>" -> pooled reference (federated z-scoring) */
   zReference?: Record<string, ZReference>;
+  /**
+   * Thresholded molecular evidence drawn INTO the gene cells rather than as their own track:
+   * mRNA as an outline, protein as thin bars, the way the portal does it. Values beyond
+   * ±threshold set the high/low bit for that (column, gene).
+   */
+  overlays?: { kind: "mrna" | "protein"; profileType: string; threshold: number; values: Map<string, number> }[];
   /** binary phenotype rows: the column ids in the set draw as 1 */
   derived: { label: string; pids: Set<string> }[];
   sort: SortKey[];
@@ -163,6 +173,21 @@ export function assembleContract(input: AssembleInput): Contract {
   }
 
   phase("gene cells");
+  // ---- molecular overlays: extra bits on the gene cells --------------------
+  for (const ov of input.overlays || []) {
+    const hi = ov.kind === "mrna" ? BITS.MRNA_HIGH : BITS.PROT_HIGH;
+    const lo = ov.kind === "mrna" ? BITS.MRNA_LOW : BITS.PROT_LOW;
+    for (const gene of genes) {
+      const cells = geneCells.get(gene)!;
+      for (let i = 0; i < allPids.length; i++) {
+        const v = ov.values.get(allPids[i] + "|" + gene);
+        if (v === undefined) continue;
+        if (v >= ov.threshold) cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | hi;
+        else if (v <= -ov.threshold) cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | lo;
+      }
+    }
+  }
+
   // ---- clinical tracks ---------------------------------------------------
   const clinTracks: Track[] = [];
   if (multi) {
@@ -290,15 +315,16 @@ export function assembleContract(input: AssembleInput): Contract {
   // tiebreakers so every sort is total and deterministic.
   const cellRank = (c: number): number => {
     if (c <= 0) return 0;
-    const t = c & BITS.AMP ? 8 : c & BITS.HOMDEL ? 7 : c & BITS.SV ? 6 : c & BITS.TRUNCATING ? 5 :
-      c & BITS.INFRAME ? 4 : c & BITS.SPLICE ? 3 : c & BITS.MISSENSE ? 2 : 1;
+    const t = c & BITS.AMP ? 10 : c & BITS.HOMDEL ? 9 : c & BITS.SV ? 8 : c & BITS.TRUNCATING ? 7 :
+      c & BITS.SPLICE ? 6 : c & BITS.INFRAME ? 5 : c & BITS.PROMOTER ? 4 : c & BITS.MISSENSE ? 3 :
+      c & BITS.OTHER_MUT ? 2 : 1;
     return t * 2 + (c & BITS.DRIVER ? 1 : 0);
   };
   // The staircase compares every gene track in order. Doing that inside a comparator costs
   // one array read and a branch per gene per comparison — the dominant cost of a 400k-column
   // sort. Each rank is 0..17, so five bits hold it: pack the first ten genes into one float
   // (50 bits, exact in a double) and the rest into a second, then compare two numbers.
-  const RANK_BITS = 32, PACKED = 10;
+  const RANK_BITS = 32, PACKED = 10;   // ranks run 0..21, so five bits each; ten fit in a double
   const packKeys = (from: number, count: number): Float64Array => {
     const key = new Float64Array(allPids.length);
     const list = genes.slice(from, from + count).map((g) => geneCells.get(g)!);
@@ -365,8 +391,11 @@ export function assembleContract(input: AssembleInput): Contract {
   for (const g of genes) {
     const cells = remap(geneCells.get(g)!);
     const profiled = cells.filter((c) => c !== NOT_PROFILED).length;
-    const altered = cells.filter((c) => c > 0).length;
-    const driverAltered = cells.filter((c) => c > 0 && (c & BITS.DRIVER)).length;
+    // an overlay is evidence about the gene, not an alteration of it: expression does not
+    // enter the altered fraction, which is what the portal reports too
+    const ALT = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
+    const altered = cells.filter((c) => c > 0 && (c & ALT)).length;
+    const driverAltered = cells.filter((c) => c > 0 && (c & ALT) && (c & BITS.DRIVER)).length;
     tracks.push({
       kind: "gene", label: g, cells,
       altered, profiled, driverAltered,

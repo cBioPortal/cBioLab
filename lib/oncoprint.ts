@@ -207,7 +207,15 @@ export function normalizeSpec(spec: OncoprintSpec) {
       .map((g: string) => String(g).toUpperCase().trim()).filter((g: string) => GENE_RE.test(g)).slice(0, 12)
   })).filter((h) => h.profileType);
   const unit: Unit = spec.unit === "sample" ? "sample" : "patient";
-  return { genes, clinical, derivedEvents, lineGap, sort, heatmap, unit, display: normalizeDisplay(spec.display) };
+  // overlays: thresholded molecular evidence drawn into the gene cells (mRNA outline,
+  // protein bars) rather than as tracks of their own — the portal's ±2 z-score rule
+  const overlays = (Array.isArray(spec.overlays) ? spec.overlays : []).slice(0, 2).map((o) => {
+    const kind = o && o.kind === "protein" ? "protein" as const : "mrna" as const;
+    const profileType = String((o && o.profileType) || "");
+    const threshold = Number(o && o.threshold);
+    return { kind, profileType, threshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 2 };
+  }).filter((o) => o.profileType);
+  return { genes, clinical, derivedEvents, lineGap, sort, heatmap, unit, overlays, display: normalizeDisplay(spec.display) };
 }
 
 // Provenance: the exact SQL a spec compiles to, without executing anything.
@@ -270,7 +278,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   // per-study database on the same instance (e.g. a GENIE release next to the public portal);
   // studies not listed live in the app's default database
   const dbOf = (s: string): string => String((spec.dbs || {})[s] || "").replace(/[^A-Za-z0-9_]/g, "") || DB;
-  const { genes, clinical, derivedEvents, lineGap, sort, heatmap, display, unit } = normalizeSpec(spec);
+  const { genes, clinical, derivedEvents, lineGap, sort, heatmap, display, unit, overlays } = normalizeSpec(spec);
   if (multi && derivedEvents.length) throw new Error("derived-event tracks are single-study; drop them or the extra studies");
   if (unit === "sample" && derivedEvents.length) throw new Error("derived-event tracks are patient-level; they cannot be drawn per sample");
 
@@ -366,6 +374,22 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
     heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf, values });
   }
 
+  // ---- molecular overlays: values thresholded into the gene cells ---------
+  const overlaysIn: AssembleInput["overlays"] = [];
+  for (const ov of overlays) {
+    const avail = await Promise.all(studies.map(async (s) => (await studyProfileTypes(s, dbOf(s))).has(ov.profileType) ? s : null));
+    const okStudies = avail.filter((s): s is string => s !== null);
+    if (!okStudies.length)
+      throw new Error("overlay: profile '" + ov.profileType + "' not in " + studies.join("/") +
+        " (available: " + ([...(await studyProfileTypes(studies[0], dbOf(studies[0])))].join(", ") || "none") + ")");
+    const values = new Map<string, number>();
+    const fetched = await Promise.all(okStudies.map(async (s) =>
+      ({ s, r: await lqRows("oncoprint:overlay " + ov.kind, heatmapSql(ov.profileType, genes, s, dbOf(s), unit), s) })));
+    for (const { s, r } of fetched)
+      for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
+    overlaysIn.push({ kind: ov.kind, profileType: ov.profileType, threshold: ov.threshold, values });
+  }
+
   // ---- derived-event rows (cohort-DSL expressions as phenotypes) ---------
   const derivedIn: AssembleInput["derived"] = [];
   for (const de of derivedEvents)
@@ -376,7 +400,7 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   const contract = assembleContract({
     genes, groups, studies, studyOf, events, coverage,
     isDriver: (r) => annotation.isDriver(r as Parameters<typeof annotation.isDriver>[0]), annotationSource: annotation.source,
-    clinical: clinicalIn, heatmap: heatmapIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit
+    clinical: clinicalIn, heatmap: heatmapIn, overlays: overlaysIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit
   });
   contract.stats.ms = Date.now() - t0;
   contract.stats.queryMs = queryMs;
