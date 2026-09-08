@@ -36,7 +36,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   **`lib/oncoprint-style.ts`** (THE visual decisions: palette, glyph bands, mutation priority, legend,
   `cellLayers`) and **`lib/oncoprint-lod.ts`** (level-of-detail bucketing): `lib/oncoprint-svg.ts`
   (server SVG: web app, `/provenance`, CLI), `app/_oncoprint/` (browser canvas + the shared `OncoprintFigure`),
-  `mcp/apps/oncoprint-html.ts` (MCP App iframe, style embedded), `python/cohortlab` (numpy/matplotlib,
+  `python/cohortlab` (numpy/matplotlib,
   reads the generated `style.json`; `npm run style:gen`, drift fails `npm test`).
   `scripts/oncoprint-cli.ts` and `python -m cohortlab` wrap all of this for local tables. **`lib/view-svg.ts`** — the same contract for every other view kind (survival,
   hotspots, compare, cooccurrence, coexpression, clinical); used by the in-app chat today and
@@ -55,8 +55,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   demo pages were retired once the Analysis app subsumed them; `/` now redirects to `/analysis`.
 - **`app/api/chat/route.ts`** — Claude tool-use loop (`update_document`, `get_catalog`).
 - **`mcp/tools.ts`** — MCP registry: `describe_dsl`, `run_analysis`, `render_oncoprint` (+v1
-  event tools); `mcp/apps/` = optional MCP-Apps interactive oncoprint (additive; user considers
-  it premature — don't invest further without being asked).
+  event tools). MCP returns oncoprints as a static image rendered from the server SVG; the
+  interactive figure is the web app's, not a third renderer.
 - **`lib/dsl-reference.ts`** — **THE single source of truth for DSL documentation.**
 
 ## Docs worth reading before changing things

@@ -13,7 +13,6 @@ import { buildExplore } from "../lib/explore.ts";
 import { PRIMARY } from "../lib/ch.ts";
 import type { AnalysisDoc, CohortDef, OncoprintSpec } from "../lib/types.ts";
 import type { PidsCarrier } from "../lib/oncoprint.ts";
-import { registerOncoprintApp } from "./apps/oncoprint-app.ts";
 
 // ---------- shared zod fragments (mirrors docs/cohort-query.schema.json) ----------
 const zSelector = z.object({
@@ -63,7 +62,6 @@ function cohortCaveats(args: any): string[] {
 function text(t: string) { return { content: [{ type: "text", text: t }] }; }
 
 export function registerTools(server: any): void {
-  registerOncoprintApp(server); // MCP Apps (SEP-1865) interactive oncoprint — additive side-module
 
   // ---- federation endpoint -------------------------------------------------
   // What a peer instance exposes to another Cohort Lab: AGGREGATES ONLY.
