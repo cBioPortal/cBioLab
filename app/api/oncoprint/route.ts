@@ -9,9 +9,12 @@ export async function POST(req: Request) {
   try {
     const spec = await req.json();
     const t0 = Date.now();
-    const contract = await buildContract(spec);
+    const sp = new URL(req.url).searchParams;
+    const log: { label: string; sql: string; ms?: number; study?: string }[] = [];
+    const provenance = sp.get("provenance") === "1";
+    const contract = await buildContract(spec, provenance ? { log, provenance } : {});
     const engineMs = Date.now() - t0;
-    if (new URL(req.url).searchParams.get("format") === "bin") {
+    if (sp.get("format") === "bin") {
       const tp = Date.now();
       const body = packContract(contract);
       return new Response(body.buffer as ArrayBuffer, { headers: {

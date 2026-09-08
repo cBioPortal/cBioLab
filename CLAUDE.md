@@ -35,7 +35,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   `lib/oncoprint-binary.ts` is the OPB1 wire format. Renderers are dumb and share
   **`lib/oncoprint-style.ts`** (THE visual decisions: palette, glyph bands, mutation priority, legend,
   `cellLayers`) and **`lib/oncoprint-lod.ts`** (level-of-detail bucketing): `lib/oncoprint-svg.ts`
-  (server SVG: web app, `/provenance`, CLI), `app/oncoprint-lab/canvas.ts` (browser canvas),
+  (server SVG: web app, `/provenance`, CLI), `app/_oncoprint/` (browser canvas + the shared `OncoprintFigure`),
   `mcp/apps/oncoprint-html.ts` (MCP App iframe, style embedded), `python/cohortlab` (numpy/matplotlib,
   reads the generated `style.json`; `npm run style:gen`, drift fails `npm test`).
   `scripts/oncoprint-cli.ts` and `python -m cohortlab` wrap all of this for local tables. **`lib/view-svg.ts`** — the same contract for every other view kind (survival,
