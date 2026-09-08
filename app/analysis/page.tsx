@@ -900,11 +900,15 @@ export default function AnalysisPage() {
 
   /** viewing options as the figure wants them, defaulted from the document */
   const figureDisplay = (v: any): FigureDisplay => ({ ...DEFAULT_FIGURE_DISPLAY, ...(v.display || {}) });
+  /** which display keys the figure owns, and therefore writes back without a re-run */
+  const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colors"]);
   const setViewDisplay = (vi: number, d: FigureDisplay) => updateViewLocal(vi, v => {
     // keep the document tidy: only options that differ from the default are written down
     const display: any = { ...(v.display || {}) };
-    for (const [k, dflt] of Object.entries(DEFAULT_FIGURE_DISPLAY))
-      if ((d as any)[k] === dflt) delete display[k]; else display[k] = (d as any)[k];
+    for (const k of FIGURE_KEYS) {
+      const val = (d as any)[k], dflt = (DEFAULT_FIGURE_DISPLAY as any)[k];
+      if (val === undefined || val === dflt) delete display[k]; else display[k] = val;
+    }
     const next = { ...v };
     if (Object.keys(display).length) next.display = display; else delete next.display;
     return next;

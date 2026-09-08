@@ -116,12 +116,12 @@ export function paletteOf(S: Style): Palette {
 
 export interface DrawResult { ms: number; cellsDrawn: number; bucketsDrawn: number }
 
-export interface DrawOpts { gap?: number; pctLabels?: boolean; style?: Style }
+export interface DrawOpts { gap?: number; pctLabels?: boolean; style?: Style; colors?: Record<string, Record<string, string>> }
 
 export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[],
   view: View, cssW: number, P: Palette = PALETTE, opts: DrawOpts = {}): DrawResult {
   const S = opts.style ?? resolveStyle(data.display?.style);
-  const colors = data.display?.colors;
+  const colors = opts.colors ?? data.display?.colors;
   const gap = opts.gap ?? GEOM.groupGap;
   const t0 = performance.now();
   const { header, rowH, rowGap, gutter } = GEOM;

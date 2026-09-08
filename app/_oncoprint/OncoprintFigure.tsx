@@ -21,7 +21,11 @@ const MAX_ZOOM = 24;
  * never a number, so they never need a refetch. Options that change numbers — hideVUS,
  * annotate — live in the spec and are the page's business.
  */
-export interface FigureDisplay { showUnaltered: boolean; whitespace: boolean; gaps: "none" | "gaps" | "pct"; colorByType: boolean }
+export interface FigureDisplay {
+  showUnaltered: boolean; whitespace: boolean; gaps: "none" | "gaps" | "pct"; colorByType: boolean;
+  /** per track, per value: the portal's Edit Colors, applied in the browser */
+  colors?: Record<string, Record<string, string>>;
+}
 export const DEFAULT_FIGURE_DISPLAY: FigureDisplay = { showUnaltered: true, whitespace: true, gaps: "none", colorByType: true };
 
 export interface Perf { fetchMs?: number; bytes?: number; engineMs?: number; packMs?: number; decodeMs?: number; drawMs?: number;
@@ -186,11 +190,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const S = styleForDisplay(resolveStyle(data.display?.style), display);
     const r = draw(ctx, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, Math.max(0, view.scrollX)) },
-      cssW, paletteOf(S), { gap: gapPx, pctLabels: gapMode === "pct", style: S });
+      cssW, paletteOf(S), { gap: gapPx, pctLabels: gapMode === "pct", style: S, colors: display.colors ?? data.display?.colors });
     const mem = (performance as any).memory;
     bump({ drawMs: r.ms, cellsDrawn: r.cellsDrawn, bucketsDrawn: r.bucketsDrawn, frames: perfRef.current.frames + 1, heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : undefined });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, visible, view, cssW, maxScroll, gapPx, gapMode]);
+  }, [data, visible, view, cssW, maxScroll, gapPx, gapMode, display.colorByType, display.colors]);
 
   // ---- interactions ---------------------------------------------------------
   const zoomAt = (factor: number, px?: number) => setView((v) => {
@@ -416,6 +420,27 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                   item(display.gaps === "none" ? "Show gaps" : "Hide gaps", display.gaps !== "none", () => set({ gaps: display.gaps === "none" ? "gaps" : "none" }))}
                 {t.categories && t.categories.length > 0 && primaryKey === t.label &&
                   item("Show gaps (w/%)", display.gaps === "pct", () => set({ gaps: "pct" }))}
+                {t.categories && t.categories.length > 0 && (
+                  <details>
+                    <summary className="meta" style={{ cursor: "pointer", padding: "0.2rem 0.3rem" }}>Edit colours</summary>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem", padding: "0.2rem 0.3rem", maxHeight: 200, overflowY: "auto" }}>
+                      {t.categories.map((v, ci) => (
+                        <label key={v} className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                          <input type="color" value={(display.colors?.[t.label]?.[v]) || CAT_COLORS[ci % CAT_COLORS.length]}
+                            onChange={(e) => set({ colors: { ...(display.colors || {}), [t.label]: { ...(display.colors?.[t.label] || {}), [v]: e.target.value } } })}
+                            style={{ width: 26, height: 18, padding: 0, border: "none", background: "none" }} />
+                          <span style={{ flex: 1 }}>{v}</span>
+                        </label>
+                      ))}
+                      {display.colors?.[t.label] && (
+                        <button className="linklike" style={{ textAlign: "left" }} onClick={() => {
+                          const next = { ...(display.colors || {}) }; delete next[t.label];
+                          set({ colors: Object.keys(next).length ? next : undefined });
+                        }}>Reset colours</button>
+                      )}
+                    </div>
+                  </details>
+                )}
                 {!sortable && <span className="meta" style={{ padding: "0.2rem 0.3rem" }}>
                   {t.kind === "gene" ? "gene tracks set the staircase; use the sort menu" : "no values to sort by"}</span>}
               </div>
@@ -434,7 +459,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             </div>
           )}
         </div>
-        <Legend data={data} colorByType={display.colorByType} />
+        <Legend data={data} colorByType={display.colorByType} colors={display.colors ?? data.display?.colors} />
         {props.footer}
         {props.timings && (
           <details style={{ marginTop: "0.5rem" }} open>
@@ -453,14 +478,13 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   );
 }
 
-function Legend({ data, colorByType }: { data: UnpackedContract; colorByType: boolean }) {
+function Legend({ data, colorByType, colors }: { data: UnpackedContract; colorByType: boolean; colors?: Record<string, Record<string, string>> }) {
   const S = styleForDisplay(resolveStyle(data.display?.style), { colorByType });
   const P = paletteOf(S);
   let bitsPresent = 0;
   for (const t of data.tracks) if (t.kind === "gene") for (let i = 0; i < t.cells.length; i++) if (t.cells[i] > 0) bitsPresent |= t.cells[i];
   const sw = (c: string, w = 10) => <span style={{ display: "inline-block", width: w, height: 10, background: c, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />;
   const np = <span style={{ display: "inline-block", width: 10, height: 10, background: `linear-gradient(${P.np} 45%, ${P.npStripe} 45%, ${P.npStripe} 55%, ${P.np} 55%)`, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />;
-  const colors = data.display?.colors;
   if (data.display?.clinicalLegends === "none") return null;
   return (
     <div className="meta" style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem 0.9rem", marginTop: "0.4rem" }}>
