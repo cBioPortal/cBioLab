@@ -218,12 +218,9 @@ export function decodeGene(code: number): string {
   return parts.join(" · ");
 }
 
-/** Genomic staircase comparator over gene tracks, same ranking as the engine. */
-export function staircaseOrder(data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[]): Uint32Array {
-  const genes = data.tracks.filter((t) => t.kind === "gene");
-  const n = order.length;
-  // precompute a rank byte per (gene, column): 0 = unaltered, higher = draws earlier
-  const ranks = genes.map((t) => {
+/** Rank byte per (gene, column): 0 = unaltered; higher draws earlier. Same ranking as the engine. */
+function staircaseRanks(data: UnpackedContract): Uint8Array[] {
+  return data.tracks.filter((t) => t.kind === "gene").map((t) => {
     const r = new Uint8Array(data.n);
     const c = t.cells;
     for (let i = 0; i < data.n; i++) {
@@ -235,13 +232,34 @@ export function staircaseOrder(data: UnpackedContract, order: Uint32Array, group
     }
     return r;
   });
-  const out = new Uint32Array(n);
+}
+
+export interface SortKey { track: string; dir: "asc" | "desc" }
+
+/**
+ * Re-order columns within each group by the given keys — a track label ("asc"/"desc",
+ * missing values last), "genomic" (staircase) or "id" (patient id) — with the staircase
+ * and patient id as the final tiebreakers, exactly like the engine.
+ */
+export function sortColumns(data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[], keys: SortKey[]): Uint32Array {
+  const ranks = staircaseRanks(data);
+  const ids = data.columns();
+  const genomic = (a: number, b: number): number => { for (const r of ranks) { const d = r[b] - r[a]; if (d) return d; } return 0; };
+  const byId = (a: number, b: number): number => (ids[a] < ids[b] ? -1 : ids[a] > ids[b] ? 1 : 0);
+  const cmps = keys.map((k): ((a: number, b: number) => number) => {
+    const sign = k.dir === "desc" ? -1 : 1;
+    if (k.track === "genomic") return (a, b) => sign * genomic(a, b);
+    if (k.track === "id") return (a, b) => sign * byId(a, b);
+    const t = data.tracks.find((x) => x.label === k.track);
+    if (!t) throw new Error("sort: no track labelled '" + k.track + "'");
+    const c = t.cells;
+    return (a, b) => { const x = c[a], y = c[b]; if (x === y) return 0; if (x === -1) return 1; if (y === -1) return -1; return sign * (x - y); };
+  });
+  cmps.push(genomic, byId);
+  const out = new Uint32Array(order.length);
   for (const g of groups) {
     const idx = Array.from(order.subarray(g.start, g.start + g.count));
-    idx.sort((a, b) => {
-      for (const r of ranks) { const d = r[b] - r[a]; if (d) return d; }
-      return a - b;
-    });
+    idx.sort((a, b) => { for (const c of cmps) { const r = c(a, b); if (r) return r; } return 0; });
     out.set(idx, g.start);
   }
   return out;

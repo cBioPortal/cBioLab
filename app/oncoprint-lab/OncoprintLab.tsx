@@ -4,7 +4,7 @@
 // window.__onco so headless measurements read the same numbers the panel shows.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, hitTest, staircaseOrder, virtualWidth,
+import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, hitTest, sortColumns, virtualWidth,
   type Hit, type View, type VisibleGroup } from "./canvas.ts";
 
 const MAX_ZOOM = 24;
@@ -20,7 +20,7 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
   const [showUnaltered, setShowUnaltered] = useState(true);
   const [hover, setHover] = useState<{ hit: Hit; x: number; y: number } | null>(null);
   const [cssW, setCssW] = useState(1200);
-  const [sortKey, setSortKey] = useState<"server" | "client">("server");
+  const [sortKey, setSortKey] = useState<string>(""); // "" = engine order; "genomic" | "id" | "[-]<track label>"
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drag = useRef<{ x: number; scrollX: number } | null>(null);
@@ -76,9 +76,10 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
       order = new Uint32Array(keep); groups = ng;
       bump({ hideMs: performance.now() - t0 });
     }
-    if (sortKey === "client") {
+    if (sortKey) {
       const t0 = performance.now();
-      order = staircaseOrder(data, order, groups);
+      const desc = sortKey.startsWith("-");
+      order = sortColumns(data, order, groups, [{ track: desc ? sortKey.slice(1) : sortKey, dir: desc ? "desc" : "asc" }]);
       bump({ sortMs: performance.now() - t0 });
     }
     return { order, groups };
@@ -95,8 +96,9 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
   const minZoom = visible ? fitZoom(visible.groups, plotW) : 1;
   const maxScroll = visible ? Math.max(0, virtualWidth(visible.groups, view.zoom) - plotW) : 0;
 
-  // fit on first data / when the visible set changes
-  useEffect(() => { if (visible) setView((v) => ({ ...v, zoom: fitZoom(visible.groups, plotW), scrollX: 0 })); }, [visible, plotW]);
+  // fit on first data and when the set of drawn columns changes (not on re-sort)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (visible) setView((v) => ({ ...v, zoom: fitZoom(visible.groups, plotW), scrollX: 0 })); }, [data, showUnaltered, plotW]);
 
   // ---- draw ----------------------------------------------------------------
   useEffect(() => {
@@ -184,8 +186,14 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
           <span className="spacer" />
           <label className="meta"><input type="checkbox" checked={showUnaltered} onChange={(e) => setShowUnaltered(e.target.checked)} /> show unaltered</label>
           <label className="meta"><input type="checkbox" checked={view.whitespace} onChange={(e) => setView((v) => ({ ...v, whitespace: e.target.checked }))} /> whitespace</label>
-          <label className="meta">sort <select value={sortKey} onChange={(e) => setSortKey(e.target.value as "server" | "client")} style={{ fontSize: "0.78rem" }}>
-            <option value="server">engine order</option><option value="client">re-sort in browser (staircase)</option></select></label>
+          <label className="meta">sort <select value={sortKey} onChange={(e) => setSortKey(e.target.value)} style={{ fontSize: "0.78rem" }}>
+            <option value="">engine order ({data.conventions.sort.join(", ")})</option>
+            <option value="genomic">genomic staircase</option>
+            <option value="id">patient id</option>
+            {data.tracks.filter((t) => t.kind !== "gene" && !/\(no data\)$/.test(t.label)).flatMap((t) => [
+              <option key={t.label} value={t.label}>{t.label} ↑</option>,
+              <option key={"-" + t.label} value={"-" + t.label}>{t.label} ↓</option>])}
+          </select></label>
           <button className="linklike" onClick={() => zoomAt(1 / 1.4)} title="zoom out">−</button>
           <input type="range" min={0} max={100} value={pct} onChange={(e) => { const p = Number(e.target.value) / 100; setView((v) => ({ ...v, zoom: minZoom * Math.pow(MAX_ZOOM / minZoom, p) })); }} style={{ width: 120 }} />
           <button className="linklike" onClick={() => zoomAt(1.4)} title="zoom in">+</button>
