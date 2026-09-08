@@ -1,5 +1,6 @@
 import { buildContract } from "../../../lib/oncoprint";
 import { packContract } from "../../../lib/oncoprint-binary";
+import { gzipSync } from "node:zlib";
 
 export const maxDuration = 120;
 
@@ -16,10 +17,17 @@ export async function POST(req: Request) {
     const engineMs = Date.now() - t0;
     if (sp.get("format") === "bin") {
       const tp = Date.now();
-      const body = packContract(contract);
-      return new Response(body.buffer as ArrayBuffer, { headers: {
+      const raw = packContract(contract);
+      // Half the payload is patient ids, which compress ~5x; cells compress little. Next does
+      // not compress octet-stream, so do it here when the client will take it.
+      const wants = /\bgzip\b/.test(req.headers.get("accept-encoding") || "");
+      const body = wants && raw.byteLength > 65536 ? gzipSync(raw, { level: 5 }) : raw;
+      const packMs = Date.now() - tp;
+      return new Response(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer, { headers: {
         "Content-Type": "application/octet-stream",
-        "X-Engine-Ms": String(engineMs), "X-Pack-Ms": String(Date.now() - tp), "X-Columns": String(contract.columns.length)
+        ...(body === raw ? {} : { "Content-Encoding": "gzip" }),
+        "X-Engine-Ms": String(engineMs), "X-Pack-Ms": String(packMs),
+        "X-Raw-Bytes": String(raw.byteLength), "X-Columns": String(contract.columns.length)
       } });
     }
     return Response.json(contract);

@@ -19,7 +19,9 @@ export interface FigureDisplay { showUnaltered: boolean; whitespace: boolean; ga
 export const DEFAULT_FIGURE_DISPLAY: FigureDisplay = { showUnaltered: true, whitespace: true, gaps: "none" };
 
 export interface Perf { fetchMs?: number; bytes?: number; engineMs?: number; packMs?: number; decodeMs?: number; drawMs?: number;
-  cellsDrawn?: number; bucketsDrawn?: number; sortMs?: number; hideMs?: number; gapMs?: number; frames: number; heapMB?: number }
+  cellsDrawn?: number; bucketsDrawn?: number; sortMs?: number; hideMs?: number; gapMs?: number; frames: number; heapMB?: number;
+  /** compressed size of the response, when the server reported it */
+  wireBytes?: number }
 
 export interface OncoprintFigureProps {
   /** POSTed to /api/oncoprint?format=bin; a change of value (by JSON) refetches */
@@ -79,7 +81,10 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         const d = unpackContract(buf);
         const decodeMs = performance.now() - t1;
         if (!alive) return;
-        bump({ fetchMs, bytes: buf.byteLength, decodeMs, engineMs: Number(res.headers.get("X-Engine-Ms")) || undefined, packMs: Number(res.headers.get("X-Pack-Ms")) || undefined });
+        const raw = Number(res.headers.get("X-Raw-Bytes")) || 0;
+        bump({ fetchMs, bytes: buf.byteLength, decodeMs, engineMs: Number(res.headers.get("X-Engine-Ms")) || undefined,
+          packMs: Number(res.headers.get("X-Pack-Ms")) || undefined,
+          ...(raw && raw === buf.byteLength ? {} : {}) });
         setData(d); setLoading(false);
         props.onContract?.(d);
       } catch (e) { if (alive) { setError(String((e as Error).message || e)); setLoading(false); } }
@@ -292,7 +297,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             <summary className="meta">timings</summary>
             <table className="meta" style={{ fontVariantNumeric: "tabular-nums", borderSpacing: "10px 2px" }}><tbody>
               <tr><td>engine (server)</td><td>{fmt(perf.engineMs)} ms</td><td>pack (server)</td><td>{fmt(perf.packMs)} ms</td></tr>
-              <tr><td>fetch incl. engine</td><td>{fmt(perf.fetchMs)} ms</td><td>payload</td><td>{fmt((perf.bytes || 0) / 1048576, 2)} MB binary</td></tr>
+              <tr><td>fetch incl. engine</td><td>{fmt(perf.fetchMs)} ms</td><td>payload</td><td>{fmt((perf.bytes || 0) / 1048576, 2)} MB decoded{perf.wireBytes ? " · " + fmt(perf.wireBytes / 1048576, 2) + " MB on the wire" : ""}</td></tr>
               <tr><td>decode</td><td>{fmt(perf.decodeMs, 1)} ms</td><td>last draw</td><td>{fmt(perf.drawMs, 1)} ms ({fmt(perf.cellsDrawn)} cells, {fmt(perf.bucketsDrawn)} buckets)</td></tr>
               <tr><td>client re-sort</td><td>{fmt(perf.sortMs)} ms</td><td>hide unaltered</td><td>{fmt(perf.hideMs)} ms{perf.gapMs != null && <> · gaps {fmt(perf.gapMs)} ms</>}</td></tr>
               <tr><td>frames</td><td>{perf.frames}</td><td>JS heap</td><td>{fmt(perf.heapMB)} MB</td></tr>
