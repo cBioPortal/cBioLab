@@ -12,6 +12,7 @@ import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binar
 import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, hitTest, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { geneLegendFor, resolveStyle, styleForDisplay } from "../../lib/oncoprint-style.ts";
+import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 
 const MAX_ZOOM = 24;
 
@@ -59,6 +60,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const [perf, setPerf] = useState<Perf>({ frames: 0 });
   const [view, setView] = useState<View>({ zoom: 1, scrollX: 0, whitespace: display.whitespace });
   const [hover, setHover] = useState<{ hit: Hit; x: number; y: number } | null>(null);
+  // per-column specifics, fetched only for the column under the pointer and remembered
+  const [detail, setDetail] = useState<Record<string, ColumnDetail | "loading">>({});
+  const detailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [cssW, setCssW] = useState(1200);
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -222,27 +226,53 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     }
     const hit = hitTest(x, y, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, view.scrollX) }, gapPx);
     setHover(hit ? { hit, x, y } : null);
+    // one column under the pointer: ask the server what it carries, once, after a pause
+    if (detailTimer.current) clearTimeout(detailTimer.current);
+    if (hit && hit.n === 1) {
+      const col = data.columns()[hit.ci];
+      if (!(col in detail)) detailTimer.current = setTimeout(async () => {
+        setDetail((d) => ({ ...d, [col]: "loading" }));
+        try {
+          const res = await fetch("/api/oncoprint/detail", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ spec, column: col }) });
+          const j = await res.json();
+          setDetail((d) => ({ ...d, [col]: j.error ? { column: col, study: "", unit: data.unit, alterations: [], panels: [], notProfiled: [], annotation: j.error } : j }));
+        } catch { setDetail((d) => { const n = { ...d }; delete n[col]; return n; }); }
+      }, 220);
+    }
   };
 
   const tip = useMemo(() => {
     if (!hover || !data || !visible) return null;
     const { hit } = hover; const t = data.tracks[hit.ti];
-    const lines: string[] = [];
-    lines.push(hit.n === 1 ? data.columns()[hit.ci] : hit.n.toLocaleString() + " patients under this pixel");
-    lines.push(visible.groups[hit.gi].name);
+    const lines: { text: string; mono?: boolean; dim?: boolean }[] = [];
+    const col = hit.n === 1 ? data.columns()[hit.ci] : null;
+    lines.push({ text: col ?? hit.n.toLocaleString() + " " + data.unit + "s under this pixel", mono: !!col });
+    lines.push({ text: visible.groups[hit.gi].name, dim: true });
     if (hit.n === 1) {
       const c = t.cells[hit.ci];
-      if (t.kind === "gene") lines.push(t.label + ": " + decodeGene(c));
-      else if (t.kind === "derivedEvent") lines.push(t.label + ": " + (c > 0 ? "yes" : "no"));
-      else if (t.numeric) lines.push(t.label + ": " + (c === -1 ? "no data" : "≈" + (Math.round(((t.min ?? 0) + (c / 255) * ((t.max ?? 1) - (t.min ?? 0))) * 10) / 10)));
-      else lines.push(t.label + ": " + (c === -1 ? "no data" : (t.categories && t.categories[c]) || "Other"));
+      if (t.kind === "gene") lines.push({ text: t.label + ": " + decodeGene(c) });
+      else if (t.kind === "derivedEvent") lines.push({ text: t.label + ": " + (c > 0 ? "yes" : "no") });
+      else if (t.numeric) lines.push({ text: t.label + ": " + (c === -1 ? "no data" : "≈" + (Math.round(((t.min ?? 0) + (c / 255) * ((t.max ?? 1) - (t.min ?? 0))) * 10) / 10)) });
+      else lines.push({ text: t.label + ": " + (c === -1 ? "no data" : (t.categories && t.categories[c]) || "Other") });
     } else if (t.kind === "gene" || t.kind === "derivedEvent") {
       let alt = 0, prof = 0;
       for (let k = hit.k; k < hit.k1; k++) { const c = t.cells[visible.order[k]]; if (c !== -1) prof++; if (c > 0) alt++; }
-      lines.push(t.label + ": " + alt + " altered of " + prof + " profiled");
-    } else lines.push(t.label + ": zoom in for per-patient values");
+      lines.push({ text: t.label + ": " + alt + " altered of " + prof + " profiled" });
+    } else lines.push({ text: t.label + ": zoom in for per-" + data.unit + " values" });
+    // the specifics, once they arrive
+    const d = col ? detail[col] : undefined;
+    if (d === "loading") lines.push({ text: "…", dim: true });
+    else if (d) {
+      const mine = d.alterations.filter((a) => t.kind !== "gene" || a.gene === t.label);
+      for (const a of mine)
+        lines.push({ text: a.gene + " " + a.alteration + " · " + a.kind.replace(/_/g, " ") + (a.driver ? " · putative driver" : " · unknown significance"), mono: true });
+      if (t.kind === "gene" && !mine.length && d.alterations.length) lines.push({ text: "no " + t.label + " alteration; " + d.alterations.length + " in other genes", dim: true });
+      if (d.panels.length) lines.push({ text: "panel " + d.panels.map((p) => p.panel).join(", ") + (d.notProfiled.length ? " — not covering " + d.notProfiled.join(", ") : ""), dim: true });
+      else if (d.notProfiled.length) lines.push({ text: "no panel covers " + d.notProfiled.join(", "), dim: true });
+    }
     return lines;
-  }, [hover, data, visible]);
+  }, [hover, data, visible, detail]);
 
   // ---- render ---------------------------------------------------------------
   const pct = visible ? Math.round(100 * Math.log(view.zoom / minZoom) / Math.log(MAX_ZOOM / minZoom)) : 0;
@@ -344,8 +374,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           )}
           {hover && tip && (
             <div style={{ position: "absolute", left: Math.min(hover.x + 12, cssW - 260), top: hover.y + 14, pointerEvents: "none", background: "var(--card)", color: "var(--ink)",
-              border: "1px solid var(--line)", borderRadius: 6, padding: "6px 8px", fontSize: "0.78rem", boxShadow: "0 4px 14px rgba(0,0,0,.12)", maxWidth: 250, zIndex: 2 }}>
-              {tip.map((l, i) => <div key={i} style={i === 0 ? { fontFamily: "IBM Plex Mono, monospace" } : undefined}>{l}</div>)}
+              border: "1px solid var(--line)", borderRadius: 6, padding: "6px 8px", fontSize: "0.78rem", boxShadow: "0 4px 14px rgba(0,0,0,.12)", maxWidth: 330, zIndex: 2 }}>
+              {tip.map((l, i) => <div key={i} style={{ ...(l.mono ? { fontFamily: "IBM Plex Mono, monospace", fontSize: "0.72rem" } : {}), ...(l.dim ? { color: "var(--muted)" } : {}) }}>{l.text}</div>)}
             </div>
           )}
         </div>
