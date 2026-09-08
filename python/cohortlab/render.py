@@ -43,13 +43,13 @@ def _diverging(v: np.ndarray, c: float) -> np.ndarray:
 def bucket_edges(n: int, width_px: int) -> np.ndarray:
     """Column index boundaries for `width_px` buckets over `n` columns (last edge = n)."""
     if n <= width_px:
-        return np.arange(n + 1)
-    return np.unique(np.floor(np.arange(width_px + 1) * n / width_px).astype(np.int64))
+        return np.arange(n + 1, dtype=np.intp)
+    return np.unique(np.floor(np.arange(width_px + 1) * n / width_px).astype(np.intp))
 
 
 def aggregate(track: Track, cells: np.ndarray, edges: np.ndarray) -> np.ndarray:
     """One display code per bucket, per track kind (matches canvas.ts `aggregate`)."""
-    starts = edges[:-1]
+    starts = np.asarray(edges[:-1], dtype=np.intp)  # reduceat wants platform-width indices (32-bit under WebAssembly)
     if track.meta.get("numeric"):
         valid = cells != -1
         s = np.add.reduceat(np.where(valid, cells, 0).astype(np.int64), starts)
