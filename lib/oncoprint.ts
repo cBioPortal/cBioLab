@@ -22,6 +22,7 @@ export const PIDS_SQL: unique symbol = Symbol("pidsSql");
 export type PidsCarrier = CohortDef & { [PIDS_SQL]?: string | Record<string, string> };
 import { buildAnnotationIndex } from "./annotation.ts";
 import { compileCohortDef } from "./cohort2.ts";
+import { wardOrder, CLUSTER_LIMIT } from "./oncoprint-cluster.ts";
 
 import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
 export { normalizeDisplay, normalizeSort } from "./oncoprint-assemble.ts";
@@ -379,6 +380,34 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
     heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf, values });
   }
 
+  // ---- clustering: an order computed here, once, from the molecular values ----
+  // "cluster:<profileType>" orders columns by a Ward dendrogram over that profile's genes.
+  // It runs where the values already are, so the SVG, the canvas, the CLI and Python all draw
+  // the same order, and the order travels in the contract beside the numbers it describes.
+  let clusterRank: Map<string, number> | undefined;
+  const clusterKey = sort.find((k) => k.track.startsWith("cluster:"));
+  if (clusterKey) {
+    const profileType = clusterKey.track.slice("cluster:".length);
+    const h = heatmapIn.find((x) => x.profileType === profileType);
+    if (!h) throw new Error("sort: cluster needs '" + profileType + "' as a heatmap profile on this oncoprint" +
+      (heatmapIn.length ? " (it has " + heatmapIn.map((x) => x.profileType).join(", ") + ")" : " (it has none)"));
+    if (allPids.length > CLUSTER_LIMIT)
+      throw new Error("clustering " + allPids.length.toLocaleString() + " columns is a quadratic computation; the limit is " +
+        CLUSTER_LIMIT.toLocaleString() + ". Narrow the cohort, or sort by one of the profile's gene tracks instead.");
+    const columns = h.genes.map((g) => {
+      const col = new Float64Array(allPids.length);
+      for (let i = 0; i < allPids.length; i++) {
+        const v = h.values.get(allPids[i] + "|" + g);
+        col[i] = v === undefined ? NaN : v;
+      }
+      return col;
+    });
+    const order = wardOrder({ columns, n: allPids.length });
+    clusterRank = new Map<string, number>();
+    order.forEach((idx, rank) => clusterRank!.set(allPids[idx], rank));
+    clusterKey.track = "cluster";
+  }
+
   // ---- molecular overlays: values thresholded into the gene cells ---------
   const overlaysIn: AssembleInput["overlays"] = [];
   for (const ov of overlays) {
@@ -405,7 +434,7 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   const contract = assembleContract({
     genes, groups, studies, studyOf, events, coverage,
     isDriver: (r) => annotation.isDriver(r as Parameters<typeof annotation.isDriver>[0]), annotationSource: annotation.source,
-    clinical: clinicalIn, heatmap: heatmapIn, overlays: overlaysIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit
+    clinical: clinicalIn, heatmap: heatmapIn, overlays: overlaysIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit, clusterRank
   });
   contract.stats.ms = Date.now() - t0;
   contract.stats.queryMs = queryMs;

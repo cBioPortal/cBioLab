@@ -133,6 +133,12 @@ export interface AssembleInput {
   display?: ResolvedDisplay;
   /** what a column is; "sample" only changes the label and the caveat — the logic is identical */
   unit?: "patient" | "sample";
+  /**
+   * Column id -> its position in a clustering computed by the engine. The sort key "cluster"
+   * reads it. Clustering needs the molecular values and a quadratic pass, so it is done once
+   * where the values are fetched rather than in this pure function.
+   */
+  clusterRank?: Map<string, number>;
 }
 
 export function assembleContract(input: AssembleInput): Contract {
@@ -381,8 +387,14 @@ export function assembleContract(input: AssembleInput): Contract {
     const sign = s.dir === "desc" ? -1 : 1;
     if (s.track === "genomic") return (x: number, y: number) => sign * genomicCmp(x, y);
     if (s.track === "id") return (x: number, y: number) => sign * byId(x, y);
+    if (s.track === "cluster") {
+      const rank = input.clusterRank;
+      if (!rank) throw new Error("sort: 'cluster' needs a clustered profile — use \"cluster:<profileType>\"");
+      const at = (i: number): number => rank.get(allPids[i]) ?? Number.MAX_SAFE_INTEGER;
+      return (x: number, y: number) => sign * (at(x) - at(y));
+    }
     const t = sortableTracks.get(s.track);
-    if (!t) throw new Error("sort: '" + s.track + "' is not a track in this oncoprint — sortable: genomic, id" +
+    if (!t) throw new Error("sort: '" + s.track + "' is not a track in this oncoprint — sortable: genomic, id, cluster:<profileType>" +
       (sortableTracks.size ? ", " + [...sortableTracks.keys()].join(", ") : "") +
       " (clinical sort keys must also be listed in clinical)");
     return trackCmp(t, sign);
