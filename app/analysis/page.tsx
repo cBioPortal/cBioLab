@@ -244,6 +244,7 @@ export default function AnalysisPage() {
   type Workspace = { doc: AnalysisDoc; savedAt: string };
   const [spaces, setSpaces] = useState<Record<string, Workspace>>({});
   const [wsName, setWsName] = useState("");
+  const [openWs, setOpenWs] = useState(true);
   const wsDialog = useRef<HTMLDialogElement | null>(null);
   const persistSpaces = (next: Record<string, Workspace>) => {
     setSpaces(next);
@@ -716,6 +717,7 @@ export default function AnalysisPage() {
     const d = { ...doc, title: name };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
     persistSpaces({ ...spaces, [name]: { doc: d, savedAt: new Date().toISOString().slice(0, 16).replace("T", " ") } });
+    setOpenWs(true);   // a just-saved workspace opens on the section it created
   };
   const openWorkspace = (name: string) => {
     const w = spaces[name];
@@ -1641,11 +1643,21 @@ export default function AnalysisPage() {
                   {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} />}
                 </div>
               ))}
-              {/* ---- workspace bar: save this document, or reopen a saved one ---- */}
+              {/* The save/open controls stay with the document; everything you
+                  MANAGE about a saved workspace — its parameters and notes —
+                  lives at the top of the main column beside the figures. */}
               <div className="wsbar">
                 <strong>{doc.title || "Untitled workspace"}</strong>
-                <button className="linklike" disabled={busy} onClick={openWorkspaceSave}
-                  title="save this whole document — views, notes and parameters — under a name">save</button>
+                <button disabled={busy} onClick={openWorkspaceSave}
+                  title="save this whole document — views, notes and parameters — under a name">
+                  {doc.title ? "Save" : "Save workspace"}
+                </button>
+                {!doc.params && (doc.views || []).length > 0 && (
+                  <button className="linklike" disabled={busy} onClick={makeTemplate}
+                    title="lift the study and a shared gene list into parameters, so this can be re-pointed in one edit">
+                    make a template
+                  </button>
+                )}
                 {Object.keys(spaces).length > 0 && (
                   <select value="" disabled={busy}
                     onChange={e => { if (e.target.value) openWorkspace(e.target.value); }}>
@@ -1655,46 +1667,7 @@ export default function AnalysisPage() {
                       .map(([n, w]) => <option key={n} value={n}>{n} — {w.savedAt}</option>)}
                   </select>
                 )}
-                {doc.title && spaces[doc.title] && (
-                  <button className="linklike" disabled={busy}
-                    title={"delete the saved workspace \u201c" + doc.title + "\u201d"}
-                    onClick={() => deleteWorkspace(doc.title!)}>delete</button>
-                )}
-                <span className="spacer" />
-                {!doc.params && (doc.views || []).length > 0 && (
-                  <button className="linklike" disabled={busy} onClick={makeTemplate}
-                    title="lift the study and a shared gene list into parameters, so this can be re-pointed in one edit">
-                    make a template
-                  </button>
-                )}
               </div>
-
-              {/* ---- parameters: the template control ---- */}
-              {doc.params && Object.keys(doc.params).length > 0 && (
-                <div className="params">
-                  <div className="row" style={{ alignItems: "baseline" }}>
-                    <strong style={{ fontSize: "0.78rem" }}>Parameters</strong>
-                    <span className="meta">— change one here and every view that uses it re-runs</span>
-                  </div>
-                  {Object.entries(doc.params).map(([k, v]) => (
-                    <ParamRow key={k} name={k} value={v} busy={busy} onChange={val => setParam(k, val)} />
-                  ))}
-                  {result?.unusedParams?.length ? (
-                    <p className="note" style={{ margin: "0.3rem 0 0" }}>
-                      Declared but never used: {result.unusedParams.map(x => "$" + x).join(", ")} — usually a
-                      rename that missed a reference.
-                    </p>
-                  ) : null}
-                </div>
-              )}
-
-              {/* ---- notes: the analyst's own prose, stored with the document ---- */}
-              <details className="notes" open={!!doc.notes}>
-                <summary>Notes{doc.notes ? "" : " — what this workspace is for"}</summary>
-                <textarea value={doc.notes || ""} placeholder="What is this analysis for? What should a reader look at first?"
-                  onChange={e => setNotes(e.target.value)} spellCheck
-                  style={{ width: "100%", height: "5rem" }} />
-              </details>
 
               {/* id, because the notes textarea above it also matches "textarea" —
                   anything reading the document from outside React needs to be
@@ -1725,6 +1698,71 @@ export default function AnalysisPage() {
             </div>
           </div>
           <div>
+            {/* The workspace itself: what this saved analysis is called, the
+                parameters that point it at a study and a gene panel, and the
+                notes that say what it is for. It sits at the TOP of the column
+                it describes, and collapses because it is read when setting the
+                workspace up and rarely while reading the figures. */}
+            {(doc.title || doc.params || doc.notes) && (
+              <details className="card wscard" open={!!openWs}
+                onToggle={e => setOpenWs((e.currentTarget as HTMLDetailsElement).open)}>
+                <summary>
+                  <strong>{doc.title || "Untitled workspace"}</strong>
+                  <span className="meta">
+                    {doc.params ? " · " + Object.keys(doc.params).length + " parameter" + (Object.keys(doc.params).length === 1 ? "" : "s") : ""}
+                    {doc.notes ? " · notes" : ""}
+                    {!doc.title || !spaces[doc.title]
+                      ? " · not saved yet"
+                      : JSON.stringify(spaces[doc.title].doc) !== JSON.stringify(doc)
+                        ? " · unsaved changes"
+                        : " · saved " + spaces[doc.title].savedAt}
+                  </span>
+                </summary>
+                <div className="wscard-body">
+                  {doc.params && Object.keys(doc.params).length > 0 ? (
+                    <div className="params">
+                      <div className="row" style={{ alignItems: "baseline" }}>
+                        <strong style={{ fontSize: "0.78rem" }}>Parameters</strong>
+                        <span className="meta">— change one here and every view that uses it re-runs</span>
+                      </div>
+                      {Object.entries(doc.params).map(([k, v]) => (
+                        <ParamRow key={k} name={k} value={v} busy={busy} onChange={val => setParam(k, val)} />
+                      ))}
+                      {result?.unusedParams?.length ? (
+                        <p className="note" style={{ margin: "0.3rem 0 0" }}>
+                          Declared but never used: {result.unusedParams.map(x => "$" + x).join(", ")} — usually a
+                          rename that missed a reference.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (doc.views || []).length > 0 && (
+                    <p className="note" style={{ margin: "0 0 0.5rem" }}>
+                      No parameters yet — “make a template” beside the document lifts the study and a
+                      shared gene list out, so this workup can be re-pointed in one edit.
+                    </p>
+                  )}
+
+                  <label className="wslabel" htmlFor="wsnotes">Notes</label>
+                  <textarea id="wsnotes" value={doc.notes || ""} spellCheck
+                    placeholder="What is this analysis for? What should a reader look at first?"
+                    onChange={e => setNotes(e.target.value)} />
+
+                  <div className="row" style={{ marginTop: "0.5rem", gap: "0.5rem" }}>
+                    <button disabled={busy} onClick={openWorkspaceSave}>
+                      {doc.title && spaces[doc.title] ? "Save changes" : "Save workspace"}
+                    </button>
+                    {doc.title && spaces[doc.title] && (
+                      <button className="linklike" disabled={busy}
+                        title={"delete the saved workspace \u201c" + doc.title + "\u201d"}
+                        onClick={() => deleteWorkspace(doc.title!)}>delete</button>
+                    )}
+                    {doc.params && (
+                      <span className="meta">Parameters are stored with the workspace, so reopening it restores them.</span>
+                    )}
+                  </div>
+                </div>
+              </details>
+            )}
             {!result && !busy && (
               <div className="card">
                 <h2>Nothing here yet</h2>

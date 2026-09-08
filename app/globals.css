@@ -632,8 +632,6 @@ details.gearmenu.inline[open] > summary {
 .paramrow input { flex: 1; min-width: 0; }
 .paramrow .pillwrap { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; flex: 1; }
 .paramrow .pillwrap .pill { cursor: pointer; font-size: 0.72rem; padding: 0.15rem 0.5rem; }
-.notes { margin-bottom: 0.5rem; font-size: 0.78rem; }
-.notes > summary { cursor: pointer; color: var(--muted); padding: 0.15rem 0; }
 .notes textarea {
   width: 100%; box-sizing: border-box; margin-top: 0.3rem; padding: 0.45rem;
   font: 0.78rem/1.45 'IBM Plex Sans', system-ui, sans-serif;
@@ -647,4 +645,30 @@ details.gearmenu.inline[open] > summary {
   white-space: pre-wrap; margin: 0.3rem 0 0.5rem; padding: 0.4rem 0.55rem;
   font-size: 0.78rem; line-height: 1.5; color: var(--ink);
   background: var(--code-bg); border-left: 3px solid var(--accent-ink); border-radius: 0 5px 5px 0;
+}
+
+/* The workspace section: what this saved analysis is called, its parameters and
+   its notes, at the top of the column of figures it describes. Collapsible,
+   because it is read when setting the workspace up and rarely after. */
+.wscard { padding: 0.7rem 0.9rem; }
+.wscard > summary {
+  cursor: pointer; list-style: none; display: flex; align-items: baseline;
+  gap: 0.5rem; flex-wrap: wrap; user-select: none;
+}
+.wscard > summary::-webkit-details-marker { display: none; }
+/* a disclosure triangle that turns, so open/closed is legible without a library */
+.wscard > summary::before {
+  content: "\25B8"; color: var(--muted); font-size: 0.8rem;
+  transition: transform 0.12s ease; display: inline-block;
+}
+.wscard[open] > summary::before { transform: rotate(90deg); }
+.wscard > summary > strong { font-size: 0.9rem; letter-spacing: 0.02em; }
+.wscard-body { margin-top: 0.7rem; }
+.wscard .params { margin-bottom: 0.6rem; }
+.wslabel { display: block; font-size: 0.76rem; color: var(--muted); margin-bottom: 0.25rem; }
+.wscard textarea {
+  width: 100%; box-sizing: border-box; height: 4.5rem; padding: 0.45rem;
+  font: 0.8rem/1.5 'IBM Plex Sans', system-ui, sans-serif;
+  background: var(--code-bg); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px;
 }

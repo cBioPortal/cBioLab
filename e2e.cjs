@@ -422,9 +422,11 @@ async function main() {
           return tds.some((td) => (td.textContent || "").trim() === "BRAF");
         }, null, { timeout: 300000 });
 
-        await page.locator(".notes summary").click();
-        await page.locator(".notes textarea").fill("e2e workspace notes");
-        await page.locator('.wsbar button:has-text("save")').click();
+        // notes live in the workspace section, which appears once there is
+        // something to manage (here: the parameters just lifted)
+        await page.waitForSelector(".wscard", { timeout: 60000 });
+        await page.locator(".wscard textarea").fill("e2e workspace notes");
+        await page.locator('.wsbar button:has-text("Save workspace")').click();
         await page.waitForSelector("dialog.wsdialog[open]", { timeout: 30000 });
         await page.locator("dialog.wsdialog input").fill("e2e workspace");
         await page.locator('dialog.wsdialog button:has-text("Save")').click();
@@ -442,8 +444,15 @@ async function main() {
         const restored = reopened.notes === "e2e workspace notes" &&
           (reopened.params.genes || []).includes("BRAF") &&
           reopened.views.length === 2;
-        wsOk = noteShown && lifted && restored;
-        wsFlow = "note: " + noteShown + ", lifted: " + lifted + ", restored after reload: " + restored;
+        // the section is the FIRST thing in the column it describes, and says
+        // when the document has moved on from what was stored
+        const atTop = await page.evaluate(() => {
+          const col = document.querySelectorAll(".ana-grid > div")[1];
+          return !!(col && col.firstElementChild && col.firstElementChild.classList.contains("wscard"));
+        });
+        wsOk = noteShown && lifted && restored && atTop;
+        wsFlow = "note: " + noteShown + ", lifted: " + lifted + ", restored after reload: " + restored +
+          ", section at top: " + atTop;
       } catch (e) { wsFlow = String(e.message).split("\n")[0]; }
       ok("a workspace saves, retargets by one parameter, and survives a reload", wsOk, wsFlow);
 
