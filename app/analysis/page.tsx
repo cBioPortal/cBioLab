@@ -2321,10 +2321,16 @@ export default function AnalysisPage() {
                       onSortKey={(k) => setViewSort(vi, k)}
                       onContract={(ct) => setContracts((m: Record<number, UnpackedContract>) => m[vi] === ct ? m : { ...m, [vi]: ct })}
                       busy={busy}
-                      heading={<><h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {(c ? c.stats.nColumns : 0).toLocaleString()} patients · {c ? c.conventions.annotation : ""}</span></h2>
+                      heading={<><h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {(c ? c.stats.nColumns : 0).toLocaleString()} {c ? c.unit : "patient"}s · {c ? c.conventions.annotation : ""}</span></h2>
                         {c && <span className="lat" title="Server-side wall-clock for this figure's queries and contract assembly; drawing happens in your browser.">{(c.stats.ms || 0).toLocaleString()}ms</span>}</>}
                       controls={<>
                         <Participation p={v.participation} />
+                        <label className="meta" title="a cohort selects patients; sample mode draws every sample of those patients">columns <select
+                          value={ocView(vi).unit || "patient"} disabled={busy}
+                          onChange={(e) => updateView(vi, (vv: any) => { const n = { ...vv }; if (e.target.value === "sample") n.unit = "sample"; else delete n.unit; return n; })}
+                          style={{ fontSize: "0.78rem" }}>
+                          <option value="patient">patients</option><option value="sample">samples</option>
+                        </select></label>
                         <button className="linklike genesbtn" disabled={busy}
                           title="choose the genes this oncoprint draws" onClick={() => openGenes(vi)}>genes</button>
                         <details className="gearmenu">

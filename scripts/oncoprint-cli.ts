@@ -21,7 +21,7 @@ import type { Contract } from "../lib/types.ts";
 const { values: a } = parseArgs({ options: {
   spec: { type: "string" }, events: { type: "string" }, clinical: { type: "string" }, coverage: { type: "string" },
   contract: { type: "string" }, genes: { type: "string" }, "group-by": { type: "string" }, sort: { type: "string" },
-  patients: { type: "string" }, study: { type: "string" }, display: { type: "string" },
+  patients: { type: "string" }, study: { type: "string" }, display: { type: "string" }, unit: { type: "string" },
   out: { type: "string" }, width: { type: "string", default: "1200" }, lod: { type: "string" }, quiet: { type: "boolean", default: false }, help: { type: "boolean", default: false }
 } });
 
@@ -50,6 +50,7 @@ try {
       coverage: a.coverage ? parseTsv(readFileSync(a.coverage, "utf8")) : undefined,
       genes: a.genes ? a.genes.split(",").map((g) => g.trim()).filter(Boolean) : undefined,
       groupBy: a["group-by"], sort: a.sort, study: a.study,
+      unit: a.unit === "sample" ? "sample" : undefined,
       display: a.display ? JSON.parse(a.display) : undefined,
       patients: a.patients ? readFileSync(a.patients, "utf8").split(/\r?\n/).map((s) => s.trim()).filter(Boolean) : undefined
     }));

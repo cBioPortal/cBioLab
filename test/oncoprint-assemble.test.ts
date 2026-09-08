@@ -103,6 +103,20 @@ test("sorting by patient id, ascending and descending", () => {
   assert.deepEqual(desc.conventions.sort, ["-id"]);
 });
 
+test("the unit labels the contract and names what a column is", () => {
+  const pt = assembleContract(input());
+  assert.equal(pt.unit, "patient");
+  assert.match(pt.conventions.column!, /one patient.*collapsed/);
+  assert.equal(pt.conventions.frequencyDenominator, "profiled patients");
+  const sm = assembleContract({ ...input(), unit: "sample" });
+  assert.equal(sm.unit, "sample");
+  assert.match(sm.conventions.column!, /one sample.*every sample of a selected patient/);
+  assert.equal(sm.conventions.frequencyDenominator, "profiled samples");
+  // the assembly itself is unit-agnostic: same rows in, same cells out
+  assert.deepEqual(sm.columns, pt.columns);
+  assert.deepEqual(sm.tracks.map((t) => t.cells), pt.tracks.map((t) => t.cells));
+});
+
 test("more than one study adds a Study track from studyOf", () => {
   const c = assembleContract({ ...input(), studies: ["s1", "s2"], studyOf: new Map([["P1", "s1"], ["P2", "s1"], ["P3", "s2"], ["P4", "s2"], ["P5", "s2"]]) });
   const st = c.tracks.find((t) => t.label === "Study")!;

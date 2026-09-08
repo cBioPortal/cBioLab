@@ -106,6 +106,8 @@ export interface LocalOptions {
   annotationSource?: string;
   /** viewing options; validated and defaulted like any other spec */
   display?: DisplaySpec;
+  /** what a column is; local tables decide for themselves what their rows are keyed by */
+  unit?: "patient" | "sample";
 }
 
 /** Everything `assembleContract` needs, from local tables. Without a coverage table every column is covered for every gene. */
@@ -135,6 +137,6 @@ export function localInput(o: LocalOptions): AssembleInput {
   return {
     genes, groups, studies: [o.study || "local"], events, coverage,
     isDriver: (r) => !!(r as LocalEvent).driver, annotationSource: o.annotationSource || "driver flags from the input",
-    clinical, heatmap: [], derived: [], sort: parseSort(o.sort), lineGap: 90, display: normalizeDisplay(o.display)
+    clinical, heatmap: [], derived: [], sort: parseSort(o.sort), lineGap: 90, display: normalizeDisplay(o.display), unit: o.unit
   };
 }

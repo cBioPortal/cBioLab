@@ -117,6 +117,8 @@ export interface AssembleInput {
   lineGap: number;
   /** resolved viewing options; defaults are filled in when absent */
   display?: ResolvedDisplay;
+  /** what a column is; "sample" only changes the label and the caveat — the logic is identical */
+  unit?: "patient" | "sample";
 }
 
 export function assembleContract(input: AssembleInput): Contract {
@@ -125,6 +127,7 @@ export function assembleContract(input: AssembleInput): Contract {
   let tp = Date.now();
   const phase = (name: string) => { if (PROF) { process.stderr.write("  " + name.padEnd(16) + (Date.now() - tp) + "ms\n"); tp = Date.now(); } };
   const { genes, groups, studies, events, coverage, isDriver, clinical, heatmap, derived, sort, lineGap } = input;
+  const unit = input.unit === "sample" ? "sample" as const : "patient" as const;
   const multi = studies.length > 1;
   const studyOf = input.studyOf || new Map<string, string>();
   const allPids = groups.flatMap((g) => g.pids);
@@ -381,11 +384,15 @@ export function assembleContract(input: AssembleInput): Contract {
 
   phase("track meta");
   return {
-    study: multi ? studies.join(" + ") : studies[0], studies, unit: "patient",
+    study: multi ? studies.join(" + ") : studies[0], studies, unit,
     groups: groupRanges,
     columns,
     tracks: tracks.map((t) => ({ ...t, cells: Array.from(t.cells as number[]) })),
-    conventions: { cna: "high-level only (±2)", notProfiled: "distinct cell state", frequencyDenominator: "profiled",
+    conventions: { cna: "high-level only (±2)", notProfiled: "distinct cell state",
+      frequencyDenominator: unit === "sample" ? "profiled samples" : "profiled patients",
+      column: unit === "sample"
+        ? "one sample; a cohort selects patients, so every sample of a selected patient is drawn — including samples on which the cohort's own criterion was never measured. Patient-level clinical values repeat across that patient's samples."
+        : "one patient; a patient's samples are collapsed (clinical: patient rows win, else one sample's value; heatmap: mean across samples; VAF: max)",
       annotation: input.annotationSource, lineGap,
       sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track) },
     display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all" },

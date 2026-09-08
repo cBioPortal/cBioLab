@@ -192,6 +192,8 @@ export type ResolvedDisplay = Required<Pick<DisplaySpec, "showUnaltered" | "whit
 export interface OncoprintView {
   kind: "oncoprint"; genes: string[]; cohorts?: string[];
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
+  /** what a column is (default "patient"); "sample" draws every sample of the cohort's patients */
+  unit?: "patient" | "sample";
 }
 /**
  * Treatment sequences: what follows what, as lines of therapy.
@@ -459,12 +461,14 @@ export interface Track {
 }
 export interface GroupRange { name: string; start: number; count: number; patients?: number }
 export interface Contract {
-  study: string; studies?: string[]; unit: "patient";
+  study: string; studies?: string[]; unit: "patient" | "sample";
   groups: GroupRange[];
   columns: string[];
   tracks: Track[];
   conventions: {
     cna: string; notProfiled: string; frequencyDenominator: string;
+    /** what one column is, and what was collapsed or expanded to make it */
+    column?: string;
     annotation: string; lineGap: number; sort: string[];
   };
   /** resolved viewing options — renderers read these, never their own defaults */
@@ -480,6 +484,8 @@ export interface Contract {
 export interface OncoprintSpec {
   study?: string; studies?: string[];
   genes: string[]; clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
+  /** what a column is (default "patient") */
+  unit?: "patient" | "sample";
   derivedEvents?: { label: string; expression: CohortDef }[];
   cohort?: { dsl: CohortDef } | null;
   layout?: { groupBy: { kind: "cohorts"; groups: { name: string; dsl: CohortDef }[] } } | null;

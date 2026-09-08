@@ -66,7 +66,8 @@ def assemble_contract(*, genes: list[str], groups: list[dict[str, Any]], studies
                       coverage: list[dict[str, Any]], is_driver: Callable[[dict[str, Any]], bool], annotation_source: str,
                       clinical: list[dict[str, Any]], heatmap: list[dict[str, Any]] | None = None, z_reference: dict[str, Any] | None = None,
                       derived: list[dict[str, Any]] | None = None, sort: list[dict[str, str]] | None = None, line_gap: int = 90,
-                      study_of: dict[str, str] | None = None, display: dict[str, Any] | None = None) -> Contract:
+                      study_of: dict[str, str] | None = None, display: dict[str, Any] | None = None,
+                      unit: str = "patient") -> Contract:
     heatmap = heatmap or []
     derived = derived or []
     sort = sort or [{"track": "genomic", "dir": "asc"}]
@@ -294,7 +295,14 @@ def assemble_contract(*, genes: list[str], groups: list[dict[str, Any]], studies
 
     return Contract(
         study=" + ".join(studies) if multi else studies[0], studies=list(studies), groups=ranges, columns=columns, tracks=tracks,
-        conventions={"cna": "high-level only (±2)", "notProfiled": "distinct cell state", "frequencyDenominator": "profiled",
+        unit=unit,
+        conventions={"cna": "high-level only (±2)", "notProfiled": "distinct cell state",
+                     "frequencyDenominator": "profiled samples" if unit == "sample" else "profiled patients",
+                     "column": ("one sample; a cohort selects patients, so every sample of a selected patient is drawn — "
+                                "including samples on which the cohort's own criterion was never measured. Patient-level "
+                                "clinical values repeat across that patient's samples.") if unit == "sample" else
+                               ("one patient; a patient's samples are collapsed (clinical: patient rows win, else one "
+                                "sample's value; heatmap: mean across samples; VAF: max)"),
                      "annotation": annotation_source, "lineGap": line_gap,
                      "sort": [("-" if s.get("dir") == "desc" else "") + s["track"] for s in sort]},
         display=dict(display) if display else dict(DEFAULT_DISPLAY),

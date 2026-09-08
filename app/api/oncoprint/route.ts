@@ -1,6 +1,8 @@
 import { buildContract } from "../../../lib/oncoprint";
 import { packContract } from "../../../lib/oncoprint-binary";
 import { gzipSync } from "node:zlib";
+import { contractToSvg } from "../../../lib/oncoprint-svg";
+import { contractToTsv } from "../../../lib/oncoprint-tabular";
 
 export const maxDuration = 120;
 
@@ -15,7 +17,17 @@ export async function POST(req: Request) {
     const provenance = sp.get("provenance") === "1";
     const contract = await buildContract(spec, provenance ? { log, provenance } : {});
     const engineMs = Date.now() - t0;
-    if (sp.get("format") === "bin") {
+    const fmt = sp.get("format");
+    if (fmt === "svg" || fmt === "tsv") {
+      // the page asks for these to download; the spec it sends carries its sort and display,
+      // so the file is the figure on screen and not a differently-ordered one
+      const body = fmt === "svg" ? contractToSvg(contract, Number(sp.get("width")) || 1600) : contractToTsv(contract);
+      return new Response(body, { headers: {
+        "Content-Type": fmt === "svg" ? "image/svg+xml" : "text/tab-separated-values",
+        "X-Engine-Ms": String(engineMs)
+      } });
+    }
+    if (fmt === "bin") {
       const tp = Date.now();
       const raw = packContract(contract);
       // Half the payload is patient ids, which compress ~5x; cells compress little. Next does

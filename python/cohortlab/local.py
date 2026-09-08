@@ -157,7 +157,8 @@ def normalize_display(d: dict[str, Any] | None) -> dict[str, Any]:
 
 def local_input(events: Table, clinical: Table | None = None, coverage: Table | None = None, genes: list[str] | None = None,
                 group_by: str | None = None, patients: list[str] | None = None, sort: str | list[str] | None = None,
-                study: str | None = None, annotation_source: str | None = None, display: dict[str, Any] | None = None) -> dict[str, Any]:
+                study: str | None = None, annotation_source: str | None = None, display: dict[str, Any] | None = None,
+                unit: str = "patient") -> dict[str, Any]:
     """Keyword arguments for `assemble_contract`, from local tables. Without coverage every column is covered for every gene."""
     ev = events_from_table(events)
     clin = clinical_from_table(clinical or [])
@@ -181,4 +182,4 @@ def local_input(events: Table, clinical: Table | None = None, coverage: Table | 
         groups = [{"name": "all", "pids": pids}]
     return dict(genes=gene_list, groups=groups, studies=[study or "local"], events=ev, coverage=cov,
                 is_driver=lambda r: bool(r.get("driver")), annotation_source=annotation_source or "driver flags from the input",
-                clinical=clin, heatmap=[], derived=[], sort=parse_sort(sort), line_gap=90, display=normalize_display(display))
+                clinical=clin, heatmap=[], derived=[], sort=parse_sort(sort), line_gap=90, display=normalize_display(display), unit=unit)

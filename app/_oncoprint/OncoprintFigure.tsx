@@ -243,13 +243,57 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const pct = visible ? Math.round(100 * Math.log(view.zoom / minZoom) / Math.log(MAX_ZOOM / minZoom)) : 0;
   const fmt = (n?: number, d = 0) => n == null ? "—" : n.toLocaleString("en-US", { maximumFractionDigits: d });
   const set = (p: Partial<FigureDisplay>) => onDisplay({ ...display, ...p });
+
+  // The figure applies sort and viewing options in the browser. A server-rendered download has
+  // to be told about them, or the file would not be the picture on screen.
+  const specOnScreen = (): unknown => {
+    const base = (typeof spec === "object" && spec !== null ? spec : {}) as Record<string, unknown>;
+    const d = (base.display || {}) as Record<string, unknown>;
+    return { ...base, ...(sortKey ? { sort: [sortKey] } : {}), display: { ...d, ...display } };
+  };
+  const save = (blob: Blob, name: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+  const [saving, setSaving] = useState<string | null>(null);
+  const download = async (what: "png" | "svg" | "tsv" | "ids") => {
+    if (!data || !visible) return;
+    setSaving(what);
+    try {
+      const stem = "oncoprint-" + (data.studies || [data.study]).join("+").slice(0, 40);
+      if (what === "ids") {
+        const ids = visible.order.length === data.n ? data.columns() : Array.from(visible.order, (i) => data.columns()[i]);
+        save(new Blob([data.unit + " order in the oncoprint is:\n" + ids.join("\n") + "\n"], { type: "text/plain" }), stem + "-" + data.unit + "-order.txt");
+      } else if (what === "png") {
+        // drawn offscreen at full width so the file is the whole figure, not the visible window
+        const w = 2000, S2 = resolveStyle(data.display?.style);
+        const cv = document.createElement("canvas");
+        const H = canvasHeight(data.tracks.length);
+        cv.width = w * 2; cv.height = H * 2;
+        const ctx = cv.getContext("2d")!;
+        ctx.setTransform(2, 0, 0, 2, 0, 0);
+        draw(ctx, data, visible.order, visible.groups, { zoom: fitZoom(visible.groups, w - GEOM.gutter, gapPx), scrollX: 0, whitespace: display.whitespace },
+          w, paletteOf(S2), { gap: gapPx, pctLabels: gapMode === "pct", style: S2 });
+        const blob: Blob = await new Promise((res) => cv.toBlob((b) => res(b!), "image/png"));
+        save(blob, stem + ".png");
+      } else {
+        const res = await fetch("/api/oncoprint?format=" + what + (what === "svg" ? "&width=1600" : ""),
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(specOnScreen()) });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+        save(await res.blob(), stem + "." + what);
+      }
+    } catch (e) { setError(String((e as Error).message || e)); }
+    setSaving(null);
+  };
   return (
     <>
       {error && <div className="error">oncoprint: {error}</div>}
       {loading && !error && <p className="meta">querying and building the contract…</p>}
       {data && visible && !error && <>
         <div className="row" style={{ alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap" }}>
-          {props.heading ?? <h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {data.stats.nColumns.toLocaleString()} patients · {data.tracks.length} tracks · {data.conventions.annotation}</span></h2>}
+          {props.heading ?? <h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {data.stats.nColumns.toLocaleString()} {data.unit}s · {data.tracks.length} tracks · {data.conventions.annotation}</span></h2>}
           <span className="spacer" />
           {props.controls}
           <label className="meta"><input type="checkbox" checked={display.showUnaltered} disabled={busy} onChange={(e) => set({ showUnaltered: e.target.checked })} /> show unaltered</label>
@@ -271,6 +315,15 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           <button className="linklike" onClick={() => zoomAt(1.4)} title="zoom in">+</button>
           <span className="meta" style={{ minWidth: 84 }}>{view.zoom >= 1 ? view.zoom.toFixed(1) + " px/col" : (1 / view.zoom).toFixed(0) + " cols/px"}</span>
           <button className="linklike" onClick={() => setView((v) => ({ ...v, zoom: minZoom, scrollX: 0 }))}>fit</button>
+          <details className="gearmenu">
+            <summary title="download this figure">{saving ? "…" : "download"}</summary>
+            <div className="gearmenu-items">
+              <button className="linklike" onClick={() => download("png")}>PNG — the whole figure at 4000px</button>
+              <button className="linklike" onClick={() => download("svg")}>SVG — re-rendered on the server from this spec</button>
+              <button className="linklike" onClick={() => download("tsv")}>Tabular TSV — one row per track, one column per {data.unit}</button>
+              <button className="linklike" onClick={() => download("ids")}>{data.unit} order — the ids as drawn</button>
+            </div>
+          </details>
         </div>
         <div ref={wrapRef} style={{ position: "relative", marginTop: "0.5rem", border: "1px solid var(--line)", borderRadius: 8, background: "#fff", overflow: "hidden" }}>
           <canvas ref={canvasRef} style={{ display: "block", cursor: view.zoom > minZoom ? "grab" : "crosshair" }}
