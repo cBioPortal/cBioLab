@@ -7,7 +7,7 @@
 // fetches from ClickHouse and calls this; a CLI or a notebook can call it on local
 // tables, and a port in another language has this function as its conformance target.
 import { heatmapTrackLabel } from "./profile-names.ts";
-import type { Contract, Track, GroupRange, ZReference } from "./types.ts";
+import type { Contract, Track, GroupRange, ZReference, ResolvedDisplay } from "./types.ts";
 
 // gene-track cell bitmask
 export const BITS = {
@@ -58,6 +58,8 @@ export interface AssembleInput {
   derived: { label: string; pids: Set<string> }[];
   sort: SortKey[];
   lineGap: number;
+  /** resolved viewing options; defaults are filled in when absent */
+  display?: ResolvedDisplay;
 }
 
 export function assembleContract(input: AssembleInput): Contract {
@@ -270,6 +272,7 @@ export function assembleContract(input: AssembleInput): Contract {
     conventions: { cna: "high-level only (±2)", notProfiled: "distinct cell state", frequencyDenominator: "profiled",
       annotation: input.annotationSource, lineGap,
       sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track) },
+    display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all" },
     stats: { nColumns: columns.length, ms: Date.now() - t0 }
   };
 }

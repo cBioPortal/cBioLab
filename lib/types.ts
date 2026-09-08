@@ -166,9 +166,32 @@ export interface HeatmapSpec {
 }
 /** Pooled reference distribution for one (profileType, gene), from per-site moments. */
 export interface ZReference { mean: number; sd: number; n: number; studies: string[] }
+/** A sort key: "genomic" (staircase), "id", or a track label; "-label" or {dir:"desc"} descends. */
+export type SortKeySpec = string | { track: string; dir?: "asc" | "desc" };
+/**
+ * How the figure is drawn. Every viewing option lives here rather than in browser
+ * state, so a shared link, the server SVG, the CLI and the Python package all
+ * reproduce the same picture. Unknown keys are rejected loudly.
+ */
+export interface DisplaySpec {
+  /** draw columns with no alteration in any gene track (default true) */
+  showUnaltered?: boolean;
+  /** whitespace between columns once they are wide enough (default true) */
+  whitespace?: boolean;
+  /** split each cohort into runs of the primary categorical sort key (default "none") */
+  gaps?: "none" | "gaps" | "pct";
+  /** category keys under the figure (default "all") */
+  clinicalLegends?: "all" | "none";
+  /** partial override of lib/oncoprint-style.ts (Phase 1b) */
+  style?: Record<string, unknown>;
+  /** per-track, per-category colours: {trackLabel: {value: "#rrggbb"}} (Phase 1b) */
+  colors?: Record<string, Record<string, string>>;
+}
+export type ResolvedDisplay = Required<Pick<DisplaySpec, "showUnaltered" | "whitespace" | "gaps" | "clinicalLegends">>
+  & Pick<DisplaySpec, "style" | "colors">;
 export interface OncoprintView {
   kind: "oncoprint"; genes: string[]; cohorts?: string[];
-  clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: string[];
+  clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
 }
 /**
  * Treatment sequences: what follows what, as lines of therapy.
@@ -439,14 +462,18 @@ export interface Contract {
     cna: string; notProfiled: string; frequencyDenominator: string;
     annotation: string; lineGap: number; sort: string[];
   };
+  /** resolved viewing options — renderers read these, never their own defaults */
+  display: ResolvedDisplay;
   stats: { nColumns: number; ms: number };
+  /** the SQL this contract was built from, when the caller asked for provenance */
+  queries?: { label: string; sql: string; ms?: number; study?: string }[];
   /** set by the MCP app's display-resolution downsampler */
   bucketed?: boolean; bucketSizes?: number[];
 }
 
 export interface OncoprintSpec {
   study?: string; studies?: string[];
-  genes: string[]; clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: string[];
+  genes: string[]; clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
   derivedEvents?: { label: string; expression: CohortDef }[];
   cohort?: { dsl: CohortDef } | null;
   layout?: { groupBy: { kind: "cohorts"; groups: { name: string; dsl: CohortDef }[] } } | null;

@@ -806,6 +806,9 @@ export default function AnalysisPage() {
   const heatmapLabels = (v: any): string[] => (v.heatmap || []).flatMap((h: any) =>
     (h.genes && h.genes.length ? h.genes : v.genes || []).map((g: any) => heatmapTrackLabel(String(g).toUpperCase(), h.profileType)));
 
+  // a sort key as the <select> spells it: "label" / "-label" / "genomic"
+  const sortKeyText = (k: any): string =>
+    k == null ? "genomic" : typeof k === "string" ? k : (k.dir === "desc" ? "-" : "") + String(k.track || "genomic");
   const pruneSort = (v: any) => {
     // drop sort keys whose track no longer exists
     const keep = new Set(["genomic", "Study", ...(v.clinical || []), ...heatmapLabels(v)]);
@@ -2335,7 +2338,7 @@ export default function AnalysisPage() {
                         .map(p => <option key={p} value={p}>{p === "VAF" ? "VAF (mutation allele fraction)" : p}</option>)}
                     </select>
                     <span className="meta">sort:</span>
-                    <select value={ocView(vi).sort?.[0] || "genomic"}
+                    <select value={sortKeyText(ocView(vi).sort?.[0])}
                       disabled={busy} onChange={e => setViewSort(vi, e.target.value)} style={{ fontSize: "0.78rem" }}>
                       <option value="genomic">genomic (staircase)</option>
                       {(result.involvedStudies || []).length > 1 && <option value="Study">Study</option>}

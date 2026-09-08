@@ -7,7 +7,7 @@
 import { chQuery, DB, STUDY } from "./ch.ts";
 import { compileCohort, sq } from "./compiler.ts";
 import { heatmapTrackLabel } from "./profile-names.ts";
-import type { CohortDef, Contract, Track, GroupRange, OncoprintSpec, HeatmapSpec, ChRow } from "./types.ts";
+import type { CohortDef, Contract, Track, GroupRange, OncoprintSpec, HeatmapSpec, ChRow, DisplaySpec, ResolvedDisplay, SortKeySpec } from "./types.ts";
 
 // Internal-only: analysis.js passes an evaluated cohort's SQL as a subquery via this
 // Symbol key. JSON.parse cannot produce Symbol keys, so client specs can never inject
@@ -151,10 +151,7 @@ export function normalizeSpec(spec: OncoprintSpec) {
   const lineGap = spec.conventions && spec.conventions.lineGap ? Number(spec.conventions.lineGap) : 90;
   // sort: ordered track keys — "genomic" (staircase), a clinical/derived/heatmap
   // track label, or "-label" for descending. Default is the genomic staircase.
-  const sort: { track: string; dir: "asc" | "desc" }[] = (Array.isArray(spec.sort) && spec.sort.length ? spec.sort : ["genomic"]).slice(0, 4).map((s: any) => {
-    if (typeof s === "string") return s.startsWith("-") ? { track: s.slice(1), dir: "desc" as const } : { track: s, dir: "asc" as const };
-    return { track: String(s && s.track || ""), dir: (s && s.dir === "desc" ? "desc" : "asc") as "asc" | "desc" };
-  });
+  const sort = normalizeSort(spec.sort);
   // heatmap: continuous per-gene molecular-profile tracks (portal-style).
   // [{profileType, genes?}] — genes default to the spec's gene tracks.
   const heatmap = (Array.isArray(spec.heatmap) ? spec.heatmap : []).slice(0, 4).map((h: HeatmapSpec) => ({
@@ -163,7 +160,59 @@ export function normalizeSpec(spec: OncoprintSpec) {
     genes: (Array.isArray(h?.genes) && h.genes!.length ? h.genes! : genes)
       .map((g: string) => String(g).toUpperCase().trim()).filter((g: string) => GENE_RE.test(g)).slice(0, 12)
   })).filter((h) => h.profileType);
-  return { genes, clinical, derivedEvents, lineGap, sort, heatmap };
+  return { genes, clinical, derivedEvents, lineGap, sort, heatmap, display: normalizeDisplay(spec.display) };
+}
+
+/** Sort keys as authored -> the engine's ordered {track, dir} list; up to 4. */
+export function normalizeSort(sort: SortKeySpec[] | undefined): { track: string; dir: "asc" | "desc" }[] {
+  const list = Array.isArray(sort) && sort.length ? sort : ["genomic"];
+  return list.slice(0, 4).map((s) => {
+    if (typeof s === "string") return s.startsWith("-") ? { track: s.slice(1), dir: "desc" as const } : { track: s, dir: "asc" as const };
+    return { track: String((s && s.track) || ""), dir: (s && s.dir === "desc" ? "desc" : "asc") as "asc" | "desc" };
+  });
+}
+
+const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "style", "colors"] as const;
+const GAP_MODES = ["none", "gaps", "pct"] as const;
+const LEGEND_MODES = ["all", "none"] as const;
+
+/** Viewing options with defaults filled in. Unknown keys and values are rejected, never ignored. */
+export function normalizeDisplay(d: DisplaySpec | undefined): ResolvedDisplay {
+  const src = (d || {}) as Record<string, unknown>;
+  for (const k of Object.keys(src))
+    if (!(DISPLAY_KEYS as readonly string[]).includes(k))
+      throw new Error("display: unknown option '" + k + "' (accepted: " + DISPLAY_KEYS.join(", ") + ")");
+  const bool = (k: "showUnaltered" | "whitespace", dflt: boolean): boolean => {
+    const v = src[k];
+    if (v === undefined) return dflt;
+    if (typeof v !== "boolean") throw new Error("display." + k + " must be true or false");
+    return v;
+  };
+  const oneOf = <T extends string>(k: string, allowed: readonly T[], dflt: T): T => {
+    const v = src[k];
+    if (v === undefined) return dflt;
+    if (typeof v !== "string" || !allowed.includes(v as T))
+      throw new Error("display." + k + ": '" + String(v) + "' is not one of " + allowed.join(", "));
+    return v as T;
+  };
+  const colors = src.colors as ResolvedDisplay["colors"];
+  if (colors !== undefined) {
+    if (typeof colors !== "object" || colors === null || Array.isArray(colors)) throw new Error("display.colors must be {track: {value: color}}");
+    for (const [track, byValue] of Object.entries(colors)) {
+      if (typeof byValue !== "object" || byValue === null || Array.isArray(byValue)) throw new Error("display.colors['" + track + "'] must be {value: color}");
+      for (const [value, color] of Object.entries(byValue))
+        if (typeof color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(color))
+          throw new Error("display.colors['" + track + "']['" + value + "']: '" + String(color) + "' is not a #rrggbb colour");
+    }
+  }
+  return {
+    showUnaltered: bool("showUnaltered", true),
+    whitespace: bool("whitespace", true),
+    gaps: oneOf("gaps", GAP_MODES, "none"),
+    clinicalLegends: oneOf("clinicalLegends", LEGEND_MODES, "all"),
+    ...(src.style !== undefined ? { style: src.style as Record<string, unknown> } : {}),
+    ...(colors !== undefined ? { colors } : {})
+  };
 }
 
 // Provenance: the exact SQL a spec compiles to, without executing anything.
@@ -189,7 +238,11 @@ export function specToQueries(spec: OncoprintSpec) {
 }
 
 /** Optional per-call sink so the analysis layer can report what this view ran. */
-export interface ContractOpts { log?: { label: string; sql: string; ms?: number; study?: string }[] }
+export interface ContractOpts {
+  log?: { label: string; sql: string; ms?: number; study?: string }[];
+  /** copy the query log into the contract, for callers that receive it directly */
+  provenance?: boolean;
+}
 
 export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}): Promise<Contract> {
   const t0 = Date.now();
@@ -214,7 +267,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   // per-study database on the same instance (e.g. a GENIE release next to the public portal);
   // studies not listed live in the app's default database
   const dbOf = (s: string): string => String((spec.dbs || {})[s] || "").replace(/[^A-Za-z0-9_]/g, "") || DB;
-  const { genes, clinical, derivedEvents, lineGap, sort, heatmap } = normalizeSpec(spec);
+  const { genes, clinical, derivedEvents, lineGap, sort, heatmap, display } = normalizeSpec(spec);
   if (multi && derivedEvents.length) throw new Error("derived-event tracks are single-study; drop them or the extra studies");
 
   // ---- columns: groups of patients --------------------------------------
@@ -235,9 +288,10 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
         for (const { s, r } of fetched)
           for (const x of r.data) { const id = qual(s, x.pid); raw.push(id); studyOf.set(id, s); }
       } else {
-        for (const p of await cohortPatients({ ...g.dsl, lineGap }, studies[0], opts.log, "oncoprint:columns", dbOf(studies[0]))) {
-          const id = qual(studies[0], p); raw.push(id); studyOf.set(id, studies[0]);
-        }
+        // no pre-compiled SQL: compile the definition against each study in turn
+        const per = await Promise.all(studies.map(async (s) =>
+          ({ s, pids: await cohortPatients({ ...g.dsl, lineGap }, s, opts.log, "oncoprint:columns", dbOf(s)) })));
+        for (const { s, pids } of per) for (const p of pids) { const id = qual(s, p); raw.push(id); studyOf.set(id, s); }
       }
       const pids = raw.filter(p => !seen.has(p));
       pids.forEach(p => seen.add(p));
@@ -315,8 +369,9 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   const contract = assembleContract({
     genes, groups, studies, studyOf, events, coverage,
     isDriver: (r) => annotation.isDriver(r as Parameters<typeof annotation.isDriver>[0]), annotationSource: annotation.source,
-    clinical: clinicalIn, heatmap: heatmapIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap
+    clinical: clinicalIn, heatmap: heatmapIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display
   });
   contract.stats.ms = Date.now() - t0;
+  if (opts.provenance && opts.log) contract.queries = opts.log.map((q) => ({ ...q, study: q.study || study }));
   return contract;
 }

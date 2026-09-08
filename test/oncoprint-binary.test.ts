@@ -15,6 +15,7 @@ const contract = (cells: number[][]): Contract => ({
     { kind: "clinical", label: "TYPE", categories: ["x", "y"], cells: cells[2] }
   ],
   conventions: { cna: "c", notProfiled: "n", frequencyDenominator: "profiled", annotation: "OncoKB", lineGap: 90, sort: ["genomic"] },
+  display: { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all" },
   stats: { nColumns: 3, ms: 1 }
 });
 
@@ -32,6 +33,7 @@ test("pack/unpack round-trips cells, metadata and columns", () => {
   assert.equal(u.tracks[1].min, 10);
   assert.deepEqual(u.tracks[2].categories, ["x", "y"]);
   assert.equal(u.conventions.annotation, "OncoKB");
+  assert.deepEqual(u.display, c.display, "viewing options survive the wire");
   assert.equal((u.tracks[0] as { cells?: unknown; dtype?: unknown }).dtype, undefined);
 });
 

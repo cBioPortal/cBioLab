@@ -89,6 +89,12 @@ test("declarative sort by a clinical track, missing values last, then the stairc
   assert.throws(() => assembleContract({ ...input(), sort: [{ track: "NOPE", dir: "asc" }] }), /not a track/);
 });
 
+test("the contract carries resolved viewing options, defaulted when the caller gives none", () => {
+  assert.deepEqual(assembleContract(input()).display, { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all" });
+  const d = { showUnaltered: false, whitespace: true, gaps: "pct" as const, clinicalLegends: "none" as const };
+  assert.deepEqual(assembleContract({ ...input(), display: d }).display, d);
+});
+
 test("more than one study adds a Study track from studyOf", () => {
   const c = assembleContract({ ...input(), studies: ["s1", "s2"], studyOf: new Map([["P1", "s1"], ["P2", "s1"], ["P3", "s2"], ["P4", "s2"], ["P5", "s2"]]) });
   const st = c.tracks.find((t) => t.label === "Study")!;
