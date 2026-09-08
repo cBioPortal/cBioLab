@@ -21,6 +21,7 @@ export default function PythonPage() {
         <span className="sub">oncoprint in Python — the package running in your browser via Pyodide</span>
         <span className="spacer" />
         <a href="/oncoprint-lab" style={{ color: "var(--accent-ink)", fontSize: "0.8rem", marginRight: "1rem" }}>interactive lab →</a>
+        <a href="/oncoprint-lab/import" style={{ color: "var(--accent-ink)", fontSize: "0.8rem", marginRight: "1rem" }}>pasted data →</a>
         <a href="/oncoprint-lab/cli" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>command line →</a>
       </header>
       <main>

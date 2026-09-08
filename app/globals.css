@@ -672,3 +672,10 @@ details.gearmenu.inline[open] > summary {
   background: var(--code-bg); color: var(--ink);
   border: 1px solid var(--line); border-radius: 6px;
 }
+
+/* the Python README, rendered on the CLI page */
+.readme h1 { font-size: 1rem; margin: 0.8rem 0 0.3rem; }
+.readme h2 { font-size: 0.88rem; margin: 1rem 0 0.3rem; text-transform: none; letter-spacing: 0; }
+.readme p, .readme li { font-size: 0.82rem; max-width: 74ch; }
+.readme code { font-size: 0.78rem; }
+.readme pre { margin: 0.4rem 0; }

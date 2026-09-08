@@ -6,6 +6,7 @@ import { existsSync, readFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { marked } from "marked";
 
 export const metadata = { title: "Oncoprint CLI — Cohort Lab" };
 export const dynamic = "force-dynamic";
@@ -68,6 +69,10 @@ async function steps(): Promise<Step[]> {
 export default async function CliPage() {
   const list = await steps();
   const events = readFileSync(join(ROOT, FIX, "events.tsv"), "utf8");
+  // the reference is the source: the CLI's own usage header, and the package's README
+  const usage = readFileSync(join(ROOT, "scripts", "oncoprint-cli.ts"), "utf8")
+    .split("\n").slice(1).filter((l) => l.startsWith("//")).map((l) => l.replace(/^\/\/ ?/, "")).join("\n").trim();
+  const readme = await marked.parse(readFileSync(join(ROOT, "python", "README.md"), "utf8"));
   return (
     <>
       <header>
@@ -75,6 +80,7 @@ export default async function CliPage() {
         <span className="sub">oncoprint from the command line — Node and Python, one contract</span>
         <span className="spacer" />
         <a href="/oncoprint-lab" style={{ color: "var(--accent-ink)", fontSize: "0.8rem", marginRight: "1rem" }}>interactive lab →</a>
+        <a href="/oncoprint-lab/import" style={{ color: "var(--accent-ink)", fontSize: "0.8rem", marginRight: "1rem" }}>pasted data →</a>
         <a href="/oncoprint-lab/python" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>python notebook →</a>
       </header>
       <main>
@@ -98,6 +104,15 @@ export default async function CliPage() {
             {s.text && <pre style={{ marginTop: "0.6rem", maxHeight: 260, overflow: "auto" }}>{s.text.split("\n").map((l) => l.length > 180 ? l.slice(0, 180) + " …" : l).join("\n")}</pre>}
           </div>
         ))}
+        <div className="card">
+          <h2>Reference <span className="plain">— read from the code, not written beside it</span></h2>
+          <p className="meta">The node CLI&apos;s usage is its own header comment; the Python section is the package&apos;s README,
+            which ships in the wheel. Neither can drift from what actually runs.</p>
+          <h3 style={{ fontSize: "0.9rem", margin: "0.8rem 0 0.3rem" }}>node</h3>
+          <pre>{usage}</pre>
+          <h3 style={{ fontSize: "0.9rem", margin: "1rem 0 0.3rem" }}>python</h3>
+          <div className="readme" dangerouslySetInnerHTML={{ __html: readme }} />
+        </div>
       </main>
     </>
   );

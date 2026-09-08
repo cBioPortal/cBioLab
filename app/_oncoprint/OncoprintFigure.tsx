@@ -34,8 +34,10 @@ export interface Perf { fetchMs?: number; bytes?: number; engineMs?: number; pac
   wireBytes?: number }
 
 export interface OncoprintFigureProps {
-  /** POSTed to /api/oncoprint?format=bin; a change of value (by JSON) refetches */
+  /** POSTed to the endpoint below; a change of value (by JSON) refetches */
   spec: unknown;
+  /** where the contract comes from; the local-tables route takes the same shapes back */
+  endpoint?: string;
   /** ordered sort keys: "genomic" | "id" | "[-]<track label>"; empty = the engine's own order */
   sortKeys: string[];
   display: FigureDisplay;
@@ -93,7 +95,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     (async () => {
       try {
         const t0 = performance.now();
-        const res = await fetch("/api/oncoprint?format=bin&provenance=1", { method: "POST", headers: { "Content-Type": "application/json" }, body: specKey });
+        const base = props.endpoint || "/api/oncoprint";
+        const res = await fetch(base + "?format=bin&provenance=1", { method: "POST", headers: { "Content-Type": "application/json" }, body: specKey });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
         const buf = await res.arrayBuffer();
         const fetchMs = performance.now() - t0;
@@ -111,7 +114,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [specKey]);
+  }, [specKey, props.endpoint]);
 
   useEffect(() => { setView((v) => ({ ...v, whitespace: display.whitespace })); }, [display.whitespace]);
 
@@ -244,7 +247,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     if (detailTimer.current) clearTimeout(detailTimer.current);
     if (hit && hit.n === 1) {
       const col = data.columns()[hit.ci];
-      if (!(col in detail)) detailTimer.current = setTimeout(async () => {
+      if (!props.endpoint && !(col in detail)) detailTimer.current = setTimeout(async () => {
         setDetail((d) => ({ ...d, [col]: "loading" }));
         try {
           const res = await fetch("/api/oncoprint/detail", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -328,7 +331,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         const blob: Blob = await new Promise((res) => cv.toBlob((b) => res(b!), "image/png"));
         save(blob, stem + ".png");
       } else {
-        const res = await fetch("/api/oncoprint?format=" + what + (what === "svg" ? "&width=1600" : ""),
+        const res = await fetch((props.endpoint || "/api/oncoprint") + "?format=" + what + (what === "svg" ? "&width=1600" : ""),
           { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(specOnScreen()) });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
         save(await res.blob(), stem + "." + what);

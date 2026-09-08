@@ -38,7 +38,10 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   (server SVG: web app, `/provenance`, CLI), `app/_oncoprint/` (browser canvas + the shared `OncoprintFigure`),
   `python/cohortlab` (numpy/matplotlib,
   reads the generated `style.json`; `npm run style:gen`, drift fails `npm test`).
-  `scripts/oncoprint-cli.ts` and `python -m cohortlab` wrap all of this for local tables. **`lib/view-svg.ts`** — the same contract for every other view kind (survival,
+  `scripts/oncoprint-cli.ts` and `python -m cohortlab` wrap all of this for local tables, and
+  `/oncoprint-lab/import` does the same in the browser (`POST /api/oncoprint/local`).
+  `lib/oncoprint-cluster.ts` orders columns by a Ward dendrogram for the `cluster:<profile>`
+  sort key; `lib/oncoprint-detail.ts` answers one column at a time for tooltips. **`lib/view-svg.ts`** — the same contract for every other view kind (survival,
   hotspots, compare, cooccurrence, coexpression, clinical); used by the in-app chat today and
   by MCP `run_analysis` for the oncoprint image.
 - **`lib/event-names.ts`** — **THE only place timeline event names are normalized.** Case-fold and
