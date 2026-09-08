@@ -14,6 +14,7 @@ import { compileCohortDef, describeCohortDef } from "../../lib/cohort2.ts";
 import { resolveStudy, studyProfiles } from "../../lib/analysis.ts";
 import { chQuery } from "../../lib/ch.ts";
 import { ONCOPRINT_APP_HTML } from "./oncoprint-html.ts";
+import { resolveStyle } from "../../lib/oncoprint-style.ts";
 
 export const ONCOPRINT_APP_URI = "ui://cohort-lab/oncoprint";
 const MIME = "text/html;profile=mcp-app";
@@ -145,7 +146,8 @@ export function registerOncoprintApp(server: any): void {
           (appContract.bucketed ? " (columns bucketed to display resolution; statistics are full-cohort)" : "") + ".";
         return {
           content: [{ type: "text", text: summary }],
-          structuredContent: { contract: appContract, args }
+          // the figure's resolved style travels beside it: the document has no imports of its own
+          structuredContent: { contract: appContract, args, style: resolveStyle(contract.display?.style) }
         };
       } catch (e) {
         return { content: [{ type: "text", text: "REJECTED: " + String((e as Error)?.message || e) + "\nCall describe_dsl for cohortDef grammar." }], isError: true };

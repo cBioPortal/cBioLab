@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 
 from .contract import Contract, Track
-from .style import STYLE, cell_layers, category_color, format_gutter_pct, gene_legend, numeric_rgb, truncate_label
+from .style import STYLE, cell_layers, format_gutter_pct, gene_legend, numeric_rgb, resolve_style, track_category_color, truncate_label
 
 _G = STYLE["geometry"]
 ROW_H, ROW_GAP, GROUP_GAP = _G["rowH"], _G["rowGap"], _G["groupGap"]
@@ -65,11 +65,16 @@ def bucket_codes(c: Contract, buckets: int) -> list[dict[str, Any]]:
     return out
 
 
-def raster(c: Contract, width: int = 1200, gutter: int = 0) -> tuple[np.ndarray, list[dict[str, Any]]]:
-    """RGB uint8 image of the tracks (no text), plus per-group pixel extents for annotation."""
-    P = STYLE["palette"]
+def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any] | None = None) -> tuple[np.ndarray, list[dict[str, Any]]]:
+    """RGB uint8 image of the tracks (no text), plus per-group pixel extents for annotation.
+
+    The figure's own style travels in the contract (`display.style`), so callers pass nothing.
+    """
+    S = style or resolve_style((c.display or {}).get("style"))
+    colors = (c.display or {}).get("colors")
+    P = S["palette"]
     paper, unaltered, derived = _rgb(P["paper"]), _rgb(P["unaltered"]), _rgb(P["derived"])
-    npfill = _rgb(STYLE["glyph"]["notProfiled"]["fill"])
+    npfill = _rgb(S["glyph"]["notProfiled"]["fill"])
     plot_w = max(1, width - gutter - GROUP_GAP * max(0, len(c.groups) - 1))
     n = max(1, c.n)
     px_per_col = plot_w / n
@@ -91,30 +96,32 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0) -> tuple[np.ndarray,
                 x0, x1 = int(xs[bi]), int(xs[bi] + bw[bi])
                 code = int(codes[bi])
                 if t.kind == "gene":
-                    for color, (b0, b1), alpha in cell_layers(code):
+                    for color, (b0, b1), alpha in cell_layers(code, S):
                         ya, yb = y0 + int(ROW_H * b0), y0 + int(ROW_H * b1)
                         col = _rgb(color)
                         img[ya:yb, x0:x1] = col if alpha >= 1 else img[ya:yb, x0:x1] + (col - img[ya:yb, x0:x1]) * alpha
                 elif t.kind == "derivedEvent":
                     img[y0:y0 + ROW_H, x0:x1] = derived if code > 0 else unaltered
                 elif t.meta.get("numeric"):
-                    img[y0:y0 + ROW_H, x0:x1] = npfill if code == -1 else np.array(numeric_rgb(code, t.meta.get("center")), dtype=np.float64)
+                    img[y0:y0 + ROW_H, x0:x1] = npfill if code == -1 else np.array(numeric_rgb(code, t.meta.get("center"), S), dtype=np.float64)
                 else:
-                    img[y0:y0 + ROW_H, x0:x1] = npfill if code == -1 else _rgb(category_color(code))
+                    img[y0:y0 + ROW_H, x0:x1] = npfill if code == -1 else _rgb(track_category_color(t, code, S, colors))
         x += int(bw.sum()) + GROUP_GAP
     return np.clip(img, 0, 255).astype(np.uint8), extents
 
 
-def figure(c: Contract, width: int = 1200, gutter: int | None = None, dpi: int = 100, title: str | None = None):
+def figure(c: Contract, width: int = 1200, gutter: int | None = None, dpi: int = 100, title: str | None = None,
+           style: dict[str, Any] | None = None):
     """A matplotlib Figure: gutter with labels and frequencies, group headers, tracks, legend."""
     import matplotlib
     matplotlib.use("Agg", force=False)
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
 
-    gutter = _G["gutter"] if gutter is None else gutter
-    P = STYLE["palette"]
-    img, extents = raster(c, width=width, gutter=gutter)
+    S = style or resolve_style((c.display or {}).get("style"))
+    gutter = S["geometry"]["gutter"] if gutter is None else gutter
+    P = S["palette"]
+    img, extents = raster(c, width=width, gutter=gutter, style=S)
     H = img.shape[0]
     header, legend_in = _G["header"], 0.45
     fig_h = (H + header) / dpi + legend_in + 0.1
@@ -128,10 +135,10 @@ def figure(c: Contract, width: int = 1200, gutter: int | None = None, dpi: int =
         ax.text(e["x0"], -header / 2, f'{e["name"]} ({e["count"]:,})', fontsize=8, color=P["muted"], va="center", clip_on=True)
     for ti, t in enumerate(c.tracks):
         y = ti * (ROW_H + ROW_GAP) + ROW_H / 2
-        ax.text(4, y, truncate_label(t.label), fontsize=8, color=P["text"], va="center")
+        ax.text(4, y, truncate_label(t.label, S), fontsize=8, color=P["text"], va="center")
         if t.meta.get("freqPct") is not None:
             ax.text(gutter - 8, y, format_gutter_pct(t.meta.get("driverPct"), t.meta.get("freqPct")), fontsize=7.5, color=P["muted"], va="center", ha="right")
-    handles = [Patch(color=color, label=label) for label, color, kind in gene_legend()]
+    handles = [Patch(color=color, label=label) for label, color, kind in gene_legend(S)]
     if any(t.kind == "derivedEvent" for t in c.tracks):
         handles.append(Patch(color=P["derived"], label="Derived event"))
     fig.legend(handles=handles, loc="lower left", ncol=len(handles), fontsize=7, frameon=False, bbox_to_anchor=(0.005, 0.0), handlelength=1.2, columnspacing=1.0)

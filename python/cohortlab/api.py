@@ -24,7 +24,7 @@ class Oncoprint:
     # ---- sources -------------------------------------------------------------
     @classmethod
     def from_tables(cls, events: str, clinical: str | None = None, coverage: str | None = None, **opts: Any) -> "Oncoprint":
-        """Local Oncoprinter-style TSVs (paths or text). opts: genes, group_by, sort, patients, study."""
+        """Local Oncoprinter-style TSVs (paths or text). opts: genes, group_by, sort, patients, study, display."""
         return cls(assemble_contract(**local_input(parse_tsv(_read(events)),
                                                    parse_tsv(_read(clinical)) if clinical else None,
                                                    parse_tsv(_read(coverage)) if coverage else None, **opts)))
@@ -86,9 +86,9 @@ class Oncoprint:
             f.write(write_opb1(self.contract))
         return path
 
-    def raster(self, width: int = 1200):
+    def raster(self, width: int = 1200, **kw):
         from .render import raster
-        return raster(self.contract, width=width)[0]
+        return raster(self.contract, width=width, **kw)[0]
 
     def figure(self, width: int = 1200, **kw):
         from .render import figure

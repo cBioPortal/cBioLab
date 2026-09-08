@@ -42,8 +42,10 @@ export const STYLE = {
   },
   geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17, cellPadMax: 3, padMinZoom: 3, padFraction: 0.3 },
   percent: { gutterDecimals: 1, runRule: "portal" }   // runRule: integer at 3 % and above, one decimal below, N/P
-} as const;
+};
 
+// Deliberately not `as const`: a resolved override is the same shape with different values,
+// so the type has to admit any colour, not only the default one.
 export type Style = typeof STYLE;
 export type Rgb = readonly [number, number, number];
 export interface Layer { color: string; band: readonly [number, number]; alpha: number }
@@ -106,4 +108,75 @@ export function geneLegend(S: Style = STYLE): { label: string; color: string; ki
   for (const o of S.glyph.cna.options) items.push({ label: o.label, color: o.color, kind: "swatch" });
   items.push({ label: S.glyph.notProfiled.label, color: S.glyph.notProfiled.stripe.color, kind: "notProfiled" });
   return items;
+}
+
+
+// ---- user overrides ---------------------------------------------------------
+// A figure may carry a partial style in its spec (`display.style`). It is merged onto the
+// defaults here, once, with loud validation — an unknown key or a bad colour is an error
+// naming what is accepted, never a silently ignored setting. Keys that change *meaning*
+// rather than appearance are refused: the bitmask, and which alteration a mixed cell shows.
+
+const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+const isPlain = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const isColor = (v: unknown): boolean => typeof v === "string" && COLOR_RE.test(v);
+
+function mergeInto(base: unknown, over: unknown, path: string): unknown {
+  if (path === "bits" || path === "version")
+    throw new Error("style." + path + " is read-only: it defines what a cell means, not how it looks");
+  if (isPlain(base)) {
+    if (!isPlain(over)) throw new Error("style." + path + " must be an object");
+    const out: Record<string, unknown> = { ...base };
+    for (const [k, v] of Object.entries(over)) {
+      if (!(k in base)) throw new Error("style." + (path ? path + "." : "") + k + " is not a style key (accepted here: " + Object.keys(base).join(", ") + ")");
+      out[k] = mergeInto((base as Record<string, unknown>)[k], v, (path ? path + "." : "") + k);
+    }
+    return out;
+  }
+  if (Array.isArray(base)) {
+    if (!Array.isArray(over)) throw new Error("style." + path + " must be an array");
+    // glyph priorities are a meaning, not a look: the same bits must stay in the same order
+    if (base.length && isPlain(base[0]) && "bit" in (base[0] as object)) {
+      if (over.length !== base.length) throw new Error("style." + path + ": keep all " + base.length + " entries; only their colour and label may change");
+      return base.map((b, i) => {
+        const o = over[i];
+        if (!isPlain(o)) throw new Error("style." + path + "[" + i + "] must be an object");
+        if ("bit" in o && o.bit !== (b as Record<string, unknown>).bit)
+          throw new Error("style." + path + "[" + i + "].bit is read-only: reordering alteration priority changes what a mixed cell means");
+        return mergeInto(b, o, path + "[" + i + "]");
+      });
+    }
+    for (const [i, v] of over.entries()) {
+      if (isColor(base[0]) && !isColor(v)) throw new Error("style." + path + "[" + i + "]: '" + String(v) + "' is not a #rrggbb colour");
+      if (typeof base[0] === "number" && typeof v !== "number") throw new Error("style." + path + "[" + i + "] must be a number");
+    }
+    return over.slice();
+  }
+  if (isColor(base) && !isColor(over)) throw new Error("style." + path + ": '" + String(over) + "' is not a #rrggbb colour");
+  if (typeof base === "number" && typeof over !== "number") throw new Error("style." + path + " must be a number");
+  if (typeof base === "boolean" && typeof over !== "boolean") throw new Error("style." + path + " must be true or false");
+  if (typeof base === "string" && typeof over !== "string") throw new Error("style." + path + " must be a string");
+  return over;
+}
+
+/** Defaults with `overrides` merged on top. Returns STYLE itself when there is nothing to merge. */
+export function resolveStyle(overrides?: Record<string, unknown> | null): Style {
+  if (!overrides || !Object.keys(overrides).length) return STYLE;
+  const merged = mergeInto(STYLE, overrides, "") as Style;
+  // not-profiled has to stay readable as a distinct state, whatever the palette says
+  const np = merged.glyph.notProfiled;
+  if (np.fill === merged.palette.unaltered && np.stripe.color === merged.palette.unaltered)
+    throw new Error("style: not-profiled would be indistinguishable from unaltered — give glyph.notProfiled a different fill or stripe");
+  return merged;
+}
+
+/**
+ * Colour for a categorical cell, honouring a per-track override
+ * (`display.colors[trackLabel][value]` — the portal's Edit Colors).
+ */
+export function trackCategoryColor(track: { label: string; categories?: string[] }, code: number, S: Style = STYLE,
+  colors?: Record<string, Record<string, string>>): string {
+  const value = track.categories && track.categories[code];
+  const override = value != null && colors && colors[track.label] ? colors[track.label][value] : undefined;
+  return override || categoryColor(code, S);
 }

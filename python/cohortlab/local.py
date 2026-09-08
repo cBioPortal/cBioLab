@@ -104,9 +104,60 @@ def parse_sort(spec: str | list[str] | None) -> list[dict[str, str]]:
     return [{"track": s[1:], "dir": "desc"} if s.startswith("-") else {"track": s, "dir": "asc"} for s in items]
 
 
+DISPLAY_KEYS = ("showUnaltered", "whitespace", "gaps", "clinicalLegends", "style", "colors")
+_GAP_MODES = ("none", "gaps", "pct")
+_LEGEND_MODES = ("all", "none")
+
+
+def normalize_display(d: dict[str, Any] | None) -> dict[str, Any]:
+    """Viewing options with defaults filled in (port of normalizeDisplay in lib/oncoprint.ts)."""
+    src = d or {}
+    for k in src:
+        if k not in DISPLAY_KEYS:
+            raise ValueError(f"display: unknown option '{k}' (accepted: {', '.join(DISPLAY_KEYS)})")
+
+    def boolean(k: str, dflt: bool) -> bool:
+        v = src.get(k)
+        if v is None:
+            return dflt
+        if not isinstance(v, bool):
+            raise ValueError(f"display.{k} must be true or false")
+        return v
+
+    def one_of(k: str, allowed: tuple[str, ...], dflt: str) -> str:
+        v = src.get(k)
+        if v is None:
+            return dflt
+        if not isinstance(v, str) or v not in allowed:
+            raise ValueError(f"display.{k}: '{v}' is not one of {', '.join(allowed)}")
+        return v
+
+    colors = src.get("colors")
+    if colors is not None:
+        if not isinstance(colors, dict):
+            raise ValueError("display.colors must be {track: {value: color}}")
+        for track, by_value in colors.items():
+            if not isinstance(by_value, dict):
+                raise ValueError(f"display.colors['{track}'] must be {{value: color}}")
+            for value, color in by_value.items():
+                if not isinstance(color, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+                    raise ValueError(f"display.colors['{track}']['{value}']: '{color}' is not a #rrggbb colour")
+    out: dict[str, Any] = {
+        "showUnaltered": boolean("showUnaltered", True),
+        "whitespace": boolean("whitespace", True),
+        "gaps": one_of("gaps", _GAP_MODES, "none"),
+        "clinicalLegends": one_of("clinicalLegends", _LEGEND_MODES, "all"),
+    }
+    if src.get("style") is not None:
+        out["style"] = src["style"]
+    if colors is not None:
+        out["colors"] = colors
+    return out
+
+
 def local_input(events: Table, clinical: Table | None = None, coverage: Table | None = None, genes: list[str] | None = None,
                 group_by: str | None = None, patients: list[str] | None = None, sort: str | list[str] | None = None,
-                study: str | None = None, annotation_source: str | None = None) -> dict[str, Any]:
+                study: str | None = None, annotation_source: str | None = None, display: dict[str, Any] | None = None) -> dict[str, Any]:
     """Keyword arguments for `assemble_contract`, from local tables. Without coverage every column is covered for every gene."""
     ev = events_from_table(events)
     clin = clinical_from_table(clinical or [])
@@ -130,4 +181,4 @@ def local_input(events: Table, clinical: Table | None = None, coverage: Table | 
         groups = [{"name": "all", "pids": pids}]
     return dict(genes=gene_list, groups=groups, studies=[study or "local"], events=ev, coverage=cov,
                 is_driver=lambda r: bool(r.get("driver")), annotation_source=annotation_source or "driver flags from the input",
-                clinical=clin, heatmap=[], derived=[], sort=parse_sort(sort), line_gap=90)
+                clinical=clin, heatmap=[], derived=[], sort=parse_sort(sort), line_gap=90, display=normalize_display(display))

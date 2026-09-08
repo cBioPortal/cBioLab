@@ -13,6 +13,7 @@ from typing import Any, Iterable
 
 import numpy as np
 
+DEFAULT_DISPLAY: dict[str, Any] = {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all"}
 BITS = {"MISSENSE": 1, "TRUNCATING": 2, "INFRAME": 4, "SPLICE": 8, "OTHER_MUT": 16, "SV": 32, "AMP": 64, "HOMDEL": 128, "DRIVER": 256}
 NOT_PROFILED = -1
 _MAGIC = 0x4F504231  # "OPB1"
@@ -47,6 +48,8 @@ class Contract:
     conventions: dict[str, Any]
     stats: dict[str, Any]
     unit: str = "patient"
+    #: resolved viewing options (showUnaltered, whitespace, gaps, clinicalLegends, style, colors)
+    display: dict[str, Any] = field(default_factory=dict)
 
     @property
     def n(self) -> int:
@@ -75,7 +78,8 @@ class Contract:
 
     def to_json(self) -> dict[str, Any]:
         return {"study": self.study, "studies": self.studies, "unit": self.unit, "groups": self.groups, "columns": self.columns,
-                "tracks": [t.to_json() for t in self.tracks], "conventions": self.conventions, "stats": self.stats}
+                "tracks": [t.to_json() for t in self.tracks], "conventions": self.conventions,
+                "display": self.display or DEFAULT_DISPLAY, "stats": self.stats}
 
     @staticmethod
     def from_json(obj: dict[str, Any]) -> "Contract":
@@ -84,7 +88,7 @@ class Contract:
             meta = {k: v for k, v in t.items() if k not in ("kind", "label", "cells")}
             tracks.append(Track(t["kind"], t["label"], np.asarray(t["cells"], dtype=np.int32), meta))
         return Contract(obj["study"], obj.get("studies") or [obj["study"]], obj["groups"], obj["columns"], tracks,
-                        obj.get("conventions", {}), obj.get("stats", {}), obj.get("unit", "patient"))
+                        obj.get("conventions", {}), obj.get("stats", {}), obj.get("unit", "patient"), obj.get("display") or dict(DEFAULT_DISPLAY))
 
     # ---- tabular export (the portal's "Tabular" download shape) -------------
     def rows(self) -> Iterable[list[str]]:
@@ -161,7 +165,7 @@ def read_opb1(data: bytes | bytearray | memoryview) -> Contract:
     co, cb = header["columnsOffset"], header["columnsBytes"]
     columns = bytes(buf[base + co: base + co + cb]).decode("utf-8").split("\n") if cb else []
     return Contract(header["study"], header.get("studies") or [header["study"]], header["groups"], columns, tracks,
-                    header.get("conventions", {}), header.get("stats", {}), header.get("unit", "patient"))
+                    header.get("conventions", {}), header.get("stats", {}), header.get("unit", "patient"), header.get("display") or dict(DEFAULT_DISPLAY))
 
 
 def write_opb1(c: Contract) -> bytes:
@@ -176,7 +180,8 @@ def write_opb1(c: Contract) -> bytes:
         metas.append({"kind": t.kind, "label": t.label, **t.meta, "dtype": "i32" if wide else "i16", "offset": cursor, "length": int(arr.size)})
         blobs.append(raw + b"\0" * (_pad4(len(raw)) - len(raw)))
         cursor += _pad4(len(raw))
-    header = {"study": c.study, "studies": c.studies, "unit": c.unit, "groups": c.groups, "conventions": c.conventions, "stats": c.stats,
+    header = {"study": c.study, "studies": c.studies, "unit": c.unit, "groups": c.groups, "conventions": c.conventions,
+              "display": c.display or DEFAULT_DISPLAY, "stats": c.stats,
               "n": c.n, "tracks": metas, "columnsOffset": cursor, "columnsBytes": len(col_bytes), "format": "OPB1"}
     hb = json.dumps(header, separators=(",", ":")).encode("utf-8")
     out = bytearray(struct.pack(">II", _MAGIC, len(hb))) + hb + b"\0" * (_pad4(len(hb)) - len(hb))

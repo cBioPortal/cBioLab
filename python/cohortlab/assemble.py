@@ -12,7 +12,7 @@ from typing import Any, Callable, Iterable
 
 import numpy as np
 
-from .contract import BITS, NOT_PROFILED, Contract, Track
+from .contract import BITS, DEFAULT_DISPLAY, NOT_PROFILED, Contract, Track
 
 
 def _round(x: float) -> int:
@@ -66,7 +66,7 @@ def assemble_contract(*, genes: list[str], groups: list[dict[str, Any]], studies
                       coverage: list[dict[str, Any]], is_driver: Callable[[dict[str, Any]], bool], annotation_source: str,
                       clinical: list[dict[str, Any]], heatmap: list[dict[str, Any]] | None = None, z_reference: dict[str, Any] | None = None,
                       derived: list[dict[str, Any]] | None = None, sort: list[dict[str, str]] | None = None, line_gap: int = 90,
-                      study_of: dict[str, str] | None = None) -> Contract:
+                      study_of: dict[str, str] | None = None, display: dict[str, Any] | None = None) -> Contract:
     heatmap = heatmap or []
     derived = derived or []
     sort = sort or [{"track": "genomic", "dir": "asc"}]
@@ -291,6 +291,7 @@ def assemble_contract(*, genes: list[str], groups: list[dict[str, Any]], studies
         conventions={"cna": "high-level only (±2)", "notProfiled": "distinct cell state", "frequencyDenominator": "profiled",
                      "annotation": annotation_source, "lineGap": line_gap,
                      "sort": [("-" if s.get("dir") == "desc" else "") + s["track"] for s in sort]},
+        display=dict(display) if display else dict(DEFAULT_DISPLAY),
         stats={"nColumns": len(columns), "ms": 0})
 
 

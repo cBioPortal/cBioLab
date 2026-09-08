@@ -30,3 +30,26 @@ test("the SVG is level-of-detail too: a 60k-column contract draws ~one rect per 
   assert.ok(rects < 1100 * c.tracks.length * 3, "rects " + rects);
   assert.ok(svg.length < 1.5e6, "bytes " + svg.length);
 });
+
+test("a figure's style override and per-track colours reach the SVG", () => {
+  const c = fixture();
+  const plain = contractToSvg(c, 800);
+  const themed = contractToSvg({ ...c, display: { ...c.display,
+    style: { palette: { unaltered: "#f0f0f0" }, glyph: { mutation: { priority: [{ color: "#abcdef" }, {}, {}, {}, {}] } } },
+    colors: { CANCER_TYPE: { Lung: "#123456" } } } }, 800);
+  assert.ok(!plain.includes("#f0f0f0") && themed.includes("#f0f0f0"), "the unaltered fill follows the override");
+  assert.ok(themed.includes("#abcdef"), "truncating mutations and their legend swatch follow the override");
+  assert.ok(themed.includes("#123456"), "the per-track colour reaches both the cells and the category key");
+  assert.equal((themed.match(/#123456/g) || []).length >= 2, true);
+  assert.ok(!themed.includes(">Lung</text>") === false, "labels are untouched");
+});
+
+test("clinicalLegends: 'none' drops the per-track keys and shrinks the canvas", () => {
+  const c = fixture();
+  const all = contractToSvg(c, 800);
+  const none = contractToSvg({ ...c, display: { ...c.display, clinicalLegends: "none" } }, 800);
+  assert.ok(none.length < all.length);
+  assert.ok(all.includes(">Lung</text>") && !none.includes(">Lung</text>"));
+  const h = (s: string) => Number(/height="(\d+)"/.exec(s)![1]);
+  assert.ok(h(none) < h(all), "height drops with the keys: " + h(none) + " vs " + h(all));
+});

@@ -7,7 +7,7 @@
 import { chQuery, DB, STUDY } from "./ch.ts";
 import { compileCohort, sq } from "./compiler.ts";
 import { heatmapTrackLabel } from "./profile-names.ts";
-import type { CohortDef, Contract, Track, GroupRange, OncoprintSpec, HeatmapSpec, ChRow, DisplaySpec, ResolvedDisplay, SortKeySpec } from "./types.ts";
+import type { CohortDef, Contract, Track, GroupRange, OncoprintSpec, HeatmapSpec, ChRow } from "./types.ts";
 
 // Internal-only: analysis.js passes an evaluated cohort's SQL as a subquery via this
 // Symbol key. JSON.parse cannot produce Symbol keys, so client specs can never inject
@@ -23,7 +23,8 @@ export type PidsCarrier = CohortDef & { [PIDS_SQL]?: string | Record<string, str
 import { buildAnnotationIndex } from "./annotation.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
-import { assembleContract, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
+import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
+export { normalizeDisplay, normalizeSort } from "./oncoprint-assemble.ts";
 
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
 
@@ -161,58 +162,6 @@ export function normalizeSpec(spec: OncoprintSpec) {
       .map((g: string) => String(g).toUpperCase().trim()).filter((g: string) => GENE_RE.test(g)).slice(0, 12)
   })).filter((h) => h.profileType);
   return { genes, clinical, derivedEvents, lineGap, sort, heatmap, display: normalizeDisplay(spec.display) };
-}
-
-/** Sort keys as authored -> the engine's ordered {track, dir} list; up to 4. */
-export function normalizeSort(sort: SortKeySpec[] | undefined): { track: string; dir: "asc" | "desc" }[] {
-  const list = Array.isArray(sort) && sort.length ? sort : ["genomic"];
-  return list.slice(0, 4).map((s) => {
-    if (typeof s === "string") return s.startsWith("-") ? { track: s.slice(1), dir: "desc" as const } : { track: s, dir: "asc" as const };
-    return { track: String((s && s.track) || ""), dir: (s && s.dir === "desc" ? "desc" : "asc") as "asc" | "desc" };
-  });
-}
-
-const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "style", "colors"] as const;
-const GAP_MODES = ["none", "gaps", "pct"] as const;
-const LEGEND_MODES = ["all", "none"] as const;
-
-/** Viewing options with defaults filled in. Unknown keys and values are rejected, never ignored. */
-export function normalizeDisplay(d: DisplaySpec | undefined): ResolvedDisplay {
-  const src = (d || {}) as Record<string, unknown>;
-  for (const k of Object.keys(src))
-    if (!(DISPLAY_KEYS as readonly string[]).includes(k))
-      throw new Error("display: unknown option '" + k + "' (accepted: " + DISPLAY_KEYS.join(", ") + ")");
-  const bool = (k: "showUnaltered" | "whitespace", dflt: boolean): boolean => {
-    const v = src[k];
-    if (v === undefined) return dflt;
-    if (typeof v !== "boolean") throw new Error("display." + k + " must be true or false");
-    return v;
-  };
-  const oneOf = <T extends string>(k: string, allowed: readonly T[], dflt: T): T => {
-    const v = src[k];
-    if (v === undefined) return dflt;
-    if (typeof v !== "string" || !allowed.includes(v as T))
-      throw new Error("display." + k + ": '" + String(v) + "' is not one of " + allowed.join(", "));
-    return v as T;
-  };
-  const colors = src.colors as ResolvedDisplay["colors"];
-  if (colors !== undefined) {
-    if (typeof colors !== "object" || colors === null || Array.isArray(colors)) throw new Error("display.colors must be {track: {value: color}}");
-    for (const [track, byValue] of Object.entries(colors)) {
-      if (typeof byValue !== "object" || byValue === null || Array.isArray(byValue)) throw new Error("display.colors['" + track + "'] must be {value: color}");
-      for (const [value, color] of Object.entries(byValue))
-        if (typeof color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(color))
-          throw new Error("display.colors['" + track + "']['" + value + "']: '" + String(color) + "' is not a #rrggbb colour");
-    }
-  }
-  return {
-    showUnaltered: bool("showUnaltered", true),
-    whitespace: bool("whitespace", true),
-    gaps: oneOf("gaps", GAP_MODES, "none"),
-    clinicalLegends: oneOf("clinicalLegends", LEGEND_MODES, "all"),
-    ...(src.style !== undefined ? { style: src.style as Record<string, unknown> } : {}),
-    ...(colors !== undefined ? { colors } : {})
-  };
 }
 
 // Provenance: the exact SQL a spec compiles to, without executing anything.

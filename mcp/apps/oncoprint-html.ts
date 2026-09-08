@@ -69,7 +69,7 @@ ${STYLE_JS}
       if (m.params && m.params.arguments) lastArgs = m.params.arguments;
     } else if (m.method === "ui/notifications/tool-result") {
       var sc = m.params && m.params.structuredContent;
-      if (sc && sc.contract) { if (sc.args) lastArgs = sc.args; setContract(sc.contract); }
+      if (sc && sc.contract) { if (sc.args) lastArgs = sc.args; if (sc.style) STYLE = sc.style; setContract(sc.contract); }
       else if (m.params && m.params.content && m.params.content[0]) showErr(m.params.content[0].text);
     } else if (m.method === "ui/notifications/host-context-changed") {
       if (m.params && m.params.hostContext && m.params.hostContext.theme) setTheme(m.params.hostContext.theme);
@@ -252,7 +252,7 @@ ${STYLE_JS}
     document.getElementById("sub").textContent = "re-sorting…";
     rpc("tools/call", { name: "render_oncoprint_app", arguments: args }).then(function (r) {
       var sc = r && r.structuredContent;
-      if (sc && sc.contract) { lastArgs = sc.args || args; setContract(sc.contract); }
+      if (sc && sc.contract) { lastArgs = sc.args || args; if (sc.style) STYLE = sc.style; setContract(sc.contract); }
       else if (r && r.content && r.content[0]) showErr(r.content[0].text);
     }).catch(function (err) { showErr("re-sort failed: " + (err && err.message || JSON.stringify(err))); });
   });

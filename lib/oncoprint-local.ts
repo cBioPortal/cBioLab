@@ -7,7 +7,8 @@
 //                                                       _DRIVER suffix (and a tolerated _GERMLINE suffix)
 //   clinical  patient  ATTR1  ATTR2 ...             attribute names may carry Oncoprinter's (number)/(string) suffix
 //   coverage  patient  genes                        comma-separated genes the patient's panel covers
-import type { AssembleInput, EventRow, SortKey } from "./oncoprint-assemble.ts";
+import { normalizeDisplay, type AssembleInput, type EventRow, type SortKey } from "./oncoprint-assemble.ts";
+import type { DisplaySpec } from "./types.ts";
 
 export type Table = Record<string, string>[];
 
@@ -103,6 +104,8 @@ export interface LocalOptions {
   sort?: string | string[];
   study?: string;
   annotationSource?: string;
+  /** viewing options; validated and defaulted like any other spec */
+  display?: DisplaySpec;
 }
 
 /** Everything `assembleContract` needs, from local tables. Without a coverage table every column is covered for every gene. */
@@ -132,6 +135,6 @@ export function localInput(o: LocalOptions): AssembleInput {
   return {
     genes, groups, studies: [o.study || "local"], events, coverage,
     isDriver: (r) => !!(r as LocalEvent).driver, annotationSource: o.annotationSource || "driver flags from the input",
-    clinical, heatmap: [], derived: [], sort: parseSort(o.sort), lineGap: 90
+    clinical, heatmap: [], derived: [], sort: parseSort(o.sort), lineGap: 90, display: normalizeDisplay(o.display)
   };
 }

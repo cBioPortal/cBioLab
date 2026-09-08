@@ -1,8 +1,9 @@
-// Viewing options and sort keys live in the spec, so they are validated there: defaults
+// Viewing options and sort keys live in the spec, so they are validated there — in the pure
+// module, so a CLI drawing local tables never has to reach the database. Defaults
 // filled in, unknown options and bad values rejected loudly rather than ignored.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeDisplay, normalizeSort } from "../lib/oncoprint.ts";
+import { normalizeDisplay, normalizeSort } from "../lib/oncoprint-assemble.ts";
 
 test("display defaults", () => {
   assert.deepEqual(normalizeDisplay(undefined), { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all" });

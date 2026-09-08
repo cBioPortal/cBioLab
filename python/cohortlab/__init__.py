@@ -7,8 +7,9 @@
     op.frequencies(); op.to_tsv("cells.tsv"); op.save("fig.png", width=1400)
 """
 from .contract import Contract, read_opb1, write_opb1, BITS, NOT_PROFILED
+from .style import STYLE, resolve_style
 from .assemble import assemble_contract
-from .local import local_input, parse_tsv
+from .local import local_input, normalize_display, parse_tsv
 from .api import Oncoprint
 
-__all__ = ["Oncoprint", "Contract", "read_opb1", "write_opb1", "assemble_contract", "local_input", "parse_tsv", "BITS", "NOT_PROFILED"]
+__all__ = ["Oncoprint", "Contract", "read_opb1", "write_opb1", "assemble_contract", "local_input", "normalize_display", "parse_tsv", "BITS", "NOT_PROFILED", "STYLE", "resolve_style"]

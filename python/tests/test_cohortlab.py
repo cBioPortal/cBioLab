@@ -96,6 +96,7 @@ class Conformance(unittest.TestCase):
             dict(group_by="CANCER_TYPE", sort="STAGE"),
             dict(sort="-AGE,CANCER_TYPE"),
             dict(genes="EGFR,TP53"),
+            dict(display='{"showUnaltered": false, "gaps": "pct", "style": {"palette": {"unaltered": "#f0f0f0"}}, "colors": {"CANCER_TYPE": {"Lung": "#123456"}}}'),
             dict(),
         ]
         for case in cases:
@@ -111,7 +112,8 @@ class Conformance(unittest.TestCase):
                 ts.pop("stats", None)
                 py = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), os.path.join(FIX, "clinical.tsv"), os.path.join(FIX, "coverage.tsv"),
                                            genes=case.get("genes", "").split(",") if case.get("genes") else None,
-                                           group_by=case.get("group_by"), sort=case.get("sort")).to_json()
+                                           group_by=case.get("group_by"), sort=case.get("sort"),
+                                           display=json.loads(case["display"]) if case.get("display") else None).to_json()
                 py.pop("stats", None)
                 self.assertEqual(json.dumps(py, sort_keys=True), json.dumps(ts, sort_keys=True))
 
@@ -131,6 +133,49 @@ class LevelOfDetailConformance(unittest.TestCase):
                     r = subprocess.run(["node", os.path.join(ROOT, "scripts", "oncoprint-cli.ts"), "--contract", cpath, "--lod", str(buckets)],
                                        check=True, cwd=ROOT, capture_output=True, text=True)
                     self.assertEqual(json.loads(r.stdout), bucket_codes(op.contract, buckets))
+
+
+class StyleOverrides(unittest.TestCase):
+    """resolve_style mirrors lib/oncoprint-style.ts, and an override reaches the drawn pixels."""
+
+    def test_merge_and_rejections(self):
+        from cohortlab import STYLE, resolve_style
+        self.assertIs(resolve_style(None), STYLE)
+        S = resolve_style({"palette": {"unaltered": "#f0f0f0"}, "glyph": {"vusAlpha": 0.6}})
+        self.assertEqual(S["palette"]["unaltered"], "#f0f0f0")
+        self.assertEqual(S["glyph"]["vusAlpha"], 0.6)
+        self.assertEqual(S["palette"]["paper"], STYLE["palette"]["paper"])
+        self.assertEqual(STYLE["palette"]["unaltered"], "#e8ecee", "the defaults are not mutated")
+        for bad, msg in [({"palete": {}}, "not a style key"), ({"palette": {"unaltered": "red"}}, "#rrggbb"),
+                         ({"bits": {"AMP": 1}}, "read-only"), ({"glyph": {"vusAlpha": "half"}}, "must be a number"),
+                         ({"glyph": {"mutation": {"priority": [{"bit": "MISSENSE"}, {}, {}, {}, {}]}}}, "read-only"),
+                         ({"glyph": {"notProfiled": {"fill": "#e8ecee", "stripe": {"color": "#e8ecee"}}}}, "indistinguishable")]:
+            with self.subTest(bad=bad):
+                with self.assertRaisesRegex(ValueError, msg):
+                    resolve_style(bad)
+
+    def test_display_validation_matches_typescript(self):
+        from cohortlab import normalize_display
+        self.assertEqual(normalize_display(None), {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all"})
+        with self.assertRaisesRegex(ValueError, "unknown option 'showUnalterd'"):
+            normalize_display({"showUnalterd": True})
+        with self.assertRaisesRegex(ValueError, "is not one of none, gaps, pct"):
+            normalize_display({"gaps": "yes"})
+        with self.assertRaisesRegex(ValueError, "#rrggbb"):
+            normalize_display({"colors": {"TYPE": {"x": "red"}}})
+
+    def test_override_reaches_the_pixels(self):
+        from cohortlab.render import raster
+        opts = dict(group_by="CANCER_TYPE", sort="STAGE")
+        plain = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), os.path.join(FIX, "clinical.tsv"), os.path.join(FIX, "coverage.tsv"), **opts)
+        themed = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), os.path.join(FIX, "clinical.tsv"), os.path.join(FIX, "coverage.tsv"),
+                                       display={"style": {"palette": {"unaltered": "#f0f0f0"}}, "colors": {"CANCER_TYPE": {"Lung": "#123456"}}}, **opts)
+        a, _ = raster(plain.contract, width=600)
+        b, _ = raster(themed.contract, width=600)
+        self.assertTrue((a == np.array([232, 236, 238])).all(axis=2).any(), "the default unaltered grey is drawn")
+        self.assertFalse((b == np.array([232, 236, 238])).all(axis=2).any(), "and is gone once overridden")
+        self.assertTrue((b == np.array([240, 240, 240])).all(axis=2).any())
+        self.assertTrue((b == np.array([0x12, 0x34, 0x56])).all(axis=2).any(), "the per-track colour is drawn")
 
 
 class Raster(unittest.TestCase):

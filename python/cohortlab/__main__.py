@@ -21,6 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--genes"); p.add_argument("--group-by"); p.add_argument("--sort"); p.add_argument("--patients"); p.add_argument("--study")
     p.add_argument("--spec"); p.add_argument("--server", default="http://localhost:3107")
     p.add_argument("--contract")
+    p.add_argument("--display", help='viewing options as JSON, e.g. \'{"showUnaltered":false}\'')
     p.add_argument("--out"); p.add_argument("--width", type=int, default=1200); p.add_argument("--quiet", action="store_true")
     a = p.parse_args(argv)
     t0 = time.time()
@@ -35,7 +36,8 @@ def main(argv: list[str] | None = None) -> int:
             with open(a.patients, encoding="utf-8") as f:
                 patients = [l.strip() for l in f if l.strip()]
         op = Oncoprint.from_tables(a.events, a.clinical, a.coverage, genes=a.genes.split(",") if a.genes else None,
-                                   group_by=a.group_by, sort=a.sort, patients=patients, study=a.study)
+                                   group_by=a.group_by, sort=a.sort, patients=patients, study=a.study,
+                                   display=json.loads(a.display) if a.display else None)
     else:
         p.print_help()
         return 2

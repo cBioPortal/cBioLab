@@ -94,3 +94,81 @@ def gene_legend(S: dict[str, Any] = STYLE) -> list[tuple[str, str, str]]:
     items += [(o["label"], o["color"], "swatch") for o in G["cna"]["options"]]
     items.append((G["notProfiled"]["label"], G["notProfiled"]["stripe"]["color"], "notProfiled"))
     return items
+
+
+# ---- user overrides ----------------------------------------------------------
+# Port of resolveStyle in lib/oncoprint-style.ts: deep-merge onto the defaults with loud
+# validation. Keys that change meaning rather than appearance are refused.
+import re as _re
+
+_COLOR_RE = _re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def _is_color(v: Any) -> bool:
+    return isinstance(v, str) and bool(_COLOR_RE.match(v))
+
+
+def _merge_into(base: Any, over: Any, path: str) -> Any:
+    if path in ("bits", "version"):
+        raise ValueError(f"style.{path} is read-only: it defines what a cell means, not how it looks")
+    if isinstance(base, dict):
+        if not isinstance(over, dict):
+            raise ValueError(f"style.{path} must be an object")
+        out = dict(base)
+        for k, v in over.items():
+            if k not in base:
+                where = f"{path}.{k}" if path else k
+                raise ValueError(f"style.{where} is not a style key (accepted here: {', '.join(base)})")
+            out[k] = _merge_into(base[k], v, f"{path}.{k}" if path else k)
+        return out
+    if isinstance(base, list):
+        if not isinstance(over, list):
+            raise ValueError(f"style.{path} must be an array")
+        if base and isinstance(base[0], dict) and "bit" in base[0]:
+            if len(over) != len(base):
+                raise ValueError(f"style.{path}: keep all {len(base)} entries; only their colour and label may change")
+            out = []
+            for i, (b, o) in enumerate(zip(base, over)):
+                if not isinstance(o, dict):
+                    raise ValueError(f"style.{path}[{i}] must be an object")
+                if "bit" in o and o["bit"] != b["bit"]:
+                    raise ValueError(f"style.{path}[{i}].bit is read-only: reordering alteration priority changes what a mixed cell means")
+                out.append(_merge_into(b, o, f"{path}[{i}]"))
+            return out
+        for i, v in enumerate(over):
+            if base and _is_color(base[0]) and not _is_color(v):
+                raise ValueError(f"style.{path}[{i}]: '{v}' is not a #rrggbb colour")
+            if base and isinstance(base[0], (int, float)) and not isinstance(v, (int, float)):
+                raise ValueError(f"style.{path}[{i}] must be a number")
+        return list(over)
+    if _is_color(base) and not _is_color(over):
+        raise ValueError(f"style.{path}: '{over}' is not a #rrggbb colour")
+    if isinstance(base, bool) and not isinstance(over, bool):
+        raise ValueError(f"style.{path} must be true or false")
+    if isinstance(base, (int, float)) and not isinstance(base, bool) and not isinstance(over, (int, float)):
+        raise ValueError(f"style.{path} must be a number")
+    if isinstance(base, str) and not isinstance(over, str):
+        raise ValueError(f"style.{path} must be a string")
+    return over
+
+
+def resolve_style(overrides: dict[str, Any] | None = None, S: dict[str, Any] = STYLE) -> dict[str, Any]:
+    """Defaults with `overrides` merged on top; the defaults themselves when there is nothing to merge."""
+    if not overrides:
+        return S
+    merged = _merge_into(S, overrides, "")
+    npf = merged["glyph"]["notProfiled"]
+    if npf["fill"] == merged["palette"]["unaltered"] and npf["stripe"]["color"] == merged["palette"]["unaltered"]:
+        raise ValueError("style: not-profiled would be indistinguishable from unaltered — give glyph.notProfiled a different fill or stripe")
+    return merged
+
+
+def track_category_color(track: Any, code: int, S: dict[str, Any] = STYLE, colors: dict[str, dict[str, str]] | None = None) -> str:
+    """Colour for a categorical cell, honouring display.colors[trackLabel][value]."""
+    cats = (track.meta.get("categories") if hasattr(track, "meta") else None) or []
+    value = cats[code] if 0 <= code < len(cats) else None
+    if value is not None and colors and track.label in colors:
+        override = colors[track.label].get(value)
+        if override:
+            return override
+    return category_color(code, S)

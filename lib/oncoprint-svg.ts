@@ -2,17 +2,20 @@
 // Zero data logic and zero style of its own: cells come from the contract, level of detail
 // from lib/oncoprint-lod.ts, every colour, band and label from lib/oncoprint-style.ts.
 import type { Contract, Track } from "./types.ts";
-import { STYLE, cellLayers, numericColor, categoryColor, formatGutterPct, truncateLabel, geneLegend } from "./oncoprint-style.ts";
+import { STYLE, cellLayers, numericColor, trackCategoryColor, formatGutterPct, truncateLabel, geneLegend, resolveStyle, type Style } from "./oncoprint-style.ts";
 import { aggregate, bucketEdges } from "./oncoprint-lod.ts";
 
 const esc = (s: unknown): string => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 const r2 = (x: number): number => Math.round(x * 100) / 100;
 
-export function contractToSvg(contract: Contract, width = 1200): string {
-  const S = STYLE, P = S.palette, G = S.geometry;
+export function contractToSvg(contract: Contract, width = 1200, style?: Style): string {
+  // the figure's own style: an override travels in the contract, so callers need pass nothing
+  const S = style ?? resolveStyle(contract.display?.style);
+  const colors = contract.display?.colors;
+  const P = S.palette, G = S.geometry;
   const { rowH: ROW_H, rowGap: ROW_GAP, gutter: GUTTER, groupGap: GROUP_GAP, header: HEADER_H } = G;
   const nTracks = contract.tracks.length;
-  const catTracks = contract.tracks.filter((t) =>
+  const catTracks = contract.display?.clinicalLegends === "none" ? [] : contract.tracks.filter((t) =>
     (t.kind === "clinical" && ((t.categories && t.categories.length) || t.numeric)) || t.kind === "heatmap");
   // gene legend, wrapped to the available width; each row is 16 px
   const items: { label: string; color: string; kind: string }[] = [...geneLegend(S)];
@@ -61,7 +64,7 @@ export function contractToSvg(contract: Contract, width = 1200): string {
         if (t.kind === "gene") geneCell(code, x, y, w);
         else if (t.kind === "derivedEvent") parts.push(rect(x, y, w, ROW_H, code > 0 ? P.derived : P.unaltered));
         else if (t.numeric) parts.push(rect(x, y, w, ROW_H, code === -1 ? S.glyph.notProfiled.fill : numericColor(code, t.center, S)));
-        else parts.push(rect(x, y, w, ROW_H, code === -1 ? S.glyph.notProfiled.fill : categoryColor(code, S)));
+        else parts.push(rect(x, y, w, ROW_H, code === -1 ? S.glyph.notProfiled.fill : trackCategoryColor(t, code, S, colors)));
       }
     });
   });
@@ -95,7 +98,7 @@ export function contractToSvg(contract: Contract, width = 1200): string {
     }
     t.categories!.slice(0, 8).forEach((c, i: number) => {
       const name = String(c).length > 20 ? String(c).slice(0, 19) + "…" : String(c);
-      parts.push(rect(cx, cy - 9, 10, 10, categoryColor(i, S)));
+      parts.push(rect(cx, cy - 9, 10, 10, trackCategoryColor(t, i, S, colors)));
       parts.push(`<text x="${cx + 14}" y="${cy}" fill="${P.muted}">${esc(name)}</text>`);
       cx += 14 + name.length * 6.2 + 16;
     });

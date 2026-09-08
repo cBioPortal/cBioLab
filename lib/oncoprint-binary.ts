@@ -21,6 +21,7 @@ export interface PackedHeader extends Omit<Contract, "tracks" | "columns"> {
   format: "OPB1";
 }
 export interface UnpackedContract extends Omit<Contract, "tracks" | "columns"> {
+  /** `display` and `queries` ride in the header, so a renderer sees them without the cells */
   n: number;
   tracks: (Omit<Track, "cells"> & { cells: Int16Array | Int32Array })[];
   /** decoded lazily — 200k ids are only needed for tooltips and exports */

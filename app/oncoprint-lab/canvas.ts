@@ -9,7 +9,8 @@
 // hiding unaltered columns or re-sorting on the client never touches the data.
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 
-import { STYLE, cellLayers, numericColor as styleNumericColor, categoryColor, formatPct, formatGutterPct, truncateLabel } from "../../lib/oncoprint-style.ts";
+import { STYLE, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatGutterPct, truncateLabel, resolveStyle, type Style } from "../../lib/oncoprint-style.ts";
+export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
 export const BITS = STYLE.bits;
@@ -88,9 +89,10 @@ export function aggregate(t: TrackLike, order: Uint32Array, k0: number, k1: numb
   return lodAggregate(t, t.cells, order, k0, k1, scratch);
 }
 
-function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: number, y: number, w: number, h: number, P: Palette): void {
+function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: number, y: number, w: number, h: number, P: Palette,
+  S: Style, colors?: Record<string, Record<string, string>>): void {
   if (t.kind === "gene") {
-    for (const l of cellLayers(code, STYLE)) {
+    for (const l of cellLayers(code, S)) {
       if (l.alpha < 1) ctx.globalAlpha = l.alpha;
       ctx.fillStyle = l.color; ctx.fillRect(x, y + h * l.band[0], w, h * (l.band[1] - l.band[0]));
       if (l.alpha < 1) ctx.globalAlpha = 1;
@@ -98,16 +100,24 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
     return;
   }
   if (t.kind === "derivedEvent") { ctx.fillStyle = code > 0 ? P.derived : P.unaltered; ctx.fillRect(x, y, w, h); return; }
-  if (t.numeric) { ctx.fillStyle = code === -1 ? P.np : numericColor(t, code); ctx.fillRect(x, y, w, h); return; }
-  ctx.fillStyle = code === -1 ? P.np : categoryColor(code, STYLE); ctx.fillRect(x, y, w, h);
+  if (t.numeric) { ctx.fillStyle = code === -1 ? P.np : styleNumericColor(code, t.center, S); ctx.fillRect(x, y, w, h); return; }
+  ctx.fillStyle = code === -1 ? P.np : trackCategoryColor(t, code, S, colors); ctx.fillRect(x, y, w, h);
+}
+
+/** The palette a contract draws with: defaults, or its own `display.style` override. */
+export function paletteOf(S: Style): Palette {
+  return { paper: S.palette.paper, unaltered: S.palette.unaltered, np: S.glyph.notProfiled.fill, npStripe: S.glyph.notProfiled.stripe.color,
+    derived: S.palette.derived, text: S.palette.text, muted: S.palette.muted, groupLine: S.palette.groupLine };
 }
 
 export interface DrawResult { ms: number; cellsDrawn: number; bucketsDrawn: number }
 
-export interface DrawOpts { gap?: number; pctLabels?: boolean }
+export interface DrawOpts { gap?: number; pctLabels?: boolean; style?: Style }
 
 export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[],
   view: View, cssW: number, P: Palette = PALETTE, opts: DrawOpts = {}): DrawResult {
+  const S = opts.style ?? resolveStyle(data.display?.style);
+  const colors = data.display?.colors;
   const gap = opts.gap ?? GEOM.groupGap;
   const t0 = performance.now();
   const { header, rowH, rowGap, gutter } = GEOM;
@@ -145,7 +155,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
       if (zoom >= 1) {
         for (let k = k0; k < k1; k++) {
           const x = gx + k * zoom - sx + gutter;
-          drawCell(ctx, t, t.cells[order[g.start + k]], x, y, Math.max(0.5, zoom - pad), rowH, P);
+          drawCell(ctx, t, t.cells[order[g.start + k]], x, y, Math.max(0.5, zoom - pad), rowH, P, S, colors);
           cellsDrawn++;
         }
       } else {
@@ -156,7 +166,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
           const kk1 = Math.min(k1, Math.max(kk0 + 1, Math.floor((px + 1 + sx - gx) / zoom)));
           if (kk0 >= kk1) continue;
           const code = aggregate(t, order, g.start + kk0, g.start + kk1, scratch);
-          drawCell(ctx, t, code, px + gutter, y, 1, rowH, P);
+          drawCell(ctx, t, code, px + gutter, y, 1, rowH, P, S, colors);
           bucketsDrawn++;
         }
       }
@@ -169,7 +179,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   data.tracks.forEach((t, ti) => {
     const y = header + ti * (rowH + rowGap);
     ctx.fillStyle = P.text; ctx.textAlign = "left";
-    ctx.fillText(truncateLabel(t.label, STYLE), 4, y + 14);
+    ctx.fillText(truncateLabel(t.label, S), 4, y + 14);
     if (t.freqPct != null) {
       ctx.fillStyle = P.muted; ctx.textAlign = "right";
       ctx.fillText(formatGutterPct(t.driverPct, t.freqPct), gutter - 8, y + 14);
