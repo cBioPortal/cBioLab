@@ -15,7 +15,9 @@ const PRESETS: Record<string, { label: string; spec: Record<string, unknown> }> 
       { name: "TP53 mut", dsl: { all: [{ kind: "oql", q: "TP53: MUT" }] } },
       { name: "TP53 wt", dsl: { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] } } ] } } } },
   top5: { label: "5 largest studies, ~166k patients", spec: { studies: BIG.slice(0, 5), genes: GENES, clinical: ["CANCER_TYPE", "AGE"] } },
-  top11: { label: "11 largest studies, ~211k patients", spec: { studies: BIG, genes: GENES, clinical: ["CANCER_TYPE", "AGE"] } }
+  top11: { label: "11 largest studies, ~211k patients", spec: { studies: BIG, genes: GENES, clinical: ["CANCER_TYPE", "AGE"] } },
+  genie: { label: "GENIE public + 5 largest, ~409k patients", spec: { studies: ["genie_public", ...BIG.slice(0, 5)], dbs: { genie_public: "cbioportal_genie_green" }, genes: GENES, clinical: ["CANCER_TYPE", "SEX"] } },
+  genie11: { label: "GENIE public + 11 largest, ~454k patients", spec: { studies: ["genie_public", ...BIG], dbs: { genie_public: "cbioportal_genie_green" }, genes: GENES, clinical: ["CANCER_TYPE", "SEX"] } }
 };
 
 export default async function OncoprintLabPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {

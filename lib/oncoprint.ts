@@ -43,7 +43,7 @@ function mutClassBit(mt: string | undefined): number {
 
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
 
-export function cohortPatientsSql(dsl: PidsCarrier | null | undefined, study: string = STUDY): string {
+export function cohortPatientsSql(dsl: PidsCarrier | null | undefined, study: string = STUDY, db: string = DB): string {
   const pre = dsl?.[PIDS_SQL];
   if (typeof pre === "string") return pre;
   // SQL for a cohort's stable_ids (null dsl = every patient with a sample).
@@ -53,27 +53,27 @@ export function cohortPatientsSql(dsl: PidsCarrier | null | undefined, study: st
     const ids = dsl.patients.map(String).filter((p: string) => /^[A-Za-z0-9._-]{1,64}$/.test(p)).slice(0, 50000);
     if (!ids.length) throw new Error("patient list is empty or invalid");
     return "SELECT DISTINCT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid\n" +
-      "FROM " + DB + ".sample_derived\n" +
+      "FROM " + db + ".sample_derived\n" +
       "WHERE cancer_study_identifier = " + sq(study) + "\n" +
       "  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (" + ids.map(sq).join(",") + ")\n" +
       "ORDER BY pid";
   }
   // DSL v2 definition ({all: [...]}) — the analysis document's cohort language
-  if (dsl && Array.isArray((dsl as { all?: unknown }).all)) return compileCohortDef(dsl as CohortDef, { study });
+  if (dsl && Array.isArray((dsl as { all?: unknown }).all)) return compileCohortDef(dsl as CohortDef, { study, db });
   if (!dsl) {
     return "SELECT DISTINCT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid\n" +
-      "FROM " + DB + ".sample_derived WHERE cancer_study_identifier = " + sq(study) + " ORDER BY pid";
+      "FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + sq(study) + " ORDER BY pid";
   }
   const { patientsSql } = compileCohort({
-    db: DB, study, a: dsl.a!, b: dsl.b, rel: dsl.rel,
+    db, study, a: dsl.a!, b: dsl.b, rel: dsl.rel,
     priorGuard: !!dsl.priorGuard, lineGap: dsl.lineGap, patientsLimit: 1000000
   });
   return patientsSql;
 }
 
 async function cohortPatients(dsl: PidsCarrier | null | undefined, study: string,
-  log?: ContractOpts["log"], label = "oncoprint:columns"): Promise<string[]> {
-  const sql = cohortPatientsSql(dsl, study);
+  log?: ContractOpts["log"], label = "oncoprint:columns", db: string = DB): Promise<string[]> {
+  const sql = cohortPatientsSql(dsl, study, db);
   const entry = { label, sql, study } as { label: string; sql: string; ms?: number; study?: string };
   if (log) log.push(entry);
   const r = await chQuery<ChRow>(sql);
@@ -81,33 +81,33 @@ async function cohortPatients(dsl: PidsCarrier | null | undefined, study: string
   return r.data.map((x) => x.pid);
 }
 
-export function genomicEventsSql(genes: string[], study: string = STUDY): string {
+export function genomicEventsSql(genes: string[], study: string = STUDY, db: string = DB): string {
   const puidPrefix = study + "_";
   return "SELECT replaceOne(patient_unique_id, " + sq(puidPrefix) + ", '') AS pid,\n" +
     "       hugo_gene_symbol AS gene, variant_type AS vt, mutation_type AS mt,\n" +
     "       mutation_variant AS mv, cna_alteration AS cna\n" +
-    "FROM " + DB + ".genomic_event_derived\n" +
+    "FROM " + db + ".genomic_event_derived\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")";
 }
 
 // one row per patient: the queried genes any of the patient's panels cover
-export function coverageSql(genes: string[], study: string = STUDY): string {
+export function coverageSql(genes: string[], study: string = STUDY, db: string = DB): string {
   const puidPrefix = study + "_";
   return "SELECT replaceOne(sd.patient_unique_id, " + sq(puidPrefix) + ", '') AS pid, groupUniqArray(pg.gene) AS genes\n" +
-    "FROM " + DB + ".sample_to_gene_panel_derived sp\n" +
-    "JOIN " + DB + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + genes.map(sq).join(",") + ")\n" +
-    "JOIN " + DB + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
+    "FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + genes.map(sq).join(",") + ")\n" +
+    "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
     "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
     "GROUP BY pid";
 }
 
-export function clinicalSql(attrs: string[], study: string = STUDY): string {
+export function clinicalSql(attrs: string[], study: string = STUDY, db: string = DB): string {
   const puidPrefix = study + "_";
   // patient-level rows win; sample-level attributes (e.g. CANCER_TYPE in MSK studies)
   // fall back to one of the patient's sample values via argMax
   return "SELECT replaceOne(patient_unique_id, " + sq(puidPrefix) + ", '') AS pid,\n" +
     "       attribute_name AS k, argMax(attribute_value, type = 'patient') AS v\n" +
-    "FROM " + DB + ".clinical_data_derived\n" +
+    "FROM " + db + ".clinical_data_derived\n" +
     "WHERE cancer_study_identifier = " + sq(study) + "\n" +
     "  AND attribute_name IN (" + attrs.map(sq).join(",") + ") AND attribute_value != ''\n" +
     "GROUP BY pid, k";
@@ -115,11 +115,12 @@ export function clinicalSql(attrs: string[], study: string = STUDY): string {
 
 // per-study molecular-profile inventory (validation for heatmap tracks)
 const _profCache = new Map<string, Set<string>>();
-async function studyProfileTypes(study: string): Promise<Set<string>> {
-  if (_profCache.has(study)) return _profCache.get(study)!;
-  const r = await chQuery("SELECT DISTINCT profile_type FROM " + DB + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study));
+async function studyProfileTypes(study: string, db: string = DB): Promise<Set<string>> {
+  const key = db + "." + study;
+  if (_profCache.has(key)) return _profCache.get(key)!;
+  const r = await chQuery("SELECT DISTINCT profile_type FROM " + db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study));
   const set = new Set((r.data as ChRow[]).map((x) => x.profile_type));
-  _profCache.set(study, set);
+  _profCache.set(key, set);
   return set;
 }
 
@@ -127,17 +128,18 @@ async function studyProfileTypes(study: string): Promise<Set<string>> {
 // counts (the portal's "Variant Allele Frequency in Selected Mutations Profile").
 // Patient-level value = max across the patient's mutations in the gene.
 const _vafCache = new Map<string, boolean>();
-async function vafAvailable(study: string): Promise<boolean> {
-  if (_vafCache.has(study)) return _vafCache.get(study)!;
-  const r = await chQuery("SELECT 1 FROM " + DB + ".mutation_derived WHERE studyId = " + sq(study) + " AND tumorAltCount > 0 LIMIT 1");
+async function vafAvailable(study: string, db: string = DB): Promise<boolean> {
+  const key = db + "." + study;
+  if (_vafCache.has(key)) return _vafCache.get(key)!;
+  const r = await chQuery("SELECT 1 FROM " + db + ".mutation_derived WHERE studyId = " + sq(study) + " AND tumorAltCount > 0 LIMIT 1");
   const ok = r.data.length > 0;
-  _vafCache.set(study, ok);
+  _vafCache.set(key, ok);
   return ok;
 }
-export function vafSql(genes: string[], study: string = STUDY): string {
+export function vafSql(genes: string[], study: string = STUDY, db: string = DB): string {
   return "SELECT patientId AS pid, `GENE.hugoGeneSymbol` AS gene,\n" +
     "       max(tumorAltCount / (tumorAltCount + tumorRefCount)) AS v\n" +
-    "FROM " + DB + ".mutation_derived\n" +
+    "FROM " + db + ".mutation_derived\n" +
     "WHERE studyId = " + sq(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
     "  AND tumorAltCount > 0 AND tumorRefCount >= 0\n" +
     "GROUP BY pid, gene";
@@ -145,11 +147,11 @@ export function vafSql(genes: string[], study: string = STUDY): string {
 
 // patient-level continuous values for heatmap tracks (columns are patients, so
 // multi-sample patients get the mean across their samples — stated in the label)
-export function heatmapSql(profileType: string, genes: string[], study: string = STUDY): string {
+export function heatmapSql(profileType: string, genes: string[], study: string = STUDY, db: string = DB): string {
   return "SELECT replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '') AS pid,\n" +
     "       ga.hugo_gene_symbol AS gene, avg(toFloat64OrNull(ga.alteration_value)) AS v\n" +
-    "FROM " + DB + ".genetic_alteration_derived ga\n" +
-    "JOIN " + DB + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
+    "FROM " + db + ".genetic_alteration_derived ga\n" +
+    "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
     "WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(profileType) + "\n" +
     "  AND ga.hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
     "  AND toFloat64OrNull(ga.alteration_value) IS NOT NULL\n" +
@@ -225,6 +227,9 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
     .map(s => String(s).replace(/[^A-Za-z0-9._-]/g, ""));
   const multi = studies.length > 1;
   const qual = (s: string, pid: string): string => multi ? s + "_" + pid : pid;
+  // per-study database on the same instance (e.g. a GENIE release next to the public portal);
+  // studies not listed live in the app's default database
+  const dbOf = (s: string): string => String((spec.dbs || {})[s] || "").replace(/[^A-Za-z0-9_]/g, "") || DB;
   const { genes, clinical, derivedEvents, lineGap, sort, heatmap } = normalizeSpec(spec);
   if (multi && derivedEvents.length) throw new Error("derived-event tracks are single-study; drop them or the extra studies");
 
@@ -246,7 +251,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
         for (const { s, r } of fetched)
           for (const x of r.data) { const id = qual(s, x.pid); raw.push(id); studyOf.set(id, s); }
       } else {
-        for (const p of await cohortPatients({ ...g.dsl, lineGap }, studies[0], opts.log)) {
+        for (const p of await cohortPatients({ ...g.dsl, lineGap }, studies[0], opts.log, "oncoprint:columns", dbOf(studies[0]))) {
           const id = qual(studies[0], p); raw.push(id); studyOf.set(id, studies[0]);
         }
       }
@@ -258,12 +263,12 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
     // no groups: every patient of every study, one column group, study order
     if (spec.cohort) throw new Error("multi-study oncoprint with a cohort requires cohort groups (layout.groupBy)");
     const fetched = await Promise.all(studies.map(async (s) =>
-      ({ s, r: await lq<ChRow>("oncoprint:columns", cohortPatientsSql(null, s), s) })));
+      ({ s, r: await lq<ChRow>("oncoprint:columns", cohortPatientsSql(null, s, dbOf(s)), s) })));
     const pids: string[] = [];
     for (const { s, r } of fetched) for (const x of r.data) { const id = qual(s, x.pid); pids.push(id); studyOf.set(id, s); }
     groups = [{ name: "all patients", pids }];
   } else {
-    const pids = await cohortPatients(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, opts.log);
+    const pids = await cohortPatients(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, opts.log, "oncoprint:columns", dbOf(study));
     for (const p of pids) studyOf.set(p, study);
     groups = [{ name: "cohort", pids }];
   }
@@ -275,8 +280,8 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   const ev: { data: any[] } = { data: [] };
   const geneCells = new Map<string, Int32Array>(genes.map((g) => [g, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
   const evFetched = await Promise.all(studies.map(s =>
-    Promise.all([lq("oncoprint:alterations", genomicEventsSql(genes, s), s),
-                 lq<{ pid: string; genes: string[] }>("oncoprint:coverage", coverageSql(genes, s), s)]).then(([e, c]) => ({ s, e, c }))));
+    Promise.all([lq("oncoprint:alterations", genomicEventsSql(genes, s, dbOf(s)), s),
+                 lq<{ pid: string; genes: string[] }>("oncoprint:coverage", coverageSql(genes, s, dbOf(s)), s)]).then(([e, c]) => ({ s, e, c }))));
   for (const { s, e, c } of evFetched) {
     const pref = multi ? s + "_" : "";
     for (const r of e.data) { if (multi) r.pid = pref + r.pid; ev.data.push(r); }
@@ -316,7 +321,7 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   }
   if (clinical.length) {
     const cd: { data: any[] } = { data: [] };
-    const cdFetched = await Promise.all(studies.map(async (s) => ({ s, r: await lq("oncoprint:clinicalTracks", clinicalSql(clinical, s), s) })));
+    const cdFetched = await Promise.all(studies.map(async (s) => ({ s, r: await lq("oncoprint:clinicalTracks", clinicalSql(clinical, s, dbOf(s)), s) })));
     for (const { s, r } of cdFetched)
       for (const x of r.data) cd.data.push(multi ? { ...x, pid: qual(s, x.pid) } : x);
     for (const attr of clinical) {
@@ -362,7 +367,7 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   for (const h of heatmap) {
     const isVaf = /^vaf$/i.test(h.profileType);
     const avail = await Promise.all(studies.map(async (s) =>
-      (isVaf ? await vafAvailable(s) : (await studyProfileTypes(s)).has(h.profileType)) ? s : null));
+      (isVaf ? await vafAvailable(s, dbOf(s)) : (await studyProfileTypes(s, dbOf(s))).has(h.profileType)) ? s : null));
     const okStudies = avail.filter((s): s is string => s !== null);
     if (!okStudies.length)
       throw new Error(isVaf
@@ -371,7 +376,7 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
           " (available: " + ([...(await studyProfileTypes(studies[0]))].join(", ") || "none") + ", VAF)");
     const valByKey = new Map<string, number>(); // columnId|gene -> value
     const hFetched = await Promise.all(okStudies.map(async (s) =>
-      ({ s, r: await lq(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s) : heatmapSql(h.profileType, h.genes, s), s) })));
+      ({ s, r: await lq(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s, dbOf(s)) : heatmapSql(h.profileType, h.genes, s, dbOf(s)), s) })));
     for (const { s, r } of hFetched)
       for (const row of r.data) valByKey.set(qual(s, row.pid) + "|" + row.gene, Number(row.v));
     const isZ = /zscore/i.test(h.profileType);
@@ -417,7 +422,7 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   // ---- derived-event tracks (cohort-DSL expressions as phenotypes) ------
   const devTracks: Track[] = [];
   for (const de of derivedEvents) {
-    const pids = new Set<string>(await cohortPatients({ ...de.expression, lineGap }, study, opts.log, "oncoprint:derivedEvent"));
+    const pids = new Set<string>(await cohortPatients({ ...de.expression, lineGap }, study, opts.log, "oncoprint:derivedEvent", dbOf(study)));
     const cells = new Int32Array(allPids.length);
     allPids.forEach((p, i) => { cells[i] = pids.has(p) ? 1 : 0; });
     devTracks.push({ kind: "derivedEvent", label: String(de.label || "derived event").slice(0, 60), cells });
