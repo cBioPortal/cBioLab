@@ -222,7 +222,7 @@ export default function AnalysisPage() {
   const [study, setStudy] = useState("msk_chord_2024");
   const [explore, setExplore] = useState<ExploreResult | null>(null);
   const [exploreBusy, setExploreBusy] = useState(false);
-  const [trackAttrs, setTrackAttrs] = useState<{ key: string; attrs: { attribute: string; kind: string }[]; profiles: string[] }>({ key: "", attrs: [], profiles: [] }); // track picker options
+  const [trackAttrs, setTrackAttrs] = useState<{ key: string; attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[] }>({ key: "", attrs: [], profiles: [] }); // track picker options
   const [sQuery, setSQuery] = useState("");                             // study-panel search
   const [sCaps, setSCaps] = useState<Set<string>>(() => new Set());                  // study-panel capability filters
   const [exStudies, setExStudies] = useState<string[]>([...DEFAULT_EXPLORE_STUDIES]); // studies being explored (checkboxes)
@@ -655,14 +655,18 @@ export default function AnalysisPage() {
       fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ study: s }) })
         .then(r => r.json()).catch(() => null)))
       .then(js => {
-        const seen = new Map<string, string>(); // attribute -> kind
+        const seen = new Map<string, { kind: string; patients: number }>(); // attribute -> kind + how many carry it
         const profs = new Set<string>(); // continuous molecular profiles (for heatmap tracks)
         for (const j of js) if (j) {
-          if (j.clinical) for (const a of j.clinical) if (!seen.has(a.attribute)) seen.set(a.attribute, a.kind);
+          if (j.clinical) for (const a of j.clinical) {
+            const prev = seen.get(a.attribute);
+            seen.set(a.attribute, { kind: prev?.kind || a.kind, patients: (prev?.patients || 0) + (a.patients || 0) });
+          }
           for (const p of j.profiles || []) if (p !== "cna") profs.add(p); // discrete cna isn't a heatmap
         }
-        setTrackAttrs({ key, attrs: [...seen.entries()].map(([attribute, kind]) => ({ attribute, kind })).sort((x, y) => x.attribute < y.attribute ? -1 : 1),
-          profiles: [...profs].sort() });
+        // most-covered first, the way the portal orders its picker
+        setTrackAttrs({ key, attrs: [...seen.entries()].map(([attribute, v]) => ({ attribute, ...v }))
+          .sort((x, y) => y.patients - x.patients || (x.attribute < y.attribute ? -1 : 1)), profiles: [...profs].sort() });
       });
   }, [result]); // eslint-disable-line
 
@@ -2397,39 +2401,15 @@ export default function AnalysisPage() {
                           </div>
                         </details>
                       </>}
+                      tracksMenu={<TracksMenu
+                        attrs={trackAttrs.attrs} profiles={trackAttrs.profiles}
+                        clinical={ocView(vi).clinical || []} heatmap={ocView(vi).heatmap || []}
+                        busy={busy}
+                        onClinical={(next) => setViewClinical(vi, next)}
+                        onHeatmap={(next) => setViewHeatmap(vi, next)} />}
                       footer={<>
                         {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                           style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
-                        <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", margin: "0.35rem 0 0" }}>
-                          <span className="meta">clinical tracks:</span>
-                          {(ocView(vi).clinical || []).map((a: any) => (
-                            <button key={a} className="linklike" disabled={busy} title="remove this track"
-                              onClick={() => setViewClinical(vi, (ocView(vi).clinical || []).filter((x: any) => x !== a))}>{a} ✕</button>
-                          ))}
-                          <select value="" disabled={busy || !trackAttrs.attrs.length}
-                            onChange={e => { const a = e.target.value; if (!a) return;
-                              const cur = (ocView(vi).clinical || []);
-                              if (!cur.includes(a) && cur.length < 8) setViewClinical(vi, [...cur, a]); }}
-                            style={{ fontSize: "0.78rem" }}>
-                            <option value="">{trackAttrs.attrs.length ? "add clinical track…" : "loading attributes…"}</option>
-                            {trackAttrs.attrs.filter(a => !(ocView(vi).clinical || []).includes(a.attribute))
-                              .map(a => <option key={a.attribute} value={a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric)" : ""}</option>)}
-                          </select>
-                          <span className="meta">heatmap:</span>
-                          {(ocView(vi).heatmap || []).map((h: any, hi: any) => (
-                            <button key={h.profileType} className="linklike" disabled={busy} title="remove this heatmap"
-                              onClick={() => setViewHeatmap(vi, (ocView(vi).heatmap || []).filter((_: any, j: any) => j !== hi))}>{h.profileType} ✕</button>
-                          ))}
-                          <select value="" disabled={busy}
-                            onChange={e => { const p = e.target.value; if (!p) return;
-                              const cur = (ocView(vi).heatmap || []);
-                              if (!cur.some((h: any) => h.profileType === p) && cur.length < 4) setViewHeatmap(vi, [...cur, { profileType: p }]); }}
-                            style={{ fontSize: "0.78rem" }}>
-                            <option value="">add heatmap…</option>
-                            {["VAF", ...(trackAttrs.profiles || [])].filter(p => !(ocView(vi).heatmap || []).some((h: any) => h.profileType === p))
-                              .map(p => <option key={p} value={p}>{p === "VAF" ? "VAF (mutation allele fraction)" : p}</option>)}
-                          </select>
-                        </div>
                         {c && c.queries && c.queries.length > 0 && (
                           <details className="provsql">
                             <summary className="meta">
@@ -2485,5 +2465,61 @@ export default function AnalysisPage() {
         </div>}
       </main>
     </>
+  );
+}
+
+/**
+ * What a figure can draw, chosen from what the involved studies actually hold. Two tabs
+ * because clinical attributes and molecular profiles are picked differently; a search box
+ * because a study can declare sixty attributes; the count of cases carrying each one, most
+ * first, because that is what decides whether a track is worth a row.
+ */
+function TracksMenu({ attrs, profiles, clinical, heatmap, busy, onClinical, onHeatmap }: {
+  attrs: { attribute: string; kind: string; patients: number }[];
+  profiles: string[];
+  clinical: string[];
+  heatmap: { profileType: string }[];
+  busy: boolean;
+  onClinical: (next: string[]) => void;
+  onHeatmap: (next: { profileType: string }[]) => void;
+}) {
+  const [tab, setTab] = useState<"clinical" | "heatmap">("clinical");
+  const [q, setQ] = useState("");
+  const match = (s: string) => s.toLowerCase().includes(q.trim().toLowerCase());
+  const heatOptions = ["VAF", ...profiles];
+  const chosen = tab === "clinical" ? clinical : heatmap.map((h) => h.profileType);
+  const shown = (tab === "clinical" ? attrs.map((a) => a.attribute) : heatOptions).filter(match);
+  const toggle = (name: string) => {
+    if (tab === "clinical") onClinical(clinical.includes(name) ? clinical.filter((x) => x !== name) : clinical.length < 8 ? [...clinical, name] : clinical);
+    else onHeatmap(chosen.includes(name) ? heatmap.filter((h) => h.profileType !== name) : heatmap.length < 4 ? [...heatmap, { profileType: name }] : heatmap);
+  };
+  const cap = tab === "clinical" ? 8 : 4;
+  return (
+    <details className="gearmenu">
+      <summary title="add or remove tracks">tracks {chosen.length ? "(" + chosen.length + ")" : ""}</summary>
+      <div className="gearmenu-items wide" style={{ minWidth: 340 }}>
+        <div className="row" style={{ gap: "0.5rem", alignItems: "center" }}>
+          <button className="linklike" style={{ fontWeight: tab === "clinical" ? 600 : 400 }} onClick={() => setTab("clinical")}>Clinical {attrs.length ? "(" + attrs.length + ")" : ""}</button>
+          <button className="linklike" style={{ fontWeight: tab === "heatmap" ? 600 : 400 }} onClick={() => setTab("heatmap")}>Heatmap ({heatOptions.length})</button>
+          <span className="spacer" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search…" style={{ fontSize: "0.78rem", width: 120 }} />
+        </div>
+        <span className="meta">{chosen.length} of {cap} chosen{tab === "clinical" ? " · cases with data, most first" : " · a profile draws one row per gene"}</span>
+        <div style={{ maxHeight: 260, overflowY: "auto", marginTop: "0.3rem" }}>
+          {!shown.length && <span className="meta">{attrs.length ? "nothing matches" : "loading…"}</span>}
+          {shown.map((name) => {
+            const on = chosen.includes(name);
+            const a = tab === "clinical" ? attrs.find((x) => x.attribute === name) : undefined;
+            return (
+              <label key={name} className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "baseline", padding: "0.1rem 0" }}>
+                <input type="checkbox" checked={on} disabled={busy || (!on && chosen.length >= cap)} onChange={() => toggle(name)} />
+                <span style={{ flex: 1 }}>{name === "VAF" ? "VAF (mutation allele fraction)" : name}{a?.kind === "num" ? " (numeric)" : ""}</span>
+                {a && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    </details>
   );
 }

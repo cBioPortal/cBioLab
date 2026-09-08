@@ -337,6 +337,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         <div className="row" style={{ alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap" }}>
           {props.heading ?? <h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {data.stats.nColumns.toLocaleString()} {data.unit}s · {data.tracks.length} tracks · {data.conventions.annotation}</span></h2>}
           <span className="spacer" />
+          {props.tracksMenu}
           {props.controls}
           <label className="meta"><input type="checkbox" checked={display.showUnaltered} disabled={busy} onChange={(e) => set({ showUnaltered: e.target.checked })} /> show unaltered</label>
           <label className="meta"><input type="checkbox" checked={display.whitespace} disabled={busy} onChange={(e) => set({ whitespace: e.target.checked })} /> whitespace</label>
