@@ -469,7 +469,8 @@ export interface Contract {
   };
   /** resolved viewing options — renderers read these, never their own defaults */
   display: ResolvedDisplay;
-  stats: { nColumns: number; ms: number };
+  /** ms: total; queryMs: fetching rows; assembleMs: turning them into this contract */
+  stats: { nColumns: number; ms: number; queryMs?: number; assembleMs?: number };
   /** the SQL this contract was built from, when the caller asked for provenance */
   queries?: { label: string; sql: string; ms?: number; study?: string }[];
   /** set by the MCP app's display-resolution downsampler */

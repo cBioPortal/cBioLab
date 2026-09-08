@@ -95,9 +95,13 @@ export interface AssembleInput {
   /** column id -> study, required when studies.length > 1 */
   studyOf?: Map<string, string>;
   events: EventRow[];
-  /** covered genes per column id; a covered gene is profiled-unaltered (0) unless an event says otherwise.
-   *  A column absent here is NOT_PROFILED for every gene it has no event for. */
-  coverage: { pid: string; genes: string[] }[];
+  /**
+   * What each column's panel covers; a covered gene is profiled-unaltered (0) unless an event
+   * says otherwise, and a column absent here is NOT_PROFILED for every gene it has no event for.
+   * Either gene names (local tables) or a bitmask over `genes` by position (the database path,
+   * where one integer per patient is far cheaper to send than an array of names).
+   */
+  coverage: ({ pid: string; genes: string[] } | { pid: string; mask: number })[];
   /** driver call per event, and the source to echo in conventions */
   isDriver: (r: EventRow) => boolean;
   annotationSource: string;
@@ -117,6 +121,9 @@ export interface AssembleInput {
 
 export function assembleContract(input: AssembleInput): Contract {
   const t0 = Date.now();
+  const PROF = !!process.env.ONCOPRINT_PROFILE;
+  let tp = Date.now();
+  const phase = (name: string) => { if (PROF) { process.stderr.write("  " + name.padEnd(16) + (Date.now() - tp) + "ms\n"); tp = Date.now(); } };
   const { genes, groups, studies, events, coverage, isDriver, clinical, heatmap, derived, sort, lineGap } = input;
   const multi = studies.length > 1;
   const studyOf = input.studyOf || new Map<string, string>();
@@ -126,10 +133,17 @@ export function assembleContract(input: AssembleInput): Contract {
 
   // ---- gene-track cells --------------------------------------------------
   const geneCells = new Map<string, Int32Array>(genes.map((g) => [g, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
+  const cellsByIndex = genes.map((g) => geneCells.get(g)!);
   for (const r of coverage) {
     const i = pidIndex.get(r.pid);
     if (i === undefined) continue;
-    for (const g of r.genes) { const cells = geneCells.get(g); if (cells && cells[i] === NOT_PROFILED) cells[i] = 0; }
+    if ("mask" in r) {
+      const m = r.mask;
+      for (let gi = 0; gi < cellsByIndex.length; gi++)
+        if ((m >> gi) & 1) { const cells = cellsByIndex[gi]; if (cells[i] === NOT_PROFILED) cells[i] = 0; }
+    } else {
+      for (const g of r.genes) { const cells = geneCells.get(g); if (cells && cells[i] === NOT_PROFILED) cells[i] = 0; }
+    }
   }
   for (const r of events) {
     const i = pidIndex.get(r.pid);
@@ -145,6 +159,7 @@ export function assembleContract(input: AssembleInput): Contract {
     cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | bit; // an observed event implies profiled
   }
 
+  phase("gene cells");
   // ---- clinical tracks ---------------------------------------------------
   const clinTracks: Track[] = [];
   if (multi) {
@@ -156,37 +171,58 @@ export function assembleContract(input: AssembleInput): Contract {
     clinTracks.push({ kind: "clinical", label: "Study", categories: studies.slice(), cells });
   }
   for (const { attr, values: valByPid } of clinical) {
+    // One string-keyed lookup per column, then three passes over a positional array. The map
+    // is keyed by column id, and at 400k columns three passes over it was the single most
+    // expensive phase of assembly.
+    const val: (string | undefined)[] = new Array(allPids.length);
+    for (let i = 0; i < allPids.length; i++) val[i] = valByPid.get(allPids[i]);
     // numeric attribute (≥90% of present values parse, >10 distinct) -> continuous
     // heat track: cells are the value scaled to 0..255 over the cohort's min..max
-    const present = allPids.map((p) => valByPid.get(p)).filter((v): v is string => v != null);
-    if (!present.length) { // unknown attribute or none of these patients have it — say so
+    // one pass over the columns: how many have a value, how many parse, their range and
+    // distinct count. Never materialises a per-column array (a spread of 400k values throws).
+    let nPresent = 0, nNumeric = 0, min = Infinity, max = -Infinity;
+    const distinct = new Set<number>();
+    for (let i = 0; i < val.length; i++) {
+      const v = val[i];
+      if (v == null) continue;
+      nPresent++;
+      const x = Number(v);
+      if (!Number.isFinite(x)) continue;
+      nNumeric++;
+      if (x < min) min = x;
+      if (x > max) max = x;
+      if (distinct.size <= 11) distinct.add(x);
+    }
+    if (!nPresent) { // unknown attribute or none of these patients have it — say so
       clinTracks.push({ kind: "clinical", label: attr + " (no data)", categories: [], cells: new Int32Array(allPids.length).fill(-1) });
       continue;
     }
-    const nums = present.map(Number).filter(Number.isFinite);
-    if (present.length && nums.length >= 0.9 * present.length && new Set(nums).size > 10) {
-      const min = Math.min(...nums), max = Math.max(...nums), span = max - min || 1;
+    if (nNumeric >= 0.9 * nPresent && distinct.size > 10) {
+      const span = max - min || 1;
       const cells = new Int32Array(allPids.length).fill(-1);
-      allPids.forEach((p, i) => {
-        const x = Number(valByPid.get(p));
+      for (let i = 0; i < val.length; i++) {
+        const v = val[i];
+        if (v == null) continue;
+        const x = Number(v);
         if (Number.isFinite(x)) cells[i] = Math.round(255 * (x - min) / span);
-      });
+      }
       clinTracks.push({ kind: "clinical", numeric: true, label: attr, min, max, cells });
       continue;
     }
     const counts = new Map<string, number>();
-    for (const p of allPids) { const v = valByPid.get(p); if (v != null) counts.set(v, (counts.get(v) || 0) + 1); }
+    for (let i = 0; i < val.length; i++) { const v = val[i]; if (v != null) counts.set(v, (counts.get(v) || 0) + 1); }
     const categories = [...counts.entries()].sort((x, y) => y[1] - x[1]).slice(0, 8).map((e) => e[0]);
     const catIdx = new Map<string, number>(categories.map((c, i) => [c, i]));
     const cells = new Int32Array(allPids.length).fill(-1);
-    allPids.forEach((p, i) => {
-      const v = valByPid.get(p);
-      if (v != null) cells[i] = catIdx.has(v) ? catIdx.get(v)! : categories.length; // last = Other
-    });
+    for (let i = 0; i < val.length; i++) {
+      const v = val[i];
+      if (v != null) { const ci = catIdx.get(v); cells[i] = ci === undefined ? categories.length : ci; } // last = Other
+    }
     const hasOther = [...counts.keys()].some((v) => !catIdx.has(v));
     clinTracks.push({ kind: "clinical", label: attr, categories: hasOther ? [...categories, "Other"] : categories, cells });
   }
 
+  phase("clinical");
   // ---- heatmap tracks (continuous molecular-profile values per gene) ----
   // Portal-style: z-score profiles get a fixed diverging ramp (±3, center 0)
   // so colors are comparable across oncoprints; other profiles that span zero
@@ -233,6 +269,7 @@ export function assembleContract(input: AssembleInput): Contract {
     }
   }
 
+  phase("heatmap");
   // ---- derived-event tracks (cohort-DSL expressions as phenotypes) ------
   const devTracks: Track[] = [];
   for (const de of derived) {
@@ -241,6 +278,7 @@ export function assembleContract(input: AssembleInput): Contract {
     devTracks.push({ kind: "derivedEvent", label: String(de.label || "derived event").slice(0, 60), cells });
   }
 
+  phase("derived");
   // ---- column sort within groups ----------------------------------------
   // Default is the genomic staircase: cells ranked by alteration type (CNA > SV >
   // truncating > in-frame > splice > missense > other), driver above VUS within
@@ -253,14 +291,35 @@ export function assembleContract(input: AssembleInput): Contract {
       c & BITS.INFRAME ? 4 : c & BITS.SPLICE ? 3 : c & BITS.MISSENSE ? 2 : 1;
     return t * 2 + (c & BITS.DRIVER ? 1 : 0);
   };
-  const genomicCmp = (x: number, y: number): number => {
-    for (const gene of genes) {
-      const cells = geneCells.get(gene)!;
-      const rx = cellRank(cells[x]), ry = cellRank(cells[y]);
-      if (rx !== ry) return ry - rx;
+  // The staircase compares every gene track in order. Doing that inside a comparator costs
+  // one array read and a branch per gene per comparison — the dominant cost of a 400k-column
+  // sort. Each rank is 0..17, so five bits hold it: pack the first ten genes into one float
+  // (50 bits, exact in a double) and the rest into a second, then compare two numbers.
+  const RANK_BITS = 32, PACKED = 10;
+  const packKeys = (from: number, count: number): Float64Array => {
+    const key = new Float64Array(allPids.length);
+    const list = genes.slice(from, from + count).map((g) => geneCells.get(g)!);
+    for (let i = 0; i < allPids.length; i++) {
+      let k = 0;
+      for (const cells of list) k = k * RANK_BITS + cellRank(cells[i]);
+      key[i] = k;
     }
-    return 0;
+    return key;
   };
+  const keyHi = packKeys(0, PACKED);
+  const keyLo = genes.length > PACKED ? packKeys(PACKED, genes.length - PACKED) : null;
+  const genomicCmp = (x: number, y: number): number => {
+    const d = keyHi[y] - keyHi[x];
+    if (d) return d;
+    return keyLo ? keyLo[y] - keyLo[x] : 0;
+  };
+  // the id tiebreaker compares integers: rank the ids once instead of on every comparison
+  const idRank = new Int32Array(allPids.length);
+  {
+    const idx = Array.from(allPids.keys());
+    idx.sort((a, b) => allPids[a] < allPids[b] ? -1 : allPids[a] > allPids[b] ? 1 : 0);
+    for (let r = 0; r < idx.length; r++) idRank[idx[r]] = r;
+  }
   const sortableTracks = new Map<string, Track>([...clinTracks, ...devTracks, ...heatTracks].map((t) => [t.label, t]));
   const trackCmp = (t: Track, sign: number) => (x: number, y: number): number => {
     const a = (t.cells as number[])[x], b = (t.cells as number[])[y];
@@ -269,7 +328,7 @@ export function assembleContract(input: AssembleInput): Contract {
     if (b === -1) return -1;
     return sign * (a - b);
   };
-  const byId = (x: number, y: number): number => allPids[x] < allPids[y] ? -1 : allPids[x] > allPids[y] ? 1 : 0;
+  const byId = (x: number, y: number): number => idRank[x] - idRank[y];
   const cmps: ((x: number, y: number) => number)[] = sort.map((s) => {
     const sign = s.dir === "desc" ? -1 : 1;
     if (s.track === "genomic") return (x: number, y: number) => sign * genomicCmp(x, y);
@@ -288,7 +347,7 @@ export function assembleContract(input: AssembleInput): Contract {
     const idxs = g.pids.map((p) => pidIndex.get(p)!);
     idxs.sort((x, y) => {
       for (const c of cmps) { const r = c(x, y); if (r) return r; }
-      return allPids[x] < allPids[y] ? -1 : 1;
+      return idRank[x] - idRank[y];
     });
     for (const i of idxs) order.push(i); // not push(...idxs): spreads over ~100k args overflow the stack
     groupRanges.push({ name: g.name, start: cursor, count: idxs.length });
@@ -297,6 +356,7 @@ export function assembleContract(input: AssembleInput): Contract {
   const remap = (arr: number[] | Int32Array): number[] => order.map((i) => (arr as number[])[i]);
   const columns = order.map((i) => allPids[i]);
 
+  phase("sort");
   // ---- track meta (panel-aware frequencies) -----------------------------
   const tracks: Track[] = [];
   for (const g of genes) {
@@ -319,6 +379,7 @@ export function assembleContract(input: AssembleInput): Contract {
   for (const t of heatTracks) tracks.push({ ...t, cells: remap(t.cells) });
   for (const t of clinTracks) tracks.push({ ...t, cells: remap(t.cells) });
 
+  phase("track meta");
   return {
     study: multi ? studies.join(" + ") : studies[0], studies, unit: "patient",
     groups: groupRanges,

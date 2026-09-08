@@ -72,15 +72,28 @@ export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], 
        FROM ${ANNOT_DB}.variant_annotation
        WHERE oncokb_version = ${sq(pin)} AND hugo_gene_symbol IN (${genes.map(sq).join(",")})
        GROUP BY t, gene, alteration`);
-    const driverSet = new Set<string>();
-    for (const r of rows.data as ChRow[]) if (Number(r.is_driver)) driverSet.add(r.t + "|" + r.gene + "|" + r.alteration);
+    // Nested by gene rather than one set of "type|gene|alteration" keys: isDriver runs once per
+    // event — 800k times on a 400k-patient figure — and composing that key allocated a string
+    // every time. Two lookups on short strings cost far less than one on a long fresh one.
+    const byGene = new Map<string, { mut: Set<string>; amp: boolean; del: boolean; sv: boolean }>();
+    const entry = (g: string) => {
+      let e = byGene.get(g);
+      if (!e) { e = { mut: new Set<string>(), amp: false, del: false, sv: false }; byGene.set(g, e); }
+      return e;
+    };
+    for (const r of rows.data as ChRow[]) {
+      if (!Number(r.is_driver)) continue;
+      const e = entry(String(r.gene));
+      if (r.t === "MUTATION") e.mut.add(String(r.alteration));
+      else if (r.t === "CNA") { if (r.alteration === "AMPLIFICATION") e.amp = true; else if (r.alteration === "DELETION") e.del = true; }
+      else if (r.t === "SV" && r.alteration === "Fusion") e.sv = true;
+    }
     const isDriver = (r: EvRow): boolean => {
-      if (r.vt === "mutation") return driverSet.has("MUTATION|" + r.gene + "|" + r.mv);
-      if (r.vt === "cna") {
-        const v = Number(r.cna);
-        return driverSet.has("CNA|" + r.gene + "|" + (v >= 2 ? "AMPLIFICATION" : "DELETION"));
-      }
-      if (r.vt === "structural_variant") return driverSet.has("SV|" + r.gene + "|Fusion");
+      const e = byGene.get(r.gene as string);
+      if (!e) return false;
+      if (r.vt === "mutation") return e.mut.has(r.mv as string);
+      if (r.vt === "cna") return Number(r.cna) >= 2 ? e.amp : e.del;
+      if (r.vt === "structural_variant") return e.sv;
       return false;
     };
     const synced = await syncedStudies();
