@@ -1,0 +1,13 @@
+patient	CANCER_TYPE	AGE	STAGE
+P01	Lung	61	III
+P02	Lung	72	IV
+P03	Colon	55	II
+P04	Lung	48	I
+P05	Colon	66	III
+P06	Breast	59	II
+P07	Lung	70	IV
+P08	Colon	63	III
+P09	Breast	44	I
+P10	Lung	80	IV
+P11	Breast	52	II
+P12	Colon	58	

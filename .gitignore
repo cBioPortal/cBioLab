@@ -9,3 +9,8 @@ mcp.log
 server-*.log
 HANDOFF.local.md
 tsconfig.tsbuildinfo
+
+# python package env
+python/.venv/
+__pycache__/
+*.egg-info/

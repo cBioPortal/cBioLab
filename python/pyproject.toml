@@ -1,0 +1,20 @@
+[project]
+name = "cohortlab"
+version = "0.1.0"
+description = "Oncoprint render contract for Cohort Lab: decode, assemble from local tables, render"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.7"]
+
+[project.scripts]
+cohortlab = "cohortlab.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cohortlab*"]

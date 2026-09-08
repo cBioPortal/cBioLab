@@ -23,23 +23,8 @@ export type PidsCarrier = CohortDef & { [PIDS_SQL]?: string | Record<string, str
 import { buildAnnotationIndex } from "./annotation.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
-// gene-track cell bitmask
-export const BITS = {
-  MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16,
-  SV: 32, AMP: 64, HOMDEL: 128,
-  DRIVER: 256   // any alteration in the cell is annotated (putative) driver
-};
-const NOT_PROFILED = -1;
-
-function mutClassBit(mt: string | undefined): number {
-  if (!mt) return BITS.OTHER_MUT;
-  const t = mt.toLowerCase();
-  if (t.startsWith("missense")) return BITS.MISSENSE;
-  if (t.startsWith("nonsense") || t.startsWith("frame_shift") || t.startsWith("nonstop")) return BITS.TRUNCATING;
-  if (t.startsWith("in_frame")) return BITS.INFRAME;
-  if (t.startsWith("splice")) return BITS.SPLICE;
-  return BITS.OTHER_MUT;
-}
+import { assembleContract, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
+export { BITS, NOT_PROFILED, mutClassBit } from "./oncoprint-assemble.ts";
 
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
 
@@ -276,94 +261,35 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   if (!allPids.length) throw new Error("cohort is empty");
 const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // provisional index
 
-  // ---- genomic events for the gene set (whole study; intersect in JS) ---
-  const ev: { data: any[] } = { data: [] };
-  const geneCells = new Map<string, Int32Array>(genes.map((g) => [g, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
+  // ---- genomic events + panel coverage, per study --------------------
+  const events: EventRow[] = [];
+  const coverage: AssembleInput["coverage"] = [];
   const evFetched = await Promise.all(studies.map(s =>
-    Promise.all([lq("oncoprint:alterations", genomicEventsSql(genes, s, dbOf(s)), s),
+    Promise.all([lq<EventRow>("oncoprint:alterations", genomicEventsSql(genes, s, dbOf(s)), s),
                  lq<{ pid: string; genes: string[] }>("oncoprint:coverage", coverageSql(genes, s, dbOf(s)), s)]).then(([e, c]) => ({ s, e, c }))));
   for (const { s, e, c } of evFetched) {
     const pref = multi ? s + "_" : "";
-    for (const r of e.data) { if (multi) r.pid = pref + r.pid; ev.data.push(r); }
-    // panel coverage: a patient's covered genes become 0 (profiled, unaltered) instead of NOT_PROFILED
-    for (const r of c.data) {
-      const i = pidIndex.get(pref + r.pid);
-      if (i === undefined) continue;
-      for (const g of r.genes) { const cells = geneCells.get(g); if (cells && cells[i] === NOT_PROFILED) cells[i] = 0; }
-    }
+    for (const r of e.data) { if (multi) r.pid = pref + r.pid; events.push(r); }
+    for (const r of c.data) { if (multi) r.pid = pref + r.pid; coverage.push(r); }
   }
-  const annotation = await buildAnnotationIndex(ev.data, genes, multi ? studies : study);
+  const annotation = await buildAnnotationIndex(events as Parameters<typeof buildAnnotationIndex>[0], genes, multi ? studies : study);
 
-  // ---- assemble gene-track cell maps ------------------------------------
-  for (const r of ev.data) {
-    const i = pidIndex.get(r.pid);
-    if (i === undefined) continue;
-    const cells = geneCells.get(r.gene);
-    if (!cells) continue;
-    let bit = 0;
-    if (r.vt === "mutation") bit = mutClassBit(r.mt);
-    else if (r.vt === "structural_variant") bit = BITS.SV;
-    else if (r.vt === "cna") bit = Number(r.cna) >= 2 ? BITS.AMP : (Number(r.cna) <= -2 ? BITS.HOMDEL : 0);
-    if (!bit) continue;
-    if (annotation.isDriver(r)) bit |= BITS.DRIVER;
-    cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | bit; // an observed event implies profiled
-  }
-
-  // ---- clinical tracks ---------------------------------------------------
-  const clinTracks: Track[] = [];
-  if (multi) {
-    // synthetic per-column provenance track; also the honest caveat that clinical
-    // vocabularies below it are merged by attribute name, not harmonized
-    const catIdx = new Map<string, number>(studies.map((s, i) => [s, i]));
-    const cells = new Int32Array(allPids.length).fill(-1);
-    allPids.forEach((p, i) => { const s = studyOf.get(p); if (s != null) cells[i] = catIdx.get(s)!; });
-    clinTracks.push({ kind: "clinical", label: "Study", categories: studies.slice(), cells });
-  }
+  // ---- clinical values per attribute -------------------------------------
+  const clinicalIn: AssembleInput["clinical"] = [];
   if (clinical.length) {
-    const cd: { data: any[] } = { data: [] };
-    const cdFetched = await Promise.all(studies.map(async (s) => ({ s, r: await lq("oncoprint:clinicalTracks", clinicalSql(clinical, s, dbOf(s)), s) })));
-    for (const { s, r } of cdFetched)
-      for (const x of r.data) cd.data.push(multi ? { ...x, pid: qual(s, x.pid) } : x);
+    const cd: { pid: string; k: string; v: string }[] = [];
+    const cdFetched = await Promise.all(studies.map(async (s) =>
+      ({ s, r: await lq<{ pid: string; k: string; v: string }>("oncoprint:clinicalTracks", clinicalSql(clinical, s, dbOf(s)), s) })));
+    for (const { s, r } of cdFetched) { const pref = multi ? s + "_" : ""; for (const x of r.data) { if (multi) x.pid = pref + x.pid; cd.push(x); } }
     for (const attr of clinical) {
-      const valByPid = new Map<string, string>();
-      for (const r of cd.data) if (r.k === attr) valByPid.set(r.pid, r.v);
-      // numeric attribute (≥90% of present values parse, >10 distinct) -> continuous
-      // heat track: cells are the value scaled to 0..255 over the cohort's min..max
-      const present = allPids.map(p => valByPid.get(p)).filter(v => v != null);
-      if (!present.length) { // unknown attribute or none of these patients have it — say so
-        clinTracks.push({ kind: "clinical", label: attr + " (no data)", categories: [], cells: new Int32Array(allPids.length).fill(-1) });
-        continue;
-      }
-      const nums = present.map(Number).filter(Number.isFinite);
-      if (present.length && nums.length >= 0.9 * present.length && new Set(nums).size > 10) {
-        const min = Math.min(...nums), max = Math.max(...nums), span = max - min || 1;
-        const cells = new Int32Array(allPids.length).fill(-1);
-        allPids.forEach((p, i) => {
-          const x = Number(valByPid.get(p));
-          if (Number.isFinite(x)) cells[i] = Math.round(255 * (x - min) / span);
-        });
-        clinTracks.push({ kind: "clinical", numeric: true, label: attr, min, max, cells });
-        continue;
-      }
-      const counts = new Map<string, number>();
-      for (const p of allPids) { const v = valByPid.get(p); if (v != null) counts.set(v, (counts.get(v) || 0) + 1); }
-      const categories = [...counts.entries()].sort((x, y) => y[1] - x[1]).slice(0, 8).map(e => e[0]);
-      const catIdx = new Map<string, number>(categories.map((c, i) => [c, i]));
-      const cells = new Int32Array(allPids.length).fill(-1);
-      allPids.forEach((p, i) => {
-        const v = valByPid.get(p);
-        if (v != null) cells[i] = catIdx.has(v) ? catIdx.get(v)! : categories.length; // last = Other
-      });
-      const hasOther = [...counts.keys()].some((v) => !catIdx.has(v));
-      clinTracks.push({ kind: "clinical", label: attr, categories: hasOther ? [...categories, "Other"] : categories, cells });
+      const values = new Map<string, string>();
+      for (const r of cd) if (r.k === attr) values.set(r.pid, r.v);
+      clinicalIn.push({ attr, values });
     }
   }
 
-  // ---- heatmap tracks (continuous molecular-profile values per gene) ----
-  // Portal-style: z-score profiles get a fixed diverging ramp (±3, center 0)
-  // so colors are comparable across oncoprints; other profiles that span zero
-  // get a symmetric diverging ramp; positive-only data gets a sequential ramp.
-  const heatTracks: Track[] = [];
+  // ---- heatmap values per profile (validated against each study's inventory) ----
+  const heatmapIn: AssembleInput["heatmap"] = [];
   for (const h of heatmap) {
     const isVaf = /^vaf$/i.test(h.profileType);
     const avail = await Promise.all(studies.map(async (s) =>
@@ -373,145 +299,25 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
       throw new Error(isVaf
         ? "heatmap: 'VAF' needs mutation allele counts, which " + studies.join("/") + " did not load"
         : "heatmap: profile '" + h.profileType + "' not in " + studies.join("/") +
-          " (available: " + ([...(await studyProfileTypes(studies[0]))].join(", ") || "none") + ", VAF)");
-    const valByKey = new Map<string, number>(); // columnId|gene -> value
+          " (available: " + ([...(await studyProfileTypes(studies[0], dbOf(studies[0])))].join(", ") || "none") + ", VAF)");
+    const values = new Map<string, number>(); // columnId|gene -> value
     const hFetched = await Promise.all(okStudies.map(async (s) =>
       ({ s, r: await lq(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s, dbOf(s)) : heatmapSql(h.profileType, h.genes, s, dbOf(s)), s) })));
     for (const { s, r } of hFetched)
-      for (const row of r.data) valByKey.set(qual(s, row.pid) + "|" + row.gene, Number(row.v));
-    const isZ = /zscore/i.test(h.profileType);
-    for (const gene of h.genes) {
-      const label = heatmapTrackLabel(gene, h.profileType);
-      // A federation reference re-scores the drawn values against a distribution
-      // pooled from every participating study — including ones that disclose no
-      // patients, and so appear nowhere in the columns.
-      const ref = (spec.zReference || {})[h.profileType + "|" + gene];
-      const usingRef = !!(ref && ref.sd > 0);
-      const tx = (v: number) => usingRef ? (v - ref!.mean) / ref!.sd : v;
-      const vals = [];
-      for (const p of allPids) { const v = valByKey.get(p + "|" + gene); if (v !== undefined) vals.push(tx(v)); }
-      if (!vals.length) {
-        heatTracks.push({ kind: "clinical", label: label + " (no data)", categories: [], cells: new Int32Array(allPids.length).fill(-1) });
-        continue;
-      }
-      let min: number, max: number, center: number | null;
-      if (isVaf) { min = 0; max = 1; center = null; }
-      else if (isZ || usingRef) { min = -3; max = 3; center = 0; }
-      else {
-        const dMin = Math.min(...vals), dMax = Math.max(...vals);
-        if (dMin < 0 && dMax > 0) { const m = Math.max(-dMin, dMax); min = -m; max = m; center = 0; }
-        else { min = dMin; max = dMax; center = null; }
-      }
-      const span = max - min || 1;
-      const cells = new Int32Array(allPids.length).fill(-1);
-      allPids.forEach((p, i) => {
-        const v = valByKey.get(p + "|" + gene);
-        if (v !== undefined) cells[i] = Math.round(255 * (Math.max(min, Math.min(max, tx(v))) - min) / span);
-      });
-      heatTracks.push({ kind: "heatmap", numeric: true, label, gene, profileType: h.profileType,
-        note: usingRef
-          ? "z-scored against " + ref!.n.toLocaleString() + " patients pooled from " + ref!.studies.length +
-            " stud" + (ref!.studies.length === 1 ? "y" : "ies") + " (" + ref!.studies.join(", ") + ") — " +
-            "the reference is federated even where the columns are not"
-          : isVaf ? "allele fraction, max across a patient's mutations in the gene" : "mean across a patient's samples",
-        min: Math.round(min * 100) / 100, max: Math.round(max * 100) / 100,
-        center: center == null ? null : Math.round(255 * (0 - min) / span), cells });
-    }
+      for (const row of r.data) values.set(qual(s, row.pid) + "|" + row.gene, Number(row.v));
+    heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf, values });
   }
 
-  // ---- derived-event tracks (cohort-DSL expressions as phenotypes) ------
-  const devTracks: Track[] = [];
-  for (const de of derivedEvents) {
-    const pids = new Set<string>(await cohortPatients({ ...de.expression, lineGap }, study, opts.log, "oncoprint:derivedEvent", dbOf(study)));
-    const cells = new Int32Array(allPids.length);
-    allPids.forEach((p, i) => { cells[i] = pids.has(p) ? 1 : 0; });
-    devTracks.push({ kind: "derivedEvent", label: String(de.label || "derived event").slice(0, 60), cells });
-  }
+  // ---- derived-event rows (cohort-DSL expressions as phenotypes) ---------
+  const derivedIn: AssembleInput["derived"] = [];
+  for (const de of derivedEvents)
+    derivedIn.push({ label: de.label, pids: new Set<string>(await cohortPatients({ ...de.expression, lineGap }, study, opts.log, "oncoprint:derivedEvent", dbOf(study))) });
 
-  // ---- column sort within groups ----------------------------------------
-  // Default is the genomic staircase: cells ranked by alteration type (CNA > SV >
-  // truncating > in-frame > splice > missense > other), driver above VUS within
-  // each type. spec.sort can put clinical/derived tracks first ("-" = descending,
-  // missing values always last); the staircase and patient id remain the final
-  // tiebreakers so every sort is total and deterministic.
-  const cellRank = (c: number): number => {
-    if (c <= 0) return 0;
-    const t = c & BITS.AMP ? 8 : c & BITS.HOMDEL ? 7 : c & BITS.SV ? 6 : c & BITS.TRUNCATING ? 5 :
-      c & BITS.INFRAME ? 4 : c & BITS.SPLICE ? 3 : c & BITS.MISSENSE ? 2 : 1;
-    return t * 2 + (c & BITS.DRIVER ? 1 : 0);
-  };
-  const genomicCmp = (x: number, y: number): number => {
-    for (const gene of genes) {
-      const cells = geneCells.get(gene)!;
-      const rx = cellRank(cells[x]), ry = cellRank(cells[y]);
-      if (rx !== ry) return ry - rx;
-    }
-    return 0;
-  };
-  const sortableTracks = new Map<string, Track>([...clinTracks, ...devTracks, ...heatTracks].map((t) => [t.label, t]));
-  const trackCmp = (t: Track, sign: number) => (x: number, y: number): number => {
-    const a = (t.cells as number[])[x], b = (t.cells as number[])[y];
-    if (a === b) return 0;
-    if (a === -1) return 1;
-    if (b === -1) return -1;
-    return sign * (a - b);
-  };
-  const cmps: ((x: number, y: number) => number)[] = sort.map((s) => {
-    const sign = s.dir === "desc" ? -1 : 1;
-    if (s.track === "genomic") return (x: number, y: number) => sign * genomicCmp(x, y);
-    const t = sortableTracks.get(s.track);
-    if (!t) throw new Error("sort: '" + s.track + "' is not a track in this oncoprint — sortable: genomic" +
-      (sortableTracks.size ? ", " + [...sortableTracks.keys()].join(", ") : "") +
-      " (clinical sort keys must also be listed in clinical)");
-    return trackCmp(t, sign);
+  const contract = assembleContract({
+    genes, groups, studies, studyOf, events, coverage,
+    isDriver: (r) => annotation.isDriver(r as Parameters<typeof annotation.isDriver>[0]), annotationSource: annotation.source,
+    clinical: clinicalIn, heatmap: heatmapIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap
   });
-  cmps.push(genomicCmp);
-  const order: number[] = [];
-  let cursor = 0;
-  const groupRanges: GroupRange[] = [];
-  for (const g of groups) {
-    const idxs = g.pids.map((p) => pidIndex.get(p)!);
-    idxs.sort((x, y) => {
-      for (const c of cmps) { const r = c(x, y); if (r) return r; }
-      return allPids[x] < allPids[y] ? -1 : 1;
-    });
-    for (const i of idxs) order.push(i); // not push(...idxs): spreads over ~100k args overflow the stack
-    groupRanges.push({ name: g.name, start: cursor, count: idxs.length });
-    cursor += idxs.length;
-  }
-  const remap = (arr: number[] | Int32Array): number[] => order.map((i) => (arr as number[])[i]);
-  const columns = order.map(i => allPids[i]);
-
-  // ---- track meta (panel-aware frequencies) -----------------------------
-  const tracks: Track[] = [];
-  for (const g of genes) {
-    const cells = remap(geneCells.get(g)!);
-    const profiled = cells.filter((c) => c !== NOT_PROFILED).length;
-    const altered = cells.filter((c) => c > 0).length;
-    const driverAltered = cells.filter((c) => c > 0 && (c & BITS.DRIVER)).length;
-    tracks.push({
-      kind: "gene", label: g, cells,
-      altered, profiled, driverAltered,
-      freqPct: profiled ? Math.round(1000 * altered / profiled) / 10 : null,
-      driverPct: profiled ? Math.round(1000 * driverAltered / profiled) / 10 : null
-    });
-  }
-  for (const t of devTracks) {
-    const cells = remap(t.cells);
-    tracks.push({ ...t, cells, altered: cells.filter((c) => c === 1).length, profiled: cells.length,
-      freqPct: Math.round(1000 * cells.filter((c) => c === 1).length / cells.length) / 10 });
-  }
-  for (const t of heatTracks) tracks.push({ ...t, cells: remap(t.cells) });
-  for (const t of clinTracks) tracks.push({ ...t, cells: remap(t.cells) });
-
-  return {
-    study: multi ? studies.join(" + ") : study, studies, unit: "patient",
-    groups: groupRanges,
-    columns,
-    tracks: tracks.map((t) => ({ ...t, cells: Array.from(t.cells as number[]) })),
-    conventions: { cna: "high-level only (±2)", notProfiled: "distinct cell state", frequencyDenominator: "profiled",
-      annotation: annotation.source, lineGap,
-      sort: sort.map(s => (s.dir === "desc" ? "-" : "") + s.track) },
-    stats: { nColumns: columns.length, ms: Date.now() - t0 }
-  };
+  contract.stats.ms = Date.now() - t0;
+  return contract;
 }
