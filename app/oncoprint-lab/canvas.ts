@@ -21,23 +21,64 @@ export type Palette = typeof PALETTE;
 
 export const GEOM = { header: 22, rowH: 20, rowGap: 3, gutter: 168, groupGap: 10 };
 
-export interface VisibleGroup { name: string; start: number; count: number; patients: number }
+export interface VisibleGroup {
+  name: string; start: number; count: number; patients: number;
+  /** per track index: altered / profiled within this run (gene and derived tracks), null otherwise */
+  pct?: (number | null)[];
+}
 export interface View { zoom: number; scrollX: number; whitespace: boolean }
 export type Cells = Int16Array | Int32Array;
 
 /** Virtual x (px, before scroll) where each group's first column starts. */
-export function groupOffsets(groups: VisibleGroup[], zoom: number): number[] {
+export function groupOffsets(groups: VisibleGroup[], zoom: number, gap: number = GEOM.groupGap): number[] {
   const out: number[] = []; let x = 0;
-  for (const g of groups) { out.push(x); x += g.count * zoom + GEOM.groupGap; }
+  for (const g of groups) { out.push(x); x += g.count * zoom + gap; }
   return out;
 }
-export function virtualWidth(groups: VisibleGroup[], zoom: number): number {
-  return groups.reduce((w, g) => w + g.count * zoom, 0) + Math.max(0, groups.length - 1) * GEOM.groupGap;
+export function virtualWidth(groups: VisibleGroup[], zoom: number, gap: number = GEOM.groupGap): number {
+  return groups.reduce((w, g) => w + g.count * zoom, 0) + Math.max(0, groups.length - 1) * gap;
 }
-export function fitZoom(groups: VisibleGroup[], plotW: number): number {
+export function fitZoom(groups: VisibleGroup[], plotW: number, gap: number = GEOM.groupGap): number {
   const n = groups.reduce((s, g) => s + g.count, 0);
-  const gaps = Math.max(0, groups.length - 1) * GEOM.groupGap;
+  const gaps = Math.max(0, groups.length - 1) * gap;
   return n ? Math.max(1e-6, (plotW - gaps) / n) : 1;
+}
+
+/** The portal's percent format: integer at 3 % and above, one decimal below, N/P when nothing is profiled. */
+export function formatPct(p: number | null): string {
+  if (p == null) return "N/P";
+  return (p < 3 ? Math.round(p * 10) / 10 : Math.round(p)) + "%";
+}
+
+/**
+ * Split each group into runs of one categorical track's value (the columns must already be
+ * sorted by that track, so runs are contiguous). Each run becomes its own group, named by the
+ * category, optionally carrying per-track altered / profiled percentages for gap labels.
+ */
+export function segmentByTrack(data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[], trackLabel: string, withPct: boolean): VisibleGroup[] {
+  const t = data.tracks.find((x) => x.label === trackLabel);
+  if (!t || !t.categories) return groups;
+  const cats = t.categories;
+  const nameOf = (c: number): string => c === -1 ? "no data" : cats[c] ?? "Other";
+  const out: VisibleGroup[] = [];
+  const multi = groups.length > 1;
+  for (const g of groups) {
+    let runStart = g.start;
+    for (let k = g.start + 1; k <= g.start + g.count; k++) {
+      if (k < g.start + g.count && t.cells[order[k]] === t.cells[order[runStart]]) continue;
+      const count = k - runStart;
+      const seg: VisibleGroup = { name: (multi ? g.name + " · " : "") + nameOf(t.cells[order[runStart]]), start: runStart, count, patients: count };
+      if (withPct) seg.pct = data.tracks.map((tr) => {
+        if (tr.kind !== "gene" && tr.kind !== "derivedEvent") return null;
+        let alt = 0, prof = 0;
+        for (let i = runStart; i < k; i++) { const c = tr.cells[order[i]]; if (c !== -1) prof++; if (c > 0) alt++; }
+        return prof ? 100 * alt / prof : null;
+      });
+      out.push(seg);
+      runStart = k;
+    }
+  }
+  return out;
 }
 export function canvasHeight(nTracks: number): number { return GEOM.header + nTracks * (GEOM.rowH + GEOM.rowGap); }
 
@@ -111,8 +152,11 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
 
 export interface DrawResult { ms: number; cellsDrawn: number; bucketsDrawn: number }
 
+export interface DrawOpts { gap?: number; pctLabels?: boolean }
+
 export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[],
-  view: View, cssW: number, P: Palette = PALETTE): DrawResult {
+  view: View, cssW: number, P: Palette = PALETTE, opts: DrawOpts = {}): DrawResult {
+  const gap = opts.gap ?? GEOM.groupGap;
   const t0 = performance.now();
   const { header, rowH, rowGap, gutter } = GEOM;
   const plotW = Math.max(0, cssW - gutter);
@@ -121,7 +165,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   ctx.font = "11px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
   ctx.textBaseline = "alphabetic";
   const zoom = view.zoom, sx = view.scrollX;
-  const offs = groupOffsets(groups, zoom);
+  const offs = groupOffsets(groups, zoom, gap);
   const pad = view.whitespace && zoom >= 3 ? Math.min(3, Math.floor(zoom * 0.3)) : 0;
   let cellsDrawn = 0, bucketsDrawn = 0;
   const scratch = new Int32Array(64);
@@ -135,11 +179,17 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
     if (gEnd < sx || gx > sx + plotW) return;
     const k0 = Math.max(0, Math.floor((sx - gx) / zoom));
     const k1 = Math.min(g.count, Math.ceil((sx + plotW - gx) / zoom));
-    // group header
+    // group header, clipped to the group's width when groups are runs of a category
+    const gw = g.count * zoom;
     ctx.fillStyle = P.muted;
-    ctx.fillText(g.name + " (" + g.patients.toLocaleString("en-US") + ")", Math.max(gutter, gx - sx + gutter), 13);
+    if (gw >= 24) ctx.fillText(g.name + (gw >= 90 ? " (" + g.patients.toLocaleString("en-US") + ")" : ""), Math.max(gutter, gx - sx + gutter), 13, Math.max(20, gw + gap - 4));
     data.tracks.forEach((t, ti) => {
       const y = header + ti * (rowH + rowGap);
+      if (opts.pctLabels && g.pct && g.pct[ti] != null) {
+        ctx.fillStyle = P.muted; ctx.font = "10px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
+        ctx.fillText(formatPct(g.pct[ti]), gEnd - sx + gutter + 3, y + 14, gap - 4);
+        ctx.font = "11px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
+      }
       if (zoom >= 1) {
         for (let k = k0; k < k1; k++) {
           const x = gx + k * zoom - sx + gutter;
@@ -181,13 +231,13 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
 export interface Hit { ti: number; gi: number; k: number; ci: number; k1: number; n: number }
 
 /** Map a canvas-space point to (track, group, column or bucket). */
-export function hitTest(x: number, y: number, data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[], view: View): Hit | null {
+export function hitTest(x: number, y: number, data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[], view: View, gap: number = GEOM.groupGap): Hit | null {
   const { header, rowH, rowGap, gutter } = GEOM;
   const ti = Math.floor((y - header) / (rowH + rowGap));
   if (ti < 0 || ti >= data.tracks.length || y - header - ti * (rowH + rowGap) > rowH) return null;
   if (x < gutter) return null;
   const vx = x - gutter + view.scrollX;
-  const offs = groupOffsets(groups, view.zoom);
+  const offs = groupOffsets(groups, view.zoom, gap);
   for (let gi = 0; gi < groups.length; gi++) {
     const g = groups[gi], gx = offs[gi];
     if (vx < gx || vx >= gx + g.count * view.zoom) continue;

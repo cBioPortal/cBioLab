@@ -4,13 +4,13 @@
 // window.__onco so headless measurements read the same numbers the panel shows.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, hitTest, sortColumns, virtualWidth,
+import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, hitTest, segmentByTrack, sortColumns, virtualWidth,
   type Hit, type View, type VisibleGroup } from "./canvas.ts";
 
 const MAX_ZOOM = 24;
 
 interface Perf { fetchMs?: number; bytes?: number; engineMs?: number; packMs?: number; decodeMs?: number; drawMs?: number;
-  cellsDrawn?: number; bucketsDrawn?: number; sortMs?: number; hideMs?: number; frames: number; heapMB?: number }
+  cellsDrawn?: number; bucketsDrawn?: number; sortMs?: number; hideMs?: number; gapMs?: number; frames: number; heapMB?: number }
 
 export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }) {
   const [data, setData] = useState<UnpackedContract | null>(null);
@@ -21,6 +21,7 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
   const [hover, setHover] = useState<{ hit: Hit; x: number; y: number } | null>(null);
   const [cssW, setCssW] = useState(1200);
   const [sortKey, setSortKey] = useState<string>(""); // "" = engine order; "genomic" | "id" | "[-]<track label>"
+  const [gapMode, setGapMode] = useState<"none" | "gaps" | "pct">("none");
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drag = useRef<{ x: number; scrollX: number } | null>(null);
@@ -56,6 +57,11 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
     return { order, groups };
   }, [data]);
 
+  // gaps follow the primary sort key when it is a categorical track (runs are contiguous only then)
+  const primaryKey = data ? (sortKey || data.conventions.sort[0] || "genomic").replace(/^-/, "") : "";
+  const gapTrack = data ? data.tracks.find((t) => t.label === primaryKey && t.categories && t.categories.length) : undefined;
+  const gapPx = gapMode === "none" || !gapTrack ? GEOM.groupGap : gapMode === "pct" ? 40 : 8;
+
   const visible = useMemo(() => {
     if (!data || !base) return null;
     let order: Uint32Array = base.order; let groups: VisibleGroup[] = base.groups;
@@ -82,8 +88,13 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
       order = sortColumns(data, order, groups, [{ track: desc ? sortKey.slice(1) : sortKey, dir: desc ? "desc" : "asc" }]);
       bump({ sortMs: performance.now() - t0 });
     }
+    if (gapMode !== "none" && gapTrack) {
+      const t0 = performance.now();
+      groups = segmentByTrack(data, order, groups, gapTrack.label, gapMode === "pct");
+      bump({ gapMs: performance.now() - t0 });
+    }
     return { order, groups };
-  }, [data, base, showUnaltered, sortKey]);
+  }, [data, base, showUnaltered, sortKey, gapMode, gapTrack]);
 
   // ---- sizing --------------------------------------------------------------
   useEffect(() => {
@@ -93,12 +104,12 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
     return () => ro.disconnect();
   }, []);
   const plotW = Math.max(50, cssW - GEOM.gutter);
-  const minZoom = visible ? fitZoom(visible.groups, plotW) : 1;
-  const maxScroll = visible ? Math.max(0, virtualWidth(visible.groups, view.zoom) - plotW) : 0;
+  const minZoom = visible ? fitZoom(visible.groups, plotW, gapPx) : 1;
+  const maxScroll = visible ? Math.max(0, virtualWidth(visible.groups, view.zoom, gapPx) - plotW) : 0;
 
   // fit on first data and when the set of drawn columns changes (not on re-sort)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (visible) setView((v) => ({ ...v, zoom: fitZoom(visible.groups, plotW), scrollX: 0 })); }, [data, showUnaltered, plotW]);
+  useEffect(() => { if (visible) setView((v) => ({ ...v, zoom: fitZoom(visible.groups, plotW, gapPx), scrollX: 0 })); }, [data, showUnaltered, plotW, gapMode]);
 
   // ---- draw ----------------------------------------------------------------
   useEffect(() => {
@@ -109,10 +120,10 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
     cv.style.width = cssW + "px"; cv.style.height = H + "px";
     const ctx = cv.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const r = draw(ctx, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, Math.max(0, view.scrollX)) }, cssW, PALETTE);
+    const r = draw(ctx, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, Math.max(0, view.scrollX)) }, cssW, PALETTE, { gap: gapPx, pctLabels: gapMode === "pct" });
     const mem = (performance as any).memory;
     bump({ drawMs: r.ms, cellsDrawn: r.cellsDrawn, bucketsDrawn: r.bucketsDrawn, frames: perfRef.current.frames + 1, heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : undefined });
-  }, [data, visible, view, cssW, maxScroll]);
+  }, [data, visible, view, cssW, maxScroll, gapPx, gapMode]);
 
   // ---- interactions -----------------------------------------------------
   const zoomAt = (factor: number, px?: number) => setView((v) => {
@@ -136,7 +147,7 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
   useEffect(() => {
     (window as any).__onco = { ...(window as any).__onco, zoomAt, setZoom: (z: number) => setView((v) => ({ ...v, zoom: Math.min(MAX_ZOOM, Math.max(minZoom, z)) })),
       setScroll: (x: number) => setView((v) => ({ ...v, scrollX: Math.max(0, Math.min(maxScroll, x)) })), fit: () => setView((v) => ({ ...v, zoom: minZoom, scrollX: 0 })),
-      setShowUnaltered, setSortKey, setWhitespace: (w: boolean) => setView((v) => ({ ...v, whitespace: w })), view, minZoom, maxScroll, ready: !!visible };
+      setShowUnaltered, setSortKey, setGapMode, setWhitespace: (w: boolean) => setView((v) => ({ ...v, whitespace: w })), view, minZoom, maxScroll, ready: !!visible };
   });
 
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -148,7 +159,7 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
       if (Math.abs(dx) > 2) setView((v) => ({ ...v, scrollX: Math.max(0, Math.min(maxScroll, drag.current!.scrollX - dx)) }));
       setHover(null); return;
     }
-    const hit = hitTest(x, y, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, view.scrollX) });
+    const hit = hitTest(x, y, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, view.scrollX) }, gapPx);
     setHover(hit ? { hit, x: e.clientX - rect.left, y: e.clientY - rect.top } : null);
   };
 
@@ -194,6 +205,9 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
               <option key={t.label} value={t.label}>{t.label} ↑</option>,
               <option key={"-" + t.label} value={"-" + t.label}>{t.label} ↓</option>])}
           </select></label>
+          <label className="meta" title={gapTrack ? "split each cohort into runs of " + gapTrack.label : "sort by a categorical clinical track first"}>gaps <select value={gapMode} disabled={!gapTrack}
+            onChange={(e) => setGapMode(e.target.value as "none" | "gaps" | "pct")} style={{ fontSize: "0.78rem" }}>
+            <option value="none">none</option><option value="gaps">gaps</option><option value="pct">gaps with %</option></select></label>
           <button className="linklike" onClick={() => zoomAt(1 / 1.4)} title="zoom out">−</button>
           <input type="range" min={0} max={100} value={pct} onChange={(e) => { const p = Number(e.target.value) / 100; setView((v) => ({ ...v, zoom: minZoom * Math.pow(MAX_ZOOM / minZoom, p) })); }} style={{ width: 120 }} />
           <button className="linklike" onClick={() => zoomAt(1.4)} title="zoom in">+</button>
@@ -225,7 +239,7 @@ export default function OncoprintLab({ spec }: { spec: Record<string, unknown> }
             <tr><td>engine (server)</td><td>{fmt(perf.engineMs)} ms</td><td>pack (server)</td><td>{fmt(perf.packMs)} ms</td></tr>
             <tr><td>fetch incl. engine</td><td>{fmt(perf.fetchMs)} ms</td><td>payload</td><td>{fmt((perf.bytes || 0) / 1048576, 2)} MB binary</td></tr>
             <tr><td>decode</td><td>{fmt(perf.decodeMs, 1)} ms</td><td>last draw</td><td>{fmt(perf.drawMs, 1)} ms ({fmt(perf.cellsDrawn)} cells, {fmt(perf.bucketsDrawn)} buckets)</td></tr>
-            <tr><td>client re-sort</td><td>{fmt(perf.sortMs)} ms</td><td>hide unaltered</td><td>{fmt(perf.hideMs)} ms</td></tr>
+            <tr><td>client re-sort</td><td>{fmt(perf.sortMs)} ms</td><td>hide unaltered</td><td>{fmt(perf.hideMs)} ms{perf.gapMs != null && <> · gaps {fmt(perf.gapMs)} ms</>}</td></tr>
             <tr><td>frames</td><td>{perf.frames}</td><td>JS heap</td><td>{fmt(perf.heapMB)} MB</td></tr>
           </tbody></table>
         </details>
