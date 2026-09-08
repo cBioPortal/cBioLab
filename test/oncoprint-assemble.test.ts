@@ -95,6 +95,14 @@ test("the contract carries resolved viewing options, defaulted when the caller g
   assert.deepEqual(assembleContract({ ...input(), display: d }).display, d);
 });
 
+test("sorting by patient id, ascending and descending", () => {
+  const asc = assembleContract({ ...input(), sort: [{ track: "id", dir: "asc" }] });
+  assert.deepEqual(asc.columns, ["P1", "P2", "P3", "P4", "P5"]);
+  const desc = assembleContract({ ...input(), sort: [{ track: "id", dir: "desc" }] });
+  assert.deepEqual(desc.columns, ["P3", "P2", "P1", "P5", "P4"], "descending within each group");
+  assert.deepEqual(desc.conventions.sort, ["-id"]);
+});
+
 test("more than one study adds a Study track from studyOf", () => {
   const c = assembleContract({ ...input(), studies: ["s1", "s2"], studyOf: new Map([["P1", "s1"], ["P2", "s1"], ["P3", "s2"], ["P4", "s2"], ["P5", "s2"]]) });
   const st = c.tracks.find((t) => t.label === "Study")!;

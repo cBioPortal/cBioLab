@@ -212,6 +212,9 @@ def assemble_contract(*, genes: list[str], groups: list[dict[str, Any]], studies
 
     gene_cell_list = [gene_cells[g] for g in genes]
 
+    def by_id(x: int, y: int) -> int:
+        return -1 if all_pids[x] < all_pids[y] else (1 if all_pids[x] > all_pids[y] else 0)
+
     def genomic_cmp(x: int, y: int) -> int:
         for cells in gene_cell_list:
             rx, ry = cell_rank(int(cells[x])), cell_rank(int(cells[y]))
@@ -241,9 +244,12 @@ def assemble_contract(*, genes: list[str], groups: list[dict[str, Any]], studies
         if s["track"] == "genomic":
             cmps.append(lambda x, y, sign=sign: sign * genomic_cmp(x, y))
             continue
+        if s["track"] == "id":
+            cmps.append(lambda x, y, sign=sign: sign * by_id(x, y))
+            continue
         t = sortable.get(s["track"])
         if t is None:
-            raise ValueError("sort: '" + s["track"] + "' is not a track in this oncoprint — sortable: genomic" +
+            raise ValueError("sort: '" + s["track"] + "' is not a track in this oncoprint — sortable: genomic, id" +
                              (", " + ", ".join(sortable) if sortable else "") + " (clinical sort keys must also be listed in clinical)")
         cmps.append(track_cmp(t, sign))
     cmps.append(genomic_cmp)

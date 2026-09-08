@@ -505,19 +505,21 @@ async function main() {
       ok("a lollipop view can be added from the UI", added.includes("hotspots") && dots > 0,
         added.length ? added.join(", ") + " · " + dots + " dots" : "view was not added");
 
-      // The oncoprint does not go through a resolver, so its provenance and its
-      // query/render split are a separate code path — and the one most likely to
-      // be left behind. This document (default views) actually contains one.
+      // The oncoprint does not go through a resolver, so its provenance is a separate
+      // code path — and the one most likely to be left behind. It is also the one view
+      // the BROWSER draws, from the binary contract, so the card must hold a canvas and
+      // the SQL that produced it. This document (default views) actually contains one.
       const onco = await page.evaluate(() => {
         for (const card of document.querySelectorAll(".ana-grid .card")) {
           const h = card.querySelector("h2");
           if (!h || !h.textContent.trim().startsWith("Oncoprint")) continue;
           const chip = card.querySelector(".lat");
+          const cv = card.querySelector("canvas");
           return {
             found: true,
             queries: card.querySelectorAll(".provsql .provq").length,
             chip: chip ? chip.textContent.trim() : null,
-            split: !!(chip && /draw\)/.test(chip.textContent))
+            drawn: !!(cv && cv.width > 100 && cv.height > 20)
           };
         }
         return { found: false };
@@ -536,9 +538,9 @@ async function main() {
       ok("a single view can be removed", beforeN > 0 && afterKinds.length === beforeN - 1,
         beforeN ? beforeN + " → " + afterKinds.length + " views (" + afterKinds.join(", ") + ")" : "no views to remove");
 
-      ok("the oncoprint reports its own queries and separates draw time",
-        onco.found && onco.queries > 0 && onco.split,
-        onco.found ? onco.queries + " queries · " + onco.chip : "no oncoprint view on the page");
+      ok("the oncoprint draws in the browser and reports the SQL behind it",
+        onco.found && onco.queries > 0 && onco.drawn,
+        onco.found ? onco.queries + " queries · " + onco.chip + " · canvas " + (onco.drawn ? "drawn" : "MISSING") : "no oncoprint view on the page");
 
       // The survival basis (endpoint + what the clock starts from) is a control,
       // not a JSON edit — and changing it must actually change the analysis.

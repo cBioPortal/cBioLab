@@ -5,7 +5,9 @@ export const maxDuration = 60;
 export async function POST(req: Request) {
   try {
     const doc = await req.json();
-    return Response.json(await runAnalysis(doc));
+    // the web app draws its own oncoprints; ?oncoprint=spec skips rendering them here
+    const mode = new URL(req.url).searchParams.get("oncoprint") === "spec" ? "spec" as const : "svg" as const;
+    return Response.json(await runAnalysis(doc, { oncoprint: mode }));
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
   }

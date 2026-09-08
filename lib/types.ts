@@ -349,6 +349,11 @@ export interface ViewResult {
   ms?: number;
   /** of that, time spent rendering on the SERVER (the oncoprint's SVG) */
   renderMs?: number;
+  /**
+   * Oncoprint only, and only for `runAnalysis(doc, {oncoprint:"spec"})`: what to POST to
+   * /api/oncoprint to get the figure. Carries cohort DEFINITIONS, never compiled SQL.
+   */
+  spec?: OncoprintSpec;
   /** the aggregate queries that produced THIS view's numbers, in order */
   queries?: { study: string; label: string; sql: string; ms?: number; remote?: boolean }[];
   cohorts?: string[]; annotation?: string;

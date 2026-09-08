@@ -79,7 +79,14 @@ function cohortStudies(def: CohortDef | undefined, docStudy: string): string[] {
   return [docStudy];
 }
 
-export async function runAnalysis(template: AnalysisDoc | TemplateDoc): Promise<AnalysisResult> {
+/**
+ * `oncoprint: "spec"` returns what to ask for instead of a rendered picture: the web app
+ * fetches the binary contract itself and draws it, so the run does no oncoprint queries.
+ * The default, "svg", is what MCP and the in-app chat need.
+ */
+export interface RunOpts { oncoprint?: "svg" | "spec" }
+
+export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: RunOpts = {}): Promise<AnalysisResult> {
   const t0 = Date.now();
   // Parameters are resolved FIRST, so everything downstream — compilers,
   // validators, provenance — sees an ordinary document and cannot tell a
@@ -902,44 +909,61 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc): Promise<
       }
       // federated: each group carries a {study: sql} map; each cohort contributes
       // only the studies it was actually evaluated in
-      const oncoLog: { label: string; sql: string; ms?: number; study?: string }[] = [];
-      const tQuery = Date.now();
-      const contract = await buildContract({
+      // The spec is built here either way: this is where the permitted studies, the
+      // federated z-reference and the cohort definitions are known.
+      const oncoSpec = {
         study: okStudies[0],
         studies: okStudies,
         genes,
         clinical: (view as OncoprintView).clinical || [],
         heatmap: (view as OncoprintView).heatmap || [],
         sort: (view as OncoprintView).sort,
+        display: (view as OncoprintView).display,
         ...(Object.keys(zReference).length ? { zReference } : {}),
         derivedEvents: [],
-        layout: { groupBy: { kind: "cohorts" as const, groups: vNames.map((n) => ({ name: n, dsl: {
-          [PIDS_SQL]: multi
-            ? Object.fromEntries(okStudies.filter((s) => cohorts[n].perStudy[s]).map((s) => [s, cohorts[n].perStudy[s].sql]))
-            : cohorts[n].perStudy[okStudies[0]].sql
-        } as PidsCarrier })) } },
         conventions: { lineGap: 90 }
-      }, { log: oncoLog });
-      const oncoQueryMs = Date.now() - tQuery;
-      const tRender = Date.now();
-      const oncoSvg = contractToSvg(contract, 1200);
-      const oncoRenderMs = Date.now() - tRender;
-      views.push({ kind: "oncoprint", cohorts: vNames, svg: oncoSvg,
+      };
+      const note = (multi
+        ? "cross-study oncoprint" + (okStudies.length <= 2 ? " (" + okStudies.join(", ") + ")" : " across " + okStudies.length + " studies") +
+          ": duplicate patients across studies appear as separate columns; clinical tracks merge attribute values by name without harmonization; the Study track shows each column's origin"
+        : "") +
+        (withheld.length
+          ? (multi ? " — " : "") + "columns cover " + shownPts.toLocaleString() + " of " +
+            (shownPts + withheldPts).toLocaleString() + " patients: " + withheld.join(", ") +
+            " answer with aggregates only, so their patients cannot be drawn as columns (compare and survival above include them)"
+          : "");
+      const oncoShared = { kind: "oncoprint" as const, cohorts: vNames,
         participation: participationFor(vStudies, true),
-        renderMs: oncoRenderMs,
-        queries: oncoLog.map((q) => ({ study: q.study || okStudies[0], label: q.label, sql: q.sql, ...(q.ms != null ? { ms: q.ms } : {}) })),
-        genes: contract.tracks.filter((t) => t.kind === "gene").map((t) => ({ gene: t.label, driverPct: t.driverPct ?? null, anyPct: t.freqPct ?? null })),
-        nColumns: contract.stats.nColumns, annotation: contract.conventions.annotation,
-        ...(multi || withheld.length ? { studies: okStudies,
-          note: (multi
-            ? "cross-study oncoprint" + (okStudies.length <= 2 ? " (" + okStudies.join(", ") + ")" : " across " + okStudies.length + " studies") +
-              ": duplicate patients across studies appear as separate columns; clinical tracks merge attribute values by name without harmonization; the Study track shows each column's origin"
-            : "") +
-            (withheld.length
-              ? (multi ? " — " : "") + "columns cover " + shownPts.toLocaleString() + " of " +
-                (shownPts + withheldPts).toLocaleString() + " patients: " + withheld.join(", ") +
-                " answer with aggregates only, so their patients cannot be drawn as columns (compare and survival above include them)"
-              : "") } : {}) });
+        ...(multi || withheld.length ? { studies: okStudies, note } : {}) };
+
+      if (opts.oncoprint === "spec") {
+        // The web app draws the figure itself from the binary contract, so the run
+        // returns what to ask for rather than a picture: the cohort DEFINITIONS travel
+        // (compiled SQL never leaves the server), and the client posts this to
+        // /api/oncoprint. Nothing is queried for this view here.
+        views.push({ ...oncoShared, spec: { ...oncoSpec,
+          layout: { groupBy: { kind: "cohorts" as const, groups: vNames.map((n) => ({ name: n, dsl: doc.cohorts[n] })) } } } });
+      } else {
+        const oncoLog: { label: string; sql: string; ms?: number; study?: string }[] = [];
+        const tQuery = Date.now();
+        const contract = await buildContract({ ...oncoSpec,
+          layout: { groupBy: { kind: "cohorts" as const, groups: vNames.map((n) => ({ name: n, dsl: {
+            [PIDS_SQL]: multi
+              ? Object.fromEntries(okStudies.filter((s) => cohorts[n].perStudy[s]).map((s) => [s, cohorts[n].perStudy[s].sql]))
+              : cohorts[n].perStudy[okStudies[0]].sql
+          } as PidsCarrier })) } }
+        }, { log: oncoLog });
+        const oncoQueryMs = Date.now() - tQuery;
+        const tRender = Date.now();
+        const oncoSvg = contractToSvg(contract, 1200);
+        const oncoRenderMs = Date.now() - tRender;
+        views.push({ ...oncoShared, svg: oncoSvg,
+          renderMs: oncoRenderMs,
+          queries: oncoLog.map((q) => ({ study: q.study || okStudies[0], label: q.label, sql: q.sql, ...(q.ms != null ? { ms: q.ms } : {}) })),
+          genes: contract.tracks.filter((t) => t.kind === "gene").map((t) => ({ gene: t.label, driverPct: t.driverPct ?? null, anyPct: t.freqPct ?? null })),
+          nColumns: contract.stats.nColumns, annotation: contract.conventions.annotation });
+        void oncoQueryMs;
+      }
     } else {
       // unreachable for well-typed documents, but documents arrive as untrusted
       // JSON from clients/chat/MCP, so an unknown kind must still be reported

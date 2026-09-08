@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
+import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
+import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 import { parameterize } from "../../lib/params.ts";
 import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
@@ -206,6 +208,8 @@ export default function AnalysisPage() {
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  /** decoded oncoprint contracts by view index — the source of the header numbers and provenance */
+  const [contracts, setContracts] = useState<Record<number, UnpackedContract>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Record<string, { def: CohortDef; savedAt: string; lastEval?: { count: number; text: string } | null }>>({});
@@ -259,9 +263,12 @@ export default function AnalysisPage() {
     setBusy(true); setError(null);
     try {
       const payload = { study: d.study || study, ...d };
-      const res = await fetch("/api/analysis", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      // the page draws its own oncoprints from the binary contract, so the run returns
+      // a spec for each one instead of a server-rendered SVG
+      const res = await fetch("/api/analysis?oncoprint=spec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
+      setContracts({});
       setResult(j);
       syncUrl(undefined, d);
     } catch (e) { setError(String((e as Error)?.message || e)); }
@@ -640,7 +647,7 @@ export default function AnalysisPage() {
   // clinical-track options for oncoprint views: union of attribute names across the
   // result's involved studies (an attribute absent in one study just renders gaps there)
   useEffect(() => {
-    if (!result || !result.views.some(v => v.kind === "oncoprint" && v.svg)) return;
+    if (!result || !result.views.some(v => v.kind === "oncoprint" && v.spec)) return;
     const studies = result.involvedStudies && result.involvedStudies.length ? result.involvedStudies : [result.study];
     const key = studies.join(",");
     if (trackAttrs.key === key) return;
@@ -687,6 +694,17 @@ export default function AnalysisPage() {
     const views = (doc.views || []).map((v, i: number) => i === vi ? patch(v) : v);
     const d = { ...doc, views };
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
+  };
+
+  /**
+   * A view change the browser can apply itself — how the oncoprint is drawn, not what it
+   * draws. The document and the URL still record it, so the link, the server SVG, the CLI
+   * and the Python package reproduce the same figure; only the round trip is skipped.
+   */
+  const updateViewLocal = (vi: number, patch: (v: any) => any) => {
+    const views = (doc.views || []).map((v, i: number) => i === vi ? patch(v) : v);
+    const d = { ...doc, views };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
   };
 
   /**
@@ -811,8 +829,8 @@ export default function AnalysisPage() {
     k == null ? "genomic" : typeof k === "string" ? k : (k.dir === "desc" ? "-" : "") + String(k.track || "genomic");
   const pruneSort = (v: any) => {
     // drop sort keys whose track no longer exists
-    const keep = new Set(["genomic", "Study", ...(v.clinical || []), ...heatmapLabels(v)]);
-    const sort = (v.sort || []).filter((s: any) => keep.has(String(s).replace(/^-/, "")));
+    const keep = new Set(["genomic", "id", "Study", ...(v.clinical || []), ...heatmapLabels(v)]);
+    const sort = (v.sort || []).filter((s: any) => keep.has(sortKeyText(s).replace(/^-/, "")));
     if (sort.length) v.sort = sort; else delete v.sort;
     return v;
   };
@@ -825,9 +843,22 @@ export default function AnalysisPage() {
     return pruneSort(next);
   });
 
-  const setViewSort = (vi: number, key: string) => updateView(vi, v => {
-    if (key === "genomic") { const { sort, ...rest } = v; return rest; }
+  /** the figure sorts in the browser, so this records the choice without re-running */
+  const setViewSort = (vi: number, key: string) => updateViewLocal(vi, v => {
+    if (!key) { const { sort, ...rest } = v; return rest; }
     return { ...v, sort: [key] };
+  });
+
+  /** viewing options as the figure wants them, defaulted from the document */
+  const figureDisplay = (v: any): FigureDisplay => ({ ...DEFAULT_FIGURE_DISPLAY, ...(v.display || {}) });
+  const setViewDisplay = (vi: number, d: FigureDisplay) => updateViewLocal(vi, v => {
+    // keep the document tidy: only options that differ from the default are written down
+    const display: any = { ...(v.display || {}) };
+    for (const [k, dflt] of Object.entries(DEFAULT_FIGURE_DISPLAY))
+      if ((d as any)[k] === dflt) delete display[k]; else display[k] = (d as any)[k];
+    const next = { ...v };
+    if (Object.keys(display).length) next.display = display; else delete next.display;
+    return next;
   });
 
   const removeCohort = (name: string) => {
@@ -2272,88 +2303,92 @@ export default function AnalysisPage() {
                       so the figure cannot differ between surfaces. */}
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
-                {v.kind === "oncoprint" && v.svg && <>
-                  <div className="row" style={{ alignItems: "baseline" }}>
-                    <h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {v.nColumns!.toLocaleString()} patients · {v.annotation}</span></h2>
-                    <span className="spacer" />
-                    <>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></>
-                    <button className="linklike genesbtn" disabled={busy}
-                      title="choose the genes this oncoprint draws"
-                      onClick={() => openGenes(vi)}>genes</button>
-                    <details className="gearmenu">
-                      <summary title="oncoprint options">⚙</summary>
-                      <div className="gearmenu-items">
-                        {(() => {
-                          const vNames = ocView(vi).cohorts || Object.keys(result.cohorts);
-                          const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];
-                          const genes = (v.genes || []).map(g => g.gene);
-                          const url = "https://www.cbioportal.org/results/oncoprint?cancer_study_list=" + vStudies.join(",") +
-                            "&case_set_id=" + (vStudies.length === 1 ? vStudies[0] + "_all" : "all") +
-                            "&gene_list=" + encodeURIComponent(genes.join(" ")) +
-                            "&profileFilter=mutations%2Cstructural_variants%2Cgistic&Z_SCORE_THRESHOLD=2.0&tab_index=tab_visualize&Action=Submit";
-                          return <>
-                            <a target="_blank" rel="noopener noreferrer" href={url}>Open these genes in the cBioPortal oncoprint ↗</a>
-                            <span className="meta">full {vStudies.length === 1 ? "study" : vStudies.length + "-study"} view, all samples — the portal can't express Cohort Lab cohorts or tracks</span>
-                          </>;
-                        })()}
-                      </div>
-                    </details>
-                  </div>
-                  {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
-                    style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
-                  <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", margin: "0.35rem 0 0.5rem" }}>
-                    <span className="meta">clinical tracks:</span>
-                    {(ocView(vi).clinical || []).map((a: any) => (
-                      <button key={a} className="linklike" disabled={busy} title="remove this track"
-                        onClick={() => setViewClinical(vi, (ocView(vi).clinical || []).filter((x: any) => x !== a))}>{a} ✕</button>
-                    ))}
-                    <select value="" disabled={busy || !trackAttrs.attrs.length}
-                      onChange={e => { const a = e.target.value; if (!a) return;
-                        const cur = (ocView(vi).clinical || []);
-                        if (!cur.includes(a) && cur.length < 8) setViewClinical(vi, [...cur, a]); }}
-                      style={{ fontSize: "0.78rem" }}>
-                      <option value="">{trackAttrs.attrs.length ? "add clinical track…" : "loading attributes…"}</option>
-                      {trackAttrs.attrs.filter(a => !(ocView(vi).clinical || []).includes(a.attribute))
-                        .map(a => <option key={a.attribute} value={a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric)" : ""}</option>)}
-                    </select>
-                    <span className="meta">heatmap:</span>
-                    {(ocView(vi).heatmap || []).map((h: any, hi: any) => (
-                      <button key={h.profileType} className="linklike" disabled={busy} title="remove this heatmap"
-                        onClick={() => setViewHeatmap(vi, (ocView(vi).heatmap || []).filter((_: any, j: any) => j !== hi))}>{h.profileType} ✕</button>
-                    ))}
-                    <select value="" disabled={busy}
-                      onChange={e => { const p = e.target.value; if (!p) return;
-                        const cur = (ocView(vi).heatmap || []);
-                        if (!cur.some((h: any) => h.profileType === p) && cur.length < 4) setViewHeatmap(vi, [...cur, { profileType: p }]); }}
-                      style={{ fontSize: "0.78rem" }}>
-                      <option value="">add heatmap…</option>
-                      {["VAF", ...(trackAttrs.profiles || [])].filter(p => !(ocView(vi).heatmap || []).some((h: any) => h.profileType === p))
-                        .map(p => <option key={p} value={p}>{p === "VAF" ? "VAF (mutation allele fraction)" : p}</option>)}
-                    </select>
-                    <span className="meta">sort:</span>
-                    <select value={sortKeyText(ocView(vi).sort?.[0])}
-                      disabled={busy} onChange={e => setViewSort(vi, e.target.value)} style={{ fontSize: "0.78rem" }}>
-                      <option value="genomic">genomic (staircase)</option>
-                      {(result.involvedStudies || []).length > 1 && <option value="Study">Study</option>}
-                      {(ocView(vi).clinical || []).flatMap((a: any) => [
-                        <option key={a} value={a}>{a} ↑</option>,
-                        <option key={"-" + a} value={"-" + a}>{a} ↓</option>
-                      ])}
-                      {heatmapLabels(ocView(vi)).flatMap(l => [
-                        <option key={l} value={l}>{l} ↑</option>,
-                        <option key={"-" + l} value={"-" + l}>{l} ↓</option>
-                      ])}
-                    </select>
-                  </div>
-                  <div style={{ overflowX: "auto", background: "#fff", borderRadius: 8, border: "1px solid var(--line)" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
-                </>}
+                {v.kind === "oncoprint" && v.spec && (() => {
+                  const c = contracts[vi];
+                  const vNames = ocView(vi).cohorts || Object.keys(result.cohorts);
+                  const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];
+                  const genes = (ocView(vi).genes || []).map(g => String(g));
+                  const portalUrl = "https://www.cbioportal.org/results/oncoprint?cancer_study_list=" + vStudies.join(",") +
+                    "&case_set_id=" + (vStudies.length === 1 ? vStudies[0] + "_all" : "all") +
+                    "&gene_list=" + encodeURIComponent(genes.join(" ")) +
+                    "&profileFilter=mutations%2Cstructural_variants%2Cgistic&Z_SCORE_THRESHOLD=2.0&tab_index=tab_visualize&Action=Submit";
+                  return <>
+                    <OncoprintFigure
+                      spec={v.spec}
+                      display={figureDisplay(ocView(vi))}
+                      sortKey={sortKeyText(ocView(vi).sort?.[0]) === "genomic" && !ocView(vi).sort ? "" : sortKeyText(ocView(vi).sort?.[0])}
+                      onDisplay={(d) => setViewDisplay(vi, d)}
+                      onSortKey={(k) => setViewSort(vi, k)}
+                      onContract={(ct) => setContracts((m: Record<number, UnpackedContract>) => m[vi] === ct ? m : { ...m, [vi]: ct })}
+                      busy={busy}
+                      heading={<><h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {(c ? c.stats.nColumns : 0).toLocaleString()} patients · {c ? c.conventions.annotation : ""}</span></h2>
+                        {c && <span className="lat" title="Server-side wall-clock for this figure's queries and contract assembly; drawing happens in your browser.">{(c.stats.ms || 0).toLocaleString()}ms</span>}</>}
+                      controls={<>
+                        <Participation p={v.participation} />
+                        <button className="linklike genesbtn" disabled={busy}
+                          title="choose the genes this oncoprint draws" onClick={() => openGenes(vi)}>genes</button>
+                        <details className="gearmenu">
+                          <summary title="oncoprint options">⚙</summary>
+                          <div className="gearmenu-items">
+                            <a target="_blank" rel="noopener noreferrer" href={portalUrl}>Open these genes in the cBioPortal oncoprint ↗</a>
+                            <span className="meta">full {vStudies.length === 1 ? "study" : vStudies.length + "-study"} view, all samples — the portal can&apos;t express Cohort Lab cohorts or tracks</span>
+                          </div>
+                        </details>
+                      </>}
+                      footer={<>
+                        {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
+                          style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
+                        <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", margin: "0.35rem 0 0" }}>
+                          <span className="meta">clinical tracks:</span>
+                          {(ocView(vi).clinical || []).map((a: any) => (
+                            <button key={a} className="linklike" disabled={busy} title="remove this track"
+                              onClick={() => setViewClinical(vi, (ocView(vi).clinical || []).filter((x: any) => x !== a))}>{a} ✕</button>
+                          ))}
+                          <select value="" disabled={busy || !trackAttrs.attrs.length}
+                            onChange={e => { const a = e.target.value; if (!a) return;
+                              const cur = (ocView(vi).clinical || []);
+                              if (!cur.includes(a) && cur.length < 8) setViewClinical(vi, [...cur, a]); }}
+                            style={{ fontSize: "0.78rem" }}>
+                            <option value="">{trackAttrs.attrs.length ? "add clinical track…" : "loading attributes…"}</option>
+                            {trackAttrs.attrs.filter(a => !(ocView(vi).clinical || []).includes(a.attribute))
+                              .map(a => <option key={a.attribute} value={a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric)" : ""}</option>)}
+                          </select>
+                          <span className="meta">heatmap:</span>
+                          {(ocView(vi).heatmap || []).map((h: any, hi: any) => (
+                            <button key={h.profileType} className="linklike" disabled={busy} title="remove this heatmap"
+                              onClick={() => setViewHeatmap(vi, (ocView(vi).heatmap || []).filter((_: any, j: any) => j !== hi))}>{h.profileType} ✕</button>
+                          ))}
+                          <select value="" disabled={busy}
+                            onChange={e => { const p = e.target.value; if (!p) return;
+                              const cur = (ocView(vi).heatmap || []);
+                              if (!cur.some((h: any) => h.profileType === p) && cur.length < 4) setViewHeatmap(vi, [...cur, { profileType: p }]); }}
+                            style={{ fontSize: "0.78rem" }}>
+                            <option value="">add heatmap…</option>
+                            {["VAF", ...(trackAttrs.profiles || [])].filter(p => !(ocView(vi).heatmap || []).some((h: any) => h.profileType === p))
+                              .map(p => <option key={p} value={p}>{p === "VAF" ? "VAF (mutation allele fraction)" : p}</option>)}
+                          </select>
+                        </div>
+                        {c && c.queries && c.queries.length > 0 && (
+                          <details className="provsql">
+                            <summary className="meta">
+                              how these numbers were computed — {c.queries.length} {c.queries.length === 1 ? "query" : "queries"} in {(c.stats.ms || 0).toLocaleString()}ms
+                            </summary>
+                            {c.queries.map((q: { label: string; sql: string; ms?: number; study?: string }, qi: number) => (
+                              <div className="provq" key={qi}>
+                                <div className="provhead">
+                                  <code>{q.label}</code>
+                                  <span className="meta">{q.study}</span>
+                                  {q.ms != null && <span className="meta">{q.ms.toLocaleString()}ms</span>}
+                                </div>
+                                <pre>{q.sql}</pre>
+                              </div>
+                            ))}
+                          </details>
+                        )}
+                      </>}
+                    />
+                  </>;
+                })()}
                 {v.queries && v.queries.length > 0 && (
                   <details className="provsql">
                     <summary className="meta">

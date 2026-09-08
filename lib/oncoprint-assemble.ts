@@ -269,11 +269,13 @@ export function assembleContract(input: AssembleInput): Contract {
     if (b === -1) return -1;
     return sign * (a - b);
   };
+  const byId = (x: number, y: number): number => allPids[x] < allPids[y] ? -1 : allPids[x] > allPids[y] ? 1 : 0;
   const cmps: ((x: number, y: number) => number)[] = sort.map((s) => {
     const sign = s.dir === "desc" ? -1 : 1;
     if (s.track === "genomic") return (x: number, y: number) => sign * genomicCmp(x, y);
+    if (s.track === "id") return (x: number, y: number) => sign * byId(x, y);
     const t = sortableTracks.get(s.track);
-    if (!t) throw new Error("sort: '" + s.track + "' is not a track in this oncoprint — sortable: genomic" +
+    if (!t) throw new Error("sort: '" + s.track + "' is not a track in this oncoprint — sortable: genomic, id" +
       (sortableTracks.size ? ", " + [...sortableTracks.keys()].join(", ") : "") +
       " (clinical sort keys must also be listed in clinical)");
     return trackCmp(t, sign);
