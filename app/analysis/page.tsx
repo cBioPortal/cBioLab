@@ -2404,9 +2404,11 @@ export default function AnalysisPage() {
                       tracksMenu={<TracksMenu
                         attrs={trackAttrs.attrs} profiles={trackAttrs.profiles}
                         clinical={ocView(vi).clinical || []} heatmap={ocView(vi).heatmap || []}
+                        cohorts={Object.keys(result.cohorts)} derivedCohorts={ocView(vi).derivedCohorts || []}
                         busy={busy}
                         onClinical={(next) => setViewClinical(vi, next)}
-                        onHeatmap={(next) => setViewHeatmap(vi, next)} />}
+                        onHeatmap={(next) => setViewHeatmap(vi, next)}
+                        onDerived={(next) => updateView(vi, (vv: any) => { const n = { ...vv }; if (next.length) n.derivedCohorts = next; else delete n.derivedCohorts; return n; })} />}
                       footer={<>
                         {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                           style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
@@ -2474,26 +2476,34 @@ export default function AnalysisPage() {
  * because a study can declare sixty attributes; the count of cases carrying each one, most
  * first, because that is what decides whether a track is worth a row.
  */
-function TracksMenu({ attrs, profiles, clinical, heatmap, busy, onClinical, onHeatmap }: {
+function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohorts, busy, onClinical, onHeatmap, onDerived }: {
   attrs: { attribute: string; kind: string; patients: number }[];
   profiles: string[];
   clinical: string[];
-  heatmap: { profileType: string }[];
+  heatmap: { profileType: string; genes?: string[] }[];
+  cohorts: string[];
+  derivedCohorts: string[];
   busy: boolean;
   onClinical: (next: string[]) => void;
-  onHeatmap: (next: { profileType: string }[]) => void;
+  onHeatmap: (next: { profileType: string; genes?: string[] }[]) => void;
+  onDerived: (next: string[]) => void;
 }) {
-  const [tab, setTab] = useState<"clinical" | "heatmap">("clinical");
+  const [tab, setTab] = useState<"clinical" | "heatmap" | "cohorts">("clinical");
   const [q, setQ] = useState("");
   const match = (s: string) => s.toLowerCase().includes(q.trim().toLowerCase());
   const heatOptions = ["VAF", ...profiles];
-  const chosen = tab === "clinical" ? clinical : heatmap.map((h) => h.profileType);
-  const shown = (tab === "clinical" ? attrs.map((a) => a.attribute) : heatOptions).filter(match);
+  const chosen = tab === "clinical" ? clinical : tab === "heatmap" ? heatmap.map((h) => h.profileType) : derivedCohorts;
+  const shown = (tab === "clinical" ? attrs.map((a) => a.attribute) : tab === "heatmap" ? heatOptions : cohorts).filter(match);
+  const cap = tab === "clinical" ? 8 : tab === "heatmap" ? 4 : 3;
   const toggle = (name: string) => {
     if (tab === "clinical") onClinical(clinical.includes(name) ? clinical.filter((x) => x !== name) : clinical.length < 8 ? [...clinical, name] : clinical);
-    else onHeatmap(chosen.includes(name) ? heatmap.filter((h) => h.profileType !== name) : heatmap.length < 4 ? [...heatmap, { profileType: name }] : heatmap);
+    else if (tab === "heatmap") onHeatmap(chosen.includes(name) ? heatmap.filter((h) => h.profileType !== name) : heatmap.length < 4 ? [...heatmap, { profileType: name }] : heatmap);
+    else onDerived(derivedCohorts.includes(name) ? derivedCohorts.filter((x) => x !== name) : derivedCohorts.length < 3 ? [...derivedCohorts, name] : derivedCohorts);
   };
-  const cap = tab === "clinical" ? 8 : 4;
+  const setHeatGenes = (profileType: string, text: string) => {
+    const genes = text.split(/[\s,]+/).map((g) => g.trim().toUpperCase()).filter(Boolean).slice(0, 12);
+    onHeatmap(heatmap.map((h) => h.profileType === profileType ? (genes.length ? { ...h, genes } : { profileType }) : h));
+  };
   return (
     <details className="gearmenu">
       <summary title="add or remove tracks">tracks {chosen.length ? "(" + chosen.length + ")" : ""}</summary>
@@ -2501,21 +2511,31 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, busy, onClinical, onHe
         <div className="row" style={{ gap: "0.5rem", alignItems: "center" }}>
           <button className="linklike" style={{ fontWeight: tab === "clinical" ? 600 : 400 }} onClick={() => setTab("clinical")}>Clinical {attrs.length ? "(" + attrs.length + ")" : ""}</button>
           <button className="linklike" style={{ fontWeight: tab === "heatmap" ? 600 : 400 }} onClick={() => setTab("heatmap")}>Heatmap ({heatOptions.length})</button>
+          <button className="linklike" style={{ fontWeight: tab === "cohorts" ? 600 : 400 }} onClick={() => setTab("cohorts")}>Cohort rows ({cohorts.length})</button>
           <span className="spacer" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search…" style={{ fontSize: "0.78rem", width: 120 }} />
         </div>
-        <span className="meta">{chosen.length} of {cap} chosen{tab === "clinical" ? " · cases with data, most first" : " · a profile draws one row per gene"}</span>
+        <span className="meta">{chosen.length} of {cap} chosen{
+          tab === "clinical" ? " · cases with data, most first"
+          : tab === "heatmap" ? " · a profile draws one row per gene; leave the genes blank to follow the figure"
+          : " · any cohort in this document can be a binary row (patients only, one study)"}</span>
         <div style={{ maxHeight: 260, overflowY: "auto", marginTop: "0.3rem" }}>
           {!shown.length && <span className="meta">{attrs.length ? "nothing matches" : "loading…"}</span>}
           {shown.map((name) => {
             const on = chosen.includes(name);
             const a = tab === "clinical" ? attrs.find((x) => x.attribute === name) : undefined;
+            const h = tab === "heatmap" && on ? heatmap.find((x) => x.profileType === name) : undefined;
             return (
-              <label key={name} className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "baseline", padding: "0.1rem 0" }}>
-                <input type="checkbox" checked={on} disabled={busy || (!on && chosen.length >= cap)} onChange={() => toggle(name)} />
-                <span style={{ flex: 1 }}>{name === "VAF" ? "VAF (mutation allele fraction)" : name}{a?.kind === "num" ? " (numeric)" : ""}</span>
-                {a && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
-              </label>
+              <div key={name}>
+                <label className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "baseline", padding: "0.1rem 0" }}>
+                  <input type="checkbox" checked={on} disabled={busy || (!on && chosen.length >= cap)} onChange={() => toggle(name)} />
+                  <span style={{ flex: 1 }}>{name === "VAF" ? "VAF (mutation allele fraction)" : name}{a?.kind === "num" ? " (numeric)" : ""}</span>
+                  {a && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
+                </label>
+                {h && <input defaultValue={(h.genes || []).join(" ")} placeholder="genes for this profile — blank follows the figure"
+                  disabled={busy} onBlur={(e) => setHeatGenes(name, e.target.value)}
+                  style={{ fontSize: "0.72rem", width: "100%", margin: "0 0 0.3rem 1.4rem" }} />}
+              </div>
             );
           })}
         </div>

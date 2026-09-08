@@ -206,6 +206,12 @@ export interface OncoprintView {
   unit?: "patient" | "sample";
   /** mRNA / protein evidence drawn into the gene cells (see OncoprintSpec.overlays) */
   overlays?: { kind: "mrna" | "protein"; profileType: string; threshold?: number }[];
+  /**
+   * Document cohorts drawn as binary rows: a column is filled when that patient is in the
+   * cohort. Any cohort definition can be a row, which is what this engine has that the portal
+   * does not. Single-study and patient-level, like the definitions themselves.
+   */
+  derivedCohorts?: string[];
 }
 /**
  * Treatment sequences: what follows what, as lines of therapy.

@@ -280,7 +280,8 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   const dbOf = (s: string): string => String((spec.dbs || {})[s] || "").replace(/[^A-Za-z0-9_]/g, "") || DB;
   const { genes, clinical, derivedEvents, lineGap, sort, heatmap, display, unit, overlays } = normalizeSpec(spec);
   if (multi && derivedEvents.length) throw new Error("derived-event tracks are single-study; drop them or the extra studies");
-  if (unit === "sample" && derivedEvents.length) throw new Error("derived-event tracks are patient-level; they cannot be drawn per sample");
+  if (unit === "sample" && derivedEvents.length)
+    throw new Error("cohort rows are patient-level: a cohort selects patients, so drawing one per sample would repeat a patient's answer across their samples. Drop the rows or switch columns back to patients.");
 
   // ---- columns: groups of patients --------------------------------------
   let groups: { name: string; pids: string[] }[]; // [{name, pids: [columnId]}] — a patient lands in its first matching group

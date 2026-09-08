@@ -922,7 +922,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         unit: (view as OncoprintView).unit,
         overlays: (view as OncoprintView).overlays,
         ...(Object.keys(zReference).length ? { zReference } : {}),
-        derivedEvents: [],
+        // document cohorts the view asked to draw as binary rows; the engine refuses them
+        // across studies and in sample mode, which are exactly the cases where "is this
+        // patient in that cohort" has no single answer per column
+        derivedEvents: (((view as OncoprintView).derivedCohorts || []).slice(0, 3))
+          .filter((n) => doc.cohorts[n])
+          .map((n) => ({ label: n, expression: doc.cohorts[n] })),
         conventions: { lineGap: 90 }
       };
       const note = (multi
