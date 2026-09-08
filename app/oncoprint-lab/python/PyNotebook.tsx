@@ -61,9 +61,16 @@ buf = io.BytesIO(); fig.savefig(buf, format="png", dpi=100)
 print("__IMG__" + base64.b64encode(buf.getvalue()).decode())`
 ];
 
+const btn = (disabled: boolean): React.CSSProperties => ({
+  font: "500 0.78rem 'IBM Plex Sans', sans-serif", padding: "0.3rem 0.7rem", borderRadius: 6, cursor: disabled ? "default" : "pointer",
+  border: "1px solid var(--accent)", background: disabled ? "transparent" : "var(--accent)", color: disabled ? "var(--muted)" : "#fff", opacity: disabled ? 0.6 : 1
+});
+
 export default function PyNotebook({ files, fixtures }: { files: Record<string, string>; fixtures: { events: string; clinical: string; coverage: string } }) {
   const [status, setStatus] = useState("loading Pyodide (≈15 MB) …");
   const [ready, setReady] = useState(false);
+  const [autoRan, setAutoRan] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
   const [cells, setCells] = useState<Cell[]>(() => CELLS(fixtures).map((code) => ({ code, out: [], running: false })));
   const py = useRef<any>(null);
   const sink = useRef<(s: string) => void>(() => {});
@@ -102,15 +109,20 @@ export default function PyNotebook({ files, fixtures }: { files: Record<string, 
     catch (e) { lines.push("⚠ " + String((e as Error).message || e)); }
     setCells((cs) => cs.map((c, j) => j === i ? { ...c, out: [...lines], running: false, ms: Math.round(performance.now() - t0) } : c));
   };
-  const runAll = async () => { for (let i = 0; i < cells.length; i++) await runCell(i); };
+  const runAll = async () => {
+    for (let i = 0; i < cells.length; i++) { setProgress("running cell " + (i + 1) + " of " + cells.length + " …"); await runCell(i); }
+    setProgress(null);
+  };
+  // run everything once as soon as the runtime is up, so the page shows results, not just code
+  useEffect(() => { if (ready && !autoRan) { setAutoRan(true); void runAll(); } }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { (window as any).__pynb = { ready, runAll, runCell, cells }; });
 
   return (
     <div>
       <div className="row" style={{ alignItems: "center", marginBottom: "0.6rem" }}>
-        <span className="meta">{status}</span>
+        <span className="meta" style={{ color: status.startsWith("failed") ? "var(--err)" : undefined }}>{progress || status}</span>
         <span className="spacer" />
-        <button className="linklike" disabled={!ready} onClick={runAll}>run all</button>
+        <button disabled={!ready || !!progress} onClick={runAll} style={btn(!ready || !!progress)}>{progress ? "running…" : "run all cells"}</button>
       </div>
       <p className="meta" style={{ maxWidth: "72ch", margin: "0 0 0.8rem" }}>
         This is CPython in your browser. The <code>cohortlab</code> package is loaded from this repo&apos;s <code>python/cohortlab/*.py</code> exactly
@@ -122,7 +134,7 @@ export default function PyNotebook({ files, fixtures }: { files: Record<string, 
             <span className="meta" style={{ fontFamily: "IBM Plex Mono, monospace", width: 44, paddingTop: 6 }}>[{i + 1}]</span>
             <textarea value={c.code} spellCheck={false} onChange={(e) => setCells((cs) => cs.map((x, j) => j === i ? { ...x, code: e.target.value } : x))}
               style={{ flex: 1, minHeight: Math.min(320, 20 + c.code.split("\n").length * 18), font: "12.5px/1.45 'IBM Plex Mono', monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 6, padding: "0.5rem 0.6rem", resize: "vertical" }} />
-            <button className="linklike" disabled={!ready || c.running} onClick={() => runCell(i)} style={{ paddingTop: 6 }}>{c.running ? "running…" : "run ▶"}</button>
+            <button disabled={!ready || c.running} onClick={() => runCell(i)} style={{ ...btn(!ready || c.running), alignSelf: "flex-start" }}>{c.running ? "running…" : "run ▶"}</button>
           </div>
           {(c.out.length > 0 || c.ms != null) && (
             <div style={{ marginLeft: 44, marginTop: "0.4rem" }}>
