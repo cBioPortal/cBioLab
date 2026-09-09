@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs";
 
 const tools = readFileSync(new URL("../mcp/tools.ts", import.meta.url), "utf8");
 const types = readFileSync(new URL("../lib/types.ts", import.meta.url), "utf8");
+const reference = readFileSync(new URL("../lib/dsl-reference.ts", import.meta.url), "utf8");
 
 /** every kind in the View union, e.g. CompareView -> "compare" */
 function engineViewKinds(): string[] {
@@ -95,5 +96,28 @@ describe("MCP run_analysis attaches the figures themselves", () => {
       "a figure that does not fit must be reported, not silently omitted");
     assert.match(tools, /Figures attached, in order/,
       "images arrive without captions, so the model needs a manifest to tell them apart");
+  });
+});
+
+describe("every view kind is DOCUMENTED, not just implemented", () => {
+  // Two hand-maintained lists describe the DSL to a reader and to a model. Both
+  // drift the same way the MCP formatter did: a view is added, the list is not,
+  // and the capability exists but is undiscoverable. `plot` shipped missing from
+  // the chat grammar, which is what prompted this test.
+  test("the markdown reference has a row for every view kind", () => {
+    const kinds = engineViewKinds();
+    const missing = kinds.filter((k) => !new RegExp("\\|\\s*\\\\`" + k + "\\\\`\\s*\\|").test(reference));
+    assert.deepEqual(missing, [],
+      "no row in the view table of lib/dsl-reference.ts for: " + missing.join(", "));
+  });
+
+  test("the compact grammar names every view kind", () => {
+    const m = /CHAT_GRAMMAR = `([\s\S]*?)`;/.exec(reference);
+    assert.ok(m, "could not find CHAT_GRAMMAR");
+    const named = new Set([...m![1].matchAll(/"kind":"(\w+)"/g)].map((x) => x[1]));
+    const missing = engineViewKinds().filter((k) => !named.has(k));
+    assert.deepEqual(missing, [],
+      "CHAT_GRAMMAR does not mention: " + missing.join(", ") +
+      " — a model given only this grammar cannot use them");
   });
 });

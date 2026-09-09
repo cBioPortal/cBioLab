@@ -832,6 +832,13 @@ export const CHAT_GRAMMAR = `Document shape:
               "binMonths":3,"fromMonths":-12,"toMonths":60,"cohorts":[names?]},
              {"kind":"sequence","labelKey":"SUBTYPE","eventType":"treatment","exclude":[values?],
               "lineGap":90,"maxSteps":3,"topN":8,"cohorts":[names?]},
+             {"kind":"plot","x":<axis>,"y":<axis>,"unit":"sample|patient","cohorts":[names?],
+              "colorBy":<axis>?,"ringBy":<axis>?,"points":true,"bins":[240,160]},
+               // <axis> = {"source":"clinical","attribute":A,"log":?}
+               //        | {"source":"molecular","profileType":P,"gene":G,"log":?}
+               //        | {"source":"alteration","gene":G,"by":"mutated|mutationType|cna|driver"?}
+               // two numeric axes -> scatter (binned, never points); one categorical -> box;
+               // two categorical -> a contingency table
              {"kind":"oncoprint","genes":[...(max 12)],"clinical":["<attribute>", ...(max 8)]?,
               "heatmap":[{"profileType":"<profile>","genes":[...]?}, ...(max 4)]?,
               "sort":["<track>"|"-<track>"|"genomic", ...(max 4)]?,"cohorts":[names?]} ] }

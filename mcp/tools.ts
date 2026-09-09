@@ -12,7 +12,7 @@ import { runAnalysis, resolveStudy, studyProfiles } from "../lib/analysis.ts";
 import { resolverFor, carriesPatientIds, studyRouting } from "../lib/federation.ts";
 import { buildExplore } from "../lib/explore.ts";
 import { PRIMARY } from "../lib/ch.ts";
-import type { AnalysisDoc, CohortDef, OncoprintSpec } from "../lib/types.ts";
+import type { AnalysisDoc, CohortDef, OncoprintSpec, ViewResult } from "../lib/types.ts";
 import type { PidsCarrier } from "../lib/oncoprint.ts";
 
 // ---------- shared zod fragments (mirrors docs/cohort-query.schema.json) ----------
@@ -203,6 +203,12 @@ export function registerTools(server: any): void {
       // Small shared formatters. The engine attaches caveats and the author
       // attaches notes; BOTH have to reach the model, or it writes about
       // figures whose methodology and intent it cannot see.
+      // A plot counts samples by default and patients on request, but the RESULT
+      // does not carry which — it is a property of the spec. Look it back up by
+      // position, the way lib/analysis.ts does for per-view notes.
+      const authored = ((document as { views?: unknown[] }).views || []) as { unit?: string }[];
+      const plotUnit = (v: ViewResult) =>
+        authored[r.views.indexOf(v)]?.unit === "patient" ? "patients" : "samples";
       const pFmt = (x: number) =>
         x === 0 ? "<1e-300" : x < 1e-4 ? x.toExponential(1) : x.toFixed(4);
       const caveatOf = (v: { caveat?: string }) =>
@@ -295,6 +301,35 @@ export function registerTools(server: any): void {
                 `    of all paths, ${stopped.toLocaleString()} were WATCHED and began no further line; ` +
                 `${cens.toLocaleString()} (${pn.started ? Math.round(100 * cens / pn.started) : 0}%) end because the RECORD stops — nothing can be concluded about those`;
             }).join("\n") + caveatOf(v) + noteOf(v));
+        } else if (v.kind === "plot") {
+          const pd = v.plot;
+          if (!pd) { out.push("Plot: no data"); }
+          else if (pd.shape === "scatter") {
+            const st = pd.stats;
+            out.push(`Plot (scatter): ${pd.x.label} vs ${pd.y.label} — ${pd.n.toLocaleString()} ${plotUnit(v)}` +
+              (pd.grid ? `, binned onto a ${pd.grid[0]}x${pd.grid[1]} grid (the payload is bins, never points)` : "") + "." +
+              (st ? `\n  Pearson r=${st.pearson != null ? st.pearson.toFixed(3) : "—"}` +
+                    (st.pPearson != null ? ` p=${pFmt(st.pPearson)}` : "") +
+                    `; Spearman rho=${st.spearman != null ? st.spearman.toFixed(3) : "—"}` +
+                    (st.pSpearman != null ? ` p=${pFmt(st.pSpearman)}` : "") +
+                    (st.slope != null ? `; least-squares slope ${st.slope.toFixed(3)}` : "") : "") +
+              caveatOf(v) + noteOf(v));
+          } else if (pd.shape === "box") {
+            out.push(`Plot (box): ${pd.y.label} by ${pd.x.label} — ${pd.n.toLocaleString()} ${plotUnit(v)}.\n` +
+              (pd.groups || []).slice(0, 12).map((g) =>
+                `  ${g.g}: median ${g.median.toFixed(2)} (IQR ${g.q1.toFixed(2)}–${g.q3.toFixed(2)}, ` +
+                `whiskers ${g.loWhisker.toFixed(2)}–${g.hiWhisker.toFixed(2)}, n=${g.n.toLocaleString()})`).join("\n") +
+              // WHICH overlay was drawn is a disclosure, not decoration: points
+              // mean the reader is seeing cases, a density means they are not.
+              (pd.overlay === "points" ? `\n  Values are drawn as individual points.`
+                : pd.overlay === "violin" ? `\n  Values are drawn as a DENSITY, not points — either above the point cap or from a participant that discloses no cases.`
+                : "") +
+              caveatOf(v) + noteOf(v));
+          } else {
+            out.push(`Plot (table): ${pd.x.label} vs ${pd.y.label} — ${pd.n.toLocaleString()} ${plotUnit(v)}.\n` +
+              (pd.cells || []).slice(0, 24).map((c) => `  ${c.cx} x ${c.cy}: ${c.n.toLocaleString()}`).join("\n") +
+              caveatOf(v) + noteOf(v));
+          }
         } else if (v.kind === "oncoprint" && v.svg) {
           out.push(`Oncoprint: ${v.nColumns!.toLocaleString()} patients — ` +
             v.genes!.map((g) => `${g.gene} ${g.driverPct}%/${g.anyPct}%`).join(", ") +
