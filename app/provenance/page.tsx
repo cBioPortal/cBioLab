@@ -3,6 +3,7 @@
 // and shows the DSL plus every SQL query the spec compiles to. Stateless: the link IS the spec.
 import { buildContract } from "../../lib/oncoprint.ts";
 import { specToQueries } from "../../lib/oncoprint.ts";
+import { oncokbPin } from "../../lib/annotation.ts";
 import { contractToSvg } from "../../lib/oncoprint-svg.ts";
 
 export const metadata = { title: "Oncoprint provenance — Cohort Lab" };
@@ -15,7 +16,7 @@ export default async function ProvenancePage({ searchParams }: { searchParams: P
   try {
     if (typeof sp.spec !== "string") throw new Error("missing ?spec= parameter (base64url-encoded OncoprintSpec)");
     spec = JSON.parse(Buffer.from(String(sp.spec), "base64url").toString("utf8"));
-    ({ queries } = specToQueries(spec));
+    ({ queries } = specToQueries(spec, await oncokbPin()));
     contract = await buildContract(spec);
     svg = contractToSvg(contract, 1200);
   } catch (e) {

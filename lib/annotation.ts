@@ -12,6 +12,22 @@ import { chQuery } from "./ch.ts";
 import type { ChRow } from "./types.ts";
 import { sq } from "./compiler.ts";
 
+/**
+ * The store's most recent release, or the ONCOKB_PIN override. Cached: it is asked for once
+ * per cohort compilation, and the answer changes only when the store is re-synced.
+ */
+let pinCache: { at: number; pin: string | null } | null = null;
+export async function oncokbPin(): Promise<string | null> {
+  if (process.env.ONCOKB_PIN) return process.env.ONCOKB_PIN;
+  if (pinCache && Date.now() - pinCache.at < 5 * 60_000) return pinCache.pin;
+  try {
+    const r = await chQuery(
+      `SELECT oncokb_version FROM ${ANNOT_DB}.variant_annotation GROUP BY oncokb_version ORDER BY max(resolved_at) DESC LIMIT 1`);
+    pinCache = { at: Date.now(), pin: (r.data[0] as { oncokb_version?: string })?.oncokb_version || null };
+  } catch { pinCache = { at: Date.now(), pin: null }; }
+  return pinCache.pin;
+}
+
 export const MOCK_SOURCE = "MOCK-2026.08 (rule-based placeholder — NOT OncoKB)";
 
 const TSG = new Set(["TP53", "STK11", "KEAP1", "ARID1A", "PTEN", "RB1", "APC", "CDKN2A",

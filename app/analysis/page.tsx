@@ -208,8 +208,12 @@ export default function AnalysisPage() {
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  /** decoded oncoprint contracts by view index — the source of the header numbers and provenance */
-  const [contracts, setContracts] = useState<Record<number, UnpackedContract>>({});
+  /**
+   * Decoded oncoprint contracts, keyed by the spec they came from rather than by view index.
+   * A re-run that leaves a figure's spec unchanged does not refetch it, so keying by index and
+   * clearing on every run left the header and the provenance panel permanently empty.
+   */
+  const [contracts, setContracts] = useState<Record<string, UnpackedContract>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Record<string, { def: CohortDef; savedAt: string; lastEval?: { count: number; text: string } | null }>>({});
@@ -268,7 +272,6 @@ export default function AnalysisPage() {
       const res = await fetch("/api/analysis?oncoprint=spec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
-      setContracts({});
       setResult(j);
       syncUrl(undefined, d);
     } catch (e) { setError(String((e as Error)?.message || e)); }
@@ -2357,7 +2360,7 @@ export default function AnalysisPage() {
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
                 {v.kind === "oncoprint" && v.spec && (() => {
-                  const c = contracts[vi];
+                  const c = contracts[JSON.stringify(v.spec)];
                   const vNames = ocView(vi).cohorts || Object.keys(result.cohorts);
                   const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];
                   const genes = (ocView(vi).genes || []).map(g => String(g));
@@ -2374,7 +2377,7 @@ export default function AnalysisPage() {
                       onSortKeys={(keys) => setViewSort(vi, keys)}
                       onMoveTrack={(label, dir) => moveTrack(vi, label, dir)}
                       onRemoveTrack={(label) => removeTrack(vi, label)}
-                      onContract={(ct) => setContracts((m: Record<number, UnpackedContract>) => m[vi] === ct ? m : { ...m, [vi]: ct })}
+                      onContract={(ct) => { const k = JSON.stringify(v.spec); setContracts((m) => m[k] === ct ? m : { ...m, [k]: ct }); }}
                       busy={busy}
                       heading={<><h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {(c ? c.stats.nColumns : 0).toLocaleString()} {c ? c.unit : "patient"}s · {c ? c.conventions.annotation : ""}</span></h2>
                         {c && <span className="lat" title="Server-side wall-clock for this figure's queries and contract assembly; drawing happens in your browser.">{(c.stats.ms || 0).toLocaleString()}ms</span>}</>}

@@ -20,7 +20,7 @@ export const PIDS_SQL: unique symbol = Symbol("pidsSql");
  * cannot produce symbol keys, so client specs can never inject through it.
  */
 export type PidsCarrier = CohortDef & { [PIDS_SQL]?: string | Record<string, string> };
-import { buildAnnotationIndex } from "./annotation.ts";
+import { buildAnnotationIndex, oncokbPin } from "./annotation.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { wardOrder, CLUSTER_LIMIT } from "./oncoprint-cluster.ts";
 
@@ -35,8 +35,8 @@ const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
  * on which the cohort's own criterion was never measured. The portal does the same, and the
  * contract says so in its conventions.
  */
-export function cohortColumnsSql(dsl: PidsCarrier | null | undefined, study: string, db: string, unit: Unit): string {
-  const pids = cohortPatientsSql(dsl, study, db);
+export function cohortColumnsSql(dsl: PidsCarrier | null | undefined, study: string, db: string, unit: Unit, pin?: string | null): string {
+  const pids = cohortPatientsSql(dsl, study, db, pin);
   if (unit === "patient") return pids;
   const prefix = study + "_";
   return "SELECT DISTINCT replaceOne(sd.sample_unique_id, " + sq(prefix) + ", '') AS pid\n" +
@@ -46,7 +46,13 @@ export function cohortColumnsSql(dsl: PidsCarrier | null | undefined, study: str
     "ORDER BY pid";
 }
 
-export function cohortPatientsSql(dsl: PidsCarrier | null | undefined, study: string = STUDY, db: string = DB): string {
+/**
+ * A cohort's columns as SQL. `pin` is the OncoKB release an `OQL ... DRIVER` clause joins
+ * against: the analysis layer resolves it once and passes it down, and so must this engine —
+ * a spec that travels to a client and comes back carries the DEFINITION, not the compiled SQL,
+ * so it is recompiled here and would otherwise be refused for want of a pin.
+ */
+export function cohortPatientsSql(dsl: PidsCarrier | null | undefined, study: string = STUDY, db: string = DB, pin?: string | null): string {
   const pre = dsl?.[PIDS_SQL];
   if (typeof pre === "string") return pre;
   // SQL for a cohort's stable_ids (null dsl = every patient with a sample).
@@ -62,7 +68,7 @@ export function cohortPatientsSql(dsl: PidsCarrier | null | undefined, study: st
       "ORDER BY pid";
   }
   // DSL v2 definition ({all: [...]}) — the analysis document's cohort language
-  if (dsl && Array.isArray((dsl as { all?: unknown }).all)) return compileCohortDef(dsl as CohortDef, { study, db });
+  if (dsl && Array.isArray((dsl as { all?: unknown }).all)) return compileCohortDef(dsl as CohortDef, { study, db, oncokbPin: pin });
   if (!dsl) {
     return "SELECT DISTINCT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid\n" +
       "FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + sq(study) + " ORDER BY pid";
@@ -75,8 +81,8 @@ export function cohortPatientsSql(dsl: PidsCarrier | null | undefined, study: st
 }
 
 async function cohortPatients(dsl: PidsCarrier | null | undefined, study: string,
-  log?: ContractOpts["log"], label = "oncoprint:columns", db: string = DB, unit: Unit = "patient"): Promise<string[]> {
-  const sql = cohortColumnsSql(dsl, study, db, unit);
+  log?: ContractOpts["log"], label = "oncoprint:columns", db: string = DB, unit: Unit = "patient", pin?: string | null): Promise<string[]> {
+  const sql = cohortColumnsSql(dsl, study, db, unit, pin);
   const entry = { label, sql, study } as { label: string; sql: string; ms?: number; study?: string };
   if (log) log.push(entry);
   const r = await chQueryRows(sql);
@@ -220,24 +226,24 @@ export function normalizeSpec(spec: OncoprintSpec) {
 }
 
 // Provenance: the exact SQL a spec compiles to, without executing anything.
-export function specToQueries(spec: OncoprintSpec) {
+export function specToQueries(spec: OncoprintSpec, pin?: string | null) {
   const study = (spec.study || STUDY).replace(/[^A-Za-z0-9._-]/g, "");
   const { genes, clinical, derivedEvents, lineGap, unit } = normalizeSpec(spec);
   const queries: { label: string; sql: string }[] = [];
   const gb = spec.layout && spec.layout.groupBy;
   if (gb && gb.kind === "cohorts" && Array.isArray(gb.groups) && gb.groups.length) {
     for (const g of gb.groups.slice(0, 4))
-      queries.push({ label: "column group \u201c" + (g.name || "group") + "\u201d \u2014 cohort " + unit + "s", sql: cohortColumnsSql({ ...g.dsl, lineGap }, study, DB, unit) });
+      queries.push({ label: "column group \u201c" + (g.name || "group") + "\u201d \u2014 cohort " + unit + "s", sql: cohortColumnsSql({ ...g.dsl, lineGap }, study, DB, unit, pin) });
   } else {
     const listN = spec.cohort && spec.cohort.dsl && Array.isArray(spec.cohort.dsl.patients) ? spec.cohort.dsl.patients.length : 0;
     queries.push({ label: listN ? "explicit patient list (" + listN + " ids, intersected with the study)" : (spec.cohort ? "cohort " + unit + "s" : "all study " + unit + "s"),
-      sql: cohortColumnsSql(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, DB, unit) });
+      sql: cohortColumnsSql(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, DB, unit, pin) });
   }
   queries.push({ label: "genomic events (mutations, CNA, SV) for the gene tracks", sql: genomicEventsSql(genes, study, DB, unit) });
   queries.push({ label: "panel coverage \u2014 the NOT_PROFILED cell source and frequency denominators", sql: coverageSql(genes, study, DB, unit) });
   if (clinical.length) queries.push({ label: "clinical attribute tracks", sql: clinicalSql(clinical, study, DB, unit) });
   for (const de of derivedEvents)
-    queries.push({ label: "derived-event track \u201c" + (de.label || "derived event") + "\u201d \u2014 cohort-DSL patients", sql: cohortColumnsSql({ ...de.expression, lineGap }, study, DB, unit) });
+    queries.push({ label: "derived-event track \u201c" + (de.label || "derived event") + "\u201d \u2014 cohort-DSL patients", sql: cohortColumnsSql({ ...de.expression, lineGap }, study, DB, unit, pin) });
   return { genes, clinical, lineGap, queries };
 }
 
@@ -276,6 +282,10 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
     .map(s => String(s).replace(/[^A-Za-z0-9._-]/g, ""));
   const multi = studies.length > 1;
   const qual = (s: string, pid: string): string => multi ? s + "_" + pid : pid;
+  // Resolved before any cohort compiles. A spec that travelled to a client and came back
+  // carries the cohort DEFINITION, not compiled SQL, so an `OQL ... DRIVER` clause is compiled
+  // here — and without the pin it would be refused for want of an annotation store.
+  const pin = await oncokbPin();
   // per-study database on the same instance (e.g. a GENIE release next to the public portal);
   // studies not listed live in the app's default database
   const dbOf = (s: string): string => String((spec.dbs || {})[s] || "").replace(/[^A-Za-z0-9_]/g, "") || DB;
@@ -304,7 +314,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
       } else {
         // no pre-compiled SQL: compile the definition against each study in turn
         const per = await Promise.all(studies.map(async (s) =>
-          ({ s, pids: await cohortPatients({ ...g.dsl, lineGap }, s, opts.log, "oncoprint:columns", dbOf(s), unit) })));
+          ({ s, pids: await cohortPatients({ ...g.dsl, lineGap }, s, opts.log, "oncoprint:columns", dbOf(s), unit, pin) })));
         for (const { s, pids } of per) for (const p of pids) { const id = qual(s, p); raw.push(id); studyOf.set(id, s); }
       }
       const pids = raw.filter(p => !seen.has(p));
@@ -315,12 +325,12 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
     // no groups: every patient of every study, one column group, study order
     if (spec.cohort) throw new Error("multi-study oncoprint with a cohort requires cohort groups (layout.groupBy)");
     const fetched = await Promise.all(studies.map(async (s) =>
-      ({ s, r: await lqRows("oncoprint:columns", cohortColumnsSql(null, s, dbOf(s), unit), s) })));
+      ({ s, r: await lqRows("oncoprint:columns", cohortColumnsSql(null, s, dbOf(s), unit, pin), s) })));
     const pids: string[] = [];
     for (const { s, r } of fetched) for (const x of r.rows) { const id = qual(s, x[0] as string); pids.push(id); studyOf.set(id, s); }
     groups = [{ name: "all patients", pids }];
   } else {
-    const pids = await cohortPatients(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, opts.log, "oncoprint:columns", dbOf(study), unit);
+    const pids = await cohortPatients(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, opts.log, "oncoprint:columns", dbOf(study), unit, pin);
     for (const p of pids) studyOf.set(p, study);
     groups = [{ name: "cohort", pids }];
   }
@@ -427,7 +437,7 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   // ---- derived-event rows (cohort-DSL expressions as phenotypes) ---------
   const derivedIn: AssembleInput["derived"] = [];
   for (const de of derivedEvents)
-    derivedIn.push({ label: de.label, pids: new Set<string>(await cohortPatients({ ...de.expression, lineGap }, study, opts.log, "oncoprint:derivedEvent", dbOf(study), unit)) });
+    derivedIn.push({ label: de.label, pids: new Set<string>(await cohortPatients({ ...de.expression, lineGap }, study, opts.log, "oncoprint:derivedEvent", dbOf(study), unit, pin)) });
 
   const queryMs = Date.now() - t0;
   const tAsm = Date.now();
