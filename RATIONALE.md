@@ -33,6 +33,9 @@ instance reached both directly and as an MCP peer.
   and how (built-in, not roadmap)
 - **Living user state** *(roadmap)* — dynamic groups, versioned annotation, and membership
   diffs subsume virtual studies / groups / sessions
+- **An honest oracle for AI hypothesis generation** *(roadmap)* — a hypothesis written as a
+  document is pre-registered, testable, multiplicity-counted, and replicable across sites by
+  construction; the generator stays creative because the tester cannot be
 
 ## The advantages of the approach
 
@@ -389,3 +392,97 @@ The honest remainder, unchanged in kind from the original plan:
 
 None of these change the shape of the answer above — they are hardening a mechanism already
 proven correct, not open design questions.
+
+## An honest oracle for AI hypothesis generation
+
+*(Proposed direction — not yet built. It composes the pieces above rather than adding a new
+mechanism.)*
+
+AI hypothesis-generation systems — Google's Co-Scientist, FutureHouse's Robin and their
+successors — generate, critique and tournament-rank hypotheses, mostly from literature. The
+scarce resource has flipped: proposing a thousand plausible hypotheses is cheap; **testing them
+honestly is not.** Where these systems test against data at all, an agent writes pandas or R
+against an export, and the 2026 "agentic garden of forking paths" results show what that costs:
+agents reproduce most of the analytical divergence of human teams, bend toward whatever they
+already believed, and their reports pass methodological review anyway. The test step is the
+weak link, and it is opaque.
+
+Cohort Lab's natural role is not the generator. It is the **executable hypothesis language and
+the falsification oracle** that generators lack.
+
+### The hypothesis is the document
+
+"STK11-driver with KEAP1 co-mutation predicts worse overall survival in lung adenocarcinoma" is
+already a two-cohort, two-view Analysis document. A generator that emits documents rather than
+paragraphs has formalized its hypothesis into something machine-checkable, hashable and
+re-runnable *before any result exists*. That is pre-registration as a side effect of the file
+format: the definition is written, timestamped and committed to, and only then evaluated. No
+co-scientist system has a hypothesis language; they have prose.
+
+### The oracle, not the generator
+
+The engine answers in seconds with panel-aware denominators, the left-truncation caveat, the
+prior-treatment guard and the compiled SQL — the same result, whichever agent asked. The
+analytical choices that fork are made once, in the engine, and disclosed in the result. This is
+the right separation of concerns: creativity and honesty want to live in different components
+with a narrow interface between them, and the document *is* that interface. The generator can be
+as inventive as it likes because the tester cannot be persuaded. The tool should stay on its
+side of that line: it evaluates hypotheses, it does not propose them, and everything it returns
+is labeled as an association in a retrospective cohort — by the readback, not by the model's
+goodwill.
+
+### Testability triage
+
+Loud rejection sorts a proposed hypothesis into three bins: answerable in this study;
+answerable in another study (a catalog search over the 542 studies — "which have treatment
+timeline events and a PFS endpoint?" — is an agent's question, not a facet's); or unanswerable
+with any of this data. Co-scientist systems rank by plausibility and novelty and have no idea
+what data exists. Telling a generator *what can be tested* is a cheap and large contribution.
+
+### Multiplicity as a ledger
+
+This is the role to push hardest. An agent that runs five hundred documents and reports the
+twelve with p < 0.05 is p-hacking at machine speed, and it will happen. Because documents are
+canonical JSON, the tool can keep a **campaign ledger**: every document registered under a
+question, with its hash, timestamp and result — nulls included. A reported finding then carries
+"1 of 512 tested, q = 0.31" whether the agent wants it to or not. The forking-paths literature
+proposes an *m-value* — the probability that a plausible analysis path yields a claim at least
+as extreme as the one reported — estimated by having agents sample paths. Here the space of
+paths is a grammar, so it is enumerable rather than sampled, and the estimate becomes a count.
+
+The same ledger is a **negative-result memory** — the result cache keyed by document hash,
+exposed as "has this been asked before, and what happened?" An institution that kept that record
+would hold something no co-scientist vendor can offer: an audit trail of every hypothesis its
+agents tested, including the ones that failed.
+
+### Replication is a routing change
+
+The same document runs on the discovery study and on a peer instance without a row moving. A
+campaign becomes: discover on msk_chord_2024, replicate on GENIE over MCP, keep only what
+survives — with every figure's participation marker stating which site answered. Replication is
+the step AI hypothesis pipelines skip because it needs a second dataset they cannot reach.
+Cross-instance federation, already built, makes it a parameter.
+
+### The temporal niche
+
+Nearly all AI hypothesis generation in cancer genomics is static — gene with gene, gene with
+outcome. Clinical hypotheses are about *course*: who progresses within six months of first
+immunotherapy, what follows what, who reaches a third line. The timeline sub-DSL is an
+executable language for exactly that class, and it is where an agent can propose hypotheses a
+human would not have enumerated. It is also where an honest oracle matters most, because
+immortal time and observability bias are precisely the traps a code-writing agent walks into.
+
+### What it would take
+
+Three tools on top of the saved-definition and federation work already described:
+
+| tool | does |
+|---|---|
+| `register_hypotheses(documents[])` | hashes and timestamps a batch under a named question — the pre-registration |
+| `run_campaign(question)` | evaluates the batch with a shared multiplicity adjustment and records every result, null or not |
+| `replicate(document, study)` | re-runs one document against a named study or federated peer |
+
+plus the negative-result memory, which is the result cache with a query interface. None of it
+changes the engine; all of it depends on the engine being the one place where the analytical
+choices are made.
+
