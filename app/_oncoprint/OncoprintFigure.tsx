@@ -559,7 +559,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const offDefaults = (Number(display.showUnaltered !== DEFAULT_FIGURE_DISPLAY.showUnaltered) +
     Number(display.whitespace !== DEFAULT_FIGURE_DISPLAY.whitespace) +
     Number(display.colorByType !== DEFAULT_FIGURE_DISPLAY.colorByType) +
-    Number(!!display.whiteBackground) + Number(display.gaps !== "none") + Number(showMini)) || 0;
+    Number(!!display.whiteBackground) + Number(display.gaps !== "none")) || 0;
   const displayMenu = useRef<HTMLDetailsElement>(null);
 
   // The figure applies sort and viewing options in the browser. A server-rendered download has
@@ -636,8 +636,6 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 <label className="chk" title="white instead of grey for unaltered cells — for print; profiled and unprofiled then look alike, apart from the stripe">
                   <input type="checkbox" checked={!!display.whiteBackground} disabled={busy}
                     onChange={(e) => set({ whiteBackground: e.target.checked || undefined })} /> white background (for print)</label>
-                <label className="chk" title="an overview of the whole figure, with the part you are looking at marked">
-                  <input type="checkbox" checked={showMini} onChange={(e) => setShowMini(e.target.checked)} /> minimap</label>
                 <label className="setrow" title={gapTrack ? "split each cohort into runs of " + gapTrack.label : "choose a categorical track as the sort key first"}>
                   <span className="meta">gaps</span>
                   <select value={display.gaps} disabled={busy || !gapTrack} onChange={(e) => set({ gaps: e.target.value as FigureDisplay["gaps"] })}>
@@ -645,6 +643,15 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                   </select>
                 </label>
                 <span className="meta">{view.zoom >= 1 ? view.zoom.toFixed(1) + " px per column" : (1 / view.zoom).toFixed(0) + " columns per pixel"} · {data.tracks.length} tracks</span>
+                {/* Everything above is written into the document, so a shared link, the server SVG,
+                    the CLI and the Python package all reproduce this picture. The minimap is not: it
+                    draws no part of the figure and no other renderer has one, so it would be a
+                    setting that only one reader could see. */}
+                <div className="menu-aside">
+                  <span className="meta">this browser only</span>
+                  <label className="chk" title="an overview of the whole figure, with the part you are looking at marked">
+                    <input type="checkbox" checked={showMini} onChange={(e) => setShowMini(e.target.checked)} /> minimap</label>
+                </div>
               </div>
             </details>
             <label className="tbfield">sort <select value={sortKeys[0] || ""} disabled={busy}

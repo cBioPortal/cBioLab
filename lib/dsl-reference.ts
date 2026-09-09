@@ -584,10 +584,48 @@ rel      := { "type": "NONE" }                                                 /
 | \`survival\` | \`endpoint?:"OS"|"PFS"|…, anchor?:{eventType,key?,value?,occurrence?}, cohorts?:[names]\` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts. Across studies the test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. \`anchor\` resets the clock to a timeline event (first chemotherapy, initial diagnosis) instead of the study's day 0, and **applies left truncation automatically**: a patient joins the risk set when the study could first observe them, never at the anchor \u2014 otherwise everyone appears to survive from the anchor to their own entry, which is exactly what put them in the study. The reported entry distribution warns when an anchor is matching earlier events than intended. Cross-study baselines are not harmonized |
 | \`course\` | \`eventTypes:[\u22646], anchor?:{eventType,key?,value?,occurrence?}, binMonths?:3, fromMonths?:-12, toMonths?:60, cohorts?:[names]\` | the **clinical course**: per time bin, the share of the cohort in each event state. Two things it refuses to fake. (1) The denominator is the patients still under observation in that bin \u2014 first recorded event to last contact (the later of their last event and their OS follow-up) \u2014 never the whole cohort, which would make a curve fall merely because follow-up ran out. (2) \`anchor\` is optional for one study but **required across studies**: day 0 is birth in some studies and first sequencing in others, and nothing in the schema records which, so raw day 0 compares incomparable clocks. Event types that carry real durations are drawn as a state the patient is IN; the rest as an event that HAPPENED \u2014 read from the data, not from the name. Bins are half-open [t, t+w). Event-name spellings differing only in case are folded (\`Treatment\`/\`TREATMENT\`) and the fold is named in the caveat; nothing else is merged |
 | \`sequence\` | \`labelKey?:"SUBTYPE", eventType?:"treatment", exclude?:[values], lineGap?:90, maxSteps?:3, topN?:8, cohorts?:[names]\` | **what follows what**: therapy transitions as lines, drawn as a Sankey. Records are first grouped into LINES \u2014 therapies less than \`lineGap\` days apart are one line, labelled by their whole combination (sorted, so \`A + B\` and \`B + A\` are one regimen). That grouping is the point: a patient has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision. Paths that end flow into TWO explicit terminals, never one: **no further line** (the study watched for at least one \`lineGap\` and saw no further therapy) and **record ends here** (it did not, so nothing can be concluded). Measured on MSK-CHORD, 68% of patients have under three months of observation after their last therapy and the median is 15 days \u2014 so collapsing the two would turn record-keeping into an apparent clinical decision. Flows out of a node sum to it, so nobody vanishes. Up to two cohorts are drawn as panels sharing one scale and one colour per regimen. \`exclude\` drops label values that are not therapies; it is a parameter and not an engine rule because such markers are **not structurally distinguishable** (MSK\u2019s \`Prior Medications to MSK\` carries no duration, but neither do \`Radiation Therapy\` or \`Investigational\`), so the choice belongs in the document where a reader can see it. One cohort only |
-| \`oncoprint\` | \`genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], cohorts?:[names]\` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
+| \`oncoprint\` | \`genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], unit?:"patient"\\|"sample", display?:{…}, overlays?:[≤2], derivedCohorts?:[≤3], cohorts?:[names]\` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
+
+\`views[].note\` is the analyst's own one-line annotation, carried through to the result and
+drawn above the figure. It is plain text on purpose — never markdown — so a document cannot
+smuggle formatting or links into a page that reports numbers.
 
 \`views[].cohorts\` defaults to all cohorts. Oncoprints federate across studies: columns are
 study-qualified, a synthetic **Study** track shows each column's origin, and duplicates appear twice.
+
+**Oncoprint columns**: \`unit: "sample"\` draws one column per SAMPLE instead of one per patient.
+A cohort still selects patients, so every sample of a selected patient is drawn — including
+samples on which the cohort's own criterion was never measured — and patient-level clinical
+values repeat across that patient's samples. The contract says so in \`conventions.column\`.
+
+**Oncoprint display options** (\`display: {…}\`): every viewing decision lives in the document
+rather than in browser state, so a shared link, the server SVG, the CLI and the Python package
+all reproduce the same picture. Unknown keys are rejected loudly.
+
+| key | default | what it does |
+| --- | --- | --- |
+| \`showUnaltered\` | \`true\` | draw columns with no alteration in any gene track |
+| \`whitespace\` | \`true\` | gaps between columns once they are wide enough |
+| \`gaps\` | \`"none"\` | \`"gaps"\` / \`"pct"\`: split each cohort into runs of the primary categorical sort key |
+| \`colorByType\` | \`true\` | colour each mutation class separately; off draws them as one |
+| \`whiteBackground\` | \`false\` | white instead of grey for unaltered cells, for print |
+| \`clinicalLegends\` | \`"all"\` | \`"none"\` drops the category keys under the figure |
+| \`colors\` | — | \`{track: {value: "#rrggbb"}}\`, the portal's Edit Colors |
+| \`style\` | — | override any visual decision (palette, glyph bands, legend); validated against the style schema |
+| **\`hideVUS\`** | \`false\` | **changes the numbers**: drops alterations the annotation source does not call drivers, so the altered fraction is over drivers alone. The contract reports how many went |
+| **\`annotate\`** | \`"oncokb"\` | **changes the numbers**: \`"none"\` calls nothing a driver, so every driver percentage becomes 0 |
+
+The last two are viewing options only in the sense that they live beside the others; they change
+what is counted, not how it is drawn, and the figure says so where it reports them.
+
+**Oncoprint overlays** (\`overlays: [{kind, profileType, threshold?}]\`, ≤2): thresholded molecular
+evidence drawn INTO the gene cells rather than as tracks of their own — \`"mrna"\` as an outline,
+\`"protein"\` as thin bars, the portal's ±2 z-score rule (\`threshold\` defaults to 2). Evidence
+about a gene is not an alteration of it, so overlays never enter the altered fraction.
+
+**Oncoprint derived-cohort rows** (\`derivedCohorts: [name]\`, ≤3): draw any cohort in the document
+as a binary row, so a phenotype defined by the cohort DSL can be read against the genomics.
+Single-study and patient-mode only, because cohort rows are patient-level.
 
 **Oncoprint merged rows**: a \`genes\` entry may be a group — \`{"label"?: "TP53 pathway", "genes":
 ["TP53", "MDM2", "MDM4"]}\` — drawn as ONE row, cBioPortal's \`[TP53 MDM2 MDM4]\`. The row is altered
@@ -621,8 +659,10 @@ Each returns three totals per gene (n, \u03a3x, \u03a3x\u00b2), which is all a m
 so the reference population can be far larger than the drawn one without any value moving.
 
 **Oncoprint sorting**: \`sort\` is an ordered list of track keys — \`"genomic"\` (the default
-staircase: alteration type + driver rank across the gene tracks), a clinical or derived-event track
-label, or \`"-label"\` for descending (e.g. \`["CANCER_TYPE", "-CURRENT_AGE_DEID"]\`). Applied
+staircase: alteration type + driver rank across the gene tracks), \`"id"\` (the column id),
+\`"cluster:<profileType>"\` (a Ward dendrogram over that profile's values, computed in the engine
+because the browser never receives them; capped at 4,000 columns), a clinical or derived-event
+track label, or \`"-label"\` for descending (e.g. \`["CANCER_TYPE", "-CURRENT_AGE_DEID"]\`). Applied
 within each cohort group; missing values always sort last; the genomic staircase and patient id are
 always the final tiebreakers. A sort key that names a track not in the oncoprint errors loudly,
 listing the sortable tracks. The effective sort is echoed in \`conventions.sort\`.

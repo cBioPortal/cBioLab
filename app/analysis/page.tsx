@@ -788,6 +788,18 @@ export default function AnalysisPage() {
   };
 
   const openGenes = (vi: number) => { setGenesFor(vi); genesDialog.current?.showModal(); };
+  /**
+   * Which cohorts a view draws. Absent means all of them, so ticking every cohort removes the
+   * field rather than freezing today's list into the document.
+   */
+  const setViewCohorts = (vi: number, names: string[], all: string[]) => updateView(vi, (v: any) => {
+    const next = { ...v };
+    if (names.length && names.length < all.length) next.cohorts = all.filter((n) => names.includes(n));
+    else delete next.cohorts;
+    return next;
+  });
+  const setViewAttrs = (vi: number, attributes: string[]) => updateView(vi, (v: any) => ({ ...v, attributes }));
+
   const setViewGenes = (vi: number, genes: GeneTrackSpec[]) =>
     updateView(vi, v => pruneSort({ ...v, genes }));
 
@@ -883,17 +895,58 @@ export default function AnalysisPage() {
   }
 
   /**
+ * A checkbox menu in a view's header: which cohorts it uses, which attributes it compares.
+ * One component, because these were the settings you could only reach by editing the JSON.
+ */
+function PickMenu({ label, title, options, chosen, onChange, min, max, busy }: {
+  label: string; title: string; busy?: boolean; min?: number; max?: number;
+  options: { value: string; label: string; hint?: string }[];
+  chosen: string[]; onChange: (next: string[]) => void;
+}) {
+  const toggle = (v: string) => {
+    const has = chosen.includes(v);
+    if (has && min != null && chosen.length <= min) return;
+    onChange(has ? chosen.filter((x) => x !== v) : [...chosen, v]);
+  };
+  return (
+    <details className="gearmenu">
+      <summary className="tbbtn" title={title}>{label} ({chosen.length})</summary>
+      <div className="gearmenu-items">
+        {options.length === 0 && <span className="meta">nothing to choose from</span>}
+        {options.map((o) => {
+          const on = chosen.includes(o.value);
+          const stuck = on ? (min != null && chosen.length <= min) : (max != null && chosen.length >= max);
+          return (
+            <label key={o.value} className="chk" title={stuck ? (on ? "a view needs at least " + min : "at most " + max) : undefined}>
+              <input type="checkbox" checked={on} disabled={busy || stuck} onChange={() => toggle(o.value)} />
+              {o.label}{o.hint && <span className="meta"> — {o.hint}</span>}
+            </label>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
+/**
  * Every view's header, with one anatomy: the title and what it is, then the actions that
  * belong to this view, then its status chips, then the control that removes it. Before this
  * each view kind built its own, so the timing chip landed in a different place in each card.
  */
-function ViewHead({ v, title, sub, actions, chips, onRemove }: {
+function ViewHead({ v, title, sub, actions, chips, cohorts, onRemove }: {
   v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode; onRemove?: () => void;
+  /** which cohorts this view draws; absent when the document has only one */
+  cohorts?: { chosen: string[]; all: string[]; max?: number; busy?: boolean; onChange: (n: string[]) => void };
 }) {
   return (
     <div className="vhead">
       <h2 className="vtitle">{title}{sub != null && <span className="plain"> — {sub}</span>}</h2>
       <div className="vmeta">
+        {cohorts && cohorts.all.length > 1 && (
+          <PickMenu label="cohorts" title="which cohorts this view draws; all of them unless you say otherwise"
+            options={cohorts.all.map((n) => ({ value: n, label: n }))} chosen={cohorts.chosen}
+            onChange={cohorts.onChange} min={1} max={cohorts.max} busy={cohorts.busy} />
+        )}
         {actions}
         {chips}
         <Latency v={v} />
@@ -917,6 +970,16 @@ function Latency({ v }: { v: any }) {
     </span>
   );
 }
+
+  /** the document's view at vi, whatever its kind */
+  const docView = (vi: number): any => ((doc.views || [])[vi] || {});
+
+  /** what a view's cohort picker needs: today's choice, everything on offer, and where to write it */
+  const cohortChoice = (vi: number, v: any, max?: number) => {
+    const all = Object.keys((result && result.cohorts) || doc.cohorts || {});
+    const chosen: string[] = Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts.filter((n: string) => all.includes(n)) : all;
+    return { chosen, all, max, busy, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
+  };
 
   /** the view at index vi, read as an oncoprint view (its editor only renders there) */
   const ocView = (vi: number): OncoprintView => ((doc.views || [])[vi] || {}) as OncoprintView;
@@ -2029,7 +2092,7 @@ function Latency({ v }: { v: any }) {
                     see .viewnote in globals.css for why it is never markdown. */}
                 {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
                 {v.kind === "compare" && v.rows && <>
-                  <ViewHead v={v} title="Compare" sub={<>alteration frequencies · {v.annotation}</>} onRemove={() => removeView(vi)}
+                  <ViewHead v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onRemove={() => removeView(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                     style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
@@ -2051,7 +2114,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <ViewHead v={v} title="Hotspots" sub="recurrent protein changes, counted per patient" onRemove={() => removeView(vi)}
+                  <ViewHead v={v} title="Hotspots" cohorts={cohortChoice(vi, docView(vi))} sub="recurrent protein changes, counted per patient" onRemove={() => removeView(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   {v.hotspots.map(h => {
@@ -2109,8 +2172,17 @@ function Latency({ v }: { v: any }) {
                   })}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <ViewHead v={v} title="Co-expression" sub="Pearson correlation from per-site sums" onRemove={() => removeView(vi)}
-                    actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
+                  <ViewHead v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onRemove={() => removeView(vi)}
+                    actions={<>
+                      <label className="tbfield" title="the molecular profile the correlation is computed over">profile <select
+                        value={docView(vi).profileType || ""} disabled={busy}
+                        onChange={(e) => updateView(vi, (vv: any) => ({ ...vv, profileType: e.target.value }))}>
+                        {!((explore && explore.profiles) || []).includes(docView(vi).profileType || "") &&
+                          <option value={docView(vi).profileType || ""}>{docView(vi).profileType || "(none)"}</option>}
+                        {((explore && explore.profiles) || []).map((pt: string) => <option key={pt} value={pt}>{pt}</option>)}
+                      </select></label>
+                      <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
+                    </>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
@@ -2144,7 +2216,11 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "clinical" && v.clinical && <>
-                  <ViewHead v={v} title="Clinical comparison" sub="attribute distributions across cohorts" onRemove={() => removeView(vi)} />
+                  <ViewHead v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onRemove={() => removeView(vi)}
+                    actions={<PickMenu label="attributes" title="which clinical attributes this view compares" busy={busy}
+                      options={(trackAttrs.attrs || []).map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind }))}
+                      chosen={(docView(vi).attributes || []).map(String)} min={1} max={20}
+                      onChange={(next) => setViewAttrs(vi, next)} />} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
@@ -2183,7 +2259,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <ViewHead v={v} title="Co-occurrence" sub="pairwise, among patients profiled for both genes" onRemove={() => removeView(vi)}
+                  <ViewHead v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onRemove={() => removeView(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
@@ -2223,7 +2299,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "survival" && <>
-                  <ViewHead v={v} title="Survival" onRemove={() => removeView(vi)}
+                  <ViewHead v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} onRemove={() => removeView(vi)}
                     sub={<>Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}{v.anchoredTo && <> — from {v.anchoredTo}</>}</>}
                     chips={v.truncated ? <span className="trunc" title={
                       "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
@@ -2315,6 +2391,10 @@ function Latency({ v }: { v: any }) {
                       — lines of therapy by {v.sequence ? v.sequence.labelKey : ""}
                       {v.sequence ? " · " + v.sequence.lineGap + "-day line gap" : ""}</span></h2>
                     <div className="vmeta">
+                      <PickMenu label="cohorts" title="which cohorts this view draws" busy={busy}
+                        options={Object.keys((result && result.cohorts) || {}).map((n) => ({ value: n, label: n }))}
+                        chosen={cohortChoice(vi, docView(vi)).chosen} min={1} max={1}
+                        onChange={(next) => setViewCohorts(vi, next, Object.keys((result && result.cohorts) || {}))} />
                     {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
                       <details className="gearmenu inline">
                         <summary title="treatment sequence options">settings</summary>
@@ -2366,6 +2446,10 @@ function Latency({ v }: { v: any }) {
                       — {[...new Set((v.course || []).map(c => c.eventType))].join(", ")}
                       {v.anchoredTo ? "" : ""} · {v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
                     <div className="vmeta">
+                      <PickMenu label="cohorts" title="which cohorts this view draws" busy={busy}
+                        options={Object.keys((result && result.cohorts) || {}).map((n) => ({ value: n, label: n }))}
+                        chosen={cohortChoice(vi, docView(vi)).chosen} min={1}
+                        onChange={(next) => setViewCohorts(vi, next, Object.keys((result && result.cohorts) || {}))} />
                     <details className="gearmenu inline">
                       <summary title="clinical course options">settings</summary>
                       {/* Every parameter of this chart is a choice, and the defaults are only a
@@ -2454,6 +2538,7 @@ function Latency({ v }: { v: any }) {
                     "&profileFilter=mutations%2Cstructural_variants%2Cgistic&Z_SCORE_THRESHOLD=2.0&tab_index=tab_visualize&Action=Submit";
                   return <>
                     <ViewHead v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onRemove={() => removeView(vi)}
+                      cohorts={cohortChoice(vi, docView(vi), 4)}
                       sub={c ? <>{c.stats.nColumns.toLocaleString()} {c.unit}s · {c.conventions.annotation}</> : "loading…"} />
                     <OncoprintFigure
                       spec={v.spec}
