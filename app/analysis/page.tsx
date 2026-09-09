@@ -2459,12 +2459,20 @@ function Latency({ v }: { v: any }) {
                 )}
                 {v.kind === "plot" && <>
                   <ViewHead v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onRemove={() => removeView(vi)}
-                    sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"}
-                    actions={<>
+                    sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
+                  {/* Every control here changes what is DRAWN and costs a query, so there is one
+                      zone and it says so — the same toolbar the oncoprint uses. */}
+                  <div className="viewtb">
+                    <div className="tbz">
+                      <span className="tbl" title="these change what is drawn, and re-run the query">data</span>
                       <AxisPicker side="x" axis={docView(vi).x} attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
                         onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, x: a }))} />
+                    </div>
+                    <div className="tbz">
                       <AxisPicker side="y" axis={docView(vi).y} attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
                         onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, y: a }))} />
+                    </div>
+                    <div className="tbz">
                       <label className="tbfield" title="what a point is; patient mode averages a patient's samples">unit <select
                         value={docView(vi).unit || "patient"} disabled={busy}
                         onChange={(e) => updateView(vi, (vv: any) => ({ ...vv, unit: e.target.value }))}>
@@ -2472,9 +2480,10 @@ function Latency({ v }: { v: any }) {
                       </select></label>
                       <button className="tbbtn" disabled={busy} title="put the x axis on y and the y axis on x"
                         onClick={() => updateView(vi, (vv: any) => ({ ...vv, x: vv.y, y: vv.x }))}>swap</button>
-                    </>} />
+                    </div>
+                  </div>
                   {v.svg
-                    ? <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
+                    ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
                     : <p className="note">{v.plot?.note || "nothing to draw"}</p>}
                 </>}
                 {v.kind === "sequence" && v.svg && <>

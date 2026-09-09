@@ -20,7 +20,7 @@ const DOC = { study: "msk_chord_2024",
 
 const measure = () => ({
   // one row per distinct top edge among the strip's zones
-  rows: new Set([...document.querySelector(".onco-tb").children]
+  rows: new Set([...document.querySelector(".viewtb").children]
     .map((x) => Math.round(x.getBoundingClientRect().top))).size,
   // on one line every control in a zone shares a centre; a wrap moves some of them down
   wrappedZones: [...document.querySelectorAll(".tbz")].filter((z) => {
@@ -28,7 +28,7 @@ const measure = () => ({
       .map((c) => { const r = c.getBoundingClientRect(); return r.top + r.height / 2; });
     return Math.max(...cs) - Math.min(...cs) > 3;
   }).length,
-  stripHeight: Math.round(document.querySelector(".onco-tb").getBoundingClientRect().height),
+  stripHeight: Math.round(document.querySelector(".viewtb").getBoundingClientRect().height),
   plot: Math.round(document.querySelector("canvas").getBoundingClientRect().width - 168)
 });
 

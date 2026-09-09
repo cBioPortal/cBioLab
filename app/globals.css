@@ -235,12 +235,13 @@ details.gearmenu > .gearmenu-items {
 }
 .gearmenu-items a { color: var(--accent-ink); font-size: var(--t-md); }
 
-/* ---- the oncoprint toolbar ------------------------------------------------
-   Two kinds of control, kept apart: DATA changes what is drawn and costs a query,
-   VIEW changes how it is drawn and is instant. A zone never wraps inside itself, so
-   a pair like the zoom controls cannot be split across a line break; zones wrap as
-   units, and the divider is where the break happens. */
-.onco-tb { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-top: var(--s3); }
+/* ---- a view's toolbar -----------------------------------------------------
+   Controls sit in labelled zones, and the zones say what kind of control they hold:
+   DATA changes what is drawn and costs a query, VIEW changes how it is drawn and is
+   instant. A zone never wraps inside itself, so a pair like the zoom controls cannot
+   be split across a line break; zones wrap as units, and the divider is where the
+   break happens. Used by the oncoprint and by plots. */
+.viewtb { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-top: var(--s3); }
 .tbz { display: flex; align-items: center; gap: var(--s2); flex-wrap: nowrap; min-width: 0; }
 .tbz + .tbz { border-left: 1px solid var(--line); padding-left: var(--s3); }
 .tbl {
@@ -248,15 +249,15 @@ details.gearmenu > .gearmenu-items {
   color: var(--muted); cursor: help; user-select: none;
 }
 /* one height for everything in the strip, so the row has a single baseline */
-.onco-tb select, .onco-tb .tbbtn, .onco-tb .zoomctl, .onco-tb .chk {
+.viewtb select, .viewtb .tbbtn, .viewtb .zoomctl, .viewtb .chk {
   height: var(--ctl-h); font-size: var(--t-md);
 }
-.onco-tb select { padding: 0 var(--s1); max-width: 13rem; }
-.onco-tb .tbfield {
+.viewtb select { padding: 0 var(--s1); max-width: 13rem; }
+.viewtb .tbfield {
   display: inline-flex; align-items: center; gap: var(--s1); margin: 0;
   font-size: var(--t-sm); color: var(--muted); white-space: nowrap;
 }
-.onco-tb .chk { display: inline-flex; align-items: center; gap: var(--s1); margin: 0; font-size: var(--t-sm); white-space: nowrap; }
+.viewtb .chk { display: inline-flex; align-items: center; gap: var(--s1); margin: 0; font-size: var(--t-sm); white-space: nowrap; }
 .tbbtn {
   display: inline-flex; align-items: center; gap: var(--s1);
   border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper);
@@ -266,7 +267,7 @@ details.gearmenu > .gearmenu-items {
 .tbbtn::-webkit-details-marker { display: none; }
 /* the disclosure buttons in the strip are buttons like any other: the generic gear-menu
    summary rule is more specific than .tbbtn, so it has to be answered here */
-.onco-tb details.gearmenu, .vmeta details.gearmenu { display: inline-flex; align-items: center; margin: 0; }
+.viewtb details.gearmenu, .vmeta details.gearmenu { display: inline-flex; align-items: center; margin: 0; }
 details.gearmenu > summary.tbbtn { font-size: var(--t-md); padding: 0 var(--s2); color: var(--ink); }
 details.gearmenu > summary.tbbtn:hover { background: var(--paper); }
 .tbbtn:hover { border-color: var(--muted); }
@@ -283,7 +284,7 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .zoomctl > button:last-child { border-left: 1px solid var(--line); font-size: var(--t-sm); }
 .zoomctl > input[type=range] { width: 6.5rem; margin: 0 var(--s1); }
 /* tiebreakers only appear when there are any, on their own line */
-.onco-tb2 { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2); flex-wrap: wrap; }
+.viewtb-more { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2); flex-wrap: wrap; }
 
 /* Explore: per-study breakdown rows */
 .sbrow {
@@ -834,3 +835,8 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
 .axispick { display: inline-flex; align-items: center; gap: var(--s1); }
 .axispick select { max-width: 11rem; }
 .axispick .axisgene { width: 5.5rem; font-size: var(--t-md); height: var(--ctl-h); padding: 0 var(--s1); text-transform: uppercase; }
+
+/* a server-rendered figure inside a view card: it takes the card's width, and scrolls
+   sideways only if it truly cannot fit */
+.viewfig { overflow-x: auto; margin-top: var(--s3); }
+.viewfig svg { max-width: 100%; height: auto; }

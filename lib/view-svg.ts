@@ -435,7 +435,7 @@ function sequenceSvg(v: ViewResult, o: SvgOpts): string {
 function plotSvg(v: ViewResult, o: SvgOpts): string {
   const d = v.plot as PlotData | undefined;
   if (!d) return "";
-  const p = palette(o.theme), W = o.width || 720;
+  const p = palette(o.theme), W = o.width || 960;
   const L = 60, R = 14, T = 16, PLOT = 300;
   const plotW = W - L - R;
   const out: string[] = [];
@@ -450,7 +450,7 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
     const shade = (n: number) => Math.min(1, 0.18 + 0.82 * Math.log1p(n) / Math.log1p(maxN));
     for (const b of d.bins)
       out.push(`<rect x="${num(L + b.bx * cw)}" y="${num(T + PLOT - (b.by + 1) * ch)}" width="${num(Math.max(cw, 0.8))}" ` +
-        `height="${num(Math.max(ch, 0.8))}" fill="#0f86a1" fill-opacity="${num(shade(b.n))}"/>`);
+        `height="${num(Math.max(ch, 0.8))}" fill="${SERIES[0]}" fill-opacity="${num(shade(b.n))}"/>`);
     // the fitted line, over every case rather than over what is visible
     const st = d.stats;
     if (st && st.slope != null && st.intercept != null && x1 > x0) {
@@ -459,7 +459,7 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
       const sy = (yv: number) => T + PLOT - PLOT * (yv - y0) / Math.max(1e-9, y1 - y0);
       const ya = Math.max(y0, Math.min(y1, yAt(x0))), yb = Math.max(y0, Math.min(y1, yAt(x1)));
       out.push(`<line x1="${num(sx(x0))}" y1="${num(sy(ya))}" x2="${num(sx(x1))}" y2="${num(sy(yb))}" ` +
-        `stroke="#D55E00" stroke-width="1.5" stroke-dasharray="4 3"/>`);
+        `stroke="${SERIES[4]}" stroke-width="1.5" stroke-dasharray="4 3"/>`);
     }
     out.push(`<rect x="${L}" y="${T}" width="${num(plotW)}" height="${PLOT}" fill="none" stroke="${p.line}"/>`);
     out.push(axisText(num(x0), L, T + PLOT + 14, "start"), axisText(num(x1), L + plotW, T + PLOT + 14, "end"));
@@ -487,8 +487,8 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
       const cx = L + bw * (i + 0.5), half = Math.min(24, bw * 0.32);
       out.push(`<line x1="${num(cx)}" y1="${num(sy(g.loWhisker))}" x2="${num(cx)}" y2="${num(sy(g.hiWhisker))}" stroke="${p.muted}"/>`);
       out.push(`<rect x="${num(cx - half)}" y="${num(sy(g.q3))}" width="${num(half * 2)}" height="${num(Math.max(1, sy(g.q1) - sy(g.q3)))}" ` +
-        `fill="#0f86a1" fill-opacity="0.25" stroke="#0f86a1"/>`);
-      out.push(`<line x1="${num(cx - half)}" y1="${num(sy(g.median))}" x2="${num(cx + half)}" y2="${num(sy(g.median))}" stroke="#0f86a1" stroke-width="2"/>`);
+        `fill="${SERIES[0]}" fill-opacity="0.25" stroke="${SERIES[0]}"/>`);
+      out.push(`<line x1="${num(cx - half)}" y1="${num(sy(g.median))}" x2="${num(cx + half)}" y2="${num(sy(g.median))}" stroke="${SERIES[0]}" stroke-width="2"/>`);
       const label = g.g.length > 14 ? g.g.slice(0, 13) + "…" : g.g;
       out.push(`<text x="${num(cx)}" y="${T + PLOT + 26}" font-size="9" fill="${p.muted}" text-anchor="end" ` +
         `transform="rotate(-40 ${num(cx)} ${T + PLOT + 26})">${esc(label)}</text>`);
@@ -512,7 +512,7 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
       xs.forEach((xv, c) => {
         const n = at.get(xv + "\u0000" + yv) || 0;
         out.push(`<rect x="${num(LX + cw * c)}" y="${num(T + chh * r)}" width="${num(cw - 1)}" height="${num(chh - 1)}" ` +
-          `fill="#0f86a1" fill-opacity="${num(n ? 0.12 + 0.78 * Math.log1p(n) / Math.log1p(maxN) : 0.03)}"/>`);
+          `fill="${SERIES[0]}" fill-opacity="${num(n ? 0.12 + 0.78 * Math.log1p(n) / Math.log1p(maxN) : 0.03)}"/>`);
         if (n) out.push(`<text x="${num(LX + cw * (c + 0.5))}" y="${num(T + chh * r + chh * 0.66)}" font-size="9" ` +
           `fill="${p.ink}" text-anchor="middle">${fmt(n)}</text>`);
       });

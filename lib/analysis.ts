@@ -692,7 +692,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         };
         // drawn on the server, like every view but the oncoprint, so chat and MCP get the figure
         const tPlot = Date.now();
-        pr.svg = viewToSvg(pr) || undefined;
+        pr.svg = viewToSvg(pr, { width: 960 }) || undefined;
         pr.renderMs = Date.now() - tPlot;
         views.push(pr);
       } catch (e) {
