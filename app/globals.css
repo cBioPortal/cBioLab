@@ -3,6 +3,19 @@
   --accent: #0f86a1; --accent-ink: #0b6478; --accent-soft: #e3f0f3;
   --line: #dde4e8; --code-bg: #f1f5f7; --mark: #b25e09;
   --ok: #2e7d32; --err: #b3261e; --err-soft: #fbeae9;
+
+  /* Type: seven steps. Everything picks one; nothing invents a size in between.
+     xs = eyebrows and chips, sm = secondary UI text, md = controls, base = prose. */
+  --t-xs: 0.66rem; --t-sm: 0.72rem; --t-md: 0.78rem; --t-base: 0.925rem;
+  --t-lg: 1.15rem; --t-xl: 1.4rem; --t-2xl: 1.75rem;
+
+  /* Space: one scale, used for padding, margin and gap alike. */
+  --s0: 0.15rem; --s1: 0.25rem; --s2: 0.4rem; --s3: 0.6rem; --s4: 1rem; --s5: 1.5rem; --s6: 2.25rem;
+
+  --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-pill: 999px;
+
+  /* One height for every inline control, so a toolbar row has a single baseline. */
+  --ctl-h: 1.75rem;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -16,36 +29,36 @@
 body {
   margin: 0; background: var(--paper); color: var(--ink);
   font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
-  font-size: 0.925rem; line-height: 1.5;
+  font-size: var(--t-base); line-height: 1.5;
 }
 header {
   display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap;
   padding: 0.8rem 1.4rem; border-bottom: 1px solid var(--line); background: var(--card);
 }
-header h1 { font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.15rem; font-weight: 600; margin: 0; }
-header .sub { color: var(--muted); font-size: 0.8rem; }
+header h1 { font-family: "IBM Plex Serif", Georgia, serif; font-size: var(--t-lg); font-weight: 600; margin: 0; }
+header .sub { color: var(--muted); font-size: var(--t-md); }
 .spacer { flex: 1; }
 .pill {
   display: inline-flex; align-items: center; gap: 0.4rem;
-  font-size: 0.75rem; padding: 0.2rem 0.65rem; border-radius: 999px;
+  font-size: var(--t-sm); padding: 0.2rem 0.65rem; border-radius: var(--r-pill);
   border: 1px solid var(--line); color: var(--muted); background: var(--paper);
 }
 .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .pill.on { color: var(--ok); border-color: var(--ok); } .pill.on .dot { background: var(--ok); }
 main { max-width: 76rem; margin: 0 auto; padding: 1.2rem 1.4rem 4rem; }
 .card {
-  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
   padding: 1rem 1.15rem; margin-bottom: 1rem;
 }
 .card h2 {
-  font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+  font-size: var(--t-sm); letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--muted); font-weight: 600; margin: 0 0 0.7rem;
 }
 .card h2 .plain { text-transform: none; letter-spacing: 0; font-weight: 400; }
-label { display: block; font-size: 0.75rem; color: var(--muted); margin: 0.55rem 0 0.15rem; }
+label { display: block; font-size: var(--t-sm); color: var(--muted); margin: 0.55rem 0 0.15rem; }
 input, select, button {
   font: inherit; color: var(--ink); background: var(--paper);
-  border: 1px solid var(--line); border-radius: 6px; padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line); border-radius: var(--r-sm); padding: 0.35rem 0.55rem;
 }
 input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 input[type=number] { width: 6.2rem; font-variant-numeric: tabular-nums; }
@@ -59,76 +72,76 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: flex-end; }
 .grid2 { display: grid; grid-template-columns: minmax(330px, 420px) 1fr; gap: 1rem; align-items: start; }
 @media (max-width: 880px) { .grid2 { grid-template-columns: 1fr; } }
-.sel-card { border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem 0.8rem; margin-bottom: 0.7rem; background: var(--paper); }
+.sel-card { border: 1px solid var(--line); border-radius: var(--r-md); padding: 0.7rem 0.8rem; margin-bottom: 0.7rem; background: var(--paper); }
 .sel-card .tag {
-  font-family: "IBM Plex Mono", monospace; font-size: 0.7rem; font-weight: 500;
+  font-family: "IBM Plex Mono", monospace; font-size: var(--t-xs); font-weight: 500;
   color: var(--accent-ink); background: var(--accent-soft);
-  padding: 0.1rem 0.5rem; border-radius: 4px;
+  padding: 0.1rem 0.5rem; border-radius: var(--r-sm);
 }
 .attr-row { display: flex; gap: 0.4rem; margin-top: 0.35rem; align-items: center; }
 .attr-row input { flex: 1; min-width: 0; }
-.attr-row .rm { border: none; background: none; color: var(--muted); padding: 0 0.3rem; font-size: 1rem; }
-.linklike { border: none; background: none; color: var(--accent-ink); padding: 0.2rem 0; font-size: 0.78rem; text-decoration: underline; }
+.attr-row .rm { border: none; background: none; color: var(--muted); padding: 0 0.3rem; font-size: var(--t-lg); }
+.linklike { border: none; background: none; color: var(--accent-ink); padding: 0.2rem 0; font-size: var(--t-md); text-decoration: underline; }
 .recipes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.recipes button { font-size: 0.76rem; padding: 0.25rem 0.6rem; border-radius: 999px; background: var(--paper); }
+.recipes button { font-size: var(--t-sm); padding: 0.25rem 0.6rem; border-radius: var(--r-pill); background: var(--paper); }
 .recipes button:hover { border-color: var(--accent); color: var(--accent-ink); }
 .recipes button.active { border-color: var(--accent); color: var(--accent-ink); }
 .stats { display: flex; gap: 2rem; flex-wrap: wrap; margin: 0.3rem 0 0.9rem; }
-.stat .n { font-size: 1.9rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.stat .n { font-size: var(--t-2xl); font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .stat .n.accent { color: var(--accent-ink); }
-.stat .lbl { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-.ratebar { height: 10px; border-radius: 5px; background: var(--code-bg); overflow: hidden; margin: 0.2rem 0 1rem; max-width: 30rem; }
-.ratebar > div { height: 100%; background: var(--accent); border-radius: 5px 0 0 5px; }
+.stat .lbl { font-size: var(--t-sm); color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.ratebar { height: 10px; border-radius: var(--r-sm); background: var(--code-bg); overflow: hidden; margin: 0.2rem 0 1rem; max-width: 30rem; }
+.ratebar > div { height: 100%; background: var(--accent); border-radius: var(--r-sm) 0 0 5px; }
 .chart { margin: 0.6rem 0 0.4rem; }
-.chart h3 { font-size: 0.8rem; font-weight: 600; margin: 0 0 0.5rem; }
+.chart h3 { font-size: var(--t-md); font-weight: 600; margin: 0 0 0.5rem; }
 .chart h3 .meta { font-weight: 400; }
 .bars { display: flex; flex-direction: column; gap: 2px; }
-.bar-row { display: grid; grid-template-columns: 9.5rem 1fr 3.6rem; gap: 0.6rem; align-items: center; font-size: 0.78rem; }
+.bar-row { display: grid; grid-template-columns: 9.5rem 1fr 3.6rem; gap: 0.6rem; align-items: center; font-size: var(--t-md); }
 .bar-row .lbl { color: var(--muted); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bar-row .track { height: 16px; display: flex; align-items: center; }
 .bar-row .fill { height: 16px; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 2px; }
 .bar-row .val { font-variant-numeric: tabular-nums; color: var(--ink); }
 .patients { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
 .patients a {
-  font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; color: var(--accent-ink);
-  border: 1px solid var(--line); border-radius: 4px; padding: 0.1rem 0.4rem; text-decoration: none;
+  font-family: "IBM Plex Mono", monospace; font-size: var(--t-sm); color: var(--accent-ink);
+  border: 1px solid var(--line); border-radius: var(--r-sm); padding: 0.1rem 0.4rem; text-decoration: none;
 }
 .patients a:hover { border-color: var(--accent); }
 details { margin-top: 0.8rem; }
-summary { cursor: pointer; font-size: 0.78rem; color: var(--muted); }
+summary { cursor: pointer; font-size: var(--t-md); color: var(--muted); }
 pre {
-  background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
-  padding: 0.8rem 0.9rem; overflow-x: auto; font-size: 0.74rem; line-height: 1.5;
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: 0.8rem 0.9rem; overflow-x: auto; font-size: var(--t-sm); line-height: 1.5;
   font-family: "IBM Plex Mono", monospace;
 }
-.meta { font-size: 0.72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.meta { font-size: var(--t-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
 .error {
-  background: var(--err-soft); color: var(--err); border-radius: 8px;
-  padding: 0.6rem 0.9rem; font-size: 0.8rem; margin: 0.6rem 0; white-space: pre-wrap; word-break: break-word;
+  background: var(--err-soft); color: var(--err); border-radius: var(--r-md);
+  padding: 0.6rem 0.9rem; font-size: var(--t-md); margin: 0.6rem 0; white-space: pre-wrap; word-break: break-word;
 }
-.note { font-size: 0.76rem; color: var(--muted); margin-top: 0.5rem; }
+.note { font-size: var(--t-sm); color: var(--muted); margin-top: 0.5rem; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
 @media (max-width: 880px) { .two-col { grid-template-columns: 1fr; } }
 .chk { display: flex; gap: 0.4rem; align-items: center; }
 .chk input { width: auto; }
 .qdesc {
-  font-size: 0.8rem; color: var(--muted); line-height: 1.9;
+  font-size: var(--t-md); color: var(--muted); line-height: 1.9;
   margin: 0 0 0.9rem; max-width: 44rem;
 }
 .qdesc strong { color: var(--ink); font-weight: 600; }
 .qdesc .tag {
-  font-family: "IBM Plex Mono", monospace; font-size: 0.68rem; font-weight: 500;
+  font-family: "IBM Plex Mono", monospace; font-size: var(--t-xs); font-weight: 500;
   color: var(--accent-ink); background: var(--accent-soft);
-  padding: 0.08rem 0.42rem; border-radius: 4px; margin-right: 0.15rem;
+  padding: 0.08rem 0.42rem; border-radius: var(--r-sm); margin-right: 0.15rem;
 }
 .qdesc .qchip {
   background: var(--accent-soft); color: var(--ink);
-  border: 1px solid var(--line); border-radius: 999px;
+  border: 1px solid var(--line); border-radius: var(--r-pill);
   padding: 0.12rem 0.6rem; font-weight: 500; white-space: nowrap;
   box-decoration-break: clone; -webkit-box-decoration-break: clone;
 }
 .qdesc .qletter {
-  font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; font-weight: 600;
+  font-family: "IBM Plex Mono", monospace; font-size: var(--t-sm); font-weight: 600;
   color: var(--accent-ink); margin-right: 0.35rem;
 }
 .qdesc .qnot { color: var(--mark); font-weight: 600; }
@@ -146,13 +159,20 @@ pre {
 .busy { opacity: 0.45; pointer-events: none; transition: opacity 0.15s; }
 .loading-block {
   display: flex; align-items: center; gap: 0.6rem; color: var(--muted);
-  font-size: 0.82rem; padding: 1.2rem 0;
+  font-size: var(--t-md); padding: 1.2rem 0;
 }
 button.primary { display: inline-flex; align-items: center; gap: 0.5rem; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
 /* analysis page: 3 panes, responsive */
-.ana-grid { display: grid; grid-template-columns: minmax(300px, 26rem) minmax(0, 1fr); gap: 1rem; align-items: start; }
+/* The analysis page earns its width: an oncoprint is the densest thing here, and capping
+   the page at a book column left it under 900px of plot on a 2560px monitor. */
+main.analysis-main { max-width: min(132rem, 100%); }
+.ana-grid { display: grid; grid-template-columns: minmax(300px, 26rem) minmax(0, 1fr); gap: var(--s4); align-items: start; }
+/* document folded away: the figures get everything */
+.ana-grid.nodoc { grid-template-columns: minmax(0, 1fr); }
+.ana-grid.nodoc > :first-child { display: none; }
+.addview-title { font-size: var(--t-md); }
 .ana-chat { position: sticky; top: 1rem; }
 @media (max-width: 1000px) { .ana-grid { grid-template-columns: 1fr; } }
 .tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; border-bottom: 1px solid var(--line); }
@@ -164,17 +184,17 @@ button.primary { display: inline-flex; align-items: center; gap: 0.5rem; }
 .fpill {
   display: inline-flex; align-items: center; gap: 0.4rem;
   background: var(--paper); border: 1px solid var(--line);
-  border-left: 3px solid var(--accent); border-radius: 6px;
-  padding: 0.16rem 0.5rem; font-size: 0.78rem; white-space: nowrap;
+  border-left: 3px solid var(--accent); border-radius: var(--r-sm);
+  padding: 0.16rem 0.5rem; font-size: var(--t-md); white-space: nowrap;
 }
-.fpill .fkind { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
-.fpill .fnot, .fnot { color: var(--mark); font-weight: 700; font-size: 0.7rem; }
-.fpill .fx, .fgroup .fx { border: none; background: none; color: var(--muted); cursor: pointer; padding: 0 0.1rem; font-size: 0.9rem; line-height: 1; }
+.fpill .fkind { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.fpill .fnot, .fnot { color: var(--mark); font-weight: 700; font-size: var(--t-xs); }
+.fpill .fx, .fgroup .fx { border: none; background: none; color: var(--muted); cursor: pointer; padding: 0 0.1rem; font-size: var(--t-base); line-height: 1; }
 .fpill .fx:hover, .fgroup .fx:hover { color: var(--err); }
-.fconn { font-size: 0.64rem; font-weight: 700; color: var(--muted); letter-spacing: 0.09em; }
-.fgroup { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; border: 1px dashed var(--line); border-radius: 8px; padding: 0.15rem 0.4rem; }
+.fconn { font-size: var(--t-xs); font-weight: 700; color: var(--muted); letter-spacing: 0.09em; }
+.fgroup { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; border: 1px dashed var(--line); border-radius: var(--r-md); padding: 0.15rem 0.4rem; }
 button.facet {
-  font-size: 0.76rem; padding: 0.18rem 0.55rem; border-radius: 999px;
+  font-size: var(--t-sm); padding: 0.18rem 0.55rem; border-radius: var(--r-pill);
   background: var(--paper); border: 1px solid var(--line); cursor: pointer;
 }
 button.facet:hover { border-color: var(--accent); color: var(--accent-ink); }
@@ -190,30 +210,80 @@ button.facet.on { border-color: var(--accent); background: var(--accent-soft); c
   padding: 0.13rem 0.4rem;
   cursor: pointer;
   font-weight: 400;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
 }
 .study-row:hover { background: var(--code-bg); }
 .study-row.sel { background: var(--code-bg); }
 .study-row input[type="checkbox"] { transform: translateY(2px); margin: 0; }
-.study-row strong { font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.study-row .meta { font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.study-row strong { font-size: var(--t-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.study-row .meta { font-size: var(--t-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .study-row .mono { font-family: "IBM Plex Mono", monospace; }
 .study-row .pts { text-align: right; font-variant-numeric: tabular-nums; }
 .study-row .caps { color: var(--accent-ink); }
 
 /* gear menu (oncoprint card options) */
 details.gearmenu { position: relative; }
-details.gearmenu > summary { list-style: none; cursor: pointer; color: var(--muted); font-size: 1.35rem; line-height: 1; padding: 0.1rem 0.3rem; border-radius: 5px; user-select: none; }
+details.gearmenu > summary { list-style: none; cursor: pointer; color: var(--muted); font-size: var(--t-xl); line-height: 1; padding: 0.1rem 0.3rem; border-radius: var(--r-sm); user-select: none; }
 details.gearmenu > summary::-webkit-details-marker { display: none; }
 details.gearmenu > summary:hover, details.gearmenu[open] > summary { color: var(--ink); background: var(--code-bg); }
 details.gearmenu > .gearmenu-items {
   position: absolute; right: 0; top: 1.7rem; z-index: 30;
-  background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
   padding: 0.55rem 0.75rem; min-width: 18rem; max-width: 24rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
   display: flex; flex-direction: column; gap: 0.25rem;
 }
-.gearmenu-items a { color: var(--accent-ink); font-size: 0.8rem; }
+.gearmenu-items a { color: var(--accent-ink); font-size: var(--t-md); }
+
+/* ---- the oncoprint toolbar ------------------------------------------------
+   Two kinds of control, kept apart: DATA changes what is drawn and costs a query,
+   VIEW changes how it is drawn and is instant. A zone never wraps inside itself, so
+   a pair like the zoom controls cannot be split across a line break; zones wrap as
+   units, and the divider is where the break happens. */
+.onco-tb { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-top: var(--s3); }
+.tbz { display: flex; align-items: center; gap: var(--s2); flex-wrap: nowrap; min-width: 0; }
+.tbz + .tbz { border-left: 1px solid var(--line); padding-left: var(--s3); }
+.tbl {
+  font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); cursor: help; user-select: none;
+}
+/* one height for everything in the strip, so the row has a single baseline */
+.onco-tb select, .onco-tb .tbbtn, .onco-tb .zoomctl, .onco-tb .chk {
+  height: var(--ctl-h); font-size: var(--t-md);
+}
+.onco-tb select { padding: 0 var(--s1); max-width: 13rem; }
+.onco-tb .tbfield {
+  display: inline-flex; align-items: center; gap: var(--s1); margin: 0;
+  font-size: var(--t-sm); color: var(--muted); white-space: nowrap;
+}
+.onco-tb .chk { display: inline-flex; align-items: center; gap: var(--s1); margin: 0; font-size: var(--t-sm); white-space: nowrap; }
+.tbbtn {
+  display: inline-flex; align-items: center; gap: var(--s1);
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper);
+  color: var(--ink); padding: 0 var(--s2); font-size: var(--t-md); cursor: pointer;
+  white-space: nowrap; list-style: none; text-decoration: none;
+}
+.tbbtn::-webkit-details-marker { display: none; }
+/* the disclosure buttons in the strip are buttons like any other: the generic gear-menu
+   summary rule is more specific than .tbbtn, so it has to be answered here */
+.onco-tb details.gearmenu, .vmeta details.gearmenu { display: inline-flex; align-items: center; margin: 0; }
+details.gearmenu > summary.tbbtn { font-size: var(--t-md); padding: 0 var(--s2); color: var(--ink); }
+details.gearmenu > summary.tbbtn:hover { background: var(--paper); }
+.tbbtn:hover { border-color: var(--muted); }
+/* a button is a button: the genes control keeps its name, not its underline */
+.tbbtn.genesbtn { text-decoration: none; font-weight: 400; }
+details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-soft); }
+/* the zoom triple reads as one instrument: one border, no gaps to break at */
+.zoomctl { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; background: var(--paper); }
+.zoomctl > button {
+  border: none; border-radius: 0; background: none; height: 100%; padding: 0 var(--s2);
+  font-size: var(--t-md); color: var(--ink-soft, var(--muted)); line-height: 1;
+}
+.zoomctl > button:hover { background: var(--code-bg); color: var(--ink); }
+.zoomctl > button:last-child { border-left: 1px solid var(--line); font-size: var(--t-sm); }
+.zoomctl > input[type=range] { width: 6.5rem; margin: 0 var(--s1); }
+/* tiebreakers only appear when there are any, on their own line */
+.onco-tb2 { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2); flex-wrap: wrap; }
 
 /* Explore: per-study breakdown rows */
 .sbrow {
@@ -223,12 +293,12 @@ details.gearmenu > .gearmenu-items {
   grid-template-columns: minmax(9rem, 1.6fr) 5.5rem minmax(4rem, 1fr) 3.2rem 5rem 2.6rem;
   gap: 0 0.6rem; align-items: center;
   padding: 0.22rem 0; border-top: 1px solid var(--line);
-  font-size: 0.78rem;
+  font-size: var(--t-md);
 }
 .sbrow:first-of-type { border-top: none; }
 .sbrow .mono { font-family: "IBM Plex Mono", monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sbrow .inst { color: var(--accent-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.72rem; }
-.sbrow .bar { display: block; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.sbrow .inst { color: var(--accent-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--t-sm); }
+.sbrow .bar { display: block; height: 8px; background: var(--line); border-radius: var(--r-sm); overflow: hidden; }
 .sbrow .bar i { display: block; height: 100%; min-width: 2px; background: var(--accent-ink); opacity: 0.8; }
 .sbrow .pct { text-align: right; font-variant-numeric: tabular-nums; }
 .sbrow .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -240,20 +310,20 @@ details.gearmenu > .gearmenu-items {
   grid-template-columns: minmax(5rem, 1fr) 3.6rem minmax(3rem, 1.6fr) 3.2rem 7rem;
   gap: 0 0.5rem; align-items: center; width: 100%;
   padding: 0.16rem 0.3rem; border: none; border-top: 1px solid var(--line);
-  background: none; color: var(--ink); font: inherit; font-size: 0.78rem;
-  text-align: left; cursor: pointer; border-radius: 4px;
+  background: none; color: var(--ink); font: inherit; font-size: var(--t-md);
+  text-align: left; cursor: pointer; border-radius: var(--r-sm);
 }
 .generow:first-child { border-top: none; }
 .generow:hover { background: var(--code-bg); }
 .generow .gname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
-.generow .cnatag { font-size: 0.62rem; letter-spacing: 0.03em; padding: 0.05rem 0.25rem; border-radius: 3px; text-align: center; }
+.generow .cnatag { font-size: var(--t-xs); letter-spacing: 0.03em; padding: 0.05rem 0.25rem; border-radius: 3px; text-align: center; }
 .generow .cnatag.amp { background: #e41a1c22; color: #b3131a; }
 .generow .cnatag.del { background: #2166ac22; color: #1b4f86; }
 .generow .cnatag.none { background: none; }
-.generow .gbar { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.generow .gbar { height: 7px; background: var(--line); border-radius: var(--r-sm); overflow: hidden; }
 .generow .gbar i { display: block; height: 100%; min-width: 2px; background: var(--accent-ink); opacity: 0.8; }
 .generow .gfreq { text-align: right; font-variant-numeric: tabular-nums; }
-.generow .gcount { text-align: right; font-variant-numeric: tabular-nums; font-size: 0.72rem; }
+.generow .gcount { text-align: right; font-variant-numeric: tabular-nums; font-size: var(--t-sm); }
 
 /* Explore: numeric clinical histograms (cBioPortal study-view bins) */
 .histo { display: flex; align-items: flex-end; gap: 2px; height: 62px; }
@@ -266,7 +336,7 @@ details.gearmenu > .gearmenu-items {
 .hbar .hfill { display: block; width: 100%; background: var(--accent-ink); opacity: 0.72; border-radius: 2px 2px 0 0; }
 .hbar .hlab {
   position: absolute; bottom: 0; left: 0; right: 0; text-align: center;
-  font-size: 0.56rem; color: var(--muted); overflow: hidden; white-space: nowrap;
+  font-size: var(--t-xs); color: var(--muted); overflow: hidden; white-space: nowrap;
 }
 
 /* Explore: categorical clinical facets as pie charts (portal study-view style) */
@@ -278,8 +348,8 @@ details.gearmenu > .gearmenu-items {
 .pielegend { display: flex; flex-wrap: wrap; gap: 0.15rem 0.5rem; flex: 1; min-width: 0; }
 .pikey {
   display: inline-flex; align-items: center; gap: 0.3rem; max-width: 100%;
-  background: none; border: none; padding: 0.06rem 0.2rem; border-radius: 4px;
-  font: inherit; font-size: 0.72rem; color: var(--ink); cursor: pointer;
+  background: none; border: none; padding: 0.06rem 0.2rem; border-radius: var(--r-sm);
+  font: inherit; font-size: var(--t-sm); color: var(--ink); cursor: pointer;
 }
 .pikey:hover { background: var(--code-bg); }
 .pikey.on { background: var(--code-bg); outline: 1px solid var(--accent-ink); }
@@ -305,8 +375,8 @@ details.gearmenu > .gearmenu-items {
      deliberately small so the label and the number stay the content */
   display: grid; grid-template-columns: 1fr 3rem auto;
   gap: 0 0.6rem; align-items: center; width: 100%;
-  background: none; border: none; padding: 0.12rem 0.3rem; border-radius: 4px;
-  font: inherit; font-size: 0.74rem; color: var(--ink); text-align: left; cursor: pointer;
+  background: none; border: none; padding: 0.12rem 0.3rem; border-radius: var(--r-sm);
+  font: inherit; font-size: var(--t-sm); color: var(--ink); text-align: left; cursor: pointer;
 }
 .valrow:hover { background: var(--code-bg); }
 .valrow.on { background: var(--code-bg); outline: 1px solid var(--accent-ink); }
@@ -319,17 +389,17 @@ details.gearmenu > .gearmenu-items {
 /* Survival: log-rank readout under the KM chart */
 .logrank {
   margin-top: 0.5rem; padding: 0.35rem 0.5rem;
-  font-size: 0.78rem; font-variant-numeric: tabular-nums;
-  background: var(--code-bg); border-radius: 4px; border: 1px solid var(--line);
+  font-size: var(--t-md); font-variant-numeric: tabular-nums;
+  background: var(--code-bg); border-radius: var(--r-sm); border: 1px solid var(--line);
 }
 
 /* Co-occurrence: tendency chips */
-.tend { font-size: 0.7rem; padding: 0.08rem 0.4rem; border-radius: 999px; white-space: nowrap; }
+.tend { font-size: var(--t-xs); padding: 0.08rem 0.4rem; border-radius: var(--r-pill); white-space: nowrap; }
 .tend.co { background: color-mix(in oklab, #0072B2 16%, transparent); color: #0072B2; }
 .tend.mx { background: color-mix(in oklab, #D55E00 16%, transparent); color: #D55E00; }
 
 /* Co-expression: signed correlation bar, centred on zero */
-.rbar { display: block; position: relative; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.rbar { display: block; position: relative; height: 8px; background: var(--line); border-radius: var(--r-sm); overflow: hidden; }
 .rbar::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muted); opacity: 0.5; }
 .rbar i { display: block; height: 100%; min-width: 1px; opacity: 0.8; }
 
@@ -354,13 +424,13 @@ details.gearmenu > .gearmenu-items {
   background: var(--line); border-radius: 1px;
 }
 .lolliaxis {
-  position: relative; height: 1.05rem; margin: 0 8px; font-size: 0.66rem;
+  position: relative; height: 1.05rem; margin: 0 8px; font-size: var(--t-xs);
   color: var(--muted); font-variant-numeric: tabular-nums;
 }
 .lolliaxis span { position: absolute; transform: translateX(-50%); top: 1px; }
 .lolliaxis span:first-child { transform: none; }
 .lolliaxis span.last { transform: translateX(-100%); }
-.lollilist { display: flex; flex-wrap: wrap; gap: 0 0.9rem; font-size: 0.74rem; margin-top: 0.2rem; }
+.lollilist { display: flex; flex-wrap: wrap; gap: 0 0.9rem; font-size: var(--t-sm); margin-top: 0.2rem; }
 .lollilist b { font-weight: 600; }
 
 /* ---------------- Examples tab ---------------- */
@@ -369,22 +439,22 @@ details.gearmenu > .gearmenu-items {
   grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr));
 }
 .excard { display: flex; flex-direction: column; gap: 0.3rem; }
-.excard h3 { margin: 0; font-size: 0.92rem; line-height: 1.3; }
-.exdem { margin: 0.15rem 0 0; font-size: 0.82rem; line-height: 1.45; }
-.exnote { margin: 0; font-size: 0.76rem; line-height: 1.45; color: var(--muted); }
+.excard h3 { margin: 0; font-size: var(--t-base); line-height: 1.3; }
+.exdem { margin: 0.15rem 0 0; font-size: var(--t-md); line-height: 1.45; }
+.exnote { margin: 0; font-size: var(--t-sm); line-height: 1.45; color: var(--muted); }
 .exmeta {
   display: flex; flex-wrap: wrap; gap: 0 0.8rem;
-  font-size: 0.72rem; color: var(--muted); margin-top: 0.15rem;
+  font-size: var(--t-sm); color: var(--muted); margin-top: 0.15rem;
 }
 .exmeta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .exjson {
-  max-height: 15rem; overflow: auto; font-size: 0.68rem; line-height: 1.4;
-  background: var(--code-bg); padding: 0.5rem; border-radius: 4px; margin: 0.3rem 0 0;
+  max-height: 15rem; overflow: auto; font-size: var(--t-xs); line-height: 1.4;
+  background: var(--code-bg); padding: 0.5rem; border-radius: var(--r-sm); margin: 0.3rem 0 0;
 }
 .extags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.5rem; }
 .extags.small { margin-top: 0.1rem; }
 .extag {
-  font: inherit; font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 999px;
+  font: inherit; font-size: var(--t-sm); padding: 0.1rem 0.5rem; border-radius: var(--r-pill);
   border: 1px solid var(--line); background: none; color: var(--ink); cursor: pointer;
 }
 .extag:hover { background: var(--code-bg); }
@@ -392,15 +462,15 @@ details.gearmenu > .gearmenu-items {
 .extag.on .meta { color: var(--bg); opacity: 0.8; }
 .extag.static { cursor: default; }
 .vkind {
-  font-size: 0.7rem; padding: 0.1rem 0.45rem; border-radius: 999px; white-space: nowrap;
+  font-size: var(--t-xs); padding: 0.1rem 0.45rem; border-radius: var(--r-pill); white-space: nowrap;
   background: color-mix(in oklab, var(--accent-ink) 16%, transparent); color: var(--accent-ink);
 }
 
 /* Participation marker: was patient-level data involved in this visualization? */
 .partbadge {
   display: inline-flex; align-items: center; gap: 0.32rem; white-space: nowrap;
-  font-size: 0.68rem; letter-spacing: 0.02em; padding: 0.1rem 0.5rem;
-  border-radius: 999px; border: 1px solid var(--line); cursor: help;
+  font-size: var(--t-xs); letter-spacing: 0.02em; padding: 0.1rem 0.5rem;
+  border-radius: var(--r-pill); border: 1px solid var(--line); cursor: help;
 }
 .partbadge i { width: 6px; height: 6px; border-radius: 50%; flex: none; }
 .partbadge.agg { color: #0072B2; border-color: color-mix(in oklab, #0072B2 40%, transparent);
@@ -412,25 +482,34 @@ details.gearmenu > .gearmenu-items {
 .partbadge.pl i { background: var(--muted); }
 
 /* View header: title may wrap; the participation marker stays pinned top-right */
-.viewhead { display: flex; align-items: flex-start; gap: 0.6rem; flex-wrap: nowrap; }
-.viewhead > h2 { flex: 1 1 auto; min-width: 0; }
-.viewhead > .spacer { display: none; }
-.partwrap { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
-.viewhead > .partwrap { flex: 0 0 auto; margin-top: 0.1rem; }
+/* One header for every view: title on the left, then this view's actions, its status
+   chips and the control that removes it — always in that order, always on one baseline. */
+.vhead {
+  display: flex; align-items: baseline; gap: var(--s3);
+  margin-bottom: var(--s3); padding-bottom: var(--s2); border-bottom: 1px solid var(--line);
+}
+.vtitle {
+  flex: 1 1 auto; min-width: 0; margin: 0;
+  font-size: var(--t-sm); letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); font-weight: 600;
+}
+.vtitle .plain { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.vmeta { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; justify-content: flex-end; }
+.partwrap { display: inline-flex; gap: var(--s1); flex-wrap: wrap; justify-content: flex-end; }
 
 /* Per-view SQL provenance: how each NUMBER was computed, not just the cohort */
 .provsql { margin-top: 0.6rem; border-top: 1px solid var(--line); padding-top: 0.4rem; }
-.provsql > summary { cursor: pointer; font-size: 0.72rem; }
+.provsql > summary { cursor: pointer; font-size: var(--t-sm); }
 .provq { margin-top: 0.5rem; }
-.provhead { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.72rem; }
-.provhead code { font-weight: 600; font-size: 0.72rem; }
+.provhead { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: var(--t-sm); }
+.provhead code { font-weight: 600; font-size: var(--t-sm); }
 .provq pre {
   max-height: 14rem; overflow: auto; margin: 0.2rem 0 0; padding: 0.5rem;
-  background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
-  font-size: 0.66rem; line-height: 1.45; white-space: pre;
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r-sm);
+  font-size: var(--t-xs); line-height: 1.45; white-space: pre;
 }
 .prem {
-  font-size: 0.66rem; padding: 0.05rem 0.4rem; border-radius: 999px; white-space: nowrap;
+  font-size: var(--t-xs); padding: 0.05rem 0.4rem; border-radius: var(--r-pill); white-space: nowrap;
   color: #B45309; background: color-mix(in oklab, #B45309 12%, transparent);
   border: 1px solid color-mix(in oklab, #B45309 35%, transparent);
 }
@@ -451,7 +530,7 @@ details.gearmenu > .gearmenu-items {
 
 /* Analysis: compose views without hand-editing the document JSON */
 .addview { padding-top: 0.5rem; padding-bottom: 0.5rem; }
-.addview .facet { font-size: 0.74rem; }
+.addview .facet { font-size: var(--t-sm); }
 
 /* Cohorts tab: tick-to-select */
 .pick { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
@@ -459,27 +538,27 @@ details.gearmenu > .gearmenu-items {
 
 /* Per-view latency, beside the participation marker */
 .lat {
-  font-size: 0.68rem; padding: 0.1rem 0.45rem; border-radius: 999px; white-space: nowrap;
+  font-size: var(--t-xs); padding: 0.1rem 0.45rem; border-radius: var(--r-pill); white-space: nowrap;
   color: var(--muted); border: 1px solid var(--line); font-variant-numeric: tabular-nums;
   cursor: help;
 }
 .lat .latsplit { opacity: 0.75; }
 
-/* Analysis: remove a single view; the card is the positioning context, and it
-   reserves the corner so the control never lands on the participation marker */
-.viewcard { position: relative; padding-right: 2.1rem; }
+/* Remove a single view. It sits in the header's own row, on the title's baseline,
+   rather than floating over the card's corner. */
+.viewcard { position: relative; }
 .removeview {
-  position: absolute; top: 0.35rem; right: 0.45rem; z-index: 2;
-  width: 1.35rem; height: 1.35rem; line-height: 1; padding: 0;
-  border: 1px solid var(--line); border-radius: 50%; background: var(--bg);
-  color: var(--muted); font-size: 0.9rem; cursor: pointer;
+  width: 1.4rem; height: 1.4rem; line-height: 1; padding: 0; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: 50%; background: none;
+  color: var(--muted); font-size: var(--t-md); cursor: pointer;
 }
-.viewcard:hover .removeview { color: var(--ink); border-color: var(--muted); }
+.viewcard:hover .removeview { border-color: var(--line); }
 .removeview:hover { background: var(--code-bg); color: #D55E00; border-color: #D55E00; }
 
 /* Survival: delayed-entry marker */
 .trunc {
-  font-size: 0.68rem; padding: 0.1rem 0.5rem; border-radius: 999px; white-space: nowrap; cursor: help;
+  font-size: var(--t-xs); padding: 0.1rem 0.5rem; border-radius: var(--r-pill); white-space: nowrap; cursor: help;
   color: #B45309; background: color-mix(in oklab, #B45309 12%, transparent);
   border: 1px solid color-mix(in oklab, #B45309 35%, transparent);
 }
@@ -488,10 +567,10 @@ details.gearmenu > .gearmenu-items {
 .basis {
   display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
   margin: 0.5rem 0 0.6rem; padding: 0.4rem 0.5rem;
-  background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
-  font-size: 0.76rem;
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r-sm);
+  font-size: var(--t-sm);
 }
-.basis select { font-size: 0.76rem; padding: 0.1rem 0.3rem; max-width: 14rem; }
+.basis select { font-size: var(--t-sm); padding: 0.1rem 0.3rem; max-width: 14rem; }
 
 /* Explore: derived facets sit in their own row above the study's own attributes */
 .derivedgrid { display: grid; gap: 0.6rem 1.4rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
@@ -500,29 +579,29 @@ details.gearmenu > .gearmenu-items {
 .chatturn { padding-top: 0.6rem; padding-bottom: 0.7rem; }
 .chatturn.user { background: var(--accent-soft); }
 .chatfig { margin: 0.7rem 0 0; }
-.chatfig figcaption { font-size: 0.78rem; margin-bottom: 0.25rem; }
+.chatfig figcaption { font-size: var(--t-md); margin-bottom: 0.25rem; }
 .chatfigbody {
-  border: 1px solid var(--line); border-radius: 8px; overflow-x: auto;
+  border: 1px solid var(--line); border-radius: var(--r-md); overflow-x: auto;
   background: var(--bg); padding: 0.3rem;
 }
 .chatfigbody svg { display: block; }
 
 /* ---------------- /rationale — RATIONALE.md rendered as a page ---------------- */
 .rationale-nav { margin-bottom: 1.2rem; }
-.rationale-nav a { color: var(--accent-ink); font-size: 0.8rem; text-decoration: none; }
+.rationale-nav a { color: var(--accent-ink); font-size: var(--t-md); text-decoration: none; }
 .rationale-nav a:hover { text-decoration: underline; }
 
 .rationale-doc { line-height: 1.65; }
 .rationale-doc h1 {
-  font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.65rem; font-weight: 600;
+  font-family: "IBM Plex Serif", Georgia, serif; font-size: var(--t-2xl); font-weight: 600;
   margin: 0 0 0.6rem;
 }
 .rationale-doc h2 {
-  font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.2rem; font-weight: 600;
+  font-family: "IBM Plex Serif", Georgia, serif; font-size: var(--t-lg); font-weight: 600;
   margin: 2rem 0 0.7rem; padding-top: 0.9rem; border-top: 1px solid var(--line);
 }
 .rationale-doc h2:first-of-type { border-top: none; padding-top: 0; }
-.rationale-doc h3 { font-size: 1.02rem; font-weight: 600; margin: 1.4rem 0 0.5rem; }
+.rationale-doc h3 { font-size: var(--t-lg); font-weight: 600; margin: 1.4rem 0 0.5rem; }
 .rationale-doc p { margin: 0 0 0.9rem; max-width: 62rem; }
 .rationale-doc ul, .rationale-doc ol { margin: 0 0 0.9rem; padding-left: 1.4rem; max-width: 62rem; }
 .rationale-doc li { margin-bottom: 0.3rem; }
@@ -531,12 +610,12 @@ details.gearmenu > .gearmenu-items {
 .rationale-doc em { color: var(--muted); }
 .rationale-doc code {
   font-family: "IBM Plex Mono", monospace; font-size: 0.85em;
-  background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px;
+  background: var(--code-bg); padding: 0.1em 0.35em; border-radius: var(--r-sm);
 }
 .rationale-doc hr { border: none; border-top: 1px solid var(--line); margin: 1.6rem 0; }
 .rationale-doc a { color: var(--accent-ink); }
 .rationale-doc table {
-  border-collapse: collapse; width: 100%; margin: 0 0 1rem; font-size: 0.86rem;
+  border-collapse: collapse; width: 100%; margin: 0 0 1rem; font-size: var(--t-md);
   display: block; overflow-x: auto;
 }
 .rationale-doc th, .rationale-doc td {
@@ -549,12 +628,12 @@ details.gearmenu > .gearmenu-items {
 
 .mermaid-diagram {
   overflow-x: auto; margin: 1rem 0 1.4rem; padding: 0.8rem;
-  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
 }
 .mermaid-diagram svg { max-width: 100%; height: auto; }
 .mermaid-fallback {
-  overflow-x: auto; font-size: 0.72rem; padding: 0.8rem; margin: 1rem 0 1.4rem;
-  background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+  overflow-x: auto; font-size: var(--t-sm); padding: 0.8rem; margin: 1rem 0 1.4rem;
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r-lg);
 }
 
 /* Settings inside a view's gear menu. The controls that used to sit in a
@@ -563,15 +642,15 @@ details.gearmenu > .gearmenu-items {
    for attention every time it is read. */
 .gearmenu-items.wide { min-width: 23rem; max-width: 31rem; }
 .gearmenu-items .setrow {
-  display: flex; align-items: center; gap: 0.4rem; font-size: 0.76rem;
+  display: flex; align-items: center; gap: 0.4rem; font-size: var(--t-sm);
   padding: 0.1rem 0;
 }
 .gearmenu-items .setrow > .meta { min-width: 5.2rem; color: var(--muted); flex: none; }
 .gearmenu-items .setrow select { flex: 1; min-width: 0; }
 .gearmenu-items .setcol { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.15rem 0; }
-.gearmenu-items .setcol > .meta { color: var(--muted); font-size: 0.76rem; }
+.gearmenu-items .setcol > .meta { color: var(--muted); font-size: var(--t-sm); }
 .gearmenu-items .pillwrap { display: flex; flex-wrap: wrap; gap: 0.25rem; }
-.gearmenu-items .pillwrap .pill { font-size: 0.72rem; padding: 0.15rem 0.5rem; cursor: pointer; }
+.gearmenu-items .pillwrap .pill { font-size: var(--t-sm); padding: 0.15rem 0.5rem; cursor: pointer; }
 .gearmenu-items hr { border: none; border-top: 1px solid var(--line); margin: 0.35rem 0 0.1rem; }
 
 /* A gear that sits next to the card title rather than at the far right of the
@@ -585,7 +664,7 @@ details.gearmenu > .gearmenu-items {
    about what it opens. Sized and baselined to sit quietly beside the heading,
    not to compete with it. */
 .gearmenu.inline > summary {
-  font-size: 0.78rem; font-weight: 500; letter-spacing: 0.01em;
+  font-size: var(--t-md); font-weight: 500; letter-spacing: 0.01em;
   color: var(--accent-ink); padding: 0 0.1rem;
   text-decoration: underline; text-decoration-style: dotted;
   text-underline-offset: 0.18em;
@@ -599,56 +678,56 @@ details.gearmenu.inline[open] > summary {
 /* Name-a-cohort dialog. Native <dialog>, so Esc, focus trapping and the
    backdrop are the platform's rather than ours. */
 .namedialog, .genedialog {
-  border: 1px solid var(--line); border-radius: 10px; background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card);
   color: var(--ink); padding: 1rem 1.1rem; min-width: 20rem; max-width: 26rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
 }
 .namedialog::backdrop, .genedialog::backdrop { background: rgba(0, 0, 0, 0.32); }
-.namedialog h3, .genedialog h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+.namedialog h3, .genedialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
 .namedialog .meta { display: block; margin-bottom: 0.6rem; }
 .namedialog input { width: 100%; box-sizing: border-box; }
 .genedialog { min-width: 24rem; max-width: 30rem; }
-.genedialog .setcol > .meta { color: var(--muted); font-size: 0.76rem; }
+.genedialog .setcol > .meta { color: var(--muted); font-size: var(--t-sm); }
 .genedialog .pillwrap { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .genedialog .pillwrap .pill { cursor: pointer; }
 /* a merged row reads as one thing: its pill and its split control share a border */
 .genedialog .pill-merged { display: inline-flex; align-items: center; gap: 0.1rem; border: 1px dashed var(--accent-ink);
-  border-radius: 999px; padding: 0 0.3rem 0 0; }
+  border-radius: var(--r-pill); padding: 0 0.3rem 0 0; }
 .genedialog .pill-merged .pill { border: none; background: none; }
 .genedialog textarea { width: 100%; box-sizing: border-box; }
 .genedialog .setrow { display: flex; gap: 0.4rem; margin-top: 0.5rem; align-items: center; }
 .genedialog .setrow input { flex: 1; min-width: 0; }
 /* the gene button sits at the end of a view header, beside the gear */
-.genesbtn { font-size: 0.78rem; font-weight: 500; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 0.18em; }
+.genesbtn { font-size: var(--t-md); font-weight: 500; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 0.18em; }
 
 /* ---- workspaces: a saved document, its parameters, and its notes ---------- */
 .wsbar {
   display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
-  font-size: 0.78rem; margin-bottom: 0.5rem; padding-bottom: 0.45rem;
+  font-size: var(--t-md); margin-bottom: 0.5rem; padding-bottom: 0.45rem;
   border-bottom: 1px solid var(--line);
 }
-.wsbar > strong { font-size: 0.82rem; }
+.wsbar > strong { font-size: var(--t-md); }
 .params {
-  border: 1px solid var(--line); border-radius: 6px; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--code-bg);
   padding: 0.45rem 0.55rem; margin-bottom: 0.5rem;
 }
-.paramrow { display: flex; align-items: center; gap: 0.45rem; margin-top: 0.35rem; font-size: 0.78rem; }
+.paramrow { display: flex; align-items: center; gap: 0.45rem; margin-top: 0.35rem; font-size: var(--t-md); }
 .paramrow > code { min-width: 5.5rem; color: var(--accent-ink); }
 .paramrow input { flex: 1; min-width: 0; }
 .paramrow .pillwrap { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; flex: 1; }
-.paramrow .pillwrap .pill { cursor: pointer; font-size: 0.72rem; padding: 0.15rem 0.5rem; }
+.paramrow .pillwrap .pill { cursor: pointer; font-size: var(--t-sm); padding: 0.15rem 0.5rem; }
 .notes textarea {
   width: 100%; box-sizing: border-box; margin-top: 0.3rem; padding: 0.45rem;
   font: 0.78rem/1.45 'IBM Plex Sans', system-ui, sans-serif;
   background: var(--card); color: var(--ink);
-  border: 1px solid var(--line); border-radius: 6px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
 }
 /* An author's note sits with the figure it describes. Rendered as plain text,
    never markdown: a ?doc= link is shareable, so notes are untrusted input and
    turning them into HTML would hand a link author script execution. */
 .viewnote {
   white-space: pre-wrap; margin: 0.3rem 0 0.5rem; padding: 0.4rem 0.55rem;
-  font-size: 0.78rem; line-height: 1.5; color: var(--ink);
+  font-size: var(--t-md); line-height: 1.5; color: var(--ink);
   background: var(--code-bg); border-left: 3px solid var(--accent-ink); border-radius: 0 5px 5px 0;
 }
 
@@ -663,34 +742,90 @@ details.gearmenu.inline[open] > summary {
 .wscard > summary::-webkit-details-marker { display: none; }
 /* a disclosure triangle that turns, so open/closed is legible without a library */
 .wscard > summary::before {
-  content: "\25B8"; color: var(--muted); font-size: 0.8rem;
+  content: "\25B8"; color: var(--muted); font-size: var(--t-md);
   transition: transform 0.12s ease; display: inline-block;
 }
 .wscard[open] > summary::before { transform: rotate(90deg); }
-.wscard > summary > strong { font-size: 0.9rem; letter-spacing: 0.02em; }
+.wscard > summary > strong { font-size: var(--t-base); letter-spacing: 0.02em; }
 .wscard-body { margin-top: 0.7rem; }
 .wscard .params { margin-bottom: 0.6rem; }
-.wslabel { display: block; font-size: 0.76rem; color: var(--muted); margin-bottom: 0.25rem; }
+.wslabel { display: block; font-size: var(--t-sm); color: var(--muted); margin-bottom: 0.25rem; }
 .wscard textarea {
   width: 100%; box-sizing: border-box; height: 4.5rem; padding: 0.45rem;
   font: 0.8rem/1.5 'IBM Plex Sans', system-ui, sans-serif;
   background: var(--code-bg); color: var(--ink);
-  border: 1px solid var(--line); border-radius: 6px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
 }
 
 /* the Python README, rendered on the CLI page */
-.readme h1 { font-size: 1rem; margin: 0.8rem 0 0.3rem; }
-.readme h2 { font-size: 0.88rem; margin: 1rem 0 0.3rem; text-transform: none; letter-spacing: 0; }
-.readme p, .readme li { font-size: 0.82rem; max-width: 74ch; }
-.readme code { font-size: 0.78rem; }
+.readme h1 { font-size: var(--t-lg); margin: 0.8rem 0 0.3rem; }
+.readme h2 { font-size: var(--t-base); margin: 1rem 0 0.3rem; text-transform: none; letter-spacing: 0; }
+.readme p, .readme li { font-size: var(--t-md); max-width: 74ch; }
+.readme code { font-size: var(--t-md); }
 .readme pre { margin: 0.4rem 0; }
 
 /* a gear menu whose summary is a word rather than the ⚙ glyph */
-details.gearmenu > summary.textual { font-size: 0.78rem; color: var(--accent-ink); text-decoration: underline; }
+details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent-ink); text-decoration: underline; }
 
 /* The oncoprint's horizontal scrollbar, drawn by us. A native one over a virtual width of
    200,000 px gives a thumb a few pixels wide that nobody can grab, and it fades out when idle;
    the canvas draws only the visible window, so this bar is the reader's only sense of place. */
 .onco-bar { position: relative; height: 13px; margin-top: 4px; background: var(--code-bg); border-radius: 7px; cursor: pointer; touch-action: none; }
-.onco-bar-thumb { position: absolute; top: 2px; height: 9px; background: var(--line); border-radius: 5px; }
+.onco-bar-thumb { position: absolute; top: 2px; height: 9px; background: var(--line); border-radius: var(--r-sm); }
 .onco-bar:hover .onco-bar-thumb { background: var(--muted); }
+
+/* the display popover's rows: a checkbox list that lines up */
+.gearmenu-items .chk { display: flex; align-items: center; gap: var(--s2); font-size: var(--t-md); padding: var(--s0) 0; }
+.gearmenu-items .chk input { margin: 0; }
+
+/* ---- apparatus ------------------------------------------------------------
+   Legend, caveats and provenance are how a figure is read and checked, so they stay
+   on the page — but a step down in weight, so they read as apparatus and not as findings. */
+.vfoot { margin-top: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--line); }
+.vfoot .onco-legend { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); font-size: var(--t-xs); color: var(--muted); }
+.vfoot .note, .vfoot .meta { font-size: var(--t-sm); }
+.vfoot .provsql { border-top: none; margin-top: var(--s2); padding-top: 0; }
+
+/* ---- the oncoprint figure's own chrome ------------------------------------
+   Static styling lives here; what stays inline in the component is geometry computed
+   from the drawing — a tooltip's position, the marquee's edges, a legend swatch's colour. */
+.onco-plot { position: relative; margin-top: var(--s2); border: 1px solid var(--line); border-radius: var(--r-md); background: #fff; overflow: hidden; }
+.onco-canvas { display: block; cursor: crosshair; }
+.onco-mini { display: block; margin-top: var(--s1); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: col-resize; background: #fff; }
+
+.onco-trackmenu {
+  position: absolute; z-index: 4; min-width: 190px; padding: var(--s1);
+  display: flex; flex-direction: column; gap: 0.1rem;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .16);
+}
+.onco-trackmenu-name { padding: 0 var(--s1) var(--s0); }
+
+.onco-tip {
+  position: absolute; z-index: 2; pointer-events: none; max-width: 330px;
+  padding: var(--s1) var(--s2); font-size: var(--t-md);
+  background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .12);
+}
+.onco-tip .dim { color: var(--muted); }
+.onco-tip .lead { font-weight: 600; }
+.onco-tip .mono { font-family: "IBM Plex Mono", monospace; font-size: var(--t-sm); }
+
+.onco-marquee {
+  position: absolute; top: 0; pointer-events: none; z-index: 3;
+  background: rgba(37, 99, 235, 0.14); border-left: 1px solid #2563eb; border-right: 1px solid #2563eb;
+}
+.onco-marquee-n { position: absolute; top: 2px; left: 3px; font-size: var(--t-xs); color: #1d4ed8; white-space: nowrap; }
+
+.onco-select {
+  margin-top: var(--s2); border-color: #2563eb; padding: var(--s3) var(--s3);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3);
+}
+.onco-select strong { font-size: var(--t-base); }
+.onco-select-name { font-size: var(--t-md); width: 150px; }
+.onco-timings { margin-top: var(--s2); }
+.onco-timings table { font-variant-numeric: tabular-nums; border-spacing: 10px 2px; }
+
+/* inside a menu: the options that do not travel with the document, kept apart from the ones that do */
+.menu-aside { margin-top: var(--s2); padding-top: var(--s2); border-top: 1px dashed var(--line); }
+.menu-aside > .meta { display: block; margin-bottom: var(--s0); }

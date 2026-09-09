@@ -28,7 +28,7 @@ export default async function ProvenancePage({ searchParams }: { searchParams: P
         <h1>Cohort Lab</h1>
         <span className="sub">oncoprint provenance — the picture, the DSL, and the SQL behind it</span>
         <span className="spacer" />
-        <a href="/oncoprint" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>oncoprint builder →</a>
+        <a href="/oncoprint" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>oncoprint builder →</a>
       </header>
       <main>
         {error && <div className="error">{error}</div>}
@@ -51,7 +51,7 @@ export default async function ProvenancePage({ searchParams }: { searchParams: P
             <h2>Generated SQL <span className="plain">— every query the spec compiles to, in execution order</span></h2>
             {queries.map((q: { label: string; sql: string }, i: number) => (
               <div key={i} style={{ marginBottom: "1rem" }}>
-                <p style={{ margin: "0 0 0.3rem", fontSize: "0.85rem" }}><strong>{i + 1}. {q.label}</strong></p>
+                <p style={{ margin: "0 0 0.3rem", fontSize: "var(--t-md)" }}><strong>{i + 1}. {q.label}</strong></p>
                 <pre>{q.sql}</pre>
               </div>
             ))}

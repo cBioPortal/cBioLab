@@ -120,9 +120,13 @@ import type { GeneTrackSpec } from "./gene-tracks.ts";
 export type { GeneTrackSpec };
 
 export interface CompareView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string;
   kind: "compare"; genes: string[]; cohorts?: string[];
 }
 export interface SurvivalView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string;
   kind: "survival"; cohorts?: string[];
   /** endpoint prefix: OS (default), PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS */
   endpoint?: string;
@@ -133,10 +137,18 @@ export interface SurvivalView {
    */
   anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
 }
-export interface CooccurrenceView { kind: "cooccurrence"; genes: string[]; cohorts?: string[] }
-export interface ClinicalView { kind: "clinical"; attributes: string[]; cohorts?: string[] }
-export interface CoexpressionView { kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[] }
-export interface HotspotsView { kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number }
+export interface CooccurrenceView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string; kind: "cooccurrence"; genes: string[]; cohorts?: string[] }
+export interface ClinicalView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string; kind: "clinical"; attributes: string[]; cohorts?: string[] }
+export interface CoexpressionView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string; kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[] }
+export interface HotspotsView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string; kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number }
 /**
  * The clinical course: what fraction of the still-observable cohort is in each
  * event state, over time relative to an anchor.
@@ -148,6 +160,8 @@ export interface HotspotsView { kind: "hotspots"; genes: string[]; cohorts?: str
  * day 0 across studies compares incomparable clocks.
  */
 export interface CourseView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string;
   kind: "course"; cohorts?: string[];
   /** canonical event names to measure; case is folded (lib/event-names.ts) */
   eventTypes: string[];
@@ -205,6 +219,8 @@ export interface DisplaySpec {
 export type ResolvedDisplay = Required<Pick<DisplaySpec, "showUnaltered" | "whitespace" | "gaps" | "clinicalLegends" | "colorByType" | "hideVUS" | "annotate" | "whiteBackground">>
   & Pick<DisplaySpec, "style" | "colors">;
 export interface OncoprintView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string;
   /** rows: a gene symbol, or {label?, genes} for one merged row over several genes */
   kind: "oncoprint"; genes: GeneTrackSpec[]; cohorts?: string[];
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
@@ -229,6 +245,8 @@ export interface OncoprintView {
  * Putting the choice in the document keeps it visible to whoever reads the result.
  */
 export interface SequenceView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string;
   kind: "sequence"; cohorts?: string[];
   /** event type carrying therapies (default: treatment) */
   eventType?: string;

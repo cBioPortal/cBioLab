@@ -79,9 +79,9 @@ export default async function CliPage() {
         <h1>Cohort Lab</h1>
         <span className="sub">oncoprint from the command line — Node and Python, one contract</span>
         <span className="spacer" />
-        <a href="/oncoprint-lab" style={{ color: "var(--accent-ink)", fontSize: "0.8rem", marginRight: "1rem" }}>interactive lab →</a>
-        <a href="/oncoprint-lab/import" style={{ color: "var(--accent-ink)", fontSize: "0.8rem", marginRight: "1rem" }}>pasted data →</a>
-        <a href="/oncoprint-lab/python" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>python notebook →</a>
+        <a href="/oncoprint-lab" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>interactive lab →</a>
+        <a href="/oncoprint-lab/import" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>pasted data →</a>
+        <a href="/oncoprint-lab/python" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>python notebook →</a>
       </header>
       <main>
         <p className="meta" style={{ maxWidth: "70ch" }}>
@@ -108,9 +108,9 @@ export default async function CliPage() {
           <h2>Reference <span className="plain">— read from the code, not written beside it</span></h2>
           <p className="meta">The node CLI&apos;s usage is its own header comment; the Python section is the package&apos;s README,
             which ships in the wheel. Neither can drift from what actually runs.</p>
-          <h3 style={{ fontSize: "0.9rem", margin: "0.8rem 0 0.3rem" }}>node</h3>
+          <h3 style={{ fontSize: "var(--t-base)", margin: "0.8rem 0 0.3rem" }}>node</h3>
           <pre>{usage}</pre>
-          <h3 style={{ fontSize: "0.9rem", margin: "1rem 0 0.3rem" }}>python</h3>
+          <h3 style={{ fontSize: "var(--t-base)", margin: "1rem 0 0.3rem" }}>python</h3>
           <div className="readme" dangerouslySetInnerHTML={{ __html: readme }} />
         </div>
       </main>

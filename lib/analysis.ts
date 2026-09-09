@@ -988,7 +988,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   // An author's note belongs to the VIEW, not to the run, so it is copied across
   // by position rather than being threaded through every branch above.
   (doc.views || []).slice(0, 6).forEach((v, i) => {
-    const note = (v as { note?: unknown }).note;
+    const note = v.note;
     if (views[i] && typeof note === "string" && note.trim()) views[i].annotationNote = note.trim();
   });
 

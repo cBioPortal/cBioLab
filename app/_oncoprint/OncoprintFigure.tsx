@@ -61,9 +61,9 @@ export interface OncoprintFigureProps {
   onExpandTrack?: (label: string) => void;
   /** the Tracks menu's contents — the page owns what can be added */
   tracksMenu?: React.ReactNode;
+  /** anything that is neither data nor view: links out, page-level extras */
+  moreMenu?: React.ReactNode;
   onDisplay: (d: FigureDisplay) => void;
-  /** left of the toolbar; defaults to a heading describing the contract */
-  heading?: React.ReactNode;
   /** extra toolbar controls, placed before the viewing options */
   controls?: React.ReactNode;
   /** below the legend — the page's provenance panel, say */
@@ -552,6 +552,15 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const pct = visible ? Math.round(100 * Math.log(view.zoom / minZoom) / Math.log(MAX_ZOOM / minZoom)) : 0;
   const fmt = (n?: number, d = 0) => n == null ? "—" : n.toLocaleString("en-US", { maximumFractionDigits: d });
   const set = (p: Partial<FigureDisplay>) => onDisplay({ ...display, ...p });
+  /**
+   * How many viewing options are away from their default. The display button wears the count so
+   * folding them behind it never hides the fact that one of them is on.
+   */
+  const offDefaults = (Number(display.showUnaltered !== DEFAULT_FIGURE_DISPLAY.showUnaltered) +
+    Number(display.whitespace !== DEFAULT_FIGURE_DISPLAY.whitespace) +
+    Number(display.colorByType !== DEFAULT_FIGURE_DISPLAY.colorByType) +
+    Number(!!display.whiteBackground) + Number(display.gaps !== "none")) || 0;
+  const displayMenu = useRef<HTMLDetailsElement>(null);
 
   // The figure applies sort and viewing options in the browser. A server-rendered download has
   // to be told about them, or the file would not be the picture on screen.
@@ -601,58 +610,94 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       {error && <div className="error">oncoprint: {error}</div>}
       {loading && !error && <p className="meta">querying and building the contract…</p>}
       {data && visible && !error && <>
-        <div className="row" style={{ alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap" }}>
-          {props.heading ?? <h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {data.stats.nColumns.toLocaleString()} {data.unit}s · {data.tracks.length} tracks · {data.conventions.annotation}</span></h2>}
-          <span className="spacer" />
-          {props.tracksMenu}
-          {props.controls}
-          <label className="meta"><input type="checkbox" checked={display.showUnaltered} disabled={busy} onChange={(e) => set({ showUnaltered: e.target.checked })} /> show unaltered</label>
-          <label className="meta"><input type="checkbox" checked={display.whitespace} disabled={busy} onChange={(e) => set({ whitespace: e.target.checked })} /> whitespace</label>
-          <label className="meta" title="colour each mutation class separately, or draw them all as one"><input type="checkbox" checked={display.colorByType} disabled={busy} onChange={(e) => set({ colorByType: e.target.checked })} /> colour by type</label>
-          <label className="meta" title="white instead of grey for unaltered cells — for print; profiled and unprofiled then look alike, apart from the stripe">
-            <input type="checkbox" checked={!!display.whiteBackground} disabled={busy} onChange={(e) => set({ whiteBackground: e.target.checked || undefined })} /> white background</label>
-          <label className="meta">sort <select value={sortKeys[0] || ""} disabled={busy}
-            onChange={(e) => onSortKeys(e.target.value ? [e.target.value, ...sortKeys.slice(1)].slice(0, 4) : sortKeys.slice(1))} style={{ fontSize: "0.78rem" }}>
-            <option value="">engine order ({data.conventions.sort.join(", ")})</option>
-            {sortKeys[0]?.startsWith("cluster:") && !data.tracks.some((t) => t.profileType === sortKeys[0].slice(8)) &&
-              <option value={sortKeys[0]}>{sortKeys[0]}</option>}
-            <option value="genomic">genomic staircase</option>
-            <option value="id">{data.unit} id</option>
-            {[...new Set(data.tracks.filter((t) => t.kind === "heatmap" && t.profileType).map((t) => t.profileType!))].map((pt) => (
-              <option key={"cluster:" + pt} value={"cluster:" + pt}>cluster by {pt}</option>
-            ))}
-            {data.tracks.filter((t) => t.kind !== "gene" && !/\(no data\)$/.test(t.label)).flatMap((t) => [
-              <option key={t.label} value={t.label}>{t.label} ↑</option>,
-              <option key={"-" + t.label} value={"-" + t.label}>{t.label} ↓</option>])}
-          </select></label>
-          {sortKeys.length > 1 && <span className="meta" title="ties in the first key are broken by these, in order">
-            then {sortKeys.slice(1).map((k) => (
-              <button key={k} className="linklike" disabled={busy} title="drop this tiebreaker"
-                onClick={() => onSortKeys(sortKeys.filter((x) => x !== k))}>{k.startsWith("-") ? k.slice(1) + " ↓" : k + " ↑"} ✕</button>
-            ))}</span>}
-          <label className="meta" title={gapTrack ? "split each cohort into runs of " + gapTrack.label : "choose a categorical track as the sort key first"}>gaps <select
-            value={display.gaps} disabled={busy || !gapTrack} onChange={(e) => set({ gaps: e.target.value as FigureDisplay["gaps"] })} style={{ fontSize: "0.78rem" }}>
-            <option value="none">none</option><option value="gaps">gaps</option><option value="pct">gaps with %</option></select></label>
-          <button className="linklike" onClick={() => zoomAt(1 / 1.4)} title="zoom out">−</button>
-          <input type="range" min={0} max={100} value={pct} title="zoom"
-            onChange={(e) => { const p = Number(e.target.value) / 100; setView((v) => ({ ...v, zoom: minZoom * Math.pow(MAX_ZOOM / minZoom, p) })); }} style={{ width: 110 }} />
-          <button className="linklike" onClick={() => zoomAt(1.4)} title="zoom in">+</button>
-          <span className="meta" style={{ minWidth: 84 }}>{view.zoom >= 1 ? view.zoom.toFixed(1) + " px/col" : (1 / view.zoom).toFixed(0) + " cols/px"}</span>
-          <button className="linklike" onClick={() => setView((v) => ({ ...v, zoom: minZoom, scrollX: 0 }))}>fit</button>
-          <label className="meta" title="an overview of the whole figure, with the part you are looking at marked">
-            <input type="checkbox" checked={showMini} onChange={(e) => setShowMini(e.target.checked)} /> minimap</label>
-          <details className="gearmenu">
-            <summary className="textual" title="download this figure">{saving ? "saving…" : "download"}</summary>
-            <div className="gearmenu-items">
-              <button className="linklike" onClick={() => download("png")}>PNG — the whole figure at 4000px</button>
-              <button className="linklike" onClick={() => download("svg")}>SVG — re-rendered on the server from this spec</button>
-              <button className="linklike" onClick={() => download("tsv")}>Tabular TSV — one row per track, one column per {data.unit}</button>
-              <button className="linklike" onClick={() => download("ids")}>{data.unit} order — the ids as drawn</button>
-            </div>
-          </details>
+        {/* The toolbar is two kinds of control, and they are kept apart on purpose. DATA changes
+            what is drawn and costs a query; VIEW changes how it is drawn and is instant. Each zone
+            wraps as a unit — nowrap inside — so a pair like the zoom controls can never be split
+            across a line break. */}
+        <div className="onco-tb">
+          <div className="tbz">
+            <span className="tbl" title="these change what is drawn, and re-run the query">data</span>
+            {props.tracksMenu}
+            {props.controls}
+          </div>
+          <div className="tbz">
+            <span className="tbl" title="these change how it is drawn, here in your browser">view</span>
+            <details className="gearmenu" ref={displayMenu}>
+              <summary className="tbbtn" title="how the figure is drawn — nothing here re-runs a query">
+                display{offDefaults ? " (" + offDefaults + ")" : ""}</summary>
+              <div className="gearmenu-items">
+                <label className="chk"><input type="checkbox" checked={display.showUnaltered} disabled={busy}
+                  onChange={(e) => set({ showUnaltered: e.target.checked })} /> show unaltered {data.unit}s</label>
+                <label className="chk"><input type="checkbox" checked={display.whitespace} disabled={busy}
+                  onChange={(e) => set({ whitespace: e.target.checked })} /> whitespace between cells</label>
+                <label className="chk" title="colour each mutation class separately, or draw them all as one">
+                  <input type="checkbox" checked={display.colorByType} disabled={busy}
+                    onChange={(e) => set({ colorByType: e.target.checked })} /> colour by mutation type</label>
+                <label className="chk" title="white instead of grey for unaltered cells — for print; profiled and unprofiled then look alike, apart from the stripe">
+                  <input type="checkbox" checked={!!display.whiteBackground} disabled={busy}
+                    onChange={(e) => set({ whiteBackground: e.target.checked || undefined })} /> white background (for print)</label>
+                <label className="setrow" title={gapTrack ? "split each cohort into runs of " + gapTrack.label : "choose a categorical track as the sort key first"}>
+                  <span className="meta">gaps</span>
+                  <select value={display.gaps} disabled={busy || !gapTrack} onChange={(e) => set({ gaps: e.target.value as FigureDisplay["gaps"] })}>
+                    <option value="none">none</option><option value="gaps">gaps</option><option value="pct">gaps with %</option>
+                  </select>
+                </label>
+                <span className="meta">{view.zoom >= 1 ? view.zoom.toFixed(1) + " px per column" : (1 / view.zoom).toFixed(0) + " columns per pixel"} · {data.tracks.length} tracks</span>
+                {/* Everything above is written into the document, so a shared link, the server SVG,
+                    the CLI and the Python package all reproduce this picture. The minimap is not: it
+                    draws no part of the figure and no other renderer has one, so it would be a
+                    setting that only one reader could see. */}
+                <div className="menu-aside">
+                  <span className="meta">this browser only</span>
+                  <label className="chk" title="an overview of the whole figure, with the part you are looking at marked">
+                    <input type="checkbox" checked={showMini} onChange={(e) => setShowMini(e.target.checked)} /> minimap</label>
+                </div>
+              </div>
+            </details>
+            <label className="tbfield">sort <select value={sortKeys[0] || ""} disabled={busy}
+              onChange={(e) => onSortKeys(e.target.value ? [e.target.value, ...sortKeys.slice(1)].slice(0, 4) : sortKeys.slice(1))}>
+              <option value="">engine order ({data.conventions.sort.join(", ")})</option>
+              {sortKeys[0]?.startsWith("cluster:") && !data.tracks.some((t) => t.profileType === sortKeys[0].slice(8)) &&
+                <option value={sortKeys[0]}>{sortKeys[0]}</option>}
+              <option value="genomic">genomic staircase</option>
+              <option value="id">{data.unit} id</option>
+              {[...new Set(data.tracks.filter((t) => t.kind === "heatmap" && t.profileType).map((t) => t.profileType!))].map((pt) => (
+                <option key={"cluster:" + pt} value={"cluster:" + pt}>cluster by {pt}</option>
+              ))}
+              {data.tracks.filter((t) => t.kind !== "gene" && !/\(no data\)$/.test(t.label)).flatMap((t) => [
+                <option key={t.label} value={t.label}>{t.label} ↑</option>,
+                <option key={"-" + t.label} value={"-" + t.label}>{t.label} ↓</option>])}
+            </select></label>
+            <span className="zoomctl">
+              <button type="button" onClick={() => zoomAt(1 / 1.4)} title="zoom out" aria-label="zoom out">−</button>
+              <input type="range" min={0} max={100} value={pct} title="zoom" aria-label="zoom"
+                onChange={(e) => { const p = Number(e.target.value) / 100; setView((v) => ({ ...v, zoom: minZoom * Math.pow(MAX_ZOOM / minZoom, p) })); }} />
+              <button type="button" onClick={() => zoomAt(1.4)} title="zoom in" aria-label="zoom in">+</button>
+              <button type="button" onClick={() => setView((v) => ({ ...v, zoom: minZoom, scrollX: 0 }))} title="fit every column in the width">fit</button>
+            </span>
+          </div>
+          <div className="tbz">
+            <details className="gearmenu">
+              <summary className="tbbtn" title="download this figure">{saving ? "saving…" : "export"}</summary>
+              <div className="gearmenu-items">
+                <button className="linklike" onClick={() => download("png")}>PNG — the whole figure at 4000px</button>
+                <button className="linklike" onClick={() => download("svg")}>SVG — re-rendered on the server from this spec</button>
+                <button className="linklike" onClick={() => download("tsv")}>Tabular TSV — one row per track, one column per {data.unit}</button>
+                <button className="linklike" onClick={() => download("ids")}>{data.unit} order — the ids as drawn</button>
+              </div>
+            </details>
+            {props.moreMenu}
+          </div>
         </div>
-        <div ref={wrapRef} style={{ position: "relative", marginTop: "0.5rem", border: "1px solid var(--line)", borderRadius: 8, background: "#fff", overflow: "hidden" }}>
-          <canvas ref={canvasRef} style={{ display: "block", cursor: "crosshair" }}
+        {sortKeys.length > 1 && <div className="onco-tb2">
+          <span className="meta" title="ties in the first key are broken by these, in order">then</span>
+          {sortKeys.slice(1).map((k) => (
+            <button key={k} className="linklike" disabled={busy} title="drop this tiebreaker"
+              onClick={() => onSortKeys(sortKeys.filter((x) => x !== k))}>{k.startsWith("-") ? k.slice(1) + " ↓" : k + " ↑"} ✕</button>
+          ))}
+        </div>}
+        <div ref={wrapRef} className="onco-plot">
+          <canvas ref={canvasRef} className="onco-canvas"
             onPointerDown={onSelDown} onPointerMove={onSelMove} onPointerUp={onSelUp} onPointerCancel={onSelUp}
             onMouseMove={onMove} onMouseLeave={() => { setHover(null); setLabelHover(null); }}
             onClick={(e) => {
@@ -676,11 +721,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 onClick={() => { act(); setTrackMenu(null); }}>{label}</button>
             );
             return (
-              <div style={{ position: "absolute", left: Math.min(trackMenu.x, cssW - 210), top: trackMenu.y + 6, zIndex: 4,
-                background: "var(--card)", border: "1px solid var(--line)", borderRadius: 6, boxShadow: "0 6px 18px rgba(0,0,0,.16)",
-                padding: "0.35rem", display: "flex", flexDirection: "column", gap: "0.1rem", minWidth: 190 }}
+              <div className="onco-trackmenu" style={{ left: Math.min(trackMenu.x, cssW - 210), top: trackMenu.y + 6 }}
                 onMouseLeave={() => setTrackMenu(null)}>
-                <span className="meta" style={{ padding: "0 0.3rem 0.2rem" }}>{t.label}
+                <span className="meta onco-trackmenu-name">{t.label}
                   {t.members && t.members.length > 1 && <><br />{t.members.join(" · ")}</>}</span>
                 {props.onMoveTrack && item("Move up", false, () => props.onMoveTrack!(t.label, -1))}
                 {props.onMoveTrack && item("Move down", false, () => props.onMoveTrack!(t.label, 1))}
@@ -728,10 +771,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             const x0 = Math.max(GEOM.gutter, Math.min(cssW, r.x0)), x1 = Math.max(GEOM.gutter, Math.min(cssW, r.x1));
             if (x1 <= x0) return null;
             return (
-              <div style={{ position: "absolute", left: x0, top: 0, width: x1 - x0, height: canvasHeight(data.tracks.length),
-                background: "rgba(37,99,235,0.14)", borderLeft: "1px solid #2563eb", borderRight: "1px solid #2563eb",
-                pointerEvents: "none", zIndex: 3 }}>
-                {sel?.live && <span style={{ position: "absolute", top: 2, left: 3, fontSize: "0.7rem", color: "#1d4ed8", whiteSpace: "nowrap" }}>
+              <div className="onco-marquee" style={{ left: x0, width: x1 - x0, height: canvasHeight(data.tracks.length) }}>
+                {sel?.live && <span className="onco-marquee-n">
                   {selCount.toLocaleString()} {data.unit}{selCount === 1 ? "" : "s"}</span>}
               </div>
             );
@@ -741,19 +782,16 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             const t = data.tracks[labelHover.ti];
             const lines = trackTooltipLines(t, data.n, data.unit);
             return (
-              <div style={{ position: "absolute", left: Math.min(labelHover.x + 12, cssW - 300), top: labelHover.y + 14, pointerEvents: "none",
-                background: "var(--card)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 6, padding: "6px 8px",
-                fontSize: "0.78rem", boxShadow: "0 4px 14px rgba(0,0,0,.12)", maxWidth: 330, zIndex: 2 }}>
-                {lines.map((l, i) => <div key={i} style={i ? { color: "var(--muted)" } : { fontWeight: 600 }}>{l}</div>)}
-                <div style={{ color: "var(--muted)", marginTop: 2 }}>click for track options</div>
+              <div className="onco-tip" style={{ left: Math.min(labelHover.x + 12, cssW - 300), top: labelHover.y + 14 }}>
+                {lines.map((l, i) => <div key={i} className={i ? "dim" : "lead"}>{l}</div>)}
+                <div className="dim">click for track options</div>
               </div>
             );
           })()}
 
           {hover && tip && (
-            <div style={{ position: "absolute", left: Math.min(hover.x + 12, cssW - 260), top: hover.y + 14, pointerEvents: "none", background: "var(--card)", color: "var(--ink)",
-              border: "1px solid var(--line)", borderRadius: 6, padding: "6px 8px", fontSize: "0.78rem", boxShadow: "0 4px 14px rgba(0,0,0,.12)", maxWidth: 330, zIndex: 2 }}>
-              {tip.map((l, i) => <div key={i} style={{ ...(l.mono ? { fontFamily: "IBM Plex Mono, monospace", fontSize: "0.72rem" } : {}), ...(l.dim ? { color: "var(--muted)" } : {}) }}>{l.text}</div>)}
+            <div className="onco-tip" style={{ left: Math.min(hover.x + 12, cssW - 260), top: hover.y + 14 }}>
+              {tip.map((l, i) => <div key={i} className={(l.mono ? "mono " : "") + (l.dim ? "dim" : "")}>{l.text}</div>)}
             </div>
           )}
         </div>
@@ -770,14 +808,13 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         {selRanges && !sel?.live && (() => {
           const n = selCount, tooMany = n > MAX_SELECTION;
           return (
-            <div className="card onco-select" style={{ marginTop: "0.5rem", borderColor: "#2563eb", display: "flex", flexWrap: "wrap",
-              alignItems: "center", gap: "0.5rem 0.8rem", padding: "0.6rem 0.8rem" }}>
-              <strong style={{ fontSize: "0.95rem" }}>{n.toLocaleString()} {data.unit}{n === 1 ? "" : "s"} selected</strong>
+            <div className="card onco-select">
+              <strong>{n.toLocaleString()} {data.unit}{n === 1 ? "" : "s"} selected</strong>
               {selGroups.length > 0 && <span className="meta">from {selGroups.join(", ")}</span>}
               <span className="spacer" />
               {props.onCreateCohort && <>
-                <label className="meta">name <input value={selName} onChange={(e) => setSelName(e.target.value)}
-                  style={{ fontSize: "0.8rem", width: 150 }} /></label>
+                <label className="meta">name <input className="onco-select-name" value={selName}
+                  onChange={(e) => setSelName(e.target.value)} /></label>
                 <button className="primary" disabled={selBusy || tooMany} onClick={createCohort}>
                   {selBusy ? "making the cohort…" : "New cohort"}</button>
               </>}
@@ -800,15 +837,17 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           );
         })()}
         {showMini && (
-          <canvas ref={miniRef} onMouseDown={miniScroll} onMouseMove={(e) => { if (e.buttons === 1) miniScroll(e); }}
-            style={{ display: "block", marginTop: "0.35rem", border: "1px solid var(--line)", borderRadius: 4, cursor: "col-resize", background: "#fff" }} />
+          <canvas ref={miniRef} className="onco-mini" onMouseDown={miniScroll}
+            onMouseMove={(e) => { if (e.buttons === 1) miniScroll(e); }} />
         )}
-        <Legend data={data} colorByType={display.colorByType} colors={display.colors ?? data.display?.colors} white={display.whiteBackground} />
-        {props.footer}
+        <div className="vfoot">
+          <Legend data={data} colorByType={display.colorByType} colors={display.colors ?? data.display?.colors} white={display.whiteBackground} />
+          {props.footer}
+        </div>
         {props.timings && (
-          <details style={{ marginTop: "0.5rem" }} open>
+          <details className="onco-timings" open>
             <summary className="meta">timings</summary>
-            <table className="meta" style={{ fontVariantNumeric: "tabular-nums", borderSpacing: "10px 2px" }}><tbody>
+            <table className="meta"><tbody>
               <tr><td>engine (server)</td><td>{fmt(perf.engineMs)} ms</td><td>pack (server)</td><td>{fmt(perf.packMs)} ms</td></tr>
               <tr><td>fetch incl. engine</td><td>{fmt(perf.fetchMs)} ms</td><td>payload</td><td>{fmt((perf.bytes || 0) / 1048576, 2)} MB decoded{perf.wireBytes ? " · " + fmt(perf.wireBytes / 1048576, 2) + " MB on the wire" : ""}</td></tr>
               <tr><td>decode</td><td>{fmt(perf.decodeMs, 1)} ms</td><td>last draw</td><td>{fmt(perf.drawMs, 1)} ms ({fmt(perf.cellsDrawn)} cells, {fmt(perf.bucketsDrawn)} buckets)</td></tr>
@@ -831,7 +870,7 @@ function Legend({ data, colorByType, colors, white }: { data: UnpackedContract; 
   const np = <span style={{ display: "inline-block", width: 10, height: 10, background: `linear-gradient(${P.np} 45%, ${P.npStripe} 45%, ${P.npStripe} 55%, ${P.np} 55%)`, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />;
   if (data.display?.clinicalLegends === "none") return null;
   return (
-    <div className="meta" style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem 0.9rem", marginTop: "0.4rem" }}>
+    <div className="onco-legend">
       {geneLegendFor(bitsPresent, S).map((it) => <span key={it.label}>{it.kind === "notProfiled" ? np
         : it.kind === "outline" ? <span style={{ display: "inline-block", width: 10, height: 10, border: "2px solid " + it.color, background: P.unaltered, marginRight: 4, verticalAlign: -1, borderRadius: 2, boxSizing: "border-box" }} />
         : sw(it.color)}{it.label}</span>)}

@@ -206,6 +206,11 @@ export default function AnalysisPage() {
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
   const [cat, setCat] = useState<any>(null);                 // event/endpoint catalog for the survival control
   const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>"
+  /**
+   * The document panel is a place to inspect and share what was asked, not something to read
+   * while interpreting a figure — so it folds away, and the results take the whole width.
+   */
+  const [docPanel, setDocPanel] = useState(true);
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -783,6 +788,18 @@ export default function AnalysisPage() {
   };
 
   const openGenes = (vi: number) => { setGenesFor(vi); genesDialog.current?.showModal(); };
+  /**
+   * Which cohorts a view draws. Absent means all of them, so ticking every cohort removes the
+   * field rather than freezing today's list into the document.
+   */
+  const setViewCohorts = (vi: number, names: string[], all: string[]) => updateView(vi, (v: any) => {
+    const next = { ...v };
+    if (names.length && names.length < all.length) next.cohorts = all.filter((n) => names.includes(n));
+    else delete next.cohorts;
+    return next;
+  });
+  const setViewAttrs = (vi: number, attributes: string[]) => updateView(vi, (v: any) => ({ ...v, attributes }));
+
   const setViewGenes = (vi: number, genes: GeneTrackSpec[]) =>
     updateView(vi, v => pruneSort({ ...v, genes }));
 
@@ -845,7 +862,7 @@ export default function AnalysisPage() {
                 {r.label} <span aria-hidden="true">×</span>
               </button>
               {merges && r.members.length > 1 && (
-                <button type="button" className="linklike" disabled={busy} style={{ fontSize: "0.72rem", marginLeft: "0.2rem" }}
+                <button type="button" className="linklike" disabled={busy} style={{ fontSize: "var(--t-sm)", marginLeft: "0.2rem" }}
                   title="draw each of these genes as its own row" onClick={() => splitGeneTrack(vi, r.label)}>split</button>
               )}
             </span>
@@ -863,7 +880,7 @@ export default function AnalysisPage() {
             <summary className="meta">edit as text — cBioPortal&apos;s gene list, where <code>[TP53 MDM2]</code> is one merged row</summary>
             <div className="setcol" style={{ marginTop: "0.3rem" }}>
               <textarea value={text ?? formatGeneList(list)} spellCheck={false} rows={3} disabled={busy}
-                onChange={(e) => setText(e.target.value)} style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: "0.8rem" }} />
+                onChange={(e) => setText(e.target.value)} style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: "var(--t-md)" }} />
               <div className="setrow">
                 <button type="button" className="facet" disabled={busy} onClick={applyText}>apply</button>
                 <button type="button" className="linklike" onClick={() => { setText(formatGeneList(list)); setTextErr(null); }}>reset</button>
@@ -876,6 +893,93 @@ export default function AnalysisPage() {
       </div>
     );
   }
+
+  /**
+ * A checkbox menu in a view's header: which cohorts it uses, which attributes it compares.
+ * One component, because these were the settings you could only reach by editing the JSON.
+ */
+function PickMenu({ label, title, options, chosen, onChange, min, max, busy }: {
+  label: string; title: string; busy?: boolean; min?: number; max?: number;
+  options: { value: string; label: string; hint?: string }[];
+  chosen: string[]; onChange: (next: string[]) => void;
+}) {
+  const toggle = (v: string) => {
+    const has = chosen.includes(v);
+    if (has && min != null && chosen.length <= min) return;
+    onChange(has ? chosen.filter((x) => x !== v) : [...chosen, v]);
+  };
+  return (
+    <details className="gearmenu">
+      <summary className="tbbtn" title={title}>{label} ({chosen.length})</summary>
+      <div className="gearmenu-items">
+        {options.length === 0 && <span className="meta">nothing to choose from</span>}
+        {options.map((o) => {
+          const on = chosen.includes(o.value);
+          const stuck = on ? (min != null && chosen.length <= min) : (max != null && chosen.length >= max);
+          return (
+            <label key={o.value} className="chk" title={stuck ? (on ? "a view needs at least " + min : "at most " + max) : undefined}>
+              <input type="checkbox" checked={on} disabled={busy || stuck} onChange={() => toggle(o.value)} />
+              {o.label}{o.hint && <span className="meta"> — {o.hint}</span>}
+            </label>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
+/**
+ * Every view's header, with one anatomy: the title and what it is, then the actions that
+ * belong to this view, then its status chips, then the control that removes it. Before this
+ * each view kind built its own, so the timing chip landed in a different place in each card.
+ */
+function ViewHead({ v, title, sub, actions, chips, cohorts, onRemove }: {
+  v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode; onRemove?: () => void;
+  /** which cohorts this view draws; absent when the document has only one */
+  cohorts?: { chosen: string[]; all: string[]; max?: number; busy?: boolean; onChange: (n: string[]) => void };
+}) {
+  return (
+    <div className="vhead">
+      <h2 className="vtitle">{title}{sub != null && <span className="plain"> — {sub}</span>}</h2>
+      <div className="vmeta">
+        {cohorts && cohorts.all.length > 1 && (
+          <PickMenu label="cohorts" title="which cohorts this view draws; all of them unless you say otherwise"
+            options={cohorts.all.map((n) => ({ value: n, label: n }))} chosen={cohorts.chosen}
+            onChange={cohorts.onChange} min={1} max={cohorts.max} busy={cohorts.busy} />
+        )}
+        {actions}
+        {chips}
+        <Latency v={v} />
+        <Participation p={v.participation} />
+        {onRemove && <button className="removeview" title="remove this view from the document"
+          aria-label="remove this view" onClick={onRemove}>×</button>}
+      </div>
+    </div>
+  );
+}
+
+/** the server-side wall clock for one view, and what that number does and does not include */
+function Latency({ v }: { v: any }) {
+  if (v.ms == null) return null;
+  return (
+    <span className="lat" title={
+      "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
+      (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
+      {v.ms.toLocaleString()}ms
+      {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
+    </span>
+  );
+}
+
+  /** the document's view at vi, whatever its kind */
+  const docView = (vi: number): any => ((doc.views || [])[vi] || {});
+
+  /** what a view's cohort picker needs: today's choice, everything on offer, and where to write it */
+  const cohortChoice = (vi: number, v: any, max?: number) => {
+    const all = Object.keys((result && result.cohorts) || doc.cohorts || {});
+    const chosen: string[] = Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts.filter((n: string) => all.includes(n)) : all;
+    return { chosen, all, max, busy, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
+  };
 
   /** the view at index vi, read as an oncoprint view (its editor only renders there) */
   const ocView = (vi: number): OncoprintView => ((doc.views || [])[vi] || {}) as OncoprintView;
@@ -907,6 +1011,9 @@ export default function AnalysisPage() {
     if (!keys.length) { const { sort, ...rest } = v; return rest; }
     return { ...v, sort: keys.slice(0, 4) };
   });
+
+  /** how many rows a view's gene list draws, for the button that opens the editor */
+  const geneRowCount = (v: any): number => { try { return normalizeGeneTracks(v.genes || []).tracks.length; } catch { return (v.genes || []).length; } };
 
   /** the row a gene-list entry draws, which is the label the figure sends back */
   const geneRowLabel = (e: GeneTrackSpec): string => typeof e === "string" ? e.toUpperCase()
@@ -1095,9 +1202,9 @@ export default function AnalysisPage() {
         <h1>Cohort Lab</h1>
         <span className="sub">analysis documents — cohorts and views over one declarative object</span>
         <span className="spacer" />
-        <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>rationale</a>
+        <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>rationale</a>
       </header>
-      <main style={{ maxWidth: "96rem" }}>
+      <main className="analysis-main">
         {/* Suggestions for every view's gene editor: the most-altered genes this
             exploration found. Typing any symbol is still allowed — the list is a
             shortcut, not a whitelist. */}
@@ -1157,7 +1264,7 @@ export default function AnalysisPage() {
             return (
               <div className="card exbar">
                 <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <strong style={{ fontSize: "0.82rem" }}>
+                  <strong style={{ fontSize: "var(--t-md)" }}>
                     {!ready ? "No studies selected"
                       : clauses ? clauses + (clauses === 1 ? " filter" : " filters")
                       : "No filters"}
@@ -1286,7 +1393,7 @@ export default function AnalysisPage() {
               </div>
             );
           })()}
-          {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "0.85rem", margin: 0 }}>
+          {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "var(--t-md)", margin: 0 }}>
             No studies selected — check one or more above to explore.</p></div>}
           {!explore && exStudies.length > 0 && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
           {explore && explore.derived && explore.derived.length > 0 && (
@@ -1310,7 +1417,7 @@ export default function AnalysisPage() {
                           its total is the draft-minus-itself total. Say so, exactly
                           as the clinical facets do, rather than show a number that
                           cannot be reconciled with the draft. */}
-                      <div style={{ fontSize: "0.78rem", fontWeight: 600 }} title={d.note}>
+                      <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }} title={d.note}>
                         {d.label} <span className="meta">· {d.covered.toLocaleString()} patients
                           {(d as any).disjunctive ? " · not narrowed by its own filter" : ""}</span>
                       </div>
@@ -1366,7 +1473,7 @@ export default function AnalysisPage() {
                       const shown = disj ? c.values.reduce((n: number, v: any) => n + v.n, 0) : c.patients;
                       const unit = c.per === "sample" ? " samples" : " patients";
                       return (
-                        <div style={{ fontSize: "0.78rem", fontWeight: 600 }}
+                        <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}
                           title={[c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
                             .filter(Boolean).join(" — ") || undefined}>
                           {c.displayName || c.attribute}{" "}
@@ -1627,7 +1734,7 @@ export default function AnalysisPage() {
             {explore && (
               <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.4rem" }}>
                 <span className="meta">quick add:</span>
-                <select value={qaAttr} onChange={e => { setQaAttr(e.target.value); setQaVal(""); }} style={{ fontSize: "0.78rem", maxWidth: "14rem" }}>
+                <select value={qaAttr} onChange={e => { setQaAttr(e.target.value); setQaVal(""); }} style={{ fontSize: "var(--t-md)", maxWidth: "14rem" }}>
                   <option value="">attribute…</option>
                   {explore.clinical.map(a => <option key={a.per + a.attribute} value={a.per + "|" + a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric)" : ""}{a.per === "sample" ? " ·sample" : ""}</option>)}
                 </select>
@@ -1638,7 +1745,7 @@ export default function AnalysisPage() {
                   if (a.kind === "num") return (
                     <>
                       <span className="meta">min {a.min} · median {a.median} · max {a.max} —</span>
-                      <input placeholder="≥" value={qaVal} onChange={e => setQaVal(e.target.value)} style={{ width: "4.5rem", fontSize: "0.78rem" }} />
+                      <input placeholder="≥" value={qaVal} onChange={e => setQaVal(e.target.value)} style={{ width: "4.5rem", fontSize: "var(--t-md)" }} />
                       <button className="facet" disabled={!Number.isFinite(Number(qaVal)) || qaVal === ""}
                         onClick={() => { addClause({ kind: "clinical", attribute: a.attribute, range: { gte: Number(qaVal) }, ...perExtra }); setQaVal(""); }}>add ≥</button>
                       <button className="facet" disabled={!Number.isFinite(Number(qaVal)) || qaVal === ""}
@@ -1647,7 +1754,7 @@ export default function AnalysisPage() {
                   );
                   return (
                     <select value="" onChange={e => { if (e.target.value !== "") addClause({ kind: "clinical", attribute: a.attribute, op: "=", value: e.target.value, ...perExtra }); }}
-                      style={{ fontSize: "0.78rem", maxWidth: "14rem" }}>
+                      style={{ fontSize: "var(--t-md)", maxWidth: "14rem" }}>
                       <option value="">value… (patients)</option>
                       {a.values.map(v => <option key={v.v} value={v.v}>{v.v} ({v.n.toLocaleString()})</option>)}
                     </select>
@@ -1655,7 +1762,7 @@ export default function AnalysisPage() {
                 })()}
                 <input list="qa-genes" placeholder="gene → OQL" value={qaGene} onChange={e => setQaGene(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && qaGene.trim()) { addClause({ kind: "oql", q: qaGene.trim().toUpperCase() + ":" }); setQaGene(""); } }}
-                  style={{ width: "9rem", fontSize: "0.78rem" }} />
+                  style={{ width: "9rem", fontSize: "var(--t-md)" }} />
                 <datalist id="qa-genes">
                   {explore.genes.map(g => <option key={g.gene} value={g.gene}>{g.n.toLocaleString()} altered</option>)}
                 </datalist>
@@ -1804,7 +1911,7 @@ export default function AnalysisPage() {
         })()}
 
         {/* ================= Analysis tab ================= */}
-        {tab === "analysis" && <div className="ana-grid">
+        {tab === "analysis" && <div className={"ana-grid" + (docPanel ? "" : " nodoc")}>
           <div>
             <div className="card">
               <h2>The document <span className="plain">— cohorts &amp; views</span></h2>
@@ -1865,7 +1972,7 @@ export default function AnalysisPage() {
                   {Object.entries(result.cohorts).map(([n, c]) => (
                     <div key={n} style={{ marginTop: "0.5rem" }}>
                       <p className="meta" style={{ margin: "0 0 0.25rem" }}><strong>{n}</strong> — {c.count.toLocaleString()} patients{c.studies && c.studies.length > 1 ? " across " + c.studies.length + " studies" : ""}</p>
-                      <pre style={{ maxHeight: "16rem", overflow: "auto", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem", fontSize: "0.68rem", whiteSpace: "pre" }}>{c.sql}</pre>
+                      <pre style={{ maxHeight: "16rem", overflow: "auto", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem", fontSize: "var(--t-xs)", whiteSpace: "pre" }}>{c.sql}</pre>
                     </div>
                   ))}
                 </details>
@@ -1897,7 +2004,7 @@ export default function AnalysisPage() {
                   {doc.params && Object.keys(doc.params).length > 0 ? (
                     <div className="params">
                       <div className="row" style={{ alignItems: "baseline" }}>
-                        <strong style={{ fontSize: "0.78rem" }}>Parameters</strong>
+                        <strong style={{ fontSize: "var(--t-md)" }}>Parameters</strong>
                         <span className="meta">— change one here and every view that uses it re-runs</span>
                       </div>
                       {Object.entries(doc.params).map(([k, v]) => (
@@ -1941,7 +2048,7 @@ export default function AnalysisPage() {
             {!result && !busy && (
               <div className="card">
                 <h2>Nothing here yet</h2>
-                <p className="note" style={{ fontSize: "0.85rem" }}>
+                <p className="note" style={{ fontSize: "var(--t-md)" }}>
                   The analysis document is empty. Add cohorts from the <button className="linklike" onClick={() => goTab("cohorts")}>Cohorts tab</button>,
                   ask chat above (e.g. “compare STK11-driver vs wild-type immunotherapy patients”), or paste a document on the left and run it.
                 </p>
@@ -1951,7 +2058,7 @@ export default function AnalysisPage() {
             {result && !result.views.length && (
               <div className="card">
                 <h2>Cohorts evaluated — no views defined</h2>
-                <p className="note" style={{ fontSize: "0.85rem" }}>
+                <p className="note" style={{ fontSize: "var(--t-md)" }}>
                   Add a views array to the document (e.g. <code>{`{"kind":"survival"}`}</code>),{" "}
                   <button className="linklike" onClick={() => { const d = { ...doc, views: DEFAULT_VIEWS }; setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d); }}>add the default views</button>, or ask chat.
                 </p>
@@ -1960,8 +2067,11 @@ export default function AnalysisPage() {
             {Object.keys(doc.cohorts || {}).length > 0 && (
               <div className="card addview">
                 <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.4rem" }}>
-                  <strong style={{ fontSize: "0.8rem" }}>Add a view</strong>
+                  <strong className="addview-title">Add a view</strong>
                   <span className="meta">{(doc.views || []).length} of 6 in this document</span>
+                  <button className="tbbtn" onClick={() => setDocPanel((x) => !x)}
+                    title={docPanel ? "fold the document away and give the figures the width" : "show the document, its cohorts and its JSON"}>
+                    {docPanel ? "hide document" : "show document"}</button>
                   <span className="spacer" />
                   {VIEW_KINDS.map(({ kind, label, why }) => {
                     const blocked = (doc.views || []).length >= 6
@@ -1978,24 +2088,16 @@ export default function AnalysisPage() {
             )}
             {result && result.views.map((v, vi) => (
               <div className="card viewcard" key={vi}>
-                <button className="removeview" title="remove this view from the document"
-                  aria-label="remove this view" onClick={() => removeView(vi)}>×</button>
                 {/* The author's own note about this figure, plain text by design —
                     see .viewnote in globals.css for why it is never markdown. */}
                 {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
                 {v.kind === "compare" && v.rows && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></div>
+                  <ViewHead v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onRemove={() => removeView(vi)}
+                    actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                     style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
                       <thead><tr>
                         <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>gene</th>
                         {v.cohorts!.map((n, i: number) => <th key={n} style={{ textAlign: "right", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}<br /><span style={{ fontWeight: 400, color: "var(--muted)" }}>driver / any</span></th>)}
@@ -2012,14 +2114,8 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Hotspots <span className="plain">— recurrent protein changes, counted per patient</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></div>
+                  <ViewHead v={v} title="Hotspots" cohorts={cohortChoice(vi, docView(vi))} sub="recurrent protein changes, counted per patient" onRemove={() => removeView(vi)}
+                    actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   {v.hotspots.map(h => {
                     const positioned = h.variants.filter(x => x.pos != null);
@@ -2035,7 +2131,7 @@ export default function AnalysisPage() {
                     return (
                       <div key={h.gene} className="lolli">
                         <div className="row" style={{ alignItems: "baseline" }}>
-                          <strong style={{ fontSize: "0.82rem" }}>{h.gene}</strong>
+                          <strong style={{ fontSize: "var(--t-md)" }}>{h.gene}</strong>
                           <span className="meta">{h.mutated.toLocaleString()} mutated patients · {h.variants.length} shown
                             {h.withheld ? " of " + (h.variants.length + h.withheld) + " distinct changes" : ""}</span>
                           <span className="spacer" />
@@ -2076,17 +2172,20 @@ export default function AnalysisPage() {
                   })}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-expression <span className="plain">— Pearson correlation from per-site sums</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></div>
+                  <ViewHead v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onRemove={() => removeView(vi)}
+                    actions={<>
+                      <label className="tbfield" title="the molecular profile the correlation is computed over">profile <select
+                        value={docView(vi).profileType || ""} disabled={busy}
+                        onChange={(e) => updateView(vi, (vv: any) => ({ ...vv, profileType: e.target.value }))}>
+                        {!((explore && explore.profiles) || []).includes(docView(vi).profileType || "") &&
+                          <option value={docView(vi).profileType || ""}>{docView(vi).profileType || "(none)"}</option>}
+                        {((explore && explore.profiles) || []).map((pt: string) => <option key={pt} value={pt}>{pt}</option>)}
+                      </select></label>
+                      <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
+                    </>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
                       <thead><tr>
                         <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>pair</th>
                         <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>n</th>
@@ -2117,17 +2216,14 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "clinical" && v.clinical && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Clinical comparison <span className="plain">— attribute distributions across cohorts</span></h2><span className="spacer" /><>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></div>
+                  <ViewHead v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onRemove={() => removeView(vi)}
+                    actions={<PickMenu label="attributes" title="which clinical attributes this view compares" busy={busy}
+                      options={(trackAttrs.attrs || []).map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind }))}
+                      chosen={(docView(vi).attributes || []).map(String)} min={1} max={20}
+                      onChange={(next) => setViewAttrs(vi, next)} />} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
                       <thead><tr>
                         <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>attribute</th>
                         {v.cohorts!.map((n, i: number) => <th key={n} style={{ textAlign: "left", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}</th>)}
@@ -2163,17 +2259,11 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-occurrence <span className="plain">— pairwise, among patients profiled for both genes</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></div>
+                  <ViewHead v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onRemove={() => removeView(vi)}
+                    actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
                       <thead><tr>
                         <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>pair</th>
                         <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>both</th>
@@ -2209,19 +2299,12 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "survival" && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Survival <span className="plain">— Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}
-                    {v.anchoredTo && <> — from {v.anchoredTo}</>}</span></h2>
-                  {v.truncated && <span className="trunc" title={
-                    "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
-                    (v.entryMonths ? "\n\nMedian " + v.entryMonths.median + " months from anchor to entry; 90th percentile "
-                      + v.entryMonths.p90 + "; longest " + v.entryMonths.max + "." : "")}>left-truncated</span>}<span className="spacer" /><>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></div>
+                  <ViewHead v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} onRemove={() => removeView(vi)}
+                    sub={<>Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}{v.anchoredTo && <> — from {v.anchoredTo}</>}</>}
+                    chips={v.truncated ? <span className="trunc" title={
+                      "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
+                      (v.entryMonths ? "\n\nMedian " + v.entryMonths.median + " months from anchor to entry; 90th percentile "
+                        + v.entryMonths.p90 + "; longest " + v.entryMonths.max + "." : "")}>left-truncated</span> : null} />
                   {(() => {
                     // The basis of a survival analysis — which endpoint, and what
                     // the clock starts from — is the thing people most want to
@@ -2274,7 +2357,7 @@ export default function AnalysisPage() {
                     );
                   })()}
                   <KMChart curves={v.curves!} />
-                  <div style={{ display: "flex", gap: "1.2rem", fontSize: "0.76rem", color: "var(--muted)", marginTop: "0.4rem", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: "1.2rem", fontSize: "var(--t-sm)", color: "var(--muted)", marginTop: "0.4rem", flexWrap: "wrap" }}>
                     {v.curves!.map((c, i: number) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: median {c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}
                   </div>
                   {v.logrank && (
@@ -2303,10 +2386,15 @@ export default function AnalysisPage() {
                   </div>
                 )}
                 {v.kind === "sequence" && v.svg && <>
-                  <div className="row" style={{ alignItems: "baseline" }}>
-                    <h2 style={{ margin: 0 }}>Treatment sequence <span className="plain">
+                  <div className="vhead">
+                    <h2 className="vtitle">Treatment sequence <span className="plain">
                       — lines of therapy by {v.sequence ? v.sequence.labelKey : ""}
                       {v.sequence ? " · " + v.sequence.lineGap + "-day line gap" : ""}</span></h2>
+                    <div className="vmeta">
+                      <PickMenu label="cohorts" title="which cohorts this view draws" busy={busy}
+                        options={Object.keys((result && result.cohorts) || {}).map((n) => ({ value: n, label: n }))}
+                        chosen={cohortChoice(vi, docView(vi)).chosen} min={1} max={1}
+                        onChange={(next) => setViewCohorts(vi, next, Object.keys((result && result.cohorts) || {}))} />
                     {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
                       <details className="gearmenu inline">
                         <summary title="treatment sequence options">settings</summary>
@@ -2345,23 +2433,23 @@ export default function AnalysisPage() {
                         </div>
                       </details>
                     )}
-                    <span className="spacer" />
-                    <>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying \u00b7 " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></>
+                    <Latency v={v} /><Participation p={v.participation} />
+                    <button className="removeview" title="remove this view from the document"
+                      aria-label="remove this view" onClick={() => removeView(vi)}>×</button>
+                    </div>
                   </div>
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
                 {v.kind === "course" && v.svg && <>
-                  <div className="row" style={{ alignItems: "baseline" }}>
-                    <h2 style={{ margin: 0 }}>Clinical course <span className="plain">
+                  <div className="vhead">
+                    <h2 className="vtitle">Clinical course <span className="plain">
                       — {[...new Set((v.course || []).map(c => c.eventType))].join(", ")}
                       {v.anchoredTo ? "" : ""} · {v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
+                    <div className="vmeta">
+                      <PickMenu label="cohorts" title="which cohorts this view draws" busy={busy}
+                        options={Object.keys((result && result.cohorts) || {}).map((n) => ({ value: n, label: n }))}
+                        chosen={cohortChoice(vi, docView(vi)).chosen} min={1}
+                        onChange={(next) => setViewCohorts(vi, next, Object.keys((result && result.cohorts) || {}))} />
                     <details className="gearmenu inline">
                       <summary title="clinical course options">settings</summary>
                       {/* Every parameter of this chart is a choice, and the defaults are only a
@@ -2430,15 +2518,10 @@ export default function AnalysisPage() {
                     );
                   })()}
                     </details>
-                    <span className="spacer" />
-                    <>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying \u00b7 " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></>
+                    <Latency v={v} /><Participation p={v.participation} />
+                    <button className="removeview" title="remove this view from the document"
+                      aria-label="remove this view" onClick={() => removeView(vi)}>×</button>
+                    </div>
                     </div>
                   {/* The same SVG the chat and MCP clients receive \u2014 one renderer,
                       so the figure cannot differ between surfaces. */}
@@ -2454,6 +2537,9 @@ export default function AnalysisPage() {
                     "&gene_list=" + encodeURIComponent(genes.join(" ")) +
                     "&profileFilter=mutations%2Cstructural_variants%2Cgistic&Z_SCORE_THRESHOLD=2.0&tab_index=tab_visualize&Action=Submit";
                   return <>
+                    <ViewHead v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onRemove={() => removeView(vi)}
+                      cohorts={cohortChoice(vi, docView(vi), 4)}
+                      sub={c ? <>{c.stats.nColumns.toLocaleString()} {c.unit}s · {c.conventions.annotation}</> : "loading…"} />
                     <OncoprintFigure
                       spec={v.spec}
                       display={figureDisplay(ocView(vi))}
@@ -2466,35 +2552,31 @@ export default function AnalysisPage() {
                       onContract={(ct) => { const k = JSON.stringify(v.spec); setContracts((m) => m[k] === ct ? m : { ...m, [k]: ct }); }}
                       onCreateCohort={(sel) => cohortFromSelection(sel, (c ? c.studies : vStudies) || vStudies)}
                       busy={busy}
-                      heading={<><h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {(c ? c.stats.nColumns : 0).toLocaleString()} {c ? c.unit : "patient"}s · {c ? c.conventions.annotation : ""}</span></h2>
-                        {c && <span className="lat" title="Server-side wall-clock for this figure's queries and contract assembly; drawing happens in your browser.">{(c.stats.ms || 0).toLocaleString()}ms</span>}</>}
                       controls={<>
-                        <Participation p={v.participation} />
-                        <label className="meta" title="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
-                          <input type="checkbox" checked={!!(ocView(vi).display as any)?.hideVUS} disabled={busy}
-                            onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "hideVUS", e.target.checked || undefined))} /> drivers only</label>
-                        <label className="meta" title="driver calls come from the version-pinned OncoKB store">annotate <select
-                          value={(ocView(vi).display as any)?.annotate || "oncokb"} disabled={busy}
-                          onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "annotate", e.target.value === "none" ? "none" : undefined))}
-                          style={{ fontSize: "0.78rem" }}>
-                          <option value="oncokb">OncoKB</option><option value="none">none</option>
-                        </select></label>
-                        <label className="meta" title="a cohort selects patients; sample mode draws every sample of those patients">columns <select
+                        <button className="tbbtn genesbtn" disabled={busy}
+                          title="choose the genes this oncoprint draws" onClick={() => openGenes(vi)}>genes ({geneRowCount(ocView(vi))})</button>
+                        <label className="tbfield" title="a cohort selects patients; sample mode draws every sample of those patients">columns <select
                           value={ocView(vi).unit || "patient"} disabled={busy}
-                          onChange={(e) => updateView(vi, (vv: any) => { const n = { ...vv }; if (e.target.value === "sample") n.unit = "sample"; else delete n.unit; return n; })}
-                          style={{ fontSize: "0.78rem" }}>
+                          onChange={(e) => updateView(vi, (vv: any) => { const n = { ...vv }; if (e.target.value === "sample") n.unit = "sample"; else delete n.unit; return n; })}>
                           <option value="patient">patients</option><option value="sample">samples</option>
                         </select></label>
-                        <button className="linklike genesbtn" disabled={busy}
-                          title="choose the genes this oncoprint draws" onClick={() => openGenes(vi)}>genes</button>
+                        <label className="tbfield" title="driver calls come from the version-pinned OncoKB store">annotate <select
+                          value={(ocView(vi).display as any)?.annotate || "oncokb"} disabled={busy}
+                          onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "annotate", e.target.value === "none" ? "none" : undefined))}>
+                          <option value="oncokb">OncoKB</option><option value="none">none</option>
+                        </select></label>
+                        <label className="chk tbchk" title="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
+                          <input type="checkbox" checked={!!(ocView(vi).display as any)?.hideVUS} disabled={busy}
+                            onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "hideVUS", e.target.checked || undefined))} /> drivers only</label>
+                      </>}
+                      moreMenu={
                         <details className="gearmenu">
-                          <summary title="oncoprint options">⚙</summary>
+                          <summary className="tbbtn" title="more, about this oncoprint">⋯</summary>
                           <div className="gearmenu-items">
                             <a target="_blank" rel="noopener noreferrer" href={portalUrl}>Open these genes in the cBioPortal oncoprint ↗</a>
                             <span className="meta">full {vStudies.length === 1 ? "study" : vStudies.length + "-study"} view, all samples — the portal can&apos;t express Cohort Lab cohorts or tracks</span>
                           </div>
-                        </details>
-                      </>}
+                        </details>}
                       tracksMenu={<TracksMenu
                         attrs={trackAttrs.attrs} profiles={trackAttrs.profiles}
                         clinical={ocView(vi).clinical || []} heatmap={ocView(vi).heatmap || []}
@@ -2600,14 +2682,14 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
   };
   return (
     <details className="gearmenu">
-      <summary className="textual" title="add or remove tracks">tracks {chosen.length ? "(" + chosen.length + ")" : ""}</summary>
+      <summary className="tbbtn" title="add or remove tracks">tracks{chosen.length ? " (" + chosen.length + ")" : ""}</summary>
       <div className="gearmenu-items wide" style={{ minWidth: 340 }}>
         <div className="row" style={{ gap: "0.5rem", alignItems: "center" }}>
           <button className="linklike" style={{ fontWeight: tab === "clinical" ? 600 : 400 }} onClick={() => setTab("clinical")}>Clinical {attrs.length ? "(" + attrs.length + ")" : ""}</button>
           <button className="linklike" style={{ fontWeight: tab === "heatmap" ? 600 : 400 }} onClick={() => setTab("heatmap")}>Heatmap ({heatOptions.length})</button>
           <button className="linklike" style={{ fontWeight: tab === "cohorts" ? 600 : 400 }} onClick={() => setTab("cohorts")}>Cohort rows ({cohorts.length})</button>
           <span className="spacer" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search…" style={{ fontSize: "0.78rem", width: 120 }} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search…" style={{ fontSize: "var(--t-md)", width: 120 }} />
         </div>
         <span className="meta">{chosen.length} of {cap} chosen{
           tab === "clinical" ? " · cases with data, most first"
@@ -2628,7 +2710,7 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
                 </label>
                 {h && <input defaultValue={(h.genes || []).join(" ")} placeholder="genes for this profile — blank follows the figure"
                   disabled={busy} onBlur={(e) => setHeatGenes(name, e.target.value)}
-                  style={{ fontSize: "0.72rem", width: "100%", margin: "0 0 0.3rem 1.4rem" }} />}
+                  style={{ fontSize: "var(--t-sm)", width: "100%", margin: "0 0 0.3rem 1.4rem" }} />}
               </div>
             );
           })}

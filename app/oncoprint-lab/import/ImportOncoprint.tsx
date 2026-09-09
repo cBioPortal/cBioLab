@@ -44,7 +44,7 @@ export default function ImportOncoprint({ sample }: { sample: { events: string; 
           {box("coverage", "patient · genes the panel covers (optional)", coverage, setCoverage, 12)}
         </div>
         <div className="row" style={{ marginTop: "0.6rem", alignItems: "center", gap: "0.6rem" }}>
-          <label className="meta">group by <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} style={{ fontSize: "0.78rem" }}>
+          <label className="meta">group by <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} style={{ fontSize: "var(--t-md)" }}>
             <option value="">nothing</option>
             {attrs.map((a) => <option key={a} value={a}>{a}</option>)}
           </select></label>
@@ -54,9 +54,11 @@ export default function ImportOncoprint({ sample }: { sample: { events: string; 
         </div>
       </div>
       <div className="card">
+        <div className="vhead">
+          <h2 className="vtitle">Pasted data <span className="plain">— no database, no cohort; the same figure the analysis page draws</span></h2>
+        </div>
         <OncoprintFigure endpoint="/api/oncoprint/local" spec={spec}
-          display={display} sortKeys={sortKeys} onDisplay={setDisplay} onSortKeys={setSortKeys}
-          heading={<h2 style={{ margin: 0 }}>Pasted data <span className="plain">— no database, no cohort; the same figure the analysis page draws</span></h2>} />
+          display={display} sortKeys={sortKeys} onDisplay={setDisplay} onSortKeys={setSortKeys} />
       </div>
     </>
   );
