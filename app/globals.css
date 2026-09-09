@@ -785,3 +785,43 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
 .vfoot .onco-legend { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); font-size: var(--t-xs); color: var(--muted); }
 .vfoot .note, .vfoot .meta { font-size: var(--t-sm); }
 .vfoot .provsql { border-top: none; margin-top: var(--s2); padding-top: 0; }
+
+/* ---- the oncoprint figure's own chrome ------------------------------------
+   Static styling lives here; what stays inline in the component is geometry computed
+   from the drawing — a tooltip's position, the marquee's edges, a legend swatch's colour. */
+.onco-plot { position: relative; margin-top: var(--s2); border: 1px solid var(--line); border-radius: var(--r-md); background: #fff; overflow: hidden; }
+.onco-canvas { display: block; cursor: crosshair; }
+.onco-mini { display: block; margin-top: var(--s1); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: col-resize; background: #fff; }
+
+.onco-trackmenu {
+  position: absolute; z-index: 4; min-width: 190px; padding: var(--s1);
+  display: flex; flex-direction: column; gap: 0.1rem;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .16);
+}
+.onco-trackmenu-name { padding: 0 var(--s1) var(--s0); }
+
+.onco-tip {
+  position: absolute; z-index: 2; pointer-events: none; max-width: 330px;
+  padding: var(--s1) var(--s2); font-size: var(--t-md);
+  background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .12);
+}
+.onco-tip .dim { color: var(--muted); }
+.onco-tip .lead { font-weight: 600; }
+.onco-tip .mono { font-family: "IBM Plex Mono", monospace; font-size: var(--t-sm); }
+
+.onco-marquee {
+  position: absolute; top: 0; pointer-events: none; z-index: 3;
+  background: rgba(37, 99, 235, 0.14); border-left: 1px solid #2563eb; border-right: 1px solid #2563eb;
+}
+.onco-marquee-n { position: absolute; top: 2px; left: 3px; font-size: var(--t-xs); color: #1d4ed8; white-space: nowrap; }
+
+.onco-select {
+  margin-top: var(--s2); border-color: #2563eb; padding: var(--s3) var(--s3);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3);
+}
+.onco-select strong { font-size: var(--t-base); }
+.onco-select-name { font-size: var(--t-md); width: 150px; }
+.onco-timings { margin-top: var(--s2); }
+.onco-timings table { font-variant-numeric: tabular-nums; border-spacing: 10px 2px; }

@@ -689,8 +689,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               onClick={() => onSortKeys(sortKeys.filter((x) => x !== k))}>{k.startsWith("-") ? k.slice(1) + " ↓" : k + " ↑"} ✕</button>
           ))}
         </div>}
-        <div ref={wrapRef} style={{ position: "relative", marginTop: "0.5rem", border: "1px solid var(--line)", borderRadius: 8, background: "#fff", overflow: "hidden" }}>
-          <canvas ref={canvasRef} style={{ display: "block", cursor: "crosshair" }}
+        <div ref={wrapRef} className="onco-plot">
+          <canvas ref={canvasRef} className="onco-canvas"
             onPointerDown={onSelDown} onPointerMove={onSelMove} onPointerUp={onSelUp} onPointerCancel={onSelUp}
             onMouseMove={onMove} onMouseLeave={() => { setHover(null); setLabelHover(null); }}
             onClick={(e) => {
@@ -714,11 +714,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 onClick={() => { act(); setTrackMenu(null); }}>{label}</button>
             );
             return (
-              <div style={{ position: "absolute", left: Math.min(trackMenu.x, cssW - 210), top: trackMenu.y + 6, zIndex: 4,
-                background: "var(--card)", border: "1px solid var(--line)", borderRadius: 6, boxShadow: "0 6px 18px rgba(0,0,0,.16)",
-                padding: "0.35rem", display: "flex", flexDirection: "column", gap: "0.1rem", minWidth: 190 }}
+              <div className="onco-trackmenu" style={{ left: Math.min(trackMenu.x, cssW - 210), top: trackMenu.y + 6 }}
                 onMouseLeave={() => setTrackMenu(null)}>
-                <span className="meta" style={{ padding: "0 0.3rem 0.2rem" }}>{t.label}
+                <span className="meta onco-trackmenu-name">{t.label}
                   {t.members && t.members.length > 1 && <><br />{t.members.join(" · ")}</>}</span>
                 {props.onMoveTrack && item("Move up", false, () => props.onMoveTrack!(t.label, -1))}
                 {props.onMoveTrack && item("Move down", false, () => props.onMoveTrack!(t.label, 1))}
@@ -766,10 +764,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             const x0 = Math.max(GEOM.gutter, Math.min(cssW, r.x0)), x1 = Math.max(GEOM.gutter, Math.min(cssW, r.x1));
             if (x1 <= x0) return null;
             return (
-              <div style={{ position: "absolute", left: x0, top: 0, width: x1 - x0, height: canvasHeight(data.tracks.length),
-                background: "rgba(37,99,235,0.14)", borderLeft: "1px solid #2563eb", borderRight: "1px solid #2563eb",
-                pointerEvents: "none", zIndex: 3 }}>
-                {sel?.live && <span style={{ position: "absolute", top: 2, left: 3, fontSize: "0.7rem", color: "#1d4ed8", whiteSpace: "nowrap" }}>
+              <div className="onco-marquee" style={{ left: x0, width: x1 - x0, height: canvasHeight(data.tracks.length) }}>
+                {sel?.live && <span className="onco-marquee-n">
                   {selCount.toLocaleString()} {data.unit}{selCount === 1 ? "" : "s"}</span>}
               </div>
             );
@@ -779,19 +775,16 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             const t = data.tracks[labelHover.ti];
             const lines = trackTooltipLines(t, data.n, data.unit);
             return (
-              <div style={{ position: "absolute", left: Math.min(labelHover.x + 12, cssW - 300), top: labelHover.y + 14, pointerEvents: "none",
-                background: "var(--card)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 6, padding: "6px 8px",
-                fontSize: "0.78rem", boxShadow: "0 4px 14px rgba(0,0,0,.12)", maxWidth: 330, zIndex: 2 }}>
-                {lines.map((l, i) => <div key={i} style={i ? { color: "var(--muted)" } : { fontWeight: 600 }}>{l}</div>)}
-                <div style={{ color: "var(--muted)", marginTop: 2 }}>click for track options</div>
+              <div className="onco-tip" style={{ left: Math.min(labelHover.x + 12, cssW - 300), top: labelHover.y + 14 }}>
+                {lines.map((l, i) => <div key={i} className={i ? "dim" : "lead"}>{l}</div>)}
+                <div className="dim">click for track options</div>
               </div>
             );
           })()}
 
           {hover && tip && (
-            <div style={{ position: "absolute", left: Math.min(hover.x + 12, cssW - 260), top: hover.y + 14, pointerEvents: "none", background: "var(--card)", color: "var(--ink)",
-              border: "1px solid var(--line)", borderRadius: 6, padding: "6px 8px", fontSize: "0.78rem", boxShadow: "0 4px 14px rgba(0,0,0,.12)", maxWidth: 330, zIndex: 2 }}>
-              {tip.map((l, i) => <div key={i} style={{ ...(l.mono ? { fontFamily: "IBM Plex Mono, monospace", fontSize: "0.72rem" } : {}), ...(l.dim ? { color: "var(--muted)" } : {}) }}>{l.text}</div>)}
+            <div className="onco-tip" style={{ left: Math.min(hover.x + 12, cssW - 260), top: hover.y + 14 }}>
+              {tip.map((l, i) => <div key={i} className={(l.mono ? "mono " : "") + (l.dim ? "dim" : "")}>{l.text}</div>)}
             </div>
           )}
         </div>
@@ -808,14 +801,13 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         {selRanges && !sel?.live && (() => {
           const n = selCount, tooMany = n > MAX_SELECTION;
           return (
-            <div className="card onco-select" style={{ marginTop: "0.5rem", borderColor: "#2563eb", display: "flex", flexWrap: "wrap",
-              alignItems: "center", gap: "0.5rem 0.8rem", padding: "0.6rem 0.8rem" }}>
-              <strong style={{ fontSize: "0.95rem" }}>{n.toLocaleString()} {data.unit}{n === 1 ? "" : "s"} selected</strong>
+            <div className="card onco-select">
+              <strong>{n.toLocaleString()} {data.unit}{n === 1 ? "" : "s"} selected</strong>
               {selGroups.length > 0 && <span className="meta">from {selGroups.join(", ")}</span>}
               <span className="spacer" />
               {props.onCreateCohort && <>
-                <label className="meta">name <input value={selName} onChange={(e) => setSelName(e.target.value)}
-                  style={{ fontSize: "0.8rem", width: 150 }} /></label>
+                <label className="meta">name <input className="onco-select-name" value={selName}
+                  onChange={(e) => setSelName(e.target.value)} /></label>
                 <button className="primary" disabled={selBusy || tooMany} onClick={createCohort}>
                   {selBusy ? "making the cohort…" : "New cohort"}</button>
               </>}
@@ -838,17 +830,17 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           );
         })()}
         {showMini && (
-          <canvas ref={miniRef} onMouseDown={miniScroll} onMouseMove={(e) => { if (e.buttons === 1) miniScroll(e); }}
-            style={{ display: "block", marginTop: "0.35rem", border: "1px solid var(--line)", borderRadius: 4, cursor: "col-resize", background: "#fff" }} />
+          <canvas ref={miniRef} className="onco-mini" onMouseDown={miniScroll}
+            onMouseMove={(e) => { if (e.buttons === 1) miniScroll(e); }} />
         )}
         <div className="vfoot">
           <Legend data={data} colorByType={display.colorByType} colors={display.colors ?? data.display?.colors} white={display.whiteBackground} />
           {props.footer}
         </div>
         {props.timings && (
-          <details style={{ marginTop: "0.5rem" }} open>
+          <details className="onco-timings" open>
             <summary className="meta">timings</summary>
-            <table className="meta" style={{ fontVariantNumeric: "tabular-nums", borderSpacing: "10px 2px" }}><tbody>
+            <table className="meta"><tbody>
               <tr><td>engine (server)</td><td>{fmt(perf.engineMs)} ms</td><td>pack (server)</td><td>{fmt(perf.packMs)} ms</td></tr>
               <tr><td>fetch incl. engine</td><td>{fmt(perf.fetchMs)} ms</td><td>payload</td><td>{fmt((perf.bytes || 0) / 1048576, 2)} MB decoded{perf.wireBytes ? " · " + fmt(perf.wireBytes / 1048576, 2) + " MB on the wire" : ""}</td></tr>
               <tr><td>decode</td><td>{fmt(perf.decodeMs, 1)} ms</td><td>last draw</td><td>{fmt(perf.drawMs, 1)} ms ({fmt(perf.cellsDrawn)} cells, {fmt(perf.bucketsDrawn)} buckets)</td></tr>

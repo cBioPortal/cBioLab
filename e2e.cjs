@@ -376,17 +376,18 @@ async function main() {
           cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
           views: [{ kind: "oncoprint", genes: ["TP53", "KRAS"] }]
         })).toString("base64")));
-        await page.waitForSelector('summary[title="oncoprint options"]', { timeout: 300000 });
+        await page.waitForSelector('summary[title="more, about this oncoprint"]', { timeout: 300000 });
         const namedButton = await page.locator("button.genesbtn").first().innerText();
-        await page.locator('summary[title="oncoprint options"]').click();
-        const gear = page.locator('details:has(summary[title="oncoprint options"]) .gearmenu-items');
+        await page.locator('summary[title="more, about this oncoprint"]').click();
+        const gear = page.locator('details:has(summary[title="more, about this oncoprint"]) .gearmenu-items');
         const gearHasEditor = (await gear.locator(".pillwrap").count()) > 0;
         const gearHasLink = (await gear.locator('a:has-text("cBioPortal")').count()) > 0;
-        gearOk = namedButton.trim() === "genes" && !gearHasEditor && gearHasLink;
-        gearSplit = "button '" + namedButton.trim() + "', gear has editor: " + gearHasEditor +
-          ", gear has portal link: " + gearHasLink;
+        // the button says how many rows it edits; the overflow menu keeps only the link out
+        gearOk = /^genes \(\d+\)$/.test(namedButton.trim()) && !gearHasEditor && gearHasLink;
+        gearSplit = "button '" + namedButton.trim() + "', menu has editor: " + gearHasEditor +
+          ", menu has portal link: " + gearHasLink;
       } catch (e) { gearSplit = String(e.message).split("\n")[0]; }
-      ok("genes are a named button; the gear keeps only the cBioPortal link", gearOk, gearSplit);
+      ok("genes are a named button; the overflow menu keeps only the cBioPortal link", gearOk, gearSplit);
 
       // Dragging across the plot picks columns and offers to make them a cohort. The count in
       // the dialog and the length of the id list must be the same number, and the cohort the
@@ -444,13 +445,37 @@ async function main() {
         await page.mouse.move(box.x + 40, box.y + 32);          // the merged row's gutter label
         await page.waitForTimeout(600);
         const tip = await page.evaluate(() => {
-          const d = [...document.querySelectorAll("div")].filter((e) => /pointer-events: none/.test(e.getAttribute("style") || ""));
-          return d.length ? d[d.length - 1].innerText.replace(/\n/g, " | ") : null;
+          const d = document.querySelector(".onco-tip");
+          return d ? d.innerText.replace(/\n/g, " | ") : null;
         });
         mergedOk = !!tip && /TP53 pathway/.test(tip) && /MDM2/.test(tip) && /MDM4/.test(tip) && /profiled/.test(tip);
         mergedWhat = tip || "no tooltip on the track label";
       } catch (e) { mergedWhat = String(e.message).split("\n")[0]; }
       ok("a merged gene row names the genes it pools when its label is hovered", mergedOk, mergedWhat);
+
+      // The toolbar separates what is drawn from how it is drawn, and a zone never wraps
+      // inside itself — which is what stops a pair like the zoom controls being split by a
+      // line break, the failure that started this work.
+      let tbWhat = "no toolbar", tbOk = false;
+      try {
+        await page.setViewportSize({ width: 1024, height: 900 });
+        await page.waitForTimeout(1200);
+        const m = await page.evaluate(() => {
+          const tb = document.querySelector(".onco-tb");
+          if (!tb) return null;
+          const zones = [...tb.querySelectorAll(".tbz")];
+          const wrapped = zones.filter((z) => {
+            const cs = [...z.children].filter((c) => !c.classList.contains("tbl"))
+              .map((c) => { const r = c.getBoundingClientRect(); return r.top + r.height / 2; });
+            return Math.max(...cs) - Math.min(...cs) > 3;
+          }).length;
+          return { zones: zones.length, wrapped, labels: [...tb.querySelectorAll(".tbl")].map((l) => l.textContent) };
+        });
+        tbOk = !!m && m.zones === 3 && m.wrapped === 0 && m.labels.join(",") === "data,view";
+        tbWhat = m ? m.zones + " zones (" + m.labels.join(", ") + "), " + m.wrapped + " wrapped inside at 1024px" : "no toolbar";
+        await page.setViewportSize({ width: 1400, height: 1000 });
+      } catch (e) { tbWhat = String(e.message).split("\n")[0]; }
+      ok("the oncoprint toolbar keeps its zones intact when it wraps", tbOk, tbWhat);
 
       // A workspace is the whole document — figures, notes and parameters — saved
       // under a name and reopened after a full reload. And a template retargets

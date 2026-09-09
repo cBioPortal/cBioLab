@@ -850,7 +850,7 @@ export default function AnalysisPage() {
                 {r.label} <span aria-hidden="true">×</span>
               </button>
               {merges && r.members.length > 1 && (
-                <button type="button" className="linklike" disabled={busy} style={{ fontSize: "0.72rem", marginLeft: "0.2rem" }}
+                <button type="button" className="linklike" disabled={busy} style={{ fontSize: "var(--t-sm)", marginLeft: "0.2rem" }}
                   title="draw each of these genes as its own row" onClick={() => splitGeneTrack(vi, r.label)}>split</button>
               )}
             </span>
@@ -868,7 +868,7 @@ export default function AnalysisPage() {
             <summary className="meta">edit as text — cBioPortal&apos;s gene list, where <code>[TP53 MDM2]</code> is one merged row</summary>
             <div className="setcol" style={{ marginTop: "0.3rem" }}>
               <textarea value={text ?? formatGeneList(list)} spellCheck={false} rows={3} disabled={busy}
-                onChange={(e) => setText(e.target.value)} style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: "0.8rem" }} />
+                onChange={(e) => setText(e.target.value)} style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: "var(--t-md)" }} />
               <div className="setrow">
                 <button type="button" className="facet" disabled={busy} onClick={applyText}>apply</button>
                 <button type="button" className="linklike" onClick={() => { setText(formatGeneList(list)); setTextErr(null); }}>reset</button>
@@ -1139,7 +1139,7 @@ function Latency({ v }: { v: any }) {
         <h1>Cohort Lab</h1>
         <span className="sub">analysis documents — cohorts and views over one declarative object</span>
         <span className="spacer" />
-        <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>rationale</a>
+        <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>rationale</a>
       </header>
       <main className="analysis-main">
         {/* Suggestions for every view's gene editor: the most-altered genes this
@@ -1201,7 +1201,7 @@ function Latency({ v }: { v: any }) {
             return (
               <div className="card exbar">
                 <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <strong style={{ fontSize: "0.82rem" }}>
+                  <strong style={{ fontSize: "var(--t-md)" }}>
                     {!ready ? "No studies selected"
                       : clauses ? clauses + (clauses === 1 ? " filter" : " filters")
                       : "No filters"}
@@ -1330,7 +1330,7 @@ function Latency({ v }: { v: any }) {
               </div>
             );
           })()}
-          {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "0.85rem", margin: 0 }}>
+          {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "var(--t-md)", margin: 0 }}>
             No studies selected — check one or more above to explore.</p></div>}
           {!explore && exStudies.length > 0 && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
           {explore && explore.derived && explore.derived.length > 0 && (
@@ -1354,7 +1354,7 @@ function Latency({ v }: { v: any }) {
                           its total is the draft-minus-itself total. Say so, exactly
                           as the clinical facets do, rather than show a number that
                           cannot be reconciled with the draft. */}
-                      <div style={{ fontSize: "0.78rem", fontWeight: 600 }} title={d.note}>
+                      <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }} title={d.note}>
                         {d.label} <span className="meta">· {d.covered.toLocaleString()} patients
                           {(d as any).disjunctive ? " · not narrowed by its own filter" : ""}</span>
                       </div>
@@ -1410,7 +1410,7 @@ function Latency({ v }: { v: any }) {
                       const shown = disj ? c.values.reduce((n: number, v: any) => n + v.n, 0) : c.patients;
                       const unit = c.per === "sample" ? " samples" : " patients";
                       return (
-                        <div style={{ fontSize: "0.78rem", fontWeight: 600 }}
+                        <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}
                           title={[c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
                             .filter(Boolean).join(" — ") || undefined}>
                           {c.displayName || c.attribute}{" "}
@@ -1671,7 +1671,7 @@ function Latency({ v }: { v: any }) {
             {explore && (
               <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.4rem" }}>
                 <span className="meta">quick add:</span>
-                <select value={qaAttr} onChange={e => { setQaAttr(e.target.value); setQaVal(""); }} style={{ fontSize: "0.78rem", maxWidth: "14rem" }}>
+                <select value={qaAttr} onChange={e => { setQaAttr(e.target.value); setQaVal(""); }} style={{ fontSize: "var(--t-md)", maxWidth: "14rem" }}>
                   <option value="">attribute…</option>
                   {explore.clinical.map(a => <option key={a.per + a.attribute} value={a.per + "|" + a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric)" : ""}{a.per === "sample" ? " ·sample" : ""}</option>)}
                 </select>
@@ -1682,7 +1682,7 @@ function Latency({ v }: { v: any }) {
                   if (a.kind === "num") return (
                     <>
                       <span className="meta">min {a.min} · median {a.median} · max {a.max} —</span>
-                      <input placeholder="≥" value={qaVal} onChange={e => setQaVal(e.target.value)} style={{ width: "4.5rem", fontSize: "0.78rem" }} />
+                      <input placeholder="≥" value={qaVal} onChange={e => setQaVal(e.target.value)} style={{ width: "4.5rem", fontSize: "var(--t-md)" }} />
                       <button className="facet" disabled={!Number.isFinite(Number(qaVal)) || qaVal === ""}
                         onClick={() => { addClause({ kind: "clinical", attribute: a.attribute, range: { gte: Number(qaVal) }, ...perExtra }); setQaVal(""); }}>add ≥</button>
                       <button className="facet" disabled={!Number.isFinite(Number(qaVal)) || qaVal === ""}
@@ -1691,7 +1691,7 @@ function Latency({ v }: { v: any }) {
                   );
                   return (
                     <select value="" onChange={e => { if (e.target.value !== "") addClause({ kind: "clinical", attribute: a.attribute, op: "=", value: e.target.value, ...perExtra }); }}
-                      style={{ fontSize: "0.78rem", maxWidth: "14rem" }}>
+                      style={{ fontSize: "var(--t-md)", maxWidth: "14rem" }}>
                       <option value="">value… (patients)</option>
                       {a.values.map(v => <option key={v.v} value={v.v}>{v.v} ({v.n.toLocaleString()})</option>)}
                     </select>
@@ -1699,7 +1699,7 @@ function Latency({ v }: { v: any }) {
                 })()}
                 <input list="qa-genes" placeholder="gene → OQL" value={qaGene} onChange={e => setQaGene(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && qaGene.trim()) { addClause({ kind: "oql", q: qaGene.trim().toUpperCase() + ":" }); setQaGene(""); } }}
-                  style={{ width: "9rem", fontSize: "0.78rem" }} />
+                  style={{ width: "9rem", fontSize: "var(--t-md)" }} />
                 <datalist id="qa-genes">
                   {explore.genes.map(g => <option key={g.gene} value={g.gene}>{g.n.toLocaleString()} altered</option>)}
                 </datalist>
@@ -1909,7 +1909,7 @@ function Latency({ v }: { v: any }) {
                   {Object.entries(result.cohorts).map(([n, c]) => (
                     <div key={n} style={{ marginTop: "0.5rem" }}>
                       <p className="meta" style={{ margin: "0 0 0.25rem" }}><strong>{n}</strong> — {c.count.toLocaleString()} patients{c.studies && c.studies.length > 1 ? " across " + c.studies.length + " studies" : ""}</p>
-                      <pre style={{ maxHeight: "16rem", overflow: "auto", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem", fontSize: "0.68rem", whiteSpace: "pre" }}>{c.sql}</pre>
+                      <pre style={{ maxHeight: "16rem", overflow: "auto", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem", fontSize: "var(--t-xs)", whiteSpace: "pre" }}>{c.sql}</pre>
                     </div>
                   ))}
                 </details>
@@ -1941,7 +1941,7 @@ function Latency({ v }: { v: any }) {
                   {doc.params && Object.keys(doc.params).length > 0 ? (
                     <div className="params">
                       <div className="row" style={{ alignItems: "baseline" }}>
-                        <strong style={{ fontSize: "0.78rem" }}>Parameters</strong>
+                        <strong style={{ fontSize: "var(--t-md)" }}>Parameters</strong>
                         <span className="meta">— change one here and every view that uses it re-runs</span>
                       </div>
                       {Object.entries(doc.params).map(([k, v]) => (
@@ -1985,7 +1985,7 @@ function Latency({ v }: { v: any }) {
             {!result && !busy && (
               <div className="card">
                 <h2>Nothing here yet</h2>
-                <p className="note" style={{ fontSize: "0.85rem" }}>
+                <p className="note" style={{ fontSize: "var(--t-md)" }}>
                   The analysis document is empty. Add cohorts from the <button className="linklike" onClick={() => goTab("cohorts")}>Cohorts tab</button>,
                   ask chat above (e.g. “compare STK11-driver vs wild-type immunotherapy patients”), or paste a document on the left and run it.
                 </p>
@@ -1995,7 +1995,7 @@ function Latency({ v }: { v: any }) {
             {result && !result.views.length && (
               <div className="card">
                 <h2>Cohorts evaluated — no views defined</h2>
-                <p className="note" style={{ fontSize: "0.85rem" }}>
+                <p className="note" style={{ fontSize: "var(--t-md)" }}>
                   Add a views array to the document (e.g. <code>{`{"kind":"survival"}`}</code>),{" "}
                   <button className="linklike" onClick={() => { const d = { ...doc, views: DEFAULT_VIEWS }; setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d); }}>add the default views</button>, or ask chat.
                 </p>
@@ -2034,7 +2034,7 @@ function Latency({ v }: { v: any }) {
                   {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                     style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
                       <thead><tr>
                         <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>gene</th>
                         {v.cohorts!.map((n, i: number) => <th key={n} style={{ textAlign: "right", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}<br /><span style={{ fontWeight: 400, color: "var(--muted)" }}>driver / any</span></th>)}
@@ -2068,7 +2068,7 @@ function Latency({ v }: { v: any }) {
                     return (
                       <div key={h.gene} className="lolli">
                         <div className="row" style={{ alignItems: "baseline" }}>
-                          <strong style={{ fontSize: "0.82rem" }}>{h.gene}</strong>
+                          <strong style={{ fontSize: "var(--t-md)" }}>{h.gene}</strong>
                           <span className="meta">{h.mutated.toLocaleString()} mutated patients · {h.variants.length} shown
                             {h.withheld ? " of " + (h.variants.length + h.withheld) + " distinct changes" : ""}</span>
                           <span className="spacer" />
@@ -2113,7 +2113,7 @@ function Latency({ v }: { v: any }) {
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
                       <thead><tr>
                         <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>pair</th>
                         <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>n</th>
@@ -2147,7 +2147,7 @@ function Latency({ v }: { v: any }) {
                   <ViewHead v={v} title="Clinical comparison" sub="attribute distributions across cohorts" onRemove={() => removeView(vi)} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
                       <thead><tr>
                         <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>attribute</th>
                         {v.cohorts!.map((n, i: number) => <th key={n} style={{ textAlign: "left", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}</th>)}
@@ -2187,7 +2187,7 @@ function Latency({ v }: { v: any }) {
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
                       <thead><tr>
                         <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>pair</th>
                         <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>both</th>
@@ -2281,7 +2281,7 @@ function Latency({ v }: { v: any }) {
                     );
                   })()}
                   <KMChart curves={v.curves!} />
-                  <div style={{ display: "flex", gap: "1.2rem", fontSize: "0.76rem", color: "var(--muted)", marginTop: "0.4rem", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: "1.2rem", fontSize: "var(--t-sm)", color: "var(--muted)", marginTop: "0.4rem", flexWrap: "wrap" }}>
                     {v.curves!.map((c, i: number) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: median {c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}
                   </div>
                   {v.logrank && (
@@ -2604,7 +2604,7 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
           <button className="linklike" style={{ fontWeight: tab === "heatmap" ? 600 : 400 }} onClick={() => setTab("heatmap")}>Heatmap ({heatOptions.length})</button>
           <button className="linklike" style={{ fontWeight: tab === "cohorts" ? 600 : 400 }} onClick={() => setTab("cohorts")}>Cohort rows ({cohorts.length})</button>
           <span className="spacer" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search…" style={{ fontSize: "0.78rem", width: 120 }} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search…" style={{ fontSize: "var(--t-md)", width: 120 }} />
         </div>
         <span className="meta">{chosen.length} of {cap} chosen{
           tab === "clinical" ? " · cases with data, most first"
@@ -2625,7 +2625,7 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
                 </label>
                 {h && <input defaultValue={(h.genes || []).join(" ")} placeholder="genes for this profile — blank follows the figure"
                   disabled={busy} onBlur={(e) => setHeatGenes(name, e.target.value)}
-                  style={{ fontSize: "0.72rem", width: "100%", margin: "0 0 0.3rem 1.4rem" }} />}
+                  style={{ fontSize: "var(--t-sm)", width: "100%", margin: "0 0 0.3rem 1.4rem" }} />}
               </div>
             );
           })}

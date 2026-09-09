@@ -44,7 +44,7 @@ export default function ImportOncoprint({ sample }: { sample: { events: string; 
           {box("coverage", "patient · genes the panel covers (optional)", coverage, setCoverage, 12)}
         </div>
         <div className="row" style={{ marginTop: "0.6rem", alignItems: "center", gap: "0.6rem" }}>
-          <label className="meta">group by <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} style={{ fontSize: "0.78rem" }}>
+          <label className="meta">group by <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} style={{ fontSize: "var(--t-md)" }}>
             <option value="">nothing</option>
             {attrs.map((a) => <option key={a} value={a}>{a}</option>)}
           </select></label>
