@@ -24,10 +24,11 @@ import { sq } from "./compiler.ts";
 import { canonicalEventName } from "./event-names.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
-  CATEGORY_CAP, DEFAULT_BINS, plotBinsSql, plotBoxSql, plotCountSql, plotStatsSql, plotTableSql,
+  CATEGORY_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
+  plotBinsSql, plotBoxSql, plotCountSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
   type PlotAxis, type PlotData, type PlotRequest } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
-export { plotBinsSql, plotBoxSql, plotCountSql, plotStatsSql, plotTableSql };
+export { plotBinsSql, plotBoxSql, plotCountSql, plotStatsSql, plotTableSql, plotViolinSql };
 export type { PlotData, PlotRequest, PlotGroup } from "./plot.ts";
 
 const num = (v: unknown): number | null => { const x = Number(v); return Number.isFinite(x) ? x : null; };
@@ -960,6 +961,8 @@ export interface QueryLogEntry { label: string; sql: string; ms?: number; remote
 
 /** Additionally available when the instance permits patient-level access. */
 export interface PatientLevelCapable extends AggregateCapable {
+  /** the values behind a box plot, with their case ids — the entitlement, in one method */
+  plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number): Promise<{ id: string; g: string; v: number }[]>;
   readonly instance: Instance & { mode: "patient-level" };
   members(def: CohortDef | null | undefined): Promise<string[]>;
 }
@@ -1142,6 +1145,25 @@ abstract class BaseResolver implements AggregateCapable {
 
 
   /**
+   * Which of these axes' clinical attributes the STUDY declares as numbers. Only it knows: it
+   * declared them. An attribute it does not declare has no answer here rather than a guess.
+   */
+  protected async clinicalKinds(axes: PlotAxis[]): Promise<Map<string, "num" | "cat">> {
+    const db = this.instance.conn.db, conn = this.instance.conn;
+    const attrs = axes.filter((a) => a.source === "clinical").map((a) => (a as { attribute: string }).attribute);
+    const kinds = new Map<string, "num" | "cat">();
+    if (!attrs.length) return kinds;
+    const meta = await chQuery<ChRow>(
+      "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt\n" +
+      "FROM " + db + ".clinical_attribute_meta cam\n" +
+      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
+      "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ")", conn)
+      .catch(() => ({ data: [] as ChRow[] }));
+    for (const r of meta.data) kinds.set(String(r.a), String(r.dt) === "NUMBER" ? "num" : "cat");
+    return kinds;
+  }
+
+  /**
    * A plot: two axes over the same cases, aggregated inside the database.
    *
    * Nothing here returns a point. A scatter comes back as counts per grid cell, a box as
@@ -1155,18 +1177,7 @@ abstract class BaseResolver implements AggregateCapable {
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
     const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def) };
 
-    // only the owning study knows whether one of its clinical attributes is a number
-    const clinAttrs = [spec.x, spec.y].filter((a) => a.source === "clinical").map((a) => (a as { attribute: string }).attribute);
-    const kinds = new Map<string, "num" | "cat">();
-    if (clinAttrs.length) {
-      const meta = await chQuery<ChRow>(
-        "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt\n" +
-        "FROM " + db + ".clinical_attribute_meta cam\n" +
-        "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
-        "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + clinAttrs.map(sq).join(",") + ")", conn)
-        .catch(() => ({ data: [] as ChRow[] }));
-      for (const r of meta.data) kinds.set(String(r.a), String(r.dt) === "NUMBER" ? "num" : "cat");
-    }
+    const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const kindOf = (attr: string) => kinds.get(attr);
     const xk = axisKind(spec.x, kindOf), yk = axisKind(spec.y, kindOf);
     const shape = plotShape(xk, yk);
@@ -1208,8 +1219,10 @@ abstract class BaseResolver implements AggregateCapable {
 
     // box: the numeric axis grouped by the categorical one, whichever way round they were given
     const numFirst = xk === "num";
-    const rows = await this.runLogged<ChRow>("plot:box",
-      plotBoxSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql), conn);
+    const [rows, vio] = await Promise.all([
+      this.runLogged<ChRow>("plot:box", plotBoxSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql), conn),
+      this.runLogged<ChRow>("plot:violin", plotViolinSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql), conn)
+    ]);
     if (rows.data.length > CATEGORY_CAP)
       throw new Error("more than " + CATEGORY_CAP + " groups on the categorical axis; narrow the cohort or pick another attribute");
     const groups = rows.data.map((r) => {
@@ -1219,7 +1232,9 @@ abstract class BaseResolver implements AggregateCapable {
       return { g: String(r.g), n: Number(r.n), lo, hi, q1: q[0], median: q[1], q3: q[2],
         loWhisker: t.loWhisker, hiWhisker: t.hiWhisker };
     });
-    return { shape, n: groups.reduce((a, g) => a + g.n, 0), ...label, groups };
+    return { shape, n: groups.reduce((a, g) => a + g.n, 0), ...label, groups,
+      violin: vio.data.map((r) => ({ g: String(r.g), b: Number(r.b), n: Number(r.n) })), violinBins: VIOLIN_BINS,
+      overlay: "violin" };
   }
 
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
@@ -1247,6 +1262,31 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     super(study, ctx);
     this.instance = { ...instance, mode: "patient-level" };
   }
+  /**
+   * The points behind a box plot, with their case ids, so a reader can find one on the figure.
+   *
+   * It lives here and nowhere else. `AggregateResolver` has no such method, and neither does a
+   * remote peer, so a participant that may not disclose a case cannot be asked for one — the
+   * same guarantee as `members()`, and for the same reason. The cap is what stops a quarter of
+   * a million dots being called a drawing; above it the caller falls back to the density every
+   * participant can compute.
+   */
+  async plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap = POINTS_CAP): Promise<{ id: string; g: string; v: number }[]> {
+    const db = this.instance.conn.db, conn = this.instance.conn;
+    const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
+    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def) };
+    const kinds = await this.clinicalKinds([spec.x, spec.y]);
+    const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
+    if (plotShape(xk, yk) !== "box") return [];
+    const numFirst = xk === "num";
+    const numSel = axisSelect(numFirst ? spec.x : spec.y, ctx, "num");
+    const catSel = axisSelect(numFirst ? spec.y : spec.x, ctx, "cat");
+    const r = await this.runLogged<ChRow>("plot:points", plotPointsSql(numSel, catSel, ctx.cohortSql, cap), conn);
+    // one over the cap means there were more than a drawing can hold: the caller draws density
+    if (r.data.length > cap) return [];
+    return r.data.map((x) => ({ id: String(x.id), g: String(x.g), v: Number(x.v) }));
+  }
+
   async members(def: CohortDef | null | undefined): Promise<string[]> {
     const r = await chQuery<ChRow>("SELECT pid FROM (" + this.cohortSql(def) + ")", this.instance.conn);
     return r.data.map((x) => x.pid);

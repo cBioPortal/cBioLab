@@ -677,14 +677,27 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         continue;
       }
       try {
-        const data = await resolvers[sites[0]].plot(doc.cohorts[cn], {
+        const r0 = resolvers[sites[0]];
+        const data = await r0.plot(doc.cohorts[cn], {
           x: pv.x, y: pv.y, unit: pv.unit === "sample" ? "sample" : "patient",
           bins: Array.isArray(pv.bins) && pv.bins.length === 2 ? [Number(pv.bins[0]), Number(pv.bins[1])] : undefined
         });
+        // The points behind a box come only from a participant entitled to see cases, and only
+        // when there are few enough to be a drawing. isPatientLevel is a type guard, so asking an
+        // aggregate-only participant for them is a compile error rather than a review catch.
+        if (data.shape === "box" && pv.points !== false && isPatientLevel(r0)) {
+          const pts = await r0.plotPoints(doc.cohorts[cn], { x: pv.x, y: pv.y, unit: pv.unit === "sample" ? "sample" : "patient" });
+          if (pts.length) { data.points = pts; data.overlay = "points"; }
+        }
         const pr: ViewResult = {
           kind: "plot", plot: data, cohorts: [cn], studies: sites,
           participation: participationFor(sites, false),
-          note: data.shape === "scatter" && data.n > 5000
+          note: data.shape === "box" && data.overlay === "violin"
+            ? "Drawn as a density per group: " + data.n.toLocaleString("en-US") + " values is past what a cloud of dots can show, " +
+              "and the quartiles are over every one of them."
+            : data.shape === "box" && data.overlay === "points"
+            ? "Every value is drawn over its box; the jitter is fixed per case, so the figure does not move between renderings."
+            : data.shape === "scatter" && data.n > 5000
             ? "Drawn as density: " + data.n.toLocaleString("en-US") + " " + (pv.unit === "sample" ? "samples" : "patients") +
               " counted into " + (data.bins || []).length.toLocaleString("en-US") + " cells. The coefficients are over every " +
               (pv.unit === "sample" ? "sample" : "patient") + ", not over what you can see."

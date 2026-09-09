@@ -17,6 +17,7 @@
 // Colours come from CSS custom properties with literal fallbacks, so an SVG
 // inlined in the app follows the page theme while the same string rasterised
 // for a chat gets a fixed light figure.
+import { jitterFor } from "./plot.ts";
 import type { ViewResult, KmCurve, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind, PlotData } from "./types.ts";
 
 /** Cohort names and data values reach <text>; they must never reach it raw. */
@@ -483,11 +484,43 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
     const span = Math.max(1e-9, hi - lo);
     const bw = plotW / gs.length;
     const sy = (val: number) => T + PLOT - PLOT * (val - lo) / span;
+    // the values behind the boxes: every point when the reader may see cases and there are few
+    // enough of them, otherwise the density of the same values
+    const byGroup = new Map<string, { id: string; v: number }[]>();
+    for (const pt of d.points || []) (byGroup.get(pt.g) ?? byGroup.set(pt.g, []).get(pt.g)!).push({ id: pt.id, v: pt.v });
+    // each violin is scaled to its OWN densest bin: one group holding 178,489 of the values
+    // would otherwise flatten every other group to an invisible sliver. How many cases a group
+    // has is already printed under its name, so the width is free to describe its shape.
+    const vio = new Map<string, Map<number, number>>();
+    const vioMax = new Map<string, number>();
+    for (const b of d.violin || []) {
+      if (!vio.has(b.g)) vio.set(b.g, new Map());
+      vio.get(b.g)!.set(b.b, b.n);
+      if (b.n > (vioMax.get(b.g) || 0)) vioMax.set(b.g, b.n);
+    }
+    const vBins = d.violinBins || 40;
+
     gs.forEach((g, i) => {
       const cx = L + bw * (i + 0.5), half = Math.min(24, bw * 0.32);
+      if (d.overlay === "violin" && vio.has(g.g)) {
+        // a half-width density either side of the box, on the same scale as every other group
+        const cells = vio.get(g.g)!;
+        const step = PLOT / vBins;
+        for (const [b, n] of cells) {
+          const w = half * 1.6 * Math.sqrt(n / (vioMax.get(g.g) || 1));
+          const yTop = T + PLOT - (b + 1) * step;
+          out.push(`<rect x="${num(cx - w)}" y="${num(yTop)}" width="${num(w * 2)}" height="${num(step + 0.4)}" ` +
+            `fill="${SERIES[0]}" fill-opacity="0.28"/>`);
+        }
+      }
+      if (d.overlay === "points" && byGroup.has(g.g)) {
+        for (const pt of byGroup.get(g.g)!)
+          out.push(`<circle cx="${num(cx + jitterFor(pt.id) * half * 0.9)}" cy="${num(sy(pt.v))}" r="1.5" ` +
+            `fill="${SERIES[0]}" fill-opacity="0.45"/>`);
+      }
       out.push(`<line x1="${num(cx)}" y1="${num(sy(g.loWhisker))}" x2="${num(cx)}" y2="${num(sy(g.hiWhisker))}" stroke="${p.muted}"/>`);
       out.push(`<rect x="${num(cx - half)}" y="${num(sy(g.q3))}" width="${num(half * 2)}" height="${num(Math.max(1, sy(g.q1) - sy(g.q3)))}" ` +
-        `fill="${SERIES[0]}" fill-opacity="0.25" stroke="${SERIES[0]}"/>`);
+        `fill="${SERIES[0]}" fill-opacity="${d.overlay === "none" ? 0.25 : 0.1}" stroke="${SERIES[0]}"/>`);
       out.push(`<line x1="${num(cx - half)}" y1="${num(sy(g.median))}" x2="${num(cx + half)}" y2="${num(sy(g.median))}" stroke="${SERIES[0]}" stroke-width="2"/>`);
       const label = g.g.length > 14 ? g.g.slice(0, 13) + "…" : g.g;
       out.push(`<text x="${num(cx)}" y="${T + PLOT + 26}" font-size="9" fill="${p.muted}" text-anchor="end" ` +
@@ -496,7 +529,10 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
     });
     for (const t of [lo, (lo + hi) / 2, hi]) out.push(axisText(num(t), L - 6, sy(t) + 3, "end", 10));
     out.push(`<rect x="${L}" y="${T}" width="${num(plotW)}" height="${PLOT}" fill="none" stroke="${p.line}"/>`);
-    const cap = caption("Box: quartiles with Tukey whiskers, computed over every case in the group. The count is above each name.",
+    const cap = caption("Box: quartiles with Tukey whiskers, computed over every case in the group. The count is above each name." +
+      (d.overlay === "points" ? " Every value is drawn over its box; the jitter is fixed per case."
+        : d.overlay === "violin" ? " The shaded width is the share of that group's values sitting at that height, scaled per group."
+        : ""),
       W, T + PLOT + 84, p.muted);
     return frame(W, T + PLOT + 84 + cap.height + 10, out.join("") + cap.svg, p.bg);
   }

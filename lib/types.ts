@@ -149,6 +149,12 @@ export interface PlotView {
   unit?: "patient" | "sample";
   /** the grid a scatter is binned onto (default 240 x 160) */
   bins?: [number, number];
+  /**
+   * Draw the values over a box plot's boxes when there are few enough of them and the study is
+   * one this participant may see cases in (default true). Above the cap, or from an
+   * aggregate-only participant, the same values are drawn as a density instead.
+   */
+  points?: boolean;
 }
 export interface CooccurrenceView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */

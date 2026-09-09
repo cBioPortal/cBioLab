@@ -29,6 +29,14 @@ export type PlotShape = "scatter" | "box" | "table" | "waterfall";
 export const CATEGORY_CAP = 150;
 /** the grid a scatter is binned onto: the payload is bounded by this, never by the cohort */
 export const DEFAULT_BINS: [number, number] = [240, 160];
+/**
+ * How many points a box plot will draw over its boxes before it stops being a drawing. Above
+ * this the same values come back as a violin: 290,000 jittered dots are a solid block, and the
+ * density is both smaller to send and what the reader was looking for.
+ */
+export const POINTS_CAP = 5000;
+/** bins per group in a violin */
+export const VIOLIN_BINS = 40;
 
 export interface AxisCtx { study: string; db?: string; unit: "patient" | "sample"; cohortSql: string }
 
@@ -218,6 +226,50 @@ export function plotBoxSql(numSel: string, catSel: string, cohortSql: string): s
     "GROUP BY g ORDER BY n DESC LIMIT " + (CATEGORY_CAP + 1);
 }
 
+/**
+ * The values behind a box, as a density per group — bins, not points, so this is an aggregate
+ * and stays answerable by a participant that may not disclose a case.
+ */
+export function plotViolinSql(numSel: string, catSel: string, cohortSql: string, bins = VIOLIN_BINS): string {
+  const b = Math.max(4, Math.min(200, Math.round(bins)));
+  return "WITH cohort AS (" + cohortSql + "),\n" +
+    "     vs AS (" + numSel + "),\n" +
+    "     gs AS (" + catSel + "),\n" +
+    "     j AS (SELECT gs.v AS g, vs.v AS x FROM vs INNER JOIN gs ON gs.id = vs.id),\n" +
+    "     e AS (SELECT min(x) x0, max(x) x1 FROM j)\n" +
+    "SELECT g, least(" + (b - 1) + ", toUInt32(floor((x - x0) / nullIf(x1 - x0, 0) * " + b + "))) AS b, count() AS n\n" +
+    "FROM j, e GROUP BY g, b";
+}
+
+/**
+ * The points behind a box, WITH their case ids, so a reader can find one.
+ *
+ * This is the only query in this module that returns an identifier, and it is deliberately not
+ * exported through lib/federation.ts with the aggregate builders: it is reachable solely from
+ * `PatientLevelResolver`, the participant whose entitlement is to see cases. An aggregate-only
+ * site has no method that could call it — see docs/DATA-BOUNDARY.md.
+ */
+export function plotPointsSql(numSel: string, catSel: string, cohortSql: string, cap = POINTS_CAP): string {
+  return "WITH cohort AS (" + cohortSql + "),\n" +
+    "     vs AS (" + numSel + "),\n" +
+    "     gs AS (" + catSel + ")\n" +
+    "SELECT vs.id AS id, gs.v AS g, vs.v AS v\n" +
+    "FROM vs INNER JOIN gs ON gs.id = vs.id\n" +
+    "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
+}
+
+/**
+ * Where a point sits across its box. Deterministic from the case id, as the portal's jitter is,
+ * so the same figure comes out of the server SVG, the browser and the Python package rather than
+ * moving every time it is drawn.
+ */
+export function jitterFor(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); }
+  const f = Math.abs(Math.sin(h >>> 0)) * 10000;
+  return (f - Math.floor(f)) * 2 - 1;
+}
+
 /** the contingency table, one row per occupied cell */
 export function plotTableSql(xSel: string, ySel: string, cohortSql: string): string {
   return pairCte(xSel, ySel, cohortSql) +
@@ -292,6 +344,12 @@ export interface PlotData {
   stats?: { pearson: number | null; spearman: number | null; slope: number | null; intercept: number | null;
             pPearson: number | null; pSpearman: number | null };
   groups?: PlotGroup[];
+  /** the values behind the boxes: points when few enough and the reader may see cases, else a density */
+  points?: { id: string; g: string; v: number }[];
+  violin?: { g: string; b: number; n: number }[];
+  violinBins?: number;
+  /** which of the two the figure is drawing, and why — the caption says so too */
+  overlay?: "points" | "violin" | "none";
   cells?: { cx: string; cy: string; n: number }[];
   note?: string;
 }
