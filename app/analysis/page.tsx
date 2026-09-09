@@ -677,7 +677,9 @@ export default function AnalysisPage() {
   // the survival "measured from" control needs this study's event types,
   // their attributes, and the endpoints it declares
   useEffect(() => {
-    if (!study) return;
+    // a templated document holds "$study" until its parameter is resolved; asking the warehouse
+    // for a study by that name is a question with no answer, so it is not asked
+    if (!study || study.startsWith("$")) return;
     let dead = false;
     fetch("/api/catalog?study=" + encodeURIComponent(study))
       .then(r => r.json()).then(j => { if (!dead && !j.error) setCat(j); }).catch(() => {});

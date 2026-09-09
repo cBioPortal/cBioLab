@@ -11,7 +11,8 @@ export async function GET(req: Request) {
     if (!cache.has(study)) {
       const sqls = catalogSqls(DB, study);
       const chk = await chQuery(sqls.studyCheck);
-      if (Number(chk.data[0].n) !== 1) throw new Error("Study '" + study + "' not found");
+      // a study nobody has is a bad request, not a server failure
+      if (Number(chk.data[0].n) !== 1) return Response.json({ error: "Study '" + study + "' not found" }, { status: 400 });
       const [tRes, vRes, kRes] = [await chQuery(sqls.types), await chQuery(sqls.values), await chQuery(sqls.keys)];
       const values: Record<string, Record<string, string[]>> = {}, keys: Record<string, string[]> = {};
       vRes.data.forEach((r) => { (values[r.t] = values[r.t] || {}); (values[r.t][r.k] = values[r.t][r.k] || []).push(r.v); });
