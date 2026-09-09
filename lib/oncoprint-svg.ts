@@ -2,7 +2,7 @@
 // Zero data logic and zero style of its own: cells come from the contract, level of detail
 // from lib/oncoprint-lod.ts, every colour, band and label from lib/oncoprint-style.ts.
 import type { Contract, Track } from "./types.ts";
-import { STYLE, cellLayers, numericColor, trackCategoryColor, formatGutterPct, truncateLabel, geneLegendFor, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
+import { STYLE, cellLayers, numericColor, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackTooltipLines, geneLegendFor, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
 import { aggregate, bucketEdges } from "./oncoprint-lod.ts";
 
 const esc = (s: unknown): string => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -75,7 +75,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style): 
 
   contract.tracks.forEach((t, ti: number) => {
     const y = HEADER_H + ti * (ROW_H + ROW_GAP);
-    parts.push(`<text x="4" y="${y + 14}" fill="${P.text}">${esc(truncateLabel(t.label, S))}</text>`);
+    parts.push(`<text x="4" y="${y + 14}" fill="${P.text}"><title>${esc(trackTooltipLines(t, contract.columns.length, contract.unit).join("\n"))}</title>${esc(trackLabelText(t, S))}</text>`);
     if (t.freqPct != null) parts.push(`<text x="${GUTTER - 8}" y="${y + 14}" fill="${P.muted}" text-anchor="end">${formatGutterPct(t.driverPct, t.freqPct, t.profiled, contract.columns.length)}</text>`);
     contract.groups.forEach((g, gi: number) => {
       const x0 = groupX[gi], pxW = g.count * colW;

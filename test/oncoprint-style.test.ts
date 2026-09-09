@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { STYLE, cellLayers, formatPct, formatGutterPct, geneLegend, geneLegendFor, numericColor, resolveStyle, trackCategoryColor } from "../lib/oncoprint-style.ts";
+import { STYLE, cellLayers, formatPct, formatGutterPct, geneLegend, geneLegendFor, numericColor, resolveStyle, trackCategoryColor, trackLabelText, trackTooltipLines } from "../lib/oncoprint-style.ts";
 import { mutClassBit } from "../lib/oncoprint-assemble.ts";
 import { STYLE_JSON } from "../scripts/gen-style.ts";
 import { bucketCodes, bucketEdges } from "../lib/oncoprint-lod.ts";
@@ -118,4 +118,30 @@ test("per-track colours override the categorical cycle for that track only", () 
   assert.equal(trackCategoryColor(track, 1, STYLE, colors), "#123456");
   assert.equal(trackCategoryColor({ label: "OTHER", categories: ["Colon"] }, 0, STYLE, colors), STYLE.palette.categorical[0]);
   assert.equal(trackCategoryColor(track, 1, STYLE), STYLE.palette.categorical[1], "no override map: the cycle");
+});
+
+test("a merged gene row wears brackets in the gutter, a single gene does not", () => {
+  assert.equal(trackLabelText({ label: "TP53" }), "TP53");
+  assert.equal(trackLabelText({ label: "TP53", members: ["TP53"] }), "TP53");
+  assert.equal(trackLabelText({ label: "TP53 pathway", members: ["TP53", "MDM2"] }), "[TP53 pathway]");
+  // the closing bracket survives truncation; the label inside is what gets cut
+  const long = trackLabelText({ label: "a very long pathway name indeed", members: ["A", "B"] });
+  assert.ok(long.startsWith("[") && long.endsWith("]"), long);
+  assert.equal(long.length, STYLE.geometry.labelMaxChars);
+});
+
+test("a track label explains itself in words, the same words for every renderer", () => {
+  assert.deepEqual(trackTooltipLines({ label: "TP53 pathway", members: ["TP53", "MDM2", "MDM4"],
+    altered: 2111, profiled: 3109, driverAltered: 2086, freqPct: 67.9, driverPct: 67.1 }, 3109), [
+    "TP53 pathway",
+    "one row over 3 genes: TP53 · MDM2 · MDM4",
+    "2,111 of 3,109 profiled patients altered (67.9%)",
+    "2,086 putative driver (67.1%)"
+  ]);
+  // a partly profiled gene says how many columns it could not answer for
+  assert.ok(trackTooltipLines({ label: "KRAS", altered: 3, profiled: 10, freqPct: 30 }, 12)
+    .some((l) => l === "not profiled in 2 of 12 columns"));
+  assert.deepEqual(trackTooltipLines({ label: "STAGE", categories: ["III", "IV"] }, 12), ["STAGE", "2 values: III, IV"]);
+  assert.deepEqual(trackTooltipLines({ label: "AGE", numeric: true, min: 44, max: 80 }, 12), ["AGE", "44 → 80"]);
+  assert.deepEqual(trackTooltipLines({ label: "EMPTY", categories: [] }, 12), ["EMPTY", "no values in these columns"]);
 });

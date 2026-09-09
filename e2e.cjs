@@ -428,6 +428,30 @@ async function main() {
       } catch (e) { dragWhat = String(e.message).split("\n")[0]; }
       ok("a drag across the oncoprint becomes a cohort of exactly those patients", dragOk, dragWhat);
 
+      // A merged row pools several genes into one. It must be recognisable as one — the gutter
+      // cannot say much in 168px, so the label is bracketed and hovering it names the members
+      // and says what the percentage is over.
+      let mergedWhat = "no oncoprint rendered", mergedOk = false;
+      try {
+        await page.goto(BASE + "/analysis?tab=analysis&doc=" + Buffer.from(JSON.stringify({
+          study: "msk_chord_2024",
+          cohorts: { "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" }] } },
+          views: [{ kind: "oncoprint", genes: [{ label: "TP53 pathway", genes: ["TP53", "MDM2", "MDM4"] }, "TP53"] }]
+        })).toString("base64url"));
+        await page.waitForSelector("canvas", { timeout: 300000 });
+        await page.waitForTimeout(2500);
+        const box = await page.locator("canvas").first().boundingBox();
+        await page.mouse.move(box.x + 40, box.y + 32);          // the merged row's gutter label
+        await page.waitForTimeout(600);
+        const tip = await page.evaluate(() => {
+          const d = [...document.querySelectorAll("div")].filter((e) => /pointer-events: none/.test(e.getAttribute("style") || ""));
+          return d.length ? d[d.length - 1].innerText.replace(/\n/g, " | ") : null;
+        });
+        mergedOk = !!tip && /TP53 pathway/.test(tip) && /MDM2/.test(tip) && /MDM4/.test(tip) && /profiled/.test(tip);
+        mergedWhat = tip || "no tooltip on the track label";
+      } catch (e) { mergedWhat = String(e.message).split("\n")[0]; }
+      ok("a merged gene row names the genes it pools when its label is hovered", mergedOk, mergedWhat);
+
       // A workspace is the whole document — figures, notes and parameters — saved
       // under a name and reopened after a full reload. And a template retargets
       // in ONE edit: change $genes and every view that refers to it follows.

@@ -9,7 +9,7 @@
 // hiding unaltered columns or re-sorting on the client never touches the data.
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 
-import { STYLE, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatGutterPct, truncateLabel, resolveStyle, type Style } from "../../lib/oncoprint-style.ts";
+import { STYLE, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatGutterPct, truncateLabel, trackLabelText, resolveStyle, type Style } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
@@ -189,7 +189,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   data.tracks.forEach((t, ti) => {
     const y = header + ti * (rowH + rowGap);
     ctx.fillStyle = P.text; ctx.textAlign = "left";
-    ctx.fillText(truncateLabel(t.label, S), 4, y + 14);
+    ctx.fillText(trackLabelText(t, S), 4, y + 14);
     if (t.freqPct != null) {
       ctx.fillStyle = P.muted; ctx.textAlign = "right";
       ctx.fillText(formatGutterPct(t.driverPct, t.freqPct, t.profiled, data.n), gutter - 8, y + 14);

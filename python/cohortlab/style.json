@@ -223,7 +223,11 @@
     "labelMaxChars": 17,
     "cellPadMax": 3,
     "padMinZoom": 3,
-    "padFraction": 0.3
+    "padFraction": 0.3,
+    "mergedBrackets": [
+      "[",
+      "]"
+    ]
   },
   "percent": {
     "gutterDecimals": 1,

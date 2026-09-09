@@ -64,7 +64,9 @@ export const STYLE = {
     sequential: { from: [222, 235, 247], to: [8, 72, 135] },            // #deebf7 -> #084887
     diverging: { low: [33, 102, 172], mid: [255, 255, 255], high: [178, 24, 43] }  // #2166ac -> white -> #b2182b
   },
-  geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17, cellPadMax: 3, padMinZoom: 3, padFraction: 0.3 },
+  geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17, cellPadMax: 3, padMinZoom: 3, padFraction: 0.3,
+    // a row pooling several genes wears the brackets that made it, the way the query spells it
+    mergedBrackets: ["[", "]"] },
   percent: { gutterDecimals: 1, runRule: "portal" }   // runRule: integer at 3 % and above, one decimal below, N/P
 };
 
@@ -138,6 +140,48 @@ export const PARTIAL_PROFILE_NOTE = "* = % over the columns profiled for that ge
 export function truncateLabel(label: string, S: Style = STYLE): string {
   const n = S.geometry.labelMaxChars;
   return label.length > n ? label.slice(0, n - 1) + "…" : label;
+}
+
+/**
+ * What the gutter prints for a track. A merged gene row is bracketed, so a reader can see at a
+ * glance that the row pools several genes rather than naming one — the brackets are the same
+ * ones that spell the row in a query. The brackets are outside the truncation, so a long label
+ * still ends in a closing bracket rather than losing it to the ellipsis.
+ */
+export function trackLabelText(track: { label: string; members?: string[] }, S: Style = STYLE): string {
+  const [open, close] = S.geometry.mergedBrackets;
+  if (!track.members || track.members.length < 2) return truncateLabel(track.label, S);
+  const n = Math.max(1, S.geometry.labelMaxChars - open.length - close.length);
+  return open + (track.label.length > n ? track.label.slice(0, n - 1) + "…" : track.label) + close;
+}
+
+/**
+ * What a track's label means, in words, for a tooltip. One owner so the canvas figure and the
+ * server SVG say the same thing about the same row — including the ones a gutter label cannot
+ * fit: the full name, the genes a merged row pools, and what its percentage is over.
+ */
+export interface TrackSummary {
+  label: string; members?: string[]; kind?: string; numeric?: boolean; categories?: string[];
+  altered?: number; profiled?: number; driverAltered?: number;
+  freqPct?: number | null; driverPct?: number | null;
+  min?: number; max?: number; profileType?: string; note?: string;
+}
+export function trackTooltipLines(t: TrackSummary, columns: number, unit = "patient"): string[] {
+  const n = (x: number) => x.toLocaleString("en-US");
+  const lines = [t.label];
+  if (t.members && t.members.length > 1) lines.push("one row over " + t.members.length + " genes: " + t.members.join(" · "));
+  if (t.freqPct != null && t.profiled != null && t.altered != null) {
+    lines.push(n(t.altered) + " of " + n(t.profiled) + " profiled " + unit + "s altered (" + t.freqPct + "%)");
+    if (t.driverPct != null && t.driverAltered != null) lines.push(n(t.driverAltered) + " putative driver (" + t.driverPct + "%)");
+    if (t.profiled < columns) lines.push("not profiled in " + n(columns - t.profiled) + " of " + n(columns) + " columns");
+  } else if (t.numeric && t.min != null && t.max != null) {
+    lines.push((t.profileType ? t.profileType + ", " : "") + t.min + " → " + t.max);
+    if (t.note) lines.push(t.note);
+  } else if (t.categories) {
+    lines.push(t.categories.length ? t.categories.length + " values: " + t.categories.slice(0, 6).join(", ") +
+      (t.categories.length > 6 ? ", …" : "") : "no values in these columns");
+  }
+  return lines;
 }
 
 /** Gene-legend entries in display order, shared by every renderer. */

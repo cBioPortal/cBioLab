@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Hit, type View, type VisibleGroup } from "./canvas.ts";
-import { geneLegendFor, resolveStyle, styleForDisplay } from "../../lib/oncoprint-style.ts";
+import { geneLegendFor, resolveStyle, styleForDisplay, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 
 const MAX_ZOOM = 24;
@@ -106,6 +106,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const [perf, setPerf] = useState<Perf>({ frames: 0 });
   const [view, setView] = useState<View>({ zoom: 1, scrollX: 0, whitespace: display.whitespace });
   const [hover, setHover] = useState<{ hit: Hit; x: number; y: number } | null>(null);
+  /** the gutter label under the pointer: a track row, not a column */
+  const [labelHover, setLabelHover] = useState<{ ti: number; x: number; y: number } | null>(null);
   // per-column specifics, fetched only for the column under the pointer and remembered
   const [detail, setDetail] = useState<Record<string, ColumnDetail | "loading">>({});
   const detailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -364,10 +366,25 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       setSortKey: (k: string) => onSortKeys(k ? [k] : []), setSortKeys: onSortKeys, view, minZoom, maxScroll, ready: !!visible };
   });
 
+  /** the track whose row contains this canvas y, or -1 */
+  const trackAt = (y: number): number => {
+    if (!data) return -1;
+    const ti = Math.floor((y - GEOM.header) / (GEOM.rowH + GEOM.rowGap));
+    return ti >= 0 && ti < data.tracks.length && y - GEOM.header - ti * (GEOM.rowH + GEOM.rowGap) <= GEOM.rowH ? ti : -1;
+  };
+
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const cv = canvasRef.current; if (!cv || !data || !visible || selDrag.current) return;
     const rect = cv.getBoundingClientRect();
     const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    // the gutter is labels, not cells: hovering one explains the row it names
+    if (x < GEOM.gutter) {
+      const ti = trackAt(y);
+      setLabelHover(ti >= 0 ? { ti, x, y } : null);
+      setHover(null);
+      return;
+    }
+    if (labelHover) setLabelHover(null);
     const hit = hitTest(x, y, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, view.scrollX) }, gapPx);
     setHover(hit ? { hit, x, y } : null);
     // one column under the pointer: ask the server what it carries, once, after a pause
@@ -637,7 +654,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         <div ref={wrapRef} style={{ position: "relative", marginTop: "0.5rem", border: "1px solid var(--line)", borderRadius: 8, background: "#fff", overflow: "hidden" }}>
           <canvas ref={canvasRef} style={{ display: "block", cursor: "crosshair" }}
             onPointerDown={onSelDown} onPointerMove={onSelMove} onPointerUp={onSelUp} onPointerCancel={onSelUp}
-            onMouseMove={onMove} onMouseLeave={() => setHover(null)}
+            onMouseMove={onMove} onMouseLeave={() => { setHover(null); setLabelHover(null); }}
             onClick={(e) => {
               // a click on a track's label opens that track's menu, like the portal's three dots
               const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
@@ -716,6 +733,19 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 pointerEvents: "none", zIndex: 3 }}>
                 {sel?.live && <span style={{ position: "absolute", top: 2, left: 3, fontSize: "0.7rem", color: "#1d4ed8", whiteSpace: "nowrap" }}>
                   {selCount.toLocaleString()} {data.unit}{selCount === 1 ? "" : "s"}</span>}
+              </div>
+            );
+          })()}
+
+          {labelHover && !trackMenu && (() => {
+            const t = data.tracks[labelHover.ti];
+            const lines = trackTooltipLines(t, data.n, data.unit);
+            return (
+              <div style={{ position: "absolute", left: Math.min(labelHover.x + 12, cssW - 300), top: labelHover.y + 14, pointerEvents: "none",
+                background: "var(--card)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 6, padding: "6px 8px",
+                fontSize: "0.78rem", boxShadow: "0 4px 14px rgba(0,0,0,.12)", maxWidth: 330, zIndex: 2 }}>
+                {lines.map((l, i) => <div key={i} style={i ? { color: "var(--muted)" } : { fontWeight: 600 }}>{l}</div>)}
+                <div style={{ color: "var(--muted)", marginTop: 2 }}>click for track options</div>
               </div>
             );
           })()}

@@ -100,6 +100,17 @@ def truncate_label(label: str, S: dict[str, Any] = STYLE) -> str:
     return label[: n - 1] + "…" if len(label) > n else label
 
 
+def track_label_text(track: Any, S: dict[str, Any] = STYLE) -> str:
+    """What the gutter prints: a merged gene row wears the brackets that spell it in a query."""
+    members = (track.meta.get("members") if hasattr(track, "meta") else track.get("members")) or []
+    label = track.label if hasattr(track, "label") else track["label"]
+    if len(members) < 2:
+        return truncate_label(label, S)
+    open_b, close_b = S["geometry"]["mergedBrackets"]
+    n = max(1, S["geometry"]["labelMaxChars"] - len(open_b) - len(close_b))
+    return open_b + (label[: n - 1] + "…" if len(label) > n else label) + close_b
+
+
 def gene_legend(S: dict[str, Any] = STYLE) -> list[tuple[str, str, str]]:
     """(label, colour, kind) in display order: mutations by priority, SV, CNA, mRNA, protein, not profiled."""
     G = S["glyph"]

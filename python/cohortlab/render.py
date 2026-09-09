@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 
 from .contract import Contract, Track
-from .style import STYLE, cell_layers, format_gutter_pct, gene_legend, numeric_rgb, resolve_style, style_for_display, track_category_color, truncate_label
+from .style import STYLE, cell_layers, format_gutter_pct, gene_legend, numeric_rgb, resolve_style, style_for_display, track_category_color, track_label_text, truncate_label
 
 _G = STYLE["geometry"]
 ROW_H, ROW_GAP, GROUP_GAP = _G["rowH"], _G["rowGap"], _G["groupGap"]
@@ -142,7 +142,7 @@ def figure(c: Contract, width: int = 1200, gutter: int | None = None, dpi: int =
         ax.text(e["x0"], -header / 2, f'{e["name"]} ({e["count"]:,})', fontsize=8, color=P["muted"], va="center", clip_on=True)
     for ti, t in enumerate(c.tracks):
         y = ti * (ROW_H + ROW_GAP) + ROW_H / 2
-        ax.text(4, y, truncate_label(t.label, S), fontsize=8, color=P["text"], va="center")
+        ax.text(4, y, track_label_text(t, S), fontsize=8, color=P["text"], va="center")
         if t.meta.get("freqPct") is not None:
             ax.text(gutter - 8, y, format_gutter_pct(t.meta.get("driverPct"), t.meta.get("freqPct"), t.meta.get("profiled"), c.n), fontsize=7.5, color=P["muted"], va="center", ha="right")
     handles = [Patch(color=color, label=label) for label, color, kind in gene_legend(S)]
