@@ -16,6 +16,13 @@ async function main() {
     const errors = [];
     page.on("pageerror", e => errors.push("pageerror: " + e.message));
     page.on("console", m => { if (m.type() === "error") errors.push("console: " + m.text()); });
+    // A console message about a failed resource does not say WHICH resource, which makes a
+    // transient server error impossible to chase. Record the method, url and status too.
+    page.on("response", r => {
+      if (r.status() >= 500) errors.push("http " + r.status() + " " + r.request().method() + " " + r.url());
+    });
+    page.on("requestfailed", r => errors.push("requestfailed " + r.method() + " " + r.url() +
+      " (" + ((r.failure() || {}).errorText || "?") + ")"));
 
     // "/" no longer serves the standalone query-builder UI — it redirects into
     // the Analysis app, which subsumes it. Verify the redirect itself once
@@ -720,7 +727,7 @@ async function main() {
     } else {
       await page.screenshot({ path: "shot-next-dark.png", fullPage: false });
     }
-    ok(scheme + ": no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    ok(scheme + ": no JS errors", errors.length === 0, errors.slice(0, 4).join(" | "));
     await ctx.close();
   }
   await browser.close();
