@@ -199,7 +199,28 @@ export function registerTools(server: any): void {
       const docB64 = Buffer.from(JSON.stringify(document)).toString("base64url");
       const content: any[] = [];
       const out: string[] = [];
+      // Small shared formatters. The engine attaches caveats and the author
+      // attaches notes; BOTH have to reach the model, or it writes about
+      // figures whose methodology and intent it cannot see.
+      const pFmt = (x: number) =>
+        x === 0 ? "<1e-300" : x < 1e-4 ? x.toExponential(1) : x.toFixed(4);
+      const caveatOf = (v: { caveat?: string }) =>
+        v.caveat ? "\n  CAVEAT (tell the user): " + v.caveat : "";
+      // the AUTHOR's note is `annotationNote`; `note` is the engine's own.
+      const noteOf = (v: { annotationNote?: string; note?: string }) =>
+        (v.annotationNote ? "\n  NOTE (the author's, tell the user): " + v.annotationNote : "") +
+        (v.note ? "\n  " + v.note : "");
       out.push(`Analysis over ${r.involvedStudies.join(" + ")} — OncoKB pin ${r.oncokbPin || "none"} — ${r.stats.ms}ms.`);
+      // The document's own title and notes are the author's framing of the whole
+      // workspace. They were stored and rendered in the app but never reached a
+      // model over MCP, so a caller could not read back what it had written.
+      const d = document as { title?: string; notes?: string; params?: Record<string, unknown> };
+      if (d.title) out.push(`Title: ${d.title}`);
+      if (d.notes) out.push(`Notes (the author's): ${d.notes}`);
+      if (r.params && Object.keys(r.params).length)
+        out.push("Parameters resolved: " + Object.entries(r.params)
+          .map(([k, v]) => `$${k} = ${JSON.stringify(v)}`).join("; ") +
+          (r.unusedParams?.length ? `  (declared but never referenced: ${r.unusedParams.map((x) => "$" + x).join(", ")})` : ""));
       out.push("Cohorts:\n" + Object.entries(r.cohorts)
         .map(([n, c]) => `- ${n}: ${c.count.toLocaleString()} patients — ${c.text}`).join("\n"));
       let images = 0;
@@ -210,11 +231,70 @@ export function registerTools(server: any): void {
             `  ${row.gene}: ` + row.cells.map((c) => `${c.cohort} ${c.driverPct}%/${c.anyPct}%`).join(" | ") +
             (row.pAny != null ? `  p=${row.pAny < 1e-4 ? row.pAny.toExponential(1) : row.pAny.toFixed(4)}` : ""));
           out.push(`Compare (driver%/any%, panel-aware denominators; annotation ${v.annotation}):\n` + rows.join("\n") +
-            (v.note ? "\nNOTE: " + v.note : ""));
+            noteOf(v));
         } else if (v.kind === "survival") {
           out.push("Survival (KM, overall survival):\n" + v.curves!.map((c) =>
             `  ${c.cohort}: median ${c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n=${c.n}, ${c.events} events${c.missing ? ", " + c.missing + " missing OS" : ""})`).join("\n") +
             "\nCAVEAT (tell the user): " + v.caveat);
+        } else if (v.kind === "cooccurrence") {
+          out.push("Co-occurrence (2x2 per pair, among patients profiled for BOTH genes):\n" +
+            (v.pairs || []).slice(0, 20).map((x) =>
+              `  ${x.a}/${x.b}: both ${x.both.toLocaleString()}, ${x.a} only ${x.onlyA.toLocaleString()}, ` +
+              `${x.b} only ${x.onlyB.toLocaleString()}, neither ${x.neither.toLocaleString()} (of ${x.profiled.toLocaleString()} profiled)` +
+              (x.log2Odds != null ? `  log2OR=${x.log2Odds.toFixed(2)} ${x.log2Odds > 0 ? "(co-occur)" : "(mutually exclusive)"}` : "") +
+              `  p=${pFmt(x.p)} q=${pFmt(x.q)}` +
+              (x.pStratified != null ? `  stratified p=${pFmt(x.pStratified)}` : "")).join("\n") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "clinical") {
+          out.push("Clinical comparison across cohorts:\n" +
+            (v.clinical || []).slice(0, 20).map((row) => {
+              const cells = row.cells.map((c) => row.kind === "num"
+                ? `${c.cohort} mean ${c.mean != null ? c.mean.toFixed(2) : "—"}` +
+                  (c.sd != null ? ` sd ${c.sd.toFixed(2)}` : "") + ` (n=${c.n.toLocaleString()})`
+                : `${c.cohort} ` + (c.top && c.top.length
+                    ? c.top.slice(0, 3).map((t) => `${t.v} ${c.n ? Math.round(1000 * t.n / c.n) / 10 : 0}%`).join(", ")
+                    : "—")).join(" | ");
+              return `  ${row.attribute} [${row.per}, ${row.kind}]: ${cells}` +
+                (row.p != null ? `  ${row.test || "test"} p=${pFmt(row.p)} q=${pFmt(row.q!)}` : "") +
+                (row.skipped ? `  SKIPPED: ${row.skipped}` : "");
+            }).join("\n") + caveatOf(v) + noteOf(v));
+        } else if (v.kind === "coexpression") {
+          out.push("Co-expression (Pearson r, computed from six per-site sums so the pooled value is exact):\n" +
+            (v.coexpression || []).slice(0, 20).map((x) =>
+              `  ${x.a}/${x.b}: r=${x.r != null ? x.r.toFixed(3) : "—"} (n=${x.n.toLocaleString()}) p=${pFmt(x.p)} q=${pFmt(x.q)}` +
+              (x.rMeta != null ? `  meta-r=${x.rMeta.toFixed(3)} across ${x.sites} sites` : "")).join("\n") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "hotspots") {
+          out.push("Recurrent protein changes (share of patients mutated in THAT gene):\n" +
+            (v.hotspots || []).map((g) =>
+              `  ${g.gene}: ${g.mutated.toLocaleString()} mutated — ` +
+              (g.variants.slice(0, 6).map((x) => `${x.variant} ${x.n.toLocaleString()} (${x.pct}%)`).join(", ") || "no change above the floor") +
+              (g.withheld ? `  [+${g.withheld.toLocaleString()} distinct changes below the suppression floor]` : "")).join("\n") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "course") {
+          const axis = v.courseAxis;
+          out.push(`Clinical course (${axis ? axis.binMonths + "-month bins, " + axis.from + " to +" + axis.to + "mo" : "binned"} ` +
+            `relative to the anchor; DENOMINATOR IS THE PATIENTS STILL OBSERVABLE IN EACH BIN, not the cohort):\n` +
+            (v.course || []).map((s2) => {
+              const pts = s2.points.filter((q) => q.pct != null && q.atRisk > 0);
+              const at = (t: number) => { const q = pts.find((z) => z.t === t); return q ? `${q.pct}% (n=${q.atRisk.toLocaleString()})` : "—"; };
+              return `  ${s2.cohort} / ${s2.eventType} [${s2.isInterval ? "a state patients are IN" : "an event that HAPPENED"}]: ` +
+                `0mo ${at(0)}, 12mo ${at(12)}, 24mo ${at(24)}, 60mo ${at(60)}`;
+            }).join("\n") + caveatOf(v) + noteOf(v));
+        } else if (v.kind === "sequence") {
+          const sq2 = v.sequence;
+          out.push(`Treatment sequence (lines of therapy by ${sq2 ? sq2.labelKey : "?"}, ` +
+            `${sq2 ? sq2.lineGap : 90}-day line gap):\n` +
+            (sq2?.panels || []).map((pn) => {
+              const first = pn.nodes.filter((n) => n.column === 1 && n.kind === "regimen")
+                .sort((a, b) => b.n - a.n).slice(0, 5)
+                .map((n) => `${n.label} ${n.n.toLocaleString()}`).join(", ");
+              const stopped = pn.nodes.filter((n) => n.kind === "stopped").reduce((t, n) => t + n.n, 0);
+              const cens = pn.censored;
+              return `  ${pn.cohort}: ${pn.started.toLocaleString()} with a first line — ${first}\n` +
+                `    of all paths, ${stopped.toLocaleString()} were WATCHED and began no further line; ` +
+                `${cens.toLocaleString()} (${pn.started ? Math.round(100 * cens / pn.started) : 0}%) end because the RECORD stops — nothing can be concluded about those`;
+            }).join("\n") + caveatOf(v) + noteOf(v));
         } else if (v.kind === "oncoprint" && v.svg && images < 2) {
           images++;
           ensureFonts();
@@ -222,7 +302,13 @@ export function registerTools(server: any): void {
           content.push({ type: "image", data: png.toString("base64"), mimeType: "image/png" });
           out.push(`Oncoprint: ${v.nColumns!.toLocaleString()} patients — ` +
             v.genes!.map((g) => `${g.gene} ${g.driverPct}%/${g.anyPct}%`).join(", ") +
-            ` — annotation ${v.annotation}.` + (v.note ? "\nNOTE (tell the user): " + v.note : ""));
+            ` — annotation ${v.annotation}.` + noteOf(v));
+        } else {
+          // A view kind with no branch above used to append nothing at all: the
+          // numbers were computed and the model was simply never told. Saying so
+          // is worse than a proper description but far better than silence.
+          out.push(`View "${v.kind}" ran but this tool has no text rendering for it yet — ` +
+            `open the interactive editor link below to see it.`);
         }
       }
       out.push(`Interactive editor (share with the user — opens this exact document, live): ${base}/analysis?doc=${docB64}` +
