@@ -614,7 +614,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             what is drawn and costs a query; VIEW changes how it is drawn and is instant. Each zone
             wraps as a unit — nowrap inside — so a pair like the zoom controls can never be split
             across a line break. */}
-        <div className="onco-tb">
+        <div className="viewtb">
           <div className="tbz">
             <span className="tbl" title="these change what is drawn, and re-run the query">data</span>
             {props.tracksMenu}
@@ -689,7 +689,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             {props.moreMenu}
           </div>
         </div>
-        {sortKeys.length > 1 && <div className="onco-tb2">
+        {sortKeys.length > 1 && <div className="viewtb-more">
           <span className="meta" title="ties in the first key are broken by these, in order">then</span>
           {sortKeys.slice(1).map((k) => (
             <button key={k} className="linklike" disabled={busy} title="drop this tiebreaker"

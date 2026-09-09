@@ -461,7 +461,7 @@ async function main() {
         await page.setViewportSize({ width: 1024, height: 900 });
         await page.waitForTimeout(1200);
         const m = await page.evaluate(() => {
-          const tb = document.querySelector(".onco-tb");
+          const tb = document.querySelector(".viewtb");
           if (!tb) return null;
           const zones = [...tb.querySelectorAll(".tbz")];
           const wrapped = zones.filter((z) => {

@@ -17,7 +17,8 @@
 // Colours come from CSS custom properties with literal fallbacks, so an SVG
 // inlined in the app follows the page theme while the same string rasterised
 // for a chat gets a fixed light figure.
-import type { ViewResult, KmCurve, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind } from "./types.ts";
+import { categoryColor, isAbsent, jitterFor } from "./plot.ts";
+import type { ViewResult, KmCurve, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind, PlotData } from "./types.ts";
 
 /** Cohort names and data values reach <text>; they must never reach it raw. */
 export const esc = (s: unknown): string =>
@@ -424,9 +425,208 @@ function sequenceSvg(v: ViewResult, o: SvgOpts): string {
   return frame(W, H, out.join(""), p.bg);
 }
 
+/**
+ * A plot, from the aggregated contract: a density field for a scatter, boxes for a numeric
+ * axis grouped by a categorical one, a shaded contingency for two categoricals.
+ *
+ * Nothing here has ever seen a point. The cells, the quartiles and the coefficients arrive
+ * already computed, which is why the same picture draws for a hundred cases or four hundred
+ * thousand.
+ */
+function plotSvg(v: ViewResult, o: SvgOpts): string {
+  const d = v.plot as PlotData | undefined;
+  if (!d) return "";
+  const p = palette(o.theme), W = o.width || 960;
+  const L = 60, R = 14, T = 16, PLOT = 300;
+  const plotW = W - L - R;
+  const out: string[] = [];
+  const axisText = (t: string, x: number, y: number, anchor = "middle", size = 11) =>
+    `<text x="${num(x)}" y="${num(y)}" font-size="${size}" fill="${p.muted}" text-anchor="${anchor}">${esc(t)}</text>`;
+
+  if (d.shape === "scatter" && d.bins && d.extent && d.grid) {
+    const { x0, x1, y0, y1 } = d.extent, [gx, gy] = d.grid;
+    const maxN = Math.max(1, ...d.bins.map((b) => b.n));
+    const cw = plotW / gx, ch = PLOT / gy;
+    // a log ramp, because a linear one hides everything but the mode — said on the figure
+    const shade = (n: number) => Math.min(1, 0.18 + 0.82 * Math.log1p(n) / Math.log1p(maxN));
+    for (const b of d.bins)
+      out.push(`<rect x="${num(L + b.bx * cw)}" y="${num(T + PLOT - (b.by + 1) * ch)}" width="${num(Math.max(cw, 0.8))}" ` +
+        `height="${num(Math.max(ch, 0.8))}" fill="${SERIES[0]}" fill-opacity="${num(shade(b.n))}"/>`);
+    // the fitted line, over every case rather than over what is visible
+    const st = d.stats;
+    if (st && st.slope != null && st.intercept != null && x1 > x0) {
+      const yAt = (xv: number) => st.intercept! + st.slope! * xv;
+      const sx = (xv: number) => L + plotW * (xv - x0) / (x1 - x0);
+      const sy = (yv: number) => T + PLOT - PLOT * (yv - y0) / Math.max(1e-9, y1 - y0);
+      const ya = Math.max(y0, Math.min(y1, yAt(x0))), yb = Math.max(y0, Math.min(y1, yAt(x1)));
+      out.push(`<line x1="${num(sx(x0))}" y1="${num(sy(ya))}" x2="${num(sx(x1))}" y2="${num(sy(yb))}" ` +
+        `stroke="${SERIES[4]}" stroke-width="1.5" stroke-dasharray="4 3"/>`);
+    }
+    out.push(`<rect x="${L}" y="${T}" width="${num(plotW)}" height="${PLOT}" fill="none" stroke="${p.line}"/>`);
+    out.push(axisText(num(x0), L, T + PLOT + 14, "start"), axisText(num(x1), L + plotW, T + PLOT + 14, "end"));
+    out.push(axisText(num(y0), L - 6, T + PLOT, "end"), axisText(num(y1), L - 6, T + 10, "end"));
+    if (st) {
+      const line = (st.pearson != null ? "Pearson " + num(st.pearson) + " (" + pFmt(st.pPearson ?? 1) + ")" : "") +
+        (st.spearman != null ? "   Spearman " + num(st.spearman) + " (" + pFmt(st.pSpearman ?? 1) + ")" : "");
+      out.push(`<text x="${W - R}" y="${T + 12}" font-size="11" fill="${p.ink}" text-anchor="end">${esc(line)}</text>`);
+    }
+    out.push(axisText(d.x.label, L + plotW / 2, T + PLOT + 30), 
+      `<text x="14" y="${T + PLOT / 2}" font-size="11" fill="${p.muted}" text-anchor="middle" ` +
+      `transform="rotate(-90 14 ${T + PLOT / 2})">${esc(d.y.label)}</text>`);
+    const cap = caption((v.note || "") + (v.note ? "  " : "") + "Darker is more " +
+      (v.plot!.n > 1 ? "cases" : "case") + "; the shade is logarithmic.", W, T + PLOT + 40, p.muted);
+    return frame(W, T + PLOT + 40 + cap.height + 10, out.join("") + cap.svg, p.bg);
+  }
+
+  if (d.shape === "box" && d.groups && d.groups.length) {
+    const gs = d.groups.slice(0, 24);
+    const lo = Math.min(...gs.map((g) => g.loWhisker)), hi = Math.max(...gs.map((g) => g.hiWhisker));
+    const span = Math.max(1e-9, hi - lo);
+    const bw = plotW / gs.length;
+    const sy = (val: number) => T + PLOT - PLOT * (val - lo) / span;
+    // the values behind the boxes: every point when the reader may see cases and there are few
+    // enough of them, otherwise the density of the same values
+    const byGroup = new Map<string, { id: string; v: number; c?: string; r?: string }[]>();
+    for (const pt of d.points || [])
+      (byGroup.get(pt.g) ?? byGroup.set(pt.g, []).get(pt.g)!).push({ id: pt.id, v: pt.v, c: pt.c, r: pt.r });
+    // each violin is scaled to its OWN densest bin: one group holding 178,489 of the values
+    // would otherwise flatten every other group to an invisible sliver. How many cases a group
+    // has is already printed under its name, so the width is free to describe its shape.
+    // a bin may hold several colour classes; the totals are what the width is scaled by
+    const vio = new Map<string, Map<number, Map<string, number>>>();
+    const vioMax = new Map<string, number>();
+    for (const b of d.violin || []) {
+      if (!vio.has(b.g)) vio.set(b.g, new Map());
+      const cells = vio.get(b.g)!;
+      if (!cells.has(b.b)) cells.set(b.b, new Map());
+      const byClass = cells.get(b.b)!;
+      byClass.set(b.c ?? "", (byClass.get(b.c ?? "") || 0) + b.n);
+      const total = [...byClass.values()].reduce((a, n) => a + n, 0);
+      if (total > (vioMax.get(b.g) || 0)) vioMax.set(b.g, total);
+    }
+    const colorKey = (d.legend || []).filter((k) => !k.ring);
+    const ringKey = (d.legend || []).filter((k) => k.ring);
+    const byLabel = new Map((d.legend || []).map((k) => [k.label, k.color]));
+    const colorOf = (label: string) => byLabel.get(label) || categoryColor(label, 0);
+    const vBins = d.violinBins || 40;
+
+    gs.forEach((g, i) => {
+      const cx = L + bw * (i + 0.5), half = Math.min(24, bw * 0.32);
+      if (d.overlay === "violin" && vio.has(g.g)) {
+        // a half-width density either side of the box, each violin scaled to its own densest bin.
+        // With a colour, one bin's width is shared out between its classes, so the split is
+        // visible without pretending the classes were measured separately.
+        const cells = vio.get(g.g)!;
+        // a bin stands for a range of VALUES, and the axis is drawn between the whiskers, so the
+        // two are mapped through the extent the bins were cut over rather than assumed equal
+        const [vx0, vx1] = d.violinExtent || [lo, hi];
+        const bw = (vx1 - vx0) / vBins;
+        for (const [b, byClass] of cells) {
+          const vLo = vx0 + b * bw, vHi = vLo + bw;
+          if (vHi < lo || vLo > hi) continue;
+          const total = [...byClass.values()].reduce((a, n) => a + n, 0);
+          const w = half * 1.6 * Math.sqrt(total / (vioMax.get(g.g) || 1));
+          const yTop = sy(Math.min(hi, vHi));
+          const step = Math.max(1.2, sy(Math.max(lo, vLo)) - yTop);
+          if (!colorKey.length) {
+            out.push(`<rect x="${num(cx - w)}" y="${num(yTop)}" width="${num(w * 2)}" height="${num(step)}" ` +
+              `fill="${SERIES[0]}" fill-opacity="0.28"/>`);
+            continue;
+          }
+          let x = cx - w;
+          for (const k of colorKey) {
+            const n = byClass.get(k.label) || 0;
+            if (!n) continue;
+            const seg = 2 * w * (n / total);
+            out.push(`<rect x="${num(x)}" y="${num(yTop)}" width="${num(seg)}" height="${num(step)}" ` +
+              `fill="${k.color}" fill-opacity="0.75"/>`);
+            x += seg;
+          }
+        }
+      }
+      if (d.overlay === "points" && byGroup.has(g.g)) {
+        // two encodings on one dot need a dot big enough to carry them; a crowded plot gets
+        // smaller ones so the cloud is still a cloud
+        const nPts = d.points!.length;
+        const rBase = Math.max(1.3, Math.min(4.5, 90 / Math.sqrt(Math.max(1, nPts))));
+        for (const pt of byGroup.get(g.g)!) {
+          const fill = pt.c != null ? colorOf(pt.c) : SERIES[0];
+          const ring = pt.r != null && !isAbsent(pt.r) ? colorOf(pt.r) : null;
+          out.push(`<circle cx="${num(cx + jitterFor(pt.id) * half * 0.9)}" cy="${num(sy(pt.v))}" ` +
+            `r="${num(ring ? rBase * 1.25 : rBase)}" fill="${fill}" fill-opacity="0.85"` +
+            (ring ? ` stroke="${ring}" stroke-width="${num(Math.max(0.6, rBase * 0.28))}"` : "") + `/>`);
+        }
+      }
+      out.push(`<line x1="${num(cx)}" y1="${num(sy(g.loWhisker))}" x2="${num(cx)}" y2="${num(sy(g.hiWhisker))}" stroke="${p.muted}"/>`);
+      out.push(`<rect x="${num(cx - half)}" y="${num(sy(g.q3))}" width="${num(half * 2)}" height="${num(Math.max(1, sy(g.q1) - sy(g.q3)))}" ` +
+        `fill="${SERIES[0]}" fill-opacity="${d.overlay === "none" ? 0.25 : 0.1}" stroke="${SERIES[0]}"/>`);
+      out.push(`<line x1="${num(cx - half)}" y1="${num(sy(g.median))}" x2="${num(cx + half)}" y2="${num(sy(g.median))}" stroke="${SERIES[0]}" stroke-width="2"/>`);
+      const label = g.g.length > 14 ? g.g.slice(0, 13) + "…" : g.g;
+      out.push(`<text x="${num(cx)}" y="${T + PLOT + 26}" font-size="9" fill="${p.muted}" text-anchor="end" ` +
+        `transform="rotate(-40 ${num(cx)} ${T + PLOT + 26})">${esc(label)}</text>`);
+      out.push(`<text x="${num(cx)}" y="${T + PLOT + 12}" font-size="8" fill="${p.muted}" text-anchor="middle">${fmt(g.n)}</text>`);
+    });
+    for (const t of [lo, (lo + hi) / 2, hi]) out.push(axisText(num(t), L - 6, sy(t) + 3, "end", 10));
+    out.push(`<rect x="${L}" y="${T}" width="${num(plotW)}" height="${PLOT}" fill="none" stroke="${p.line}"/>`);
+    let keyY = T + PLOT + 74;
+    if (colorKey.length || ringKey.length) {
+      let kx = L;
+      const chip = (k: { label: string; color: string; ring?: boolean }) => {
+        const w = 12 + k.label.length * 5.4;
+        if (kx + w > W - R) { kx = L; keyY += 14; }
+        const g = k.ring
+          ? `<circle cx="${num(kx + 4)}" cy="${num(keyY - 3)}" r="3.4" fill="none" stroke="${k.color}" stroke-width="1.6"/>`
+          : `<circle cx="${num(kx + 4)}" cy="${num(keyY - 3)}" r="3.4" fill="${k.color}"/>`;
+        out.push(g + `<text x="${num(kx + 11)}" y="${num(keyY)}" font-size="9" fill="${p.muted}">${esc(k.label)}</text>`);
+        kx += w;
+      };
+      if (colorKey.length) { out.push(`<text x="${L}" y="${num(keyY - 14)}" font-size="9" fill="${p.muted}">${esc(d.colorLabel || "colour")}</text>`); colorKey.forEach(chip); }
+      // a ring means "this case also has that", so absence gets no ring and no key entry
+      if (ringKey.some((k) => !isAbsent(k.label))) {
+        kx = L; keyY += 16;
+        out.push(`<text x="${L}" y="${num(keyY - 14)}" font-size="9" fill="${p.muted}">${esc(d.ringLabel || "ring")}</text>`);
+        ringKey.filter((k) => !isAbsent(k.label)).forEach(chip);
+      }
+      keyY += 8;
+    }
+    const cap = caption("Box: quartiles with Tukey whiskers, computed over every case in the group. The count is above each name." +
+      (d.overlay === "points" ? " Every value is drawn over its box; the jitter is fixed per case."
+        : d.overlay === "violin" ? " The shaded width is the share of that group's values sitting at that height, scaled per group."
+        : ""),
+      W, Math.max(T + PLOT + 84, keyY), p.muted);
+    const bottom = Math.max(T + PLOT + 84, keyY);
+    return frame(W, bottom + cap.height + 10, out.join("") + cap.svg, p.bg);
+  }
+
+  if (d.shape === "table" && d.cells && d.cells.length) {
+    const xs = [...new Set(d.cells.map((c) => c.cx))].slice(0, 12);
+    const ys = [...new Set(d.cells.map((c) => c.cy))].slice(0, 12);
+    const at = new Map(d.cells.map((c) => [c.cx + "\u0000" + c.cy, c.n]));
+    const maxN = Math.max(1, ...d.cells.map((c) => c.n));
+    const LX = 130, cw = (W - LX - R) / xs.length, chh = Math.min(30, PLOT / Math.max(1, ys.length));
+    ys.forEach((yv, r) => {
+      out.push(`<text x="${LX - 6}" y="${num(T + chh * r + chh * 0.66)}" font-size="10" fill="${p.muted}" text-anchor="end">${esc(yv.length > 20 ? yv.slice(0, 19) + "…" : yv)}</text>`);
+      xs.forEach((xv, c) => {
+        const n = at.get(xv + "\u0000" + yv) || 0;
+        out.push(`<rect x="${num(LX + cw * c)}" y="${num(T + chh * r)}" width="${num(cw - 1)}" height="${num(chh - 1)}" ` +
+          `fill="${SERIES[0]}" fill-opacity="${num(n ? 0.12 + 0.78 * Math.log1p(n) / Math.log1p(maxN) : 0.03)}"/>`);
+        if (n) out.push(`<text x="${num(LX + cw * (c + 0.5))}" y="${num(T + chh * r + chh * 0.66)}" font-size="9" ` +
+          `fill="${p.ink}" text-anchor="middle">${fmt(n)}</text>`);
+      });
+    });
+    xs.forEach((xv, c) => out.push(`<text x="${num(LX + cw * (c + 0.5))}" y="${num(T + chh * ys.length + 12)}" font-size="9" ` +
+      `fill="${p.muted}" text-anchor="end" transform="rotate(-40 ${num(LX + cw * (c + 0.5))} ${num(T + chh * ys.length + 12)})">${esc(xv.length > 16 ? xv.slice(0, 15) + "…" : xv)}</text>`));
+    const h = T + chh * ys.length + 86;
+    const cap = caption(d.x.label + " across, " + d.y.label + " down. " + fmt(d.n) + " cases counted in the database.", W, h, p.muted);
+    return frame(W, h + cap.height + 10, out.join("") + cap.svg, p.bg);
+  }
+  return "";
+}
+
 export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {
   if (!v || v.error) return null;
   if (v.kind === "oncoprint") return v.svg || null;   // already rendered by the contract
+  if (v.kind === "plot" && v.plot) return plotSvg(v, o) || null;
   if (v.kind === "course" && v.course && v.course.length) return courseSvg(v, o);
   if (v.kind === "sequence" && v.sequence && v.sequence.panels.some((z) => z.flows.length)) return sequenceSvg(v, o);
   if (v.kind === "survival" && v.curves && v.curves.length) return survivalSvg(v, o);

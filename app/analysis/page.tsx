@@ -476,6 +476,9 @@ export default function AnalysisPage() {
     return [...by.values()].sort((a, b) => b.n - a.n);
   };
   /** a continuous profile for co-expression / heatmaps, if this study has one */
+  /** the numeric clinical attributes this study declares, for a plot's default axes */
+  const numericAttrs = (): string[] => (trackAttrs.attrs || []).filter((a) => a.kind === "num").map((a) => a.attribute);
+
   const contProfile = (): string | null => {
     const ps = (explore && explore.profiles) || [];
     return ps.find((p: string) => /zscore/i.test(p)) || ps.find((p: string) => /mrna|rna_seq/i.test(p)) || null;
@@ -486,6 +489,8 @@ export default function AnalysisPage() {
     { kind: "survival", label: "Survival" },
     { kind: "oncoprint", label: "Oncoprint" },
     { kind: "hotspots", label: "Lollipop (hotspots)" },
+    { kind: "plot", label: "Plot",
+      why: () => viewAttrs().length ? null : "no clinical attributes known yet — open Explore once so the app can read this study's attributes" },
     { kind: "cooccurrence", label: "Co-occurrence" },
     { kind: "clinical", label: "Clinical comparison",
       why: () => viewAttrs().length ? null : "no clinical attributes known yet — open Explore once so the app can read this study's attributes" },
@@ -515,6 +520,16 @@ export default function AnalysisPage() {
       : kind === "clinical" ? { kind, attributes: viewAttrs() }
       : kind === "coexpression" ? { kind, genes: genes.slice(0, 5), profileType: contProfile() }
       : kind === "hotspots" ? { kind, genes: genes.slice(0, 4), minCount: 1 }
+      : kind === "plot" ? (() => {
+          // start from two attributes this study actually declares, and fall back to an
+          // alteration axis, which every study can answer
+          const nums = numericAttrs();
+          if (nums.length >= 2) return { kind, x: { source: "clinical", attribute: nums[0] }, y: { source: "clinical", attribute: nums[1] }, unit: "sample" };
+          const cat = (trackAttrs.attrs || []).find((a) => a.kind !== "num");
+          return { kind, unit: "sample",
+            x: { source: "alteration", gene: genes[0] || "TP53", by: "mutationType" },
+            y: cat ? { source: "clinical", attribute: cat.attribute } : { source: "alteration", gene: genes[1] || "KRAS", by: "mutated" } };
+        })()
       : kind === "course" ? (() => {
           const evs = viewEvents();
           // Rank by STRUCTURE, not by how common the type is. Picking the two
@@ -895,6 +910,69 @@ export default function AnalysisPage() {
   }
 
   /**
+ * One axis of a plot. The source decides what else is asked for: a clinical attribute, a gene
+ * in a molecular profile, or a gene's alterations. It is the same vocabulary the engine uses,
+ * so what the reader picks is what the document says.
+ */
+function AxisPicker({ side, axis, attrs, profiles, busy, onChange, allowNone, categorical }: {
+  side: string; axis: any; busy?: boolean;
+  attrs: { attribute: string; kind: string }[]; profiles: string[];
+  onChange: (a: any) => void;
+  /** a colour is optional in a way an axis is not */
+  allowNone?: boolean;
+  /** colours come from categories, so a molecular value is not on offer */
+  categorical?: boolean;
+}) {
+  const a = axis || {};
+  const src = axis ? (a.source || "clinical") : "none";
+  const set = (next: any) => onChange(next);
+  return (
+    <span className="axispick">
+      <span className="tbl">{side}</span>
+      <select value={src} disabled={busy} title="what this axis measures"
+        onChange={(e) => {
+          const s = e.target.value;
+          set(s === "none" ? undefined
+            : s === "clinical" ? { source: "clinical", attribute: (attrs[0] || {}).attribute || "" }
+            : s === "molecular" ? { source: "molecular", profileType: profiles[0] || "", gene: a.gene || "TP53" }
+            : { source: "alteration", gene: a.gene || "TP53", by: "mutationType" });
+        }}>
+        {allowNone && <option value="none">none</option>}
+        <option value="clinical">clinical</option>
+        {!categorical && <option value="molecular">molecular</option>}
+        <option value="alteration">alteration</option>
+      </select>
+      {src === "clinical" && (
+        <select value={a.attribute || ""} disabled={busy} title="which clinical attribute"
+          onChange={(e) => set({ ...a, attribute: e.target.value })}>
+          {!attrs.some((x) => x.attribute === a.attribute) && <option value={a.attribute || ""}>{a.attribute || "(none)"}</option>}
+          {attrs.map((x) => <option key={x.attribute} value={x.attribute}>{x.attribute}{x.kind === "num" ? "" : " (categorical)"}</option>)}
+        </select>
+      )}
+      {src === "molecular" && <>
+        <select value={a.profileType || ""} disabled={busy} title="which molecular profile"
+          onChange={(e) => set({ ...a, profileType: e.target.value })}>
+          {!profiles.includes(a.profileType || "") && <option value={a.profileType || ""}>{a.profileType || "(none)"}</option>}
+          {profiles.map((pt) => <option key={pt} value={pt}>{pt}</option>)}
+        </select>
+        <input className="axisgene" value={a.gene || ""} disabled={busy} placeholder="gene"
+          onChange={(e) => set({ ...a, gene: e.target.value.toUpperCase() })} />
+      </>}
+      {src === "alteration" && <>
+        <input className="axisgene" value={a.gene || ""} disabled={busy} placeholder="gene"
+          onChange={(e) => set({ ...a, gene: e.target.value.toUpperCase() })} />
+        <select value={a.by || "mutationType"} disabled={busy} title="how the gene's alterations are grouped"
+          onChange={(e) => set({ ...a, by: e.target.value })}>
+          <option value="mutationType">mutation type</option>
+          <option value="mutated">mutated vs not</option>
+          <option value="cna">copy number</option>
+        </select>
+      </>}
+    </span>
+  );
+}
+
+/**
  * A checkbox menu in a view's header: which cohorts it uses, which attributes it compares.
  * One component, because these were the settings you could only reach by editing the JSON.
  */
@@ -2385,6 +2463,44 @@ function Latency({ v }: { v: any }) {
                     </select>
                   </div>
                 )}
+                {v.kind === "plot" && <>
+                  <ViewHead v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onRemove={() => removeView(vi)}
+                    sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
+                  {/* Every control here changes what is DRAWN and costs a query, so there is one
+                      zone and it says so — the same toolbar the oncoprint uses. */}
+                  <div className="viewtb">
+                    <div className="tbz">
+                      <span className="tbl" title="these change what is drawn, and re-run the query">data</span>
+                      <AxisPicker side="x" axis={docView(vi).x} attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
+                        onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, x: a }))} />
+                    </div>
+                    <div className="tbz">
+                      <AxisPicker side="y" axis={docView(vi).y} attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
+                        onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, y: a }))} />
+                    </div>
+                    <div className="tbz">
+                      <span className="tbl" title="a category colours each value; above the points cap it splits the density instead">colour</span>
+                      <AxisPicker side="fill" axis={docView(vi).colorBy} allowNone categorical
+                        attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
+                        onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
+                      <AxisPicker side="ring" axis={docView(vi).ringBy} allowNone categorical
+                        attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
+                        onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
+                    </div>
+                    <div className="tbz">
+                      <label className="tbfield" title="what a point is; patient mode averages a patient's samples">unit <select
+                        value={docView(vi).unit || "patient"} disabled={busy}
+                        onChange={(e) => updateView(vi, (vv: any) => ({ ...vv, unit: e.target.value }))}>
+                        <option value="patient">patients</option><option value="sample">samples</option>
+                      </select></label>
+                      <button className="tbbtn" disabled={busy} title="put the x axis on y and the y axis on x"
+                        onClick={() => updateView(vi, (vv: any) => ({ ...vv, x: vv.y, y: vv.x }))}>swap</button>
+                    </div>
+                  </div>
+                  {v.svg
+                    ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
+                    : <p className="note">{v.plot?.note || "nothing to draw"}</p>}
+                </>}
                 {v.kind === "sequence" && v.svg && <>
                   <div className="vhead">
                     <h2 className="vtitle">Treatment sequence <span className="plain">

@@ -137,6 +137,32 @@ export interface SurvivalView {
    */
   anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
 }
+/**
+ * A plot: two axes over the same cases. The shape — scatter, box, contingency — follows from
+ * what the axes are, exactly as it does in the portal, rather than being asked for.
+ */
+export interface PlotView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string;
+  kind: "plot"; x: PlotAxis; y: PlotAxis; cohorts?: string[];
+  /** what a point is (default "sample"); patient mode averages a patient's samples */
+  unit?: "patient" | "sample";
+  /** the grid a scatter is binned onto (default 240 x 160) */
+  bins?: [number, number];
+  /**
+   * Draw the values over a box plot's boxes when there are few enough of them and the study is
+   * one this participant may see cases in (default true). Above the cap, or from an
+   * aggregate-only participant, the same values are drawn as a density instead.
+   */
+  points?: boolean;
+  /**
+   * Colour the values by a category, as the portal's "Color samples by" does: `colorBy` fills
+   * each point, `ringBy` rings it, so a case that is both amplified and mutated stays legible.
+   * Above the points cap the fill splits the density instead.
+   */
+  colorBy?: PlotAxis;
+  ringBy?: PlotAxis;
+}
 export interface CooccurrenceView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string; kind: "cooccurrence"; genes: string[]; cohorts?: string[] }
@@ -260,7 +286,9 @@ export interface SequenceView {
   /** distinct labels kept before the rest fold into "other" (default 6) */
   topN?: number;
 }
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView;
+import type { PlotAxis, PlotData } from "./plot.ts";
+export type { PlotAxis, PlotData };
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -411,7 +439,9 @@ export interface ViewResult {
   logrank?: LogRank; logrankPooled?: LogRank;
   pairs?: CooccurRow[];                     // cooccurrence
   clinical?: ClinicalRow[];                 // clinical comparison
-  coexpression?: CoexprRow[];               // co-expression
+  coexpression?: CoexprRow[];
+  /** a plot's aggregated contract: bins, groups or cells — never points */
+  plot?: PlotData;               // co-expression
   hotspots?: HotspotGene[];                 // hotspots / lollipop
   course?: CourseSeries[];                  // clinical course
   sequence?: SequenceResult;                // treatment sequences

@@ -23,6 +23,23 @@ import { chQuery, DB, PRIMARY, connections, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { canonicalEventName } from "./event-names.ts";
 import { compileCohortDef } from "./cohort2.ts";
+import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
+  categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
+  plotBinsSql, plotBoxSql, plotCountSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
+  type PlotAxis, type PlotData, type PlotPoint, type PlotRequest } from "./plot.ts";
+// re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
+export { plotBinsSql, plotBoxSql, plotCountSql, plotStatsSql, plotTableSql, plotViolinSql };
+export type { PlotData, PlotRequest, PlotGroup, PlotPoint } from "./plot.ts";
+
+/** the colour key: the commonest categories, capped, each with the colour every renderer uses */
+export function legendFor(values: string[], ring = false): { label: string; color: string; ring?: boolean }[] {
+  const counts = new Map<string, number>();
+  for (const v of values) if (v) counts.set(v, (counts.get(v) || 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, COLOR_CAP)
+    .map(([label], i) => ({ label, color: categoryColor(label, i), ...(ring ? { ring: true } : {}) }));
+}
+
+const num = (v: unknown): number | null => { const x = Number(v); return Number.isFinite(x) ? x : null; };
 import { genomicEventsSql, coverageSql } from "./oncoprint.ts";
 import type { CohortDef, CompileCtx, ChRow, ChResult } from "./types.ts";
 
@@ -931,6 +948,8 @@ export interface AggregateCapable {
   /** which attribute keys could label a therapy line here */
   sequenceKeys(def: CohortDef | null | undefined, eventType: string): Promise<{ key: string; label: string; patients: number; values: number }[]>;
   pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
+  /** a plot's aggregated contract: bins, groups or cells — never points */
+  plot(def: CohortDef | null | undefined, spec: PlotRequest): Promise<PlotData>;
   attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]>;
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
   variantCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<VariantReport>;
@@ -950,6 +969,8 @@ export interface QueryLogEntry { label: string; sql: string; ms?: number; remote
 
 /** Additionally available when the instance permits patient-level access. */
 export interface PatientLevelCapable extends AggregateCapable {
+  /** the values behind a box plot, with their case ids — the entitlement, in one method */
+  plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number): Promise<PlotPoint[]>;
   readonly instance: Instance & { mode: "patient-level" };
   members(def: CohortDef | null | undefined): Promise<string[]>;
 }
@@ -1130,6 +1151,106 @@ abstract class BaseResolver implements AggregateCapable {
     return out;
   }
 
+
+  /**
+   * Which of these axes' clinical attributes the STUDY declares as numbers. Only it knows: it
+   * declared them. An attribute it does not declare has no answer here rather than a guess.
+   */
+  protected async clinicalKinds(axes: PlotAxis[]): Promise<Map<string, "num" | "cat">> {
+    const db = this.instance.conn.db, conn = this.instance.conn;
+    const attrs = axes.filter((a) => a.source === "clinical").map((a) => (a as { attribute: string }).attribute);
+    const kinds = new Map<string, "num" | "cat">();
+    if (!attrs.length) return kinds;
+    const meta = await chQuery<ChRow>(
+      "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt\n" +
+      "FROM " + db + ".clinical_attribute_meta cam\n" +
+      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
+      "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ")", conn)
+      .catch(() => ({ data: [] as ChRow[] }));
+    for (const r of meta.data) kinds.set(String(r.a), String(r.dt) === "NUMBER" ? "num" : "cat");
+    return kinds;
+  }
+
+  /**
+   * A plot: two axes over the same cases, aggregated inside the database.
+   *
+   * Nothing here returns a point. A scatter comes back as counts per grid cell, a box as
+   * quartiles per group, a contingency as counts per pair — so the answer is a few kilobytes
+   * whatever the cohort's size, and an aggregate-only participant can compute it at all.
+   */
+  async plot(def: CohortDef | null | undefined, spec: PlotRequest): Promise<PlotData> {
+    const db = this.instance.conn.db, conn = this.instance.conn;
+    validateAxis(spec.x, "x");
+    validateAxis(spec.y, "y");
+    const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
+    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def) };
+
+    const kinds = await this.clinicalKinds([spec.x, spec.y]);
+    const kindOf = (attr: string) => kinds.get(attr);
+    const xk = axisKind(spec.x, kindOf), yk = axisKind(spec.y, kindOf);
+    const shape = plotShape(xk, yk);
+    if (shape === "waterfall") throw new Error("an ordered-cases axis (a waterfall) is not implemented yet; give both axes a source");
+    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const label = { x: { label: axisLabel(spec.x), kind: xk }, y: { label: axisLabel(spec.y), kind: yk } };
+
+    if (shape === "scatter") {
+      const c = await this.runLogged<ChRow>("plot:extent", plotCountSql(xSel, ySel, ctx.cohortSql, true), conn);
+      const n = Number(c.data[0]?.n || 0);
+      if (!n) return { shape, n: 0, ...label, note: "no " + unit + " has a value on both axes" };
+      const [st, bins] = await Promise.all([
+        this.runLogged<ChRow>("plot:stats", plotStatsSql(xSel, ySel, ctx.cohortSql), conn),
+        this.runLogged<ChRow>("plot:bins", plotBinsSql(xSel, ySel, ctx.cohortSql, spec.bins), conn)
+      ]);
+      const r = st.data[0] || {};
+      const pearson = num(r.pearson), spearman = num(r.spearman);
+      return {
+        shape, n, ...label,
+        extent: { x0: Number(c.data[0].x0), x1: Number(c.data[0].x1), y0: Number(c.data[0].y0), y1: Number(c.data[0].y1) },
+        grid: [spec.bins?.[0] ?? DEFAULT_BINS[0], spec.bins?.[1] ?? DEFAULT_BINS[1]],
+        bins: bins.data.map((b) => ({ bx: Number(b.bx), by: Number(b.by), n: Number(b.n) })),
+        stats: { pearson, spearman, slope: num(r.slope), intercept: num(r.intercept),
+          pPearson: corrPValue(pearson, n), pSpearman: corrPValue(spearman, n) }
+      };
+    }
+
+    if (shape === "table") {
+      const c = await this.runLogged<ChRow>("plot:extent", plotCountSql(xSel, ySel, ctx.cohortSql, false), conn);
+      const n = Number(c.data[0]?.n || 0), kx = Number(c.data[0]?.kx || 0), ky = Number(c.data[0]?.ky || 0);
+      if (!n) return { shape, n: 0, ...label, note: "no " + unit + " has a value on both axes" };
+      // a truncated contingency table is a wrong contingency table, so it is refused
+      if (kx > CATEGORY_CAP || ky > CATEGORY_CAP)
+        throw new Error("this pair has " + Math.max(kx, ky) + " distinct categories on one axis and " + CATEGORY_CAP +
+          " is the most a contingency table stays readable (and testable) at; narrow the cohort or pick another attribute");
+      const cells = await this.runLogged<ChRow>("plot:cells", plotTableSql(xSel, ySel, ctx.cohortSql), conn);
+      return { shape, n, ...label, cells: cells.data.map((r) => ({ cx: String(r.cx), cy: String(r.cy), n: Number(r.n) })) };
+    }
+
+    // box: the numeric axis grouped by the categorical one, whichever way round they were given
+    const numFirst = xk === "num";
+    const colorSel = spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
+    const [rows, vio] = await Promise.all([
+      this.runLogged<ChRow>("plot:box", plotBoxSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql), conn),
+      this.runLogged<ChRow>("plot:violin",
+        plotViolinSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql, VIOLIN_BINS, colorSel), conn)
+    ]);
+    if (rows.data.length > CATEGORY_CAP)
+      throw new Error("more than " + CATEGORY_CAP + " groups on the categorical axis; narrow the cohort or pick another attribute");
+    const groups = rows.data.map((r) => {
+      const q = (r.q as unknown as number[]).map(Number);
+      const lo = Number(r.lo), hi = Number(r.hi);
+      const t = tukey(q[0], q[2], lo, hi);
+      return { g: String(r.g), n: Number(r.n), lo, hi, q1: q[0], median: q[1], q3: q[2],
+        loWhisker: t.loWhisker, hiWhisker: t.hiWhisker };
+    });
+    const violin = vio.data.map((r) => ({ g: String(r.g), b: Number(r.b), n: Number(r.n),
+      ...(spec.colorBy ? { c: String(r.c ?? "") } : {}) }));
+    const vx0 = num(vio.data[0]?.vx0), vx1 = num(vio.data[0]?.vx1);
+    return { shape, n: groups.reduce((a, g) => a + g.n, 0), ...label, groups,
+      violin, violinBins: VIOLIN_BINS, overlay: "violin",
+      ...(vx0 != null && vx1 != null ? { violinExtent: [vx0, vx1] as [number, number] } : {}),
+      ...(spec.colorBy ? { colorLabel: axisLabel(spec.colorBy), legend: legendFor(violin.map((v) => v.c || "")) } : {}) };
+  }
+
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
     if (!pairs.length) return [];
     const r = await this.runLogged<ChRow>("pairCounts",
@@ -1155,6 +1276,35 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     super(study, ctx);
     this.instance = { ...instance, mode: "patient-level" };
   }
+  /**
+   * The points behind a box plot, with their case ids, so a reader can find one on the figure.
+   *
+   * It lives here and nowhere else. `AggregateResolver` has no such method, and neither does a
+   * remote peer, so a participant that may not disclose a case cannot be asked for one — the
+   * same guarantee as `members()`, and for the same reason. The cap is what stops a quarter of
+   * a million dots being called a drawing; above it the caller falls back to the density every
+   * participant can compute.
+   */
+  async plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap = POINTS_CAP): Promise<PlotPoint[]> {
+    const db = this.instance.conn.db, conn = this.instance.conn;
+    const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
+    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def) };
+    const kinds = await this.clinicalKinds([spec.x, spec.y]);
+    const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
+    if (plotShape(xk, yk) !== "box") return [];
+    const numFirst = xk === "num";
+    const numSel = axisSelect(numFirst ? spec.x : spec.y, ctx, "num");
+    const catSel = axisSelect(numFirst ? spec.y : spec.x, ctx, "cat");
+    const colorSel = spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
+    const ringSel = spec.ringBy ? axisSelect(spec.ringBy, ctx, "cat") : undefined;
+    const r = await this.runLogged<ChRow>("plot:points",
+      plotPointsSql(numSel, catSel, ctx.cohortSql, cap, colorSel, ringSel), conn);
+    // one over the cap means there were more than a drawing can hold: the caller draws density
+    if (r.data.length > cap) return [];
+    return r.data.map((x) => ({ id: String(x.id), g: String(x.g), v: Number(x.v),
+      ...(colorSel ? { c: String(x.c ?? "") } : {}), ...(ringSel ? { r: String(x.r ?? "") } : {}) }));
+  }
+
   async members(def: CohortDef | null | undefined): Promise<string[]> {
     const r = await chQuery<ChRow>("SELECT pid FROM (" + this.cohortSql(def) + ")", this.instance.conn);
     return r.data.map((x) => x.pid);

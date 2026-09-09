@@ -11,6 +11,7 @@ import { sq } from "./compiler.ts";
 import { compileCohortDef, describeCohortDef } from "./cohort2.ts";
 import { genomicEventsSql, coverageSql, buildContract, PIDS_SQL } from "./oncoprint.ts";
 import { geneSymbols } from "./gene-tracks.ts";
+import type { PlotView } from "./types.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, fisherZMeta } from "./stats.ts";
@@ -21,8 +22,7 @@ import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting, restrictedStudies,
   type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments,
-  type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow
-} from "./federation.ts";
+  type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, legendFor } from "./federation.ts";
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 
@@ -663,6 +663,62 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             ? " With more than one study the distinct-change count is an UPPER BOUND: per-study distinct counts cannot be merged exactly (a change seen at both sites is counted twice), so the number withheld by the display cap is not reported."
             : "") });
 
+    } else if (view.kind === "plot") {
+      const pv = view as PlotView;
+      const cn = vNames[0];
+      const sites = cohorts[cn].studies;
+      // Bins from two studies are counted against two different scales, so pooling them would
+      // draw a picture of neither. Federated plots need a shared scale; until then, say so.
+      if (sites.length > 1) {
+        views.push({ kind: "plot", error: "a plot is computed within one study, and this cohort spans " +
+          sites.length + " (" + sites.join(", ") + "). Bins from different studies are counted on different scales, " +
+          "so pooling them would draw a picture of neither." });
+        continue;
+      }
+      try {
+        const r0 = resolvers[sites[0]];
+        const data = await r0.plot(doc.cohorts[cn], {
+          x: pv.x, y: pv.y, unit: pv.unit === "sample" ? "sample" : "patient",
+          ...(pv.colorBy ? { colorBy: pv.colorBy } : {}), ...(pv.ringBy ? { ringBy: pv.ringBy } : {}),
+          bins: Array.isArray(pv.bins) && pv.bins.length === 2 ? [Number(pv.bins[0]), Number(pv.bins[1])] : undefined
+        });
+        // The points behind a box come only from a participant entitled to see cases, and only
+        // when there are few enough to be a drawing. isPatientLevel is a type guard, so asking an
+        // aggregate-only participant for them is a compile error rather than a review catch.
+        if (data.shape === "box" && pv.points !== false && isPatientLevel(r0)) {
+          const pts = await r0.plotPoints(doc.cohorts[cn], { x: pv.x, y: pv.y,
+            unit: pv.unit === "sample" ? "sample" : "patient",
+            ...(pv.colorBy ? { colorBy: pv.colorBy } : {}), ...(pv.ringBy ? { ringBy: pv.ringBy } : {}) });
+          if (pts.length) {
+            data.points = pts;
+            data.overlay = "points";
+            // the key describes what is drawn, so it is built from the points themselves
+            if (pv.colorBy) data.legend = legendFor(pts.map((x) => x.c || ""));
+            if (pv.ringBy) data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true)];
+          }
+        }
+        const pr: ViewResult = {
+          kind: "plot", plot: data, cohorts: [cn], studies: sites,
+          participation: participationFor(sites, false),
+          note: data.shape === "box" && data.overlay === "violin"
+            ? "Drawn as a density per group: " + data.n.toLocaleString("en-US") + " values is past what a cloud of dots can show, " +
+              "and the quartiles are over every one of them."
+            : data.shape === "box" && data.overlay === "points"
+            ? "Every value is drawn over its box; the jitter is fixed per case, so the figure does not move between renderings."
+            : data.shape === "scatter" && data.n > 5000
+            ? "Drawn as density: " + data.n.toLocaleString("en-US") + " " + (pv.unit === "sample" ? "samples" : "patients") +
+              " counted into " + (data.bins || []).length.toLocaleString("en-US") + " cells. The coefficients are over every " +
+              (pv.unit === "sample" ? "sample" : "patient") + ", not over what you can see."
+            : undefined
+        };
+        // drawn on the server, like every view but the oncoprint, so chat and MCP get the figure
+        const tPlot = Date.now();
+        pr.svg = viewToSvg(pr, { width: 960 }) || undefined;
+        pr.renderMs = Date.now() - tPlot;
+        views.push(pr);
+      } catch (e) {
+        views.push({ kind: "plot", error: String((e as Error).message || e) });
+      }
     } else if (view.kind === "coexpression") {
       const v = view as CoexpressionView;
       const profileType = String(v.profileType || "").trim();
