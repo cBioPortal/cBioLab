@@ -93,7 +93,6 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const miniRef = useRef<HTMLCanvasElement>(null);
   const [showMini, setShowMini] = useState(false);
-  const drag = useRef<{ x: number; scrollX: number } | null>(null);
   const perfRef = useRef<Perf>({ frames: 0 });
   const bump = (p: Partial<Perf>) => {
     perfRef.current = { ...perfRef.current, ...p };
@@ -195,9 +194,21 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const minZoom = visible ? fitZoom(visible.groups, plotW, gapPx) : 1;
   const maxScroll = visible ? Math.max(0, virtualWidth(visible.groups, view.zoom, gapPx) - plotW) : 0;
 
-  // fit when the set of drawn columns changes, not on a re-sort of the same columns
+  // Fit when the set of drawn columns changes — not on a re-sort of the same columns, and not
+  // when the width changes: a reader who has zoomed in should keep their zoom when the page
+  // reflows (the scrollbar appearing was enough to snap them back to fit).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (visible) setView((v) => ({ ...v, zoom: fitZoom(visible.groups, plotW, gapPx), scrollX: 0 })); }, [data, display.showUnaltered, plotW, gapMode]);
+  useEffect(() => { if (visible) setView((v) => ({ ...v, zoom: fitZoom(visible.groups, plotW, gapPx), scrollX: 0 })); }, [data, display.showUnaltered, gapMode]);
+  // a narrower figure can leave the zoom below what now fits, or scrolled past the end
+  useEffect(() => {
+    if (!visible) return;
+    setView((v) => {
+      const zoom = Math.max(v.zoom, fitZoom(visible.groups, plotW, gapPx));
+      const scrollX = Math.max(0, Math.min(v.scrollX, Math.max(0, virtualWidth(visible.groups, zoom, gapPx) - plotW)));
+      return zoom === v.zoom && scrollX === v.scrollX ? v : { ...v, zoom, scrollX };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plotW]);
 
   // ---- draw -----------------------------------------------------------------
   useEffect(() => {
@@ -244,6 +255,43 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, visible, view, cssW, gapPx, showMini, display]);
 
+  /**
+   * The scrollbar is ours rather than the browser's. A native one over a virtual width of
+   * 200,000 px gives a five-pixel thumb that nobody can grab; this one keeps a usable minimum,
+   * is always visible, and jumps to where the track is clicked.
+   */
+  const BAR_MIN = 34;
+  const barGeom = () => {
+    const track = Math.max(1, plotW);
+    const w = Math.max(BAR_MIN, track * plotW / Math.max(plotW, plotW + maxScroll));
+    const x = maxScroll <= 0 ? 0 : (track - w) * Math.min(maxScroll, Math.max(0, view.scrollX)) / maxScroll;
+    return { track, w, x };
+  };
+  const barDrag = useRef<{ startX: number; startScroll: number } | null>(null);
+  const barToScroll = (px: number) => {
+    const { track, w } = barGeom();
+    return Math.max(0, Math.min(maxScroll, px / Math.max(1, track - w) * maxScroll));
+  };
+  const onBarDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const { w, x } = barGeom();
+    const at = e.clientX - rect.left;
+    if (at < x || at > x + w) setView((v) => ({ ...v, scrollX: barToScroll(at - w / 2) }));   // click the track: jump
+    barDrag.current = { startX: e.clientX, startScroll: at < x || at > x + w ? barToScroll(at - w / 2) : view.scrollX };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onBarMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!barDrag.current) return;
+    const { track, w } = barGeom();
+    const dx = e.clientX - barDrag.current.startX;
+    const delta = dx / Math.max(1, track - w) * maxScroll;
+    setView((v) => ({ ...v, scrollX: Math.max(0, Math.min(maxScroll, barDrag.current!.startScroll + delta)) }));
+  };
+  const onBarUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    barDrag.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
   const miniScroll = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!visible) return;
     const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
@@ -286,11 +334,6 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     const cv = canvasRef.current; if (!cv || !data || !visible) return;
     const rect = cv.getBoundingClientRect();
     const x = e.clientX - rect.left, y = e.clientY - rect.top;
-    if (drag.current) {
-      const dx = e.clientX - drag.current.x;
-      if (Math.abs(dx) > 2) setView((v) => ({ ...v, scrollX: Math.max(0, Math.min(maxScroll, drag.current!.scrollX - dx)) }));
-      setHover(null); return;
-    }
     const hit = hitTest(x, y, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, view.scrollX) }, gapPx);
     setHover(hit ? { hit, x, y } : null);
     // one column under the pointer: ask the server what it carries, once, after a pause
@@ -445,10 +488,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           </details>
         </div>
         <div ref={wrapRef} style={{ position: "relative", marginTop: "0.5rem", border: "1px solid var(--line)", borderRadius: 8, background: "#fff", overflow: "hidden" }}>
-          <canvas ref={canvasRef} style={{ display: "block", cursor: view.zoom > minZoom ? "grab" : "crosshair" }}
-            onMouseMove={onMove} onMouseLeave={() => { setHover(null); drag.current = null; }}
-            onMouseDown={(e) => { drag.current = { x: e.clientX, scrollX: view.scrollX }; }}
-            onMouseUp={() => { drag.current = null; }}
+          <canvas ref={canvasRef} style={{ display: "block", cursor: "crosshair" }}
+            onMouseMove={onMove} onMouseLeave={() => setHover(null)}
             onClick={(e) => {
               // a click on a track's label opens that track's menu, like the portal's three dots
               const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
@@ -511,12 +552,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               </div>
             );
           })()}
-          {maxScroll > 0 && (
-            <div style={{ position: "absolute", left: GEOM.gutter, right: 0, bottom: 0, height: 6, background: "var(--code-bg)" }}>
-              <div style={{ position: "absolute", height: 6, background: "var(--accent)", opacity: 0.6, borderRadius: 3,
-                left: (100 * Math.min(maxScroll, view.scrollX) / (maxScroll + plotW)) + "%", width: (100 * plotW / (maxScroll + plotW)) + "%" }} />
-            </div>
-          )}
+
           {hover && tip && (
             <div style={{ position: "absolute", left: Math.min(hover.x + 12, cssW - 260), top: hover.y + 14, pointerEvents: "none", background: "var(--card)", color: "var(--ink)",
               border: "1px solid var(--line)", borderRadius: 6, padding: "6px 8px", fontSize: "0.78rem", boxShadow: "0 4px 14px rgba(0,0,0,.12)", maxWidth: 330, zIndex: 2 }}>
@@ -524,6 +560,16 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             </div>
           )}
         </div>
+        {maxScroll > 0 && (() => {
+          const { w, x } = barGeom();
+          return (
+            <div className="onco-bar" title="drag to move across the figure"
+              onPointerDown={onBarDown} onPointerMove={onBarMove} onPointerUp={onBarUp} onPointerCancel={onBarUp}
+              style={{ marginLeft: GEOM.gutter, width: Math.max(0, cssW - GEOM.gutter) }}>
+              <div className="onco-bar-thumb" style={{ left: Math.round(x), width: Math.round(w) }} />
+            </div>
+          );
+        })()}
         {showMini && (
           <canvas ref={miniRef} onMouseDown={miniScroll} onMouseMove={(e) => { if (e.buttons === 1) miniScroll(e); }}
             style={{ display: "block", marginTop: "0.35rem", border: "1px solid var(--line)", borderRadius: 4, cursor: "col-resize", background: "#fff" }} />

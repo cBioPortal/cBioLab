@@ -682,3 +682,10 @@ details.gearmenu.inline[open] > summary {
 
 /* a gear menu whose summary is a word rather than the ⚙ glyph */
 details.gearmenu > summary.textual { font-size: 0.78rem; color: var(--accent-ink); text-decoration: underline; }
+
+/* The oncoprint's horizontal scrollbar, drawn by us. A native one over a virtual width of
+   200,000 px gives a thumb a few pixels wide that nobody can grab, and it fades out when idle;
+   the canvas draws only the visible window, so this bar is the reader's only sense of place. */
+.onco-bar { position: relative; height: 13px; margin-top: 4px; background: var(--code-bg); border-radius: 7px; cursor: pointer; touch-action: none; }
+.onco-bar-thumb { position: absolute; top: 2px; height: 9px; background: var(--line); border-radius: 5px; }
+.onco-bar:hover .onco-bar-thumb { background: var(--muted); }

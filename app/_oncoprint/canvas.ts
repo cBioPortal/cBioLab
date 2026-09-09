@@ -26,7 +26,7 @@ export type Palette = typeof PALETTE;
  * row with no gutter by swapping these for one call and putting them back, rather than
  * threading a geometry argument through every function for one caller.
  */
-export const GEOM = { header: STYLE.geometry.header, rowH: STYLE.geometry.rowH, rowGap: STYLE.geometry.rowGap, gutter: STYLE.geometry.gutter, groupGap: STYLE.geometry.groupGap };
+export const GEOM = { header: STYLE.geometry.header, rowH: STYLE.geometry.rowH, rowGap: STYLE.geometry.rowGap, gutter: STYLE.geometry.gutter, groupGap: STYLE.geometry.groupGap, footer: 10 };
 
 export interface VisibleGroup {
   name: string; start: number; count: number; patients: number;
@@ -83,7 +83,8 @@ export function segmentByTrack(data: UnpackedContract, order: Uint32Array, group
   }
   return out;
 }
-export function canvasHeight(nTracks: number): number { return GEOM.header + nTracks * (GEOM.rowH + GEOM.rowGap); }
+/** the drawing plus breathing room under the last track */
+export function canvasHeight(nTracks: number): number { return GEOM.header + nTracks * (GEOM.rowH + GEOM.rowGap) + GEOM.footer; }
 
 export function numericColor(t: { center?: number | null }, v: number): string { return styleNumericColor(v, t.center, STYLE); }
 
