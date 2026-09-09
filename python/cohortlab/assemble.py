@@ -13,6 +13,7 @@ from typing import Any, Callable, Iterable
 import numpy as np
 
 from .contract import BITS, DEFAULT_DISPLAY, NOT_PROFILED, Contract, Track
+from .gene_tracks import normalize_gene_tracks
 
 
 def _round(x: float) -> int:
@@ -62,7 +63,7 @@ def _heatmap_label(gene: str, profile_type: str) -> str:
     return gene + " " + profile_type
 
 
-def assemble_contract(*, genes: list[str], groups: list[dict[str, Any]], studies: list[str], events: list[dict[str, Any]],
+def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies: list[str], events: list[dict[str, Any]],
                       coverage: list[dict[str, Any]], is_driver: Callable[[dict[str, Any]], bool], annotation_source: str,
                       clinical: list[dict[str, Any]], heatmap: list[dict[str, Any]] | None = None, z_reference: dict[str, Any] | None = None,
                       derived: list[dict[str, Any]] | None = None, sort: list[dict[str, str]] | None = None, line_gap: int = 90,
@@ -81,21 +82,33 @@ def assemble_contract(*, genes: list[str], groups: list[dict[str, Any]], studies
     pid_index = {p: i for i, p in enumerate(all_pids)}
 
     # ---- gene-track cells ------------------------------------------------
-    gene_cells = {g: np.full(n, NOT_PROFILED, dtype=np.int32) for g in genes}
+    # A merged row is the bitwise OR of its members, so it is altered where any member is and
+    # profiled where any member was — the union denominator, with no special case. A gene may
+    # appear in several rows (merged, and again alone), so one symbol maps to a LIST of rows.
+    gene_tracks, _symbols = normalize_gene_tracks(genes)
+    gene_cells = {t.label: np.full(n, NOT_PROFILED, dtype=np.int32) for t in gene_tracks}
+    rows_of_gene: dict[str, list[Any]] = {}
+    for t in gene_tracks:
+        for m in t.members:
+            rows_of_gene.setdefault(m, []).append(gene_cells[t.label])
     for r in coverage:
         i = pid_index.get(r["pid"])
         if i is None:
             continue
         for g in r["genes"]:
-            cells = gene_cells.get(g)
-            if cells is not None and cells[i] == NOT_PROFILED:
-                cells[i] = 0
+            for cells in rows_of_gene.get(g, ()):
+                if cells[i] == NOT_PROFILED:
+                    cells[i] = 0
+    # Hiding unknown significance drops the ALTERATION as the event is read, so a driver in one
+    # gene cannot smuggle another gene's passenger onto a merged row. The column stays profiled.
+    hide_vus = bool((display or {}).get("hideVUS"))
+    hidden_vus = 0
     for r in events:
         i = pid_index.get(r["pid"])
         if i is None:
             continue
-        cells = gene_cells.get(r["gene"])
-        if cells is None:
+        rows = rows_of_gene.get(r["gene"])
+        if not rows:
             continue
         bit = 0
         if r["vt"] == "mutation":
@@ -107,9 +120,17 @@ def assemble_contract(*, genes: list[str], groups: list[dict[str, Any]], studies
             bit = BITS["AMP"] if cna >= 2 else (BITS["HOMDEL"] if cna <= -2 else 0)
         if not bit:
             continue
-        if is_driver(r):
+        driver = is_driver(r)
+        if hide_vus and not driver:
+            hidden_vus += 1
+            for cells in rows:
+                if cells[i] == NOT_PROFILED:
+                    cells[i] = 0
+            continue
+        if driver:
             bit |= BITS["DRIVER"]
-        cells[i] = (0 if cells[i] == NOT_PROFILED else int(cells[i])) | bit
+        for cells in rows:
+            cells[i] = (0 if cells[i] == NOT_PROFILED else int(cells[i])) | bit
 
     # ---- clinical tracks -------------------------------------------------
     clin: list[Track] = []
@@ -211,7 +232,7 @@ def assemble_contract(*, genes: list[str], groups: list[dict[str, Any]], studies
             4 if c & BITS["INFRAME"] else 3 if c & BITS["SPLICE"] else 2 if c & BITS["MISSENSE"] else 1
         return t * 2 + (1 if c & BITS["DRIVER"] else 0)
 
-    gene_cell_list = [gene_cells[g] for g in genes]
+    gene_cell_list = [gene_cells[t.label] for t in gene_tracks]
 
     def by_id(x: int, y: int) -> int:
         return -1 if all_pids[x] < all_pids[y] else (1 if all_pids[x] > all_pids[y] else 0)
@@ -275,12 +296,13 @@ def assemble_contract(*, genes: list[str], groups: list[dict[str, Any]], studies
 
     # ---- track meta (panel-aware frequencies) -------------------------------
     tracks: list[Track] = []
-    for g in genes:
-        cells = gene_cells[g][order_arr]
+    for gt in gene_tracks:
+        cells = gene_cells[gt.label][order_arr]
         profiled = int((cells != NOT_PROFILED).sum())
         altered = int((cells > 0).sum())
         driver_altered = int(((cells > 0) & ((cells & BITS["DRIVER"]) != 0)).sum())
-        tracks.append(Track("gene", g, cells, {
+        tracks.append(Track("gene", gt.label, cells, {
+            **({"members": list(gt.members)} if len(gt.members) > 1 else {}),
             "altered": altered, "profiled": profiled, "driverAltered": driver_altered,
             "freqPct": _round(1000 * altered / profiled) / 10 if profiled else None,
             "driverPct": _round(1000 * driver_altered / profiled) / 10 if profiled else None}))
@@ -306,7 +328,7 @@ def assemble_contract(*, genes: list[str], groups: list[dict[str, Any]], studies
                      "annotation": annotation_source, "lineGap": line_gap,
                      "sort": [("-" if s.get("dir") == "desc" else "") + s["track"] for s in sort]},
         display=dict(display) if display else dict(DEFAULT_DISPLAY),
-        stats={"nColumns": len(columns), "ms": 0})
+        stats={"nColumns": len(columns), "ms": 0, **({"hiddenVus": hidden_vus} if hide_vus else {})})
 
 
 def _num(x: float) -> int | float:

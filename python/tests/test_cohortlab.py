@@ -96,6 +96,10 @@ class Conformance(unittest.TestCase):
             dict(group_by="CANCER_TYPE", sort="STAGE"),
             dict(sort="-AGE,CANCER_TYPE"),
             dict(genes="EGFR,TP53"),
+            # merged rows: the label the members imply, an explicit one, and a gene drawn both ways
+            dict(genes="[TP53 MDM2] KRAS"),
+            dict(genes='["TP53 pathway" TP53 MDM2] TP53 KRAS'),
+            dict(genes="[TP53 MDM2] KRAS", display='{"hideVUS": true}'),
             dict(display='{"showUnaltered": false, "gaps": "pct", "style": {"palette": {"unaltered": "#f0f0f0"}}, "colors": {"CANCER_TYPE": {"Lung": "#123456"}}}'),
             dict(),
         ]
@@ -111,7 +115,7 @@ class Conformance(unittest.TestCase):
                     ts = json.load(f)
                 ts.pop("stats", None)
                 py = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), os.path.join(FIX, "clinical.tsv"), os.path.join(FIX, "coverage.tsv"),
-                                           genes=case.get("genes", "").split(",") if case.get("genes") else None,
+                                           genes=case.get("genes") or None,
                                            group_by=case.get("group_by"), sort=case.get("sort"),
                                            display=json.loads(case["display"]) if case.get("display") else None).to_json()
                 py.pop("stats", None)
@@ -207,3 +211,27 @@ class Raster(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GeneTracks(unittest.TestCase):
+    """The port of lib/gene-tracks.ts: what a row is, and the portal's bracket text."""
+
+    def test_rows_and_symbols(self):
+        from cohortlab.gene_tracks import gene_symbols, normalize_gene_tracks, parse_gene_list, to_gene_list
+        tracks, symbols = normalize_gene_tracks([{"genes": ["tp53", "MDM2"]}, "TP53", "kras"])
+        self.assertEqual([t.label for t in tracks], ["TP53 / MDM2", "TP53", "KRAS"])
+        self.assertEqual(symbols, ["TP53", "MDM2", "KRAS"], "first appearance: the mask bit order")
+        self.assertEqual(gene_symbols([{"label": "P", "genes": ["TP53"]}, "KRAS"]), ["TP53", "KRAS"])
+        again, _ = normalize_gene_tracks(to_gene_list(tracks))
+        self.assertEqual(again, tracks, "normalizing the canonical form is a no-op")
+        self.assertEqual(parse_gene_list('TP53 ["P" MDM2, MDM4]'), ["TP53", {"label": "P", "genes": ["MDM2", "MDM4"]}])
+
+    def test_refusals_match_the_typescript(self):
+        from cohortlab.gene_tracks import normalize_gene_tracks, parse_gene_list
+        for bad in ("[TP53", "TP53]", "[[TP53]]", "[]", "TP53: MUT"):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                parse_gene_list(bad)
+        with self.assertRaises(ValueError):
+            normalize_gene_tracks([{"genes": ["!!"]}])
+        with self.assertRaises(ValueError):
+            normalize_gene_tracks([{"label": "X", "genes": ["TP53"]}, {"label": "X", "genes": ["KRAS"]}])

@@ -4,6 +4,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .gene_tracks import gene_symbols, parse_gene_list
+
 Table = list[dict[str, str]]
 
 
@@ -160,21 +162,25 @@ def normalize_display(d: dict[str, Any] | None) -> dict[str, Any]:
     return out
 
 
-def local_input(events: Table, clinical: Table | None = None, coverage: Table | None = None, genes: list[str] | None = None,
+def local_input(events: Table, clinical: Table | None = None, coverage: Table | None = None, genes: list[Any] | str | None = None,
                 group_by: str | None = None, patients: list[str] | None = None, sort: str | list[str] | None = None,
                 study: str | None = None, annotation_source: str | None = None, display: dict[str, Any] | None = None,
                 unit: str = "patient") -> dict[str, Any]:
     """Keyword arguments for `assemble_contract`, from local tables. Without coverage every column is covered for every gene."""
     ev = events_from_table(events)
     clin = clinical_from_table(clinical or [])
-    gene_list = [g.upper() for g in (genes if genes else list(dict.fromkeys(e["gene"] for e in ev)))]
+    # the rows as authored (a symbol, or {label?, genes} for a merged row), and the flat symbols
+    if isinstance(genes, str):
+        genes = parse_gene_list(genes)
+    gene_list = list(genes) if genes else list(dict.fromkeys(e["gene"].upper() for e in ev))
+    symbols = gene_symbols(gene_list)
     if patients:
         pids = list(patients)
     else:
         pids = list(dict.fromkeys([e["pid"] for e in ev]
                                   + ([r[_id_column(clinical[0])] for r in clinical] if clinical else [])
                                   + ([r[_id_column(coverage[0])] for r in coverage] if coverage else [])))
-    cov = coverage_from_table(coverage) if coverage else [{"pid": p, "genes": gene_list} for p in pids]
+    cov = coverage_from_table(coverage) if coverage else [{"pid": p, "genes": symbols} for p in pids]
     if group_by:
         attr = next((c for c in clin if c["attr"] == group_by), None)
         if attr is None:

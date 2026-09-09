@@ -34,6 +34,22 @@ op = Oncoprint.from_server({"study": "msk_chord_2024",
 op = Oncoprint.from_file("figure.opb1")
 ```
 
+## Merged rows
+
+A gene list entry may be a group, drawn as one row — cBioPortal's `[TP53 MDM2 MDM4]`. The row is
+altered where any member is altered and profiled where any member was profiled, so its percentage
+is over the union of the members' panels.
+
+```python
+op = Oncoprint.from_tables("events.tsv", genes='["TP53 pathway" TP53 MDM2 MDM4] KRAS')
+op = Oncoprint.from_tables("events.tsv", genes=[{"label": "TP53 pathway", "genes": ["TP53", "MDM2"]}, "KRAS"])
+op.tracks["TP53 pathway"]        # the merged cells
+op.contract.track("TP53 pathway").meta["members"]
+```
+
+Per-track OQL inside a bracket (`[TP53: MUT MDM2: AMP]`) is refused rather than quietly drawn as
+the whole gene.
+
 ## What you get
 
 ```python

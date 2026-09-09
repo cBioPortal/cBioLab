@@ -2,7 +2,9 @@
 // Oncoprint from the command line. Three sources, five outputs, one contract in between.
 //
 //   node scripts/oncoprint-cli.ts --events events.tsv [--clinical c.tsv] [--coverage cov.tsv]
-//        [--genes TP53,KRAS] [--group-by CANCER_TYPE] [--sort=CANCER_TYPE,-AGE]
+//        [--genes "TP53,KRAS"] [--group-by CANCER_TYPE] [--sort=CANCER_TYPE,-AGE]
+//   --genes takes cBioPortal's own gene-list text, so `--genes '["TP53 pathway" TP53 MDM2] KRAS'`
+//   draws the bracketed genes as one merged row.
 //        [--display '{"showUnaltered":false,"style":{"palette":{"unaltered":"#f0f0f0"}}}'] --out fig.svg
 //   node --env-file=.env.local scripts/oncoprint-cli.ts --spec spec.json --out fig.png
 //   node scripts/oncoprint-cli.ts --contract fig.opb1 --out cells.tsv
@@ -12,6 +14,7 @@ import { parseArgs } from "node:util";
 import { readFileSync, writeFileSync } from "node:fs";
 import { assembleContract } from "../lib/oncoprint-assemble.ts";
 import { localInput, parseTsv } from "../lib/oncoprint-local.ts";
+import { parseGeneList } from "../lib/gene-tracks.ts";
 import { contractToSvg } from "../lib/oncoprint-svg.ts";
 import { contractToTsv } from "../lib/oncoprint-tabular.ts";
 import { packContract, unpackContract } from "../lib/oncoprint-binary.ts";
@@ -48,7 +51,7 @@ try {
       events: parseTsv(readFileSync(a.events!, "utf8")),
       clinical: a.clinical ? parseTsv(readFileSync(a.clinical, "utf8")) : undefined,
       coverage: a.coverage ? parseTsv(readFileSync(a.coverage, "utf8")) : undefined,
-      genes: a.genes ? a.genes.split(",").map((g) => g.trim()).filter(Boolean) : undefined,
+      genes: a.genes ? parseGeneList(a.genes) : undefined,
       groupBy: a["group-by"], sort: a.sort, study: a.study,
       unit: a.unit === "sample" ? "sample" : undefined,
       display: a.display ? JSON.parse(a.display) : undefined,
