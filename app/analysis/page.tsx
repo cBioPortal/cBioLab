@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
 import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
+import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 import { parameterize } from "../../lib/params.ts";
@@ -780,47 +781,96 @@ export default function AnalysisPage() {
   };
 
   const openGenes = (vi: number) => { setGenesFor(vi); genesDialog.current?.showModal(); };
-  const setViewGenes = (vi: number, genes: string[]) =>
+  const setViewGenes = (vi: number, genes: GeneTrackSpec[]) =>
     updateView(vi, v => pruneSort({ ...v, genes }));
+
+  /** replace a merged row with its members, in place — the figure's "expand", written to the document */
+  const splitGeneTrack = (vi: number, label: string) => {
+    const list = (((doc.views || [])[vi] || {}) as any).genes || [];
+    const out: GeneTrackSpec[] = [];
+    for (const e of list) {
+      const members = e && typeof e === "object" ? (e.genes || []).map((g: string) => String(g).toUpperCase()) : null;
+      if (members && geneRowLabel(e) === label) out.push(...members); else out.push(e);
+    }
+    // the same gene may already be drawn on its own; expanding must not create two rows with one name
+    setViewGenes(vi, out.filter((e, i) => typeof e !== "string" || out.indexOf(e) === i));
+  };
 
   function GeneEditor({ vi }: { vi: number }) {
     const [add, setAdd] = useState("");
+    const [text, setText] = useState<string | null>(null);
+    const [textErr, setTextErr] = useState<string | null>(null);
     // Read the DOCUMENT's view, never the result. A ViewResult also has a
     // `genes` field, but it holds {gene, driverPct, anyPct} objects for the
     // oncoprint and nothing at all for compare — reading it left the editor
     // empty and made "add" replace the real list rather than extend it.
     const spec: any = (doc.views || [])[vi] || {};
-    const genes: string[] = (spec.genes || []).map(String);
+    const list: GeneTrackSpec[] = spec.genes || [];
+    // a list that cannot be read is still editable as text, which is how it gets fixed
+    let rows: { label: string; members: string[] }[] = [];
+    let listErr: string | null = null;
+    try { rows = normalizeGeneTracks(list).tracks; } catch (e) { listErr = String((e as Error).message || e); }
+    const symbols = geneSymbols(list);
     // Co-occurrence and co-expression are pairwise: one gene yields no pairs, so
     // the last two cannot be removed without the view becoming an error.
     const floor = (spec.kind === "cooccurrence" || spec.kind === "coexpression") ? 2 : 1;
+    // merged rows are an oncoprint idea; every other view flattens them to their members
+    const merges = spec.kind === "oncoprint";
+    const drop = (label: string) => setViewGenes(vi, list.filter((e) =>
+      (typeof e === "string" ? e.toUpperCase() : (e.label || (e.genes || []).join(" / "))) !== label));
     const commit = () => {
       const g = add.trim().toUpperCase();
-      if (!g || genes.includes(g)) { setAdd(""); return; }
-      setViewGenes(vi, [...genes, g].slice(0, 12));
+      if (!g || symbols.includes(g)) { setAdd(""); return; }
+      setViewGenes(vi, [...list, g].slice(0, 12));
       setAdd("");
+    };
+    const applyText = () => {
+      try { setViewGenes(vi, parseGeneList(text || "")); setTextErr(null); setText(null); }
+      catch (e) { setTextErr(String((e as Error).message || e)); }
     };
     return (
       <div className="setcol">
-        <span className="meta">{genes.length} of 12 — click one to remove it</span>
+        <span className="meta">{rows.length} of 12 rows{merges && symbols.length !== rows.length ? " · " + symbols.length + " genes" : ""} — click one to remove it</span>
+        {listErr && <span className="mark">{listErr}</span>}
         <div className="pillwrap">
-          {genes.map(g => (
-            <button key={g} type="button" className="pill" disabled={busy || genes.length <= floor}
-              title={genes.length <= floor
-                ? (floor === 2 ? "this view compares pairs, so it needs at least two genes" : "a view needs at least one gene")
-                : "remove " + g}
-              onClick={() => setViewGenes(vi, genes.filter(x => x !== g))}>
-              {g} <span aria-hidden="true">×</span>
-            </button>
+          {rows.map(r => (
+            <span key={r.label} className={r.members.length > 1 ? "pill-merged" : undefined}>
+              <button type="button" className="pill" disabled={busy || rows.length <= floor}
+                title={rows.length <= floor
+                  ? (floor === 2 ? "this view compares pairs, so it needs at least two genes" : "a view needs at least one gene")
+                  : r.members.length > 1 ? "remove this merged row (" + r.members.join(", ") + ")" : "remove " + r.label}
+                onClick={() => drop(r.label)}>
+                {r.label} <span aria-hidden="true">×</span>
+              </button>
+              {merges && r.members.length > 1 && (
+                <button type="button" className="linklike" disabled={busy} style={{ fontSize: "0.72rem", marginLeft: "0.2rem" }}
+                  title="draw each of these genes as its own row" onClick={() => splitGeneTrack(vi, r.label)}>split</button>
+              )}
+            </span>
           ))}
         </div>
         <div className="setrow">
-          <input list="view-genes" placeholder="add a gene…" value={add} disabled={busy || genes.length >= 12}
+          <input list="view-genes" placeholder="add a gene…" value={add} disabled={busy || rows.length >= 12}
             onChange={e => setAdd(e.target.value.toUpperCase())}
             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); } }} />
-          <button type="button" className="facet" disabled={busy || !add.trim() || genes.length >= 12}
+          <button type="button" className="facet" disabled={busy || !add.trim() || rows.length >= 12}
             onClick={commit}>add</button>
         </div>
+        {merges && (
+          <details onToggle={(e) => { if ((e.target as HTMLDetailsElement).open && text === null) setText(formatGeneList(list)); }}>
+            <summary className="meta">edit as text — cBioPortal&apos;s gene list, where <code>[TP53 MDM2]</code> is one merged row</summary>
+            <div className="setcol" style={{ marginTop: "0.3rem" }}>
+              <textarea value={text ?? formatGeneList(list)} spellCheck={false} rows={3} disabled={busy}
+                onChange={(e) => setText(e.target.value)} style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: "0.8rem" }} />
+              <div className="setrow">
+                <button type="button" className="facet" disabled={busy} onClick={applyText}>apply</button>
+                <button type="button" className="linklike" onClick={() => { setText(formatGeneList(list)); setTextErr(null); }}>reset</button>
+                <span className="meta">a label is optional: <code>[&quot;TP53 pathway&quot; TP53 MDM2]</code></span>
+              </div>
+              {textErr && <span className="mark">{textErr}</span>}
+            </div>
+          </details>
+        )}
       </div>
     );
   }
@@ -856,12 +906,16 @@ export default function AnalysisPage() {
     return { ...v, sort: keys.slice(0, 4) };
   });
 
+  /** the row a gene-list entry draws, which is the label the figure sends back */
+  const geneRowLabel = (e: GeneTrackSpec): string => typeof e === "string" ? e.toUpperCase()
+    : (e.label || (e.genes || []).map((g) => String(g).toUpperCase()).join(" / "));
+
   /**
    * A track's label back to the thing that produced it. Gene tracks are the view's genes,
    * heatmap tracks belong to a profile, everything else is a clinical attribute.
    */
   const trackOwner = (v: any, label: string): "genes" | "clinical" | "heatmap" | null => {
-    if ((v.genes || []).some((g: string) => String(g).toUpperCase() === label)) return "genes";
+    if ((v.genes || []).some((g: GeneTrackSpec) => geneRowLabel(g) === label)) return "genes";
     if ((v.clinical || []).includes(label)) return "clinical";
     if (heatmapLabels(v).includes(label)) return "heatmap";
     return null;
@@ -871,7 +925,7 @@ export default function AnalysisPage() {
     if (!owner) return v;
     const list = owner === "genes" ? (v.genes || []).map((g: string) => String(g)) : owner === "clinical" ? [...(v.clinical || [])] : null;
     if (!list) return v;   // heatmap tracks follow their profile's gene list
-    const i = list.findIndex((x: string) => (owner === "genes" ? x.toUpperCase() : x) === label);
+    const i = list.findIndex((x: string) => (owner === "genes" ? geneRowLabel(x) : x) === label);
     const j = i + dir;
     if (i < 0 || j < 0 || j >= list.length) return v;
     [list[i], list[j]] = [list[j], list[i]];
@@ -880,7 +934,7 @@ export default function AnalysisPage() {
   const removeTrack = (vi: number, label: string) => updateView(vi, (v: any) => {
     const owner = trackOwner(v, label);
     if (owner === "genes") {
-      const genes = (v.genes || []).filter((g: string) => String(g).toUpperCase() !== label);
+      const genes = (v.genes || []).filter((g: GeneTrackSpec) => geneRowLabel(g) !== label);
       return genes.length ? pruneSort({ ...v, genes }) : v;   // a figure needs at least one gene
     }
     if (owner === "clinical") return pruneSort({ ...v, clinical: (v.clinical || []).filter((a: string) => a !== label) });
@@ -2406,6 +2460,7 @@ export default function AnalysisPage() {
                       onSortKeys={(keys) => setViewSort(vi, keys)}
                       onMoveTrack={(label, dir) => moveTrack(vi, label, dir)}
                       onRemoveTrack={(label) => removeTrack(vi, label)}
+                      onExpandTrack={(label) => splitGeneTrack(vi, label)}
                       onContract={(ct) => { const k = JSON.stringify(v.spec); setContracts((m) => m[k] === ct ? m : { ...m, [k]: ct }); }}
                       onCreateCohort={(sel) => cohortFromSelection(sel, (c ? c.studies : vStudies) || vStudies)}
                       busy={busy}

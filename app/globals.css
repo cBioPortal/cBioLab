@@ -611,7 +611,12 @@ details.gearmenu.inline[open] > summary {
 .genedialog .setcol > .meta { color: var(--muted); font-size: 0.76rem; }
 .genedialog .pillwrap { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .genedialog .pillwrap .pill { cursor: pointer; }
-.genedialog .setrow { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
+/* a merged row reads as one thing: its pill and its split control share a border */
+.genedialog .pill-merged { display: inline-flex; align-items: center; gap: 0.1rem; border: 1px dashed var(--accent-ink);
+  border-radius: 999px; padding: 0 0.3rem 0 0; }
+.genedialog .pill-merged .pill { border: none; background: none; }
+.genedialog textarea { width: 100%; box-sizing: border-box; }
+.genedialog .setrow { display: flex; gap: 0.4rem; margin-top: 0.5rem; align-items: center; }
 .genedialog .setrow input { flex: 1; min-width: 0; }
 /* the gene button sits at the end of a view header, beside the gear */
 .genesbtn { font-size: 0.78rem; font-weight: 500; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 0.18em; }

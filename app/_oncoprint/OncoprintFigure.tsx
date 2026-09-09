@@ -57,6 +57,8 @@ export interface OncoprintFigureProps {
   /** move a track within its kind, or drop it; absent means the page cannot edit tracks */
   onMoveTrack?: (label: string, dir: -1 | 1) => void;
   onRemoveTrack?: (label: string) => void;
+  /** draw a merged gene row's members as rows of their own */
+  onExpandTrack?: (label: string) => void;
   /** the Tracks menu's contents — the page owns what can be added */
   tracksMenu?: React.ReactNode;
   onDisplay: (d: FigureDisplay) => void;
@@ -502,7 +504,10 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     lines.push({ text: visible.groups[hit.gi].name, dim: true });
     if (hit.n === 1) {
       const c = t.cells[hit.ci];
-      if (t.kind === "gene") lines.push({ text: t.label + ": " + decodeGene(c) });
+      if (t.kind === "gene") {
+        lines.push({ text: t.label + ": " + decodeGene(c) });
+        if (t.members && t.members.length > 1) lines.push({ text: "merged: " + t.members.join(" · "), dim: true });
+      }
       else if (t.kind === "derivedEvent") lines.push({ text: t.label + ": " + (c > 0 ? "yes" : "no") });
       else if (t.numeric) lines.push({ text: t.label + ": " + (c === -1 ? "no data" : "≈" + (Math.round(((t.min ?? 0) + (c / 255) * ((t.max ?? 1) - (t.min ?? 0))) * 10) / 10)) });
       else lines.push({ text: t.label + ": " + (c === -1 ? "no data" : (t.categories && t.categories[c]) || "Other") });
@@ -515,7 +520,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     const d = col ? detail[col] : undefined;
     if (d === "loading") lines.push({ text: "…", dim: true });
     else if (d) {
-      const mine = d.alterations.filter((a) => t.kind !== "gene" || a.gene === t.label);
+      const isMine = (gene: string) => t.kind !== "gene" || (t.members ? t.members.includes(gene) : gene === t.label);
+      const mine = d.alterations.filter((a) => isMine(a.gene));
       for (const a of mine)
         lines.push({ text: a.gene + " " + a.alteration + " · " + a.kind.replace(/_/g, " ") + (a.driver ? " · putative driver" : " · unknown significance"), mono: true });
       if (t.kind === "gene" && !mine.length && d.alterations.length) lines.push({ text: "no " + t.label + " alteration; " + d.alterations.length + " in other genes", dim: true });
@@ -657,10 +663,13 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 background: "var(--card)", border: "1px solid var(--line)", borderRadius: 6, boxShadow: "0 6px 18px rgba(0,0,0,.16)",
                 padding: "0.35rem", display: "flex", flexDirection: "column", gap: "0.1rem", minWidth: 190 }}
                 onMouseLeave={() => setTrackMenu(null)}>
-                <span className="meta" style={{ padding: "0 0.3rem 0.2rem" }}>{t.label}</span>
+                <span className="meta" style={{ padding: "0 0.3rem 0.2rem" }}>{t.label}
+                  {t.members && t.members.length > 1 && <><br />{t.members.join(" · ")}</>}</span>
                 {props.onMoveTrack && item("Move up", false, () => props.onMoveTrack!(t.label, -1))}
                 {props.onMoveTrack && item("Move down", false, () => props.onMoveTrack!(t.label, 1))}
                 {props.onRemoveTrack && item("Remove track", false, () => props.onRemoveTrack!(t.label))}
+                {props.onExpandTrack && t.members && t.members.length > 1 &&
+                  item("Expand into " + t.members.length + " rows", false, () => props.onExpandTrack!(t.label))}
                 {item("Sort a-Z", isKey(""), () => setPrimary(key("")), sortable)}
                 {item("Sort Z-a", isKey("-"), () => setPrimary(key("-")), sortable)}
                 {item("Don't sort by this", sortable && !isKey("") && !isKey("-"), () => setPrimary(null), sortable)}
