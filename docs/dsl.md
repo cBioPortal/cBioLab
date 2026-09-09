@@ -101,10 +101,20 @@ rel      := { "type": "NONE" }                                                 /
 | `survival` | `endpoint?:"OS"|"PFS"|…, anchor?:{eventType,key?,value?,occurrence?}, cohorts?:[names]` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts. Across studies the test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. `anchor` resets the clock to a timeline event (first chemotherapy, initial diagnosis) instead of the study's day 0, and **applies left truncation automatically**: a patient joins the risk set when the study could first observe them, never at the anchor — otherwise everyone appears to survive from the anchor to their own entry, which is exactly what put them in the study. The reported entry distribution warns when an anchor is matching earlier events than intended. Cross-study baselines are not harmonized |
 | `course` | `eventTypes:[≤6], anchor?:{eventType,key?,value?,occurrence?}, binMonths?:3, fromMonths?:-12, toMonths?:60, cohorts?:[names]` | the **clinical course**: per time bin, the share of the cohort in each event state. Two things it refuses to fake. (1) The denominator is the patients still under observation in that bin — first recorded event to last contact (the later of their last event and their OS follow-up) — never the whole cohort, which would make a curve fall merely because follow-up ran out. (2) `anchor` is optional for one study but **required across studies**: day 0 is birth in some studies and first sequencing in others, and nothing in the schema records which, so raw day 0 compares incomparable clocks. Event types that carry real durations are drawn as a state the patient is IN; the rest as an event that HAPPENED — read from the data, not from the name. Bins are half-open [t, t+w). Event-name spellings differing only in case are folded (`Treatment`/`TREATMENT`) and the fold is named in the caveat; nothing else is merged |
 | `sequence` | `labelKey?:"SUBTYPE", eventType?:"treatment", exclude?:[values], lineGap?:90, maxSteps?:3, topN?:8, cohorts?:[names]` | **what follows what**: therapy transitions as lines, drawn as a Sankey. Records are first grouped into LINES — therapies less than `lineGap` days apart are one line, labelled by their whole combination (sorted, so `A + B` and `B + A` are one regimen). That grouping is the point: a patient has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision. Paths that end flow into TWO explicit terminals, never one: **no further line** (the study watched for at least one `lineGap` and saw no further therapy) and **record ends here** (it did not, so nothing can be concluded). Measured on MSK-CHORD, 68% of patients have under three months of observation after their last therapy and the median is 15 days — so collapsing the two would turn record-keeping into an apparent clinical decision. Flows out of a node sum to it, so nobody vanishes. Up to two cohorts are drawn as panels sharing one scale and one colour per regimen. `exclude` drops label values that are not therapies; it is a parameter and not an engine rule because such markers are **not structurally distinguishable** (MSK’s `Prior Medications to MSK` carries no duration, but neither do `Radiation Therapy` or `Investigational`), so the choice belongs in the document where a reader can see it. One cohort only |
-| `oncoprint` | `genes:[≤12], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], cohorts?:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
+| `oncoprint` | `genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], cohorts?:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 `views[].cohorts` defaults to all cohorts. Oncoprints federate across studies: columns are
 study-qualified, a synthetic **Study** track shows each column's origin, and duplicates appear twice.
+
+**Oncoprint merged rows**: a `genes` entry may be a group — `{"label"?: "TP53 pathway", "genes":
+["TP53", "MDM2", "MDM4"]}` — drawn as ONE row, cBioPortal's `[TP53 MDM2 MDM4]`. The row is altered
+where any member is altered and profiled where any member was profiled, so its percentage is over
+the **union** of the members' panels. Without a label the row is named by its members
+(`TP53 / MDM2 / MDM4`). Groups do not nest, a gene may appear both in a group and on its own, and
+the caps are 12 rows and 32 distinct genes (coverage is one bit per gene in a 32-bit mask). Merged
+rows are an oncoprint idea: every other view flattens a group to its members. Per-track OQL inside a
+group (`[TP53: MUT MDM2: AMP]`) is **refused**, not approximated — a track here draws every
+alteration type its genes have.
 
 **Oncoprint clinical tracks**: any attribute name; patient-level rows win, sample-level attributes
 fall back to one sample value per patient. Numeric attributes (≥90% parseable, >10 distinct) render
@@ -1132,7 +1142,60 @@ ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene t
 }
 ```
 
-### Example 14: A federated z-score reference on an oncoprint
+### Example 14: Merged gene rows: a pathway as one track
+
+Pancreatic adenocarcinoma. The first row pools TP53, MDM2 and MDM4: it is altered where any of them is, and its denominator is the union of the three genes' panels — not their intersection, and not the whole cohort. TP53 is drawn again on its own underneath, so the difference the other two make is readable rather than asserted. A row's members are listed in its tooltip and in the contract's `members` field.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "Pancreatic": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Pancreatic Cancer"
+          ],
+          "per": "sample"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "oncoprint",
+      "genes": [
+        {
+          "label": "TP53 pathway",
+          "genes": [
+            "TP53",
+            "MDM2",
+            "MDM4"
+          ]
+        },
+        "TP53",
+        {
+          "label": "RAS",
+          "genes": [
+            "KRAS",
+            "NRAS",
+            "HRAS"
+          ]
+        },
+        "SMAD4",
+        "CDKN2A"
+      ],
+      "clinical": [
+        "CURRENT_AGE_DEID"
+      ]
+    }
+  ]
+}
+```
+
+### Example 15: A federated z-score reference on an oncoprint
 
 A heatmap track with reference:"federation" is scored against a distribution pooled from EVERY participating study, including instances that disclose no patients and therefore contribute no columns — each returns three totals per gene (n, sum, sum of squares), which is enough to define the reference. Run with luad_tcga_pan_can_atlas_2018 aggregate-only, its patients are absent from the columns while its 510 patients still shape what the drawn columns mean.
 
@@ -1171,7 +1234,7 @@ A heatmap track with reference:"federation" is scored against a distribution poo
 }
 ```
 
-### Example 15: The clinical course: who is still on treatment, and when
+### Example 16: The clinical course: who is still on treatment, and when
 
 MSK-CHORD, aligned on each patient's FIRST treatment, split by TP53 status. Treatment carries real start/stop dates so it is drawn as a state patients are IN; surgery has no duration, so it is the share with a surgery in that bin — a distinction read from the data's shape, not from the event's name. Note surgery peaking BEFORE time zero: resection typically precedes first systemic therapy. The at-risk row under the axis is the denominator, and it falls steeply — a curve read without it would be badly misleading.
 
@@ -1221,7 +1284,7 @@ MSK-CHORD, aligned on each patient's FIRST treatment, split by TP53 status. Trea
 }
 ```
 
-### Example 16: A reusable workup: one template, retargeted in a single edit
+### Example 17: A reusable workup: one template, retargeted in a single edit
 
 The gene list appears once, in `params`, and every view refers to it as `$genes`; the study likewise. Change either and all three figures follow. The rule is only that a value which is exactly "$name" is replaced by that parameter — no interpolation, no expressions — so the resolved document is an ordinary one and compiles to exactly the SQL you would get by typing the values in. A `$name` with no declaration is a loud error naming the path, and a parameter declared but never referenced is reported back, which is what catches a rename that missed a reference. `notes` and each view’s `note` travel with the document.
 
@@ -1273,7 +1336,7 @@ The gene list appears once, in `params`, and every view refers to it as `$genes`
 }
 ```
 
-### Example 17: What comes after what: lines of therapy, and what ending a path means
+### Example 18: What comes after what: lines of therapy, and what ending a path means
 
 MSK-CHORD therapy lines by TP53 status, 90-day gap, two panels on one scale. Read the grey blocks first, and read them as TWO things: the darker terminal is patients the study watched for at least a line gap who began no further therapy; the lighter one is patients whose records simply stop, about whom nothing can be concluded. Over half of all paths end censored — collapsing them together (as a plain Sankey does) would turn record-keeping into an apparent clinical decision. The real signal is in first line: TP53 wild-type receives far more hormone therapy than TP53-mutant, which is what hormone-receptor-positive disease looks like. The four excluded SUBTYPE values are a judgement made HERE, in the document, not hidden in the engine — 'Prior Medications to MSK' is a provenance marker rather than a therapy, and radiation and bone treatment co-occur with almost everything, so leaving them in explodes the combination space. Nothing in the data structure distinguishes them from real treatments, which is exactly why the choice is visible.
 
@@ -1322,7 +1385,7 @@ MSK-CHORD therapy lines by TP53 status, 90-day gap, two panels on one scale. Rea
 }
 ```
 
-### Example 18: Lollipop plot: recurrent protein changes, with a suppression floor
+### Example 19: Lollipop plot: recurrent protein changes, with a suppression floor
 
 Hotspots in colorectal cancer. Percentages are of the patients carrying any mutation in that gene, so BRAF V600E accounts for roughly 70% of BRAF-mutant cases. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.
 
@@ -1358,7 +1421,7 @@ Hotspots in colorectal cancer. Percentages are of the patients carrying any muta
 }
 ```
 
-### Example 19: Co-expression from sums alone
+### Example 20: Co-expression from sums alone
 
 Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.
 
@@ -1391,7 +1454,7 @@ Pearson correlation between gene pairs in TCGA breast cancer. A correlation depe
 }
 ```
 
-### Example 20: Clinical attributes compared between cohorts
+### Example 21: Clinical attributes compared between cohorts
 
 How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.
 
@@ -1437,7 +1500,7 @@ How TP53-mutant and wild-type tumors differ clinically. Categorical attributes a
 }
 ```
 
-### Example 21: Co-occurrence and mutual exclusivity in NSCLC
+### Example 22: Co-occurrence and mutual exclusivity in NSCLC
 
 Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.
 
@@ -1474,7 +1537,7 @@ Pairwise associations among lung cancer driver genes. Each site returns four cou
 }
 ```
 
-### Example 22: Survival from first chemotherapy, left-truncated
+### Example 23: Survival from first chemotherapy, left-truncated
 
 TP53-mutant vs wild-type, overall survival measured from each patient's first chemotherapy rather than from sequencing. Patients whose first chemotherapy falls after day 0, or who never had chemotherapy, are excluded rather than given negative follow-up. The result reports how long after the anchor patients became observable, so an anchor that is matching earlier events than intended shows up as a long tail.
 
@@ -1519,7 +1582,7 @@ TP53-mutant vs wild-type, overall survival measured from each patient's first ch
 }
 ```
 
-### Example 23: Study-stratified survival across two studies
+### Example 24: Study-stratified survival across two studies
 
 TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.
 

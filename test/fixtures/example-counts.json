@@ -51,6 +51,9 @@
     "Molecular heatmap tracks, sorted by expression": {
       "ERBB2 amp": 123
     },
+    "Merged gene rows: a pathway as one track": {
+      "Pancreatic": 3109
+    },
     "A federated z-score reference on an oncoprint": {
       "ERBB2 amp": 132
     },
