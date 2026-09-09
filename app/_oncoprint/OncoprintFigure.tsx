@@ -62,8 +62,6 @@ export interface OncoprintFigureProps {
   /** the Tracks menu's contents — the page owns what can be added */
   tracksMenu?: React.ReactNode;
   onDisplay: (d: FigureDisplay) => void;
-  /** left of the toolbar; defaults to a heading describing the contract */
-  heading?: React.ReactNode;
   /** extra toolbar controls, placed before the viewing options */
   controls?: React.ReactNode;
   /** below the legend — the page's provenance panel, say */
@@ -602,8 +600,6 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       {loading && !error && <p className="meta">querying and building the contract…</p>}
       {data && visible && !error && <>
         <div className="row" style={{ alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap" }}>
-          {props.heading ?? <h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {data.stats.nColumns.toLocaleString()} {data.unit}s · {data.tracks.length} tracks · {data.conventions.annotation}</span></h2>}
-          <span className="spacer" />
           {props.tracksMenu}
           {props.controls}
           <label className="meta"><input type="checkbox" checked={display.showUnaltered} disabled={busy} onChange={(e) => set({ showUnaltered: e.target.checked })} /> show unaltered</label>

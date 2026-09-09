@@ -54,9 +54,11 @@ export default function ImportOncoprint({ sample }: { sample: { events: string; 
         </div>
       </div>
       <div className="card">
+        <div className="vhead">
+          <h2 className="vtitle">Pasted data <span className="plain">— no database, no cohort; the same figure the analysis page draws</span></h2>
+        </div>
         <OncoprintFigure endpoint="/api/oncoprint/local" spec={spec}
-          display={display} sortKeys={sortKeys} onDisplay={setDisplay} onSortKeys={setSortKeys}
-          heading={<h2 style={{ margin: 0 }}>Pasted data <span className="plain">— no database, no cohort; the same figure the analysis page draws</span></h2>} />
+          display={display} sortKeys={sortKeys} onDisplay={setDisplay} onSortKeys={setSortKeys} />
       </div>
     </>
   );

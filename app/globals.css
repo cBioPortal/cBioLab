@@ -425,11 +425,20 @@ details.gearmenu > .gearmenu-items {
 .partbadge.pl i { background: var(--muted); }
 
 /* View header: title may wrap; the participation marker stays pinned top-right */
-.viewhead { display: flex; align-items: flex-start; gap: 0.6rem; flex-wrap: nowrap; }
-.viewhead > h2 { flex: 1 1 auto; min-width: 0; }
-.viewhead > .spacer { display: none; }
-.partwrap { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
-.viewhead > .partwrap { flex: 0 0 auto; margin-top: 0.1rem; }
+/* One header for every view: title on the left, then this view's actions, its status
+   chips and the control that removes it — always in that order, always on one baseline. */
+.vhead {
+  display: flex; align-items: baseline; gap: var(--s3);
+  margin-bottom: var(--s3); padding-bottom: var(--s2); border-bottom: 1px solid var(--line);
+}
+.vtitle {
+  flex: 1 1 auto; min-width: 0; margin: 0;
+  font-size: var(--t-sm); letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); font-weight: 600;
+}
+.vtitle .plain { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.vmeta { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; justify-content: flex-end; }
+.partwrap { display: inline-flex; gap: var(--s1); flex-wrap: wrap; justify-content: flex-end; }
 
 /* Per-view SQL provenance: how each NUMBER was computed, not just the cohort */
 .provsql { margin-top: 0.6rem; border-top: 1px solid var(--line); padding-top: 0.4rem; }
@@ -478,16 +487,16 @@ details.gearmenu > .gearmenu-items {
 }
 .lat .latsplit { opacity: 0.75; }
 
-/* Analysis: remove a single view; the card is the positioning context, and it
-   reserves the corner so the control never lands on the participation marker */
-.viewcard { position: relative; padding-right: 2.1rem; }
+/* Remove a single view. It sits in the header's own row, on the title's baseline,
+   rather than floating over the card's corner. */
+.viewcard { position: relative; }
 .removeview {
-  position: absolute; top: 0.35rem; right: 0.45rem; z-index: 2;
-  width: 1.35rem; height: 1.35rem; line-height: 1; padding: 0;
-  border: 1px solid var(--line); border-radius: 50%; background: var(--bg);
-  color: var(--muted); font-size: var(--t-base); cursor: pointer;
+  width: 1.4rem; height: 1.4rem; line-height: 1; padding: 0; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: 50%; background: none;
+  color: var(--muted); font-size: var(--t-md); cursor: pointer;
 }
-.viewcard:hover .removeview { color: var(--ink); border-color: var(--muted); }
+.viewcard:hover .removeview { border-color: var(--line); }
 .removeview:hover { background: var(--code-bg); color: #D55E00; border-color: #D55E00; }
 
 /* Survival: delayed-entry marker */

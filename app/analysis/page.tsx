@@ -877,6 +877,42 @@ export default function AnalysisPage() {
     );
   }
 
+  /**
+ * Every view's header, with one anatomy: the title and what it is, then the actions that
+ * belong to this view, then its status chips, then the control that removes it. Before this
+ * each view kind built its own, so the timing chip landed in a different place in each card.
+ */
+function ViewHead({ v, title, sub, actions, chips, onRemove }: {
+  v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode; onRemove?: () => void;
+}) {
+  return (
+    <div className="vhead">
+      <h2 className="vtitle">{title}{sub != null && <span className="plain"> — {sub}</span>}</h2>
+      <div className="vmeta">
+        {actions}
+        {chips}
+        <Latency v={v} />
+        <Participation p={v.participation} />
+        {onRemove && <button className="removeview" title="remove this view from the document"
+          aria-label="remove this view" onClick={onRemove}>×</button>}
+      </div>
+    </div>
+  );
+}
+
+/** the server-side wall clock for one view, and what that number does and does not include */
+function Latency({ v }: { v: any }) {
+  if (v.ms == null) return null;
+  return (
+    <span className="lat" title={
+      "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
+      (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
+      {v.ms.toLocaleString()}ms
+      {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
+    </span>
+  );
+}
+
   /** the view at index vi, read as an oncoprint view (its editor only renders there) */
   const ocView = (vi: number): OncoprintView => ((doc.views || [])[vi] || {}) as OncoprintView;
 
@@ -1978,20 +2014,12 @@ export default function AnalysisPage() {
             )}
             {result && result.views.map((v, vi) => (
               <div className="card viewcard" key={vi}>
-                <button className="removeview" title="remove this view from the document"
-                  aria-label="remove this view" onClick={() => removeView(vi)}>×</button>
                 {/* The author's own note about this figure, plain text by design —
                     see .viewnote in globals.css for why it is never markdown. */}
                 {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
                 {v.kind === "compare" && v.rows && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Compare <span className="plain">— alteration frequencies · {v.annotation}</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></div>
+                  <ViewHead v={v} title="Compare" sub={<>alteration frequencies · {v.annotation}</>} onRemove={() => removeView(vi)}
+                    actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                     style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
@@ -2012,14 +2040,8 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Hotspots <span className="plain">— recurrent protein changes, counted per patient</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></div>
+                  <ViewHead v={v} title="Hotspots" sub="recurrent protein changes, counted per patient" onRemove={() => removeView(vi)}
+                    actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   {v.hotspots.map(h => {
                     const positioned = h.variants.filter(x => x.pos != null);
@@ -2076,14 +2098,8 @@ export default function AnalysisPage() {
                   })}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-expression <span className="plain">— Pearson correlation from per-site sums</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></div>
+                  <ViewHead v={v} title="Co-expression" sub="Pearson correlation from per-site sums" onRemove={() => removeView(vi)}
+                    actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
@@ -2117,14 +2133,7 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "clinical" && v.clinical && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Clinical comparison <span className="plain">— attribute distributions across cohorts</span></h2><span className="spacer" /><>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></div>
+                  <ViewHead v={v} title="Clinical comparison" sub="attribute distributions across cohorts" onRemove={() => removeView(vi)} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
@@ -2163,14 +2172,8 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Co-occurrence <span className="plain">— pairwise, among patients profiled for both genes</span></h2><button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button><span className="spacer" /><>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></div>
+                  <ViewHead v={v} title="Co-occurrence" sub="pairwise, among patients profiled for both genes" onRemove={() => removeView(vi)}
+                    actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", width: "100%" }}>
@@ -2209,19 +2212,12 @@ export default function AnalysisPage() {
                   </div>
                 </>}
                 {v.kind === "survival" && <>
-                  <div className="viewhead"><h2 style={{ margin: 0 }}>Survival <span className="plain">— Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}
-                    {v.anchoredTo && <> — from {v.anchoredTo}</>}</span></h2>
-                  {v.truncated && <span className="trunc" title={
-                    "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
-                    (v.entryMonths ? "\n\nMedian " + v.entryMonths.median + " months from anchor to entry; 90th percentile "
-                      + v.entryMonths.p90 + "; longest " + v.entryMonths.max + "." : "")}>left-truncated</span>}<span className="spacer" /><>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></div>
+                  <ViewHead v={v} title="Survival" onRemove={() => removeView(vi)}
+                    sub={<>Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}{v.anchoredTo && <> — from {v.anchoredTo}</>}</>}
+                    chips={v.truncated ? <span className="trunc" title={
+                      "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
+                      (v.entryMonths ? "\n\nMedian " + v.entryMonths.median + " months from anchor to entry; 90th percentile "
+                        + v.entryMonths.p90 + "; longest " + v.entryMonths.max + "." : "")}>left-truncated</span> : null} />
                   {(() => {
                     // The basis of a survival analysis — which endpoint, and what
                     // the clock starts from — is the thing people most want to
@@ -2303,10 +2299,11 @@ export default function AnalysisPage() {
                   </div>
                 )}
                 {v.kind === "sequence" && v.svg && <>
-                  <div className="row" style={{ alignItems: "baseline" }}>
-                    <h2 style={{ margin: 0 }}>Treatment sequence <span className="plain">
+                  <div className="vhead">
+                    <h2 className="vtitle">Treatment sequence <span className="plain">
                       — lines of therapy by {v.sequence ? v.sequence.labelKey : ""}
                       {v.sequence ? " · " + v.sequence.lineGap + "-day line gap" : ""}</span></h2>
+                    <div className="vmeta">
                     {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
                       <details className="gearmenu inline">
                         <summary title="treatment sequence options">settings</summary>
@@ -2345,23 +2342,19 @@ export default function AnalysisPage() {
                         </div>
                       </details>
                     )}
-                    <span className="spacer" />
-                    <>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying \u00b7 " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></>
+                    <Latency v={v} /><Participation p={v.participation} />
+                    <button className="removeview" title="remove this view from the document"
+                      aria-label="remove this view" onClick={() => removeView(vi)}>×</button>
+                    </div>
                   </div>
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
                 {v.kind === "course" && v.svg && <>
-                  <div className="row" style={{ alignItems: "baseline" }}>
-                    <h2 style={{ margin: 0 }}>Clinical course <span className="plain">
+                  <div className="vhead">
+                    <h2 className="vtitle">Clinical course <span className="plain">
                       — {[...new Set((v.course || []).map(c => c.eventType))].join(", ")}
                       {v.anchoredTo ? "" : ""} · {v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
+                    <div className="vmeta">
                     <details className="gearmenu inline">
                       <summary title="clinical course options">settings</summary>
                       {/* Every parameter of this chart is a choice, and the defaults are only a
@@ -2430,15 +2423,10 @@ export default function AnalysisPage() {
                     );
                   })()}
                     </details>
-                    <span className="spacer" />
-                    <>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying \u00b7 " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></>
+                    <Latency v={v} /><Participation p={v.participation} />
+                    <button className="removeview" title="remove this view from the document"
+                      aria-label="remove this view" onClick={() => removeView(vi)}>×</button>
+                    </div>
                     </div>
                   {/* The same SVG the chat and MCP clients receive \u2014 one renderer,
                       so the figure cannot differ between surfaces. */}
@@ -2454,6 +2442,8 @@ export default function AnalysisPage() {
                     "&gene_list=" + encodeURIComponent(genes.join(" ")) +
                     "&profileFilter=mutations%2Cstructural_variants%2Cgistic&Z_SCORE_THRESHOLD=2.0&tab_index=tab_visualize&Action=Submit";
                   return <>
+                    <ViewHead v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onRemove={() => removeView(vi)}
+                      sub={c ? <>{c.stats.nColumns.toLocaleString()} {c.unit}s · {c.conventions.annotation}</> : "loading…"} />
                     <OncoprintFigure
                       spec={v.spec}
                       display={figureDisplay(ocView(vi))}
@@ -2466,8 +2456,6 @@ export default function AnalysisPage() {
                       onContract={(ct) => { const k = JSON.stringify(v.spec); setContracts((m) => m[k] === ct ? m : { ...m, [k]: ct }); }}
                       onCreateCohort={(sel) => cohortFromSelection(sel, (c ? c.studies : vStudies) || vStudies)}
                       busy={busy}
-                      heading={<><h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {(c ? c.stats.nColumns : 0).toLocaleString()} {c ? c.unit : "patient"}s · {c ? c.conventions.annotation : ""}</span></h2>
-                        {c && <span className="lat" title="Server-side wall-clock for this figure's queries and contract assembly; drawing happens in your browser.">{(c.stats.ms || 0).toLocaleString()}ms</span>}</>}
                       controls={<>
                         <Participation p={v.participation} />
                         <label className="meta" title="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
