@@ -22,8 +22,7 @@ import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, expandSurvivalCounts, studyRouting, restrictedStudies,
   type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments,
-  type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow
-} from "./federation.ts";
+  type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, legendFor } from "./federation.ts";
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 
@@ -680,14 +679,23 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         const r0 = resolvers[sites[0]];
         const data = await r0.plot(doc.cohorts[cn], {
           x: pv.x, y: pv.y, unit: pv.unit === "sample" ? "sample" : "patient",
+          ...(pv.colorBy ? { colorBy: pv.colorBy } : {}), ...(pv.ringBy ? { ringBy: pv.ringBy } : {}),
           bins: Array.isArray(pv.bins) && pv.bins.length === 2 ? [Number(pv.bins[0]), Number(pv.bins[1])] : undefined
         });
         // The points behind a box come only from a participant entitled to see cases, and only
         // when there are few enough to be a drawing. isPatientLevel is a type guard, so asking an
         // aggregate-only participant for them is a compile error rather than a review catch.
         if (data.shape === "box" && pv.points !== false && isPatientLevel(r0)) {
-          const pts = await r0.plotPoints(doc.cohorts[cn], { x: pv.x, y: pv.y, unit: pv.unit === "sample" ? "sample" : "patient" });
-          if (pts.length) { data.points = pts; data.overlay = "points"; }
+          const pts = await r0.plotPoints(doc.cohorts[cn], { x: pv.x, y: pv.y,
+            unit: pv.unit === "sample" ? "sample" : "patient",
+            ...(pv.colorBy ? { colorBy: pv.colorBy } : {}), ...(pv.ringBy ? { ringBy: pv.ringBy } : {}) });
+          if (pts.length) {
+            data.points = pts;
+            data.overlay = "points";
+            // the key describes what is drawn, so it is built from the points themselves
+            if (pv.colorBy) data.legend = legendFor(pts.map((x) => x.c || ""));
+            if (pv.ringBy) data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true)];
+          }
         }
         const pr: ViewResult = {
           kind: "plot", plot: data, cohorts: [cn], studies: sites,

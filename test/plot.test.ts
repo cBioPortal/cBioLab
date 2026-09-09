@@ -3,7 +3,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotBinsSql, plotBoxSql, plotCountSql,
-  plotShape, plotStatsSql, plotTableSql, tukey, validateAxis, CATEGORY_CAP, DEFAULT_BINS } from "../lib/plot.ts";
+  plotShape, plotStatsSql, plotTableSql, plotPointsSql, plotViolinSql, categoryColor, isAbsent,
+  tukey, validateAxis, CATEGORY_CAP, DEFAULT_BINS } from "../lib/plot.ts";
+import { STYLE } from "../lib/oncoprint-style.ts";
 
 const ctx = { study: "x", db: "db", unit: "sample" as const, cohortSql: "SELECT pid FROM p" };
 const num = { source: "clinical" as const, attribute: "MUTATION_COUNT" };
@@ -109,4 +111,35 @@ test("an alteration axis answers for every case in the cohort, not only the alte
   assert.match(sql, /Not mutated/);
   assert.match(sql, /Multiple/, "a case with two classes is its own category rather than being picked between");
   assert.match(axisSelect({ source: "alteration", gene: "MDM2", by: "cna" }, ctx, "cat"), /Amplification|Deep deletion/);
+});
+
+test("a category takes the colour the oncoprint gives it, so the two figures agree", () => {
+  // the mutation classes and copy-number states come from the shared style module
+  assert.equal(categoryColor("Missense"), STYLE.glyph.mutation.priority.find((m) => /Missense/.test(m.label))!.color);
+  assert.equal(categoryColor("Truncating"), STYLE.glyph.mutation.priority.find((m) => /Truncating/.test(m.label))!.color);
+  assert.equal(categoryColor("Amplification"), STYLE.glyph.cna.options.find((o) => /Amplification/.test(o.label))!.color);
+  // anything else cycles the shared categorical palette rather than inventing a colour
+  assert.equal(categoryColor("Stage 4", 1), STYLE.palette.categorical[1]);
+  // "nothing here" is neutral, and visible on white — the oncoprint's unaltered fill is not
+  assert.equal(categoryColor("Not mutated"), STYLE.palette.groupLine);
+  assert.notEqual(categoryColor("Not mutated"), STYLE.palette.unaltered);
+});
+
+test("absence is neutral and never a ring", () => {
+  for (const l of ["Not mutated", "neutral", "No data", "wild type", "none", ""]) assert.equal(isAbsent(l), true, l);
+  for (const l of ["Missense", "Amplification", "Multiple", "Stage 4"]) assert.equal(isAbsent(l), false, l);
+});
+
+test("colour reaches the query only when it was asked for", () => {
+  const numSel = "SELECT 1 AS id, 1 AS v", catSel = "SELECT 1 AS id, 'g' AS v", colSel = "SELECT 1 AS id, 'c' AS v";
+  const plain = plotPointsSql(numSel, catSel, "SELECT '' AS pid");
+  assert.equal(/ AS c\b/.test(plain), false);
+  const coloured = plotPointsSql(numSel, catSel, "SELECT '' AS pid", 100, colSel, colSel);
+  assert.match(coloured, /cs\.v AS c/);
+  assert.match(coloured, /rs\.v AS r/);
+  assert.match(coloured, /LEFT JOIN/, "a case with no value for the colour is still a point");
+  // the density gains a dimension, not a row per case
+  assert.match(plotViolinSql(numSel, catSel, "SELECT '' AS pid", 40, colSel), /GROUP BY g, b, c/);
+  // and it is cut over the middle 99%, so one outlier cannot put every value in one bin
+  assert.match(plotViolinSql(numSel, catSel, "SELECT '' AS pid"), /quantileExact\(0\.005\)/);
 });

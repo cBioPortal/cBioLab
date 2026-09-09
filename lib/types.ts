@@ -155,6 +155,13 @@ export interface PlotView {
    * aggregate-only participant, the same values are drawn as a density instead.
    */
   points?: boolean;
+  /**
+   * Colour the values by a category, as the portal's "Color samples by" does: `colorBy` fills
+   * each point, `ringBy` rings it, so a case that is both amplified and mutated stays legible.
+   * Above the points cap the fill splits the density instead.
+   */
+  colorBy?: PlotAxis;
+  ringBy?: PlotAxis;
 }
 export interface CooccurrenceView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */

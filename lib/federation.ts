@@ -24,12 +24,20 @@ import { sq } from "./compiler.ts";
 import { canonicalEventName } from "./event-names.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
-  CATEGORY_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
+  categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
   plotBinsSql, plotBoxSql, plotCountSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
-  type PlotAxis, type PlotData, type PlotRequest } from "./plot.ts";
+  type PlotAxis, type PlotData, type PlotPoint, type PlotRequest } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
 export { plotBinsSql, plotBoxSql, plotCountSql, plotStatsSql, plotTableSql, plotViolinSql };
-export type { PlotData, PlotRequest, PlotGroup } from "./plot.ts";
+export type { PlotData, PlotRequest, PlotGroup, PlotPoint } from "./plot.ts";
+
+/** the colour key: the commonest categories, capped, each with the colour every renderer uses */
+export function legendFor(values: string[], ring = false): { label: string; color: string; ring?: boolean }[] {
+  const counts = new Map<string, number>();
+  for (const v of values) if (v) counts.set(v, (counts.get(v) || 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, COLOR_CAP)
+    .map(([label], i) => ({ label, color: categoryColor(label, i), ...(ring ? { ring: true } : {}) }));
+}
 
 const num = (v: unknown): number | null => { const x = Number(v); return Number.isFinite(x) ? x : null; };
 import { genomicEventsSql, coverageSql } from "./oncoprint.ts";
@@ -962,7 +970,7 @@ export interface QueryLogEntry { label: string; sql: string; ms?: number; remote
 /** Additionally available when the instance permits patient-level access. */
 export interface PatientLevelCapable extends AggregateCapable {
   /** the values behind a box plot, with their case ids — the entitlement, in one method */
-  plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number): Promise<{ id: string; g: string; v: number }[]>;
+  plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number): Promise<PlotPoint[]>;
   readonly instance: Instance & { mode: "patient-level" };
   members(def: CohortDef | null | undefined): Promise<string[]>;
 }
@@ -1219,9 +1227,11 @@ abstract class BaseResolver implements AggregateCapable {
 
     // box: the numeric axis grouped by the categorical one, whichever way round they were given
     const numFirst = xk === "num";
+    const colorSel = spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
     const [rows, vio] = await Promise.all([
       this.runLogged<ChRow>("plot:box", plotBoxSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql), conn),
-      this.runLogged<ChRow>("plot:violin", plotViolinSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql), conn)
+      this.runLogged<ChRow>("plot:violin",
+        plotViolinSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql, VIOLIN_BINS, colorSel), conn)
     ]);
     if (rows.data.length > CATEGORY_CAP)
       throw new Error("more than " + CATEGORY_CAP + " groups on the categorical axis; narrow the cohort or pick another attribute");
@@ -1232,9 +1242,13 @@ abstract class BaseResolver implements AggregateCapable {
       return { g: String(r.g), n: Number(r.n), lo, hi, q1: q[0], median: q[1], q3: q[2],
         loWhisker: t.loWhisker, hiWhisker: t.hiWhisker };
     });
+    const violin = vio.data.map((r) => ({ g: String(r.g), b: Number(r.b), n: Number(r.n),
+      ...(spec.colorBy ? { c: String(r.c ?? "") } : {}) }));
+    const vx0 = num(vio.data[0]?.vx0), vx1 = num(vio.data[0]?.vx1);
     return { shape, n: groups.reduce((a, g) => a + g.n, 0), ...label, groups,
-      violin: vio.data.map((r) => ({ g: String(r.g), b: Number(r.b), n: Number(r.n) })), violinBins: VIOLIN_BINS,
-      overlay: "violin" };
+      violin, violinBins: VIOLIN_BINS, overlay: "violin",
+      ...(vx0 != null && vx1 != null ? { violinExtent: [vx0, vx1] as [number, number] } : {}),
+      ...(spec.colorBy ? { colorLabel: axisLabel(spec.colorBy), legend: legendFor(violin.map((v) => v.c || "")) } : {}) };
   }
 
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
@@ -1271,7 +1285,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * a million dots being called a drawing; above it the caller falls back to the density every
    * participant can compute.
    */
-  async plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap = POINTS_CAP): Promise<{ id: string; g: string; v: number }[]> {
+  async plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap = POINTS_CAP): Promise<PlotPoint[]> {
     const db = this.instance.conn.db, conn = this.instance.conn;
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
     const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def) };
@@ -1281,10 +1295,14 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const numFirst = xk === "num";
     const numSel = axisSelect(numFirst ? spec.x : spec.y, ctx, "num");
     const catSel = axisSelect(numFirst ? spec.y : spec.x, ctx, "cat");
-    const r = await this.runLogged<ChRow>("plot:points", plotPointsSql(numSel, catSel, ctx.cohortSql, cap), conn);
+    const colorSel = spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
+    const ringSel = spec.ringBy ? axisSelect(spec.ringBy, ctx, "cat") : undefined;
+    const r = await this.runLogged<ChRow>("plot:points",
+      plotPointsSql(numSel, catSel, ctx.cohortSql, cap, colorSel, ringSel), conn);
     // one over the cap means there were more than a drawing can hold: the caller draws density
     if (r.data.length > cap) return [];
-    return r.data.map((x) => ({ id: String(x.id), g: String(x.g), v: Number(x.v) }));
+    return r.data.map((x) => ({ id: String(x.id), g: String(x.g), v: Number(x.v),
+      ...(colorSel ? { c: String(x.c ?? "") } : {}), ...(ringSel ? { r: String(x.r ?? "") } : {}) }));
   }
 
   async members(def: CohortDef | null | undefined): Promise<string[]> {

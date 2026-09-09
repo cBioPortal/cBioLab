@@ -14,6 +14,7 @@
 // what lets an aggregate-only participant answer a plot at all (see docs/DATA-BOUNDARY.md).
 import { sq } from "./compiler.ts";
 import { DB } from "./ch.ts";
+import { STYLE } from "./oncoprint-style.ts";
 
 /** what goes on one axis */
 export type PlotAxis =
@@ -37,12 +38,37 @@ export const DEFAULT_BINS: [number, number] = [240, 160];
 export const POINTS_CAP = 5000;
 /** bins per group in a violin */
 export const VIOLIN_BINS = 40;
+/** distinct colours a legend can carry before it stops being a legend */
+export const COLOR_CAP = 12;
+
+/**
+ * The colour for one category. A mutation class or a copy-number state takes the colour the
+ * oncoprint gives it, so a missense dot here is the same green as a missense cell there; anything
+ * else takes the shared categorical cycle. Renderers never pick a colour of their own.
+ */
+export function categoryColor(label: string, i = 0): string {
+  const l = String(label).toLowerCase();
+  // "nothing here" needs to be visible ON WHITE, which the oncoprint's unaltered fill is not:
+  // there it sits on a coloured row, here it is a dot on paper.
+  if (isAbsent(label)) return STYLE.palette.groupLine;
+  if (l === "multiple") return STYLE.palette.text;
+  for (const m of STYLE.glyph.mutation.priority) if (m.label.toLowerCase().startsWith(l)) return m.color;
+  for (const o of STYLE.glyph.cna.options) if (o.label.toLowerCase() === l) return o.color;
+  if (l === "deep deletion") return STYLE.glyph.cna.options.find((o) => /deletion/i.test(o.label))?.color || STYLE.palette.categorical[0];
+  const pal = STYLE.palette.categorical;
+  return pal[i % pal.length];
+}
 
 export interface AxisCtx { study: string; db?: string; unit: "patient" | "sample"; cohortSql: string }
 
 const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
 const ATTR_RE = /^[A-Za-z0-9_]{1,64}$/;
 const PROFILE_RE = /^[A-Za-z0-9_.-]{1,64}$/;
+
+/** categories that mean "this case has none of that", which draw as neutral and never as a ring */
+export function isAbsent(label: string): boolean {
+  return /^(not mutated|neutral|no data|wild type|none|)$/i.test(String(label).trim());
+}
 
 /** the shape a pair of axes draws as — the portal's own rule, kept deliberately */
 export function plotShape(x: AxisKind, y: AxisKind): PlotShape {
@@ -230,15 +256,24 @@ export function plotBoxSql(numSel: string, catSel: string, cohortSql: string): s
  * The values behind a box, as a density per group — bins, not points, so this is an aggregate
  * and stays answerable by a participant that may not disclose a case.
  */
-export function plotViolinSql(numSel: string, catSel: string, cohortSql: string, bins = VIOLIN_BINS): string {
+export function plotViolinSql(numSel: string, catSel: string, cohortSql: string, bins = VIOLIN_BINS, colorSel?: string): string {
   const b = Math.max(4, Math.min(200, Math.round(bins)));
+  // Cut the bins over the middle 99% rather than min..max. One mutation count of 25,697 would
+  // otherwise put every other value in bin 0, and the density would be a solid block. The box
+  // is drawn between its whiskers, and the renderer clips whatever falls outside.
+  // With a colour, the density splits by class: the key gains one dimension and the payload
+  // stays bounded by groups x bins x classes rather than by the cohort.
   return "WITH cohort AS (" + cohortSql + "),\n" +
     "     vs AS (" + numSel + "),\n" +
-    "     gs AS (" + catSel + "),\n" +
-    "     j AS (SELECT gs.v AS g, vs.v AS x FROM vs INNER JOIN gs ON gs.id = vs.id),\n" +
-    "     e AS (SELECT min(x) x0, max(x) x1 FROM j)\n" +
-    "SELECT g, least(" + (b - 1) + ", toUInt32(floor((x - x0) / nullIf(x1 - x0, 0) * " + b + "))) AS b, count() AS n\n" +
-    "FROM j, e GROUP BY g, b";
+    "     gs AS (" + catSel + ")" + (colorSel ? ",\n     cs AS (" + colorSel + ")" : "") + ",\n" +
+    "     j AS (SELECT gs.v AS g, vs.v AS x" + (colorSel ? ", cs.v AS c" : "") + " FROM vs INNER JOIN gs ON gs.id = vs.id" +
+      (colorSel ? "\n            LEFT JOIN cs ON cs.id = vs.id" : "") + "),\n" +
+    "     e AS (SELECT quantileExact(0.005)(x) x0, quantileExact(0.995)(x) x1 FROM j)\n" +
+    // the extent travels with the bins: a box is drawn between its whiskers, so the renderer
+    // needs to know what value a bin index stands for rather than assuming it spans the axis
+    "SELECT g, least(" + (b - 1) + ", toUInt32(floor((x - x0) / nullIf(x1 - x0, 0) * " + b + "))) AS b, " +
+      (colorSel ? "c, " : "") + "count() AS n, any(x0) AS vx0, any(x1) AS vx1\n" +
+    "FROM j, e GROUP BY g, b" + (colorSel ? ", c" : "");
 }
 
 /**
@@ -249,12 +284,17 @@ export function plotViolinSql(numSel: string, catSel: string, cohortSql: string,
  * `PatientLevelResolver`, the participant whose entitlement is to see cases. An aggregate-only
  * site has no method that could call it — see docs/DATA-BOUNDARY.md.
  */
-export function plotPointsSql(numSel: string, catSel: string, cohortSql: string, cap = POINTS_CAP): string {
+export function plotPointsSql(numSel: string, catSel: string, cohortSql: string, cap = POINTS_CAP,
+  colorSel?: string, ringSel?: string): string {
   return "WITH cohort AS (" + cohortSql + "),\n" +
     "     vs AS (" + numSel + "),\n" +
-    "     gs AS (" + catSel + ")\n" +
-    "SELECT vs.id AS id, gs.v AS g, vs.v AS v\n" +
-    "FROM vs INNER JOIN gs ON gs.id = vs.id\n" +
+    "     gs AS (" + catSel + ")" +
+    (colorSel ? ",\n     cs AS (" + colorSel + ")" : "") +
+    (ringSel ? ",\n     rs AS (" + ringSel + ")" : "") + "\n" +
+    "SELECT vs.id AS id, gs.v AS g, vs.v AS v" + (colorSel ? ", cs.v AS c" : "") + (ringSel ? ", rs.v AS r" : "") + "\n" +
+    "FROM vs INNER JOIN gs ON gs.id = vs.id" +
+    (colorSel ? "\n  LEFT JOIN cs ON cs.id = vs.id" : "") +
+    (ringSel ? "\n  LEFT JOIN rs ON rs.id = vs.id" : "") + "\n" +
     "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
 }
 
@@ -331,7 +371,14 @@ function lgamma(z: number): number {
 
 // ---- the contract a plot returns -------------------------------------------
 /** what a plot asks for; the shape it draws as is decided from the axes, not requested */
-export interface PlotRequest { x: PlotAxis; y: PlotAxis; unit?: "patient" | "sample"; bins?: [number, number] }
+/** one drawn value, with its case id and whatever it is coloured by */
+export interface PlotPoint { id: string; g: string; v: number; c?: string; r?: string }
+
+export interface PlotRequest {
+  x: PlotAxis; y: PlotAxis; unit?: "patient" | "sample"; bins?: [number, number];
+  /** colour the values by a category: the fill, and optionally a ring, as the portal does */
+  colorBy?: PlotAxis; ringBy?: PlotAxis;
+}
 export interface PlotGroup { g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number; loWhisker: number; hiWhisker: number }
 export interface PlotData {
   shape: "scatter" | "box" | "table";
@@ -345,9 +392,15 @@ export interface PlotData {
             pPearson: number | null; pSpearman: number | null };
   groups?: PlotGroup[];
   /** the values behind the boxes: points when few enough and the reader may see cases, else a density */
-  points?: { id: string; g: string; v: number }[];
-  violin?: { g: string; b: number; n: number }[];
+  points?: PlotPoint[];
+  violin?: { g: string; b: number; n: number; c?: string }[];
+  /** what the colours mean: the fill category, the ring category, and the key to draw */
+  colorLabel?: string;
+  ringLabel?: string;
+  legend?: { label: string; color: string; ring?: boolean }[];
   violinBins?: number;
+  /** the value range the violin's bins were cut over, which is not the range the box is drawn on */
+  violinExtent?: [number, number];
   /** which of the two the figure is drawing, and why — the caption says so too */
   overlay?: "points" | "violin" | "none";
   cells?: { cx: string; cy: string; n: number }[];

@@ -17,7 +17,7 @@
 // Colours come from CSS custom properties with literal fallbacks, so an SVG
 // inlined in the app follows the page theme while the same string rasterised
 // for a chat gets a fixed light figure.
-import { jitterFor } from "./plot.ts";
+import { categoryColor, isAbsent, jitterFor } from "./plot.ts";
 import type { ViewResult, KmCurve, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind, PlotData } from "./types.ts";
 
 /** Cohort names and data values reach <text>; they must never reach it raw. */
@@ -486,37 +486,76 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
     const sy = (val: number) => T + PLOT - PLOT * (val - lo) / span;
     // the values behind the boxes: every point when the reader may see cases and there are few
     // enough of them, otherwise the density of the same values
-    const byGroup = new Map<string, { id: string; v: number }[]>();
-    for (const pt of d.points || []) (byGroup.get(pt.g) ?? byGroup.set(pt.g, []).get(pt.g)!).push({ id: pt.id, v: pt.v });
+    const byGroup = new Map<string, { id: string; v: number; c?: string; r?: string }[]>();
+    for (const pt of d.points || [])
+      (byGroup.get(pt.g) ?? byGroup.set(pt.g, []).get(pt.g)!).push({ id: pt.id, v: pt.v, c: pt.c, r: pt.r });
     // each violin is scaled to its OWN densest bin: one group holding 178,489 of the values
     // would otherwise flatten every other group to an invisible sliver. How many cases a group
     // has is already printed under its name, so the width is free to describe its shape.
-    const vio = new Map<string, Map<number, number>>();
+    // a bin may hold several colour classes; the totals are what the width is scaled by
+    const vio = new Map<string, Map<number, Map<string, number>>>();
     const vioMax = new Map<string, number>();
     for (const b of d.violin || []) {
       if (!vio.has(b.g)) vio.set(b.g, new Map());
-      vio.get(b.g)!.set(b.b, b.n);
-      if (b.n > (vioMax.get(b.g) || 0)) vioMax.set(b.g, b.n);
+      const cells = vio.get(b.g)!;
+      if (!cells.has(b.b)) cells.set(b.b, new Map());
+      const byClass = cells.get(b.b)!;
+      byClass.set(b.c ?? "", (byClass.get(b.c ?? "") || 0) + b.n);
+      const total = [...byClass.values()].reduce((a, n) => a + n, 0);
+      if (total > (vioMax.get(b.g) || 0)) vioMax.set(b.g, total);
     }
+    const colorKey = (d.legend || []).filter((k) => !k.ring);
+    const ringKey = (d.legend || []).filter((k) => k.ring);
+    const byLabel = new Map((d.legend || []).map((k) => [k.label, k.color]));
+    const colorOf = (label: string) => byLabel.get(label) || categoryColor(label, 0);
     const vBins = d.violinBins || 40;
 
     gs.forEach((g, i) => {
       const cx = L + bw * (i + 0.5), half = Math.min(24, bw * 0.32);
       if (d.overlay === "violin" && vio.has(g.g)) {
-        // a half-width density either side of the box, on the same scale as every other group
+        // a half-width density either side of the box, each violin scaled to its own densest bin.
+        // With a colour, one bin's width is shared out between its classes, so the split is
+        // visible without pretending the classes were measured separately.
         const cells = vio.get(g.g)!;
-        const step = PLOT / vBins;
-        for (const [b, n] of cells) {
-          const w = half * 1.6 * Math.sqrt(n / (vioMax.get(g.g) || 1));
-          const yTop = T + PLOT - (b + 1) * step;
-          out.push(`<rect x="${num(cx - w)}" y="${num(yTop)}" width="${num(w * 2)}" height="${num(step + 0.4)}" ` +
-            `fill="${SERIES[0]}" fill-opacity="0.28"/>`);
+        // a bin stands for a range of VALUES, and the axis is drawn between the whiskers, so the
+        // two are mapped through the extent the bins were cut over rather than assumed equal
+        const [vx0, vx1] = d.violinExtent || [lo, hi];
+        const bw = (vx1 - vx0) / vBins;
+        for (const [b, byClass] of cells) {
+          const vLo = vx0 + b * bw, vHi = vLo + bw;
+          if (vHi < lo || vLo > hi) continue;
+          const total = [...byClass.values()].reduce((a, n) => a + n, 0);
+          const w = half * 1.6 * Math.sqrt(total / (vioMax.get(g.g) || 1));
+          const yTop = sy(Math.min(hi, vHi));
+          const step = Math.max(1.2, sy(Math.max(lo, vLo)) - yTop);
+          if (!colorKey.length) {
+            out.push(`<rect x="${num(cx - w)}" y="${num(yTop)}" width="${num(w * 2)}" height="${num(step)}" ` +
+              `fill="${SERIES[0]}" fill-opacity="0.28"/>`);
+            continue;
+          }
+          let x = cx - w;
+          for (const k of colorKey) {
+            const n = byClass.get(k.label) || 0;
+            if (!n) continue;
+            const seg = 2 * w * (n / total);
+            out.push(`<rect x="${num(x)}" y="${num(yTop)}" width="${num(seg)}" height="${num(step)}" ` +
+              `fill="${k.color}" fill-opacity="0.75"/>`);
+            x += seg;
+          }
         }
       }
       if (d.overlay === "points" && byGroup.has(g.g)) {
-        for (const pt of byGroup.get(g.g)!)
-          out.push(`<circle cx="${num(cx + jitterFor(pt.id) * half * 0.9)}" cy="${num(sy(pt.v))}" r="1.5" ` +
-            `fill="${SERIES[0]}" fill-opacity="0.45"/>`);
+        // two encodings on one dot need a dot big enough to carry them; a crowded plot gets
+        // smaller ones so the cloud is still a cloud
+        const nPts = d.points!.length;
+        const rBase = Math.max(1.3, Math.min(4.5, 90 / Math.sqrt(Math.max(1, nPts))));
+        for (const pt of byGroup.get(g.g)!) {
+          const fill = pt.c != null ? colorOf(pt.c) : SERIES[0];
+          const ring = pt.r != null && !isAbsent(pt.r) ? colorOf(pt.r) : null;
+          out.push(`<circle cx="${num(cx + jitterFor(pt.id) * half * 0.9)}" cy="${num(sy(pt.v))}" ` +
+            `r="${num(ring ? rBase * 1.25 : rBase)}" fill="${fill}" fill-opacity="0.85"` +
+            (ring ? ` stroke="${ring}" stroke-width="${num(Math.max(0.6, rBase * 0.28))}"` : "") + `/>`);
+        }
       }
       out.push(`<line x1="${num(cx)}" y1="${num(sy(g.loWhisker))}" x2="${num(cx)}" y2="${num(sy(g.hiWhisker))}" stroke="${p.muted}"/>`);
       out.push(`<rect x="${num(cx - half)}" y="${num(sy(g.q3))}" width="${num(half * 2)}" height="${num(Math.max(1, sy(g.q1) - sy(g.q3)))}" ` +
@@ -529,12 +568,34 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
     });
     for (const t of [lo, (lo + hi) / 2, hi]) out.push(axisText(num(t), L - 6, sy(t) + 3, "end", 10));
     out.push(`<rect x="${L}" y="${T}" width="${num(plotW)}" height="${PLOT}" fill="none" stroke="${p.line}"/>`);
+    let keyY = T + PLOT + 74;
+    if (colorKey.length || ringKey.length) {
+      let kx = L;
+      const chip = (k: { label: string; color: string; ring?: boolean }) => {
+        const w = 12 + k.label.length * 5.4;
+        if (kx + w > W - R) { kx = L; keyY += 14; }
+        const g = k.ring
+          ? `<circle cx="${num(kx + 4)}" cy="${num(keyY - 3)}" r="3.4" fill="none" stroke="${k.color}" stroke-width="1.6"/>`
+          : `<circle cx="${num(kx + 4)}" cy="${num(keyY - 3)}" r="3.4" fill="${k.color}"/>`;
+        out.push(g + `<text x="${num(kx + 11)}" y="${num(keyY)}" font-size="9" fill="${p.muted}">${esc(k.label)}</text>`);
+        kx += w;
+      };
+      if (colorKey.length) { out.push(`<text x="${L}" y="${num(keyY - 14)}" font-size="9" fill="${p.muted}">${esc(d.colorLabel || "colour")}</text>`); colorKey.forEach(chip); }
+      // a ring means "this case also has that", so absence gets no ring and no key entry
+      if (ringKey.some((k) => !isAbsent(k.label))) {
+        kx = L; keyY += 16;
+        out.push(`<text x="${L}" y="${num(keyY - 14)}" font-size="9" fill="${p.muted}">${esc(d.ringLabel || "ring")}</text>`);
+        ringKey.filter((k) => !isAbsent(k.label)).forEach(chip);
+      }
+      keyY += 8;
+    }
     const cap = caption("Box: quartiles with Tukey whiskers, computed over every case in the group. The count is above each name." +
       (d.overlay === "points" ? " Every value is drawn over its box; the jitter is fixed per case."
         : d.overlay === "violin" ? " The shaded width is the share of that group's values sitting at that height, scaled per group."
         : ""),
-      W, T + PLOT + 84, p.muted);
-    return frame(W, T + PLOT + 84 + cap.height + 10, out.join("") + cap.svg, p.bg);
+      W, Math.max(T + PLOT + 84, keyY), p.muted);
+    const bottom = Math.max(T + PLOT + 84, keyY);
+    return frame(W, bottom + cap.height + 10, out.join("") + cap.svg, p.bg);
   }
 
   if (d.shape === "table" && d.cells && d.cells.length) {

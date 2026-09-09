@@ -914,13 +914,17 @@ export default function AnalysisPage() {
  * in a molecular profile, or a gene's alterations. It is the same vocabulary the engine uses,
  * so what the reader picks is what the document says.
  */
-function AxisPicker({ side, axis, attrs, profiles, busy, onChange }: {
-  side: "x" | "y"; axis: any; busy?: boolean;
+function AxisPicker({ side, axis, attrs, profiles, busy, onChange, allowNone, categorical }: {
+  side: string; axis: any; busy?: boolean;
   attrs: { attribute: string; kind: string }[]; profiles: string[];
   onChange: (a: any) => void;
+  /** a colour is optional in a way an axis is not */
+  allowNone?: boolean;
+  /** colours come from categories, so a molecular value is not on offer */
+  categorical?: boolean;
 }) {
   const a = axis || {};
-  const src = a.source || "clinical";
+  const src = axis ? (a.source || "clinical") : "none";
   const set = (next: any) => onChange(next);
   return (
     <span className="axispick">
@@ -928,12 +932,14 @@ function AxisPicker({ side, axis, attrs, profiles, busy, onChange }: {
       <select value={src} disabled={busy} title="what this axis measures"
         onChange={(e) => {
           const s = e.target.value;
-          set(s === "clinical" ? { source: "clinical", attribute: (attrs[0] || {}).attribute || "" }
+          set(s === "none" ? undefined
+            : s === "clinical" ? { source: "clinical", attribute: (attrs[0] || {}).attribute || "" }
             : s === "molecular" ? { source: "molecular", profileType: profiles[0] || "", gene: a.gene || "TP53" }
             : { source: "alteration", gene: a.gene || "TP53", by: "mutationType" });
         }}>
+        {allowNone && <option value="none">none</option>}
         <option value="clinical">clinical</option>
-        <option value="molecular">molecular</option>
+        {!categorical && <option value="molecular">molecular</option>}
         <option value="alteration">alteration</option>
       </select>
       {src === "clinical" && (
@@ -2471,6 +2477,15 @@ function Latency({ v }: { v: any }) {
                     <div className="tbz">
                       <AxisPicker side="y" axis={docView(vi).y} attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
                         onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, y: a }))} />
+                    </div>
+                    <div className="tbz">
+                      <span className="tbl" title="a category colours each value; above the points cap it splits the density instead">colour</span>
+                      <AxisPicker side="fill" axis={docView(vi).colorBy} allowNone categorical
+                        attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
+                        onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
+                      <AxisPicker side="ring" axis={docView(vi).ringBy} allowNone categorical
+                        attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
+                        onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
                     </div>
                     <div className="tbz">
                       <label className="tbfield" title="what a point is; patient mode averages a patient's samples">unit <select
