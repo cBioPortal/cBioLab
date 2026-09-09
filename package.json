@@ -9,6 +9,7 @@
     "docs:gen": "node scripts/gen-dsl-doc.ts",
     "style:gen": "node scripts/gen-style.ts",
     "docs:check": "node --env-file=.env.local scripts/check-dsl-doc.ts",
+    "docs:counts": "UPDATE_COUNTS=1 node --env-file=.env.local scripts/check-dsl-doc.ts",
     "test": "node --test \"test/**/*.test.ts\"",
     "test:boundary": "node --test test/boundary.test.ts"
   },

@@ -1,0 +1,90 @@
+{
+  "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
+  "oncokbPin": "v7.4",
+  "generated": "2026-09-09",
+  "examples": {
+    "Lung adenocarcinoma: a four-view workup": {
+      "EGFR-mutant NSCLC": 1893,
+      "KRAS-mutant NSCLC": 2194
+    },
+    "One cohort, five ways: the colorectal hotspot workup": {
+      "CRC, KRAS-mutant": 2362,
+      "CRC, KRAS wild-type": 3134
+    },
+    "Federated end to end: two studies, four views": {
+      "TP53 mut": 25555,
+      "TP53 wt": 24627
+    },
+    "Genomic status via OQL, compared": {
+      "STK11 driver": 1113,
+      "STK11 wt": 23592
+    },
+    "Clinical + timeline event composition": {
+      "never-smoker fast progressors": 502
+    },
+    "Derived filters: enough follow-up to answer the question": {
+      "followed 2y+": 11096,
+      "followed < 6mo": 4946
+    },
+    "Progression on immunotherapy: during, versus absent": {
+      "progressed on immunotherapy": 1423,
+      "no progression within a year": 534
+    },
+    "Derived treatment lines: who reaches a third line?": {
+      "reached 3rd line": 3088,
+      "first line only": 13620
+    },
+    "True first line: fast progression versus durable control": {
+      "progressed within 180d of 1L chemo": 3319,
+      "no progression within 180d": 6584
+    },
+    "Lab thresholds over time: PSA above 100": {
+      "PSA above 100": 879,
+      "PSA measured, never above 100": 3250
+    },
+    "any / not / genomicData": {
+      "CRC/PAAD without CDKN2A loss": 8140
+    },
+    "Cross-study federation with an oncoprint": {
+      "TP53-mut, CHORD+MET": 25555
+    },
+    "Molecular heatmap tracks, sorted by expression": {
+      "ERBB2 amp": 123
+    },
+    "A federated z-score reference on an oncoprint": {
+      "ERBB2 amp": 132
+    },
+    "The clinical course: who is still on treatment, and when": {
+      "TP53 mut": 13105,
+      "TP53 wt": 11594
+    },
+    "A reusable workup: one template, retargeted in a single edit": {
+      "NSCLC": 7809
+    },
+    "What comes after what: lines of therapy, and what ending a path means": {
+      "TP53 mut": 13105,
+      "TP53 wt": 11594
+    },
+    "Lollipop plot: recurrent protein changes, with a suppression floor": {
+      "CRC": 5543
+    },
+    "Co-expression from sums alone": {
+      "BRCA": 1066
+    },
+    "Clinical attributes compared between cohorts": {
+      "TP53 mut": 13105,
+      "TP53 wt": 11594
+    },
+    "Co-occurrence and mutual exclusivity in NSCLC": {
+      "NSCLC": 7809
+    },
+    "Survival from first chemotherapy, left-truncated": {
+      "TP53 mut": 13105,
+      "TP53 wt": 11594
+    },
+    "Study-stratified survival across two studies": {
+      "TP53 mut": 25555,
+      "TP53 wt": 24627
+    }
+  }
+}

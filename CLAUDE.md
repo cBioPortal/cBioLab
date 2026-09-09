@@ -88,6 +88,11 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
    and the docs gate already proves every gallery entry runs. `npm run docs:check` (part of e2e) fails on drift and
    EXECUTES every documented example against the live compiler. The chat prompt grammar and the
    MCP `describe_dsl` tool render from the same module.
+   **Every example's cohort counts are pinned** in `test/fixtures/example-counts.json` and asserted
+   by the same gate, so "it still runs" is not mistaken for "it still gives the same answer". A
+   renamed cohort, a moved number and a pin left behind by a deleted example all fail. After an
+   intentional change (or a warehouse reload, or a new OncoKB pin) review what moved and re-pin
+   with `npm run docs:counts`.
 5. **SQL injection surface**: cohort SQL passes between modules only via the `PIDS_SQL` Symbol
    (JSON can't forge Symbol keys). Keep it that way.
 6. **Track labels are sort keys** — engine and UI derive them from the shared
