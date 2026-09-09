@@ -117,11 +117,17 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   boundary suite).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
-  counts against known values) → run e2e → commit → push `analysis`. **Stop there.**
+  counts against known values) → run e2e → commit → push **your own branch**. **Stop there.**
+- **Branch from `master`, work on a feature branch, and leave the merge to a person.** There is
+  no staging trunk: the `analysis` branch was retired once it stopped being a distinct line of
+  development and became a second name for `master`. Name a branch after the work, push it, and
+  say what is on it.
 - **`master` is human-gated.** Never fast-forward or merge to `master` on your own initiative;
   do it only when the user says so in that session. `master` is the deploy branch of a repo
   under the `cBioPortal` org — advancing it is a publishing act, not a bookkeeping step, and
-  there is no CI, so the only gate is a person deciding the work is ready.
+  there is no CI, so the only gate is a person deciding the work is ready. When they do say so,
+  merge the feature branch (`--no-ff`) rather than fast-forwarding, so the branch is legible in
+  the history, and delete it afterwards.
 - **What e2e actually proves.** `node e2e.cjs` drives a local `npx next start -p 3100` against
   the **built working tree** — `.next` from the last `npm run build` — not against a commit and
   not against production. So: rebuild before running it, and if the tree is dirty you are
