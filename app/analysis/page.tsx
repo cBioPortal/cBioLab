@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
-import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
+import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 import { parameterize } from "../../lib/params.ts";
@@ -916,6 +916,35 @@ export default function AnalysisPage() {
     if (Object.keys(display).length) next.display = display; else delete next.display;
     return next;
   });
+
+  /**
+   * A drag across an oncoprint becomes a cohort of exactly those patients — an explicit list,
+   * not a rule, so the document says plainly that it was picked by hand.
+   *
+   * Sample columns are resolved to their patients first: a cohort selects patients, so a
+   * cohort named from a sample selection carries those patients (and therefore their other
+   * samples too). Throwing is how the figure's dialog is told why it cannot be done.
+   */
+  const cohortFromSelection = async (sel: ColumnSelection, studies: string[]) => {
+    const one = studies.length === 1 ? studies[0] : null;
+    if (!one) throw new Error("a cohort is evaluated against one study; this figure pools " +
+      studies.length + " (" + studies.join(", ") + "), and the columns are study-qualified — select within a single-study figure");
+    let ids = sel.ids;
+    if (sel.unit === "sample") {
+      const res = await fetch("/api/oncoprint/patients-of", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ study: one, samples: ids }) });
+      const j = await res.json();
+      if (!res.ok || j.error) throw new Error(j.error || res.statusText);
+      ids = j.patients as string[];
+      if (!ids.length) throw new Error("no patients found for those samples");
+    }
+    const taken = new Set(Object.keys(doc.cohorts || {}));
+    let name = sel.name || "selection";
+    for (let i = 2; taken.has(name); i++) name = (sel.name || "selection") + " " + i;
+    const d: AnalysisDoc = { ...doc, cohorts: { ...doc.cohorts, [name]: { all: [{ kind: "patients", ids }] } } };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    run(d);
+  };
 
   const removeCohort = (name: string) => {
     const cs = { ...doc.cohorts }; delete cs[name];
@@ -2378,6 +2407,7 @@ export default function AnalysisPage() {
                       onMoveTrack={(label, dir) => moveTrack(vi, label, dir)}
                       onRemoveTrack={(label) => removeTrack(vi, label)}
                       onContract={(ct) => { const k = JSON.stringify(v.spec); setContracts((m) => m[k] === ct ? m : { ...m, [k]: ct }); }}
+                      onCreateCohort={(sel) => cohortFromSelection(sel, (c ? c.studies : vStudies) || vStudies)}
                       busy={busy}
                       heading={<><h2 style={{ margin: 0 }}>Oncoprint <span className="plain">— {(c ? c.stats.nColumns : 0).toLocaleString()} {c ? c.unit : "patient"}s · {c ? c.conventions.annotation : ""}</span></h2>
                         {c && <span className="lat" title="Server-side wall-clock for this figure's queries and contract assembly; drawing happens in your browser.">{(c.stats.ms || 0).toLocaleString()}ms</span>}</>}

@@ -381,6 +381,46 @@ async function main() {
       } catch (e) { gearSplit = String(e.message).split("\n")[0]; }
       ok("genes are a named button; the gear keeps only the cBioPortal link", gearOk, gearSplit);
 
+      // Dragging across the plot picks columns and offers to make them a cohort. The count in
+      // the dialog and the length of the id list must be the same number, and the cohort the
+      // compiler evaluates must come back the same size — a selection that quietly grows or
+      // shrinks on the way into the document would be worse than no selection at all.
+      let dragWhat = "no oncoprint rendered", dragOk = false;
+      try {
+        await page.goto(BASE + "/analysis?tab=analysis&doc=" + Buffer.from(JSON.stringify({
+          study: "msk_chord_2024",
+          cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
+          views: [{ kind: "oncoprint", genes: ["TP53", "KRAS"] }]
+        })).toString("base64url"));
+        await page.waitForSelector("canvas", { timeout: 300000 });
+        await page.waitForTimeout(1500);
+        const box = await page.locator("canvas").first().boundingBox();
+        const y = box.y + 40;
+        await page.mouse.move(box.x + 400, y);
+        await page.mouse.down();
+        await page.mouse.move(box.x + 700, y, { steps: 10 });
+        await page.mouse.up();
+        await page.waitForSelector(".onco-select", { timeout: 60000 });
+        const said = (await page.locator(".onco-select strong").innerText()).trim();
+        const claimed = Number(said.replace(/[^0-9]/g, ""));
+        await page.locator(".onco-select input").fill("dragged");
+        await page.locator('.onco-select button:has-text("New cohort")').click();
+        await page.waitForFunction(() => {
+          try { return !!JSON.parse(document.querySelector("#docjson").value).cohorts["dragged"]; }
+          catch { return false; }
+        }, null, { timeout: 300000 });
+        const leaf = (await page.evaluate(() => JSON.parse(document.querySelector("#docjson").value).cohorts["dragged"].all[0]));
+        // the pill shows what the compiler counted for that cohort
+        await page.waitForFunction(() => /dragged/.test(document.body.innerText), null, { timeout: 300000 });
+        const counted = await page.evaluate(() => {
+          const m = document.body.innerText.match(/dragged\s+([\d,]+)\s+patients/);
+          return m ? Number(m[1].replace(/,/g, "")) : null;
+        });
+        dragOk = claimed > 0 && leaf.kind === "patients" && leaf.ids.length === claimed && counted === claimed;
+        dragWhat = said + " -> " + leaf.ids.length + " ids -> compiler counted " + counted;
+      } catch (e) { dragWhat = String(e.message).split("\n")[0]; }
+      ok("a drag across the oncoprint becomes a cohort of exactly those patients", dragOk, dragWhat);
+
       // A workspace is the whole document — figures, notes and parameters — saved
       // under a name and reopened after a full reload. And a template retargets
       // in ONE edit: change $genes and every view that refers to it follows.

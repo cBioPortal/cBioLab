@@ -9,7 +9,7 @@
 // changes cause a refetch; everything else is applied to the decoded arrays in place.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, hitTest, paletteOf, segmentByTrack, sortColumns,
+import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { geneLegendFor, resolveStyle, styleForDisplay } from "../../lib/oncoprint-style.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
@@ -73,7 +73,28 @@ export interface OncoprintFigureProps {
   /** expose the figure on window.__onco so headless runs can drive it */
   instrument?: boolean;
   busy?: boolean;
+  /**
+   * Turn a dragged selection of columns into a cohort. Absent means the figure still lets a
+   * reader drag and count, but offers no cohort action — the lab and the pasted-data page have
+   * no document to put one in. Throwing is how the page refuses; the message is shown in the
+   * dialog.
+   */
+  onCreateCohort?: (sel: ColumnSelection) => void | Promise<void>;
 }
+
+/** what a drag across the plot picked out */
+export interface ColumnSelection {
+  /** the column ids as drawn, in drawn order */
+  ids: string[];
+  unit: string;
+  /** the name typed in the dialog */
+  name: string;
+  /** the column groups the drag crossed */
+  groups: string[];
+}
+
+/** a cohort's explicit id list is capped in the compiler; the dialog says so before the refusal */
+const MAX_SELECTION = 50000;
 
 export default function OncoprintFigure(props: OncoprintFigureProps) {
   const { spec, sortKeys, display, onSortKeys, onDisplay, busy } = props;
@@ -88,6 +109,17 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const detailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** the track whose menu is open, and where to put it */
   const [trackMenu, setTrackMenu] = useState<{ ti: number; x: number; y: number } | null>(null);
+  /** a drag across the plot: canvas x of where it started and where it is now */
+  const [sel, setSel] = useState<{ x0: number; x1: number; live: boolean } | null>(null);
+  /**
+   * A finished selection, held in k-space (positions in the drawn order) rather than in pixels,
+   * so scrolling or zooming while the dialog is open moves the marquee with the columns it
+   * picked instead of quietly picking different ones.
+   */
+  const [selRanges, setSelRanges] = useState<{ gi: number; k0: number; k1: number }[] | null>(null);
+  const [selName, setSelName] = useState("selection");
+  const [selBusy, setSelBusy] = useState(false);
+  const [selError, setSelError] = useState<string | null>(null);
   const [cssW, setCssW] = useState(1200);
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -331,7 +363,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   });
 
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const cv = canvasRef.current; if (!cv || !data || !visible) return;
+    const cv = canvasRef.current; if (!cv || !data || !visible || selDrag.current) return;
     const rect = cv.getBoundingClientRect();
     const x = e.clientX - rect.left, y = e.clientY - rect.top;
     const hit = hitTest(x, y, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, view.scrollX) }, gapPx);
@@ -351,6 +383,115 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       }, 220);
     }
   };
+
+  // ---- drag a selection of columns ------------------------------------------
+  const clampX = (x: number) => Math.max(GEOM.gutter, Math.min(cssW, x));
+  const scrollNow = () => Math.min(maxScroll, Math.max(0, view.scrollX));
+
+  /** the columns under a canvas-x range, as ranges in the drawn order */
+  const rangesFor = (xa: number, xb: number): { gi: number; k0: number; k1: number }[] => {
+    if (!visible) return [];
+    const lo = clampX(Math.min(xa, xb)), hi = clampX(Math.max(xa, xb));
+    const sx = scrollNow();
+    const v0 = lo - GEOM.gutter + sx, v1 = hi - GEOM.gutter + sx;
+    const offs = groupOffsets(visible.groups, view.zoom, gapPx);
+    const out: { gi: number; k0: number; k1: number }[] = [];
+    visible.groups.forEach((g, gi) => {
+      const gx = offs[gi];
+      if (v1 <= gx || v0 >= gx + g.count * view.zoom) return;
+      const k0 = Math.max(0, Math.floor((v0 - gx) / view.zoom));
+      const k1 = Math.min(g.count, Math.ceil((v1 - gx) / view.zoom));
+      if (k1 > k0) out.push({ gi, k0: g.start + k0, k1: g.start + k1 });
+    });
+    return out;
+  };
+  const countOf = (ranges: { k0: number; k1: number }[]) => ranges.reduce((n, r) => n + (r.k1 - r.k0), 0);
+  /** where a finished selection sits on screen now */
+  const rectOf = (ranges: { gi: number; k0: number; k1: number }[]): { x0: number; x1: number } | null => {
+    if (!visible || !ranges.length) return null;
+    const offs = groupOffsets(visible.groups, view.zoom, gapPx);
+    const sx = scrollNow();
+    let v0 = Infinity, v1 = -Infinity;
+    for (const r of ranges) {
+      const g = visible.groups[r.gi], gx = offs[r.gi];
+      v0 = Math.min(v0, gx + (r.k0 - g.start) * view.zoom);
+      v1 = Math.max(v1, gx + (r.k1 - g.start) * view.zoom);
+    }
+    return { x0: v0 - sx + GEOM.gutter, x1: v1 - sx + GEOM.gutter };
+  };
+  const selCount = sel && sel.live ? countOf(rangesFor(sel.x0, sel.x1)) : selRanges ? countOf(selRanges) : 0;
+  const clearSelection = () => { setSel(null); setSelRanges(null); setSelError(null); };
+
+  const selDrag = useRef<{ x0: number } | null>(null);
+  const onSelDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.button !== 0 || !data || !visible) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x < GEOM.gutter) return;                       // the gutter belongs to the track menu
+    selDrag.current = { x0: x };
+    setSel({ x0: x, x1: x, live: true }); setSelRanges(null); setSelError(null); setHover(null);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onSelMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const st = selDrag.current; if (!st) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    setSel({ x0: st.x0, x1: e.clientX - rect.left, live: true });
+  };
+  const onSelUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    const st = selDrag.current; selDrag.current = null;
+    if (!st) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const ranges = Math.abs(x - st.x0) < 4 ? [] : rangesFor(st.x0, x);   // under 4px is a click, not a drag
+    if (!ranges.length) { setSel(null); return; }
+    setSel({ x0: st.x0, x1: x, live: false });
+    setSelRanges(ranges);
+  };
+
+  /** the ids a finished selection stands for, in drawn order */
+  const selectionIds = (): string[] => {
+    if (!data || !visible || !selRanges) return [];
+    const cols = data.columns();
+    const out: string[] = [];
+    for (const r of selRanges) for (let k = r.k0; k < r.k1; k++) out.push(cols[visible.order[k]]);
+    return out;
+  };
+  const selGroups = selRanges && visible ? [...new Set(selRanges.map((r) => visible.groups[r.gi].name))] : [];
+
+  const zoomToSelection = () => {
+    if (!visible || !selRanges || !selRanges.length) return;
+    const offs = groupOffsets(visible.groups, view.zoom, gapPx);
+    let v0 = Infinity, v1 = -Infinity;
+    for (const r of selRanges) {
+      const g = visible.groups[r.gi], gx = offs[r.gi];
+      v0 = Math.min(v0, gx + (r.k0 - g.start) * view.zoom);
+      v1 = Math.max(v1, gx + (r.k1 - g.start) * view.zoom);
+    }
+    const span = Math.max(1e-6, v1 - v0);
+    const zoom = Math.min(MAX_ZOOM, Math.max(minZoom, view.zoom * plotW / span));
+    setView((v) => ({ ...v, zoom, scrollX: Math.max(0, v0 / v.zoom * zoom) }));
+    clearSelection();
+  };
+
+  const createCohort = async () => {
+    if (!data || !props.onCreateCohort) return;
+    setSelBusy(true); setSelError(null);
+    try {
+      await props.onCreateCohort({ ids: selectionIds(), unit: data.unit, name: selName.trim() || "selection", groups: selGroups });
+      clearSelection();
+    } catch (e) { setSelError(String((e as Error).message || e)); }
+    setSelBusy(false);
+  };
+
+  // a selection is a position in the drawn order, so a re-sort or a change of visible columns
+  // retires it rather than pointing at whatever now sits in those slots
+  useEffect(() => { setSel(null); setSelRanges(null); setSelError(null); }, [visible]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") clearSelection(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   const tip = useMemo(() => {
     if (!hover || !data || !visible) return null;
@@ -489,6 +630,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         </div>
         <div ref={wrapRef} style={{ position: "relative", marginTop: "0.5rem", border: "1px solid var(--line)", borderRadius: 8, background: "#fff", overflow: "hidden" }}>
           <canvas ref={canvasRef} style={{ display: "block", cursor: "crosshair" }}
+            onPointerDown={onSelDown} onPointerMove={onSelMove} onPointerUp={onSelUp} onPointerCancel={onSelUp}
             onMouseMove={onMove} onMouseLeave={() => setHover(null)}
             onClick={(e) => {
               // a click on a track's label opens that track's menu, like the portal's three dots
@@ -553,6 +695,22 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             );
           })()}
 
+          {(() => {
+            const r = sel && sel.live ? { x0: Math.min(sel.x0, sel.x1), x1: Math.max(sel.x0, sel.x1) }
+              : selRanges ? rectOf(selRanges) : null;
+            if (!r) return null;
+            const x0 = Math.max(GEOM.gutter, Math.min(cssW, r.x0)), x1 = Math.max(GEOM.gutter, Math.min(cssW, r.x1));
+            if (x1 <= x0) return null;
+            return (
+              <div style={{ position: "absolute", left: x0, top: 0, width: x1 - x0, height: canvasHeight(data.tracks.length),
+                background: "rgba(37,99,235,0.14)", borderLeft: "1px solid #2563eb", borderRight: "1px solid #2563eb",
+                pointerEvents: "none", zIndex: 3 }}>
+                {sel?.live && <span style={{ position: "absolute", top: 2, left: 3, fontSize: "0.7rem", color: "#1d4ed8", whiteSpace: "nowrap" }}>
+                  {selCount.toLocaleString()} {data.unit}{selCount === 1 ? "" : "s"}</span>}
+              </div>
+            );
+          })()}
+
           {hover && tip && (
             <div style={{ position: "absolute", left: Math.min(hover.x + 12, cssW - 260), top: hover.y + 14, pointerEvents: "none", background: "var(--card)", color: "var(--ink)",
               border: "1px solid var(--line)", borderRadius: 6, padding: "6px 8px", fontSize: "0.78rem", boxShadow: "0 4px 14px rgba(0,0,0,.12)", maxWidth: 330, zIndex: 2 }}>
@@ -567,6 +725,38 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               onPointerDown={onBarDown} onPointerMove={onBarMove} onPointerUp={onBarUp} onPointerCancel={onBarUp}
               style={{ marginLeft: GEOM.gutter, width: Math.max(0, cssW - GEOM.gutter) }}>
               <div className="onco-bar-thumb" style={{ left: Math.round(x), width: Math.round(w) }} />
+            </div>
+          );
+        })()}
+        {selRanges && !sel?.live && (() => {
+          const n = selCount, tooMany = n > MAX_SELECTION;
+          return (
+            <div className="card onco-select" style={{ marginTop: "0.5rem", borderColor: "#2563eb", display: "flex", flexWrap: "wrap",
+              alignItems: "center", gap: "0.5rem 0.8rem", padding: "0.6rem 0.8rem" }}>
+              <strong style={{ fontSize: "0.95rem" }}>{n.toLocaleString()} {data.unit}{n === 1 ? "" : "s"} selected</strong>
+              {selGroups.length > 0 && <span className="meta">from {selGroups.join(", ")}</span>}
+              <span className="spacer" />
+              {props.onCreateCohort && <>
+                <label className="meta">name <input value={selName} onChange={(e) => setSelName(e.target.value)}
+                  style={{ fontSize: "0.8rem", width: 150 }} /></label>
+                <button className="primary" disabled={selBusy || tooMany} onClick={createCohort}>
+                  {selBusy ? "making the cohort…" : "New cohort"}</button>
+              </>}
+              <button className="linklike" onClick={zoomToSelection}>Zoom to selection</button>
+              <button className="linklike" onClick={async () => {
+                const ids = selectionIds();
+                const text = ids.join("\n") + "\n";
+                try { await navigator.clipboard.writeText(text); setSelError(ids.length.toLocaleString() + " ids copied"); }
+                catch { save(new Blob([text], { type: "text/plain" }), "selection-" + data.unit + "s.txt"); }
+              }}>Copy ids</button>
+              <button className="linklike" onClick={clearSelection}>Cancel</button>
+              {data.unit === "sample" && props.onCreateCohort && <span className="meta" style={{ flexBasis: "100%" }}>
+                a cohort selects patients — the patients these samples belong to become the cohort, so it may also carry
+                their other samples</span>}
+              {tooMany && <span className="mark" style={{ flexBasis: "100%" }}>
+                a cohort&apos;s explicit list is capped at {MAX_SELECTION.toLocaleString()} ids — narrow the drag, or filter with a
+                cohort definition instead</span>}
+              {selError && <span className="mark" style={{ flexBasis: "100%" }}>{selError}</span>}
             </div>
           );
         })()}
