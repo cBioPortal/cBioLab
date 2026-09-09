@@ -103,18 +103,49 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
    label of their own.** The Python port is pinned by conformance tests (contract JSON, bucket
    codes) and golden snapshots (`test/fixtures/oncoprint/golden.svg`, `golden-raster.npz`;
    `UPDATE_GOLDEN=1` to accept an intentional change).
-9. **The patient-data boundary** (`docs/DATA-BOUNDARY.md`) — aggregate-only and remote
+9. **The document holds anything that changes what a reader sees; the browser holds the rest.**
+   If a setting would change a shared link, the server-rendered SVG, the CLI or the Python
+   package, it belongs in the view — that is why the oncoprint's viewing options are a `display`
+   object and not React state. Zoom, scroll, hover, an open menu and a drag selection describe a
+   viewport or a moment, not a figure, and stay out. A menu that mixes the two says which is
+   which (see the display popover's "this browser only" group).
+10. **The patient-data boundary** (`docs/DATA-BOUNDARY.md`) — aggregate-only and remote
    participants never emit or receive patient identifiers, and the guarantee is a *missing
    method* rather than a flag. Views degrade and say so rather than silently narrowing.
    Never add an id-returning path to `AggregateResolver` / `RemoteAggregateResolver`.
+
+## UI conventions — the layout system
+
+Added by a design audit of the analysis page; `scripts/layout-metrics.cjs` measures whether it
+still holds, against a running server.
+
+- **One scale, in `app/globals.css`.** Seven type steps (`--t-xs` … `--t-2xl`), seven spacing
+  steps (`--s0` … `--s6`), four radii, one control height (`--ctl-h`). Nothing declares a font
+  size or a border radius outside it — the app once had 36 distinct font sizes, five of them
+  meaning "small text".
+- **One header per view: `ViewHead`.** Title, then this view's actions, then its status chips,
+  then remove, on one baseline. Every view kind renders through it; a view that builds its own
+  header is a bug, because the timing chip and the close control then move between cards.
+- **Toolbars are labelled zones, not a row of controls** (`.viewtb` / `.tbz` / `.tbl`). A zone
+  holds one kind of control and **never wraps inside itself**, so a pair like the zoom triple
+  cannot be split by a line break; zones wrap as units and the divider is where the break
+  happens. Where a view has both kinds, `data` (re-runs a query) sits left of `view` (instant).
+- **One idiom per job.** `.tbbtn` for a button or a disclosure, `.tbfield` for a labelled select,
+  `.chk` for a checkbox. Underlined link-buttons are not a fourth kind of control.
+- **Apparatus goes in `.vfoot`.** Legend, methodology caveats and provenance stay on the page and
+  a step down in weight, so they read as apparatus rather than as findings.
+- **Server-rendered figures share the palette.** `lib/view-svg.ts` owns `palette()`, `SERIES` and
+  the frame/caption helpers; a renderer that invents a colour is drifting from every other view.
+- **Geometry stays inline, styling does not.** A tooltip's position and a legend swatch's colour
+  are data computed from the drawing; borders, padding and type are classes.
 
 ## Workflows
 
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
 - Test: `npm test` — unit suites, no database needed (the patient-data boundary, the stats used by
   federated views, cohort-definition semantics, clinical-course semantics, and the SVG figure
-  renderers, and template parameters; 158 checks across 7 suites). `node e2e.cjs` — 69 checks (Playwright + docs gate + the
-  boundary suite).
+  renderers, plots, gene tracks and template parameters; 232 checks across 38 suites).
+  `node e2e.cjs` — 74 checks (Playwright + docs gate + the boundary suite).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push **your own branch**. **Stop there.**
