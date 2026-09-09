@@ -12,7 +12,7 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, ExploreResult } from "./types.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow } from "./federation.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest } from "./federation.ts";
 import { carriesPatientIds } from "./federation.ts";
 
 interface RemoteAggregates {
@@ -192,6 +192,17 @@ export class RemoteAggregateResolver implements AggregateCapable {
     this.remember(r);
     return r.eventCourse || [];
   }
+  /**
+   * Plots are not federated yet. A peer's bins would be counted on its own scale, and pooling
+   * them with ours would draw a picture of neither cohort — so this refuses rather than
+   * returning something that looks like an answer.
+   */
+  async plot(def: CohortDef | null | undefined, _spec: PlotRequest): Promise<PlotData> {
+    this.guard(def);
+    throw new Error("the peer serving " + this.study + " does not answer plots yet: bins from two sites are counted " +
+      "on two scales, and pooling them needs a shared one");
+  }
+
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
     this.guard(def);
     if (!pairs.length) return [];

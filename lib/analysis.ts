@@ -11,6 +11,7 @@ import { sq } from "./compiler.ts";
 import { compileCohortDef, describeCohortDef } from "./cohort2.ts";
 import { genomicEventsSql, coverageSql, buildContract, PIDS_SQL } from "./oncoprint.ts";
 import { geneSymbols } from "./gene-tracks.ts";
+import type { PlotView } from "./types.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, fisherZMeta } from "./stats.ts";
@@ -663,6 +664,40 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             ? " With more than one study the distinct-change count is an UPPER BOUND: per-study distinct counts cannot be merged exactly (a change seen at both sites is counted twice), so the number withheld by the display cap is not reported."
             : "") });
 
+    } else if (view.kind === "plot") {
+      const pv = view as PlotView;
+      const cn = vNames[0];
+      const sites = cohorts[cn].studies;
+      // Bins from two studies are counted against two different scales, so pooling them would
+      // draw a picture of neither. Federated plots need a shared scale; until then, say so.
+      if (sites.length > 1) {
+        views.push({ kind: "plot", error: "a plot is computed within one study, and this cohort spans " +
+          sites.length + " (" + sites.join(", ") + "). Bins from different studies are counted on different scales, " +
+          "so pooling them would draw a picture of neither." });
+        continue;
+      }
+      try {
+        const data = await resolvers[sites[0]].plot(doc.cohorts[cn], {
+          x: pv.x, y: pv.y, unit: pv.unit === "sample" ? "sample" : "patient",
+          bins: Array.isArray(pv.bins) && pv.bins.length === 2 ? [Number(pv.bins[0]), Number(pv.bins[1])] : undefined
+        });
+        const pr: ViewResult = {
+          kind: "plot", plot: data, cohorts: [cn], studies: sites,
+          participation: participationFor(sites, false),
+          note: data.shape === "scatter" && data.n > 5000
+            ? "Drawn as density: " + data.n.toLocaleString("en-US") + " " + (pv.unit === "sample" ? "samples" : "patients") +
+              " counted into " + (data.bins || []).length.toLocaleString("en-US") + " cells. The coefficients are over every " +
+              (pv.unit === "sample" ? "sample" : "patient") + ", not over what you can see."
+            : undefined
+        };
+        // drawn on the server, like every view but the oncoprint, so chat and MCP get the figure
+        const tPlot = Date.now();
+        pr.svg = viewToSvg(pr) || undefined;
+        pr.renderMs = Date.now() - tPlot;
+        views.push(pr);
+      } catch (e) {
+        views.push({ kind: "plot", error: String((e as Error).message || e) });
+      }
     } else if (view.kind === "coexpression") {
       const v = view as CoexpressionView;
       const profileType = String(v.profileType || "").trim();

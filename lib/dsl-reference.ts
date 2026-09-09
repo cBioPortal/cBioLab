@@ -305,6 +305,26 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "A plot of 13,000 samples, drawn as density",
+    demonstrates: "The portal's Plots tab fetches every point to the browser. This one counts them in the database and sends the counts, so the same picture draws for a hundred cases or four hundred thousand.",
+    tags: ["plot", "scale"],
+    note: "Tumour mutational burden against fraction of the genome altered, over every sample of a TP53-mutant cohort. The figure is a density field: the samples are counted into a 240x160 grid, and only the occupied cells travel. Pearson, Spearman and the fitted line are computed over EVERY sample inside ClickHouse, so they describe the whole cohort rather than the points that happened to be painted last. The second view groups the same measure by TP53 mutation class, as quartiles with Tukey whiskers.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] }
+      },
+      views: [
+        { kind: "plot", unit: "sample",
+          x: { source: "clinical", attribute: "MUTATION_COUNT" },
+          y: { source: "clinical", attribute: "FRACTION_GENOME_ALTERED" } },
+        { kind: "plot", unit: "sample",
+          x: { source: "alteration", gene: "TP53", by: "mutationType" },
+          y: { source: "clinical", attribute: "FRACTION_GENOME_ALTERED" } }
+      ]
+    }
+  },
+  {
     title: "Merged gene rows: a pathway as one track",
     demonstrates: "Several genes drawn as one row, the way cBioPortal's [TP53 MDM2 MDM4] does, with the members kept alongside so the pooling is visible.",
     tags: ["oncoprint", "merged tracks"],
@@ -584,6 +604,7 @@ rel      := { "type": "NONE" }                                                 /
 | \`survival\` | \`endpoint?:"OS"|"PFS"|…, anchor?:{eventType,key?,value?,occurrence?}, cohorts?:[names]\` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts. Across studies the test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. \`anchor\` resets the clock to a timeline event (first chemotherapy, initial diagnosis) instead of the study's day 0, and **applies left truncation automatically**: a patient joins the risk set when the study could first observe them, never at the anchor \u2014 otherwise everyone appears to survive from the anchor to their own entry, which is exactly what put them in the study. The reported entry distribution warns when an anchor is matching earlier events than intended. Cross-study baselines are not harmonized |
 | \`course\` | \`eventTypes:[\u22646], anchor?:{eventType,key?,value?,occurrence?}, binMonths?:3, fromMonths?:-12, toMonths?:60, cohorts?:[names]\` | the **clinical course**: per time bin, the share of the cohort in each event state. Two things it refuses to fake. (1) The denominator is the patients still under observation in that bin \u2014 first recorded event to last contact (the later of their last event and their OS follow-up) \u2014 never the whole cohort, which would make a curve fall merely because follow-up ran out. (2) \`anchor\` is optional for one study but **required across studies**: day 0 is birth in some studies and first sequencing in others, and nothing in the schema records which, so raw day 0 compares incomparable clocks. Event types that carry real durations are drawn as a state the patient is IN; the rest as an event that HAPPENED \u2014 read from the data, not from the name. Bins are half-open [t, t+w). Event-name spellings differing only in case are folded (\`Treatment\`/\`TREATMENT\`) and the fold is named in the caveat; nothing else is merged |
 | \`sequence\` | \`labelKey?:"SUBTYPE", eventType?:"treatment", exclude?:[values], lineGap?:90, maxSteps?:3, topN?:8, cohorts?:[names]\` | **what follows what**: therapy transitions as lines, drawn as a Sankey. Records are first grouped into LINES \u2014 therapies less than \`lineGap\` days apart are one line, labelled by their whole combination (sorted, so \`A + B\` and \`B + A\` are one regimen). That grouping is the point: a patient has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision. Paths that end flow into TWO explicit terminals, never one: **no further line** (the study watched for at least one \`lineGap\` and saw no further therapy) and **record ends here** (it did not, so nothing can be concluded). Measured on MSK-CHORD, 68% of patients have under three months of observation after their last therapy and the median is 15 days \u2014 so collapsing the two would turn record-keeping into an apparent clinical decision. Flows out of a node sum to it, so nobody vanishes. Up to two cohorts are drawn as panels sharing one scale and one colour per regimen. \`exclude\` drops label values that are not therapies; it is a parameter and not an engine rule because such markers are **not structurally distinguishable** (MSK\u2019s \`Prior Medications to MSK\` carries no duration, but neither do \`Radiation Therapy\` or \`Investigational\`), so the choice belongs in the document where a reader can see it. One cohort only |
+| \`plot\` | \`x:axis, y:axis, unit?:"patient"\\|"sample", bins?:[240,160], cohorts?:[names]\` | two axes over the same cases, aggregated **inside the database**: a scatter comes back as counts per grid cell, a box as quartiles per group, two categoricals as a contingency table. The payload is a few kilobytes whatever the cohort's size |
 | \`oncoprint\` | \`genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], unit?:"patient"\\|"sample", display?:{…}, overlays?:[≤2], derivedCohorts?:[≤3], cohorts?:[names]\` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 \`views[].note\` is the analyst's own one-line annotation, carried through to the result and
@@ -592,6 +613,31 @@ smuggle formatting or links into a page that reports numbers.
 
 \`views[].cohorts\` defaults to all cohorts. Oncoprints federate across studies: columns are
 study-qualified, a synthetic **Study** track shows each column's origin, and duplicates appear twice.
+
+### Plot axes
+
+An axis is one of four things, and the pair decides the shape — the portal's own rule:
+
+| \`source\` | shape of the axis | fields |
+| --- | --- | --- |
+| \`clinical\` | number or category, **as the study declared it** | \`attribute\` |
+| \`molecular\` | number | \`profileType\`, \`gene\` |
+| \`alteration\` | category | \`gene\`, \`by\`: \`"mutationType"\` (default) \\| \`"mutated"\` \\| \`"cna"\` |
+
+number × number draws a **density scatter**, number × category a **box**, category × category a
+**contingency table**. Every statistic is computed where the rows are and is therefore exact over
+every case, not over what fits in a browser: n, Pearson and Spearman with their two-sided t-test
+p-values, and the least-squares line. Quartiles use Tukey's 1.5×IQR fences.
+
+Three things are refused rather than approximated. A molecular axis **must name one gene** — a
+whole profile is 630 million values in this warehouse, and reading them to draw one picture is
+never what was meant. A categorical axis with more than 150 distinct values is refused, because a
+truncated contingency table is a wrong one. And a plot whose cohort spans **more than one study**
+is refused, because bins from two studies are counted on two scales and pooling them would draw a
+picture of neither.
+
+A case with no value on an axis is simply absent, so a pair is an inner join: only cases measured
+on both axes are counted, and the figure reports how many that was.
 
 **Oncoprint columns**: \`unit: "sample"\` draws one column per SAMPLE instead of one per patient.
 A cohort still selects patients, so every sample of a selected patient is drawn — including

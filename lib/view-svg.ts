@@ -17,7 +17,7 @@
 // Colours come from CSS custom properties with literal fallbacks, so an SVG
 // inlined in the app follows the page theme while the same string rasterised
 // for a chat gets a fixed light figure.
-import type { ViewResult, KmCurve, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind } from "./types.ts";
+import type { ViewResult, KmCurve, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind, PlotData } from "./types.ts";
 
 /** Cohort names and data values reach <text>; they must never reach it raw. */
 export const esc = (s: unknown): string =>
@@ -424,9 +424,112 @@ function sequenceSvg(v: ViewResult, o: SvgOpts): string {
   return frame(W, H, out.join(""), p.bg);
 }
 
+/**
+ * A plot, from the aggregated contract: a density field for a scatter, boxes for a numeric
+ * axis grouped by a categorical one, a shaded contingency for two categoricals.
+ *
+ * Nothing here has ever seen a point. The cells, the quartiles and the coefficients arrive
+ * already computed, which is why the same picture draws for a hundred cases or four hundred
+ * thousand.
+ */
+function plotSvg(v: ViewResult, o: SvgOpts): string {
+  const d = v.plot as PlotData | undefined;
+  if (!d) return "";
+  const p = palette(o.theme), W = o.width || 720;
+  const L = 60, R = 14, T = 16, PLOT = 300;
+  const plotW = W - L - R;
+  const out: string[] = [];
+  const axisText = (t: string, x: number, y: number, anchor = "middle", size = 11) =>
+    `<text x="${num(x)}" y="${num(y)}" font-size="${size}" fill="${p.muted}" text-anchor="${anchor}">${esc(t)}</text>`;
+
+  if (d.shape === "scatter" && d.bins && d.extent && d.grid) {
+    const { x0, x1, y0, y1 } = d.extent, [gx, gy] = d.grid;
+    const maxN = Math.max(1, ...d.bins.map((b) => b.n));
+    const cw = plotW / gx, ch = PLOT / gy;
+    // a log ramp, because a linear one hides everything but the mode — said on the figure
+    const shade = (n: number) => Math.min(1, 0.18 + 0.82 * Math.log1p(n) / Math.log1p(maxN));
+    for (const b of d.bins)
+      out.push(`<rect x="${num(L + b.bx * cw)}" y="${num(T + PLOT - (b.by + 1) * ch)}" width="${num(Math.max(cw, 0.8))}" ` +
+        `height="${num(Math.max(ch, 0.8))}" fill="#0f86a1" fill-opacity="${num(shade(b.n))}"/>`);
+    // the fitted line, over every case rather than over what is visible
+    const st = d.stats;
+    if (st && st.slope != null && st.intercept != null && x1 > x0) {
+      const yAt = (xv: number) => st.intercept! + st.slope! * xv;
+      const sx = (xv: number) => L + plotW * (xv - x0) / (x1 - x0);
+      const sy = (yv: number) => T + PLOT - PLOT * (yv - y0) / Math.max(1e-9, y1 - y0);
+      const ya = Math.max(y0, Math.min(y1, yAt(x0))), yb = Math.max(y0, Math.min(y1, yAt(x1)));
+      out.push(`<line x1="${num(sx(x0))}" y1="${num(sy(ya))}" x2="${num(sx(x1))}" y2="${num(sy(yb))}" ` +
+        `stroke="#D55E00" stroke-width="1.5" stroke-dasharray="4 3"/>`);
+    }
+    out.push(`<rect x="${L}" y="${T}" width="${num(plotW)}" height="${PLOT}" fill="none" stroke="${p.line}"/>`);
+    out.push(axisText(num(x0), L, T + PLOT + 14, "start"), axisText(num(x1), L + plotW, T + PLOT + 14, "end"));
+    out.push(axisText(num(y0), L - 6, T + PLOT, "end"), axisText(num(y1), L - 6, T + 10, "end"));
+    if (st) {
+      const line = (st.pearson != null ? "Pearson " + num(st.pearson) + " (" + pFmt(st.pPearson ?? 1) + ")" : "") +
+        (st.spearman != null ? "   Spearman " + num(st.spearman) + " (" + pFmt(st.pSpearman ?? 1) + ")" : "");
+      out.push(`<text x="${W - R}" y="${T + 12}" font-size="11" fill="${p.ink}" text-anchor="end">${esc(line)}</text>`);
+    }
+    out.push(axisText(d.x.label, L + plotW / 2, T + PLOT + 30), 
+      `<text x="14" y="${T + PLOT / 2}" font-size="11" fill="${p.muted}" text-anchor="middle" ` +
+      `transform="rotate(-90 14 ${T + PLOT / 2})">${esc(d.y.label)}</text>`);
+    const cap = caption((v.note || "") + (v.note ? "  " : "") + "Darker is more " +
+      (v.plot!.n > 1 ? "cases" : "case") + "; the shade is logarithmic.", W, T + PLOT + 40, p.muted);
+    return frame(W, T + PLOT + 40 + cap.height + 10, out.join("") + cap.svg, p.bg);
+  }
+
+  if (d.shape === "box" && d.groups && d.groups.length) {
+    const gs = d.groups.slice(0, 24);
+    const lo = Math.min(...gs.map((g) => g.loWhisker)), hi = Math.max(...gs.map((g) => g.hiWhisker));
+    const span = Math.max(1e-9, hi - lo);
+    const bw = plotW / gs.length;
+    const sy = (val: number) => T + PLOT - PLOT * (val - lo) / span;
+    gs.forEach((g, i) => {
+      const cx = L + bw * (i + 0.5), half = Math.min(24, bw * 0.32);
+      out.push(`<line x1="${num(cx)}" y1="${num(sy(g.loWhisker))}" x2="${num(cx)}" y2="${num(sy(g.hiWhisker))}" stroke="${p.muted}"/>`);
+      out.push(`<rect x="${num(cx - half)}" y="${num(sy(g.q3))}" width="${num(half * 2)}" height="${num(Math.max(1, sy(g.q1) - sy(g.q3)))}" ` +
+        `fill="#0f86a1" fill-opacity="0.25" stroke="#0f86a1"/>`);
+      out.push(`<line x1="${num(cx - half)}" y1="${num(sy(g.median))}" x2="${num(cx + half)}" y2="${num(sy(g.median))}" stroke="#0f86a1" stroke-width="2"/>`);
+      const label = g.g.length > 14 ? g.g.slice(0, 13) + "…" : g.g;
+      out.push(`<text x="${num(cx)}" y="${T + PLOT + 26}" font-size="9" fill="${p.muted}" text-anchor="end" ` +
+        `transform="rotate(-40 ${num(cx)} ${T + PLOT + 26})">${esc(label)}</text>`);
+      out.push(`<text x="${num(cx)}" y="${T + PLOT + 12}" font-size="8" fill="${p.muted}" text-anchor="middle">${fmt(g.n)}</text>`);
+    });
+    for (const t of [lo, (lo + hi) / 2, hi]) out.push(axisText(num(t), L - 6, sy(t) + 3, "end", 10));
+    out.push(`<rect x="${L}" y="${T}" width="${num(plotW)}" height="${PLOT}" fill="none" stroke="${p.line}"/>`);
+    const cap = caption("Box: quartiles with Tukey whiskers, computed over every case in the group. The count is above each name.",
+      W, T + PLOT + 84, p.muted);
+    return frame(W, T + PLOT + 84 + cap.height + 10, out.join("") + cap.svg, p.bg);
+  }
+
+  if (d.shape === "table" && d.cells && d.cells.length) {
+    const xs = [...new Set(d.cells.map((c) => c.cx))].slice(0, 12);
+    const ys = [...new Set(d.cells.map((c) => c.cy))].slice(0, 12);
+    const at = new Map(d.cells.map((c) => [c.cx + "\u0000" + c.cy, c.n]));
+    const maxN = Math.max(1, ...d.cells.map((c) => c.n));
+    const LX = 130, cw = (W - LX - R) / xs.length, chh = Math.min(30, PLOT / Math.max(1, ys.length));
+    ys.forEach((yv, r) => {
+      out.push(`<text x="${LX - 6}" y="${num(T + chh * r + chh * 0.66)}" font-size="10" fill="${p.muted}" text-anchor="end">${esc(yv.length > 20 ? yv.slice(0, 19) + "…" : yv)}</text>`);
+      xs.forEach((xv, c) => {
+        const n = at.get(xv + "\u0000" + yv) || 0;
+        out.push(`<rect x="${num(LX + cw * c)}" y="${num(T + chh * r)}" width="${num(cw - 1)}" height="${num(chh - 1)}" ` +
+          `fill="#0f86a1" fill-opacity="${num(n ? 0.12 + 0.78 * Math.log1p(n) / Math.log1p(maxN) : 0.03)}"/>`);
+        if (n) out.push(`<text x="${num(LX + cw * (c + 0.5))}" y="${num(T + chh * r + chh * 0.66)}" font-size="9" ` +
+          `fill="${p.ink}" text-anchor="middle">${fmt(n)}</text>`);
+      });
+    });
+    xs.forEach((xv, c) => out.push(`<text x="${num(LX + cw * (c + 0.5))}" y="${num(T + chh * ys.length + 12)}" font-size="9" ` +
+      `fill="${p.muted}" text-anchor="end" transform="rotate(-40 ${num(LX + cw * (c + 0.5))} ${num(T + chh * ys.length + 12)})">${esc(xv.length > 16 ? xv.slice(0, 15) + "…" : xv)}</text>`));
+    const h = T + chh * ys.length + 86;
+    const cap = caption(d.x.label + " across, " + d.y.label + " down. " + fmt(d.n) + " cases counted in the database.", W, h, p.muted);
+    return frame(W, h + cap.height + 10, out.join("") + cap.svg, p.bg);
+  }
+  return "";
+}
+
 export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {
   if (!v || v.error) return null;
   if (v.kind === "oncoprint") return v.svg || null;   // already rendered by the contract
+  if (v.kind === "plot" && v.plot) return plotSvg(v, o) || null;
   if (v.kind === "course" && v.course && v.course.length) return courseSvg(v, o);
   if (v.kind === "sequence" && v.sequence && v.sequence.panels.some((z) => z.flows.length)) return sequenceSvg(v, o);
   if (v.kind === "survival" && v.curves && v.curves.length) return survivalSvg(v, o);

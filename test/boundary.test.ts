@@ -21,12 +21,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
-  carriesPatientIds, geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
+  carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotStatsSql, plotTableSql,
+  geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
   clinicalCountsSql, clinicalMomentsSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
   timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
 import * as federation from "../lib/federation.ts";
+import { axisSelect } from "../lib/plot.ts";
 import { RemoteAggregateResolver } from "../lib/federation-remote.ts";
 import type { Instance } from "../lib/federation.ts";
 import { PRIMARY } from "../lib/ch.ts";
@@ -177,8 +179,23 @@ describe("federation SQL returns aggregates, never identifiers", () => {
    * reach a peer without someone deciding what it may project. Several cases
    * may share one builder — the suffix after ':' is free-form.
    */
+  // the axis subqueries the plot builders wrap, built the way the resolver builds them
+  const axisCtx = { study: "x", db: "db", unit: "sample" as const, cohortSql };
+  const numAxis = axisSelect({ source: "clinical", attribute: "MUTATION_COUNT" }, axisCtx, "num");
+  const numAxis2 = axisSelect({ source: "molecular", profileType: "rna_seq_mrna", gene: "TP53" }, axisCtx, "num");
+  const catAxis = axisSelect({ source: "clinical", attribute: "CANCER_TYPE" }, axisCtx, "cat");
+  const catAxis2 = axisSelect({ source: "alteration", gene: "TP53", by: "mutationType" }, axisCtx, "cat");
+
   const BUILDERS: Record<string, () => string> = {
-    "geneCountsSql": () => geneCountsSql(cohortSql, ["TP53", "KRAS"], "x", "v7.4", "db"),
+    // Plots: an axis selects (id, value) per case, but every builder here groups the id away.
+  // If one ever projected a case id, this suite is what would stop it reaching a peer.
+  "plotCountSql": () => plotCountSql(numAxis, catAxis, cohortSql, false),
+  "plotCountSql:numeric": () => plotCountSql(numAxis, numAxis2, cohortSql, true),
+  "plotStatsSql": () => plotStatsSql(numAxis, numAxis2, cohortSql),
+  "plotBinsSql": () => plotBinsSql(numAxis, numAxis2, cohortSql),
+  "plotBoxSql": () => plotBoxSql(numAxis, catAxis, cohortSql),
+  "plotTableSql": () => plotTableSql(catAxis, catAxis2, cohortSql),
+  "geneCountsSql": () => geneCountsSql(cohortSql, ["TP53", "KRAS"], "x", "v7.4", "db"),
     "geneCountsSql:no-annotation-pin": () => geneCountsSql(cohortSql, ["TP53"], "x", null, "db"),
     "survivalCountsSql": () => survivalCountsSql(cohortSql, "x", "db"),
     "survivalCountsSql:PFS": () => survivalCountsSql(cohortSql, "x", "db", "PFS"),
