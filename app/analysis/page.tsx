@@ -206,6 +206,11 @@ export default function AnalysisPage() {
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
   const [cat, setCat] = useState<any>(null);                 // event/endpoint catalog for the survival control
   const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>"
+  /**
+   * The document panel is a place to inspect and share what was asked, not something to read
+   * while interpreting a figure — so it folds away, and the results take the whole width.
+   */
+  const [docPanel, setDocPanel] = useState(true);
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -944,6 +949,9 @@ function Latency({ v }: { v: any }) {
     return { ...v, sort: keys.slice(0, 4) };
   });
 
+  /** how many rows a view's gene list draws, for the button that opens the editor */
+  const geneRowCount = (v: any): number => { try { return normalizeGeneTracks(v.genes || []).tracks.length; } catch { return (v.genes || []).length; } };
+
   /** the row a gene-list entry draws, which is the label the figure sends back */
   const geneRowLabel = (e: GeneTrackSpec): string => typeof e === "string" ? e.toUpperCase()
     : (e.label || (e.genes || []).map((g) => String(g).toUpperCase()).join(" / "));
@@ -1133,7 +1141,7 @@ function Latency({ v }: { v: any }) {
         <span className="spacer" />
         <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "0.8rem" }}>rationale</a>
       </header>
-      <main style={{ maxWidth: "96rem" }}>
+      <main className="analysis-main">
         {/* Suggestions for every view's gene editor: the most-altered genes this
             exploration found. Typing any symbol is still allowed — the list is a
             shortcut, not a whitelist. */}
@@ -1840,7 +1848,7 @@ function Latency({ v }: { v: any }) {
         })()}
 
         {/* ================= Analysis tab ================= */}
-        {tab === "analysis" && <div className="ana-grid">
+        {tab === "analysis" && <div className={"ana-grid" + (docPanel ? "" : " nodoc")}>
           <div>
             <div className="card">
               <h2>The document <span className="plain">— cohorts &amp; views</span></h2>
@@ -1996,8 +2004,11 @@ function Latency({ v }: { v: any }) {
             {Object.keys(doc.cohorts || {}).length > 0 && (
               <div className="card addview">
                 <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.4rem" }}>
-                  <strong style={{ fontSize: "0.8rem" }}>Add a view</strong>
+                  <strong className="addview-title">Add a view</strong>
                   <span className="meta">{(doc.views || []).length} of 6 in this document</span>
+                  <button className="tbbtn" onClick={() => setDocPanel((x) => !x)}
+                    title={docPanel ? "fold the document away and give the figures the width" : "show the document, its cohorts and its JSON"}>
+                    {docPanel ? "hide document" : "show document"}</button>
                   <span className="spacer" />
                   {VIEW_KINDS.map(({ kind, label, why }) => {
                     const blocked = (doc.views || []).length >= 6
@@ -2457,32 +2468,30 @@ function Latency({ v }: { v: any }) {
                       onCreateCohort={(sel) => cohortFromSelection(sel, (c ? c.studies : vStudies) || vStudies)}
                       busy={busy}
                       controls={<>
-                        <Participation p={v.participation} />
-                        <label className="meta" title="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
-                          <input type="checkbox" checked={!!(ocView(vi).display as any)?.hideVUS} disabled={busy}
-                            onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "hideVUS", e.target.checked || undefined))} /> drivers only</label>
-                        <label className="meta" title="driver calls come from the version-pinned OncoKB store">annotate <select
-                          value={(ocView(vi).display as any)?.annotate || "oncokb"} disabled={busy}
-                          onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "annotate", e.target.value === "none" ? "none" : undefined))}
-                          style={{ fontSize: "0.78rem" }}>
-                          <option value="oncokb">OncoKB</option><option value="none">none</option>
-                        </select></label>
-                        <label className="meta" title="a cohort selects patients; sample mode draws every sample of those patients">columns <select
+                        <button className="tbbtn genesbtn" disabled={busy}
+                          title="choose the genes this oncoprint draws" onClick={() => openGenes(vi)}>genes ({geneRowCount(ocView(vi))})</button>
+                        <label className="tbfield" title="a cohort selects patients; sample mode draws every sample of those patients">columns <select
                           value={ocView(vi).unit || "patient"} disabled={busy}
-                          onChange={(e) => updateView(vi, (vv: any) => { const n = { ...vv }; if (e.target.value === "sample") n.unit = "sample"; else delete n.unit; return n; })}
-                          style={{ fontSize: "0.78rem" }}>
+                          onChange={(e) => updateView(vi, (vv: any) => { const n = { ...vv }; if (e.target.value === "sample") n.unit = "sample"; else delete n.unit; return n; })}>
                           <option value="patient">patients</option><option value="sample">samples</option>
                         </select></label>
-                        <button className="linklike genesbtn" disabled={busy}
-                          title="choose the genes this oncoprint draws" onClick={() => openGenes(vi)}>genes</button>
+                        <label className="tbfield" title="driver calls come from the version-pinned OncoKB store">annotate <select
+                          value={(ocView(vi).display as any)?.annotate || "oncokb"} disabled={busy}
+                          onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "annotate", e.target.value === "none" ? "none" : undefined))}>
+                          <option value="oncokb">OncoKB</option><option value="none">none</option>
+                        </select></label>
+                        <label className="chk tbchk" title="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
+                          <input type="checkbox" checked={!!(ocView(vi).display as any)?.hideVUS} disabled={busy}
+                            onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "hideVUS", e.target.checked || undefined))} /> drivers only</label>
+                      </>}
+                      moreMenu={
                         <details className="gearmenu">
-                          <summary title="oncoprint options">⚙</summary>
+                          <summary className="tbbtn" title="more, about this oncoprint">⋯</summary>
                           <div className="gearmenu-items">
                             <a target="_blank" rel="noopener noreferrer" href={portalUrl}>Open these genes in the cBioPortal oncoprint ↗</a>
                             <span className="meta">full {vStudies.length === 1 ? "study" : vStudies.length + "-study"} view, all samples — the portal can&apos;t express Cohort Lab cohorts or tracks</span>
                           </div>
-                        </details>
-                      </>}
+                        </details>}
                       tracksMenu={<TracksMenu
                         attrs={trackAttrs.attrs} profiles={trackAttrs.profiles}
                         clinical={ocView(vi).clinical || []} heatmap={ocView(vi).heatmap || []}
@@ -2588,7 +2597,7 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
   };
   return (
     <details className="gearmenu">
-      <summary className="textual" title="add or remove tracks">tracks {chosen.length ? "(" + chosen.length + ")" : ""}</summary>
+      <summary className="tbbtn" title="add or remove tracks">tracks{chosen.length ? " (" + chosen.length + ")" : ""}</summary>
       <div className="gearmenu-items wide" style={{ minWidth: 340 }}>
         <div className="row" style={{ gap: "0.5rem", alignItems: "center" }}>
           <button className="linklike" style={{ fontWeight: tab === "clinical" ? 600 : 400 }} onClick={() => setTab("clinical")}>Clinical {attrs.length ? "(" + attrs.length + ")" : ""}</button>

@@ -165,7 +165,14 @@ button.primary { display: inline-flex; align-items: center; gap: 0.5rem; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
 /* analysis page: 3 panes, responsive */
-.ana-grid { display: grid; grid-template-columns: minmax(300px, 26rem) minmax(0, 1fr); gap: 1rem; align-items: start; }
+/* The analysis page earns its width: an oncoprint is the densest thing here, and capping
+   the page at a book column left it under 900px of plot on a 2560px monitor. */
+main.analysis-main { max-width: min(132rem, 100%); }
+.ana-grid { display: grid; grid-template-columns: minmax(300px, 26rem) minmax(0, 1fr); gap: var(--s4); align-items: start; }
+/* document folded away: the figures get everything */
+.ana-grid.nodoc { grid-template-columns: minmax(0, 1fr); }
+.ana-grid.nodoc > :first-child { display: none; }
+.addview-title { font-size: var(--t-md); }
 .ana-chat { position: sticky; top: 1rem; }
 @media (max-width: 1000px) { .ana-grid { grid-template-columns: 1fr; } }
 .tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; border-bottom: 1px solid var(--line); }
@@ -227,6 +234,56 @@ details.gearmenu > .gearmenu-items {
   display: flex; flex-direction: column; gap: 0.25rem;
 }
 .gearmenu-items a { color: var(--accent-ink); font-size: var(--t-md); }
+
+/* ---- the oncoprint toolbar ------------------------------------------------
+   Two kinds of control, kept apart: DATA changes what is drawn and costs a query,
+   VIEW changes how it is drawn and is instant. A zone never wraps inside itself, so
+   a pair like the zoom controls cannot be split across a line break; zones wrap as
+   units, and the divider is where the break happens. */
+.onco-tb { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-top: var(--s3); }
+.tbz { display: flex; align-items: center; gap: var(--s2); flex-wrap: nowrap; min-width: 0; }
+.tbz + .tbz { border-left: 1px solid var(--line); padding-left: var(--s3); }
+.tbl {
+  font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); cursor: help; user-select: none;
+}
+/* one height for everything in the strip, so the row has a single baseline */
+.onco-tb select, .onco-tb .tbbtn, .onco-tb .zoomctl, .onco-tb .chk {
+  height: var(--ctl-h); font-size: var(--t-md);
+}
+.onco-tb select { padding: 0 var(--s1); max-width: 13rem; }
+.onco-tb .tbfield {
+  display: inline-flex; align-items: center; gap: var(--s1); margin: 0;
+  font-size: var(--t-sm); color: var(--muted); white-space: nowrap;
+}
+.onco-tb .chk { display: inline-flex; align-items: center; gap: var(--s1); margin: 0; font-size: var(--t-sm); white-space: nowrap; }
+.tbbtn {
+  display: inline-flex; align-items: center; gap: var(--s1);
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper);
+  color: var(--ink); padding: 0 var(--s2); font-size: var(--t-md); cursor: pointer;
+  white-space: nowrap; list-style: none; text-decoration: none;
+}
+.tbbtn::-webkit-details-marker { display: none; }
+/* the disclosure buttons in the strip are buttons like any other: the generic gear-menu
+   summary rule is more specific than .tbbtn, so it has to be answered here */
+.onco-tb details.gearmenu, .vmeta details.gearmenu { display: inline-flex; align-items: center; margin: 0; }
+details.gearmenu > summary.tbbtn { font-size: var(--t-md); padding: 0 var(--s2); color: var(--ink); }
+details.gearmenu > summary.tbbtn:hover { background: var(--paper); }
+.tbbtn:hover { border-color: var(--muted); }
+/* a button is a button: the genes control keeps its name, not its underline */
+.tbbtn.genesbtn { text-decoration: none; font-weight: 400; }
+details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-soft); }
+/* the zoom triple reads as one instrument: one border, no gaps to break at */
+.zoomctl { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; background: var(--paper); }
+.zoomctl > button {
+  border: none; border-radius: 0; background: none; height: 100%; padding: 0 var(--s2);
+  font-size: var(--t-md); color: var(--ink-soft, var(--muted)); line-height: 1;
+}
+.zoomctl > button:hover { background: var(--code-bg); color: var(--ink); }
+.zoomctl > button:last-child { border-left: 1px solid var(--line); font-size: var(--t-sm); }
+.zoomctl > input[type=range] { width: 6.5rem; margin: 0 var(--s1); }
+/* tiebreakers only appear when there are any, on their own line */
+.onco-tb2 { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2); flex-wrap: wrap; }
 
 /* Explore: per-study breakdown rows */
 .sbrow {
@@ -716,3 +773,15 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
 .onco-bar { position: relative; height: 13px; margin-top: 4px; background: var(--code-bg); border-radius: 7px; cursor: pointer; touch-action: none; }
 .onco-bar-thumb { position: absolute; top: 2px; height: 9px; background: var(--line); border-radius: var(--r-sm); }
 .onco-bar:hover .onco-bar-thumb { background: var(--muted); }
+
+/* the display popover's rows: a checkbox list that lines up */
+.gearmenu-items .chk { display: flex; align-items: center; gap: var(--s2); font-size: var(--t-md); padding: var(--s0) 0; }
+.gearmenu-items .chk input { margin: 0; }
+
+/* ---- apparatus ------------------------------------------------------------
+   Legend, caveats and provenance are how a figure is read and checked, so they stay
+   on the page — but a step down in weight, so they read as apparatus and not as findings. */
+.vfoot { margin-top: var(--s3); padding-top: var(--s2); border-top: 1px solid var(--line); }
+.vfoot .onco-legend { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); font-size: var(--t-xs); color: var(--muted); }
+.vfoot .note, .vfoot .meta { font-size: var(--t-sm); }
+.vfoot .provsql { border-top: none; margin-top: var(--s2); padding-top: 0; }
