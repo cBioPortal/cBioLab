@@ -4,6 +4,7 @@ import { chQuery, DB, STUDY, PORTAL } from "../lib/ch.ts";
 import { compileCohort, compileLines, catalogSqls, lineCatalogSqls, LINE_TYPE } from "../lib/compiler.ts";
 import { buildContract } from "../lib/oncoprint.ts";
 import { contractToSvg } from "../lib/oncoprint-svg.ts";
+import { viewToSvg, viewTitle } from "../lib/view-svg.ts";
 import sharp from "sharp";
 import { ensureFonts } from "../lib/fonts.ts";
 import { renderDslMarkdown } from "../lib/dsl-reference.ts";
@@ -223,7 +224,6 @@ export function registerTools(server: any): void {
           (r.unusedParams?.length ? `  (declared but never referenced: ${r.unusedParams.map((x) => "$" + x).join(", ")})` : ""));
       out.push("Cohorts:\n" + Object.entries(r.cohorts)
         .map(([n, c]) => `- ${n}: ${c.count.toLocaleString()} patients — ${c.text}`).join("\n"));
-      let images = 0;
       for (const v of r.views) {
         if (v.error) { out.push(`View ${v.kind}: ERROR — ${v.error}`); continue; }
         if (v.kind === "compare") {
@@ -295,11 +295,7 @@ export function registerTools(server: any): void {
                 `    of all paths, ${stopped.toLocaleString()} were WATCHED and began no further line; ` +
                 `${cens.toLocaleString()} (${pn.started ? Math.round(100 * cens / pn.started) : 0}%) end because the RECORD stops — nothing can be concluded about those`;
             }).join("\n") + caveatOf(v) + noteOf(v));
-        } else if (v.kind === "oncoprint" && v.svg && images < 2) {
-          images++;
-          ensureFonts();
-          const png = await sharp(Buffer.from(v.svg), { density: 144 }).png().toBuffer();
-          content.push({ type: "image", data: png.toString("base64"), mimeType: "image/png" });
+        } else if (v.kind === "oncoprint" && v.svg) {
           out.push(`Oncoprint: ${v.nColumns!.toLocaleString()} patients — ` +
             v.genes!.map((g) => `${g.gene} ${g.driverPct}%/${g.anyPct}%`).join(", ") +
             ` — annotation ${v.annotation}.` + noteOf(v));
@@ -311,6 +307,33 @@ export function registerTools(server: any): void {
             `open the interactive editor link below to see it.`);
         }
       }
+      // FIGURES. lib/view-svg.ts renders every view kind the app draws, and the
+      // oncoprint carries its own SVG, so the same renderer that produces the
+      // web figure produces this one — a chat client sees the chart, not a
+      // description of it. Rasterised at a fixed light theme, because the CSS
+      // custom properties that follow the page theme have no meaning outside it.
+      //
+      // Capped: each PNG is a sizeable base64 block in the model's context, and
+      // four figures is a workup rather than a gallery. What is dropped is named
+      // rather than silently omitted.
+      const MAX_FIGURES = 4;
+      const drawn: string[] = [];
+      let skipped = 0;
+      for (const v of r.views) {
+        if (v.error) continue;
+        const svg = v.svg || viewToSvg(v, { theme: "light" });
+        if (!svg) continue;
+        if (drawn.length >= MAX_FIGURES) { skipped++; continue; }
+        ensureFonts();
+        const png = await sharp(Buffer.from(svg), { density: 144 }).png().toBuffer();
+        content.push({ type: "image", data: png.toString("base64"), mimeType: "image/png" });
+        drawn.push(viewTitle(v));
+      }
+      if (drawn.length)
+        out.push(`Figures attached, in order:\n` +
+          drawn.map((t, i) => `  ${i + 1}. ${t}`).join("\n") +
+          (skipped ? `\n  (${skipped} further figure${skipped === 1 ? "" : "s"} not attached — open the editor link below)` : ""));
+
       out.push(`Interactive editor (share with the user — opens this exact document, live): ${base}/analysis?doc=${docB64}` +
         `\nThat page also shows the generated SQL for every cohort (full provenance).`);
       content.push({ type: "text", text: out.join("\n\n") });

@@ -72,3 +72,28 @@ describe("MCP run_analysis describes every view the engine can produce", () => {
       `${branches} view branches but only ${caveats} surface a caveat`);
   });
 });
+
+describe("MCP run_analysis attaches the figures themselves", () => {
+  test("figures come from the SAME renderer the web app uses", () => {
+    // Not a second drawing path: lib/view-svg.ts is the one renderer, so a
+    // figure in a chat transcript and a figure in the app cannot diverge.
+    assert.match(tools, /import \{ viewToSvg, viewTitle \} from "\.\.\/lib\/view-svg\.ts"/);
+    assert.match(tools, /v\.svg \|\| viewToSvg\(v, \{ theme: "light" \}\)/,
+      "the oncoprint carries its own svg; every other kind is rendered on demand");
+  });
+
+  test("rasterised at a fixed light theme, not the page theme", () => {
+    // The SVGs colour themselves from CSS custom properties so they follow the
+    // app's theme. Outside the app those variables do not exist, so a figure
+    // rasterised without a fixed theme would fall back unpredictably.
+    assert.match(tools, /theme: "light"/);
+  });
+
+  test("the figure count is capped and what is dropped is named", () => {
+    assert.match(tools, /MAX_FIGURES/);
+    assert.match(tools, /further figure/,
+      "a figure that does not fit must be reported, not silently omitted");
+    assert.match(tools, /Figures attached, in order/,
+      "images arrive without captions, so the model needs a manifest to tell them apart");
+  });
+});
