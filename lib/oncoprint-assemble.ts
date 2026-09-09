@@ -7,6 +7,7 @@
 // fetches from ClickHouse and calls this; a CLI or a notebook can call it on local
 // tables, and a port in another language has this function as its conformance target.
 import { heatmapTrackLabel } from "./profile-names.ts";
+import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import type { Contract, Track, GroupRange, ZReference, ResolvedDisplay, DisplaySpec, SortKeySpec } from "./types.ts";
 
 // gene-track cell bitmask
@@ -95,8 +96,11 @@ export function normalizeDisplay(d: DisplaySpec | undefined): ResolvedDisplay {
 
 
 export interface AssembleInput {
-  /** gene tracks, in order (already validated / uppercased) */
-  genes: string[];
+  /**
+   * The rows, in order: a gene symbol, or `{label?, genes}` for a merged row. `normalizeGeneTracks`
+   * also fixes the order of the distinct symbols, which is the order `coverage`'s mask bits are in.
+   */
+  genes: GeneTrackSpec[];
   /** column groups: name + column ids in fetch order; a column id appears in at most one group */
   groups: { name: string; pids: string[] }[];
   /** study label(s) for the contract header; more than one adds a categorical Study track */
@@ -107,7 +111,7 @@ export interface AssembleInput {
   /**
    * What each column's panel covers; a covered gene is profiled-unaltered (0) unless an event
    * says otherwise, and a column absent here is NOT_PROFILED for every gene it has no event for.
-   * Either gene names (local tables) or a bitmask over `genes` by position (the database path,
+   * Either gene names (local tables) or a bitmask over the distinct gene symbols by position (the database path,
    * where one integer per patient is far cheaper to send than an array of names).
    */
   coverage: ({ pid: string; genes: string[] } | { pid: string; mask: number })[];
@@ -147,7 +151,9 @@ export function assembleContract(input: AssembleInput): Contract {
   const PROF = !!process.env.ONCOPRINT_PROFILE;
   let tp = Date.now();
   const phase = (name: string) => { if (PROF) { process.stderr.write("  " + name.padEnd(16) + (Date.now() - tp) + "ms\n"); tp = Date.now(); } };
-  const { genes, groups, studies, events, coverage, isDriver, clinical, heatmap, derived, sort, lineGap } = input;
+  const { groups, studies, events, coverage, isDriver, clinical, heatmap, derived, sort, lineGap } = input;
+  // the rows, and the flat symbol list whose order the coverage mask bits follow
+  const { tracks: geneTracks, symbols: geneSymbolList } = normalizeGeneTracks(input.genes);
   const unit = input.unit === "sample" ? "sample" as const : "patient" as const;
   const multi = studies.length > 1;
   const studyOf = input.studyOf || new Map<string, string>();
@@ -156,56 +162,63 @@ export function assembleContract(input: AssembleInput): Contract {
   const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i]));
 
   // ---- gene-track cells --------------------------------------------------
-  const geneCells = new Map<string, Int32Array>(genes.map((g) => [g, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
-  const cellsByIndex = genes.map((g) => geneCells.get(g)!);
+  // A merged row is the bitwise OR of its members, which makes it altered where any member is
+  // altered and profiled where any member was profiled — the union denominator, with no
+  // special case: the sentinel survives only where every member is unprofiled. A gene may
+  // appear in several rows (merged, and again on its own), so one symbol maps to a LIST.
+  const geneCells = new Map<string, Int32Array>(geneTracks.map((t) => [t.label, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
+  const rowsOfGene = new Map<string, Int32Array[]>();
+  for (const t of geneTracks) for (const m of t.members) {
+    const list = rowsOfGene.get(m);
+    if (list) list.push(geneCells.get(t.label)!); else rowsOfGene.set(m, [geneCells.get(t.label)!]);
+  }
+  const rowsByMaskBit = geneSymbolList.map((g) => rowsOfGene.get(g) ?? []);
   for (const r of coverage) {
     const i = pidIndex.get(r.pid);
     if (i === undefined) continue;
     if ("mask" in r) {
       const m = r.mask;
-      for (let gi = 0; gi < cellsByIndex.length; gi++)
-        if ((m >> gi) & 1) { const cells = cellsByIndex[gi]; if (cells[i] === NOT_PROFILED) cells[i] = 0; }
+      for (let gi = 0; gi < rowsByMaskBit.length; gi++)
+        if ((m >> gi) & 1) for (const cells of rowsByMaskBit[gi]) if (cells[i] === NOT_PROFILED) cells[i] = 0;
     } else {
-      for (const g of r.genes) { const cells = geneCells.get(g); if (cells && cells[i] === NOT_PROFILED) cells[i] = 0; }
+      for (const g of r.genes) for (const cells of rowsOfGene.get(g) || []) if (cells[i] === NOT_PROFILED) cells[i] = 0;
     }
   }
+  // Hiding unknown significance drops the ALTERATION, not the cell's bits: a cell holding a
+  // driver amplification and a passenger missense keeps only the amplification, and a merged
+  // row's driver in one gene does not smuggle another gene's passenger through. What was
+  // dropped is counted so a caption can say so.
+  const hideVus = !!input.display?.hideVUS;
+  let hiddenVus = 0;
   for (const r of events) {
     const i = pidIndex.get(r.pid);
     if (i === undefined) continue;
-    const cells = geneCells.get(r.gene);
-    if (!cells) continue;
+    const rows = rowsOfGene.get(r.gene);
+    if (!rows) continue;
     let bit = 0;
     if (r.vt === "mutation") bit = mutClassBit(r.mt);
     else if (r.vt === "structural_variant") bit = BITS.SV;
     else if (r.vt === "cna") bit = Number(r.cna) >= 2 ? BITS.AMP : (Number(r.cna) <= -2 ? BITS.HOMDEL : 0);
     if (!bit) continue;
-    if (isDriver(r)) bit |= BITS.DRIVER;
-    cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | bit; // an observed event implies profiled
+    const driver = isDriver(r);
+    if (hideVus && !driver) {
+      hiddenVus++;
+      for (const cells of rows) if (cells[i] === NOT_PROFILED) cells[i] = 0;   // it was still assayed
+      continue;
+    }
+    if (driver) bit |= BITS.DRIVER;
+    for (const cells of rows) cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | bit; // an observed event implies profiled
   }
 
   phase("gene cells");
-  // ---- hide unknown significance ------------------------------------------
-  // Not a rendering trick: the alterations leave the cells, so the altered fraction below is
-  // over drivers alone. The count of what went is reported so a caption can say so.
-  let hiddenVus = 0;
-  if (input.display?.hideVUS) {
-    const ALT_BITS = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
-    for (const gene of genes) {
-      const cells = geneCells.get(gene)!;
-      for (let i = 0; i < cells.length; i++) {
-        const c = cells[i];
-        if (c > 0 && (c & ALT_BITS) && !(c & BITS.DRIVER)) { cells[i] = c & ~ALT_BITS; hiddenVus++; }
-      }
-    }
-  }
 
   // ---- molecular overlays: extra bits on the gene cells --------------------
   for (const ov of input.overlays || []) {
     const hi = ov.kind === "mrna" ? BITS.MRNA_HIGH : BITS.PROT_HIGH;
     const lo = ov.kind === "mrna" ? BITS.MRNA_LOW : BITS.PROT_LOW;
-    for (const gene of genes) {
-      const cells = geneCells.get(gene)!;
-      for (let i = 0; i < allPids.length; i++) {
+    for (const t of geneTracks) {
+      const cells = geneCells.get(t.label)!;
+      for (const gene of t.members) for (let i = 0; i < allPids.length; i++) {
         const v = ov.values.get(allPids[i] + "|" + gene);
         if (v === undefined) continue;
         if (v >= ov.threshold) cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | hi;
@@ -353,7 +366,7 @@ export function assembleContract(input: AssembleInput): Contract {
   const RANK_BITS = 32, PACKED = 10;   // ranks run 0..21, so five bits each; ten fit in a double
   const packKeys = (from: number, count: number): Float64Array => {
     const key = new Float64Array(allPids.length);
-    const list = genes.slice(from, from + count).map((g) => geneCells.get(g)!);
+    const list = geneTracks.slice(from, from + count).map((t) => geneCells.get(t.label)!);
     for (let i = 0; i < allPids.length; i++) {
       let k = 0;
       for (const cells of list) k = k * RANK_BITS + cellRank(cells[i]);
@@ -362,7 +375,7 @@ export function assembleContract(input: AssembleInput): Contract {
     return key;
   };
   const keyHi = packKeys(0, PACKED);
-  const keyLo = genes.length > PACKED ? packKeys(PACKED, genes.length - PACKED) : null;
+  const keyLo = geneTracks.length > PACKED ? packKeys(PACKED, geneTracks.length - PACKED) : null;
   const genomicCmp = (x: number, y: number): number => {
     const d = keyHi[y] - keyHi[x];
     if (d) return d;
@@ -420,8 +433,8 @@ export function assembleContract(input: AssembleInput): Contract {
   phase("sort");
   // ---- track meta (panel-aware frequencies) -----------------------------
   const tracks: Track[] = [];
-  for (const g of genes) {
-    const cells = remap(geneCells.get(g)!);
+  for (const gt of geneTracks) {
+    const cells = remap(geneCells.get(gt.label)!);
     const profiled = cells.filter((c) => c !== NOT_PROFILED).length;
     // an overlay is evidence about the gene, not an alteration of it: expression does not
     // enter the altered fraction, which is what the portal reports too
@@ -429,7 +442,8 @@ export function assembleContract(input: AssembleInput): Contract {
     const altered = cells.filter((c) => c > 0 && (c & ALT)).length;
     const driverAltered = cells.filter((c) => c > 0 && (c & ALT) && (c & BITS.DRIVER)).length;
     tracks.push({
-      kind: "gene", label: g, cells,
+      kind: "gene", label: gt.label, cells,
+      ...(gt.members.length > 1 ? { members: gt.members } : {}),
       altered, profiled, driverAltered,
       freqPct: profiled ? Math.round(1000 * altered / profiled) / 10 : null,
       driverPct: profiled ? Math.round(1000 * driverAltered / profiled) / 10 : null

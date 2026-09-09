@@ -472,6 +472,8 @@ export interface Track {
   kind: TrackKind; label: string; cells: number[] | Int32Array;
   /** gene tracks */
   altered?: number; profiled?: number; driverAltered?: number;
+  /** a merged gene row: the symbols it pools, in order. Absent on a single-gene row. */
+  members?: string[];
   freqPct?: number | null; driverPct?: number | null;
   /** categorical clinical tracks */
   categories?: string[];

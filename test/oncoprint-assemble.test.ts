@@ -125,3 +125,92 @@ test("more than one study adds a Study track from studyOf", () => {
   assert.equal(st.cells[c.columns.indexOf("P3")], 1);
   assert.equal(c.study, "s1 + s2");
 });
+
+// ---- merged gene rows (cBioPortal's `[TP53 MDM2]`) -------------------------
+
+test("a merged row is the OR of its members, and profiled where any member was", () => {
+  const i = input();
+  i.genes = [{ label: "pathway", genes: ["TP53", "KRAS"] }];
+  const c = assembleContract(i);
+  const t = c.tracks.find((x) => x.label === "pathway")!;
+  const col = (p: string) => c.columns.indexOf(p);
+  assert.deepEqual(t.members, ["TP53", "KRAS"]);
+  assert.equal(t.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER);
+  assert.equal(t.cells[col("P2")], BITS.TRUNCATING | BITS.AMP | BITS.DRIVER, "both members' bits land in one cell");
+  assert.equal(t.cells[col("P4")], 0, "profiled for TP53 only, and unaltered in both");
+  assert.equal(t.cells[col("P5")], BITS.SV | BITS.DRIVER);
+});
+
+test("a merged row's denominator is the union of its members' panels", () => {
+  const i = input();
+  // P4's panel covers TP53 but not KRAS; on its own KRAS is profiled in 3 columns, TP53 in 5
+  i.genes = [{ genes: ["TP53", "KRAS"] }];
+  const c = assembleContract(i);
+  const t = c.tracks[0];
+  assert.equal(t.label, "TP53 / KRAS", "the default label names the members");
+  assert.equal(t.profiled, 5, "union: every column profiled for either gene");
+  assert.equal(t.altered, 3, "P1, P2 and P5; P3's low-level gain is not an alteration and P4 has none");
+  assert.equal(t.freqPct, 60);
+  assert.equal(t.driverPct, 60, "the driver bit is per cell, so P2's driver amplification makes its cell a driver cell");
+});
+
+test("a gene can be both merged and drawn on its own, and the rows agree", () => {
+  const i = input();
+  i.genes = [{ label: "either", genes: ["TP53", "KRAS"] }, "TP53", "KRAS"];
+  const c = assembleContract(i);
+  const solo = c.tracks.find((t) => t.label === "TP53")!;
+  const merged = c.tracks.find((t) => t.label === "either")!;
+  assert.equal(c.tracks.filter((t) => t.kind === "gene").length, 3);
+  assert.equal(solo.profiled, 5); assert.equal(solo.altered, 3);
+  for (let k = 0; k < c.columns.length; k++)
+    if (solo.cells[k] > 0) assert.ok((merged.cells[k] & solo.cells[k]) === solo.cells[k], "the merged row carries every bit of its member");
+  assert.equal(solo.members, undefined, "a single-gene row names no members");
+});
+
+test("the staircase ranks a merged row as one row", () => {
+  const i = input();
+  i.genes = [{ label: "either", genes: ["TP53", "KRAS"] }];
+  const c = assembleContract(i);
+  const t = c.tracks[0];
+  // within group A: P2 (amp, driver) outranks P1 (missense driver) outranks P3 (unaltered)
+  assert.deepEqual(c.columns.slice(0, 3), ["P2", "P1", "P3"]);
+  assert.ok(t.cells[0] & BITS.AMP);
+});
+
+test("a merged row draws its members' overlays too", () => {
+  const i = input();
+  i.genes = [{ label: "either", genes: ["TP53", "KRAS"] }];
+  i.overlays = [{ kind: "mrna", profileType: "rna", threshold: 2, values: new Map([["P3|KRAS", 3.1], ["P1|TP53", -2.5]]) }];
+  const c = assembleContract(i);
+  const t = c.tracks[0];
+  const col = (p: string) => c.columns.indexOf(p);
+  assert.ok(t.cells[col("P3")] & BITS.MRNA_HIGH, "KRAS expression lands on the merged row");
+  assert.ok(t.cells[col("P1")] & BITS.MRNA_LOW);
+});
+
+test("hiding unknown significance drops the alteration, not the whole cell", () => {
+  const i = input();
+  i.genes = [{ label: "either", genes: ["TP53", "KRAS"] }];
+  i.display = { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true,
+    hideVUS: true, annotate: "oncokb", whiteBackground: false };
+  const c = assembleContract(i);
+  const col = (p: string) => c.columns.indexOf(p);
+  // P2 has a non-driver TP53 truncation and a driver KRAS amp: the truncation goes, the amp stays.
+  // A merged row must not let one gene's driver smuggle another gene's passenger through.
+  assert.equal(c.tracks[0].cells[col("P2")], BITS.AMP | BITS.DRIVER);
+  assert.equal(c.tracks[0].cells[col("P1")], BITS.MISSENSE | BITS.DRIVER, "a driver is kept");
+  assert.equal(c.stats.hiddenVus, 1);
+});
+
+test("hiding unknown significance leaves the cell profiled where the alteration was found", () => {
+  const i = input();
+  i.display = { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true,
+    hideVUS: true, annotate: "oncokb", whiteBackground: false };
+  const c = assembleContract(i);
+  const tp53 = c.tracks.find((t) => t.label === "TP53")!;
+  const col = (p: string) => c.columns.indexOf(p);
+  // P5 is in no coverage row: its only evidence of being assayed is the (driver) SV
+  assert.equal(tp53.cells[col("P2")], 0, "the passenger truncation is gone, the column stays profiled");
+  assert.equal(tp53.profiled, 5);
+  assert.equal(tp53.altered, 2, "P1 and P5, both drivers");
+});
