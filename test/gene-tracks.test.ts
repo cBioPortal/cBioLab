@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatGeneList, geneSymbols, hasMergedTracks, normalizeGeneTracks, parseGeneList, MAX_GENE_SYMBOLS } from "../lib/gene-tracks.ts";
+import { formatGeneList, geneSymbols, hasMergedTracks, normalizeGeneTracks, parseGeneList, toGeneList, MAX_GENE_SYMBOLS } from "../lib/gene-tracks.ts";
 
 test("a plain list is one track per gene, in order", () => {
   const { tracks, symbols } = normalizeGeneTracks(["tp53", " KRAS ", "EGFR"]);
@@ -67,4 +67,14 @@ test("bad bracket text is refused with the reason", () => {
 test("per-track OQL is refused rather than silently drawn as the whole gene", () => {
   assert.throws(() => parseGeneList("TP53: MUT"), /per-track OQL/);
   assert.throws(() => parseGeneList("[TP53:MUT MDM2:AMP]"), /per-track OQL/);
+});
+
+test("normalizing is idempotent through the canonical form", () => {
+  // buildContract normalizes to get the symbols for SQL, and the assembler normalizes again
+  const authored = ["TP53", { genes: ["EGFR", "MET"] }, { label: "RTK", genes: ["ERBB2", "MET"] }];
+  const once = normalizeGeneTracks(authored);
+  const twice = normalizeGeneTracks(toGeneList(once.tracks));
+  assert.deepEqual(twice.tracks, once.tracks);
+  assert.deepEqual(twice.symbols, once.symbols);
+  assert.deepEqual(toGeneList(once.tracks), ["TP53", { label: "EGFR / MET", genes: ["EGFR", "MET"] }, { label: "RTK", genes: ["ERBB2", "MET"] }]);
 });

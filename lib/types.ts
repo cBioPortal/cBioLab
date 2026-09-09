@@ -116,6 +116,9 @@ export interface CompileCtx {
 }
 
 // ---------- analysis document ----------------------------------------------
+import type { GeneTrackSpec } from "./gene-tracks.ts";
+export type { GeneTrackSpec };
+
 export interface CompareView {
   kind: "compare"; genes: string[]; cohorts?: string[];
 }
@@ -202,7 +205,8 @@ export interface DisplaySpec {
 export type ResolvedDisplay = Required<Pick<DisplaySpec, "showUnaltered" | "whitespace" | "gaps" | "clinicalLegends" | "colorByType" | "hideVUS" | "annotate" | "whiteBackground">>
   & Pick<DisplaySpec, "style" | "colors">;
 export interface OncoprintView {
-  kind: "oncoprint"; genes: string[]; cohorts?: string[];
+  /** rows: a gene symbol, or {label?, genes} for one merged row over several genes */
+  kind: "oncoprint"; genes: GeneTrackSpec[]; cohorts?: string[];
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
   /** what a column is (default "patient"); "sample" draws every sample of the cohort's patients */
   unit?: "patient" | "sample";
@@ -507,7 +511,8 @@ export interface Contract {
 
 export interface OncoprintSpec {
   study?: string; studies?: string[];
-  genes: string[]; clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
+  /** rows: a gene symbol, or {label?, genes} for one merged row over several genes */
+  genes: GeneTrackSpec[]; clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
   /** what a column is (default "patient") */
   unit?: "patient" | "sample";
   /**

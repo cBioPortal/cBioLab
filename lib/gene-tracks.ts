@@ -167,3 +167,9 @@ export function formatGeneList(list: unknown): string {
     return "[" + label + members.join(" ") + "]";
   }).join(" ");
 }
+
+/** the canonical authored form of a normalized list, so re-normalizing is a no-op */
+export function toGeneList(tracks: GeneTrack[]): GeneTrackSpec[] {
+  return tracks.map((t) => t.members.length === 1 && t.label === t.members[0]
+    ? t.members[0] : { label: t.label, genes: t.members });
+}

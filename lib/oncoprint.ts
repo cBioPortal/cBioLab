@@ -25,6 +25,7 @@ import { compileCohortDef } from "./cohort2.ts";
 import { wardOrder, CLUSTER_LIMIT } from "./oncoprint-cluster.ts";
 
 import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
+import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
 export { normalizeDisplay, normalizeSort } from "./oncoprint-assemble.ts";
 
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
@@ -196,9 +197,12 @@ export function heatmapSql(profileType: string, genes: string[], study: string =
 }
 
 export function normalizeSpec(spec: OncoprintSpec) {
-  const genes = (spec.genes || []).map(g => String(g).toUpperCase().trim())
-    .filter(g => GENE_RE.test(g)).slice(0, 12);
+  // `geneList` is the rows (a symbol, or a merged group); `genes` is the flat symbol list every
+  // query and the coverage mask are built from. One normalizer owns both, and the assembler runs
+  // the same one on `geneList`, so the mask's bit order cannot disagree with the SQL's.
+  const { tracks: geneTracks, symbols: genes } = normalizeGeneTracks(spec.genes || []);
   if (!genes.length) throw new Error("at least one valid gene symbol required");
+  const geneList = toGeneList(geneTracks);
   const clinical = (spec.clinical || []).map(String).slice(0, 8);
   const derivedEvents = (spec.derivedEvents || []).slice(0, 3);
   const lineGap = spec.conventions && spec.conventions.lineGap ? Number(spec.conventions.lineGap) : 90;
@@ -222,7 +226,7 @@ export function normalizeSpec(spec: OncoprintSpec) {
     const threshold = Number(o && o.threshold);
     return { kind, profileType, threshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 2 };
   }).filter((o) => o.profileType);
-  return { genes, clinical, derivedEvents, lineGap, sort, heatmap, unit, overlays, display: normalizeDisplay(spec.display) };
+  return { genes, geneList, clinical, derivedEvents, lineGap, sort, heatmap, unit, overlays, display: normalizeDisplay(spec.display) };
 }
 
 // Provenance: the exact SQL a spec compiles to, without executing anything.
@@ -289,7 +293,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   // per-study database on the same instance (e.g. a GENIE release next to the public portal);
   // studies not listed live in the app's default database
   const dbOf = (s: string): string => String((spec.dbs || {})[s] || "").replace(/[^A-Za-z0-9_]/g, "") || DB;
-  const { genes, clinical, derivedEvents, lineGap, sort, heatmap, display, unit, overlays } = normalizeSpec(spec);
+  const { genes, geneList, clinical, derivedEvents, lineGap, sort, heatmap, display, unit, overlays } = normalizeSpec(spec);
   if (multi && derivedEvents.length) throw new Error("derived-event tracks are single-study; drop them or the extra studies");
   if (unit === "sample" && derivedEvents.length)
     throw new Error("cohort rows are patient-level: a cohort selects patients, so drawing one per sample would repeat a patient's answer across their samples. Drop the rows or switch columns back to patients.");
@@ -442,7 +446,7 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   const queryMs = Date.now() - t0;
   const tAsm = Date.now();
   const contract = assembleContract({
-    genes, groups, studies, studyOf, events, coverage,
+    genes: geneList, groups, studies, studyOf, events, coverage,
     isDriver: (r) => annotation.isDriver(r as Parameters<typeof annotation.isDriver>[0]), annotationSource: annotation.source,
     clinical: clinicalIn, heatmap: heatmapIn, overlays: overlaysIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit, clusterRank
   });

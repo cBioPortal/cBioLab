@@ -108,3 +108,16 @@ describe("parameterize lifts what it can see, and nothing else", () => {
     assert.deepEqual(doc, original);
   });
 });
+
+test("a merged gene list is lifted whole, and only when every view has the same one", () => {
+  const merged = [{ label: "TP53 pathway", genes: ["TP53", "MDM2"] }, "KRAS"];
+  const lifted = parameterize({ study: "s", cohorts: {}, views: [
+    { kind: "oncoprint", genes: merged } as never, { kind: "compare", genes: merged } as never] });
+  assert.deepEqual((lifted.params as Record<string, unknown>).genes, merged);
+  assert.deepEqual((lifted.views || []).map((v) => (v as unknown as { genes: unknown }).genes), ["$genes", "$genes"]);
+  // the same symbols, but one view merges them: different figures, so nothing is lifted
+  const notLifted = parameterize({ study: "s", cohorts: {}, views: [
+    { kind: "oncoprint", genes: [{ genes: ["TP53", "MDM2"] }] } as never,
+    { kind: "compare", genes: ["TP53", "MDM2"] } as never] });
+  assert.equal((notLifted.params as Record<string, unknown>).genes, undefined);
+});

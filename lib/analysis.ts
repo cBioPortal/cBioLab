@@ -10,6 +10,7 @@ import { chQuery, DB, STUDY, PRIMARY } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { compileCohortDef, describeCohortDef } from "./cohort2.ts";
 import { genomicEventsSql, coverageSql, buildContract, PIDS_SQL } from "./oncoprint.ts";
+import { geneSymbols } from "./gene-tracks.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, fisherZMeta } from "./stats.ts";
@@ -168,7 +169,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     const mark = queryMark(), pushedBefore = views.length, viewT0 = Date.now();
 
     if (view.kind === "compare") {
-      const genes = ((view as CompareView).genes || []).map((g) => String(g).toUpperCase().trim()).filter((g) => GENE_RE.test(g)).slice(0, 20);
+      const genes = geneSymbols((view as CompareView).genes).slice(0, 20);
       if (!genes.length) { views.push({ kind: "compare", error: "compare view needs genes" }); continue; }
       // Every participant answers with per-gene counts computed in its own
       // database; the analysis layer only sums. Identical arithmetic whether the
@@ -621,7 +622,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
 
     } else if (view.kind === "hotspots") {
       const hv = view as HotspotsView;
-      const uniq = [...new Set((hv.genes || []).map((g) => String(g).toUpperCase().trim()).filter((g) => GENE_RE.test(g)))].slice(0, 12);
+      const uniq = geneSymbols(hv.genes).slice(0, 12);
       if (!uniq.length) { views.push({ kind: "hotspots", error: "hotspots view needs genes" }); continue; }
       const minCount = Math.max(1, Math.min(1000, Math.floor(Number(hv.minCount) || 1)));
       const cn = vNames[0];
@@ -665,7 +666,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     } else if (view.kind === "coexpression") {
       const v = view as CoexpressionView;
       const profileType = String(v.profileType || "").trim();
-      const uniq = [...new Set((v.genes || []).map((g) => String(g).toUpperCase().trim()).filter((g) => GENE_RE.test(g)))]
+      const uniq = geneSymbols(v.genes)
         .slice(0, COOCCUR_GENE_LIMIT);
       if (!profileType) { views.push({ kind: "coexpression", error: "coexpression view needs a profileType (e.g. rna_seq_v2_mrna_median_Zscores)" }); continue; }
       if (uniq.length < 2) { views.push({ kind: "coexpression", error: "coexpression needs at least 2 distinct genes" }); continue; }
@@ -793,9 +794,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     } else if (view.kind === "cooccurrence") {
       // Co-occurrence is a property of ONE cohort, not a comparison between two,
       // so it reads the first cohort in the view and says which.
-      const genes = ((view as CooccurrenceView).genes || []).map((g) => String(g).toUpperCase().trim())
-        .filter((g) => GENE_RE.test(g));
-      const uniq = [...new Set(genes)].slice(0, COOCCUR_GENE_LIMIT);
+      const uniq = geneSymbols((view as CooccurrenceView).genes).slice(0, COOCCUR_GENE_LIMIT);
       if (uniq.length < 2) { views.push({ kind: "cooccurrence", error: "co-occurrence needs at least 2 distinct genes" }); continue; }
       const pairs: [string, string][] = [];
       for (let i = 0; i < uniq.length; i++) for (let j = i + 1; j < uniq.length; j++) pairs.push([uniq[i], uniq[j]]);
@@ -889,7 +888,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       const zReference: Record<string, ZReference> = {};
       for (const h of heatSpecs) {
         if (h.reference !== "federation" || /^vaf$/i.test(h.profileType)) continue;
-        const hGenes = (h.genes && h.genes.length ? h.genes : genes).map((g) => String(g).toUpperCase().trim()).filter((g) => GENE_RE.test(g));
+        const hGenes = h.genes && h.genes.length ? geneSymbols(h.genes) : geneSymbols(genes);
         if (!hGenes.length) continue;
         const per = await Promise.all(vStudies.map(async (st) => ({
           st, m: await resolvers[st].profileMoments(null, hGenes, h.profileType).catch(() => [] as ProfileMoments[])

@@ -8,6 +8,7 @@
 //   clinical  patient  ATTR1  ATTR2 ...             attribute names may carry Oncoprinter's (number)/(string) suffix
 //   coverage  patient  genes                        comma-separated genes the patient's panel covers
 import { normalizeDisplay, type AssembleInput, type EventRow, type SortKey } from "./oncoprint-assemble.ts";
+import { geneSymbols, type GeneTrackSpec } from "./gene-tracks.ts";
 import type { DisplaySpec } from "./types.ts";
 
 export type Table = Record<string, string>[];
@@ -95,8 +96,9 @@ export interface LocalOptions {
   events: Table;
   clinical?: Table;
   coverage?: Table;
-  /** gene tracks; default: genes in the events, first appearance order */
-  genes?: string[];
+  /** the rows: a gene symbol, or {label?, genes} for a merged row. Default: the genes in the
+   * events, first appearance order, one row each. */
+  genes?: GeneTrackSpec[];
   /** a clinical attribute whose values become column groups, in first-appearance order */
   groupBy?: string;
   /** explicit column ids and order; default: union of the tables, first appearance */
@@ -114,7 +116,8 @@ export interface LocalOptions {
 export function localInput(o: LocalOptions): AssembleInput {
   const events = eventsFromTable(o.events);
   const clinical = clinicalFromTable(o.clinical || []);
-  const genes = (o.genes && o.genes.length ? o.genes : [...new Set(events.map((e) => e.gene))]).map((g) => g.toUpperCase());
+  const geneList: GeneTrackSpec[] = o.genes && o.genes.length ? o.genes : [...new Set(events.map((e) => e.gene))];
+  const genes = geneSymbols(geneList);   // the flat symbols: what "covered for every gene" means below
   let patients: string[];
   if (o.patients && o.patients.length) patients = o.patients;
   else {
@@ -135,7 +138,7 @@ export function localInput(o: LocalOptions): AssembleInput {
     groups = [...byVal.entries()].map(([name, pids]) => ({ name, pids }));
   } else groups = [{ name: "all", pids: patients }];
   return {
-    genes, groups, studies: [o.study || "local"], events, coverage,
+    genes: geneList, groups, studies: [o.study || "local"], events, coverage,
     isDriver: (r) => !!(r as LocalEvent).driver, annotationSource: o.annotationSource || "driver flags from the input",
     clinical, heatmap: [], derived: [], sort: parseSort(o.sort), lineGap: 90, display: normalizeDisplay(o.display), unit: o.unit
   };
