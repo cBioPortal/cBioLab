@@ -1899,6 +1899,30 @@ function Latency({ v }: { v: any }) {
                         <button key={g.gene + (g.cna ?? "")} className="generow" title={"click to add " + meta.oql(g)}
                           onClick={() => addClause({ kind: "oql", q: meta.oql(g) })}>
                           <span className="gname">{g.gene}</span>
+                          {/* altered / wild-type / NOT PROFILED, the three-way split
+                              the portal draws as a per-gene pie. The third segment is
+                              the point: a sample whose panel omits this gene is not
+                              wild-type for it, it was never tested, and that is
+                              invisible in "altered/profiled" alone. For CNA in
+                              genie_public it is 70,450 of 289,869 samples — a quarter
+                              of the cohort. Computed here from numbers already in the
+                              payload; no extra query. */}
+                          {(() => {
+                            const total = explore.totals?.samples ?? g.profiled;
+                            const wild = Math.max(0, g.profiled - g.altered);
+                            const unprofiled = Math.max(0, total - g.profiled);
+                            const sum = g.altered + wild + unprofiled || 1;
+                            const w = (n: number) => (100 * n / sum) + "%";
+                            return (
+                              <span className="gsplit" aria-hidden="true"
+                                title={g.altered.toLocaleString() + " altered · " + wild.toLocaleString() +
+                                  " profiled and unaltered · " + unprofiled.toLocaleString() + " not profiled for " + g.gene}>
+                                <i className="s-alt" style={{ width: w(g.altered) }} />
+                                <i className="s-wt" style={{ width: w(wild) }} />
+                                <i className="s-np" style={{ width: w(unprofiled) }} />
+                              </span>
+                            );
+                          })()}
                           {/* cytoband for CNA and the event count for mutations were
                               already in the payload and simply not drawn. The event
                               count is not the same as the sample count: TP53 in
