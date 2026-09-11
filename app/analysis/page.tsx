@@ -254,6 +254,8 @@ export default function AnalysisPage() {
    * also narrows the NEXT request: the server is told which attributes to facet,
    * so it stops computing the ones being hidden.
    */
+  const [geneFilter, setGeneFilter] = useState<Record<string, string>>({});   // per-table gene box, client-side
+  const [clinFilter, setClinFilter] = useState("");                            // matches an attribute name OR one of its values
   const [attrCoverage, setAttrCoverage] = useState(0);                       // clinical attributes shown
 
   /**
@@ -575,6 +577,28 @@ export default function AnalysisPage() {
   const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
 
   /** attributes meeting a coverage bar, from the last unnarrowed response */
+  /**
+   * Which clinical facets are on screen. ONE definition, because this was two
+   * copies — one computing the header's count, one filtering the render — and
+   * they disagreed the moment a search box was added: the header read
+   * "8 attributes" while all 20 were still drawn.
+   *
+   * The search matches an attribute's name AND the values inside it, so "lung"
+   * finds Cancer Type by its contents when the reader does not know the
+   * attribute's name. With 805 values in Cancer Type Detailed, scanning was the
+   * weakest part of this page next to the portal's per-chart search.
+   */
+  const visibleClinical = (list: { attribute: string; displayName?: string; kind: string; studyCount?: number; values?: { v: string }[] }[]): typeof list => {
+    const q = clinFilter.trim().toLowerCase();
+    const coverageOk = (c: { studyCount?: number }) =>
+      attrCoverage === 0 || (c.studyCount ?? 1) >= Math.ceil(attrCoverage * exStudies.length);
+    const textOk = (c: { attribute: string; displayName?: string; kind: string; values?: { v: string }[] }) => !q ||
+      (c.attribute || "").toLowerCase().includes(q) ||
+      (c.displayName || "").toLowerCase().includes(q) ||
+      (c.kind === "cat" && (c.values || []).some((v) => String(v.v).toLowerCase().includes(q)));
+    return list.filter((c) => coverageOk(c) && textOk(c));
+  };
+
   const attrsForBar = (bar: number, studiesOverride?: string[] | string): string[] => {
     if (bar <= 0 || !exFullAttrsRef.current.length) return [];
     const n = (studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current).length;
@@ -1548,13 +1572,15 @@ function Latency({ v }: { v: any }) {
             <div>
               <div className="card">
                 {(() => {
-                  const visible = explore.clinical.filter(c => attrCoverage === 0 ||
-                    (c.studyCount ?? 1) >= Math.ceil(attrCoverage * exStudies.length));
+                  const visible = visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical;
                   const shown = Math.min(visible.length, attrLimit);
                   return (
                     <div className="row" style={{ alignItems: "baseline" }}>
                       <h2 style={{ margin: 0 }}>Clinical <span className="plain">— counted in each attribute's own unit, as the portal does</span></h2>
                       <span className="spacer" />
+                      <input className="genesearch" type="search" placeholder="find attribute or value" value={clinFilter}
+                        title="matches an attribute's name or any of its values"
+                        onChange={e => setClinFilter(e.target.value)} />
                       <span className="meta">{shown < visible.length
                         ? "showing " + shown + " of " + visible.length + " attributes"
                         : visible.length + " attributes"}
@@ -1579,9 +1605,7 @@ function Latency({ v }: { v: any }) {
                     </div>
                   );
                 })()}
-                {explore.clinical
-                  .filter(c => attrCoverage === 0 ||
-                    (c.studyCount ?? 1) >= Math.ceil(attrCoverage * exStudies.length))
+                {(visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical)
                   .slice(0, attrLimit).map(c => (
                   /* data-attr / data-shape make the facet identifiable from outside
                      React — the e2e suite asserts that an attribute's shape does not
@@ -1651,6 +1675,11 @@ function Latency({ v }: { v: any }) {
                                 <span className="vname">{v.v}</span>
                                 <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * v.n / max)) + "%" }} /></span>
                                 <span className="vn">{v.n.toLocaleString()}</span>
+                                {/* share of the cases that HAVE a value for this
+                                    attribute, which is the facet's own total — not
+                                    the whole cohort, since that would make every
+                                    sparsely-recorded attribute look small. */}
+                                <span className="vpct">{c.patients ? (Math.round(1000 * v.n / c.patients) / 10) + "%" : ""}</span>
                               </button>
                             ))}
                             {(c.distinct ?? 0) > c.values.length && (
@@ -1785,29 +1814,54 @@ function Latency({ v }: { v: any }) {
                   cna:     { title: "CNA Genes",     rows: explore.cnaGenes,     total: explore.geneTotals?.cna,     oql: (g: any) => g.gene + (g.cna === 2 ? ": AMP" : ": HOMDEL") },
                   sv:      { title: "SV Genes",      rows: explore.svGenes,      total: explore.geneTotals?.sv,      oql: (g: any) => g.gene + ": FUSION" }
                 }[kind];
-                const rows = meta.rows || [];
-                if (!rows.length) return null;
+                const all = meta.rows || [];
+                // Client-side, over the rows already loaded. The table is capped
+                // at GENE_TABLE_LIMIT server-side, so this finds a gene among the
+                // top 500 by alteration count and says so when it cannot — a box
+                // that silently searched less than it appeared to would be worse
+                // than no box.
+                const needle = (geneFilter[kind] || "").trim().toUpperCase();
+                const rows = needle ? all.filter((g: any) => g.gene.toUpperCase().includes(needle)) : all;
+                if (!all.length) return null;
                 return (
                   <div className="card" key={kind}>
                     <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
                       <h2 style={{ margin: 0 }}>{meta.title} <span className="plain">— samples, panel-aware frequency</span></h2>
                       <span className="spacer" />
-                      <span className="meta">{"showing " + Math.min(rows.length, geneRowLimit).toLocaleString() +
-                        " of " + (meta.total || rows.length).toLocaleString() +
-                        ""}</span>
+                      <span className="meta">{needle
+                        ? rows.length.toLocaleString() + " of " + all.length.toLocaleString() + " loaded match"
+                        : "showing " + Math.min(rows.length, geneRowLimit).toLocaleString() +
+                          " of " + (meta.total || rows.length).toLocaleString()}</span>
+                      <input className="genesearch" type="search" placeholder="find gene" value={geneFilter[kind] || ""}
+                        title={"filters the " + all.length + " genes loaded for this table, not all " + (meta.total || all.length)}
+                        onChange={e => setGeneFilter({ ...geneFilter, [kind]: e.target.value })} />
                     </div>
                     <div className="generows">
                       {rows.slice(0, geneRowLimit).map((g) => (
                         <button key={g.gene + (g.cna ?? "")} className="generow" title={"click to add " + meta.oql(g)}
                           onClick={() => addClause({ kind: "oql", q: meta.oql(g) })}>
                           <span className="gname">{g.gene}</span>
+                          {/* cytoband for CNA and the event count for mutations were
+                              already in the payload and simply not drawn. The event
+                              count is not the same as the sample count: TP53 in
+                              genie_public has 125,303 mutations across 111,368
+                              samples, and only one of those is the frequency's
+                              numerator. */}
+                          {kind === "cna" && <span className="gcyto" title="cytoband">{g.cytoband || ""}</span>}
+                          {kind !== "cna" && <span className="gevents" title={g.events.toLocaleString() + " events across " + g.altered.toLocaleString() + " samples"}>{g.events.toLocaleString()}</span>}
                           <span className={g.cna != null ? "cnatag " + (g.cna === 2 ? "amp" : "del") : "cnatag none"}>{g.cna != null ? (g.cna === 2 ? "AMP" : "HOMDEL") : ""}</span>
                           <span className="gfreq">{g.freqPct != null ? g.freqPct + "%" : "—"}</span>
                           <span className="gcount">{g.altered.toLocaleString()}<span className="meta">/{g.profiled.toLocaleString()}</span></span>
                         </button>
                       ))}
                     </div>
-                    {rows.length > geneRowLimit && (
+                    {needle && !rows.length && (
+                      <p className="note" style={{ margin: "0.4rem 0 0" }}>
+                        No match among the {all.length.toLocaleString()} genes loaded for this table
+                        {meta.total && meta.total > all.length ? " (of " + meta.total.toLocaleString() + " altered in this cohort)" : ""}.
+                      </p>
+                    )}
+                    {!needle && rows.length > geneRowLimit && (
                       <button className="linklike" onClick={() => setGeneRowLimit(geneRowLimit + 50)}>show more</button>
                     )}
                   </div>

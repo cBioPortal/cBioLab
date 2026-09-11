@@ -840,3 +840,29 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
    sideways only if it truly cannot fit */
 .viewfig { overflow-x: auto; margin-top: var(--s3); }
 .viewfig svg { max-width: 100%; height: auto; }
+
+/* ---- per-card search boxes -------------------------------------------------
+   Deliberately quiet: these sit in a card header beside the count, and a
+   full-height input there reads as the card's subject rather than a filter. */
+.genesearch {
+  font: inherit; font-size: var(--t-sm); color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 3px;
+  padding: 0.1rem 0.4rem; width: 10.5rem; height: 1.5rem;
+}
+.genesearch::placeholder { color: var(--muted); }
+.genesearch:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* cytoband (CNA) and event count (mutations/SV) — columns whose data was
+   already in the payload and simply not drawn. */
+.generow .gcyto,
+.generow .gevents {
+  font-size: var(--t-sm); color: var(--muted); text-align: right;
+  font-variant-numeric: tabular-nums; min-width: 4.5rem;
+}
+.generow .gcyto { text-align: left; min-width: 6rem; }
+
+/* share of the cases that carry a value for the attribute */
+.valrow .vpct {
+  font-size: var(--t-sm); color: var(--muted); text-align: right;
+  font-variant-numeric: tabular-nums; min-width: 3.2rem;
+}
