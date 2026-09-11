@@ -254,6 +254,17 @@ export default function AnalysisPage() {
    * also narrows the NEXT request: the server is told which attributes to facet,
    * so it stops computing the ones being hidden.
    */
+  /**
+   * The study picker's STAGED selection. null means "not staging" — the picker
+   * is closed and the applied set is authoritative.
+   *
+   * Ticking a box used to call setExploreStudies, which debounces a facet fetch
+   * 350ms later: assembling a ten-study selection fired ten requests, nine of
+   * them for a selection the reader was still in the middle of describing, and
+   * at this scale each one is seconds of ClickHouse work. Staging makes the
+   * cost proportional to intent — one request when they say they are done.
+   */
+  const [exDraftStudies, setExDraftStudies] = useState<string[] | null>(null);
   const [geneFilter, setGeneFilter] = useState<Record<string, string>>({});   // per-table gene box, client-side
   const [clinFilter, setClinFilter] = useState("");                            // matches an attribute name OR one of its values
   const [attrCoverage, setAttrCoverage] = useState(0);                       // clinical attributes shown
@@ -1459,9 +1470,22 @@ function Latency({ v }: { v: any }) {
             ];
             const byId = new Map(studies.map((s) => [s.id, s] as const));
             const selPts = exStudies.reduce((n: number, id: string) => n + (byId.get(id)?.patients ?? 0), 0);
+            // Two toggles on purpose. The chips in the header are an edit to a
+            // selection the reader has already committed, so they apply at once.
+            // The checkboxes below are them composing a new one, so they stage.
             const toggle = (id: any) => {
               const cur = exSel.current;
               setExploreStudies(cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
+            };
+            const staged = exDraftStudies ?? exStudies;
+            const toggleStaged = (id: string) =>
+              setExDraftStudies(staged.includes(id) ? staged.filter(x => x !== id) : [...staged, id]);
+            const dirty = exDraftStudies != null &&
+              (staged.length !== exStudies.length || staged.some(x => !exStudies.includes(x)));
+            const applyStaged = () => {
+              setExDraftStudies(null);
+              setExPanelOpen(false);
+              setExploreStudies(staged);
             };
             const q = sQuery.trim().toLowerCase();
             const hits = studies.filter(s =>
@@ -1472,9 +1496,14 @@ function Latency({ v }: { v: any }) {
                 <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
                   <h2 style={{ margin: 0 }}>Exploring <span className="plain">— {exStudies.length === 0 ? "no studies selected" :
                     exStudies.length + (exStudies.length === 1 ? " study" : " studies") + " · " +
-                    (explore?.totals
-                      ? explore.totals.patients.toLocaleString() + " patients · " + explore.totals.samples.toLocaleString() + " samples"
-                      : selPts.toLocaleString() + " patients") +
+                    // While a fetch is in flight the PREVIOUS result's totals are
+                    // not this selection's. Submitting 560 studies takes about a
+                    // minute, and showing the old 267,816 as though it described
+                    // the new set is worse than showing the study list's own sum
+                    // and saying it is still counting.
+                    (exploreBusy || !explore?.totals
+                      ? selPts.toLocaleString() + " patients" + (exploreBusy ? " · counting…" : "")
+                      : explore.totals.patients.toLocaleString() + " patients · " + explore.totals.samples.toLocaleString() + " samples") +
                     (exStudies.length > 1 ? " (overlap not deduplicated)" : "")}</span></h2>
                   {exStudies.map(id => (
                     <span key={id} className="qchip" title={byId.get(id)?.name ?? id}>
@@ -1483,7 +1512,10 @@ function Latency({ v }: { v: any }) {
                     </span>
                   ))}
                   <span className="spacer" />
-                  <button onClick={() => setExPanelOpen(!exPanelOpen)}>{exPanelOpen ? "done" : "add / change studies"}</button>
+                  <button onClick={() => {
+                    if (exPanelOpen) { setExDraftStudies(null); setExPanelOpen(false); }   // close discards
+                    else { setExDraftStudies(exStudies); setExPanelOpen(true); }           // open seeds
+                  }}>{exPanelOpen ? "cancel" : "add / change studies"}</button>
                 </div>
                 {exPanelOpen && <>
                   <div className="row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center", margin: "0.6rem 0" }}>
@@ -1496,12 +1528,38 @@ function Latency({ v }: { v: any }) {
                       </button>
                     ))}
                     <span className="meta">{hits.length.toLocaleString()} of {studies.length.toLocaleString()}</span>
+                    {/* "all matches", not "all 200 drawn": the list renders the
+                        200 largest, and a button that silently selected only
+                        those would disagree with the count beside it. The number
+                        is on the button because selecting 546 studies is a
+                        minutes-long query, and that should be a decision rather
+                        than a surprise. */}
+                    <button className="facet" disabled={!hits.length}
+                      title={"adds the " + hits.length + " studies matching the current search to the staged set, keeping what is already staged — use clear first to replace"}
+                      onClick={() => setExDraftStudies([...new Set([...staged, ...hits.map(h => h.id)])])}>
+                      add all {hits.length.toLocaleString()} match{hits.length === 1 ? "" : "es"}
+                    </button>
+                    <button className="facet" disabled={!staged.length}
+                      onClick={() => setExDraftStudies([])}>clear</button>
+                  </div>
+                  <div className="row applybar" style={{ alignItems: "center", gap: "0.5rem" }}>
+                    <strong>{staged.length.toLocaleString()}</strong>
+                    <span className="meta">
+                      {staged.length === 1 ? "study staged" : "studies staged"}
+                      {staged.length ? " · " + staged.reduce((n: number, id: string) => n + (byId.get(id)?.patients ?? 0), 0).toLocaleString() + " patients" : ""}
+                      {dirty ? " · not queried yet" : " · matches what is shown"}
+                    </span>
+                    <span className="spacer" />
+                    <button className="primary" disabled={!dirty || !staged.length} onClick={applyStaged}
+                      title={staged.length ? "run the facets for these " + staged.length + " studies" : "stage at least one study"}>
+                      submit
+                    </button>
                   </div>
                   {!studies.length && <div className="loading-block"><span className="spinner" /> Loading studies…</div>}
                   <div style={{ maxHeight: "22rem", overflowY: "auto" }}>
                     {hits.slice(0, 200).map(s => (
-                      <label key={s.id} title={s.name} className={"study-row" + (exStudies.includes(s.id) ? " sel" : "")}>
-                        <input type="checkbox" checked={exStudies.includes(s.id)} onChange={() => toggle(s.id)} />
+                      <label key={s.id} title={s.name} className={"study-row" + (staged.includes(s.id) ? " sel" : "")}>
+                        <input type="checkbox" checked={staged.includes(s.id)} onChange={() => toggleStaged(s.id)} />
                         <strong>{s.name}</strong>
                         <span className="meta mono">{s.id}</span>
                         <span className="meta">{s.cancerType}</span>

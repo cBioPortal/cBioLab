@@ -350,7 +350,7 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .pikey {
   display: inline-flex; align-items: center; gap: 0.3rem; max-width: 100%;
   background: none; border: none; padding: 0.06rem 0.2rem; border-radius: var(--r-sm);
-  font: inherit; font-size: var(--t-sm); color: var(--ink); cursor: pointer;
+  font: inherit; font-size: var(--t-md); color: var(--ink); cursor: pointer;
 }
 .pikey:hover { background: var(--code-bg); }
 .pikey.on { background: var(--code-bg); outline: 1px solid var(--accent-ink); }
@@ -377,7 +377,7 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
   display: grid; grid-template-columns: 1fr 3rem auto;
   gap: 0 0.6rem; align-items: center; width: 100%;
   background: none; border: none; padding: 0.12rem 0.3rem; border-radius: var(--r-sm);
-  font: inherit; font-size: var(--t-sm); color: var(--ink); text-align: left; cursor: pointer;
+  font: inherit; font-size: var(--t-md); color: var(--ink); text-align: left; cursor: pointer;
 }
 .valrow:hover { background: var(--code-bg); }
 .valrow.on { background: var(--code-bg); outline: 1px solid var(--accent-ink); }
@@ -845,9 +845,9 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
    Deliberately quiet: these sit in a card header beside the count, and a
    full-height input there reads as the card's subject rather than a filter. */
 .genesearch {
-  font: inherit; font-size: var(--t-sm); color: var(--ink);
-  background: var(--bg); border: 1px solid var(--line); border-radius: 3px;
-  padding: 0.1rem 0.4rem; width: 10.5rem; height: 1.5rem;
+  font: inherit; font-size: var(--t-md); color: var(--ink);
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding: 0 var(--s2); width: 10.5rem; height: var(--ctl-h);
 }
 .genesearch::placeholder { color: var(--muted); }
 .genesearch:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -865,4 +865,11 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
 .valrow .vpct {
   font-size: var(--t-sm); color: var(--muted); text-align: right;
   font-variant-numeric: tabular-nums; min-width: 3.2rem;
+}
+
+/* The study picker's submit bar. Sits between the search row and the list so a
+   staged count is visible while scrolling the list, not below the fold. */
+.applybar {
+  margin: 0.5rem 0; padding: 0.5rem 0.65rem;
+  background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
 }
