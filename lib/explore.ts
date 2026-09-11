@@ -7,6 +7,7 @@ import { derivedMetricSql, basePatientsSql } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
 import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, NumericBin, DerivedFacet } from "./types.ts";
+import { clinicalValueFoldSql } from "./event-names.ts";
 
 /**
  * cBioPortal's linear bin intervals (LinearDataBinner). The binner picks the
@@ -181,7 +182,7 @@ async function studyCardinality(study: string, conn: ChConn): Promise<Map<string
   const hit = _cardCache.get(key);
   if (hit) return hit;
   const r = await chQuery<ChRow>(
-    "SELECT type, attribute_name AS a, uniqExact(attribute_value) AS nv\n" +
+    "SELECT type, attribute_name AS a, uniqExact(" + clinicalValueFoldSql("attribute_value") + ") AS nv\n" +
     "FROM " + conn.db + ".clinical_data_derived\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
     "GROUP BY type, a", conn).catch(() => ({ data: [] as ChRow[] }));
@@ -202,7 +203,7 @@ async function studyCardinality(study: string, conn: ChConn): Promise<Map<string
 
   // ---- clinical attributes: classify categorical vs numeric --------------
   const cls = await chQuery(
-    "SELECT type, attribute_name AS a, uniqExact(attribute_value) AS nv,\n" +
+    "SELECT type, attribute_name AS a, uniqExact(" + clinicalValueFoldSql("attribute_value") + ") AS nv,\n" +
     "  countIf(toFloat64OrNull(attribute_value) IS NOT NULL) / count() AS numratio,\n" +
     "  uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS np,\n" +
     "  min(toFloat64OrNull(attribute_value)) AS mn, max(toFloat64OrNull(attribute_value)) AS mx,\n" +
@@ -228,12 +229,19 @@ async function studyCardinality(study: string, conn: ChConn): Promise<Map<string
   let catValues: ChRow[] = [];
   if (catAttrs.length) {
     const v = await chQuery(
-      "SELECT type, attribute_name AS a, attribute_value AS v,\n" +
+      // Grouped by the FOLDED value, so `Female` and `FEMALE` are one row —
+      // and counted with uniqExact at the folded level rather than by summing
+      // the variants, because a patient with one sample spelled each way would
+      // otherwise be counted twice. The label shown is the most frequent
+      // original spelling, so the reader sees `Female`, not `female`.
+      "SELECT type, attribute_name AS a,\n" +
+      "       topK(1)(attribute_value)[1] AS v,\n" +
+      "       " + clinicalValueFoldSql("attribute_value") + " AS vkey,\n" +
       "       uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
       "FROM " + db + ".clinical_data_derived\n" +
       "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
       "  AND attribute_name IN (" + catAttrs.map(r => sq(r.a)).join(",") + ")" + cond + "\n" +
-      "GROUP BY type, a, v ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT + " BY type, a", conn);
+      "GROUP BY type, a, vkey ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT + " BY type, a", conn);
     catValues = v.data;
   }
   // Disjunctive faceting: attributes already constrained in the draft get their value
@@ -255,11 +263,12 @@ async function studyCardinality(study: string, conn: ChConn): Promise<Map<string
       subCond = "\n  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + rsql + "))";
     }
     const v = await chQuery(
-      "SELECT attribute_value AS v, uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
+      "SELECT topK(1)(attribute_value)[1] AS v, " + clinicalValueFoldSql("attribute_value") + " AS vkey,\n" +
+      "       uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
       "FROM " + db + ".clinical_data_derived\n" +
       "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
       "  AND type = " + sq(per) + " AND attribute_name = " + sq(attr) + subCond + "\n" +
-      "GROUP BY v ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT, conn);
+      "GROUP BY vkey ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT, conn);
     disjValues.set(key, v.data.map(x => ({ v: x.v, n: Number(x.n) })));
   }
 

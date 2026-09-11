@@ -44,6 +44,45 @@ export function canonicalEventName(raw: string): string {
   return String(raw ?? "").trim().toLowerCase();
 }
 
+/**
+ * The grouping key for a CLINICAL ATTRIBUTE VALUE — `RACE`, `GENDER`,
+ * `METASTATIC_SITE`. Delegates rather than restating the rule, because it is
+ * the same rule for the same reason, and two copies would drift.
+ *
+ * The measurement in the table above covers these too: 212 distinct values fold
+ * to 193, merging 19 real duplicates with 5 residual separator-only pairs left
+ * deliberately visible.
+ *
+ * This one is not merely cosmetic. A facet click compiles to an equality on the
+ * value, so before folding, clicking `Female` in `breast_msk_2025` selected
+ * 1,097 patients and silently left behind the 1,987 recorded as `FEMALE` — a
+ * cohort 35.6% short, with every downstream survival curve and gene frequency
+ * computed on it. See clinicalValueFoldSql.
+ */
+export function canonicalClinicalValue(raw: string): string {
+  return canonicalEventName(raw);
+}
+
+/**
+ * The SQL that folds a clinical value to its grouping key.
+ *
+ * ONE expression, used by the facet query that counts the values AND by the
+ * cohort predicate that selects them. That shared use is the whole point: if
+ * the chart grouped by a folded key while the predicate matched a raw literal,
+ * the label would look right and select a subset of what it counted — strictly
+ * worse than not folding at all, because the error stops being visible.
+ *
+ * Both sides are folded IN SQL, never one side in JavaScript. ClickHouse
+ * `lower` is ASCII-only and JS `toLowerCase` is Unicode-aware, so a value like
+ * `MÜNCHEN` would fold two different ways and the predicate would match
+ * nothing. Folding the column and the literal with the same function makes that
+ * class of bug unrepresentable; `lowerUTF8`/`trimBoth` are named explicitly for
+ * the same reason.
+ */
+export function clinicalValueFoldSql(expr: string): string {
+  return "lowerUTF8(trimBoth(" + expr + "))";
+}
+
 /** One canonical event name and the spellings that folded into it. */
 export interface FoldedName {
   /** the grouping key — lowercase, trimmed */

@@ -817,6 +817,21 @@ async function main() {
     if (!/^FAIL /m.test(out)) results.push("FAIL check:denominators crashed: " + String(e.message).slice(0, 120));
   }
 
+  // Value-folding gate. A facet click compiles to an equality on the value, so
+  // while `Female` and `FEMALE` were separate literals the click selected one of
+  // them and the cohort was silently short — 35.6% short in breast_msk_2025.
+  // The source tripwire can only see that both sides share one fold expression;
+  // this confirms the resulting cohort is actually the whole group.
+  try {
+    const { execSync } = require("child_process");
+    const out = execSync("npm run --silent check:values", { cwd: __dirname, encoding: "utf8", timeout: 300000 });
+    for (const line of out.trim().split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
+  } catch (e) {
+    const out = String((e.stdout || "") + (e.stderr || "")).trim();
+    for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
+    if (!/^FAIL /m.test(out)) results.push("FAIL check:values crashed: " + String(e.message).slice(0, 120));
+  }
+
   console.log(results.join("\n"));
   process.exit(results.some(r => r.startsWith("FAIL")) ? 1 : 0);
 }

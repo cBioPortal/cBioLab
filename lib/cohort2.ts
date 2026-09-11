@@ -15,6 +15,7 @@
 import { DB, STUDY } from "./ch.ts";
 import { compileCohort, sq } from "./compiler.ts";
 import { oqlLeafSql } from "./oql.ts";
+import { clinicalValueFoldSql } from "./event-names.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
@@ -57,7 +58,10 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
   const per = leaf.per === "sample" ? "sample" : "patient"; // sample-level collapses: patient matches if ANY sample matches
   const conds: string[] = [];
   if (Array.isArray(leaf.values) && leaf.values.length) {
-    conds.push("attribute_value IN (" + leaf.values.slice(0, 50).map(v => sq(String(v))).join(",") + ")");
+    // folded on both sides, exactly as the `=` case is — a multi-value pick is
+    // several facet clicks, and must select what those facets counted
+    conds.push(clinicalValueFoldSql("attribute_value") + " IN (" +
+      leaf.values.slice(0, 50).map(v => clinicalValueFoldSql(sq(String(v)))).join(",") + ")");
   }
   if (leaf.range && typeof leaf.range === "object") {
     const r = leaf.range as Record<string, number | undefined>, num = "toFloat64OrNull(attribute_value)";
@@ -73,7 +77,12 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
     if (!op) throw new Error("invalid clinical op (use = != > >= < <=)");
     conds.push(typeof leaf.value === "number"
       ? "toFloat64OrNull(attribute_value) " + op + " " + Number(leaf.value)
-      : "attribute_value " + op + " " + sq(String(leaf.value)));
+      // Equality folds case and whitespace, matching how the facet that offered
+      // this value counted it. Ordering comparisons do not: they are for
+      // numbers, and folding a string range would change what it means.
+      : op === "=" || op === "!="
+        ? clinicalValueFoldSql("attribute_value") + " " + op + " " + clinicalValueFoldSql(sq(String(leaf.value)))
+        : "attribute_value " + op + " " + sq(String(leaf.value)));
   }
   if (!conds.length) throw new Error("clinical clause needs op/value, values[], or range{gt,gte,lt,lte}");
   return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
