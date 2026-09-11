@@ -46,6 +46,31 @@ describe("gene frequencies keep a panel-aware denominator", () => {
       "WES must be excluded from the panel join");
   });
 
+  test("panel counts are distinct SAMPLES, not rows", () => {
+    // sample_to_gene_panel_derived holds one row per (sample, panel,
+    // genetic_profile). A study that publishes two profiles of one alteration
+    // type — every TCGA study publishes a discrete AND a linear CNA profile —
+    // therefore lists each sample twice. Counting rows doubled the denominator
+    // and halved every CNA frequency in 101 of 353 studies: brca_tcga reported
+    // MYC amplification at 229/2160 = 10.6% against a true 229/1080 = 21.2%.
+    assert.match(src, /uniqExact\(sample_unique_id\) AS n/,
+      "the panel and WES counts must count distinct samples");
+    assert.equal(/count\(\) AS n/.test(src), false,
+      "counting rows double-counts a sample that appears under two genetic profiles");
+  });
+
+  test("one builder serves both the single-study and the pooled path", () => {
+    // The pooled path exists for performance, but a second copy of the
+    // denominator is how the two would drift apart. There is one builder, and
+    // a single study is simply the list of length one.
+    assert.match(explore, /export async function geneTables\(\{\s*studies/,
+      "the gene tables must be built by one exported, study-list-taking builder");
+    assert.match(explore, /geneTables\(\{ studies: \[study\]/,
+      "the single-study path must go through that same builder");
+    assert.match(explore, /geneTables\(\{ studies: ss/,
+      "the federated path must go through that same builder");
+  });
+
   test("uncalled mutations are excluded, as the portal does", () => {
     assert.match(src, /mutation_status\s*!=\s*'UNCALLED'/,
       "uncalled mutations exist only to show read support and are not alterations");

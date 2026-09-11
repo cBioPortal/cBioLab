@@ -119,7 +119,7 @@ async function attachHistograms(opts: {
   }));
 }
 
-export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, binEdges, attributes }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn; geneSearch?: string; skipBins?: boolean; binEdges?: Record<string, { edges: number[]; interval: number }>; attributes?: string[] }): Promise<ExploreResult> {
+export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, binEdges, attributes }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn; geneSearch?: string; skipBins?: boolean; skipGenes?: boolean; binEdges?: Record<string, { edges: number[]; interval: number }>; attributes?: string[] }): Promise<ExploreResult> {
   const db = conn.db;
   const t0 = Date.now();
   // An optional allow-list of attribute names. Exploring hundreds of studies at
@@ -308,89 +308,14 @@ async function studyCardinality(study: string, conn: ChConn): Promise<Map<string
     (dsql ? "\n  AND p.stable_id IN (SELECT pid FROM (" + dsql + "))" : "") + "\n" +
     "GROUP BY t ORDER BY n DESC", conn);
 
-  // ---- gene tables: Mutated / CNA / SV, cBioPortal study-view semantics ----
-  // Counts are SAMPLES. The denominator is samples profiled for THAT gene in the
-  // relevant alteration type, computed the way the portal does it:
-  //   profiled(gene) = panel-profiled(gene)  +  whole-exome sample count
-  // The WES panel is excluded from the join on purpose: it enumerates ~45k genes,
-  // so joining it multiplies every WES sample by that many rows (47.8M for one
-  // TCGA study). The portal splits it into a scalar for exactly this reason.
-  const geneTable = async (
-    variantType: "mutation" | "cna" | "structural_variant",
-    alterationType: "MUTATION_EXTENDED" | "COPY_NUMBER_ALTERATION" | "STRUCTURAL_VARIANT"
-  ): Promise<{ rows: GeneTableRow[]; total: number }> => {
-    const isCna = variantType === "cna";
-    const where =
-      "WHERE cancer_study_identifier = " + sq(study) + "\n" +
-      "  AND variant_type = " + sq(variantType) +
-      // the portal excludes uncalled mutations: they exist only to show read support
-      (variantType === "mutation" ? "\n  AND mutation_status != 'UNCALLED'" : "") +
-      (geneSearch ? "\n  AND positionCaseInsensitive(hugo_gene_symbol, " + sq(geneSearch) + ") > 0" : "") +
-      sampleCond;
-
-    const [altered, panelProfiled, wes, distinct] = await Promise.all([
-      chQuery<ChRow>(
-        "SELECT hugo_gene_symbol AS g," + (isCna ? " cna_alteration AS cna, any(cna_cytoband) AS cytoband," : "") + "\n" +
-        "       uniqExact(sample_unique_id) AS altered, count() AS events\n" +
-        "FROM " + db + ".genomic_event_derived\n" + where + "\n" +
-        "GROUP BY g" + (isCna ? ", cna" : "") + "\n" +
-        "ORDER BY altered DESC, g ASC LIMIT " + GENE_TABLE_LIMIT, conn),
-      // Aggregate samples PER PANEL first, then join panels to their genes. The
-      // naive sample-level join costs 13s on a 290k-sample study; collapsing to
-      // ~100 panel rows first gives the identical answer in ~250ms.
-      chQuery<ChRow>(
-        "WITH pc AS (\n" +
-        "  SELECT gene_panel_id, count() AS n\n" +
-        "  FROM " + db + ".sample_to_gene_panel_derived\n" +
-        "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
-        "    AND alteration_type = " + sq(alterationType) + " AND gene_panel_id != 'WES'" +
-        panelSampleCond + "\n" +
-        "  GROUP BY gene_panel_id\n" +
-        ")\n" +
-        "SELECT gptg.gene AS g, sum(pc.n) AS n\n" +
-        "FROM " + db + ".gene_panel_to_gene_derived gptg\n" +
-        "INNER JOIN pc ON pc.gene_panel_id = gptg.gene_panel_id\n" +
-        "WHERE gptg.gene_panel_id IN (SELECT gene_panel_id FROM pc)\n" +
-        "GROUP BY g", conn),
-      chQuery<ChRow>(
-        "SELECT count() AS n\n" +
-        "FROM " + db + ".sample_to_gene_panel_derived\n" +
-        "WHERE cancer_study_identifier = " + sq(study) + "\n" +
-        "  AND alteration_type = " + sq(alterationType) + " AND gene_panel_id = 'WES'" +
-        panelSampleCond, conn),
-      chQuery<ChRow>(
-        "SELECT uniqExact(hugo_gene_symbol) AS n FROM " + db + ".genomic_event_derived\n" + where, conn)
-    ]);
-
-    const panelMap = new Map<string, number>(panelProfiled.data.map((r) => [r.g, Number(r.n)]));
-    const wesN = Number(wes.data[0]?.n || 0);
-    const rows = altered.data.map((r): GeneTableRow => {
-      const profiled = (panelMap.get(r.g) || 0) + wesN;
-      const alt = Number(r.altered);
-      return {
-        gene: r.g, altered: alt, events: Number(r.events), profiled,
-        freqPct: profiled ? Math.round(1000 * alt / profiled) / 10 : null,
-        ...(isCna ? { cna: Number(r.cna), cytoband: r.cytoband } : {})
-      };
-    });
-    return { rows, total: Number(distinct.data[0]?.n || 0) };
-  };
-
-  const [mut, cna, sv] = await Promise.all([
-    geneTable("mutation", "MUTATION_EXTENDED"),
-    geneTable("cna", "COPY_NUMBER_ALTERATION"),
-    geneTable("structural_variant", "STRUCTURAL_VARIANT")
-  ]);
-  const mutatedGenes = mut.rows, cnaGenes = cna.rows, svGenes = sv.rows;
-  const geneTotals = { mutated: mut.total, cna: cna.total, sv: sv.total };
-
-  // legacy combined list (patients), retained for existing consumers
-  const genes = await chQuery(
-    "SELECT hugo_gene_symbol AS g, uniqExact(patient_unique_id) AS n\n" +
-    "FROM " + db + ".genomic_event_derived\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + "\n" +
-    "  AND (variant_type != 'cna' OR abs(cna_alteration) >= 2)" + cond + "\n" +
-    "GROUP BY g ORDER BY n DESC LIMIT 15", conn);
+  // ---- gene tables: built for this ONE study by the shared builder ---------
+  // The federated path calls the same builder once for every study on a
+  // connection instead of once per study; `skipGenes` is how it tells this
+  // pass not to duplicate that work. See geneTables() below.
+  const { mutatedGenes, cnaGenes, svGenes, geneTotals, genes } = skipGenes
+    ? { mutatedGenes: [], cnaGenes: [], svGenes: [], genes: [],
+        geneTotals: { mutated: 0, cna: 0, sv: 0 } }
+    : await geneTables({ studies: [study], db, conn, geneSearch, cond, panelSampleCond });
 
   // ---- molecular data types (portal: molecular-profile sample counts) -----
   // Samples with data of each type. The three that our DSL can filter on
@@ -436,7 +361,7 @@ async function studyCardinality(study: string, conn: ChConn): Promise<Map<string
     attributeCardinality: Object.fromEntries(cardinality),
     clinical, derived,
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
-    genes: genes.data.map((r) => ({ gene: r.g, n: Number(r.n) })),
+    genes,
     caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
     mutatedGenes, cnaGenes, svGenes, geneTotals, totals, dataTypes,
     numStats: numAttrs.map((r) => ({ attribute: r.a, per: r.type as "patient" | "sample", min: Number(r.mn), max: Number(r.mx), q1: Number(r.q1), q3: Number(r.q3), allInts: String(r.allints) === "1", n: Number(r.np) })),
@@ -536,6 +461,146 @@ async function buildDerivedFacets(
   return DERIVED_SPECS.map((s2) => out.find((o) => o.metric === s2.metric)).filter((x): x is DerivedFacet => !!x);
 }
 
+// ---- gene tables ----------------------------------------------------------
+/**
+ * The Mutated / CNA / SV tables, and the legacy combined gene list, for one or
+ * more studies **on a single connection**.
+ *
+ * WHY A LIST OF STUDIES. Explore over 546 studies ran this block once per
+ * study: 13 of its ~17 round trips, ~7,100 queries for one page load, and 137s
+ * of wall clock. Both the numerator and the denominator are additive over
+ * samples (docs/PERFORMANCE.md §1), so putting the studies in one IN list
+ * returns exactly the arithmetic that merging per-study results produces — at
+ * ~2.3s of query time for all 546 rather than ~7,100 round trips.
+ *
+ * Pooling also CORRECTS the per-study merge. Each study's table is truncated at
+ * GENE_TABLE_LIMIT and the merge sums only the parts that survived that cut, so
+ * a gene ranking outside some study's top-N lost that study's PROFILED samples
+ * along with its (small) altered count, and the frequency came out biased high.
+ * Pooled, every selected study contributes to the denominator whether or not the
+ * gene ranks in it. See test/pooled-genes.test.ts.
+ *
+ * Safe because `sample_unique_id` is unique across studies — measured 408,055
+ * rows and 408,055 distinct values in sample_derived — so `uniqExact` over a
+ * pooled scan still counts each sample exactly once.
+ *
+ * One study is just the list of length one, which is the ONLY implementation of
+ * the panel-aware denominator: there is no second copy to drift.
+ */
+export async function geneTables({ studies, db, conn, geneSearch, cond = "", panelSampleCond = "" }: {
+  studies: string[]; db: string; conn: ChConn; geneSearch?: string;
+  cond?: string; panelSampleCond?: string;
+}): Promise<Pick<ExploreResult, "mutatedGenes" | "cnaGenes" | "svGenes" | "geneTotals" | "genes">> {
+  /** one study keeps the equality the pinned denominators were measured against */
+  const studyIn = (ss: string[]) => ss.length === 1
+    ? "cancer_study_identifier = " + sq(ss[0])
+    : "cancer_study_identifier IN (" + ss.map(sq).join(",") + ")";
+
+  // ---- gene tables: Mutated / CNA / SV, cBioPortal study-view semantics ----
+  // Counts are SAMPLES. The denominator is samples profiled for THAT gene in the
+  // relevant alteration type, computed the way the portal does it:
+  //   profiled(gene) = panel-profiled(gene)  +  whole-exome sample count
+  // The WES panel is excluded from the join on purpose: it enumerates ~45k genes,
+  // so joining it multiplies every WES sample by that many rows (47.8M for one
+  // TCGA study). The portal splits it into a scalar for exactly this reason.
+  const geneTable = async (
+    variantType: "mutation" | "cna" | "structural_variant",
+    alterationType: "MUTATION_EXTENDED" | "COPY_NUMBER_ALTERATION" | "STRUCTURAL_VARIANT"
+  ): Promise<{ rows: GeneTableRow[]; total: number }> => {
+    const isCna = variantType === "cna";
+    const where =
+      "WHERE " + studyIn(studies) + "\n" +
+      "  AND variant_type = " + sq(variantType) +
+      // the portal excludes uncalled mutations: they exist only to show read support
+      (variantType === "mutation" ? "\n  AND mutation_status != 'UNCALLED'" : "") +
+      (geneSearch ? "\n  AND positionCaseInsensitive(hugo_gene_symbol, " + sq(geneSearch) + ") > 0" : "") +
+      cond;
+
+    const [altered, panelProfiled, wes, distinct] = await Promise.all([
+      chQuery<ChRow>(
+        "SELECT hugo_gene_symbol AS g," + (isCna ? " cna_alteration AS cna, any(cna_cytoband) AS cytoband," : "") + "\n" +
+        "       uniqExact(sample_unique_id) AS altered, count() AS events\n" +
+        "FROM " + db + ".genomic_event_derived\n" + where + "\n" +
+        "GROUP BY g" + (isCna ? ", cna" : "") + "\n" +
+        "ORDER BY altered DESC, g ASC LIMIT " + GENE_TABLE_LIMIT, conn),
+      // Aggregate samples PER PANEL first, then join panels to their genes. The
+      // naive sample-level join costs 13s on a 290k-sample study; collapsing to
+      // ~100 panel rows first gives the identical answer in ~250ms.
+      //
+      // DISTINCT SAMPLES, never rows. This table carries one row per (sample,
+      // panel, genetic_profile), and a study that publishes two profiles of the
+      // same alteration type — a discrete AND a linear CNA profile, which every
+      // TCGA study does — lists each sample twice. Counting rows doubled the
+      // denominator and so HALVED every CNA frequency: brca_tcga reported MYC
+      // amplification at 229/2160 = 10.6% where the truth is 229/1080 = 21.2%.
+      // Measured across the database: 101 of 353 studies with CNA panels are
+      // affected, 0 of 540 for mutations and 0 of 221 for structural variants.
+      chQuery<ChRow>(
+        "WITH pc AS (\n" +
+        "  SELECT gene_panel_id, uniqExact(sample_unique_id) AS n\n" +
+        "  FROM " + db + ".sample_to_gene_panel_derived\n" +
+        "  WHERE " + studyIn(studies) + "\n" +
+        "    AND alteration_type = " + sq(alterationType) + " AND gene_panel_id != 'WES'" +
+        panelSampleCond + "\n" +
+        "  GROUP BY gene_panel_id\n" +
+        ")\n" +
+        // Summing across the panels that carry the gene leaves one residual: a
+        // sample on two DIFFERENT panels for the same alteration type is counted
+        // once per panel. Deduplicating that needs the sample-level join this
+        // CTE exists to avoid, and it is rare — 328 samples across the whole
+        // database against 37,666 cured by counting distinct above.
+        "SELECT gptg.gene AS g, sum(pc.n) AS n\n" +
+        "FROM " + db + ".gene_panel_to_gene_derived gptg\n" +
+        "INNER JOIN pc ON pc.gene_panel_id = gptg.gene_panel_id\n" +
+        "WHERE gptg.gene_panel_id IN (SELECT gene_panel_id FROM pc)\n" +
+        "GROUP BY g", conn),
+      // distinct samples for the same reason as the panel counts above
+      chQuery<ChRow>(
+        "SELECT uniqExact(sample_unique_id) AS n\n" +
+        "FROM " + db + ".sample_to_gene_panel_derived\n" +
+        "WHERE " + studyIn(studies) + "\n" +
+        "  AND alteration_type = " + sq(alterationType) + " AND gene_panel_id = 'WES'" +
+        panelSampleCond, conn),
+      chQuery<ChRow>(
+        "SELECT uniqExact(hugo_gene_symbol) AS n FROM " + db + ".genomic_event_derived\n" + where, conn)
+    ]);
+
+    const panelMap = new Map<string, number>(panelProfiled.data.map((r) => [r.g, Number(r.n)]));
+    const wesN = Number(wes.data[0]?.n || 0);
+    const rows = altered.data.map((r): GeneTableRow => {
+      const profiled = (panelMap.get(r.g) || 0) + wesN;
+      const alt = Number(r.altered);
+      return {
+        gene: r.g, altered: alt, events: Number(r.events), profiled,
+        freqPct: profiled ? Math.round(1000 * alt / profiled) / 10 : null,
+        ...(isCna ? { cna: Number(r.cna), cytoband: r.cytoband } : {})
+      };
+    });
+  return { rows, total: Number(distinct.data[0]?.n || 0) };
+};
+
+const [mut, cna, sv] = await Promise.all([
+  geneTable("mutation", "MUTATION_EXTENDED"),
+  geneTable("cna", "COPY_NUMBER_ALTERATION"),
+  geneTable("structural_variant", "STRUCTURAL_VARIANT")
+]);
+const mutatedGenes = mut.rows, cnaGenes = cna.rows, svGenes = sv.rows;
+const geneTotals = { mutated: mut.total, cna: cna.total, sv: sv.total };
+
+// legacy combined list (patients), retained for existing consumers
+const genes = await chQuery(
+  "SELECT hugo_gene_symbol AS g, uniqExact(patient_unique_id) AS n\n" +
+  "FROM " + db + ".genomic_event_derived\n" +
+  "WHERE " + studyIn(studies) + "\n" +
+  "  AND (variant_type != 'cna' OR abs(cna_alteration) >= 2)" + cond + "\n" +
+  "GROUP BY g ORDER BY n DESC LIMIT 15", conn);
+
+  return {
+    mutatedGenes, cnaGenes, svGenes, geneTotals,
+    genes: genes.data.map((r) => ({ gene: r.g, n: Number(r.n) }))
+  };
+}
+
 // ---- federated explore: several studies at once ---------------------------
 // Runs buildExplore per study and merges by name — counts are summed with the
 // project-wide policy: patient overlap across studies is NOT deduplicated and
@@ -547,13 +612,44 @@ export async function buildExploreFederated({ studies, draft, oncokbPin, profile
   // Pass 1: facets per study, WITHOUT histograms — each study's own quartiles
   // would give it different bin edges, and bars over different ranges cannot be
   // summed. Skip the work rather than compute bins we would throw away.
-  const parts = await Promise.all(studies.map(s =>
-    buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, attributes,
-      conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}) })));
+  // The gene tables are 13 of each study's ~17 round trips. They also POOL:
+  // altered and profiled are both additive over samples, so one query per
+  // connection with the studies in an IN list is the same arithmetic that
+  // merging per-study tables performs — and a better denominator, because no
+  // study's contribution is lost to its own top-N cut (see geneTables).
+  //
+  // Two cases keep the per-study path. A draft filter compiles per study, so
+  // pooling it would need a cohort compiler that spans studies; and a lone
+  // study has nothing to pool with, so it stays byte-identical to before.
+  const poolGenes = !draft && studies.length > 1;
+  const connGroups = new Map<string, { conn: ChConn; studies: string[] }>();
+  if (poolGenes) for (const s of studies) {
+    const conn = connByStudy?.get(s) || PRIMARY;
+    const k = conn.id + "|" + conn.db;
+    if (!connGroups.has(k)) connGroups.set(k, { conn, studies: [] });
+    connGroups.get(k)!.studies.push(s);
+  }
+
+  const [parts, geneParts] = await Promise.all([
+    Promise.all(studies.map(s =>
+      buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: poolGenes, attributes,
+        conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}) }))),
+    Promise.all([...connGroups.values()].map(async ({ conn, studies: ss }) => {
+      const g = await geneTables({ studies: ss, db: conn.db, conn, geneSearch });
+      // A gene-only participant. It names no study and holds no patients or
+      // facets, so every other field merges as a zero and it adds nothing to
+      // the study breakdown. Feeding it through the SAME mergeExplore as the
+      // per-study parts is the point: the rule for summing altered and profiled
+      // before dividing then has exactly one implementation, whether the parts
+      // came from studies, from connections, or from a remote peer.
+      return { study: "", studies: [], draftCount: null, clinical: [], events: [],
+        caseLists: [], profiles: [], gaProfiles: [], stats: { ms: 0 }, ...g } as ExploreResult;
+    }))
+  ]);
 
   // Pass 2: derive ONE set of edges per attribute from the pooled statistics,
   // then have every study bin against those, so the bars line up and add.
-  const merged = mergeExplore(parts, !!draft);
+  const merged = mergeExplore([...parts, ...geneParts], !!draft);
   const edgesByAttr = sharedBinEdges(parts);
   if (Object.keys(edgesByAttr).length) {
     const numFacets = merged.clinical.filter(
@@ -753,6 +849,10 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     })(),
     profiles: [...new Set(parts.flatMap((p) => p.profiles))],
     gaProfiles: [...new Set(parts.flatMap((p) => p.gaProfiles))],
-    stats: { ms: Date.now() - t0, perStudy: Object.fromEntries(parts.map((p, i) => [studies[i], p.draftCount])) }
+    // Keyed by each part's OWN study rather than by position: `studies` above is
+    // flat-mapped, so any part that is not exactly one study — a pooled
+    // gene-only participant, or an already-merged result — slid every
+    // subsequent key one place along.
+    stats: { ms: Date.now() - t0, perStudy: Object.fromEntries(parts.filter((p) => p.study).map((p) => [p.study, p.draftCount])) }
   };
 }

@@ -314,8 +314,10 @@ absolute values caught it, because two compensating errors agree with each other
 ## 2. How Explore scales today
 
 `buildExploreFederated` calls `buildExplore` once **per study**, and each call
-makes ~17 ClickHouse round trips. At 560 studies that is ~8,400 queries for one
-page load. Cost is therefore linear in study *count*, not in patients.
+makes 41 ClickHouse round trips (measured; an earlier draft of this section said
+~17). At 560 studies that is ~23,000 queries for one page load. Cost is
+therefore linear in study *count*, not in patients. §3b records what pooling the
+13 gene-table round trips removed from that.
 
 | studies | patients | all attributes | 20-attribute list |
 |---|---|---|---|
@@ -386,7 +388,7 @@ Measured directly against the database, not through the endpoint:
 | the same for all three alteration types | 4.40s | 388,899 |
 
 For comparison, one study's gene-table numerator alone currently takes 0.25s,
-and there are three of them per study among the ~17 round trips.
+and there are three of them per study among the 41 round trips.
 
 The pooled gene table was checked against the pinned values and reproduces them
 exactly — `msk_ch_2020` DNMT3A `2559/7216`, `histiocytosis_cobi_msk_2019` BRAF
@@ -420,6 +422,91 @@ Two limits on these numbers, stated so they are not over-read:
 - `LIMIT n BY study` keeps the per-study cap, but the pooled result set is ~560x
   larger (222,682 gene rows against 500). That is a payload question to design,
   not inherit.
+
+## 3b. What pooling actually delivered, measured
+
+Shipped: `geneTables()` in `lib/explore.ts` takes a **list** of studies, and
+`buildExploreFederated` calls it once per connection instead of once per study.
+One study is the list of length one, so there is a single implementation of the
+panel-aware denominator rather than a pooled copy that could drift from it.
+
+**Round-trip counts, measured by instrumenting `post()` in `lib/ch.ts`** — and
+correcting the "~17" repeated earlier in this document, which was wrong:
+
+| | round trips |
+|---|---|
+| one study, full | **41** |
+| one study, `skipGenes` | 28 |
+| → the gene tables | **13** |
+| 8 studies federated, pooled | 333 |
+
+333 accounts exactly: `8 × 28` per-study, `+ 13` pooled once, `+ 96` for pass-2
+histograms (6 numeric facets × 8 studies × 2 queries). Nothing unexplained.
+
+**End to end, through `buildExploreFederated`, 20 common attributes, no draft.**
+Both columns are the same study list on the same idle server with equally warm
+caches — the first pooled run showed 1 study at 1432ms purely because it ran
+cold, which is why the A/B was repeated rather than reported:
+
+| studies | patients | master | pooled | |
+|---|---|---|---|---|
+| 1 | 48,179 | 829ms | 815ms | unchanged, as designed |
+| 8 | 193,788 | 2.2s | 1.4s | 1.6× |
+| 32 | 259,133 | 9.2s | 4.2s | 2.2× |
+| 64 | 292,094 | 18.4s | 7.8s | 2.4× |
+| 128 | 327,607 | 37.5s | 14.6s | 2.6× |
+| 256 | 361,706 | 65.9s | 28.6s | 2.3× |
+| **546** | **379,989** | **126.4s** | **60.0s** | **2.1×** |
+
+Half the round trips removed buys rather more than half the time, because the
+gene queries were the expensive ones, not merely the numerous ones.
+
+**This does not clear the Vercel ceiling.** `app/api/explore/route.ts` sets
+`maxDuration = 60`, and 546 studies now lands at 60.0s. The remaining 28
+per-study round trips are the ceiling; pooling those is the next step, and the
+same argument applies to them — they are all `GROUP BY` away from being one
+query per connection.
+
+### Two denominator errors this work surfaced
+
+Both were live on `master`, neither was introduced by pooling.
+
+**1. CNA frequencies were reported at half their true value, in 101 studies.**
+`sample_to_gene_panel_derived` holds one row per (sample, panel,
+**genetic_profile**). Every TCGA study publishes both a discrete and a linear CNA
+profile, so each sample appears twice, and a denominator built with `count()`
+doubled. `brca_tcga` reported MYC amplification at `229/2160 = 10.6%`; the truth
+is `229/1080 = 21.2%`, which is what cBioPortal reports.
+
+Measured scope, across the whole database:
+
+| alteration type | studies | with duplicate rows | extra rows |
+|---|---|---|---|
+| MUTATION_EXTENDED | 540 | **0** | 0 |
+| STRUCTURAL_VARIANT | 221 | **0** | 0 |
+| COPY_NUMBER_ALTERATION | 353 | **101** | 37,994 of 282,726 |
+
+Fixed by counting `uniqExact(sample_unique_id)` rather than rows. One residual
+remains and is deliberate: a sample on two **different** panels is still counted
+once per panel, because deduplicating that needs the sample-level join the
+per-panel CTE exists to avoid (13s on a 290k-sample study). It is 328 samples
+across the entire database, against 37,666 cured.
+
+**2. The per-study merge dropped profiled samples, biasing frequencies high.**
+A study's gene table has a row only for genes it saw altered, and the merge sums
+`profiled` across the rows that exist. So a study that profiled a gene and never
+saw it mutated contributed nothing to the denominator. Pooling counts it.
+Measured over 5 studies: 500 of 500 CNA rows and 486 of 500 mutation rows
+recover samples the per-study sum drops. `together 713/10154 vs summed
+713/10109` — identical numerator, larger and correct denominator.
+
+This is why `npm run check:denominators` asserts the numerator is exactly
+additive but the denominator only that pooled is **never smaller**, and pins the
+absolute value against an independently shaped query. The numerator check
+compares one gene at a time: both tables are cut at `GENE_TABLE_LIMIT`, so
+comparing the truncated lists would measure the cut rather than the arithmetic.
+All of it is mutation-verified — restoring `count()` turns the independent-count
+check and the `brca_tcga` pins red, with `229/1080 -> 229/2160` in the output.
 
 ## 4. Time to display vs cbioportal.org
 
