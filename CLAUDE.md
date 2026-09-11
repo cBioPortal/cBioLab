@@ -65,7 +65,13 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 ## Docs worth reading before changing things
 
 - [`docs/DATA-BOUNDARY.md`](docs/DATA-BOUNDARY.md) — the patient-data rule and how it is enforced.
-- [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) — measured comparison against cbioportal.org.
+- [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) — measured comparison against cbioportal.org, how
+  Explore scales with study count, and **the panel-aware denominator rule that outranks all of
+  it**: a sample whose gene panel omits a gene is NOT PROFILED for it, never wild-type, so a
+  frequency is `altered ÷ samples profiled for THAT gene`. Dividing by a study or selection total
+  does not error — it silently reports every gene as rarer than it is. Both halves are additive
+  over samples, which is what makes pooling safe; averaging per-study percentages is never safe.
+  Guarded by `test/denominator.test.ts` and `npm run check:denominators` (in the e2e gate).
   Read before claiming this project is "fast": on a cached single chart the portal is ~20x
   quicker, we have no application cache, and our advantage is data movement (36x less to the
   browser), not speed. Also records the ~20,000-id ceiling on explicit patient lists.
@@ -144,8 +150,10 @@ still holds, against a running server.
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
 - Test: `npm test` — unit suites, no database needed (the patient-data boundary, the stats used by
   federated views, cohort-definition semantics, clinical-course semantics, and the SVG figure
-  renderers, plots, gene tracks and template parameters; 237 checks across 38 suites).
-  `node e2e.cjs` — 74 checks (Playwright + docs gate + the boundary suite).
+  renderers, plots, gene tracks, template parameters and the panel-aware denominator;
+  252 checks across 40 suites).
+  `node e2e.cjs` — 81 checks (Playwright + docs gate + the boundary suite + the
+  denominator gate).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push **your own branch**. **Stop there.**

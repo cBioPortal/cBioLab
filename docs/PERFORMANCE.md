@@ -255,3 +255,157 @@ answer was superseded by the next click and the draft count never caught up.
 
 Buckets of one metric now share a single scan with the ranges OR'd in the `WHERE`. Same counts,
 **4.6s for four buckets and flat** in the number of buckets (3.7 / 3.2 / 4.6 for 1 / 2 / 4).
+
+---
+
+# Explore at scale, and what any change to it must not break
+
+Measured 2026-09-10/11 against the live database. Read the first section before
+optimising anything here: it is a correctness constraint, not a performance note.
+
+## 1. The rule that outranks performance: panel-aware denominators
+
+Samples are sequenced with different gene panels, **within a single study as well
+as across studies**. `nsclc_ctdx_msk_2022` uses 8 different panels for copy
+number; `msk_ch_2020` is 73% whole-exome and 27% panel; `brca_msk_erbb2_2026`
+has 7 panels and no whole-exome at all.
+
+A sample whose panel does not include a gene cannot report on that gene. It is
+**not profiled** — not wild-type. So a gene's frequency is:
+
+    altered for that gene  ÷  samples actually profiled for that gene
+
+where `profiled(gene) = Σ(samples on panels containing the gene) + whole-exome samples`.
+
+The tempting shortcut — dividing by the study total, or by the number of samples
+in the current selection — **does not raise an error**. It returns a plausible
+percentage that is simply wrong, always in the same direction: everything looks
+rarer than it is. Injecting exactly that mistake produced:
+
+| study | gene | correct | with the shortcut |
+|---|---|---|---|
+| `msk_ch_2020` | DNMT3A | 2559/7216 = 35.5% | 2559/24146 = 10.6% |
+| `nsclc_ctdx_msk_2022` | CDKN2A (deep del) | 159/1476 = 10.8% | 159/2621 = 6.1% |
+| `histiocytosis_cobi_msk_2019` | BRAF | 8/47 = 17.0% | 8/52 = 15.4% |
+
+The last row is why this is guarded by tests rather than by care: a five-sample
+difference, a number nobody would question.
+
+**Because profiling is a property of (sample, gene), both the numerator and the
+denominator are additive over samples.** That is what makes any pooling safe —
+summing `altered` and summing `profiled` across studies and then dividing gives
+exactly the per-study answer. `mergeExplore` already relies on this. What is
+never safe is averaging per-study percentages, which would weigh a 30-sample
+study the same as a 30,000-sample one.
+
+Guarded by `test/denominator.test.ts` (source tripwire, no database) and
+`npm run check:denominators` (live differential with pinned values, in the e2e
+gate). Both were mutation-verified against the shortcut above. Note that the
+additivity half of the check stayed GREEN under that mutation — only the pinned
+absolute values caught it, because two compensating errors agree with each other.
+
+## 2. How Explore scales today
+
+`buildExploreFederated` calls `buildExplore` once **per study**, and each call
+makes ~17 ClickHouse round trips. At 560 studies that is ~8,400 queries for one
+page load. Cost is therefore linear in study *count*, not in patients.
+
+| studies | patients | all attributes | 20-attribute list |
+|---|---|---|---|
+| 1 | 48,179 | 2.4s · 25 facets | 1.6s · 10 facets |
+| 8 | 193,788 | 3.9s · 179 | 2.6s · 19 |
+| 32 | 259,569 | 9.9s · 697 | 7.5s · 19 |
+| 64 | 293,454 | 17.6s · 1,634 | 14.6s · 20 |
+| 128 | 575,915 | — | 29.4s · 20 |
+| 256 | 613,643 | — | 54.3s · 20 |
+| **560** | **633,924** | — | **137.3s · 21** |
+
+Single studies, warm — cost tracks patients *and* attribute count, neither alone:
+`msk_ch_2023` (42,714 patients, 6 attributes) 3.6s; `msk_chord_2024` (24,950
+patients, 50 attributes) 5.7s; `genie_public` (242,866 patients, 25 attributes)
+15.2s.
+
+Three conclusions:
+
+- **Capping attributes is a UI fix, not a performance fix.** Restricting to 20
+  common attributes cuts the facet count 80x (1,634 → 20) and the latency only
+  17%. 1,634 facets is unreadable, so the cap is worth having — but it does not
+  address the ceiling.
+- **Production caps out well below the box.** `app/api/explore/route.ts` sets
+  `maxDuration = 60`, so Vercel fails somewhere around 256 studies regardless.
+- **The default landing state is slow.** `DEFAULT_EXPLORE_STUDIES` is
+  `["msk_chord_2024", "genie_public"]` — two studies, one of them 242k patients.
+
+### Correction to earlier figures in this repo's history
+
+An earlier run of this ladder reported 18.3s for one study and 97.6s for 64, and
+an outright failure at 560. Those numbers were taken while a second full-scale
+Explore ran against the same server, and are roughly 5x too slow. The table above
+was measured on an idle server and supersedes them.
+
+## 3. Why per-study, and what a pooled version must keep
+
+Five reasons the code fans out per study, of which one is load-bearing:
+
+1. **Cross-instance federation** — real. A study may live in another database or
+   another institution's instance, and one SQL statement cannot span them. But
+   the routing here is **546 studies on one connection and 14 on another**: the
+   generality is paid 560 times to serve a 2-way split.
+2. **The cohort compiler is single-study** — real, but only when a draft filter
+   exists. The measurements above used no draft and still cost 137s.
+3. **Panel-aware denominators** — per-study *grouping*, which SQL does natively;
+   not a reason for separate round trips. See §1: the panel join is what makes
+   the number right, not the study filter.
+4. **Vocabularies are not harmonised** — a labelling decision. One query can
+   return `(study, attribute, value, n)` and the "do not merge these" rule stays
+   where it is.
+5. **The OncoKB pin** — global. Not per-study at all.
+
+So the shape of a faster version is **partition by connection, not by study**:
+one set of queries per connection covering all its studies with
+`GROUP BY cancer_study_identifier`, merged as today. Federation survives — a peer
+study still goes over MCP, a study on another instance still gets its own pass.
+
+A pooled clinical-facet query over all 546 co-located studies measures **0.41s**,
+against 137s for the full endpoint — but that is only the clinical facets. Gene
+tables, derived facets, event types and case lists are all still per-study and
+would become the new ceiling.
+
+**Sequencing suggested by the risk, not the payoff:** pool the clinical facets
+first (semantics are labelling only), leave the gene tables per-study, and
+measure what remains. The gene tables are where §1 lives, and they should not be
+touched until the differential check can compare pooled against per-study output
+gene by gene.
+
+## 4. Time to display vs cbioportal.org
+
+Oncoprint, 5 genes, measured from navigation to the figure's pixels going stable
+— a definition that does not care whether the renderer is WebGL or 2D canvas.
+Both sides drew patient columns.
+
+| study | patients | cbioportal.org | ours (Vercel) | ours (local) |
+|---|---|---|---|---|
+| `aml_target_gdc` | 2,274 | 7.6s | 1.9s | 1.5s |
+| `msk_chord_2024` | 24,950 | **38.0s** | **2.3s** | 2.3s |
+
+The ratio is less interesting than the slope. Over an 11x larger cohort,
+cbioportal.org goes 7.6s → 38.0s while we go 1.9s → 2.3s. They ship per-sample,
+per-gene records to the browser and annotate through OncoKB in the frontend, so
+cost grows with cohort size; our oncoprint sends a bounded aggregated contract
+and the canvas draws at level of detail.
+
+Caveats, which matter:
+
+- **Not a cache artefact.** Three identical repeats gave 7.7 / 7.1 / 7.6s, so
+  cbioportal.org is not serving a warm result cache for these queries.
+- **Their page is heavier** — ten tabs, extra tracks, a full results shell —
+  against our single card. Some of the constant offset is page weight.
+- **On `aml_target_gdc` our driver annotation is admittedly thinner.** Our own UI
+  says so ("variants synced from msk_chord_2024; coverage may be partial") and we
+  report NPM1 at 0% driver, which is wrong for AML. The `any%` figures match
+  theirs exactly (TP53 1%, KRAS ~12%, NRAS 27%, FLT3 13%, NPM1 11%), so the
+  comparison is sound for alteration frequency and not for driver calls.
+- `msk_chord_2024` carries no such caveat — it is the study our OncoKB store
+  syncs from — but their per-gene percentages are drawn into canvas rather than
+  DOM text, so matched frequencies were **not** verified at that scale. Matched
+  column counts (24,950 both sides) and complete annotation were.
