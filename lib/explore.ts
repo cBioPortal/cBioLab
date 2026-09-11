@@ -119,9 +119,14 @@ async function attachHistograms(opts: {
   }));
 }
 
-export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, binEdges }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn; geneSearch?: string; skipBins?: boolean; binEdges?: Record<string, { edges: number[]; interval: number }> }): Promise<ExploreResult> {
+export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, binEdges, attributes }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn; geneSearch?: string; skipBins?: boolean; binEdges?: Record<string, { edges: number[]; interval: number }>; attributes?: string[] }): Promise<ExploreResult> {
   const db = conn.db;
   const t0 = Date.now();
+  // An optional allow-list of attribute names. Exploring hundreds of studies at
+  // once, a reader wants the handful of attributes those studies SHARE, not the
+  // union of every study's own vocabulary — which reached 1,634 facets across 64
+  // studies. Empty means "everything", so nothing changes by default.
+  const attrAllow = [...new Set((attributes || []).map(String).filter((a) => /^[A-Za-z0-9_]{1,64}$/.test(a)))].slice(0, 60);
   let cond = "", sampleCond = "", panelSampleCond = "", draftCount = null, dsql = null;
   if (draft && Array.isArray(draft.all) && draft.all.length) {
     dsql = compileCohortDef(draft, { oncokbPin, profiles, gaProfiles, study, db });
@@ -207,7 +212,8 @@ async function studyCardinality(study: string, conn: ChConn): Promise<Map<string
     "  countIf(toFloat64OrNull(attribute_value) IS NULL) AS na,\n" +
     "  countIf(toFloat64OrNull(attribute_value) = round(toFloat64OrNull(attribute_value))) = countIf(toFloat64OrNull(attribute_value) IS NOT NULL) AS allints\n" +
     "FROM " + db + ".clinical_data_derived\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''" + cond + "\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''" + cond +
+    (attrAllow.length ? "\n  AND attribute_name IN (" + attrAllow.map(sq).join(",") + ")" : "") + "\n" +
     "GROUP BY type, a ORDER BY np DESC LIMIT 250", conn);
   // Declared datatype wins; the old value-sniffing survives only as a fallback
   // for attributes with no metadata row, so nothing is silently discarded.
@@ -537,12 +543,12 @@ async function buildDerivedFacets(
 // whole harmonization). Numeric medians are patient-weighted approximations;
 // min/max are exact. An attribute classified differently across studies takes
 // the kind of the study with the most patients for it.
-export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>; connByStudy?: Map<string, ChConn>; geneSearch?: string }): Promise<ExploreResult> {
+export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>; connByStudy?: Map<string, ChConn>; geneSearch?: string; attributes?: string[] }): Promise<ExploreResult> {
   // Pass 1: facets per study, WITHOUT histograms — each study's own quartiles
   // would give it different bin edges, and bars over different ranges cannot be
   // summed. Skip the work rather than compute bins we would throw away.
   const parts = await Promise.all(studies.map(s =>
-    buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true,
+    buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, attributes,
       conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}) })));
 
   // Pass 2: derive ONE set of edges per attribute from the pooled statistics,

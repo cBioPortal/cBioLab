@@ -803,6 +803,20 @@ async function main() {
     for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
     if (!/^FAIL /m.test(out)) results.push("FAIL docs:check crashed: " + String(e.message).slice(0, 120));
   }
+  // Panel-aware denominator gate. A gene's frequency is altered / profiled-for-
+  // that-gene, resolved through the panel tables — and the wrong version, a
+  // study-or-cohort total, produces plausible percentages rather than an error.
+  // Runs against the live database over studies whose panels genuinely differ.
+  try {
+    const { execSync } = require("child_process");
+    const out = execSync("npm run --silent check:denominators", { cwd: __dirname, encoding: "utf8", timeout: 300000 });
+    for (const line of out.trim().split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
+  } catch (e) {
+    const out = String((e.stdout || "") + (e.stderr || "")).trim();
+    for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
+    if (!/^FAIL /m.test(out)) results.push("FAIL check:denominators crashed: " + String(e.message).slice(0, 120));
+  }
+
   console.log(results.join("\n"));
   process.exit(results.some(r => r.startsWith("FAIL")) ? 1 : 0);
 }
