@@ -298,6 +298,13 @@ exactly the per-study answer. `mergeExplore` already relies on this. What is
 never safe is averaging per-study percentages, which would weigh a 30-sample
 study the same as a 30,000-sample one.
 
+This also makes the denominator **cheap to compute in bulk**: profiling status is
+already reduced into `sample_to_gene_panel_derived` (1.45M rows) and
+`gene_panel_to_gene_derived` (70,694 rows), so the correct denominator for every
+(study, gene) pair across all 560 studies is one join over ~1.5M rows — measured
+at 0.46s. Correctness here does not cost performance, and nothing needs to be
+traded against it.
+
 Guarded by `test/denominator.test.ts` (source tripwire, no database) and
 `npm run check:denominators` (live differential with pinned values, in the e2e
 gate). Both were mutation-verified against the shortcut above. Note that the
@@ -366,16 +373,53 @@ one set of queries per connection covering all its studies with
 `GROUP BY cancer_study_identifier`, merged as today. Federation survives — a peer
 study still goes over MCP, a study on another instance still gets its own pass.
 
-A pooled clinical-facet query over all 546 co-located studies measures **0.41s**,
-against 137s for the full endpoint — but that is only the clinical facets. Gene
-tables, derived facets, event types and case lists are all still per-study and
-would become the new ceiling.
+### What pooling actually costs, measured
 
-**Sequencing suggested by the risk, not the payoff:** pool the clinical facets
-first (semantics are labelling only), leave the gene tables per-study, and
-measure what remains. The gene tables are where §1 lives, and they should not be
-touched until the differential check can compare pooled against per-study output
-gene by gene.
+Measured directly against the database, not through the endpoint:
+
+| pooled query, ALL studies at once | time | rows |
+|---|---|---|
+| clinical facets (20 common attributes) | 0.41s | — |
+| panel-aware denominator, every (study, gene) | **0.46s** | 86,178 |
+| altered counts, mutations, top 500 per study | 1.40s | 222,682 |
+| **complete gene table — altered AND profiled, every study** | **1.77s** | 222,682 |
+| the same for all three alteration types | 4.40s | 388,899 |
+
+For comparison, one study's gene-table numerator alone currently takes 0.25s,
+and there are three of them per study among the ~17 round trips.
+
+The pooled gene table was checked against the pinned values and reproduces them
+exactly — `msk_ch_2020` DNMT3A `2559/7216`, `histiocytosis_cobi_msk_2019` BRAF
+`8/47`.
+
+**Correction to an earlier draft of this section.** It recommended pooling the
+clinical facets first and leaving the gene tables alone, on the grounds that the
+gene tables are where the denominator rule lives and therefore the risky part.
+That was wrong, and backwards:
+
+- The denominator is **not** recomputed from the 50M-row event table. Profiling
+  status is already reduced into `sample_to_gene_panel_derived` (1.45M rows) and
+  `gene_panel_to_gene_derived` (70,694 rows). Joining those across every study
+  touches ~1.5M rows and costs 0.46s.
+- It is **correct by construction when pooled**, because profiling is a property
+  of `(sample, panel, gene)`. The `GROUP BY study` is presentation; the join is
+  what makes the number right. The same join that is right for one study is right
+  for 560 in one pass.
+- So the gene tables are simultaneously the **most expensive** part of the
+  per-study fan-out and the **cheapest and safest** to pool.
+
+The revised order is therefore the opposite: **pool the gene tables first**, since
+that is where the time is, and the pinned differential already covers the only
+thing that could go wrong.
+
+Two limits on these numbers, stated so they are not over-read:
+
+- They are raw SQL. The endpoint also merges results, and a **drafted** Explore
+  still needs per-study compiled predicates from `compileCohortDef` — the pooled
+  figures above are for the unfiltered case.
+- `LIMIT n BY study` keeps the per-study cap, but the pooled result set is ~560x
+  larger (222,682 gene rows against 500). That is a payload question to design,
+  not inherit.
 
 ## 4. Time to display vs cbioportal.org
 
