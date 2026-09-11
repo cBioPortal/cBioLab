@@ -581,6 +581,13 @@ export interface OncoprintSpec {
 
 // ---------- explore ---------------------------------------------------------
 interface FacetBase {
+  /**
+   * How many of the participating studies carry this attribute. 1 for a single
+   * study. Lets the UI separate attributes the selection SHARES from one study's
+   * own vocabulary — across 64 studies the union reaches 1,634 facets, in which
+   * the handful every study has are lost among the rest.
+   */
+  studyCount?: number;
   attribute: string; per: "patient" | "sample"; patients: number;
   /** from clinical_attribute_meta — the portal's own declarations */
   displayName?: string; description?: string;

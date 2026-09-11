@@ -651,7 +651,11 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     const base = {
       attribute: same[0].attribute, per: same[0].per, patients,
       displayName: withMeta.displayName, description: withMeta.description,
-      priority: withMeta.priority, distinct: Math.max(...same.map((i) => i.distinct ?? 0)) || undefined
+      priority: withMeta.priority, distinct: Math.max(...same.map((i) => i.distinct ?? 0)) || undefined,
+      // How many of the participating studies carry this attribute at all. A
+      // union across studies reached 1,634 facets, in which the handful every
+      // study shares are indistinguishable from one study's private vocabulary.
+      studyCount: same.length
     };
     if (kind === "num") {
       return { ...base, kind: "num" as const,

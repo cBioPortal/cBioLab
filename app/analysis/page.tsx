@@ -239,12 +239,22 @@ export default function AnalysisPage() {
   const [exPanelOpen, setExPanelOpen] = useState(false);                // study panel expanded?
   const exSel = useRef<string[]>([...DEFAULT_EXPLORE_STUDIES]);                   // current selection (ref: immune to state races)
   const exFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);                                    // debounce for multi-toggle refetch
-  const exFetchSeq = useRef(0);                                         // stale-response guard for explore fetches
+  const exFetchSeq = useRef(0);
+  /** facets from the last UNNARROWED response — the bar is always computed from these */
+  const exFullAttrsRef = useRef<{ attribute: string; studyCount: number }[]>([]);                                         // stale-response guard for explore fetches
   const [qaAttr, setQaAttr] = useState("");                             // creator quick-add: attribute
   const [qaVal, setQaVal] = useState("");                               // creator quick-add: numeric threshold
   const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
   const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
-  const [attrLimit, setAttrLimit] = useState(20);                       // clinical attributes shown
+  const [attrLimit, setAttrLimit] = useState(20);
+  /**
+   * Minimum share of the selected studies an attribute must appear in to be
+   * shown. Across 64 studies the union of vocabularies is 1,634 facets, and the
+   * ones every study shares — CANCER_TYPE, SEX, OS_STATUS — are lost in it. This
+   * also narrows the NEXT request: the server is told which attributes to facet,
+   * so it stops computing the ones being hidden.
+   */
+  const [attrCoverage, setAttrCoverage] = useState(0);                       // clinical attributes shown
 
   /**
    * Saved workspaces. A workspace IS the analysis document — several views,
@@ -564,7 +574,14 @@ export default function AnalysisPage() {
 
   const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
 
-  const fetchExplore = async (draftOverride?: CohortDef | null, studiesOverride?: string[] | string) => {
+  /** attributes meeting a coverage bar, from the last unnarrowed response */
+  const attrsForBar = (bar: number, studiesOverride?: string[] | string): string[] => {
+    if (bar <= 0 || !exFullAttrsRef.current.length) return [];
+    const n = (studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current).length;
+    return exFullAttrsRef.current.filter(a => a.studyCount >= Math.ceil(bar * n)).map(a => a.attribute);
+  };
+
+  const fetchExplore = async (draftOverride?: CohortDef | null, studiesOverride?: string[] | string, attrsOverride?: string[]) => {
     // Several independent triggers can ask for the same facets at once (a
     // ?tab=explore deep link, the tab button, and the catalog resolving the
     // default study selection all fire on load). exFetchSeq supersedes stale
@@ -574,7 +591,7 @@ export default function AnalysisPage() {
     const inflightKey = JSON.stringify([
       studiesOverride ?? exSel.current,
       draftOverride !== undefined ? draftOverride : parseDraft(),
-      null
+      attrsOverride ?? attrsForBar(attrCoverage, studiesOverride)
     ]);
     if (exInflight.current === inflightKey) return;
     exInflight.current = inflightKey;
@@ -584,10 +601,20 @@ export default function AnalysisPage() {
       const list = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current;
       if (!list.length) { setExplore(null); exInflight.current = null; setExploreBusy(false); return; }
       const res = await fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studies: list, draft: draftOverride !== undefined ? draftOverride : parseDraft() }) });
+        body: JSON.stringify({ studies: list, draft: draftOverride !== undefined ? draftOverride : parseDraft(),
+          // Narrow the server's work to the attributes that will actually be
+          // shown. Only sent once a previous result has told us which those are.
+          ...((attrsOverride ?? attrsForBar(attrCoverage, studiesOverride)).length
+            ? { attributes: attrsOverride ?? attrsForBar(attrCoverage, studiesOverride) } : {}) }) });
       const j = await res.json();
       if (seq !== exFetchSeq.current) return; // superseded while in flight — discard
-      if (!j.error) setExplore(j); else setError(j.error);
+      if (!j.error) {
+        setExplore(j);
+        // only a response that was NOT narrowed can define the full vocabulary
+        if (!(attrsOverride ?? []).length && !(attrCoverage > 0))
+          exFullAttrsRef.current = (j.clinical || [])
+            .map((c: { attribute: string; studyCount?: number }) => ({ attribute: c.attribute, studyCount: c.studyCount ?? 1 }));
+      } else setError(j.error);
     } catch (e) { if (seq === exFetchSeq.current) setError(String((e as Error)?.message || e)); }
     if (seq === exFetchSeq.current) exInflight.current = null; setExploreBusy(false);
   };
@@ -1521,18 +1548,41 @@ function Latency({ v }: { v: any }) {
             <div>
               <div className="card">
                 {(() => {
-                  const shown = Math.min(explore.clinical.length, attrLimit);
+                  const visible = explore.clinical.filter(c => attrCoverage === 0 ||
+                    (c.studyCount ?? 1) >= Math.ceil(attrCoverage * exStudies.length));
+                  const shown = Math.min(visible.length, attrLimit);
                   return (
                     <div className="row" style={{ alignItems: "baseline" }}>
                       <h2 style={{ margin: 0 }}>Clinical <span className="plain">— counted in each attribute's own unit, as the portal does</span></h2>
                       <span className="spacer" />
-                      <span className="meta">{shown < explore.clinical.length
-                        ? "showing " + shown + " of " + explore.clinical.length + " attributes"
-                        : explore.clinical.length + " attributes"}</span>
+                      <span className="meta">{shown < visible.length
+                        ? "showing " + shown + " of " + visible.length + " attributes"
+                        : visible.length + " attributes"}
+                        {attrCoverage > 0 && visible.length < explore.clinical.length
+                          ? " (" + (explore.clinical.length - visible.length) + " hidden as study-specific)" : ""}</span>
+                      {exStudies.length > 1 && (
+                        <select value={String(attrCoverage)} disabled={exploreBusy}
+                          title="attributes carried by only one study are that study's own vocabulary, not something the selection shares"
+                          onChange={e => {
+                            const v = Number(e.target.value);
+                            setAttrCoverage(v);
+                            // Refetch UNNARROWED so the bar can be lowered again
+                            // later; the filtering below is what the reader sees,
+                            // and subsequent fetches narrow the server's work.
+                            setTimeout(() => fetchExplore(undefined, undefined, []), 0);
+                          }}>
+                          <option value="0">every attribute</option>
+                          <option value="0.5">in most studies</option>
+                          <option value="1">in every study</option>
+                        </select>
+                      )}
                     </div>
                   );
                 })()}
-                {explore.clinical.slice(0, attrLimit).map(c => (
+                {explore.clinical
+                  .filter(c => attrCoverage === 0 ||
+                    (c.studyCount ?? 1) >= Math.ceil(attrCoverage * exStudies.length))
+                  .slice(0, attrLimit).map(c => (
                   /* data-attr / data-shape make the facet identifiable from outside
                      React — the e2e suite asserts that an attribute's shape does not
                      change when the draft does. */
