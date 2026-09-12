@@ -859,6 +859,19 @@ async function main() {
     if (!/^FAIL /m.test(out)) results.push("FAIL check:denominators crashed: " + String(e.message).slice(0, 120));
   }
 
+  // Gene-status facet gate. A filterable facet's count comes from one query and
+  // its cohort from a compiled clause; nothing forces them to agree, and both
+  // ways this broke during development were invisible in the output's shape.
+  try {
+    const { execSync } = require("child_process");
+    const out = execSync("npm run --silent check:genefacets", { cwd: __dirname, encoding: "utf8", timeout: 300000 });
+    for (const line of out.trim().split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
+  } catch (e) {
+    const out = String((e.stdout || "") + (e.stderr || "")).trim();
+    for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
+    if (!/^FAIL /m.test(out)) results.push("FAIL check:genefacets crashed: " + String(e.message).slice(0, 120));
+  }
+
   // Value-folding gate. A facet click compiles to an equality on the value, so
   // while `Female` and `FEMALE` were separate literals the click selected one of
   // them and the cohort was silently short — 35.6% short in breast_msk_2025.

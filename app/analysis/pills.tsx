@@ -57,7 +57,11 @@ function leafText(leaf: any) {
     const unit = leaf.metric === "alteredGenes" ? " genes" : "mo";
     return String(leaf.metric || "derived").replace(/Months$/, "") + " " + bits + unit;
   }
-  if (k === "profiled") return "profiled: " + leaf.type;
+  // The gene matters: "NOT profiled: MUTATION" reads as "never sequenced for
+  // mutations at all", where the clause a gene-status facet builds means "no
+  // panel of theirs covers THIS gene". Two different cohorts, and the narrower
+  // one is the whole point of that facet.
+  if (k === "profiled") return "profiled: " + leaf.type + (leaf.gene ? " · " + leaf.gene : "");
   if (k === "caseList") return leaf.id;
   if (k === "genomicData") return `${leaf.gene} ${leaf.profileType} ` + (leaf.range ? Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ") : "");
   if (k === "genericAssay") return `${leaf.entity} ` + JSON.stringify(leaf.range || leaf.values);

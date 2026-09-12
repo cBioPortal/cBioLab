@@ -32,7 +32,45 @@ export interface ClinicalLeaf {
   value?: string | number;
 }
 export interface PatientsLeaf { kind: "patients"; ids: string[] }
-export interface ProfiledLeaf { kind: "profiled"; type: "MUTATION" | "CNA" | "SV" }
+export interface GeneStateFacet {
+  gene: string;
+  type: "MUTATION" | "CNA";
+  /** always "patient": the unit the draft filter selects in */
+  per: "patient";
+  /** patients in the cohort, the base of the notProfiled slice */
+  total: number;
+  /** patients with at least one sample on a panel covering this gene */
+  profiled: number;
+  states: { state: "altered" | "amp" | "del" | "unaltered" | "notProfiled"; label: string; n: number }[];
+  /**
+   * Patients with a call for this gene who are on NO panel covering it — a
+   * source-data inconsistency, not a state a reader can select. genie_public has
+   * 7 for EGFR. They are counted in `notProfiled` (no panel of theirs covers
+   * the gene) and reported here so the contradiction is visible rather than
+   * quietly folded into the altered slice, where it would break the partition.
+   */
+  alteredUnprofiled?: number;
+  /**
+   * Patients counted in BOTH Amplified and Deleted — amplified in one sample,
+   * deleted in another. These four CNA states are selectable conditions, not a
+   * partition, and this is by how much they over-sum. EGFR in genie_public has
+   * exactly one.
+   */
+  overlap?: number;
+}
+
+export interface ProfiledLeaf {
+  kind: "profiled"; type: "MUTATION" | "CNA" | "SV";
+  /**
+   * Narrow to samples profiled for THIS GENE — the panel they were run on
+   * actually covers it. Without this, "profiled for mutations" includes samples
+   * whose panel omits the gene, and a cohort built as "profiled AND NOT altered"
+   * would call them wild-type for a gene nobody tested. That is the same error
+   * the panel-aware denominator exists to prevent, so the gene-specific
+   * alteration facets always set it.
+   */
+  gene?: string;
+}
 export interface CaseListLeaf { kind: "caseList"; id: string }
 export interface GenomicDataLeaf {
   kind: "genomicData"; gene: string; profileType: string;
@@ -681,6 +719,16 @@ export interface ExploreResult {
   derived?: DerivedFacet[];
   /** legacy combined list — kept so existing consumers keep working */
   genes: { gene: string; n: number }[];
+  /**
+   * Per-gene alteration facets — the portal's "EGFR: Somatic mutations" and
+   * "EGFR: Copy-number alterations" charts. Counted in PATIENTS, because that is
+   * the unit a click filters in; the gene tables beside them count samples, and
+   * each says which it is.
+   *
+   * `notProfiled` is the reason these exist. A patient whose panels omit the
+   * gene is not wild-type for it and must not land in the unaltered slice.
+   */
+  geneFacets?: GeneStateFacet[];
   /** portal-equivalent gene tables (samples, panel-aware denominators) */
   mutatedGenes?: GeneTableRow[];
   cnaGenes?: GeneTableRow[];

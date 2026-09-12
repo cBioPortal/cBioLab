@@ -48,6 +48,8 @@ export async function POST(req: Request) {
     const geneSearch = typeof body.geneSearch === "string" ? body.geneSearch.slice(0, 40) : undefined;
     // Optional attribute allow-list — see buildExplore. Omitted means everything.
     const attributes = Array.isArray(body.attributes) ? body.attributes.map(String).slice(0, 60) : undefined;
+    // genes the reader has asked to chart as their own alteration facet
+    const geneCharts = Array.isArray(body.geneCharts) ? body.geneCharts.map(String).slice(0, 6) : undefined;
     const remoteParts = await Promise.all(remote.map((s) => {
       const peer = peerForStudy(s)!;
       return remoteFacets(s, peer.url, draft, peer.label, geneSearch);
@@ -56,9 +58,9 @@ export async function POST(req: Request) {
       return Response.json(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts));
     }
     const localResult = local.length === 1
-      ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch, attributes,
+      ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch, attributes, geneCharts,
           ...profilesByStudy.get(local[0]), conn: connByStudy.get(local[0]) })
-      : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes });
+      : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts });
     return Response.json(remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult);
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });

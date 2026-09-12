@@ -175,10 +175,23 @@ function derivedLeafSql(leaf: any, ctx: Ctx): string {
 function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): string {
   const t = PROFILED_TYPE[String(leaf.type || "").toUpperCase()];
   if (!t) throw new Error("profiled clause: type must be MUTATION, CNA, or SV");
+  const db = dbOf(ctx);
+  // Optional gene narrowing, resolved through the SAME panel tables as the
+  // gene-table denominator: a sample is profiled for a gene when its panel
+  // covers that gene, or when it is whole-exome. WES is a separate term rather
+  // than a join because it enumerates ~45k genes — joining it multiplied one
+  // TCGA study to 47.8M rows. See geneTables() in lib/explore.ts.
+  let geneCond = "";
+  if (leaf.gene != null) {
+    const gene = String(leaf.gene).toUpperCase().trim();
+    if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(gene)) throw new Error("profiled clause: invalid gene symbol");
+    geneCond = "\n    AND (sp.gene_panel_id = 'WES' OR sp.gene_panel_id IN (\n" +
+      "      SELECT gene_panel_id FROM " + db + ".gene_panel_to_gene_derived WHERE gene = " + sq(gene) + "))";
+  }
   return "SELECT DISTINCT " + PID("sd.patient_unique_id", ctx.study) + " AS pid\n" +
-    "  FROM " + dbOf(ctx) + ".sample_to_gene_panel_derived sp\n" +
-    "  JOIN " + dbOf(ctx) + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
-    "  WHERE sp.cancer_study_identifier = " + sq(ctx.study) + " AND sp.alteration_type = " + sq(t);
+    "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
+    "  WHERE sp.cancer_study_identifier = " + sq(ctx.study) + " AND sp.alteration_type = " + sq(t) + geneCond;
 }
 
 function caseListLeafSql(leaf: CaseListLeaf, ctx: Ctx): string {
