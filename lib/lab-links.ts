@@ -75,8 +75,20 @@ function cutSpec(spec: unknown, keep: number, notes: string[], path = ""): unkno
 export interface LabLinks {
   cli: string;
   python: string;
+  /** the figure as a self-contained Jupyter notebook — package and contract embedded */
+  ipynb: string;
   /** stated on the button and again on the lab page when the link could not carry everything */
   cut?: string;
+}
+
+/**
+ * JupyterLite — real JupyterLab, in the reader's browser, run by jupyter.org — opening a notebook
+ * of ours. It is the reader's browser that fetches the URL, so this works for any origin they can
+ * reach, but only over https: an https page cannot fetch an http one.
+ */
+export const JUPYTERLITE = "https://jupyter.org/try-jupyter/lab/index.html";
+export function jupyterLiteUrl(absoluteIpynbUrl: string): string {
+  return JUPYTERLITE + "?fromURL=" + encodeURIComponent(absoluteIpynbUrl);
 }
 
 /**
@@ -97,7 +109,8 @@ export function labLinks(spec: unknown, max = SPEC_URL_MAX): LabLinks | null {
   }
   if (encoded.length > max) return null;
   const q = "?spec=" + encoded + (cut ? "&cut=" + encodeURIComponent(cut) : "");
-  return { cli: "/oncoprint-lab/cli" + q, python: "/oncoprint-lab/python" + q, cut };
+  return { cli: "/oncoprint-lab/cli" + q, python: "/oncoprint-lab/python" + q,
+    ipynb: "/api/oncoprint/notebook/oncoprint.ipynb" + q, cut };
 }
 
 /** a spec built from pasted tables rather than from the warehouse */

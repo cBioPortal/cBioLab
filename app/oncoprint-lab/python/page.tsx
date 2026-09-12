@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import PyNotebook from "./PyNotebook.tsx";
-import { decodeSpec } from "../../../lib/lab-links.ts";
+import { decodeSpec, jupyterLiteUrl } from "../../../lib/lab-links.ts";
 
 export const metadata = { title: "Oncoprint in Python — Cohort Lab" };
 export const dynamic = "force-dynamic";
@@ -35,6 +35,21 @@ export default async function PythonPage({ searchParams }: { searchParams: Promi
       </header>
       <main>
         {error && <div className="error">{error}</div>}
+        {encoded && (() => {
+          // The same figure as a real notebook. The download works anywhere; JupyterLite is
+          // jupyter.org running JupyterLab in the reader's browser, and it fetches the file from
+          // this server — so it needs this instance to be reachable from that browser as a public
+          // address, which a private or tailnet-only deployment is not.
+          const ipynb = "/api/oncoprint/notebook/oncoprint.ipynb?spec=" + encoded + (cut ? "&cut=" + encodeURIComponent(cut) : "");
+          const base = process.env.APP_BASE_URL;
+          return (
+            <p className="meta" style={{ margin: "0 0 0.8rem" }}>
+              Prefer a real notebook? <a href={ipynb} download="oncoprint.ipynb">Download .ipynb</a> — the package and this
+              figure&apos;s contract are embedded, so it opens in Jupyter, VS Code or Colab and runs with nothing installed
+              {base ? <> · <a href={jupyterLiteUrl(base + ipynb)} target="_blank" rel="noreferrer">open it in JupyterLite ↗</a></> : null}.
+            </p>
+          );
+        })()}
         <PyNotebook files={files} fixtures={fixtures} spec={spec} cut={cut} />
       </main>
     </>

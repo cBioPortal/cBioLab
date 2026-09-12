@@ -12,7 +12,7 @@ import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binar
 import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { geneLegendFor, resolveStyle, styleForDisplay, trackTooltipLines } from "../../lib/oncoprint-style.ts";
-import { labLinks } from "../../lib/lab-links.ts";
+import { jupyterLiteUrl, labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 
 const MAX_ZOOM = 24;
@@ -575,6 +575,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const lab = useMemo(() => labLinks(specOnScreen()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [JSON.stringify(spec), sortKeys.join(","), JSON.stringify(display)]);
+  // jupyter.org's JupyterLite fetches the notebook from here, in the reader's browser: possible
+  // for any origin they can reach, but an https page cannot fetch an http one, so a plain-http
+  // dev server offers the download alone.
+  const jupyterlite = lab && typeof window !== "undefined" && window.location.protocol === "https:"
+    ? jupyterLiteUrl(window.location.origin + lab.ipynb) : null;
   const save = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -693,12 +698,16 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 {/* Not a download: the same spec, opened where it can be run rather than looked at.
                     Nothing is exported — the link carries the definition, and the lab page re-runs it. */}
                 <div className="menu-aside">
-                  <span className="meta">open this figure in</span>
+                  <span className="meta">open this figure elsewhere</span>
                   {lab ? <>
                     <a className="linklike" href={lab.cli} target="_blank" rel="noreferrer"
-                      title="the node and Python command lines, run against this spec on this server">the command line ↗</a>
+                      title="the node and Python command lines, run against this spec on this server">export to CLI emulator ↗</a>
                     <a className="linklike" href={lab.python} target="_blank" rel="noreferrer"
-                      title="this figure in a Pyodide notebook — the cohortlab package, in your browser">a Python notebook ↗</a>
+                      title="this figure in a Pyodide notebook — the cohortlab package, in your browser">export to Python notebook ↗</a>
+                    <a className="linklike" href={lab.ipynb} download="oncoprint.ipynb"
+                      title="a real .ipynb with the package and this figure's contract embedded — it needs no install and no network">export to Jupyter (.ipynb)</a>
+                    {jupyterlite && <a className="linklike" href={jupyterlite} target="_blank" rel="noreferrer"
+                      title="JupyterLab in your browser, run by jupyter.org, opening that same notebook">open it in JupyterLite ↗</a>}
                     {lab.cut && <span className="meta">{lab.cut}</span>}
                   </> : <span className="meta">this figure&apos;s spec is too large to travel in a link;
                     export the tabular TSV instead</span>}
