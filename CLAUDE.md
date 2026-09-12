@@ -174,3 +174,37 @@ still holds, against a running server.
   also why it cannot run in CI as written.
 - Commit style: author is the user; end messages with the Claude co-author trailer. One commit
   per feature with a body that explains semantics and what was verified.
+
+## Session folders, branches and ports
+
+One folder per session, one branch per folder, one dev server per folder on a
+stable port that always reflects it.
+
+| | |
+|---|---|
+| folder | a git worktree — `cBio-next-<name>` |
+| branch | `session/<name>`, checked out only there |
+| port | `next dev`, kept alive by `serve-<port>.sh`, serving that folder |
+| gate | `cBio-next-<name>-gate`, a sibling worktree for build + e2e |
+
+`scripts/session-setup.sh <name> <port>` creates all of it.
+`scripts/gate.sh` runs build + unit + e2e **in the gate worktree**, never in the
+session folder.
+
+**Do not run `npm run build` in a session folder.** `next dev` and `next build`
+share `.next/`. Serving a production build from a folder that is also built in
+is what broke the tailnet instance three times: each build rewrote the chunk
+hashes and deleted the ones the running server still referenced, so the client
+JS 404ed and every interaction fell back to a server render — with no error
+anywhere except a failed request in the browser console.
+
+Current mappings (`tailscale serve`, stable):
+
+| external | local | folder |
+|---|---|---|
+| `:8446` | 3102 | `/home/ubuntu/cBio-next` (this session, branch `value-folding`) |
+| `:8447` | 3107 | `/home/ubuntu/projects/cbio-next-oncoprint/cohort-lab` (separate checkout) |
+
+After any change meant to reach a reviewer, **check the URL they will open** —
+one curl for the page plus one for a chunk it references. Asserting it works is
+not the same as looking.

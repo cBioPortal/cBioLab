@@ -1,17 +1,26 @@
 #!/bin/sh
-# Keep the tailnet-facing app (https://…:8446 -> 127.0.0.1:3102) alive.
+# The DEV server for this session's folder, on the stable port behind
+# https://vps-870e202d.tailf02841.ts.net:8446 (tailscale serve maps 8446 -> 3102).
 #
-# This box runs several heavy dev servers and sits near its memory ceiling, so a
-# long-lived idle next-server is a plausible OOM victim — and a gate run (build +
-# Playwright + node --test) is exactly the kind of spike that triggers one. It is
-# also killed deliberately by `fuser -k 3102/tcp` during rebuilds. Either way the
-# fix is the same: come straight back.
+# WHY `next dev` AND NOT `next start`. This used to run a production build from
+# this same directory, and every `npm run build` rewrote the chunk hashes and
+# deleted the old ones — so the running server's manifest pointed at files that
+# no longer existed, the client JS never loaded, and the page silently fell back
+# to a server render on every interaction. It broke three times that way.
+# `next dev` compiles from the filesystem on demand, so the port always reflects
+# whatever is in this folder. There is no build step to forget.
 #
-# Stop it with:  pkill -f serve-3102.sh   (then fuser -k 3102/tcp)
+# COROLLARY: do NOT run `npm run build` in this directory. dev and build share
+# .next/ and will fight. Gate builds belong in ../cBio-next-gate.
+#
+# Restarts on exit because this box sits near its memory ceiling and a
+# long-lived server is a plausible OOM victim.
+#
+# Stop it with:  kill <this pid>   (find it with: ps -o pid,args -C sh | grep 3102)
 cd "$(dirname "$0")" || exit 1
 while true; do
-  echo "[keepalive] starting $(date -Is)" >> server-analysis.log
-  NODE_OPTIONS=--max-old-space-size=640 npx next start -p 3102 -H 127.0.0.1 >> server-analysis.log 2>&1
-  echo "[keepalive] exited rc=$? at $(date -Is); restarting in 3s" >> server-analysis.log
+  echo "[dev] starting $(date -Is)" >> server-analysis.log
+  NODE_OPTIONS=--max-old-space-size=1024 npx next dev -p 3102 -H 127.0.0.1 >> server-analysis.log 2>&1
+  echo "[dev] exited rc=$? at $(date -Is); restarting in 3s" >> server-analysis.log
   sleep 3
 done
