@@ -97,6 +97,7 @@ export function jupyterLiteUrl(absoluteIpynbUrl: string): string {
  * than offering a link to a figure that is not this one.
  */
 export function labLinks(spec: unknown, max = SPEC_URL_MAX): LabLinks | null {
+  let used = spec;
   let encoded = encodeSpec(spec);
   let cut: string | undefined;
   for (const keep of CUTS) {
@@ -104,13 +105,23 @@ export function labLinks(spec: unknown, max = SPEC_URL_MAX): LabLinks | null {
     const notes: string[] = [];
     const smaller = cutSpec(spec, keep, notes);
     if (!notes.length) return null;             // nothing left to cut, and it still does not fit
+    used = smaller;
     encoded = encodeSpec(smaller);
     cut = "this link carries a cut of the figure — " + notes.join("; ");
   }
   if (encoded.length > max) return null;
   const q = "?spec=" + encoded + (cut ? "&cut=" + encodeURIComponent(cut) : "");
   return { cli: "/oncoprint-lab/cli" + q, python: "/oncoprint-lab/python" + q,
-    ipynb: "/api/oncoprint/notebook/oncoprint.ipynb" + q, cut };
+    ipynb: ipynbPath(used, cut), cut };
+}
+
+/**
+ * The notebook's URL must END in `.ipynb`, so everything it carries goes in the path: JupyterLite's
+ * open-from-URL names the uploaded file `basename(url)`, query string and all, and a file called
+ * `oncoprint.ipynb?spec=…` opens in the text editor as a page of JSON instead of as a notebook.
+ */
+export function ipynbPath(spec: unknown, cut?: string | null): string {
+  return "/api/oncoprint/notebook/" + encodeSpec(cut ? { spec, cut } : { spec }) + "/oncoprint.ipynb";
 }
 
 /** a spec built from pasted tables rather than from the warehouse */

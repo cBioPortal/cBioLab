@@ -1,7 +1,9 @@
-// GET /api/oncoprint/notebook/<anything>.ipynb?spec=<base64url> — the figure as a Jupyter notebook.
+// GET /api/oncoprint/notebook/<payload>/oncoprint.ipynb — the figure as a Jupyter notebook.
 //
-// The path segment exists so the file arrives named: JupyterLite's open-from-URL takes the name
-// from the URL's last segment, and a query string alone would produce a nameless notebook.
+// Everything the request carries is in the PATH, and the last segment is the file name, because
+// JupyterLite's open-from-URL uploads the fetched file as basename(url) — query string included.
+// A file named `oncoprint.ipynb?spec=…` is not a notebook to JupyterLab: it opens in the text
+// editor as a page of JSON. The payload is base64url `{spec, cut?}`.
 //
 // The response is self-contained (package and contract embedded, see lib/notebook.ts) and is sent
 // with an open CORS header, because the point is for a notebook host on another origin —
@@ -11,13 +13,13 @@
 import { gzipSync } from "node:zlib";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { buildContract } from "../../../../../lib/oncoprint.ts";
-import { assembleContract } from "../../../../../lib/oncoprint-assemble.ts";
-import { localInput, parseTsv } from "../../../../../lib/oncoprint-local.ts";
-import { packContract } from "../../../../../lib/oncoprint-binary.ts";
-import { decodeSpec, isLocalSpec } from "../../../../../lib/lab-links.ts";
-import { oncoprintNotebook, notebookStats } from "../../../../../lib/notebook.ts";
-import type { Contract } from "../../../../../lib/types.ts";
+import { buildContract } from "../../../../../../lib/oncoprint.ts";
+import { assembleContract } from "../../../../../../lib/oncoprint-assemble.ts";
+import { localInput, parseTsv } from "../../../../../../lib/oncoprint-local.ts";
+import { packContract } from "../../../../../../lib/oncoprint-binary.ts";
+import { decodeSpec, isLocalSpec } from "../../../../../../lib/lab-links.ts";
+import { oncoprintNotebook, notebookStats } from "../../../../../../lib/notebook.ts";
+import type { Contract } from "../../../../../../lib/types.ts";
 
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
@@ -39,13 +41,13 @@ function packageB64(): string {
 
 export function OPTIONS() { return new Response(null, { status: 204, headers: CORS }); }
 
-export async function GET(req: Request, ctx: { params: Promise<{ file: string }> }) {
-  const { file } = await ctx.params;
+export async function GET(req: Request, ctx: { params: Promise<{ payload: string; file: string }> }) {
+  const { payload, file } = await ctx.params;
   try {
     const url = new URL(req.url);
-    const encoded = url.searchParams.get("spec");
-    if (!encoded) throw new Error("missing ?spec= (base64url-encoded OncoprintSpec)");
-    const spec = decodeSpec(encoded) as Record<string, unknown>;
+    const carried = decodeSpec(payload) as { spec?: Record<string, unknown>; cut?: string };
+    const spec = (carried && typeof carried === "object" && carried.spec ? carried.spec : carried) as Record<string, unknown>;
+    if (!spec || typeof spec !== "object") throw new Error("the path must carry a base64url {spec, cut?} object");
     const contract: Contract = isLocalSpec(spec)
       ? assembleContract(localInput({
           events: parseTsv(String(spec.events)),
@@ -64,7 +66,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ file: string }>
       packageB64: packageB64(),
       stats: notebookStats(contract),
       origin: process.env.APP_BASE_URL || url.origin,
-      cut: url.searchParams.get("cut") || undefined
+      cut: carried?.cut || url.searchParams.get("cut") || undefined
     });
     const name = /\.ipynb$/.test(file) ? file : "oncoprint.ipynb";
     return new Response(JSON.stringify(nb), {

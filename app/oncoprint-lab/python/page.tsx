@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import PyNotebook from "./PyNotebook.tsx";
-import { decodeSpec, jupyterLiteUrl } from "../../../lib/lab-links.ts";
+import { decodeSpec, ipynbPath, jupyterLiteUrl } from "../../../lib/lab-links.ts";
 
 export const metadata = { title: "Oncoprint in Python — Cohort Lab" };
 export const dynamic = "force-dynamic";
@@ -40,7 +40,7 @@ export default async function PythonPage({ searchParams }: { searchParams: Promi
           // jupyter.org running JupyterLab in the reader's browser, and it fetches the file from
           // this server — so it needs this instance to be reachable from that browser as a public
           // address, which a private or tailnet-only deployment is not.
-          const ipynb = "/api/oncoprint/notebook/oncoprint.ipynb?spec=" + encoded + (cut ? "&cut=" + encodeURIComponent(cut) : "");
+          const ipynb = ipynbPath(spec, cut);
           const base = process.env.APP_BASE_URL;
           return (
             <p className="meta" style={{ margin: "0 0 0.8rem" }}>
