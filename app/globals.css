@@ -831,8 +831,11 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
 .onco-timings table { font-variant-numeric: tabular-nums; border-spacing: 10px 2px; }
 
 /* inside a menu: the options that do not travel with the document, kept apart from the ones that do */
-.menu-aside { margin-top: var(--s2); padding-top: var(--s2); border-top: 1px dashed var(--line); }
-.menu-aside > .meta { display: block; margin-bottom: var(--s0); }
+.menu-aside {
+  margin-top: var(--s2); padding-top: var(--s2); border-top: 1px dashed var(--line);
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--s0);
+}
+.menu-aside > .meta { display: block; }
 
 /* a plot's axis controls: source, then whatever that source needs */
 .axispick { display: inline-flex; align-items: center; gap: var(--s1); }

@@ -3,29 +3,39 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import PyNotebook from "./PyNotebook.tsx";
+import { decodeSpec } from "../../../lib/lab-links.ts";
 
 export const metadata = { title: "Oncoprint in Python — Cohort Lab" };
 export const dynamic = "force-dynamic";
 
-export default function PythonPage() {
+export default async function PythonPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const sp = await searchParams;
+  const encoded = typeof sp.spec === "string" ? sp.spec : null;
+  const cut = typeof sp.cut === "string" ? sp.cut : null;
+  let spec: Record<string, unknown> | null = null, error: string | null = null;
+  if (encoded) {
+    try { spec = decodeSpec(encoded) as Record<string, unknown>; }
+    catch (e) { error = "could not read ?spec=: " + String((e as Error).message || e); }
+  }
   const root = process.cwd();
   const pkgDir = join(root, "python", "cohortlab");
   const files: Record<string, string> = {};
-  for (const f of readdirSync(pkgDir)) if (f.endsWith(".py")) files["cohortlab/" + f] = readFileSync(join(pkgDir, f), "utf8");
+  for (const f of readdirSync(pkgDir)) if (f.endsWith(".py") || f === "style.json") files["cohortlab/" + f] = readFileSync(join(pkgDir, f), "utf8");
   const fix = join(root, "test", "fixtures", "oncoprint");
   const fixtures = { events: readFileSync(join(fix, "events.tsv"), "utf8"), clinical: readFileSync(join(fix, "clinical.tsv"), "utf8"), coverage: readFileSync(join(fix, "coverage.tsv"), "utf8") };
   return (
     <>
       <header>
         <h1>Cohort Lab</h1>
-        <span className="sub">oncoprint in Python — the package running in your browser via Pyodide</span>
+        <span className="sub">{spec ? "your oncoprint in Python" : "oncoprint in Python"} — the package running in your browser via Pyodide</span>
         <span className="spacer" />
         <a href="/oncoprint-lab" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>interactive lab →</a>
         <a href="/oncoprint-lab/import" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>pasted data →</a>
-        <a href="/oncoprint-lab/cli" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>command line →</a>
+        <a href={"/oncoprint-lab/cli" + (encoded ? "?spec=" + encoded + (cut ? "&cut=" + encodeURIComponent(cut) : "") : "")} style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>command line →</a>
       </header>
       <main>
-        <PyNotebook files={files} fixtures={fixtures} />
+        {error && <div className="error">{error}</div>}
+        <PyNotebook files={files} fixtures={fixtures} spec={spec} cut={cut} />
       </main>
     </>
   );
