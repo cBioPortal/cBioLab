@@ -265,6 +265,12 @@ export default function AnalysisPage() {
    * cost proportional to intent — one request when they say they are done.
    */
   const [exDraftStudies, setExDraftStudies] = useState<string[] | null>(null);
+  /** genes charted as their own alteration facet (the portal's per-gene charts) */
+  const [geneCharts, setGeneCharts] = useState<string[]>([]);
+  const geneChartsRef = useRef<string[]>([]);   // fetchExplore reads this, not the closure
+  const [geneChartInput, setGeneChartInput] = useState("");
+  /** the header lists selected studies as chips; past a handful it is summarised */
+  const [studyChipsOpen, setStudyChipsOpen] = useState(false);
   const [geneFilter, setGeneFilter] = useState<Record<string, string>>({});   // per-table gene box, client-side
   const [clinFilter, setClinFilter] = useState("");                            // matches an attribute name OR one of its values
   const [attrCoverage, setAttrCoverage] = useState(0);                       // clinical attributes shown
@@ -626,7 +632,8 @@ export default function AnalysisPage() {
     const inflightKey = JSON.stringify([
       studiesOverride ?? exSel.current,
       draftOverride !== undefined ? draftOverride : parseDraft(),
-      attrsOverride ?? attrsForBar(attrCoverage, studiesOverride)
+      attrsOverride ?? attrsForBar(attrCoverage, studiesOverride),
+      geneChartsRef.current
     ]);
     if (exInflight.current === inflightKey) return;
     exInflight.current = inflightKey;
@@ -640,7 +647,8 @@ export default function AnalysisPage() {
           // Narrow the server's work to the attributes that will actually be
           // shown. Only sent once a previous result has told us which those are.
           ...((attrsOverride ?? attrsForBar(attrCoverage, studiesOverride)).length
-            ? { attributes: attrsOverride ?? attrsForBar(attrCoverage, studiesOverride) } : {}) }) });
+            ? { attributes: attrsOverride ?? attrsForBar(attrCoverage, studiesOverride) } : {}),
+          ...(geneChartsRef.current.length ? { geneCharts: geneChartsRef.current } : {}) }) });
       const j = await res.json();
       if (seq !== exFetchSeq.current) return; // superseded while in flight — discard
       if (!j.error) {
@@ -690,6 +698,53 @@ export default function AnalysisPage() {
     }
     d.all.push(clause);
     const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d);
+  };
+
+  /**
+   * Append several clauses as one action. A gene-state pick is two of them —
+   * "profiled for this gene" AND the alteration — and it has to be both: the
+   * facet counted 14,690 EGFR-mutant patients inside the profiled set, while
+   * the OQL clause alone selects 14,697, because 7 patients carry a call for a
+   * gene no panel of theirs covers. A facet whose number changed when you
+   * clicked it would be the worst of the options.
+   *
+   * Deliberately plainer than addClause: no kind-specific merging, because
+   * these clauses only mean what they mean together.
+   */
+  const addClauses = (clauses: any[]) => {
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
+    if (!d || !Array.isArray(d.all)) d = { all: [] };
+    for (const c of clauses) d.all.push(c);
+    setCDefText(JSON.stringify(d, null, 2));
+    fetchExplore(d);
+  };
+
+  /** the clauses that select one state of one gene's alteration facet */
+  const geneStateClauses = (gene: string, type: "MUTATION" | "CNA", state: string): any[] => {
+    const prof = { kind: "profiled", type, gene };
+    const oql = (q: string) => ({ kind: "oql", q: gene + ": " + q });
+    if (state === "notProfiled") return [{ not: prof }];
+    if (state === "altered") return [prof, oql("MUT")];
+    if (state === "amp") return [prof, oql("AMP")];
+    if (state === "del") return [prof, oql("HOMDEL")];
+    // unaltered: profiled and none of the calls this facet counts
+    return [prof, { not: oql(type === "CNA" ? "AMP HOMDEL" : "MUT") }];
+  };
+
+  const chartGene = (raw: string) => {
+    const g = String(raw || "").toUpperCase().trim();
+    if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(g)) return;
+    const next = geneCharts.includes(g) ? geneCharts : [...geneCharts, g].slice(-6);
+    geneChartsRef.current = next;
+    setGeneCharts(next);
+    setGeneChartInput("");
+    fetchExplore();
+  };
+  const unchartGene = (g: string) => {
+    const next = geneCharts.filter((x) => x !== g);
+    geneChartsRef.current = next;
+    setGeneCharts(next);
+    fetchExplore();
   };
 
   const removeDraftClause = (i: number) => {
@@ -1505,12 +1560,35 @@ function Latency({ v }: { v: any }) {
                       ? selPts.toLocaleString() + " patients" + (exploreBusy ? " · counting…" : "")
                       : explore.totals.patients.toLocaleString() + " patients · " + explore.totals.samples.toLocaleString() + " samples") +
                     (exStudies.length > 1 ? " (overlap not deduplicated)" : "")}</span></h2>
-                  {exStudies.map(id => (
-                    <span key={id} className="qchip" title={byId.get(id)?.name ?? id}>
-                      {id}
-                      <button className="linklike" style={{ marginLeft: "0.3rem" }} onClick={() => toggle(id)}>×</button>
-                    </span>
-                  ))}
+                  {/* One chip per study is fine for a handful and unreadable for
+                      560 — the header became a wall of identifiers that pushed
+                      everything else off screen. Past CHIP_CAP it summarises,
+                      with the full list in the tooltip and expandable in place.
+                      Expanded, the list scrolls rather than growing the header. */}
+                  {(() => {
+                    const CHIP_CAP = 5;
+                    const over = exStudies.length - CHIP_CAP;
+                    const shown = studyChipsOpen || over <= 1 ? exStudies : exStudies.slice(0, CHIP_CAP);
+                    const nameOf = (id: string) => byId.get(id)?.name ? id + " — " + byId.get(id)!.name : id;
+                    return (
+                      <span className={"studychips" + (studyChipsOpen ? " open" : "")}>
+                        {shown.map(id => (
+                          <span key={id} className="qchip" title={nameOf(id)}>
+                            {id}
+                            <button className="linklike" style={{ marginLeft: "0.3rem" }}
+                              title={"remove " + id + " from the selection"}
+                              onClick={() => toggle(id)}>×</button>
+                          </span>
+                        ))}
+                        {over > 1 && (
+                          <button className="qchip morechip" onClick={() => setStudyChipsOpen(!studyChipsOpen)}
+                            title={studyChipsOpen ? "collapse the list" : exStudies.map(nameOf).join("\n")}>
+                            {studyChipsOpen ? "show fewer" : "+" + over.toLocaleString() + " more"}
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })()}
                   <span className="spacer" />
                   <button onClick={() => {
                     if (exPanelOpen) { setExDraftStudies(null); setExPanelOpen(false); }   // close discards
@@ -1583,6 +1661,77 @@ function Latency({ v }: { v: any }) {
           {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "var(--t-md)", margin: 0 }}>
             No studies selected — check one or more above to explore.</p></div>}
           {!explore && exStudies.length > 0 && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
+          {/* Per-gene alteration facets — the portal's "EGFR: Somatic mutations"
+              and "EGFR: Copy-number alterations". Filterable, and counted in
+              PATIENTS because that is the unit a click selects in; the gene
+              tables on the right count samples and say so. */}
+          {explore && (
+            <div className="card">
+              <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
+                <h2 style={{ margin: 0 }}>Gene status <span className="plain">— alteration state per gene, click to filter</span></h2>
+                <span className="spacer" />
+                <input className="genesearch" type="search" placeholder="chart a gene (e.g. EGFR)"
+                  value={geneChartInput} disabled={exploreBusy}
+                  onChange={e => setGeneChartInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") chartGene(geneChartInput); }} />
+                <button disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}>add</button>
+              </div>
+              {!geneCharts.length && (
+                <p className="note" style={{ margin: "0.4rem 0 0" }}>
+                  Name a gene to see how many patients are altered, unaltered, or <strong>never tested</strong> for
+                  it. The third is the one a frequency cannot show: in GENIE public, 86,353 patients are on no panel
+                  covering EGFR copy number.
+                </p>
+              )}
+              {geneCharts.map(g => (
+                <span key={g} className="qchip" style={{ marginRight: "0.3rem" }}>
+                  {g}
+                  <button className="linklike" style={{ marginLeft: "0.3rem" }} title={"stop charting " + g}
+                    onClick={() => unchartGene(g)}>×</button>
+                </span>
+              ))}
+              {(explore.geneFacets || []).map(f => {
+                const max = Math.max(...f.states.map(x => x.n), 1);
+                return (
+                  <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type}
+                    style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0", marginTop: "0.4rem" }}>
+                    <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}>
+                      {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
+                      <span className="meta"> · patient-level · {f.total.toLocaleString()} patients</span>
+                    </div>
+                    <div className="vallist">
+                      {f.states.map(st => (
+                        <button key={st.state} className="valrow"
+                          title={st.label + " — " + st.n.toLocaleString() + " patients (click to filter)"}
+                          onClick={() => addClauses(geneStateClauses(f.gene, f.type, st.state))}>
+                          <span className="vname" style={st.state === "notProfiled" ? { color: "var(--muted)" } : undefined}>
+                            {st.label}
+                          </span>
+                          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * st.n / max)) + "%" }} /></span>
+                          <span className="vn">{st.n.toLocaleString()}</span>
+                          <span className="vpct">{f.total ? (Math.round(1000 * st.n / f.total) / 10) + "%" : ""}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {f.overlap ? (
+                      <p className="note" style={{ margin: "0.25rem 0 0" }}>
+                        {f.overlap.toLocaleString()} patient{f.overlap === 1 ? " is" : "s are"} counted in both
+                        Amplified and Deleted — amplified in one sample, deleted in another — so these rows
+                        over-sum the cohort by that much.
+                      </p>
+                    ) : null}
+                    {f.alteredUnprofiled ? (
+                      <p className="note" style={{ margin: "0.25rem 0 0" }}>
+                        {f.alteredUnprofiled.toLocaleString()} patient{f.alteredUnprofiled === 1 ? " has" : "s have"} a
+                        call for {f.gene} but sit on no panel covering it — a contradiction in the source data. They are
+                        counted as not profiled.
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {explore && explore.derived && explore.derived.length > 0 && (
             <div className="card">
               <h2>Derived <span className="plain">— computed from the data's shape, so these mean the same thing in any study</span></h2>

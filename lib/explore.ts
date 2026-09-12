@@ -6,7 +6,7 @@ import { sq } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
-import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, NumericBin, DerivedFacet } from "./types.ts";
+import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet } from "./types.ts";
 import { clinicalValueFoldSql } from "./event-names.ts";
 
 /**
@@ -60,6 +60,8 @@ export function numericBinEdges(
 
 /** display cap per gene table; totals report the full count behind it */
 const GENE_TABLE_LIMIT = 500;
+/** how many genes may carry their own alteration facet at once */
+const GENE_FACET_LIMIT = 6;
 import { isClinicalLeaf } from "./types.ts";
 
 
@@ -120,7 +122,7 @@ async function attachHistograms(opts: {
   }));
 }
 
-export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, binEdges, attributes }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn; geneSearch?: string; skipBins?: boolean; skipGenes?: boolean; binEdges?: Record<string, { edges: number[]; interval: number }>; attributes?: string[] }): Promise<ExploreResult> {
+export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, binEdges, attributes, geneCharts }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn; geneSearch?: string; skipBins?: boolean; skipGenes?: boolean; binEdges?: Record<string, { edges: number[]; interval: number }>; attributes?: string[]; geneCharts?: string[] }): Promise<ExploreResult> {
   const db = conn.db;
   const t0 = Date.now();
   // An optional allow-list of attribute names. Exploring hundreds of studies at
@@ -359,6 +361,13 @@ async function studyCardinality(study: string, conn: ChConn): Promise<Map<string
   // concept "Treatment" in 87 studies and "TREATMENT" in 10). A study without
   // the underlying table simply yields no buckets and the facet is omitted.
   const derived = await derivedP;
+  // Per-gene alteration facets for whatever genes the reader has asked to chart.
+  // Their base is this study's cohort size in PATIENTS, which is what the
+  // notProfiled slice is measured against.
+  const geneFacets = await geneStateFacets({
+    genes: geneCharts || [], study, db, conn, cond, total: studyN,
+    draft, ctx: { oncokbPin, profiles, gaProfiles }
+  });
 
   return {
     study, draftCount, studyBreakdown,
@@ -372,7 +381,7 @@ async function studyCardinality(study: string, conn: ChConn): Promise<Map<string
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
     genes,
     caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
-    mutatedGenes, cnaGenes, svGenes, geneTotals, totals, dataTypes,
+    mutatedGenes, cnaGenes, svGenes, geneTotals, geneFacets, totals, dataTypes,
     numStats: numAttrs.map((r) => ({ attribute: r.a, per: r.type as "patient" | "sample", min: Number(r.mn), max: Number(r.mx), q1: Number(r.q1), q3: Number(r.q3), allInts: String(r.allints) === "1", n: Number(r.np) })),
     profiles: profiles || [], gaProfiles: gaProfiles || [],
     stats: { ms: Date.now() - t0 }
@@ -610,6 +619,208 @@ const genes = await chQuery(
   };
 }
 
+// ---- per-gene alteration facets ------------------------------------------
+/**
+ * The portal's per-gene charts — "EGFR: Somatic mutations: Mutated vs Not
+ * Mutated" and "EGFR: Copy-number alterations" — as facets you can filter on.
+ *
+ * WHY THEY EARN THEIR PLACE. Every other view of a gene here reports a ratio:
+ * altered over profiled. A ratio cannot show what it left out. These name the
+ * three states a patient can actually be in, and the third one is the point:
+ *
+ *   altered       the gene is called in at least one of their samples
+ *   unaltered     profiled for this gene, and not called
+ *   not profiled  no sample of theirs was ever run on a panel covering it
+ *
+ * The last is not wild-type and must never be pooled with it. In genie_public,
+ * 4,676 patients sit on panels that omit EGFR and 61,640 on panels that omit
+ * FAT1 — a "wild-type" slice that swallowed them would be wrong by that much.
+ *
+ * COUNTED IN PATIENTS, not samples, because that is the unit a click filters in.
+ * The gene tables on the same page count samples and say so; a facet whose
+ * number moved when you clicked it would be worse than the inconsistency.
+ *
+ * `profiled` resolves through the same panel tables as the gene-table
+ * denominator, WES as a separate term for the same reason (it enumerates ~45k
+ * genes; joining it multiplied one TCGA study to 47.8M rows).
+ */
+/**
+ * Does this top-level clause constrain the given gene, as the gene-status facet
+ * itself would have added it?
+ *
+ * Matched narrowly on purpose: a `profiled` leaf naming the gene, or an OQL leaf
+ * whose query is exactly that one gene, either of them possibly negated. A
+ * merged multi-gene OQL clause ("EGFR: MUT; KRAS: MUT") does NOT match and stays
+ * applied — dropping it would quietly relax somebody else's constraint.
+ */
+function isGeneClauseFor(c: unknown, gene: string): boolean {
+  const leaf = (x: unknown): boolean => {
+    const l = x as { kind?: string; gene?: string; q?: string };
+    if (!l) return false;
+    if (l.kind === "profiled") return String(l.gene || "").toUpperCase() === gene;
+    if (l.kind === "oql") {
+      const m = /^\s*([A-Za-z0-9.-]+)\s*:/.exec(String(l.q || ""));
+      return !!m && m[1].toUpperCase() === gene && !String(l.q).includes(";");
+    }
+    return false;
+  };
+  const c2 = c as { not?: unknown };
+  return leaf(c) || (!!c2 && leaf(c2.not));
+}
+
+async function geneStateFacets(opts: {
+  genes: string[]; study: string; db: string; conn: ChConn;
+  cond: string; total: number;
+  draft?: CohortDef | null;
+  ctx?: { oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[] };
+}): Promise<GeneStateFacet[]> {
+  const { study, db, conn, total, draft } = opts;
+  const genes = [...new Set(opts.genes.map((g) => String(g).toUpperCase().trim()))]
+    .filter((g) => /^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(g)).slice(0, GENE_FACET_LIMIT);
+  if (!genes.length) return [];
+
+  /**
+   * "Was this sample run on an assay covering this gene?" — as a predicate to
+   * embed, not a subquery that projects patient ids.
+   *
+   * Two reasons for that shape. It is the idiom already used by
+   * `panelSampleCond` above, and a standalone `SELECT DISTINCT
+   * patient_unique_id` trips test/boundary.test.ts, which forbids any explore
+   * query from projecting a bare identifier outside an aggregate. That guard
+   * cannot tell a subquery from a result set, and loosening it to admit this one
+   * would be how it stops catching the thing it exists for.
+   *
+   * An earlier version aliased the panel join and textually rewrote the draft
+   * predicate to match, which produced `sd.sd.patient_unique_id` and a 400 on
+   * every drafted request. Nothing is rewritten here.
+   */
+  /**
+   * DISJUNCTIVE FACETING, the same rule the clinical and derived facets follow.
+   * A gene already constrained in the draft is counted against the draft MINUS
+   * its own clauses — otherwise clicking "Mutated" leaves the facet reading
+   * 100% mutated and 0 everywhere else, and there is no way to see the
+   * alternatives or widen the choice. That is the disappearing-options bug, and
+   * it arrives by default unless this is done.
+   */
+  const condFor = (gene: string): string | null => {
+    if (!draft || !Array.isArray(draft.all) || !draft.all.length) return null;
+    const rest = draft.all.filter((c) => !isGeneClauseFor(c, gene));
+    if (rest.length === draft.all.length) return null;            // nothing of this gene's: use opts.cond
+    if (!rest.length) return "";                                  // only this gene's: no predicate at all
+    const rsql = compileCohortDef({ ...draft, all: rest }, { ...opts.ctx, study, db });
+    return "\n  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + rsql + "))";
+  };
+
+  /**
+   * The cohort size under a given predicate. `notProfiled` is total minus
+   * profiled, so the two MUST be counted under the same one — a base carried
+   * over from the full draft while the states were counted without this gene's
+   * clauses would make the slice a difference of two different cohorts.
+   */
+  const baseTotal = async (c: string): Promise<number> => Number((await chQuery<ChRow>(
+    "SELECT uniqExact(patient_unique_id) AS n FROM " + db + ".sample_derived\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + c, conn)).data[0]?.n || 0);
+
+  const panelPred = (gene: string, alterationType: string) =>
+    "\n  AND sample_unique_id IN (SELECT sample_unique_id FROM " + db + ".sample_to_gene_panel_derived\n" +
+    "    WHERE cancer_study_identifier = " + sq(study) + " AND alteration_type = " + sq(alterationType) + "\n" +
+    "      AND (gene_panel_id = 'WES' OR gene_panel_id IN (\n" +
+    "        SELECT gene_panel_id FROM " + db + ".gene_panel_to_gene_derived WHERE gene = " + sq(gene) + ")))";
+
+  /** patients with at least one sample profiled for this gene, under `c` */
+  const profiledOf = (gene: string, alterationType: string, c: string) =>
+    "SELECT uniqExact(patient_unique_id) AS n\n" +
+    "FROM " + db + ".sample_derived\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + panelPred(gene, alterationType) + c;
+
+  const resolved = await Promise.all(genes.map(async (gene) => {
+    const own = condFor(gene);
+    if (own === null) return { gene, cond: opts.cond, total };
+    return { gene, cond: own, total: await baseTotal(own) };
+  }));
+
+  const out = await Promise.all(resolved.flatMap(({ gene, cond, total }) => [
+    // mutations: altered / unaltered / not profiled
+    (async (): Promise<GeneStateFacet> => {
+      const [prof, alt] = await Promise.all([
+        chQuery<ChRow>(profiledOf(gene, "MUTATION_EXTENDED", cond), conn),
+        chQuery<ChRow>(
+          // The call must come from a sample the assay actually covered.
+          // Counting altered patients independently and clamping to the profiled
+          // total put 7 EGFR-mutant patients who are on no EGFR-covering panel
+          // into both the mutated and the not-profiled slice: the states still
+          // summed to the cohort, and were still wrong. `all_altered` is kept
+          // only to report that contradiction rather than bury it.
+          "SELECT uniqExact(patient_unique_id) AS all_altered,\n" +
+          "       uniqExactIf(patient_unique_id, sample_unique_id IN (\n" +
+          "         SELECT sample_unique_id FROM " + db + ".sample_to_gene_panel_derived\n" +
+          "         WHERE cancer_study_identifier = " + sq(study) + " AND alteration_type = 'MUTATION_EXTENDED'\n" +
+          "           AND (gene_panel_id = 'WES' OR gene_panel_id IN (\n" +
+          "             SELECT gene_panel_id FROM " + db + ".gene_panel_to_gene_derived WHERE gene = " + sq(gene) + ")))) AS in_panel\n" +
+          "FROM " + db + ".genomic_event_derived\n" +
+          "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'mutation'\n" +
+          "  AND mutation_status != 'UNCALLED' AND hugo_gene_symbol = " + sq(gene) + cond, conn)
+      ]);
+      const profiled = Number(prof.data[0]?.n || 0);
+      const altered = Number(alt.data[0]?.in_panel || 0);
+      const orphan = Math.max(0, Number(alt.data[0]?.all_altered || 0) - altered);
+      return {
+        gene, type: "MUTATION", per: "patient", total, profiled,
+        ...(orphan ? { alteredUnprofiled: orphan } : {}),
+        states: [
+          { state: "altered", label: "Mutated", n: altered },
+          { state: "unaltered", label: "Not mutated", n: Math.max(0, profiled - altered) },
+          { state: "notProfiled", label: "Not profiled", n: Math.max(0, total - profiled) }
+        ]
+      };
+    })(),
+    // CNA: amplified / deleted / diploid / not profiled
+    (async (): Promise<GeneStateFacet> => {
+      const [prof, calls, anyCall] = await Promise.all([
+        chQuery<ChRow>(profiledOf(gene, "COPY_NUMBER_ALTERATION", cond), conn),
+        chQuery<ChRow>(
+          "SELECT cna_alteration AS c, uniqExact(patient_unique_id) AS n\n" +
+          "FROM " + db + ".genomic_event_derived\n" +
+          "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'cna'\n" +
+          "  AND abs(cna_alteration) >= 2 AND hugo_gene_symbol = " + sq(gene) +
+          panelPred(gene, "COPY_NUMBER_ALTERATION") + cond + "\n" +
+          "GROUP BY c", conn),
+        // The UNION of the two calls, asked for directly. Diploid cannot be
+        // profiled minus amp minus del: a patient amplified in one sample and
+        // deleted in another is in both counts, and subtracting both removes
+        // them twice. EGFR in genie_public has exactly one such patient, which
+        // is how this was caught — the facet said 152,241 and the clause the
+        // click builds selected 152,242.
+        chQuery<ChRow>(
+          "SELECT uniqExact(patient_unique_id) AS n FROM " + db + ".genomic_event_derived\n" +
+          "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'cna'\n" +
+          "  AND abs(cna_alteration) >= 2 AND hugo_gene_symbol = " + sq(gene) +
+          panelPred(gene, "COPY_NUMBER_ALTERATION") + cond, conn)
+      ]);
+      const profiled = Number(prof.data[0]?.n || 0);
+      const amp = Number(calls.data.find((r) => Number(r.c) === 2)?.n || 0);
+      const del = Number(calls.data.find((r) => Number(r.c) === -2)?.n || 0);
+      const anyAltered = Number(anyCall.data[0]?.n || 0);
+      // Amplified and Deleted OVERLAP at patient level, so these four states are
+      // a list of selectable conditions and not a partition — the counts can
+      // sum past the cohort by the overlap. Reported rather than hidden, since a
+      // reader adding them up deserves to know why they do not reconcile.
+      const overlap = Math.max(0, amp + del - anyAltered);
+      return {
+        gene, type: "CNA", per: "patient", total, profiled,
+        ...(overlap ? { overlap } : {}),
+        states: [
+          { state: "amp", label: "Amplified", n: amp },
+          { state: "del", label: "Deleted", n: del },
+          { state: "unaltered", label: "Diploid", n: Math.max(0, profiled - anyAltered) },
+          { state: "notProfiled", label: "Not profiled", n: Math.max(0, total - profiled) }
+        ]
+      };
+    })()
+  ]));
+  return out.filter((f) => f.profiled > 0 || f.total > 0);
+}
+
 // ---- federated explore: several studies at once ---------------------------
 // Runs buildExplore per study and merges by name — counts are summed with the
 // project-wide policy: patient overlap across studies is NOT deduplicated and
@@ -617,7 +828,7 @@ const genes = await chQuery(
 // whole harmonization). Numeric medians are patient-weighted approximations;
 // min/max are exact. An attribute classified differently across studies takes
 // the kind of the study with the most patients for it.
-export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>; connByStudy?: Map<string, ChConn>; geneSearch?: string; attributes?: string[] }): Promise<ExploreResult> {
+export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>; connByStudy?: Map<string, ChConn>; geneSearch?: string; attributes?: string[]; geneCharts?: string[] }): Promise<ExploreResult> {
   // Pass 1: facets per study, WITHOUT histograms — each study's own quartiles
   // would give it different bin edges, and bars over different ranges cannot be
   // summed. Skip the work rather than compute bins we would throw away.
@@ -641,7 +852,7 @@ export async function buildExploreFederated({ studies, draft, oncokbPin, profile
 
   const [parts, geneParts] = await Promise.all([
     Promise.all(studies.map(s =>
-      buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: poolGenes, attributes,
+      buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: poolGenes, attributes, geneCharts,
         conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}) }))),
     Promise.all([...connGroups.values()].map(async ({ conn, studies: ss }) => {
       const g = await geneTables({ studies: ss, db: conn.db, conn, geneSearch });
@@ -820,6 +1031,22 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
       .slice(0, GENE_TABLE_LIMIT);
   };
 
+  // Per-gene facets sum: total, profiled and every state are patient counts over
+  // disjoint studies, so the same additivity that lets the gene tables pool
+  // applies here. Patients shared between studies are not deduplicated, which is
+  // this project's stated policy for every count on this page.
+  const gfKey = (f: { gene: string; type: string }) => f.gene + "|" + f.type;
+  const gfMap = new Map<string, GeneStateFacet>();
+  for (const p of parts) for (const f of p.geneFacets || []) {
+    const cur = gfMap.get(gfKey(f));
+    if (!cur) { gfMap.set(gfKey(f), { ...f, states: f.states.map((x) => ({ ...x })) }); continue; }
+    cur.total += f.total; cur.profiled += f.profiled;
+    for (const st of f.states) {
+      const c = cur.states.find((x) => x.state === st.state);
+      if (c) c.n += st.n; else cur.states.push({ ...st });
+    }
+  }
+
   const lm = new Map<string, { id: string; name: string; n: number }>();
   for (const p of parts) for (const l of p.caseLists) {
     const cur = lm.get(l.id) || { id: l.id, name: l.name, n: 0 };
@@ -836,6 +1063,7 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
     genes: [...gm.entries()].map(([gene, n]) => ({ gene, n })).sort((x, y) => y.n - x.n).slice(0, 15),
     caseLists: [...lm.values()].sort((x, y) => y.n - x.n).slice(0, 10),
+    geneFacets: [...gfMap.values()],
     mutatedGenes: mergeGeneTable((p) => p.mutatedGenes),
     cnaGenes: mergeGeneTable((p) => p.cnaGenes),
     svGenes: mergeGeneTable((p) => p.svGenes),

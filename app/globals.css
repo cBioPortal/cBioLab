@@ -895,3 +895,15 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
   background: repeating-linear-gradient(45deg,
     var(--line) 0 2px, transparent 2px 4px);
 }
+
+/* Selected-study chips in the Explore header. One per study is fine for a
+   handful; at 560 the header became a wall of identifiers, so past a cap the
+   list summarises and expands in place — scrolling rather than growing, so a
+   large selection cannot push the facets off screen. */
+.studychips { display: contents; }
+.studychips.open {
+  display: flex; flex-wrap: wrap; gap: var(--s1);
+  max-height: 7.5rem; overflow-y: auto; overscroll-behavior: contain;
+  flex: 1 1 100%; padding: var(--s1) 0;
+}
+.morechip { cursor: pointer; border-style: dashed; }

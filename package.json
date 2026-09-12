@@ -12,6 +12,7 @@
     "docs:counts": "UPDATE_COUNTS=1 node --env-file=.env.local scripts/check-dsl-doc.ts",
     "test": "node --test \"test/**/*.test.ts\"",
     "test:boundary": "node --test test/boundary.test.ts",
+    "check:genefacets": "node --env-file=.env.local scripts/check-gene-facets.ts",
     "check:values": "node --env-file=.env.local scripts/check-value-folding.ts",
     "check:denominators": "node --env-file=.env.local scripts/check-denominators.ts",
     "denominators:pin": "UPDATE_DENOM=1 node --env-file=.env.local scripts/check-denominators.ts"
