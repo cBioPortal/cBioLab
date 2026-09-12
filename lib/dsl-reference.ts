@@ -757,7 +757,7 @@ take a standalone spec (the analysis oncoprint view compiles to the same engine)
 
 Cell values are bitmasks (MISSENSE 1, TRUNCATING 2, INFRAME 4, SPLICE 8, OTHER_MUT 16, SV 32,
 AMP 64, HOMDEL 128, DRIVER 256); −1 is NOT_PROFILED. Frequencies use profiled denominators.
-Shareable links: \`/oncoprint?spec=<base64url>\`.
+Shareable links, all taking the same base64url spec: \`/oncoprint-lab?spec=\` (the interactive figure), \`/provenance?spec=\` (picture, DSL and SQL), \`/oncoprint-lab/cli?spec=\` (the node and Python command lines, run against it) and \`/oncoprint-lab/python?spec=\` (a Pyodide notebook).
 
 ## Endpoints
 

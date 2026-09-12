@@ -493,7 +493,10 @@ export function registerTools(server: any): void {
           : `\nAnnotations: ${contract.conventions.annotation} — driver/VUS classification is version-pinned; the same spec re-renders identically against this release.`) +
         `\nProvenance (share this with the user): ${provUrl}\n` +
         `That page re-renders this exact oncoprint and shows the DSL spec and every generated SQL query.` +
-        `\nInteractive editor (share this too — it opens THIS oncoprint with live controls): ${base}/oncoprint?spec=${specB64}` +
+        `\nInteractive figure (share this too — it opens THIS oncoprint with live controls): ${base}/oncoprint-lab?spec=${specB64}` +
+        `\nThe same figure outside the browser, if the user works in a terminal or a notebook: ` +
+        `${base}/oncoprint-lab/cli?spec=${specB64} (the node and Python command lines, run against this spec) and ` +
+        `${base}/oncoprint-lab/python?spec=${specB64} (the cohortlab package in a Pyodide notebook).` +
         `\nModifications the user can ask for right here in chat: add or remove gene tracks (up to 12); ` +
         `add clinical attribute tracks, up to 8 (e.g. OS_STATUS, GENDER, SMOKING_PREDICTIONS_3_CLASSES; numeric ones like CURRENT_AGE_DEID render as heat); ` +
         `add derived-event phenotype tracks from any cohort expression (e.g. "reached 3rd line", "had surgery"); ` +
