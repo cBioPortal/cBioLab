@@ -185,24 +185,30 @@ stable port that always reflects it.
 | folder | a git worktree — `cBio-next-<name>` |
 | branch | `session/<name>`, checked out only there |
 | port | `next dev`, kept alive by `serve-<port>.sh`, serving that folder |
-| gate | `cBio-next-<name>-gate`, a sibling worktree for build + e2e |
 
-`scripts/session-setup.sh <name> <port>` creates all of it.
-`scripts/gate.sh` runs build + unit + e2e **in the gate worktree**, never in the
-session folder.
+`scripts/session-setup.sh <name> <port>` creates it.
+`scripts/gate.sh` runs build + unit + e2e **in the same folder**, building to
+`.next-gate` via `NEXT_DIST_DIR` so it never touches the `.next` the dev server
+owns.
 
-**Do not run `npm run build` in a session folder.** `next dev` and `next build`
-share `.next/`. Serving a production build from a folder that is also built in
-is what broke the tailnet instance three times: each build rewrote the chunk
-hashes and deleted the ones the running server still referenced, so the client
-JS 404ed and every interaction fell back to a server render — with no error
-anywhere except a failed request in the browser console.
+**The rule is about the DIRECTORY, not the folder.** `next dev` and `next build`
+both write `.next`, so they must not share it. Serving a production build from a
+directory that is also built in is what broke the tailnet instance three times:
+each build rewrote the content-hashed chunk filenames and deleted the ones the
+running server still referenced, so the client JS 404ed and every interaction
+fell back to a server render — with no error anywhere except a failed request in
+the browser console. `next dev` plus a separate `distDir` for builds removes the
+failure mode instead of managing it.
+
+Side effect worth knowing: a build with `NEXT_DIST_DIR` set makes Next append
+`.next-gate/types/**/*.ts` to `tsconfig.json`. It is committed deliberately and
+is inert for anyone who does not set the variable.
 
 Current mappings (`tailscale serve`, stable):
 
 | external | local | folder |
 |---|---|---|
-| `:8446` | 3102 | `/home/ubuntu/cBio-next` (this session, branch `value-folding`) |
+| `:8446` | 3102 | `/home/ubuntu/cBio-next` |
 | `:8447` | 3107 | `/home/ubuntu/projects/cbio-next-oncoprint/cohort-lab` (separate checkout) |
 
 After any change meant to reach a reviewer, **check the URL they will open** —

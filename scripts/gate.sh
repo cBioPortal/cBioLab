@@ -1,48 +1,30 @@
 #!/bin/bash
-# Run the full gate WITHOUT touching the session folder.
+# Run the full gate — build, unit tests, e2e — in THIS folder, without
+# disturbing the `next dev` server that serves it.
 #
-# WHY THIS EXISTS. The session folder is served live by `next dev` on a stable
-# port (see ../serve-3102.sh), and `next dev` and `next build` share .next/.
-# Building in the session folder therefore fights the dev server — which is the
-# same class of problem, differently shaped, as the one that broke the tailnet
-# instance three times by deleting the chunks it was serving.
+# The constraint is a shared directory, not a shared folder: `next dev` owns
+# `.next`, so the build here goes to `.next-gate` via NEXT_DIST_DIR and the two
+# coexist. (Serving a production build from a directory that is also built in is
+# what silently broke the tailnet instance three times — each build rewrote the
+# chunk hashes and deleted the ones the running server still referenced.)
 #
-# So the gate runs in a sibling worktree pinned to this folder's current commit.
-# Uncommitted work is NOT gated: commit first, or pass --dirty to copy the
-# working tree across.
+# This used to run in a sibling worktree, which cost 1.2G to solve the same
+# problem a config value solves.
 #
-# Usage:  scripts/gate.sh [--dirty]
+# Usage:  scripts/gate.sh
 set -euo pipefail
-SESSION="$(cd "$(dirname "$0")/.." && pwd)"
-GATE="${SESSION}-gate"
+cd "$(cd "$(dirname "$0")/.." && pwd)"
+export NEXT_DIST_DIR=.next-gate
 PORT=3100
 
-[ -d "$GATE" ] || { echo "no gate worktree at $GATE — create it with:"; \
-  echo "  git worktree add --detach $GATE HEAD"; exit 1; }
-
-cd "$SESSION"
-if [ "${1:-}" = "--dirty" ]; then
-  echo "== syncing working tree (including uncommitted changes) =="
-  rsync -a --delete --exclude .git --exclude node_modules --exclude .next \
-    --exclude server-analysis.log "$SESSION/" "$GATE/"
-else
-  [ -z "$(git status --porcelain)" ] || { echo "working tree is dirty; commit or use --dirty"; exit 1; }
-  SHA="$(git rev-parse HEAD)"
-  echo "== syncing gate worktree to $SHA =="
-  git -C "$GATE" checkout -q --detach "$SHA"
-fi
-
-cd "$GATE"
-[ -d node_modules ] || npm ci --no-audit --no-fund
-[ -f .env.local ] || cp "$SESSION/.env.local" .env.local
-
-echo "== build =="   && npm run build 2>&1 | tail -3
-echo "== unit =="    && npm test 2>&1 | grep -E "^# (tests|pass|fail)"
+echo "== $(git branch --show-current 2>/dev/null || echo detached) @ $(git rev-parse --short HEAD)$([ -n "$(git status --porcelain)" ] && echo ' + uncommitted changes') =="
+echo "== build (-> $NEXT_DIST_DIR) ==" && npm run build 2>&1 | tail -3
+echo "== unit =="                      && npm test 2>&1 | grep -E "^# (tests|pass|fail)"
 echo "== e2e =="
 fuser -k $PORT/tcp 2>/dev/null || true
 sleep 2
 (npm start -- -p $PORT >/tmp/gate-server.log 2>&1 &)
 for _ in $(seq 1 40); do curl -sf -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/analysis" && break; sleep 3; done
-node e2e.cjs; RC=$?
+set +e; node e2e.cjs; RC=$?; set -e
 fuser -k $PORT/tcp 2>/dev/null || true
 exit $RC

@@ -17,3 +17,6 @@ __pycache__/
 
 python/build/
 python/dist/
+
+# gate build output — a production build beside the dev server (scripts/gate.sh)
+.next-gate
