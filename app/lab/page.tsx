@@ -1,5 +1,5 @@
 "use client";
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useLayoutEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
 import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
 import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
@@ -268,6 +268,8 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const viewKeys = useRef(new WeakMap<object, number>());
   const nextViewKey = useRef(0);
   const resultViewKeys = useRef<number[]>([]);
+  /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
+  const menuOpenRef = useRef(new Map<string, boolean>());
   const keyFor = (v: object): number => {
     let k = viewKeys.current.get(v);
     if (k == null) { k = nextViewKey.current++; viewKeys.current.set(v, k); }
@@ -944,7 +946,16 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
 
   /** Rewrite one view in the document and re-run. */
   const patchView = (i: number, patch: Record<string, unknown>) => {
-    const views = (doc.views || []).map((v: any, j: number) => j === i ? { ...v, ...patch } : v);
+    const views = (doc.views || []).map((v: any, j: number) => {
+      if (j !== i) return v;
+      const nv = { ...v, ...patch };
+      // see updateView's comment: keyFor() is by object identity, and this always
+      // makes a new object, so the edited view's own key must be carried over by
+      // hand or the card being edited is the one that remounts.
+      const k = viewKeys.current.get(v);
+      if (k != null) viewKeys.current.set(nv, k);
+      return nv;
+    });
     for (const v of views as any[]) if (v.anchor == null) delete v.anchor;   // null means "study baseline"
     const d = { ...doc, views };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
@@ -957,7 +968,18 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   }, [tab, study, explore]); // eslint-disable-line
 
   const updateView = (vi: number, patch: (v: any) => any) => {
-    const views = (doc.views || []).map((v, i: number) => i === vi ? patch(v) : v);
+    const views = (doc.views || []).map((v, i: number) => {
+      if (i !== vi) return v;
+      const nv = patch(v);
+      // keyFor() looks up a view by object identity, and `patch` always returns a
+      // new object — carry the old one's key over, or every edit (a checkbox, a
+      // gene, an anchor) would read as "this view is gone, a new one appeared" and
+      // remount the very card being edited: closing any open menu on it, and
+      // dropping the oncoprint canvas it had already drawn.
+      const k = viewKeys.current.get(v);
+      if (k != null) viewKeys.current.set(nv, k);
+      return nv;
+    });
     const d = { ...doc, views };
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
   };
@@ -1209,11 +1231,41 @@ function AxisPicker({ side, axis, attrs, profiles, busy, onChange, allowNone, ca
 }
 
 /**
+ * A gearmenu's open/closed state, keyed by a caller-chosen id, read from a
+ * store the page keeps in a ref (see `menuOpenRef` in AnalysisPage) rather
+ * than in this module's own top-level state. An edit to the very view a menu
+ * belongs to (ticking a cohort, changing an anchor — anything that runs
+ * updateView/patchView) makes Next.js re-evaluate this whole module — a
+ * plain module-level Map would be a fresh, empty one on the next read, same
+ * as every function declared here, ViewHead and PickMenu included, being a
+ * new object each time. A `useRef` on the page's own component survives
+ * that (its hooks live on the fiber, not on this module), which is also why
+ * `doc`/`result`/etc. were never at risk — only bindings that live at this
+ * module's top level are.
+ *
+ * A native `<details>` has no memory of its own across a remount like that,
+ * so without this it silently reopens closed the moment you interact with
+ * something inside it. This restores it synchronously before the browser
+ * paints, so the close is never visible, and stays current on every
+ * open/close however it happens — a click on the summary, or
+ * PopoverAutoClose's outside-click/Escape handler, both fire the same
+ * native "toggle" event this listens for.
+ */
+function useGearmenuOpen(id: string, store: Map<string, boolean>) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  useLayoutEffect(() => {
+    if (store.get(id) && ref.current) ref.current.open = true;
+  }, [id, store]);
+  const onToggle = (e: React.SyntheticEvent<HTMLDetailsElement>) => store.set(id, e.currentTarget.open);
+  return { ref, onToggle };
+}
+
+/**
  * A checkbox menu in a view's header: which cohorts it uses, which attributes it compares.
  * One component, because these were the settings you could only reach by editing the JSON.
  */
-function PickMenu({ label, title, options, chosen, onChange, min, max, busy }: {
-  label: string; title: string; busy?: boolean; min?: number; max?: number;
+function PickMenu({ label, title, options, chosen, onChange, min, max, busy, menuId, menuStore }: {
+  label: string; title: string; busy?: boolean; min?: number; max?: number; menuId: string; menuStore: Map<string, boolean>;
   options: { value: string; label: string; hint?: string }[];
   chosen: string[]; onChange: (next: string[]) => void;
 }) {
@@ -1222,8 +1274,9 @@ function PickMenu({ label, title, options, chosen, onChange, min, max, busy }: {
     if (has && min != null && chosen.length <= min) return;
     onChange(has ? chosen.filter((x) => x !== v) : [...chosen, v]);
   };
+  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   return (
-    <details className="gearmenu">
+    <details className="gearmenu" ref={ref} onToggle={onToggle}>
       <summary className="tbbtn" title={title}>{label} ({chosen.length})</summary>
       <div className="gearmenu-items">
         {options.length === 0 && <span className="meta">nothing to choose from</span>}
@@ -1248,12 +1301,13 @@ function PickMenu({ label, title, options, chosen, onChange, min, max, busy }: {
  * Before this each view kind built its own, so the timing chip landed in a different place
  * in each card.
  */
-function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown, onRemove }: {
+function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown, onRemove, menuStore }: {
   v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode;
-  onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void;
+  onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void; menuStore: Map<string, boolean>;
   /** which cohorts this view draws; absent when the document has only one */
-  cohorts?: { chosen: string[]; all: string[]; max?: number; busy?: boolean; onChange: (n: string[]) => void };
+  cohorts?: { chosen: string[]; all: string[]; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void };
 }) {
+  const menuKey = cohorts?.viewKey ?? "vh";
   return (
     <div className="vhead">
       <h2 className="vtitle">{title}{sub != null && <span className="plain"> — {sub}</span>}</h2>
@@ -1261,22 +1315,23 @@ function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown
         {cohorts && cohorts.all.length > 1 && (
           <PickMenu label="cohorts" title="which cohorts this view draws; all of them unless you say otherwise"
             options={cohorts.all.map((n) => ({ value: n, label: n }))} chosen={cohorts.chosen}
-            onChange={cohorts.onChange} min={1} max={cohorts.max} busy={cohorts.busy} />
+            onChange={cohorts.onChange} min={1} max={cohorts.max} busy={cohorts.busy} menuId={"pick:" + menuKey} menuStore={menuStore} />
         )}
         {actions}
         {chips}
         <Latency v={v} />
         <Participation p={v.participation} />
-        {(onMoveUp || onMoveDown || onRemove) && <ViewMenu onMoveUp={onMoveUp} onMoveDown={onMoveDown} onRemove={onRemove} />}
+        {(onMoveUp || onMoveDown || onRemove) && <ViewMenu menuId={"reorder:" + menuKey} menuStore={menuStore} onMoveUp={onMoveUp} onMoveDown={onMoveDown} onRemove={onRemove} />}
       </div>
     </div>
   );
 }
 
 /** The gear at the end of every card's header: reorder this view, or drop it. */
-function ViewMenu({ onMoveUp, onMoveDown, onRemove }: { onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void }) {
+function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove }: { menuId: string; menuStore: Map<string, boolean>; onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void }) {
+  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   return (
-    <details className="gearmenu">
+    <details className="gearmenu" ref={ref} onToggle={onToggle}>
       <summary className="tbbtn" title="reorder or remove this view" aria-label="reorder or remove this view">⋯</summary>
       <div className="gearmenu-items">
         <button className="linklike" disabled={!onMoveUp} onClick={onMoveUp}>move up</button>
@@ -1310,7 +1365,7 @@ function Latency({ v }: { v: any }) {
   const cohortChoice = (vi: number, v: any, max?: number) => {
     const all = Object.keys((result && result.cohorts) || doc.cohorts || {});
     const chosen: string[] = Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts.filter((n: string) => all.includes(n)) : all;
-    return { chosen, all, max, busy, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
+    return { chosen, all, max, busy, viewKey: resultViewKeys.current[vi] ?? vi, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
   };
 
   /** the view at index vi, read as an oncoprint view (its editor only renders there) */
@@ -2681,7 +2736,7 @@ function Latency({ v }: { v: any }) {
                     see .viewnote in globals.css for why it is never markdown. */}
                 {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
                 {v.kind === "compare" && v.rows && <>
-                  <ViewHead v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                     style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
@@ -2703,7 +2758,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <ViewHead v={v} title="Hotspots" cohorts={cohortChoice(vi, docView(vi))} sub="recurrent protein changes, counted per patient" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Hotspots" cohorts={cohortChoice(vi, docView(vi))} sub="recurrent protein changes, counted per patient" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   {v.hotspots.map(h => {
@@ -2761,7 +2816,7 @@ function Latency({ v }: { v: any }) {
                   })}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <ViewHead v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     actions={<>
                       <label className="tbfield" title="the molecular profile the correlation is computed over">profile <select
                         value={docView(vi).profileType || ""} disabled={busy}
@@ -2805,8 +2860,9 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "clinical" && v.clinical && <>
-                  <ViewHead v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     actions={<PickMenu label="attributes" title="which clinical attributes this view compares" busy={busy}
+                      menuId={"attrs:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current}
                       options={(trackAttrs.attrs || []).map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind }))}
                       chosen={(docView(vi).attributes || []).map(String)} min={1} max={20}
                       onChange={(next) => setViewAttrs(vi, next)} />} />
@@ -2848,7 +2904,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <ViewHead v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
@@ -2888,7 +2944,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "survival" && v.curves && <>
-                  <ViewHead v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     sub={<>Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}{v.anchoredTo && <> — from {v.anchoredTo}</>}</>}
                     chips={v.truncated ? <span className="trunc" title={
                       "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
@@ -2975,7 +3031,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 )}
                 {v.kind === "plot" && <>
-                  <ViewHead v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
                   {/* Every control here changes what is DRAWN and costs a query, so there is one
                       zone and it says so — the same toolbar the oncoprint uses. */}
@@ -3019,6 +3075,7 @@ function Latency({ v }: { v: any }) {
                       {v.sequence ? " · " + v.sequence.lineGap + "-day line gap" : ""}</span></h2>
                     <div className="vmeta">
                       <PickMenu label="cohorts" title="which cohorts this view draws" busy={busy}
+                        menuId={"pick:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current}
                         options={Object.keys((result && result.cohorts) || {}).map((n) => ({ value: n, label: n }))}
                         chosen={cohortChoice(vi, docView(vi)).chosen} min={1} max={1}
                         onChange={(next) => setViewCohorts(vi, next, Object.keys((result && result.cohorts) || {}))} />
@@ -3061,7 +3118,7 @@ function Latency({ v }: { v: any }) {
                       </details>
                     )}
                     <Latency v={v} /><Participation p={v.participation} />
-                    <ViewMenu onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} />
+                    <ViewMenu menuId={"reorder:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} />
                     </div>
                   </div>
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
@@ -3073,6 +3130,7 @@ function Latency({ v }: { v: any }) {
                       {v.anchoredTo ? "" : ""} · {v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
                     <div className="vmeta">
                       <PickMenu label="cohorts" title="which cohorts this view draws" busy={busy}
+                        menuId={"pick:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current}
                         options={Object.keys((result && result.cohorts) || {}).map((n) => ({ value: n, label: n }))}
                         chosen={cohortChoice(vi, docView(vi)).chosen} min={1}
                         onChange={(next) => setViewCohorts(vi, next, Object.keys((result && result.cohorts) || {}))} />
@@ -3145,7 +3203,7 @@ function Latency({ v }: { v: any }) {
                   })()}
                     </details>
                     <Latency v={v} /><Participation p={v.participation} />
-                    <ViewMenu onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} />
+                    <ViewMenu menuId={"reorder:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} />
                     </div>
                     </div>
                   {/* The same SVG the chat and MCP clients receive \u2014 one renderer,
@@ -3157,7 +3215,7 @@ function Latency({ v }: { v: any }) {
                   const vNames = ocView(vi).cohorts || Object.keys(result.cohorts);
                   const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];
                   return <>
-                    <ViewHead v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                    <ViewHead menuStore={menuOpenRef.current} v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                       cohorts={cohortChoice(vi, docView(vi), 4)}
                       sub={c ? <>{c.stats.nColumns.toLocaleString()} {c.unit}s · {c.conventions.annotation}</> : "loading…"} />
                     <OncoprintFigure
