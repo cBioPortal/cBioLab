@@ -3156,11 +3156,6 @@ function Latency({ v }: { v: any }) {
                   const c = contracts[JSON.stringify(v.spec)];
                   const vNames = ocView(vi).cohorts || Object.keys(result.cohorts);
                   const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];
-                  const genes = (ocView(vi).genes || []).map(g => String(g));
-                  const portalUrl = "https://www.cbioportal.org/results/oncoprint?cancer_study_list=" + vStudies.join(",") +
-                    "&case_set_id=" + (vStudies.length === 1 ? vStudies[0] + "_all" : "all") +
-                    "&gene_list=" + encodeURIComponent(genes.join(" ")) +
-                    "&profileFilter=mutations%2Cstructural_variants%2Cgistic&Z_SCORE_THRESHOLD=2.0&tab_index=tab_visualize&Action=Submit";
                   return <>
                     <ViewHead v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                       cohorts={cohortChoice(vi, docView(vi), 4)}
@@ -3194,14 +3189,6 @@ function Latency({ v }: { v: any }) {
                           <input type="checkbox" checked={!!(ocView(vi).display as any)?.hideVUS} disabled={busy}
                             onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "hideVUS", e.target.checked || undefined))} /> drivers only</label>
                       </>}
-                      moreMenu={
-                        <details className="gearmenu">
-                          <summary className="tbbtn" title="more, about this oncoprint">⋯</summary>
-                          <div className="gearmenu-items">
-                            <a target="_blank" rel="noopener noreferrer" href={portalUrl}>Open these genes in the cBioPortal oncoprint ↗</a>
-                            <span className="meta">full {vStudies.length === 1 ? "study" : vStudies.length + "-study"} view, all samples — the portal can&apos;t express cbio-lab cohorts or tracks</span>
-                          </div>
-                        </details>}
                       tracksMenu={<TracksMenu
                         attrs={trackAttrs.attrs} profiles={trackAttrs.profiles}
                         clinical={ocView(vi).clinical || []} heatmap={ocView(vi).heatmap || []}

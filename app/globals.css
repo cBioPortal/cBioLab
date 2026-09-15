@@ -244,6 +244,9 @@ details.gearmenu > .gearmenu-items {
   display: flex; flex-direction: column; gap: 0.25rem;
 }
 .gearmenu-items a { color: var(--accent-ink); font-size: var(--t-md); }
+/* a <button> centers its text by default; every other item in this column
+   (links, checkboxes) reads flush left, so a button among them looked adrift. */
+.gearmenu-items > button.linklike { text-align: left; }
 
 /* ---- a view's toolbar -----------------------------------------------------
    Controls sit in labelled zones, and the zones say what kind of control they hold:

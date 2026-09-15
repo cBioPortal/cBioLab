@@ -134,7 +134,10 @@ async function main() {
         const r = b2.getBoundingClientRect();
         return { h: Math.round(r.height), w: Math.round(r.width) };
       });
-      ok("value bars stay small", !!vals.bars && !!barBox && barBox.h <= 5 && barBox.w <= 80,
+      // 8px + a 1px border each side, matching .gsplit's frame — a deliberate
+      // widening from the original 3px hint so clinical, genomic and the
+      // alteration-split bar all read as one family of bar (see globals.css).
+      ok("value bars stay small", !!vals.bars && !!barBox && barBox.h <= 10 && barBox.w <= 80,
         barBox ? vals.bars + " bars, " + barBox.w + "x" + barBox.h + "px" : "no bars found");
 
       ok("the attribute expander sits inside the Clinical card",
@@ -376,18 +379,21 @@ async function main() {
           cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
           views: [{ kind: "oncoprint", genes: ["TP53", "KRAS"] }]
         })).toString("base64")));
-        await page.waitForSelector('summary[title="more, about this oncoprint"]', { timeout: 300000 });
+        await page.waitForSelector('summary[title="download or open this figure elsewhere"]', { timeout: 300000 });
         const namedButton = await page.locator("button.genesbtn").first().innerText();
-        await page.locator('summary[title="more, about this oncoprint"]').click();
-        const gear = page.locator('details:has(summary[title="more, about this oncoprint"]) .gearmenu-items');
+        await page.locator('summary[title="download or open this figure elsewhere"]').click();
+        const gear = page.locator('details:has(summary[title="download or open this figure elsewhere"]) .gearmenu-items');
         const gearHasEditor = (await gear.locator(".pillwrap").count()) > 0;
-        const gearHasLink = (await gear.locator('a:has-text("cBioPortal")').count()) > 0;
-        // the button says how many rows it edits; the overflow menu keeps only the link out
-        gearOk = /^genes \(\d+\)$/.test(namedButton.trim()) && !gearHasEditor && gearHasLink;
+        const gearHasCbioportal = (await gear.locator('a:has-text("cBioPortal")').count()) > 0;
+        const gearHasDownloads = (await gear.locator("text=download figures").count()) > 0;
+        // the button says how many rows it edits; the overflow menu is downloads/exports only —
+        // no gene editor, and no cBioPortal escape hatch (removed: the portal can't express
+        // cbio-lab cohorts or tracks, so the link only ever pointed at a different figure)
+        gearOk = /^genes \(\d+\)$/.test(namedButton.trim()) && !gearHasEditor && !gearHasCbioportal && gearHasDownloads;
         gearSplit = "button '" + namedButton.trim() + "', menu has editor: " + gearHasEditor +
-          ", menu has portal link: " + gearHasLink;
+          ", menu has cBioPortal link: " + gearHasCbioportal + ", menu has downloads: " + gearHasDownloads;
       } catch (e) { gearSplit = String(e.message).split("\n")[0]; }
-      ok("genes are a named button; the overflow menu keeps only the cBioPortal link", gearOk, gearSplit);
+      ok("genes are a named button; the overflow menu holds downloads, not a cBioPortal link", gearOk, gearSplit);
 
       // Dragging across the plot picks columns and offers to make them a cohort. The count in
       // the dialog and the length of the id list must be the same number, and the cohort the
@@ -559,7 +565,9 @@ async function main() {
       let beforeN = 0, afterKinds = [];
       try {
         beforeN = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).length;
-        await page.locator(".viewcard").first().locator(".removeview").click();
+        const firstCard = page.locator(".viewcard").first();
+        await firstCard.locator("summary[title='reorder or remove this view']").click();
+        await firstCard.locator(".gearmenu-items button:has-text('remove')").click();
         await page.waitForFunction((n) => {
           try { return (JSON.parse(document.querySelector("#docjson").value).views || []).length === n - 1; }
           catch { return false; }
