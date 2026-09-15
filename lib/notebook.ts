@@ -37,8 +37,8 @@ export function oncoprintNotebook(o: NotebookInput): unknown {
     md(`# Oncoprint — ${num(s.columns)} ${s.unit}s, ${s.tracks} tracks
 
 ${s.genes.length ? "Genes: **" + s.genes.join("**, **") + "**. " : ""}${s.groups.length > 1 ? "Groups: " + s.groups.join(", ") + ". " : ""}
-Exported from [Cohort Lab](${o.origin}). This notebook carries the figure's **contract** — the one
-JSON object every Cohort Lab renderer reads — and the \`cohortlab\` package itself, so it runs with
+Exported from [cbio-lab](${o.origin}). This notebook carries the figure's **contract** — the one
+JSON object every cbio-lab renderer reads — and the \`cohortlab\` package itself, so it runs with
 no install, no database and no network. \`numpy\` and \`matplotlib\` are the only outside packages.
 ${o.cut ? "\n> **" + o.cut + "** The numbers below are of that cut, not of the whole cohort.\n" : ""}
 The spec that produced it, if you want to re-run it live against the server, is in the last cell.`),
@@ -49,6 +49,13 @@ One cell, two gzipped blobs: the package as committed, and this figure. Run it a
 nothing below reads it again.`),
 
     code(`import base64, gzip, json, pathlib, sys
+
+# JupyterLite's Pyodide kernel only preloads a package when it sees a literal
+# "import" for it in the cell being run; numpy and matplotlib are needed by
+# cohortlab (imported below) but never named literally here, so without these
+# two lines JupyterLite fails the import below with ModuleNotFoundError while
+# every other host (Jupyter, Colab, VS Code) already has them installed.
+import numpy, matplotlib
 
 PACKAGE = "${o.packageB64}"
 CONTRACT = "${o.contractB64}"
