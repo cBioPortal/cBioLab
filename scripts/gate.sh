@@ -11,11 +11,16 @@
 # This used to run in a sibling worktree, which cost 1.2G to solve the same
 # problem a config value solves.
 #
-# Usage:  scripts/gate.sh
+# PORT defaults to 3100 but is overridable via GATE_PORT — needed so two
+# sessions gating around the same time don't kill each other's e2e server
+# mid-suite (fuser -k below would otherwise hit whichever session's server got
+# there first).
+#
+# Usage:  scripts/gate.sh   (or  GATE_PORT=4100 scripts/gate.sh)
 set -euo pipefail
 cd "$(cd "$(dirname "$0")/.." && pwd)"
 export NEXT_DIST_DIR=.next-gate
-PORT=3100
+PORT="${GATE_PORT:-3100}"
 
 echo "== $(git branch --show-current 2>/dev/null || echo detached) @ $(git rev-parse --short HEAD)$([ -n "$(git status --porcelain)" ] && echo ' + uncommitted changes') =="
 echo "== build (-> $NEXT_DIST_DIR) ==" && npm run build 2>&1 | tail -3
@@ -25,6 +30,6 @@ fuser -k $PORT/tcp 2>/dev/null || true
 sleep 2
 (npm start -- -p $PORT >/tmp/gate-server.log 2>&1 &)
 for _ in $(seq 1 40); do curl -sf -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/analysis" && break; sleep 3; done
-set +e; node e2e.cjs; RC=$?; set -e
+set +e; E2E_PORT=$PORT node e2e.cjs; RC=$?; set -e
 fuser -k $PORT/tcp 2>/dev/null || true
 exit $RC
