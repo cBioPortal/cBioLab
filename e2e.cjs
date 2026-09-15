@@ -1,6 +1,6 @@
 const { chromium } = require("/home/ubuntu/cohort-lab/node_modules/playwright");
 
-const BASE = "http://localhost:3100";
+const BASE = "http://localhost:" + (process.env.E2E_PORT || 3100);
 
 async function main() {
   const browser = await chromium.launch({
