@@ -1,4 +1,5 @@
 import "./globals.css";
+import PopoverAutoClose from "./PopoverAutoClose";
 
 export const metadata = {
   title: "cbio-lab",
@@ -12,7 +13,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Serif:wght@600&display=swap" />
       </head>
-      <body>{children}</body>
+      <body>
+        <PopoverAutoClose />
+        {children}
+      </body>
     </html>
   );
 }

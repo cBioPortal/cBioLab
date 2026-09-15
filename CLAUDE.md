@@ -157,6 +157,10 @@ still holds, against a running server.
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push **your own branch**. **Stop there.**
+  This is the checkpoint for a *finished* piece of work, not a loop to run after every edit —
+  `node e2e.cjs` needs a fresh production build and a real browser, so it's slow. While iterating,
+  use `next dev`'s hot reload for visual changes and `npm test` (fast, no build) for logic
+  changes; run the full build+e2e gate once, right before commit/push.
 - **Branch from `master`, work on a feature branch, and leave the merge to a person.** There is
   no staging trunk: the `analysis` branch was retired once it stopped being a distinct line of
   development and became a second name for `master`. Name a branch after the work, push it, and
@@ -178,18 +182,22 @@ still holds, against a running server.
 ## Session folders, branches and ports
 
 One folder per session, one branch per folder, one dev server per folder on a
-stable port that always reflects it.
+stable port that always reflects it. Multiple sessions can run concurrently —
+each gets its own worktree, branch and port, so they never write the same
+files or fight over `.next`.
 
 | | |
 |---|---|
-| folder | a git worktree — `cBio-next-<name>` |
+| folder | a git worktree — `~/projects/cbio-next-<name>/cohort-lab` (the orchestrator convention in `~/projects/CLAUDE.md`; not a sibling of `~/cBio-next`) |
 | branch | `session/<name>`, checked out only there |
 | port | `next dev`, kept alive by `serve-<port>.sh`, serving that folder |
+| gate port | a per-session port for `scripts/gate.sh`'s ephemeral e2e server (default 3100 — override with `GATE_PORT` so concurrent sessions gating at the same time don't kill each other's server mid-suite) |
 
-`scripts/session-setup.sh <name> <port>` creates it.
+`scripts/session-setup.sh <name> <port> [gate-port]` creates it — worktree, branch, dev server,
+and a generated `CLAUDE.md` in the project folder with all of the above filled in.
 `scripts/gate.sh` runs build + unit + e2e **in the same folder**, building to
 `.next-gate` via `NEXT_DIST_DIR` so it never touches the `.next` the dev server
-owns.
+owns. Run it manually before commit/push, not after every edit — see above.
 
 **The rule is about the DIRECTORY, not the folder.** `next dev` and `next build`
 both write `.next`, so they must not share it. Serving a production build from a

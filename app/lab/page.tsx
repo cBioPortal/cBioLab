@@ -31,8 +31,25 @@ function tabFromParams(sp: SearchParams): typeof TABS[number] {
 }
 
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
-/** beyond this many distinct values a pie is unreadable — the portal shows a table */
-const PIE_MAX_SLICES = 8;
+/**
+ * Which clinical attributes draw as a pie rather than a table — a fixed
+ * editorial choice, not a live count. It used to be "distinct values above
+ * some limit renders as a table", computed from whichever studies happen to
+ * be selected — so the SAME attribute could be a table in one study and a
+ * pie in another, or flip mid-session the moment the study selection
+ * changed: msk_chord_2024 alone has few enough Cancer Type values to clear
+ * that bar, add genie_public and it doesn't. A chart's TYPE changing under
+ * the reader is worse than a chart being the "wrong" shape for a given
+ * study, so this is now a name-based allowlist, frozen regardless of the
+ * data. Anything not listed here draws as a table — the safe default,
+ * since a table degrades gracefully to any cardinality and a pie with 30
+ * slices does not. Extend this list rather than reintroducing a threshold.
+ */
+const PIE_ATTRIBUTES = new Set([
+  "SEX", "GENDER",
+  "OS_STATUS", "DFS_STATUS", "DSS_STATUS", "PFS_STATUS", "RFS_STATUS",
+  "SAMPLE_TYPE", "SOMATIC_STATUS"
+]);
 
 /** Prompts where a figure is the answer, not decoration. */
 const CHAT_STARTERS = [
@@ -295,6 +312,18 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const exFetchSeq = useRef(0);
   /** facets from the last UNNARROWED response — the bar is always computed from these */
   const exFullAttrsRef = useRef<{ attribute: string; studyCount: number }[]>([]);                                         // stale-response guard for explore fetches
+  /**
+   * Clinical attribute order, pinned from the last response with NO facet
+   * selection applied. The server sorts attributes by priority then by
+   * coverage WITHIN the current draft (lib/explore.ts) — so two attributes
+   * with similar coverage overall can swap places the moment a selection
+   * changes who is being counted, and the whole page reshuffles under the
+   * reader even though no number is wrong. This is the reference point that
+   * stops that: it only moves when the draft is empty (a real re-scoping —
+   * changing studies, or clearing filters), never as a side effect of a
+   * click. Keyed by `per|attribute` to match the `data-attr` the DOM uses.
+   */
+  const attrOrderRef = useRef<string[] | null>(null);
   const [qaAttr, setQaAttr] = useState("");                             // creator quick-add: attribute
   const [qaVal, setQaVal] = useState("");                               // creator quick-add: numeric threshold
   const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
@@ -385,15 +414,20 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     }).catch(() => {});
     // tab itself is already correct from the initial render (see initialTab()) — this
     // only needs to fetch what that landing tab needs and hydrate a shared ?doc= link.
-    if (tabRef.current === "explore") fetchExplore();
+    // A ?doc= link's study must land in exSel BEFORE fetchExplore reads it: doing
+    // that fetch first sent it out scoped to the hardcoded default studies, so
+    // every facet on screen — cardinality included, hence a table rendering where
+    // a pie belonged — reflected the wrong population until the next click
+    // quietly re-scoped everything and the shapes changed under the reader.
     try {
       const b64 = new URLSearchParams(window.location.search).get("doc");
       if (b64) {
         const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0))));
         if (d.study) { setStudy(d.study); setExStudies([d.study]); exSel.current = [d.study]; }
         setDoc(d); setDocText(JSON.stringify(d, null, 2));
+        if (tabRef.current === "explore") fetchExplore();
         run(d);
-      }
+      } else if (tabRef.current === "explore") fetchExplore();
     } catch (e) { setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
   }, []); // eslint-disable-line
 
@@ -712,8 +746,9 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     try {
       const list = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current;
       if (!list.length) { setExplore(null); exInflight.current = null; setExploreBusy(false); return; }
+      const draft = draftOverride !== undefined ? draftOverride : parseDraft();
       const res = await fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studies: list, draft: draftOverride !== undefined ? draftOverride : parseDraft(),
+        body: JSON.stringify({ studies: list, draft,
           // Narrow the server's work to the attributes that will actually be
           // shown. Only sent once a previous result has told us which those are.
           ...((attrsOverride ?? attrsForBar(attrCoverage, studiesOverride)).length
@@ -722,6 +757,20 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
       const j = await res.json();
       if (seq !== exFetchSeq.current) return; // superseded while in flight — discard
       if (!j.error) {
+        // Pin attribute order to the last selection-free response; see
+        // attrOrderRef's own comment for why the server's live order can't
+        // be trusted as-is once any facet is selected.
+        const noSelection = !draft || !Array.isArray(draft.all) || !draft.all.length;
+        if (noSelection) {
+          attrOrderRef.current = (j.clinical || []).map((c: { per: string; attribute: string }) => c.per + "|" + c.attribute);
+        } else if (attrOrderRef.current && j.clinical) {
+          const order = attrOrderRef.current;
+          const rank = (c: { per: string; attribute: string }) => {
+            const i = order.indexOf(c.per + "|" + c.attribute);
+            return i === -1 ? order.length : i;
+          };
+          j.clinical = [...j.clinical].sort((a: any, b: any) => rank(a) - rank(b));
+        }
         setExplore(j);
         // only a response that was NOT narrowed can define the full vocabulary
         if (!(attrsOverride ?? []).length && !(attrCoverage > 0))
@@ -1746,6 +1795,11 @@ function Latency({ v }: { v: any }) {
               </div>
             );
           })()}
+          {/* A facet click starts a recount, and a second click before it lands
+              would race it — so the facets themselves greyscale until it does.
+              The study picker above stays live: choosing studies is a staged,
+              separately-submitted action, not an immediate filter. */}
+          <div className={exploreBusy ? "busy" : undefined} aria-busy={exploreBusy}>
           {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "var(--t-md)", margin: 0 }}>
             No studies selected — check one or more above to explore.</p></div>}
           {!explore && exStudies.length > 0 && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
@@ -1906,9 +1960,7 @@ function Latency({ v }: { v: any }) {
                      React — the e2e suite asserts that an attribute's shape does not
                      change when the draft does. */
                   <div key={c.per + c.attribute} data-attr={c.per + "|" + c.attribute}
-                    data-shape={c.kind === "cat"
-                      ? ((explore.attributeCardinality?.[c.per + "|" + c.attribute] ?? (c as any).distinct ?? c.values.length) > PIE_MAX_SLICES ? "list" : "pie")
-                      : c.kind}
+                    data-shape={c.kind === "cat" ? (PIE_ATTRIBUTES.has(c.attribute) ? "pie" : "list") : c.kind}
                     style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0" }}>
                     {(() => {
                       // A facet already in the draft is re-queried WITHOUT its own
@@ -1939,12 +1991,10 @@ function Latency({ v }: { v: any }) {
                       const clause = (v: any) => ({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v,
                         ...(c.per === "sample" ? { per: "sample" } : {}) });
                       // slice geometry: cumulative angles over the returned values.
-                      // The shape is decided by the attribute's cardinality IN THE
-                      // STUDY, never by how many values survive the current draft.
-                      // The filtered count drops as you narrow a cohort, so keying
-                      // off it made attributes flip from list to pie on an unrelated
-                      // click and the page change shape while being read.
-                      const asList = (explore.attributeCardinality?.[c.per + "|" + c.attribute] ?? c.distinct ?? c.values.length) > PIE_MAX_SLICES;
+                      // The shape comes from PIE_ATTRIBUTES, a fixed allowlist — see
+                      // its own comment for why cardinality (the study's, or worse,
+                      // the draft's) can't be trusted to decide this.
+                      const asList = !PIE_ATTRIBUTES.has(c.attribute);
                       let acc = 0;
                       const R = 34, CX = 36, CY = 36;
                       const arcs = c.values.map((v: any, i: number) => {
@@ -1973,8 +2023,15 @@ function Latency({ v }: { v: any }) {
                                 {/* share of the cases that HAVE a value for this
                                     attribute, which is the facet's own total — not
                                     the whole cohort, since that would make every
-                                    sparsely-recorded attribute look small. */}
-                                <span className="vpct">{c.patients ? (Math.round(1000 * v.n / c.patients) / 10) + "%" : ""}</span>
+                                    sparsely-recorded attribute look small. `total`,
+                                    not `c.patients`: once this attribute is itself
+                                    drafted, c.patients is the draft's (self-narrowed)
+                                    count, while `total` is the disjunctive-safe sum
+                                    of this facet's own values — the same one the pie
+                                    view's arcs already use, which is why only the
+                                    list view had every other value's share collapse
+                                    around whichever one you had just clicked. */}
+                                <span className="vpct">{(Math.round(1000 * v.n / total) / 10) + "%"}</span>
                               </button>
                             ))}
                             {(c.distinct ?? 0) > c.values.length && (
@@ -2087,7 +2144,7 @@ function Latency({ v }: { v: any }) {
                         <>
                           <span className="gname">{dt.profile}</span>
                           <span className="meta dtlabel">{dt.label}</span>
-                          <span className="gbar"><i style={{ width: Math.max(1, Math.round(100 * dt.n / max)) + "%" }} /></span>
+                          <span className="gbar"><i style={{ width: Math.max(2, Math.round(100 * dt.n / max)) + "%" }} /></span>
                           <span className="gcount">{dt.n.toLocaleString()}</span>
                         </>
                       );
@@ -2221,6 +2278,7 @@ function Latency({ v }: { v: any }) {
               </div>
             </div>
           </div>}
+          </div>
         </div>}
 
         {/* ================= Cohorts tab ================= */}
@@ -3098,11 +3156,6 @@ function Latency({ v }: { v: any }) {
                   const c = contracts[JSON.stringify(v.spec)];
                   const vNames = ocView(vi).cohorts || Object.keys(result.cohorts);
                   const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];
-                  const genes = (ocView(vi).genes || []).map(g => String(g));
-                  const portalUrl = "https://www.cbioportal.org/results/oncoprint?cancer_study_list=" + vStudies.join(",") +
-                    "&case_set_id=" + (vStudies.length === 1 ? vStudies[0] + "_all" : "all") +
-                    "&gene_list=" + encodeURIComponent(genes.join(" ")) +
-                    "&profileFilter=mutations%2Cstructural_variants%2Cgistic&Z_SCORE_THRESHOLD=2.0&tab_index=tab_visualize&Action=Submit";
                   return <>
                     <ViewHead v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                       cohorts={cohortChoice(vi, docView(vi), 4)}
@@ -3136,14 +3189,6 @@ function Latency({ v }: { v: any }) {
                           <input type="checkbox" checked={!!(ocView(vi).display as any)?.hideVUS} disabled={busy}
                             onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "hideVUS", e.target.checked || undefined))} /> drivers only</label>
                       </>}
-                      moreMenu={
-                        <details className="gearmenu">
-                          <summary className="tbbtn" title="more, about this oncoprint">⋯</summary>
-                          <div className="gearmenu-items">
-                            <a target="_blank" rel="noopener noreferrer" href={portalUrl}>Open these genes in the cBioPortal oncoprint ↗</a>
-                            <span className="meta">full {vStudies.length === 1 ? "study" : vStudies.length + "-study"} view, all samples — the portal can&apos;t express cbio-lab cohorts or tracks</span>
-                          </div>
-                        </details>}
                       tracksMenu={<TracksMenu
                         attrs={trackAttrs.attrs} profiles={trackAttrs.profiles}
                         clinical={ocView(vi).clinical || []} heatmap={ocView(vi).heatmap || []}

@@ -88,8 +88,18 @@ of the cells behind it, so a figure of any width is drawn at the same cost. Ever
 priority comes from \`style.json\`, generated from the TypeScript style module — this picture is the
 one the web app draws.`),
 
-    code(`fig = op.figure(width=1200)
-fig`),
+    code(`import io
+from IPython.display import Image, display
+
+# op.figure() returns a matplotlib Figure drawn on the non-interactive "Agg"
+# backend (there is no display server to draw to here), so returning it bare
+# shows nothing unless the frontend already switched on inline display itself
+# — not guaranteed on JupyterLite's Pyodide kernel. Rendering it to a PNG
+# buffer and displaying that explicitly works the same way everywhere.
+fig = op.figure(width=1200)
+buf = io.BytesIO()
+fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+display(Image(buf.getvalue()))`),
 
     md(`## The arrays
 

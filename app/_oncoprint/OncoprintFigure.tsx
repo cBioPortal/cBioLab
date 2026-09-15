@@ -62,8 +62,6 @@ export interface OncoprintFigureProps {
   onExpandTrack?: (label: string) => void;
   /** the Tracks menu's contents — the page owns what can be added */
   tracksMenu?: React.ReactNode;
-  /** anything that is neither data nor view: links out, page-level extras */
-  moreMenu?: React.ReactNode;
   onDisplay: (d: FigureDisplay) => void;
   /** extra toolbar controls, placed before the viewing options */
   controls?: React.ReactNode;
@@ -689,8 +687,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           </div>
           <div className="tbz">
             <details className="gearmenu">
-              <summary className="tbbtn" title="download this figure">{saving ? "saving…" : "export"}</summary>
+              <summary className="tbbtn" title="download or open this figure elsewhere" aria-label="download or open this figure elsewhere">{saving ? "saving…" : "⋯"}</summary>
               <div className="gearmenu-items">
+                <span className="meta">download figures</span>
                 <button className="linklike" onClick={() => download("png")}>PNG — the whole figure at 4000px</button>
                 <button className="linklike" onClick={() => download("svg")}>SVG — re-rendered on the server from this spec</button>
                 <button className="linklike" onClick={() => download("tsv")}>Tabular TSV — one row per track, one column per {data.unit}</button>
@@ -714,7 +713,6 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 </div>
               </div>
             </details>
-            {props.moreMenu}
           </div>
         </div>
         {sortKeys.length > 1 && <div className="viewtb-more">

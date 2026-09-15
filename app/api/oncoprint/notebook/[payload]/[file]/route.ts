@@ -24,7 +24,11 @@ import type { Contract } from "../../../../../../lib/types.ts";
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
-const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" };
+// Chrome's Private Network Access blocks a public page (jupyter.org) from fetching a server on a
+// private/tailnet/local address unless the preflight explicitly allows it — without this header,
+// JupyterLite's fetch is silently refused ("Permission was denied for this request") and the
+// reader gets JupyterLite's own default starter notebook instead of any error naming this route.
+const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Private-Network": "true" };
 
 let packed: string | null = null;
 /** the package as committed — every .py plus the generated style.json — gzipped once per process */

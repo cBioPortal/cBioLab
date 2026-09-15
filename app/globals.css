@@ -244,6 +244,9 @@ details.gearmenu > .gearmenu-items {
   display: flex; flex-direction: column; gap: 0.25rem;
 }
 .gearmenu-items a { color: var(--accent-ink); font-size: var(--t-md); }
+/* a <button> centers its text by default; every other item in this column
+   (links, checkboxes) reads flush left, so a button among them looked adrift. */
+.gearmenu-items > button.linklike { text-align: left; }
 
 /* ---- a view's toolbar -----------------------------------------------------
    Controls sit in labelled zones, and the zones say what kind of control they hold:
@@ -332,8 +335,11 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .generow .cnatag.amp { background: #e41a1c22; color: #b3131a; }
 .generow .cnatag.del { background: #2166ac22; color: #1b4f86; }
 .generow .cnatag.none { background: none; }
-.generow .gbar { height: 7px; background: var(--line); border-radius: var(--r-sm); overflow: hidden; }
-.generow .gbar i { display: block; height: 100%; min-width: 2px; background: var(--accent-ink); opacity: 0.8; }
+/* Same bar as a clinical value's (.valrow .vbar), which in turn matches the
+   gene alteration split's frame (.gsplit) — one family, whether the bar is a
+   relative magnitude or a proportion. */
+.generow .gbar { height: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+.generow .gbar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .generow .gfreq { text-align: right; font-variant-numeric: tabular-nums; }
 .generow .gcount { text-align: right; font-variant-numeric: tabular-nums; font-size: var(--t-sm); }
 
@@ -364,7 +370,10 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
   font: inherit; font-size: var(--t-md); color: var(--ink); cursor: pointer;
 }
 .pikey:hover { background: var(--code-bg); }
-.pikey.on { background: var(--code-bg); outline: 1px solid var(--accent-ink); }
+/* Selected, not just hovered: a flat accent tint, not a boxed outline — a
+   bordered, rounded pill sitting inside a plain legend read as clutter. */
+.pikey.on { background: var(--accent-soft); font-weight: 600; }
+.pikey.on .pname { color: var(--accent-ink); }
 .pikey .swatch { width: 9px; height: 9px; border-radius: 2px; flex: 0 0 9px; }
 .pikey .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 11rem; }
 .pikey .pn { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -373,7 +382,10 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .generow.dtrow { grid-template-columns: minmax(6rem, 1fr) minmax(6rem, 1.4fr) minmax(3rem, 1.2fr) 6rem; }
 .generow.dtrow.static { cursor: default; }
 .generow.dtrow.static:hover { background: none; }
-.generow.dtrow.on { background: var(--code-bg); outline: 1px solid var(--accent-ink); }
+/* Selected, not just hovered: a flat accent tint flush with the row above and
+   below it, not a boxed, rounded outline — this is a dense list, not a card. */
+.generow.dtrow.on { background: var(--accent-soft); border-radius: 0; }
+.generow.dtrow.on .dtlabel { color: var(--accent-ink); font-weight: 600; }
 .generow .dtlabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Explore: high-cardinality categorical facets as a ranked list (portal table) */
@@ -393,11 +405,16 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
   font: inherit; font-size: var(--t-md); color: var(--ink); text-align: left; cursor: pointer;
 }
 .valrow:hover { background: var(--code-bg); }
-.valrow.on { background: var(--code-bg); outline: 1px solid var(--accent-ink); }
+/* Selected, not just hovered: a flat accent tint flush with the row above and
+   below it, not a boxed, rounded outline — this is a dense list, not a card. */
+.valrow.on { background: var(--accent-soft); border-radius: 0; }
+.valrow.on .vname { color: var(--accent-ink); font-weight: 600; }
 .valrow .vname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.valrow .vbar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
-.valrow .vbar i { display: block; height: 100%; min-width: 2px; background: var(--accent-ink); opacity: 0.55; }
-.valrow:hover .vbar i, .valrow.on .vbar i { opacity: 0.9; }
+/* Same frame as a gene's alteration split (.generow .gsplit) — a bordered
+   8px track, solid fill, no track tint and no hover-opacity trick — so a
+   relative-magnitude bar and a proportion bar read as one family. */
+.valrow .vbar { height: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+.valrow .vbar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .valrow .vn { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 
 /* Survival: log-rank readout under the KM chart */
