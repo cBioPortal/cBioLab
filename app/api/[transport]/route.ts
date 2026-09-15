@@ -4,7 +4,7 @@ import { registerTools } from "../../../mcp/tools.ts";
 
 const handler = createMcpHandler(
   (server) => registerTools(server),
-  { serverInfo: { name: "cohort-lab", version: "1.0.0" } },
+  { serverInfo: { name: "cbio-lab", version: "1.0.0" } },
   { basePath: "/api", disableSse: true, maxDuration: 60 }
 );
 

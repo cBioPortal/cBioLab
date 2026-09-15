@@ -35,7 +35,7 @@ const measure = () => ({
 function sourceCounts() {
   const root = join(__dirname, "..");
   const css = readFileSync(join(root, "app/globals.css"), "utf8");
-  const files = ["app/analysis/page.tsx", "app/_oncoprint/OncoprintFigure.tsx"].map((f) => readFileSync(join(root, f), "utf8"));
+  const files = ["app/lab/page.tsx", "app/_oncoprint/OncoprintFigure.tsx"].map((f) => readFileSync(join(root, f), "utf8"));
   const sizes = new Set([...css.matchAll(/font-size: *([0-9.]+rem)/g)].map((m) => m[1]));
   for (const f of files) for (const m of f.matchAll(/fontSize: *"([0-9.]+rem)"/g)) sizes.add(m[1]);
   return { fontSizes: sizes.size, inlineStyles: files.reduce((n, f) => n + (f.match(/style=\{\{/g) || []).length, 0) };
@@ -43,7 +43,7 @@ function sourceCounts() {
 
 (async () => {
   const browser = await chromium.launch({ executablePath: CHROME, args: ["--no-sandbox"] });
-  const url = BASE + "/analysis?tab=analysis&doc=" + Buffer.from(JSON.stringify(DOC)).toString("base64url");
+  const url = BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify(DOC)).toString("base64url");
   const rows = [];
   for (const w of [1024, 1280, 1600, 2560]) {
     const page = await browser.newPage({ viewport: { width: w, height: 1000 } });
@@ -51,11 +51,6 @@ function sourceCounts() {
     await page.waitForSelector("canvas", { timeout: 300000 });
     await page.waitForTimeout(8000);
     rows.push([w + "px", await page.evaluate(measure)]);
-    if (w === 2560) {
-      await page.locator('button:has-text("hide document")').click();
-      await page.waitForTimeout(1500);
-      rows.push(["2560px, document hidden", await page.evaluate(measure)]);
-    }
     await page.close();
   }
   await browser.close();

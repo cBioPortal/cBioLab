@@ -79,11 +79,12 @@ function leafText(leaf: any) {
 
 function Pill({ leaf, negated, onRemove }: { leaf: any; negated?: boolean; onRemove?: () => void }) {
   const meta = KIND_META[leafKind(leaf)] || KIND_META.clinical;
+  const text = leafText(leaf);
   return (
-    <span className="fpill" style={{ borderLeftColor: meta.color }} title={JSON.stringify(leaf)}>
+    <span className="fpill" style={{ borderLeftColor: meta.color }}>
       <span className="fkind">{meta.label}</span>
       {negated && <span className="fnot">NOT</span>}
-      <span>{leafText(leaf)}</span>
+      <span className="fval" title={text}>{text}</span>
       {onRemove && <button className="fx" aria-label="remove clause" onClick={onRemove}>×</button>}
     </span>
   );

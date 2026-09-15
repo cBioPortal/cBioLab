@@ -1,4 +1,4 @@
-// Cohort Lab MCP server — standalone Streamable HTTP (stateless).
+// cbio-lab MCP server — standalone Streamable HTTP (stateless).
 // The same tools are served on Vercel via app/api/[transport]/route.js.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -22,7 +22,7 @@ const app = express();
 app.use(express.json({ limit: "2mb" }));
 app.post("/mcp", async (req: any, res: any) => {
   try {
-    const server = new McpServer({ name: "cohort-lab", version: "1.0.0" });
+    const server = new McpServer({ name: "cbio-lab", version: "1.0.0" });
     registerTools(server);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on("close", () => { transport.close(); server.close(); });
@@ -35,4 +35,4 @@ app.post("/mcp", async (req: any, res: any) => {
 app.get("/mcp", (req: any, res: any) => res.status(405).json({ error: "POST only (stateless)" }));
 
 const PORT = process.env.MCP_PORT || 3201;
-app.listen(Number(PORT), "127.0.0.1", () => console.log("cohort-lab MCP on http://127.0.0.1:" + PORT + "/mcp"));
+app.listen(Number(PORT), "127.0.0.1", () => console.log("cbio-lab MCP on http://127.0.0.1:" + PORT + "/mcp"));

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import PyNotebook from "./PyNotebook.tsx";
 import { decodeSpec, ipynbPath, jupyterLiteUrl } from "../../../lib/lab-links.ts";
 
-export const metadata = { title: "Oncoprint in Python — Cohort Lab" };
+export const metadata = { title: "Oncoprint in Python — cbio-lab" };
 export const dynamic = "force-dynamic";
 
 export default async function PythonPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
@@ -26,7 +26,7 @@ export default async function PythonPage({ searchParams }: { searchParams: Promi
   return (
     <>
       <header>
-        <h1>Cohort Lab</h1>
+        <h1>cbio-lab</h1>
         <span className="sub">{spec ? "your oncoprint in Python" : "oncoprint in Python"} — the package running in your browser via Pyodide</span>
         <span className="spacer" />
         <a href="/oncoprint-lab" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>interactive lab →</a>

@@ -3,7 +3,7 @@
 // Stateless — the link is the spec, like /provenance.
 import OncoprintLab from "./OncoprintLab.tsx";
 
-export const metadata = { title: "Oncoprint lab — Cohort Lab" };
+export const metadata = { title: "Oncoprint lab — cbio-lab" };
 export const dynamic = "force-dynamic";
 
 const GENES = ["TP53", "KRAS", "EGFR", "STK11", "KEAP1", "PIK3CA", "ARID1A"];
@@ -32,13 +32,13 @@ export default async function OncoprintLabPage({ searchParams }: { searchParams:
   return (
     <>
       <header>
-        <h1>Cohort Lab</h1>
+        <h1>cbio-lab</h1>
         <span className="sub">oncoprint lab — level-of-detail canvas over the binary contract</span>
         <span className="spacer" />
         <a href="/oncoprint-lab/import" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>pasted data →</a>
         <a href="/oncoprint-lab/cli" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>command line →</a>
         <a href="/oncoprint-lab/python" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>python notebook →</a>
-        <a href="/analysis" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>analysis →</a>
+        <a href="/lab" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>analysis →</a>
       </header>
       <main>
         <p className="meta" style={{ margin: "0 0 0.6rem" }}>

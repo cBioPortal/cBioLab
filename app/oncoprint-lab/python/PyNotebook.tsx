@@ -35,7 +35,7 @@ op = Oncoprint.from_tables(events, clinical, coverage, **{k: v for k, v in opts.
 print(op)
 for row in op.frequencies(): print(row)`;
   }
-  return `# 1 · ${spec ? "your figure" : "a contract"} from this Cohort Lab instance: the engine compiles the spec, we receive OPB1 bytes
+  return `# 1 · ${spec ? "your figure" : "a contract"} from this cbio-lab instance: the engine compiles the spec, we receive OPB1 bytes
 import json
 from pyodide.http import pyfetch
 from cohortlab import Oncoprint, read_opb1

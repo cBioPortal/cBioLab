@@ -11,7 +11,7 @@
 **Patient-level data must never leave the database that holds it, except to a
 participant explicitly entitled to patient-level access.**
 
-Cohort Lab can fulfil one analysis document from several *instances* of
+cbio-lab can fulfil one analysis document from several *instances* of
 differing trust level. Each is represented by a resolver:
 
 | participant | may see member ids? | how it answers |

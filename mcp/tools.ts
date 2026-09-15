@@ -65,7 +65,7 @@ function text(t: string) { return { content: [{ type: "text", text: t }] }; }
 export function registerTools(server: any): void {
 
   // ---- federation endpoint -------------------------------------------------
-  // What a peer instance exposes to another Cohort Lab: AGGREGATES ONLY.
+  // What a peer instance exposes to another cbio-lab: AGGREGATES ONLY.
   // Counts computed inside this instance's database; no patient id is ever
   // returned, which is what makes document-level federation safe to point at
   // data that cannot be shared row-wise.
@@ -73,7 +73,7 @@ export function registerTools(server: any): void {
     "federated_aggregates",
     {
       description:
-        "Federation endpoint for another Cohort Lab instance. Evaluates a cohort definition against a study THIS instance holds and returns aggregates only — cohort size, per-gene (profiled, altered, driver) counts, (months, event, n) survival triples, and per-gene-pair 2x2 tables. Never returns patient identifiers. Used by a coordinating instance to include this site's patients in compare and survival views without patient-level data leaving.",
+        "Federation endpoint for another cbio-lab instance. Evaluates a cohort definition against a study THIS instance holds and returns aggregates only — cohort size, per-gene (profiled, altered, driver) counts, (months, event, n) survival triples, and per-gene-pair 2x2 tables. Never returns patient identifiers. Used by a coordinating instance to include this site's patients in compare and survival views without patient-level data leaving.",
       inputSchema: {
         study: z.string().max(120).describe("Study id held by this instance"),
         cohort: z.record(z.string(), z.any()).describe("Cohort definition (v2 DSL; see describe_dsl)"),
@@ -149,7 +149,7 @@ export function registerTools(server: any): void {
     "federated_facets",
     {
       description:
-        "Federation endpoint for another Cohort Lab instance: the faceted catalog for a study THIS instance holds — clinical attributes with value counts (or numeric min/median/max), timeline event types, most-altered genes, case lists, molecular profiles, and the study's patient count — optionally conditioned on a draft cohort. Aggregates only; never returns patient identifiers. Lets a coordinating instance browse and filter this site's data without querying its database.",
+        "Federation endpoint for another cbio-lab instance: the faceted catalog for a study THIS instance holds — clinical attributes with value counts (or numeric min/median/max), timeline event types, most-altered genes, case lists, molecular profiles, and the study's patient count — optionally conditioned on a draft cohort. Aggregates only; never returns patient identifiers. Lets a coordinating instance browse and filter this site's data without querying its database.",
       inputSchema: {
         study: z.string().max(120).describe("Study id held by this instance"),
         draft: z.record(z.string(), z.any()).nullish().describe("Optional draft cohort definition (v2 DSL) to condition every count on"),
@@ -179,7 +179,7 @@ export function registerTools(server: any): void {
 
   server.tool(
     "describe_dsl",
-    "The complete, generated reference for the Cohort Lab DSL: the Analysis document (cohorts + views), every clause kind (OQL, clinical, timeline events, case lists, continuous genomic data, ...), cross-study federation semantics, the OncoprintSpec, and runnable examples. Read this before composing documents by hand; it is generated from the same source as the docs and the in-app chat grammar, and its examples are CI-executed against the live compiler.",
+    "The complete, generated reference for the cbio-lab DSL: the Analysis document (cohorts + views), every clause kind (OQL, clinical, timeline events, case lists, continuous genomic data, ...), cross-study federation semantics, the OncoprintSpec, and runnable examples. Read this before composing documents by hand; it is generated from the same source as the docs and the in-app chat grammar, and its examples are CI-executed against the live compiler.",
     {},
     async () => ({ content: [{ type: "text", text: renderDslMarkdown() }] })
   );
@@ -369,7 +369,7 @@ export function registerTools(server: any): void {
           drawn.map((t, i) => `  ${i + 1}. ${t}`).join("\n") +
           (skipped ? `\n  (${skipped} further figure${skipped === 1 ? "" : "s"} not attached — open the editor link below)` : ""));
 
-      out.push(`Interactive editor (share with the user — opens this exact document, live): ${base}/analysis?doc=${docB64}` +
+      out.push(`Interactive editor (share with the user — opens this exact document, live): ${base}/lab?doc=${docB64}` +
         `\nThat page also shows the generated SQL for every cohort (full provenance).`);
       content.push({ type: "text", text: out.join("\n\n") });
       return { content };

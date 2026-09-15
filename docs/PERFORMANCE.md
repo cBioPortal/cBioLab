@@ -76,7 +76,7 @@ The rows are not equivalent, though, which is the next section.
 The like-for-like comparison is one screen against one screen: their study view
 against our Explore tab.
 
-| | cbioportal.org study view | cohort-lab Explore |
+| | cbioportal.org study view | cbio-lab Explore |
 |---|---|---|
 | time to charts | 3,797 ms | 3,511 ms |
 | API calls | 22 | **3** |

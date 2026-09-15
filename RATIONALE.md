@@ -1,8 +1,8 @@
-# Cohort Lab — what it is and why it's built this way
+# cbio-lab — what it is and why it's built this way
 
 ## In one sentence
 
-Cohort Lab is a demonstration that a cBioPortal-class tool can be rebuilt around **one
+cbio-lab is a demonstration that a cBioPortal-class tool can be rebuilt around **one
 declarative object** — the Analysis document (cohorts defined by OQL / clinical / timeline
 clauses, plus views) — that a human, a chatbot, and an MCP client all read and write, with the
 server compiling it to ClickHouse SQL and every result carrying its own provenance.
@@ -143,7 +143,7 @@ panels: in MSK-CHORD, 19,979 of 24,950 patients were profiled for it. 510 patien
 MSH3 alteration — that's **2.6%** of the profiled, but only **2.0%** if you naively divide by
 the whole study. The naive figure understates the frequency by a quarter, and the error is
 invisible for genes on every panel (TP53: 53.5% either way), which is exactly what makes it
-treacherous. Cohort Lab therefore renders "not profiled" as a first-class oncoprint cell state
+treacherous. cbio-lab therefore renders "not profiled" as a first-class oncoprint cell state
 (striped — a different statement than "no alteration") and computes every frequency and every
 Fisher test over profiled patients only.
 
@@ -165,7 +165,7 @@ MSK-CHORD's treated patients carry an NLP-derived "prior medications to MSK" fla
 ~20% are undetermined. The difference is not marginal: **3,341** patients have a "first"
 immunotherapy event on their MSK timeline, but only **2,392** remain after the prior-treatment
 guard (`priorGuard: true`) — meaning **28% of the unguarded cohort** received their *observed*
-first immunotherapy, not necessarily their *actual* first. Cohort Lab makes the guard an
+first immunotherapy, not necessarily their *actual* first. cbio-lab makes the guard an
 explicit DSL flag and warns whenever a query leans on "first" without it. (The same honesty
 applies to absence queries: `NOT_FOLLOWED_BY` supports an observability guard so "no
 progression recorded" is not conflated with "lost to follow-up".)
@@ -175,7 +175,7 @@ progression recorded" is not conflated with "lost to follow-up".)
 A cohort spanning **msk_chord_2024 + msk_met_2021** with `TP53: MUT` contains **25,555
 members: 13,105 from CHORD plus 12,450 from MET**. These are two MSK studies with overlapping
 enrollment windows — some of those are the same human being counted twice, and the data
-provides no reliable way to link them. Rather than pretend otherwise, Cohort Lab keys every
+provides no reliable way to link them. Rather than pretend otherwise, cbio-lab keys every
 cross-study member by `study + patient id`, never deduplicates, and says so in every federated
 view: comparisons caption it, oncoprints add a Study track showing each column's origin and note
 that duplicates appear as separate columns, and the Explore header reads "(overlap not
@@ -281,11 +281,11 @@ redesign.
 | mode | instance is reached as | what crosses the wire | fits |
 |---|---|---|---|
 | **Data-level** | a second ClickHouse connection (`CLICKHOUSE2_*`) | aggregates, computed per-instance and summed by the one engine | instances under one trust umbrella |
-| **Document-level** | another Cohort Lab, over MCP (`PEER_MCP`) | a cohort definition out; *counts* back, never rows | institutions that cannot share patient-level data |
+| **Document-level** | another cbio-lab, over MCP (`PEER_MCP`) | a cohort definition out; *counts* back, never rows | institutions that cannot share patient-level data |
 
 Both were run against the same real second database (a separate ClickHouse instance holding a
 GENIE-derived study, `cbioportal_genie_green`) — once as a direct data-level connection, once
-fronted by a second Cohort Lab process reached purely over MCP — and the two were compared:
+fronted by a second cbio-lab process reached purely over MCP — and the two were compared:
 
 - cohort sizes: **25,555 / 24,627** patients, identical on both paths
 - per-gene compare counts, identical
@@ -407,7 +407,7 @@ agents reproduce most of the analytical divergence of human teams, bend toward w
 already believed, and their reports pass methodological review anyway. The test step is the
 weak link, and it is opaque.
 
-Cohort Lab's natural role is not the generator. It is the **executable hypothesis language and
+cbio-lab's natural role is not the generator. It is the **executable hypothesis language and
 the falsification oracle** that generators lack.
 
 ### The hypothesis is the document

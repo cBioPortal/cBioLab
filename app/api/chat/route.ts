@@ -10,7 +10,7 @@ import type { AnalysisResult } from "../../../lib/types.ts";
 
 export const maxDuration = 60;
 
-const SYSTEM = `You are the analysis assistant inside Cohort Lab, a cohort-analysis tool over
+const SYSTEM = `You are the analysis assistant inside cbio-lab, a cohort-analysis tool over
 cBioPortal studies. The current study is the "study" field of <current_document>; keep it in any
 document you emit. Attribute/event vocabularies are per-study (the examples below are from MSK
 studies; other studies differ — timeline events exist mainly in MSK studies).

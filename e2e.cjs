@@ -26,9 +26,9 @@ async function main() {
 
     // "/" no longer serves the standalone query-builder UI — it redirects into
     // the Analysis app, which subsumes it. Verify the redirect itself once
-    // (scheme-independent) and use /analysis as the base for both passes below.
+    // (scheme-independent) and use /lab as the base for both passes below.
     const rootResp = await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
-    ok(scheme + ": / redirects into the app", /\/analysis(\?|$)/.test(page.url()) && rootResp.ok(),
+    ok(scheme + ": / redirects into the app", /\/lab(\?|$)/.test(page.url()) && rootResp.ok(),
       page.url() + " status " + rootResp.status());
     await page.waitForSelector(".tabs button", { timeout: 90000 });
     ok(scheme + ": app shell loads", (await page.locator(".tabs button").count()) >= 4);
@@ -72,11 +72,11 @@ async function main() {
         const svgCount = await page.locator(".mermaid-diagram svg").count();
         const fallback = await page.locator(".mermaid-fallback").count();
         const backLink = await page.locator(".rationale-nav a").getAttribute("href");
-        rationaleOk = svgCount > 0 && fallback === 0 && backLink === "/analysis";
+        rationaleOk = svgCount > 0 && fallback === 0 && backLink === "/lab";
         rationaleInfo = "svg=" + svgCount + " fallback=" + fallback + " backLink=" + backLink;
       } catch (e) { rationaleInfo = String(e.message || e).slice(0, 100); }
       ok("/rationale renders with a live Mermaid diagram", rationaleOk, rationaleInfo);
-      await page.goto(BASE + "/analysis");
+      await page.goto(BASE + "/lab");
       await page.waitForSelector("header a", { timeout: 60000 });
       const headerLinks = await page.locator("header a").allTextContents();
       ok("header nav points only at /rationale (oncoprint/builder links removed)",
@@ -85,7 +85,7 @@ async function main() {
 
       // Derived facets: computed from the data's shape, so they must appear for a
       // study regardless of how it names its events, and clicking must filter.
-      await page.goto(BASE + "/analysis?tab=explore");
+      await page.goto(BASE + "/lab?tab=explore");
       await page.waitForSelector(".exbar", { timeout: 120000 });
       let der = { facets: 0, filtered: false };
       try {
@@ -146,7 +146,7 @@ async function main() {
 
       // Explore's top action bar: build a draft by clicking a facet, then Analyze.
       // This is the main path from browsing to an analysis, so it is gated.
-      await page.goto(BASE + "/analysis");
+      await page.goto(BASE + "/lab");
       await page.locator("button:has-text('Explore')").first().click();
       await page.waitForSelector(".exbar", { timeout: 120000 });
       // A study alone is a cohort — every patient in it — so Analyze must work
@@ -327,7 +327,7 @@ async function main() {
       // untrue for every gene-bearing view.
       let geneEdit = "no compare view rendered", geneOk = false;
       try {
-        await page.goto(BASE + "/analysis?doc=" + encodeURIComponent(Buffer.from(JSON.stringify({
+        await page.goto(BASE + "/lab?doc=" + encodeURIComponent(Buffer.from(JSON.stringify({
           study: "msk_chord_2024",
           cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
           views: [{ kind: "compare", genes: ["TP53", "KRAS", "EGFR"] }]
@@ -371,7 +371,7 @@ async function main() {
       // to a named button and a modal, so the gear is not where editing hides.
       let gearSplit = "no oncoprint rendered", gearOk = false;
       try {
-        await page.goto(BASE + "/analysis?doc=" + encodeURIComponent(Buffer.from(JSON.stringify({
+        await page.goto(BASE + "/lab?doc=" + encodeURIComponent(Buffer.from(JSON.stringify({
           study: "msk_chord_2024",
           cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
           views: [{ kind: "oncoprint", genes: ["TP53", "KRAS"] }]
@@ -395,7 +395,7 @@ async function main() {
       // shrinks on the way into the document would be worse than no selection at all.
       let dragWhat = "no oncoprint rendered", dragOk = false;
       try {
-        await page.goto(BASE + "/analysis?tab=analysis&doc=" + Buffer.from(JSON.stringify({
+        await page.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify({
           study: "msk_chord_2024",
           cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
           views: [{ kind: "oncoprint", genes: ["TP53", "KRAS"] }]
@@ -434,7 +434,7 @@ async function main() {
       // and says what the percentage is over.
       let mergedWhat = "no oncoprint rendered", mergedOk = false;
       try {
-        await page.goto(BASE + "/analysis?tab=analysis&doc=" + Buffer.from(JSON.stringify({
+        await page.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify({
           study: "msk_chord_2024",
           cohorts: { "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" }] } },
           views: [{ kind: "oncoprint", genes: [{ label: "TP53 pathway", genes: ["TP53", "MDM2", "MDM4"] }, "TP53"] }]
@@ -480,80 +480,14 @@ async function main() {
       // A workspace is the whole document — figures, notes and parameters — saved
       // under a name and reopened after a full reload. And a template retargets
       // in ONE edit: change $genes and every view that refers to it follows.
-      let wsFlow = "workspace bar never rendered", wsOk = false;
-      try {
-        await page.goto(BASE + "/analysis?doc=" + encodeURIComponent(Buffer.from(JSON.stringify({
-          study: "msk_chord_2024",
-          cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
-          views: [{ kind: "compare", genes: ["TP53", "KRAS"], note: "Frequencies first." },
-                  { kind: "cooccurrence", genes: ["TP53", "KRAS"] }]
-        })).toString("base64")));
-        await page.waitForSelector(".wsbar", { timeout: 300000 });
-        await page.waitForSelector(".viewnote", { timeout: 300000 });
-        const noteShown = (await page.locator(".viewnote").first().innerText()).includes("Frequencies first");
-
-        // lift study + the shared gene list into parameters
-        await page.locator('button:has-text("make a template")').click();
-        await page.waitForSelector(".params", { timeout: 300000 });
-        const readDoc = () => page.evaluate(() => JSON.parse(document.querySelector("#docjson").value));
-        await page.waitForFunction(() => {
-          const t = document.querySelector("#docjson"); if (!t) return false;
-          try { const d = JSON.parse(t.value); return !!(d.params && d.params.genes); } catch { return false; }
-        }, null, { timeout: 300000 });
-        const templated = await readDoc();
-        const lifted = templated.study === "$study" &&
-          templated.views.every((v) => v.genes === "$genes");
-
-        // retarget through the parameter control
-        const genesRow = page.locator(".paramrow", { hasText: "$genes" });
-        await genesRow.locator("input").fill("BRAF");
-        await genesRow.locator("input").press("Enter");
-        await page.waitForFunction(() => {
-          const t = document.querySelector("#docjson"); if (!t) return false;
-          try { return (JSON.parse(t.value).params.genes || []).includes("BRAF"); } catch { return false; }
-        }, null, { timeout: 300000 });
-        // every view followed the one edit
-        await page.waitForFunction(() => {
-          const tds = [...document.querySelectorAll(".ana-grid table tbody tr td:first-child")];
-          return tds.some((td) => (td.textContent || "").trim() === "BRAF");
-        }, null, { timeout: 300000 });
-
-        // notes live in the workspace section, which appears once there is
-        // something to manage (here: the parameters just lifted)
-        await page.waitForSelector(".wscard", { timeout: 60000 });
-        await page.locator(".wscard textarea").fill("e2e workspace notes");
-        await page.locator('.wsbar button:has-text("Save workspace")').click();
-        await page.waitForSelector("dialog.wsdialog[open]", { timeout: 30000 });
-        await page.locator("dialog.wsdialog input").fill("e2e workspace");
-        await page.locator('dialog.wsdialog button:has-text("Save")').click();
-        await page.waitForTimeout(2000);
-
-        // a FULL reload, then reopen it
-        await page.goto(BASE + "/analysis?tab=analysis");
-        await page.waitForSelector(".wsbar select", { timeout: 300000 });
-        await page.locator(".wsbar select").selectOption("e2e workspace");
-        await page.waitForFunction(() => {
-          const t = document.querySelector("#docjson"); if (!t) return false;
-          try { return JSON.parse(t.value).title === "e2e workspace"; } catch { return false; }
-        }, null, { timeout: 300000 });
-        const reopened = await readDoc();
-        const restored = reopened.notes === "e2e workspace notes" &&
-          (reopened.params.genes || []).includes("BRAF") &&
-          reopened.views.length === 2;
-        // the section is the FIRST thing in the column it describes, and says
-        // when the document has moved on from what was stored
-        const atTop = await page.evaluate(() => {
-          const col = document.querySelectorAll(".ana-grid > div")[1];
-          return !!(col && col.firstElementChild && col.firstElementChild.classList.contains("wscard"));
-        });
-        wsOk = noteShown && lifted && restored && atTop;
-        wsFlow = "note: " + noteShown + ", lifted: " + lifted + ", restored after reload: " + restored +
-          ", section at top: " + atTop;
-      } catch (e) { wsFlow = String(e.message).split("\n")[0]; }
-      ok("a workspace saves, retargets by one parameter, and survives a reload", wsOk, wsFlow);
+      //
+      // DISABLED: the workspace controls (.wsbar — save/open/make-a-template) are
+      // hidden in the UI for now (app/lab/page.tsx, `{false && (...)}`), so this
+      // flow has no UI path to drive it. Re-enable once that section returns —
+      // until then this would just hang on `.wsbar` for 5 minutes and fail.
 
       // Tabs are deep-linked: a refresh must land you where you were.
-      await page.goto(BASE + "/analysis");
+      await page.goto(BASE + "/lab");
       await page.waitForSelector(".tabs button", { timeout: 120000 });
       await page.locator(".tabs button:has-text('Explore')").click();
       await page.waitForTimeout(400);
@@ -566,13 +500,14 @@ async function main() {
       // A ?doc= link still implies the analysis, but an explicit ?tab= wins.
       const linkDoc = { study: "msk_chord_2024", cohorts: { X: { all: [{ kind: "oql", q: "TP53: MUT" }] } }, views: [{ kind: "survival" }] };
       const enc = Buffer.from(JSON.stringify(linkDoc)).toString("base64url");
-      await page.goto(BASE + "/analysis?tab=examples&doc=" + enc);
+      await page.goto(BASE + "/lab?tab=examples&doc=" + enc);
       await page.waitForTimeout(1800);
       ok("an explicit ?tab= beats the document's default tab",
         (await page.locator(".tabs button.active").innerText()).trim() === "Examples");
 
       // Cohorts tab: tick cohorts, submit them together. No per-row "add" links.
-      await page.goto(BASE + "/analysis");
+      await page.goto(BASE + "/lab");
+      await page.locator(".tabs button:has-text('Cohorts')").click();
       await page.waitForSelector(".pick input", { timeout: 240000 });
       ok("cohort rows use checkboxes, not per-row add links",
         (await page.locator("button:has-text('add to analysis')").count()) === 0,
@@ -644,7 +579,7 @@ async function main() {
         cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] },
                    "TP53 wt": { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] } },
         views: [{ kind: "survival" }] };
-      await page.goto(BASE + "/analysis?tab=analysis&doc=" + Buffer.from(JSON.stringify(survDoc)).toString("base64url"));
+      await page.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify(survDoc)).toString("base64url"));
       let basis = { types: 0, changed: false, truncated: false, anchor: null };
       try {
         await page.waitForSelector(".basis", { timeout: 300000 });
@@ -668,7 +603,7 @@ async function main() {
       // Examples tab: the documented analysis documents, rendered as a gallery.
       // The docs gate already proves each one RUNS; this proves the app can
       // launch them and that the federated views actually paint something.
-      await page.goto(BASE + "/analysis");
+      await page.goto(BASE + "/lab");
       await page.locator("button:has-text('Examples')").first().click();
       await page.waitForSelector(".excard", { timeout: 120000 });
       const nCards = await page.locator(".excard").count();
@@ -685,7 +620,7 @@ async function main() {
         ["Clinical attributes compared between cohorts", "h2:has-text('Clinical comparison')", "clinical"]
       ];
       // a multi-view document must render EVERY one of its views, not just the first
-      await page.goto(BASE + "/analysis");
+      await page.goto(BASE + "/lab");
       await page.locator("button:has-text('Examples')").first().click();
       await page.waitForSelector(".excard", { timeout: 120000 });
       await page.locator(".excard").filter({ hasText: "One cohort, five ways" }).first()
@@ -762,7 +697,7 @@ async function main() {
         marker.missing.length ? "missing on: " + marker.missing.join(", ") : marker.seen.length + " views marked");
 
       for (const [title, sel, label] of launches) {
-        await page.goto(BASE + "/analysis");
+        await page.goto(BASE + "/lab");
         await page.locator("button:has-text('Examples')").first().click();
         await page.waitForSelector(".excard", { timeout: 120000 });
         const card = page.locator(".excard").filter({ hasText: title }).first();
@@ -811,7 +746,7 @@ async function main() {
     const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
     const sp = await ctx.newPage();
     try {
-      await sp.goto(BASE + "/analysis?tab=explore", { waitUntil: "domcontentloaded" });
+      await sp.goto(BASE + "/lab?tab=explore", { waitUntil: "domcontentloaded" });
       await sp.waitForSelector("[data-attr]", { timeout: 300000 });
       await sp.waitForTimeout(2000);
       let apiCalls = 0;

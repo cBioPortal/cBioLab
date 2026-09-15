@@ -6,7 +6,7 @@ import { specToQueries } from "../../lib/oncoprint.ts";
 import { oncokbPin } from "../../lib/annotation.ts";
 import { contractToSvg } from "../../lib/oncoprint-svg.ts";
 
-export const metadata = { title: "Oncoprint provenance — Cohort Lab" };
+export const metadata = { title: "Oncoprint provenance — cbio-lab" };
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export default async function ProvenancePage({ searchParams }: { searchParams: P
   return (
     <>
       <header>
-        <h1>Cohort Lab</h1>
+        <h1>cbio-lab</h1>
         <span className="sub">oncoprint provenance — the picture, the DSL, and the SQL behind it</span>
         <span className="spacer" />
         {typeof sp.spec === "string" && <>

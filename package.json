@@ -1,5 +1,5 @@
 {
-  "name": "cohort-lab",
+  "name": "cbio-lab",
   "private": true,
   "scripts": {
     "dev": "next dev",

@@ -45,7 +45,7 @@ const ok = (name: string, pass: boolean, detail = "") => {
   if (!pass) failures++;
 };
 
-/** must stay identical to geneStateClauses() in app/analysis/page.tsx */
+/** must stay identical to geneStateClauses() in app/lab/page.tsx */
 const clausesFor = (gene: string, type: "MUTATION" | "CNA", state: string): unknown[] => {
   const prof = { kind: "profiled", type, gene };
   const oql = (q: string) => ({ kind: "oql", q: gene + ": " + q });

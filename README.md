@@ -1,4 +1,4 @@
-# Cohort Lab
+# cbio-lab
 
 Prototype for **cohort-level temporal queries over cBioPortal clinical timeline events** (msk_chord_2024).
 Users define cohorts by relationships between events — "progression within 180 days of starting immunotherapy",

@@ -12,7 +12,7 @@ import { marked } from "marked";
 import { decodeSpec, isLocalSpec } from "../../../lib/lab-links.ts";
 import { formatGeneList } from "../../../lib/gene-tracks.ts";
 
-export const metadata = { title: "Oncoprint CLI — Cohort Lab" };
+export const metadata = { title: "Oncoprint CLI — cbio-lab" };
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
@@ -170,7 +170,7 @@ export default async function CliPage({ searchParams }: { searchParams: Promise<
   return (
     <>
       <header>
-        <h1>Cohort Lab</h1>
+        <h1>cbio-lab</h1>
         <span className="sub">{spec ? "your oncoprint, on the command line" : "oncoprint from the command line — Node and Python, one contract"}</span>
         <span className="spacer" />
         <a href="/oncoprint-lab" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>interactive lab →</a>

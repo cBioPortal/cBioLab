@@ -1,4 +1,4 @@
-// Shared domain types for the Cohort Lab DSL and engine.
+// Shared domain types for the cbio-lab DSL and engine.
 //
 // These mirror the grammar documented in lib/dsl-reference.ts (the single source
 // of DSL documentation). Types here are deliberately *structural and permissive

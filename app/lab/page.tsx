@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
 import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
 import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
@@ -9,6 +9,26 @@ import { parameterize } from "../../lib/params.ts";
 import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
 import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
 import type { ViewParticipation } from "../../lib/types.ts";
+
+const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
+
+type SearchParams = { [key: string]: string | string[] | undefined };
+
+/**
+ * The landing tab, from the SAME searchParams Next.js already resolves on the
+ * server for this route — not a client-only re-parse of window.location. That
+ * match is what avoids a hydration mismatch: read the URL again on the client
+ * (even synchronously, even before paint) and the server's HTML — rendered
+ * from ?tab=analysis — no longer matches what the client says the first
+ * render should be, so React discards and re-renders the whole tree, which is
+ * the flash. Reading the identical resolved value on both sides sidesteps it.
+ * An explicit ?tab= wins; a shared ?doc= link without one implies Analysis.
+ */
+function tabFromParams(sp: SearchParams): typeof TABS[number] {
+  const wanted = typeof sp.tab === "string" ? sp.tab : null;
+  if (wanted && (TABS as readonly string[]).includes(wanted)) return wanted as typeof TABS[number];
+  return typeof sp.doc === "string" ? "analysis" : "explore";
+}
 
 const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
 /** beyond this many distinct values a pie is unreadable — the portal shows a table */
@@ -135,8 +155,11 @@ function KMChart({ curves }: { curves: KmCurve[] }) {
 const DEFAULT_EXPLORE_STUDIES = ["msk_chord_2024", "genie_public"];
 
 const EMPTY_DOC: AnalysisDoc = { cohorts: {}, views: [] };
+// "compare" dropped from the default set: computing driver/any/p for 7 genes
+// across every cohort is by far the slowest of the three, and this set exists
+// to make Analyze feel instant, not to be exhaustive — add it back per-document
+// with "+ Compare genes" when you actually want it.
 const DEFAULT_VIEWS: View[] = [
-  { kind: "compare", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR", "ARID1A", "MSH3"] },
   { kind: "survival" },
   { kind: "oncoprint", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR"] }
 ];
@@ -193,8 +216,9 @@ function ParamRow({ name, value, busy, onChange }:
   );
 }
 
-export default function AnalysisPage() {
-  const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">("cohorts");
+export default function AnalysisPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = use(searchParams);
+  const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">(() => tabFromParams(sp));
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   const [copied, setCopied] = useState<string | null>(null);
   const [exMsg, setExMsg] = useState<string | null>(null);
@@ -202,15 +226,44 @@ export default function AnalysisPage() {
   const [genesFor, setGenesFor] = useState<number | null>(null);
   const genesDialog = useRef<HTMLDialogElement | null>(null);
   const saveDialog = useRef<HTMLDialogElement | null>(null);   // Explore action-bar feedback
-  const tabRef = useRef<string>("cohorts");                  // the tab syncUrl should record
+  const tabRef = useRef<string>(tabFromParams(sp));            // the tab syncUrl should record
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
+  /**
+   * Stable React keys for view cards, by the identity of the DRAFT view object
+   * that produced each one — not the array index, and not the objects in
+   * `result.views` itself, which the server rebuilds from scratch on every
+   * run() and so would remount every card on every edit, including ones
+   * nobody touched. `doc.views[i]` keeps its object reference across
+   * addView, removeView and patchView (they only ever replace the one view
+   * that changed), and moveView explicitly swaps those references rather
+   * than cloning them, so a card's key travels with it when it moves.
+   *
+   * `resultViewKeys` is the actual per-render lookup (index in result.views
+   * -> stable key), snapshotted by run() from the SAME `d` it just sent,
+   * not re-derived from the live `doc` state at render time — `doc` can
+   * already hold the next edit (one more/fewer view) by the time a slower
+   * run() resolves, and indexing into it with `result.views`' index during
+   * that window pairs each view with the WRONG doc entry, which briefly
+   * looks to React like every view past the edit point turned into a
+   * different one and remounted it (an oncoprint losing its already-drawn
+   * canvas to a needless refetch, mid-edit).
+   */
+  const viewKeys = useRef(new WeakMap<object, number>());
+  const nextViewKey = useRef(0);
+  const resultViewKeys = useRef<number[]>([]);
+  const keyFor = (v: object): number => {
+    let k = viewKeys.current.get(v);
+    if (k == null) { k = nextViewKey.current++; viewKeys.current.set(v, k); }
+    return k;
+  };
   const [cat, setCat] = useState<any>(null);                 // event/endpoint catalog for the survival control
   const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>"
   /**
-   * The document panel is a place to inspect and share what was asked, not something to read
-   * while interpreting a figure — so it folds away, and the results take the whole width.
+   * The document's raw JSON is a place to inspect and share what was asked, not something to
+   * read while interpreting a figure — so it lives behind a button, in a dialog, rather than
+   * taking up permanent width beside the results.
    */
-  const [docPanel, setDocPanel] = useState(true);
+  const docDialog = useRef<HTMLDialogElement | null>(null);
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -307,6 +360,9 @@ export default function AnalysisPage() {
       const res = await fetch("/api/analysis?oncoprint=spec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
+      // aligned with `d`, the document THIS run actually sent — not `doc`,
+      // which may already hold a further edit by the time this resolves
+      resultViewKeys.current = (d.views || []).map((v: any) => keyFor(v));
       setResult(j);
       syncUrl(undefined, d);
     } catch (e) { setError(String((e as Error)?.message || e)); }
@@ -327,21 +383,15 @@ export default function AnalysisPage() {
       const next = keep.length ? keep : (list.length ? [list[0].id] : []);
       if (list.length && next.join(",") !== exSel.current.join(",")) setExploreStudies(next);
     }).catch(() => {});
+    // tab itself is already correct from the initial render (see initialTab()) — this
+    // only needs to fetch what that landing tab needs and hydrate a shared ?doc= link.
+    if (tabRef.current === "explore") fetchExplore();
     try {
-      const params = new URLSearchParams(window.location.search);
-      const wanted = params.get("tab");
-      const b64 = params.get("doc");
-      if (wanted && (TABS as readonly string[]).includes(wanted)) {
-        tabRef.current = wanted;
-        setTab(wanted as typeof TABS[number]);
-        if (wanted === "explore") fetchExplore();
-      }
+      const b64 = new URLSearchParams(window.location.search).get("doc");
       if (b64) {
         const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0))));
         if (d.study) { setStudy(d.study); setExStudies([d.study]); exSel.current = [d.study]; }
         setDoc(d); setDocText(JSON.stringify(d, null, 2));
-        // an explicit ?tab= wins; otherwise a shared document means the analysis
-        if (!wanted) goTab("analysis");
         run(d);
       }
     } catch (e) { setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
@@ -352,7 +402,6 @@ export default function AnalysisPage() {
    * lands on the same tab. `doc` and `tab` are written together — writing one
    * with a bare "?tab=…" would drop the other.
    */
-  const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
   // run() writes the URL too, and during the mount effect its closure still
   // holds the initial tab — so the current tab is read from a ref, never from
   // the render closure, or a shared ?doc= link would record the wrong tab.
@@ -542,6 +591,27 @@ export default function AnalysisPage() {
     else { setResult(null); syncUrl(undefined, d); }   // nothing left to run
   };
 
+  /** Swap a view with its neighbour. Order is cosmetic — the computed result for
+   *  each view is unchanged, so this reorders `result.views` too rather than
+   *  re-running the document just to move a card. */
+  const moveView = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    const views = [...(doc.views || [])];
+    if (j < 0 || j >= views.length) return;
+    [views[i], views[j]] = [views[j], views[i]];
+    const d = { ...doc, views };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    syncUrl(undefined, d);
+    if (result) {
+      const rviews = [...result.views];
+      [rviews[i], rviews[j]] = [rviews[j], rviews[i]];
+      setResult({ ...result, views: rviews });
+      const rk = [...resultViewKeys.current];
+      [rk[i], rk[j]] = [rk[j], rk[i]];
+      resultViewKeys.current = rk;
+    }
+  };
+
   const addView = (kind: string) => {
     const genes = viewGenes();
     const v: any =
@@ -586,7 +656,7 @@ export default function AnalysisPage() {
       : kind === "cooccurrence" ? { kind, genes: genes.slice(0, 6) }
       : kind === "oncoprint" ? { kind, genes: genes.slice(0, 5) }
       : { kind, genes };
-    const d = { ...doc, views: [...(doc.views || []), v] };
+    const d = { ...doc, views: [v, ...(doc.views || [])] };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
     run(d);
   };
@@ -1125,11 +1195,13 @@ function PickMenu({ label, title, options, chosen, onChange, min, max, busy }: {
 
 /**
  * Every view's header, with one anatomy: the title and what it is, then the actions that
- * belong to this view, then its status chips, then the control that removes it. Before this
- * each view kind built its own, so the timing chip landed in a different place in each card.
+ * belong to this view, then its status chips, then the controls that reorder and remove it.
+ * Before this each view kind built its own, so the timing chip landed in a different place
+ * in each card.
  */
-function ViewHead({ v, title, sub, actions, chips, cohorts, onRemove }: {
-  v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode; onRemove?: () => void;
+function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown, onRemove }: {
+  v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode;
+  onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void;
   /** which cohorts this view draws; absent when the document has only one */
   cohorts?: { chosen: string[]; all: string[]; max?: number; busy?: boolean; onChange: (n: string[]) => void };
 }) {
@@ -1146,10 +1218,26 @@ function ViewHead({ v, title, sub, actions, chips, cohorts, onRemove }: {
         {chips}
         <Latency v={v} />
         <Participation p={v.participation} />
-        {onRemove && <button className="removeview" title="remove this view from the document"
-          aria-label="remove this view" onClick={onRemove}>×</button>}
+        {(onMoveUp || onMoveDown || onRemove) && <ViewMenu onMoveUp={onMoveUp} onMoveDown={onMoveDown} onRemove={onRemove} />}
       </div>
     </div>
+  );
+}
+
+/** The gear at the end of every card's header: reorder this view, or drop it. */
+function ViewMenu({ onMoveUp, onMoveDown, onRemove }: { onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void }) {
+  return (
+    <details className="gearmenu">
+      <summary className="tbbtn" title="reorder or remove this view" aria-label="reorder or remove this view">⋯</summary>
+      <div className="gearmenu-items">
+        <button className="linklike" disabled={!onMoveUp} onClick={onMoveUp}>move up</button>
+        <button className="linklike" disabled={!onMoveDown} onClick={onMoveDown}>move down</button>
+        {onRemove && <>
+          <hr />
+          <button className="linklike" onClick={onRemove}>remove</button>
+        </>}
+      </div>
+    </details>
   );
 }
 
@@ -1394,7 +1482,7 @@ function Latency({ v }: { v: any }) {
   return (
     <>
       <header>
-        <h1>Cohort Lab</h1>
+        <h1>cbio-lab</h1>
         <span className="sub">analysis documents — cohorts and views over one declarative object</span>
         <span className="spacer" />
         <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>rationale</a>
@@ -2324,75 +2412,105 @@ function Latency({ v }: { v: any }) {
         })()}
 
         {/* ================= Analysis tab ================= */}
-        {tab === "analysis" && <div className={"ana-grid" + (docPanel ? "" : " nodoc")}>
+        {tab === "analysis" && <div className="ana-grid">
           <div>
-            <div className="card">
-              <h2>The document <span className="plain">— cohorts &amp; views</span></h2>
-              {result && Object.entries(result.cohorts).map(([n, c], i) => (
-                <div key={n} style={{ marginBottom: "0.65rem" }}>
-                  <p className="qdesc" style={{ marginBottom: "0.25rem" }}>
-                    <span className="qchip"><span className="qletter" style={{ color: CAT_COLORS[i % CAT_COLORS.length] }}>■</span>{n}</span>{" "}
-                    <strong>{c.count.toLocaleString()}</strong> patients{" "}
-                    <button className="linklike" disabled={busy} title="remove this cohort from the analysis" onClick={() => removeCohort(n)}>remove</button>
-                  </p>
-                  {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} />}
-                </div>
-              ))}
-              {/* The save/open controls stay with the document; everything you
-                  MANAGE about a saved workspace — its parameters and notes —
-                  lives at the top of the main column beside the figures. */}
-              <div className="wsbar">
-                <strong>{doc.title || "Untitled workspace"}</strong>
-                <button disabled={busy} onClick={openWorkspaceSave}
-                  title="save this whole document — views, notes and parameters — under a name">
-                  {doc.title ? "Save" : "Save workspace"}
-                </button>
-                {!doc.params && (doc.views || []).length > 0 && (
-                  <button className="linklike" disabled={busy} onClick={makeTemplate}
-                    title="lift the study and a shared gene list into parameters, so this can be re-pointed in one edit">
-                    make a template
-                  </button>
-                )}
-                {Object.keys(spaces).length > 0 && (
-                  <select value="" disabled={busy}
-                    onChange={e => { if (e.target.value) openWorkspace(e.target.value); }}>
-                    <option value="">open…</option>
-                    {Object.entries(spaces)
-                      .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
-                      .map(([n, w]) => <option key={n} value={n}>{n} — {w.savedAt}</option>)}
-                  </select>
-                )}
-              </div>
-
-              {/* id, because the notes textarea above it also matches "textarea" —
-                  anything reading the document from outside React needs to be
-                  able to say WHICH one. */}
-              <textarea id="docjson" value={docText} onChange={e => setDocText(e.target.value)} spellCheck={false}
-                style={{ width: "100%", height: "20rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
-              <div className="row" style={{ marginTop: "0.6rem" }}>
-                <button className="primary" disabled={busy} onClick={applyText}>{busy && <span className="spinner onprimary" />}{busy ? "Running…" : "Run document"}</button>
-                {doc.cohorts && Object.keys(doc.cohorts).length > 0 &&
-                  <button disabled={busy} title="empty the document — removes all cohorts and views" onClick={clearAnalysis}>Clear analysis</button>}
-                {result && <span className="meta">{result.stats.ms}ms · OncoKB {result.oncokbPin}</span>}
-
-              </div>
-              <p className="note">Views: <code>{`{"kind":"compare","genes":[…]}`}</code> · <code>{`{"kind":"survival"}`}</code> · <code>{`{"kind":"oncoprint","genes":[…],"clinical":[attrs…]}`}</code></p>
-              {result && (
-                <details style={{ marginTop: "0.5rem" }}>
-                  <summary className="meta" style={{ cursor: "pointer" }}>
-                    Generated SQL (provenance) — the exact query each cohort compiled to, per study · OncoKB pin {result.oncokbPin || "none"}
-                  </summary>
-                  {Object.entries(result.cohorts).map(([n, c]) => (
-                    <div key={n} style={{ marginTop: "0.5rem" }}>
-                      <p className="meta" style={{ margin: "0 0 0.25rem" }}><strong>{n}</strong> — {c.count.toLocaleString()} patients{c.studies && c.studies.length > 1 ? " across " + c.studies.length + " studies" : ""}</p>
-                      <pre style={{ maxHeight: "16rem", overflow: "auto", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem", fontSize: "var(--t-xs)", whiteSpace: "pre" }}>{c.sql}</pre>
+            {/* Cohorts, bare: each is its own labelled, bordered box, with no
+                enclosing card — they ARE the leftbar, not a section within it. */}
+            <h2 className="vtitle" style={{ marginBottom: "0.9rem" }}>
+              Cohorts{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
+            </h2>
+            <div className="cohortlist">
+              {busy && !result
+                ? Array.from({ length: Math.max(1, Object.keys(doc.cohorts || {}).length) }).map((_, i) => (
+                    <div key={i} className="skeleton skeleton-cohort" />
+                  ))
+                : result && Object.entries(result.cohorts).map(([n, c], i) => (
+                    <div key={n} className="cohortbox">
+                      <div className="cohortbox-head">
+                        <span className="qchip"><span className="qletter" style={{ color: CAT_COLORS[i % CAT_COLORS.length] }}>■</span>{n}</span>
+                        <strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span>
+                        <span className="spacer" />
+                        <button className="linklike" disabled={busy} title="remove this cohort from the analysis" onClick={() => removeCohort(n)}>remove</button>
+                      </div>
+                      {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} />}
                     </div>
                   ))}
-                </details>
-              )}
             </div>
+            {/* Workspace controls (save/open/template): hidden for now. */}
+            {false && (
+              <div className="card">
+                <h2>Workspace</h2>
+                <div className="wsbar" style={{ marginBottom: 0, paddingBottom: 0, border: "none" }}>
+                  <strong>{doc.title || "Untitled workspace"}</strong>
+                  <button disabled={busy} onClick={openWorkspaceSave}
+                    title="save this whole document — views, notes and parameters — under a name">
+                    {doc.title ? "Save" : "Save workspace"}
+                  </button>
+                  {!doc.params && (doc.views || []).length > 0 && (
+                    <button className="linklike" disabled={busy} onClick={makeTemplate}
+                      title="lift the study and a shared gene list into parameters, so this can be re-pointed in one edit">
+                      make a template
+                    </button>
+                  )}
+                  {Object.keys(spaces).length > 0 && (
+                    <select value="" disabled={busy}
+                      onChange={e => { if (e.target.value) openWorkspace(e.target.value); }}>
+                      <option value="">open…</option>
+                      {Object.entries(spaces)
+                        .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
+                        .map(([n, w]) => <option key={n} value={n}>{n} — {w.savedAt}</option>)}
+                    </select>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
+          {/* The document's JSON, generated SQL and run/clear controls: a dialog
+              rather than a permanent column, so the leftbar can just be cohorts. */}
+          <dialog ref={docDialog} className="docdialog"
+            onClick={e => { if (e.target === docDialog.current) docDialog.current?.close(); }}>
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.5rem" }}>
+              <h3 style={{ margin: 0 }}>The document <span className="plain">— views</span></h3>
+              <button className="linklike" onClick={() => docDialog.current?.close()}>close</button>
+            </div>
+            {/* id, because the notes textarea above it also matches "textarea" —
+                anything reading the document from outside React needs to be
+                able to say WHICH one. */}
+            <textarea id="docjson" value={docText} onChange={e => setDocText(e.target.value)} spellCheck={false}
+              style={{ width: "100%", height: "20rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
+            <div className="row" style={{ marginTop: "0.6rem" }}>
+              <button className="primary" disabled={busy} onClick={applyText}>{busy && <span className="spinner onprimary" />}{busy ? "Running…" : "Run document"}</button>
+              {doc.cohorts && Object.keys(doc.cohorts).length > 0 &&
+                <button disabled={busy} title="empty the document — removes all cohorts and views" onClick={clearAnalysis}>Clear analysis</button>}
+              {result && <span className="meta">{result.stats.ms}ms · OncoKB {result.oncokbPin}</span>}
+            </div>
+            <p className="note">Views: <code>{`{"kind":"compare","genes":[…]}`}</code> · <code>{`{"kind":"survival"}`}</code> · <code>{`{"kind":"oncoprint","genes":[…],"clinical":[attrs…]}`}</code></p>
+            {result && (
+              <details style={{ marginTop: "0.5rem" }}>
+                <summary className="meta" style={{ cursor: "pointer" }}>
+                  Generated SQL (provenance) — the exact query each cohort compiled to, per study · OncoKB pin {result.oncokbPin || "none"}
+                </summary>
+                {Object.entries(result.cohorts).map(([n, c]) => (
+                  <div key={n} style={{ marginTop: "0.5rem" }}>
+                    <p className="meta" style={{ margin: "0 0 0.25rem" }}><strong>{n}</strong> — {c.count.toLocaleString()} patients{c.studies && c.studies.length > 1 ? " across " + c.studies.length + " studies" : ""}</p>
+                    <pre style={{ maxHeight: "16rem", overflow: "auto", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem", fontSize: "var(--t-xs)", whiteSpace: "pre" }}>{c.sql}</pre>
+                  </div>
+                ))}
+              </details>
+            )}
+          </dialog>
           <div>
+            <div className="row" style={{ alignItems: "baseline", marginBottom: "0.9rem" }}>
+              <h2 className="vtitle">
+                Analysis{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
+              </h2>
+              <div className="vmeta">
+                <button className="linklike" onClick={() => docDialog.current?.showModal()}
+                  title="open the document's raw JSON — edit it, run it, or view generated SQL">
+                  show document json
+                </button>
+              </div>
+            </div>
             {/* The workspace itself: what this saved analysis is called, the
                 parameters that point it at a study and a gene panel, and the
                 notes that say what it is for. It sits at the TOP of the column
@@ -2458,16 +2576,19 @@ function Latency({ v }: { v: any }) {
                 </div>
               </details>
             )}
-            {!result && !busy && (
+            {busy && !result && <div className="skeleton skeleton-addview" />}
+            {busy && !result && Array.from({ length: Math.max(1, (doc.views || []).length) }).map((_, i) => (
+              <div key={i} className="skeleton skeleton-view" />
+            ))}
+            {!busy && !result && (
               <div className="card">
                 <h2>Nothing here yet</h2>
                 <p className="note" style={{ fontSize: "var(--t-md)" }}>
                   The analysis document is empty. Add cohorts from the <button className="linklike" onClick={() => goTab("cohorts")}>Cohorts tab</button>,
-                  ask chat above (e.g. “compare STK11-driver vs wild-type immunotherapy patients”), or paste a document on the left and run it.
+                  ask chat above (e.g. “compare STK11-driver vs wild-type immunotherapy patients”), or open <button className="linklike" onClick={() => docDialog.current?.showModal()}>show document json</button> and paste one in.
                 </p>
               </div>
             )}
-            {busy && !result && <div className="card"><div className="loading-block"><span className="spinner" /> Evaluating analysis document…</div></div>}
             {result && !result.views.length && (
               <div className="card">
                 <h2>Cohorts evaluated — no views defined</h2>
@@ -2477,14 +2598,11 @@ function Latency({ v }: { v: any }) {
                 </p>
               </div>
             )}
-            {Object.keys(doc.cohorts || {}).length > 0 && (
+            {!(busy && !result) && Object.keys(doc.cohorts || {}).length > 0 && (
               <div className="card addview">
                 <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.4rem" }}>
                   <strong className="addview-title">Add a view</strong>
                   <span className="meta">{(doc.views || []).length} of 6 in this document</span>
-                  <button className="tbbtn" onClick={() => setDocPanel((x) => !x)}
-                    title={docPanel ? "fold the document away and give the figures the width" : "show the document, its cohorts and its JSON"}>
-                    {docPanel ? "hide document" : "show document"}</button>
                   <span className="spacer" />
                   {VIEW_KINDS.map(({ kind, label, why }) => {
                     const blocked = (doc.views || []).length >= 6
@@ -2500,12 +2618,12 @@ function Latency({ v }: { v: any }) {
               </div>
             )}
             {result && result.views.map((v, vi) => (
-              <div className="card viewcard" key={vi}>
+              <div className="card viewcard" key={resultViewKeys.current[vi] ?? vi}>
                 {/* The author's own note about this figure, plain text by design —
                     see .viewnote in globals.css for why it is never markdown. */}
                 {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
                 {v.kind === "compare" && v.rows && <>
-                  <ViewHead v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onRemove={() => removeView(vi)}
+                  <ViewHead v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                     style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
@@ -2527,7 +2645,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <ViewHead v={v} title="Hotspots" cohorts={cohortChoice(vi, docView(vi))} sub="recurrent protein changes, counted per patient" onRemove={() => removeView(vi)}
+                  <ViewHead v={v} title="Hotspots" cohorts={cohortChoice(vi, docView(vi))} sub="recurrent protein changes, counted per patient" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   {v.hotspots.map(h => {
@@ -2585,7 +2703,7 @@ function Latency({ v }: { v: any }) {
                   })}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <ViewHead v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onRemove={() => removeView(vi)}
+                  <ViewHead v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     actions={<>
                       <label className="tbfield" title="the molecular profile the correlation is computed over">profile <select
                         value={docView(vi).profileType || ""} disabled={busy}
@@ -2629,7 +2747,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "clinical" && v.clinical && <>
-                  <ViewHead v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onRemove={() => removeView(vi)}
+                  <ViewHead v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     actions={<PickMenu label="attributes" title="which clinical attributes this view compares" busy={busy}
                       options={(trackAttrs.attrs || []).map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind }))}
                       chosen={(docView(vi).attributes || []).map(String)} min={1} max={20}
@@ -2672,7 +2790,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <ViewHead v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onRemove={() => removeView(vi)}
+                  <ViewHead v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
@@ -2711,8 +2829,8 @@ function Latency({ v }: { v: any }) {
                     </table>
                   </div>
                 </>}
-                {v.kind === "survival" && <>
-                  <ViewHead v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} onRemove={() => removeView(vi)}
+                {v.kind === "survival" && v.curves && <>
+                  <ViewHead v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     sub={<>Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}{v.anchoredTo && <> — from {v.anchoredTo}</>}</>}
                     chips={v.truncated ? <span className="trunc" title={
                       "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
@@ -2799,7 +2917,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 )}
                 {v.kind === "plot" && <>
-                  <ViewHead v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onRemove={() => removeView(vi)}
+                  <ViewHead v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                     sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
                   {/* Every control here changes what is DRAWN and costs a query, so there is one
                       zone and it says so — the same toolbar the oncoprint uses. */}
@@ -2885,8 +3003,7 @@ function Latency({ v }: { v: any }) {
                       </details>
                     )}
                     <Latency v={v} /><Participation p={v.participation} />
-                    <button className="removeview" title="remove this view from the document"
-                      aria-label="remove this view" onClick={() => removeView(vi)}>×</button>
+                    <ViewMenu onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} />
                     </div>
                   </div>
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
@@ -2970,8 +3087,7 @@ function Latency({ v }: { v: any }) {
                   })()}
                     </details>
                     <Latency v={v} /><Participation p={v.participation} />
-                    <button className="removeview" title="remove this view from the document"
-                      aria-label="remove this view" onClick={() => removeView(vi)}>×</button>
+                    <ViewMenu onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} />
                     </div>
                     </div>
                   {/* The same SVG the chat and MCP clients receive \u2014 one renderer,
@@ -2988,7 +3104,7 @@ function Latency({ v }: { v: any }) {
                     "&gene_list=" + encodeURIComponent(genes.join(" ")) +
                     "&profileFilter=mutations%2Cstructural_variants%2Cgistic&Z_SCORE_THRESHOLD=2.0&tab_index=tab_visualize&Action=Submit";
                   return <>
-                    <ViewHead v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onRemove={() => removeView(vi)}
+                    <ViewHead v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
                       cohorts={cohortChoice(vi, docView(vi), 4)}
                       sub={c ? <>{c.stats.nColumns.toLocaleString()} {c.unit}s · {c.conventions.annotation}</> : "loading…"} />
                     <OncoprintFigure
@@ -3025,7 +3141,7 @@ function Latency({ v }: { v: any }) {
                           <summary className="tbbtn" title="more, about this oncoprint">⋯</summary>
                           <div className="gearmenu-items">
                             <a target="_blank" rel="noopener noreferrer" href={portalUrl}>Open these genes in the cBioPortal oncoprint ↗</a>
-                            <span className="meta">full {vStudies.length === 1 ? "study" : vStudies.length + "-study"} view, all samples — the portal can&apos;t express Cohort Lab cohorts or tracks</span>
+                            <span className="meta">full {vStudies.length === 1 ? "study" : vStudies.length + "-study"} view, all samples — the portal can&apos;t express cbio-lab cohorts or tracks</span>
                           </div>
                         </details>}
                       tracksMenu={<TracksMenu

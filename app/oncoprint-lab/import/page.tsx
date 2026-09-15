@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import ImportOncoprint from "./ImportOncoprint.tsx";
 
-export const metadata = { title: "Oncoprint from pasted data — Cohort Lab" };
+export const metadata = { title: "Oncoprint from pasted data — cbio-lab" };
 export const dynamic = "force-dynamic";
 
 export default function ImportPage() {
@@ -13,7 +13,7 @@ export default function ImportPage() {
   return (
     <>
       <header>
-        <h1>Cohort Lab</h1>
+        <h1>cbio-lab</h1>
         <span className="sub">oncoprint from pasted data — the portal&apos;s Oncoprinter shape, this engine</span>
         <span className="spacer" />
         <a href="/oncoprint-lab" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>interactive lab →</a>

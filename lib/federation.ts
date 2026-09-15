@@ -17,7 +17,7 @@
 // data rather than being unable to reach it. That is a faithful test of the
 // engine (merge math, capability negotiation, honest degradation) and a stub
 // for the transport — a real deployment swaps in a second connection
-// (data-level federation) or an MCP client to a remote Cohort Lab
+// (data-level federation) or an MCP client to a remote cbio-lab
 // (document-level federation) behind the same interface.
 import { chQuery, DB, PRIMARY, connections, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";

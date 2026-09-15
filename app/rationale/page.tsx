@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { marked } from "marked";
 import MermaidBlock from "./mermaid-block.tsx";
 
-export const metadata = { title: "Rationale — Cohort Lab" };
+export const metadata = { title: "Rationale — cbio-lab" };
 
 marked.setOptions({ gfm: true });
 
@@ -24,7 +24,7 @@ export default function RationalePage() {
   return (
     <main className="rationale-doc">
       <div className="rationale-nav">
-        <a href="/analysis">← back to the app</a>
+        <a href="/lab">← back to the app</a>
       </div>
       {parts.map((part, i) =>
         i % 2 === 1

@@ -1,8 +1,8 @@
 <!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.ts; regenerate with `npm run docs:gen`. -->
 
-# Cohort Lab DSL (v2.2)
+# cbio-lab DSL (v2.2)
 
-One declarative JSON object — the **Analysis document** — describes everything Cohort Lab does:
+One declarative JSON object — the **Analysis document** — describes everything cbio-lab does:
 which patients form each cohort, and which views compare them. The server compiles it to
 ClickHouse SQL (`lib/cohort2.ts`, `lib/oql.ts`, `lib/compiler.ts`, `lib/analysis.ts`);
 clients never send SQL. Every result carries provenance: the definition readback and the exact

@@ -164,17 +164,23 @@ pre {
 button.primary { display: inline-flex; align-items: center; gap: 0.5rem; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
+/* Skeleton loading: shaped like the content it stands in for, so a run
+   doesn't collapse the page to a spinner and then pop back to full height. */
+@keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.skeleton { background: var(--line); border-radius: var(--r-md); animation: skeleton-pulse 1.3s ease-in-out infinite; }
+.skeleton-cohort { flex: 1 1 18rem; max-width: 26rem; height: 4.6rem; }
+.skeleton-view { height: 16rem; margin-bottom: 1rem; }
+.skeleton-addview { height: 3.4rem; margin-bottom: 1rem; }
+
 /* analysis page: 3 panes, responsive */
 /* The analysis page earns its width: an oncoprint is the densest thing here, and capping
    the page at a book column left it under 900px of plot on a 2560px monitor. */
 main.analysis-main { max-width: min(132rem, 100%); }
-.ana-grid { display: grid; grid-template-columns: minmax(300px, 26rem) minmax(0, 1fr); gap: var(--s4); align-items: start; }
-/* document folded away: the figures get everything */
-.ana-grid.nodoc { grid-template-columns: minmax(0, 1fr); }
-.ana-grid.nodoc > :first-child { display: none; }
+/* One column, full width: cohorts are a compact strip, not a sidebar, so the
+   figures below — the oncoprint above all — get the whole page to draw in. */
+.ana-grid { display: flex; flex-direction: column; gap: var(--s4); }
 .addview-title { font-size: var(--t-md); }
 .ana-chat { position: sticky; top: 1rem; }
-@media (max-width: 1000px) { .ana-grid { grid-template-columns: 1fr; } }
 .tabs { display: flex; gap: 0.4rem; margin-bottom: 1rem; border-bottom: 1px solid var(--line); }
 .tabs button { border: none; background: none; border-radius: 0; padding: 0.45rem 0.9rem; color: var(--muted); border-bottom: 2px solid transparent; font-weight: 500; }
 .tabs button.active { color: var(--accent-ink); border-bottom-color: var(--accent); }
@@ -182,13 +188,17 @@ main.analysis-main { max-width: min(132rem, 100%); }
 /* filter pills — study-view-style rendering of cohort definitions */
 .fpills { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
 .fpill {
-  display: inline-flex; align-items: center; gap: 0.4rem;
+  display: inline-flex; align-items: center; gap: 0.4rem; max-width: 100%;
   background: var(--paper); border: 1px solid var(--line);
   border-left: 3px solid var(--accent); border-radius: var(--r-sm);
-  padding: 0.16rem 0.5rem; font-size: var(--t-md); white-space: nowrap;
+  padding: 0.16rem 0.5rem; font-size: var(--t-xs); white-space: nowrap;
 }
 .fpill .fkind { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
 .fpill .fnot, .fnot { color: var(--mark); font-weight: 700; font-size: var(--t-xs); }
+/* the value itself is the one part long enough to need cutting — a gene list,
+   an OQL query, a clinical value set — so it alone truncates, with the full
+   text on hover; the kind label and NOT tag next to it always stay whole. */
+.fpill .fval { max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fpill .fx, .fgroup .fx { border: none; background: none; color: var(--muted); cursor: pointer; padding: 0 0.1rem; font-size: var(--t-base); line-height: 1; }
 .fpill .fx:hover, .fgroup .fx:hover { color: var(--err); }
 .fconn { font-size: var(--t-xs); font-weight: 700; color: var(--muted); letter-spacing: 0.09em; }
@@ -548,17 +558,7 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 }
 .lat .latsplit { opacity: 0.75; }
 
-/* Remove a single view. It sits in the header's own row, on the title's baseline,
-   rather than floating over the card's corner. */
 .viewcard { position: relative; }
-.removeview {
-  width: 1.4rem; height: 1.4rem; line-height: 1; padding: 0; flex: 0 0 auto;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid transparent; border-radius: 50%; background: none;
-  color: var(--muted); font-size: var(--t-md); cursor: pointer;
-}
-.viewcard:hover .removeview { border-color: var(--line); }
-.removeview:hover { background: var(--code-bg); color: #D55E00; border-color: #D55E00; }
 
 /* Survival: delayed-entry marker */
 .trunc {
@@ -681,13 +681,16 @@ details.gearmenu.inline[open] > summary {
 
 /* Name-a-cohort dialog. Native <dialog>, so Esc, focus trapping and the
    backdrop are the platform's rather than ours. */
-.namedialog, .genedialog {
+.namedialog, .genedialog, .docdialog {
   border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card);
   color: var(--ink); padding: 1rem 1.1rem; min-width: 20rem; max-width: 26rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
 }
-.namedialog::backdrop, .genedialog::backdrop { background: rgba(0, 0, 0, 0.32); }
-.namedialog h3, .genedialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
+.namedialog::backdrop, .genedialog::backdrop, .docdialog::backdrop { background: rgba(0, 0, 0, 0.32); }
+.namedialog h3, .genedialog h3, .docdialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
+/* The document's JSON, run/clear controls and generated SQL — wide enough for
+   both, and tall enough to scroll internally rather than push past the viewport. */
+.docdialog { width: min(90vw, 48rem); max-width: 48rem; max-height: 85vh; overflow: auto; }
 .namedialog .meta { display: block; margin-bottom: 0.6rem; }
 .namedialog input { width: 100%; box-sizing: border-box; }
 .genedialog { min-width: 24rem; max-width: 30rem; }
@@ -703,6 +706,17 @@ details.gearmenu.inline[open] > summary {
 .genedialog .setrow input { flex: 1; min-width: 0; }
 /* the gene button sits at the end of a view header, beside the gear */
 .genesbtn { font-size: var(--t-md); font-weight: 500; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 0.18em; }
+
+/* ---- cohorts: each one its own labelled, bordered section ----------------- */
+/* A row, not a column: cohorts are a compact strip across the top of the
+   Analysis tab, wrapping onto more lines rather than stacking a full-height
+   sidebar. Each box sizes to its content, up to a comfortable reading width. */
+.cohortlist { display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.6rem; }
+.cohortbox {
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card);
+  padding: 0.55rem 0.7rem; flex: 1 1 18rem; max-width: 26rem;
+}
+.cohortbox-head { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.35rem; }
 
 /* ---- workspaces: a saved document, its parameters, and its notes ---------- */
 .wsbar {

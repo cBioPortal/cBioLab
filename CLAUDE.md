@@ -1,4 +1,4 @@
-# Cohort Lab — project instructions
+# cbio-lab — project instructions
 
 > **New session? Read `HANDOFF.local.md` in this directory FIRST** (gitignored; machine/ops
 > specifics, credentials locations, pending work, and working-style notes that must not live
@@ -16,7 +16,7 @@ A working demonstration that a cBioPortal-class tool can be rebuilt around **one
 JSON object** — the *Analysis document* (`{study, cohorts: {name: def}, views: [...]}`) — that
 the web UI and MCP clients all read and write. The server compiles it to
 ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (UI at
-`/analysis`, MCP at `/api/mcp`, project rationale at `/rationale`).
+`/lab`, MCP at `/api/mcp`, project rationale at `/rationale`).
 
 ## Architecture map
 
@@ -53,9 +53,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   before (`AnalysisDoc` = resolved, `TemplateDoc` = as authored). `runAnalysis` is the boundary.
   Also `parameterize()`, the one-click lift of study + a shared gene list.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
-- **`app/analysis/page.tsx`** — the app: Explore (study checkboxes + facets) / Cohorts /
+- **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Cohorts /
   Analysis / Examples. The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
-  demo pages were retired once the Analysis app subsumed them; `/` now redirects to `/analysis`.
+  demo pages were retired once the Analysis app subsumed them; `/` now redirects to `/lab`.
 - **`app/api/chat/route.ts`** — Claude tool-use loop (`update_document`, `get_catalog`).
 - **`mcp/tools.ts`** — MCP registry: `describe_dsl`, `run_analysis`, `render_oncoprint` (+v1
   event tools). MCP returns oncoprints as a static image rendered from the server SVG; the

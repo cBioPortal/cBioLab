@@ -1,4 +1,4 @@
-// Document-level federation: a peer Cohort Lab reached over MCP.
+// Document-level federation: a peer cbio-lab reached over MCP.
 //
 // The peer holds data this instance cannot query directly — a different
 // database, a different institution, a different trust domain. It exposes one
@@ -64,7 +64,7 @@ async function mcpCall<T = RemoteAggregates>(url: string, name: string, args: un
 
   const init = await rpc({
     jsonrpc: "2.0", id: 1, method: "initialize",
-    params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "cohort-lab-federation", version: "1.0.0" } }
+    params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "cbio-lab-federation", version: "1.0.0" } }
   });
   const sessionHeaders: Record<string, string> = init.sid ? { "mcp-session-id": init.sid } : {};
   if (init.sid) await fetch(url, {

@@ -1,6 +1,6 @@
 # cohortlab
 
-The Cohort Lab oncoprint render contract, in Python: decode it, build it from local tables,
+The cbio-lab oncoprint render contract, in Python: decode it, build it from local tables,
 draw it, export it.
 
 An oncoprint here is one JSON object — the *render contract* — carrying a bitmask per cell, the
@@ -24,7 +24,7 @@ from cohortlab import Oncoprint
 op = Oncoprint.from_tables("events.tsv", "clinical.tsv", "coverage.tsv",
                            group_by="CANCER_TYPE", sort="STAGE")
 
-# 2. a Cohort Lab instance: it compiles the cohort DSL and returns the binary contract
+# 2. a cbio-lab instance: it compiles the cohort DSL and returns the binary contract
 op = Oncoprint.from_server({"study": "msk_chord_2024",
                             "genes": ["TP53", "KRAS", "EGFR"],
                             "clinical": ["CANCER_TYPE"]},
