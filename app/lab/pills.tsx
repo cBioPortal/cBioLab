@@ -54,8 +54,12 @@ function leafText(leaf: any) {
     // meaningless pill "CLINICAL ?".
     const r = leaf.range || {};
     const bits = Object.entries(r).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ");
-    const unit = leaf.metric === "alteredGenes" ? " genes" : "mo";
-    return String(leaf.metric || "derived").replace(/Months$/, "") + " " + bits + unit;
+    // "lines" already names its own unit ("≥3 lines"); the others get "mo" or
+    // "genes" appended. "lines"/"treatmentSpan" also name the event type they
+    // read, which — unlike the other three — is not implied by the metric name.
+    const unit = leaf.metric === "alteredGenes" ? " genes" : leaf.metric === "lines" ? "" : "mo";
+    const of = leaf.eventType ? " '" + leaf.eventType + "'" : "";
+    return String(leaf.metric || "derived").replace(/Months$/, "") + of + " " + bits + unit;
   }
   // The gene matters: "NOT profiled: MUTATION" reads as "never sequenced for
   // mutations at all", where the clause a gene-status facet builds means "no

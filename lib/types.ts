@@ -111,11 +111,20 @@ export interface EventLeaf extends EventLeafFields { kind: "event" }
  * A filter on a value computed from the shape of the data — dates, gene symbols
  * — rather than on a study's own event names or attribute keys, which vary from
  * study to study and so cannot be relied on.
+ *
+ * "lines" and "treatmentSpan" are the exception: they read a study's own
+ * event-type vocabulary on purpose (there is no vocabulary-free way to ask
+ * "how many lines of treatment"), so they carry the event type they mean —
+ * see lib/cohort2.ts's derivedMetricSql for why that is safe to allow here.
  */
 export interface DerivedLeaf {
   kind: "derived";
-  metric: "followupMonths" | "historyMonths" | "alteredGenes";
+  metric: "followupMonths" | "historyMonths" | "alteredGenes" | "lines" | "treatmentSpan";
   range: { gte?: number; gt?: number; lte?: number; lt?: number };
+  /** required for "lines" and "treatmentSpan"; meaningless for the other three */
+  eventType?: string;
+  /** "lines" only — records within this many days belong to one line (default 90) */
+  lineGap?: number;
 }
 export type Leaf =
   | OqlLeaf | ClinicalLeaf | EventLeaf | PatientsLeaf | ProfiledLeaf
@@ -690,7 +699,7 @@ export interface StudyBreakdownRow {
  * so it means the same thing in every study that has the underlying table.
  */
 export interface DerivedFacet {
-  metric: "followupMonths" | "historyMonths" | "alteredGenes";
+  metric: "followupMonths" | "historyMonths" | "alteredGenes" | "lines" | "treatmentSpan";
   label: string; unit: string; note: string;
   /** how many patients the metric could be computed for at all */
   covered: number;
@@ -701,6 +710,20 @@ export interface DerivedFacet {
    * match the draft total — the UI says so, as it does for clinical facets.
    */
   disjunctive?: true;
+  /**
+   * Echoed back for "lines"/"treatmentSpan" so the reader can build a matching
+   * {kind:"derived",...} clause without re-deriving which event type this
+   * facet was computed from — see DerivedLeaf.
+   */
+  eventType?: string;
+  lineGap?: number;
+}
+
+/** A reader-requested derived facet beyond the fixed three — see buildDerivedFacets. */
+export interface ExtraDerivedRequest {
+  metric: "lines" | "treatmentSpan";
+  eventType: string;
+  lineGap?: number;
 }
 export interface ExploreResult {
   study: string; studies?: string[]; draftCount: number | null;

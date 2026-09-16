@@ -270,6 +270,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const resultViewKeys = useRef<number[]>([]);
   /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
   const menuOpenRef = useRef(new Map<string, boolean>());
+  const moreDerivedMenu = useGearmenuOpen("explore:more-derivations", menuOpenRef.current);
   const keyFor = (v: object): number => {
     let k = viewKeys.current.get(v);
     if (k == null) { k = nextViewKey.current++; viewKeys.current.set(v, k); }
@@ -352,6 +353,9 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   /** genes charted as their own alteration facet (the portal's per-gene charts) */
   const [geneCharts, setGeneCharts] = useState<string[]>([]);
   const geneChartsRef = useRef<string[]>([]);   // fetchExplore reads this, not the closure
+  /** derived facets beyond the fixed three, switched on from "show more derivations" */
+  const [exExtraDerived, setExExtraDerived] = useState<{ metric: "lines" | "treatmentSpan"; eventType: string; lineGap?: number }[]>([]);
+  const exExtraDerivedRef = useRef<typeof exExtraDerived>([]);   // fetchExplore reads this, not the closure
   const [geneChartInput, setGeneChartInput] = useState("");
   /** the header lists selected studies as chips; past a handful it is summarised */
   const [studyChipsOpen, setStudyChipsOpen] = useState(false);
@@ -739,7 +743,8 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
       studiesOverride ?? exSel.current,
       draftOverride !== undefined ? draftOverride : parseDraft(),
       attrsOverride ?? attrsForBar(attrCoverage, studiesOverride),
-      geneChartsRef.current
+      geneChartsRef.current,
+      exExtraDerivedRef.current
     ]);
     if (exInflight.current === inflightKey) return;
     exInflight.current = inflightKey;
@@ -755,7 +760,8 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
           // shown. Only sent once a previous result has told us which those are.
           ...((attrsOverride ?? attrsForBar(attrCoverage, studiesOverride)).length
             ? { attributes: attrsOverride ?? attrsForBar(attrCoverage, studiesOverride) } : {}),
-          ...(geneChartsRef.current.length ? { geneCharts: geneChartsRef.current } : {}) }) });
+          ...(geneChartsRef.current.length ? { geneCharts: geneChartsRef.current } : {}),
+          ...(exExtraDerivedRef.current.length ? { extraDerived: exExtraDerivedRef.current } : {}) }) });
       const j = await res.json();
       if (seq !== exFetchSeq.current) return; // superseded while in flight — discard
       if (!j.error) {
@@ -801,7 +807,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     if (clause.kind === "derived") {
       const sameRange = (a: any, b: any) =>
         (a.range || {}).gte === (b.range || {}).gte && (a.range || {}).lt === (b.range || {}).lt;
-      const isMine = (l: any) => l && l.kind === "derived" && l.metric === clause.metric;
+      const isMine = (l: any) => l && l.kind === "derived" && l.metric === clause.metric && (l.eventType || "") === (clause.eventType || "");
       const idx = d.all.findIndex((c: any) => isMine(c) || (Array.isArray(c.any) && c.any.every(isMine) && c.any.length));
       if (idx >= 0) {
         const cur = d.all[idx];
@@ -865,6 +871,39 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     const next = geneCharts.filter((x) => x !== g);
     geneChartsRef.current = next;
     setGeneCharts(next);
+    fetchExplore();
+  };
+
+  /** timeline event types this study's Explore facets actually have, folded by case */
+  const exploreEventTypes = (): { canonical: string; label: string; n: number }[] => {
+    const raw: { type: string; n: number }[] = (explore && explore.events) || [];
+    const by = new Map<string, { canonical: string; label: string; n: number }>();
+    for (const e of raw) {
+      const c = String(e.type).trim().toLowerCase();
+      if (!c) continue;
+      const cur = by.get(c);
+      if (cur) { cur.n += e.n; if (e.n > 0 && e.type.length < cur.label.length) cur.label = e.type; }
+      else by.set(c, { canonical: c, label: e.type, n: e.n });
+    }
+    return [...by.values()].sort((a, b) => b.n - a.n);
+  };
+  /** the study's own best guess at "a therapy" — the same heuristic addView's sequence default uses */
+  const treatmentEventType = (): { canonical: string; label: string } | null =>
+    exploreEventTypes().find((e) => /treat|therap|regimen|drug|medicat/.test(e.canonical)) || null;
+
+  const EXTRA_DERIVED_KINDS: { metric: "lines" | "treatmentSpan"; label: (name: string) => string }[] = [
+    { metric: "lines", label: (name) => "Lines of '" + name + "'" },
+    { metric: "treatmentSpan", label: (name) => "Time in '" + name + "' records" }
+  ];
+  const extraDerivedOn = (metric: string) => exExtraDerived.some((x) => x.metric === metric);
+  const toggleExtraDerived = (metric: "lines" | "treatmentSpan") => {
+    const tx = treatmentEventType();
+    if (!tx) return;
+    const next = extraDerivedOn(metric)
+      ? exExtraDerived.filter((x) => x.metric !== metric)
+      : [...exExtraDerived, { metric, eventType: tx.label, ...(metric === "lines" ? { lineGap: 90 } : {}) }];
+    exExtraDerivedRef.current = next;
+    setExExtraDerived(next);
     fetchExplore();
   };
 
@@ -1931,20 +1970,44 @@ function Latency({ v }: { v: any }) {
           )}
           {explore && explore.derived && explore.derived.length > 0 && (
             <div className="card">
-              <h2>Derived <span className="plain">— computed from the data's shape, so these mean the same thing in any study</span></h2>
+              <div className="row" style={{ alignItems: "baseline" }}>
+                <h2 style={{ margin: 0 }}>Derived <span className="plain">— computed from the data's shape, so these mean the same thing in any study</span></h2>
+                <span className="spacer" />
+                <details className="gearmenu" ref={moreDerivedMenu.ref} onToggle={moreDerivedMenu.onToggle}>
+                  <summary className="tbbtn" title="more ways to derive a facet from this study's own timeline">show more derivations</summary>
+                  <div className="gearmenu-items">
+                    <span className="meta">from this study's own timeline events</span>
+                    {(() => {
+                      const tx = treatmentEventType();
+                      return EXTRA_DERIVED_KINDS.map((k) => (
+                        <label key={k.metric} className="chk"
+                          title={tx ? "based on '" + tx.label + "' events" : "this study records no treatment-like timeline events, so this can't be derived here"}>
+                          <input type="checkbox" checked={extraDerivedOn(k.metric)} disabled={!tx}
+                            onChange={() => toggleExtraDerived(k.metric)} />
+                          {tx ? k.label(tx.label) : k.label("a treatment event")}
+                          {!tx && <span className="meta"> — not available for this study</span>}
+                        </label>
+                      ));
+                    })()}
+                  </div>
+                </details>
+              </div>
               <div className="derivedgrid">
                 {explore.derived.map(d => {
                   const max = Math.max(...d.buckets.map(b => b.n), 1);
+                  const dEventType = (d as any).eventType as string | undefined;
+                  const dLineGap = (d as any).lineGap as number | undefined;
                   const picked = (b: { gte?: number; lt?: number }) => {
                     const dr = parseDraft();
                     // Buckets OR together into an `any` group, so look inside one
                     // as well as at top level or a second pick never highlights.
                     const leaves = ((dr && dr.all) || []).flatMap((c: any) => Array.isArray(c.any) ? c.any : [c]);
                     return leaves.some((c: any) => c && c.kind === "derived" && c.metric === d.metric
+                      && (c.eventType || undefined) === dEventType
                       && (c.range || {}).gte === b.gte && (c.range || {}).lt === b.lt);
                   };
                   return (
-                    <div key={d.metric} data-derived={d.metric} data-buckets={d.buckets.length}>
+                    <div key={d.metric + "|" + (dEventType || "")} data-derived={d.metric} data-buckets={d.buckets.length}>
                       {/* A metric already in the draft is counted WITHOUT its own
                           clauses so its other buckets stay selectable, which means
                           its total is the draft-minus-itself total. Say so, exactly
@@ -1959,6 +2022,7 @@ function Latency({ v }: { v: any }) {
                           <button key={b.label} className={picked(b) ? "valrow on" : "valrow"}
                             title={d.note + " — click to filter"}
                             onClick={() => addClause({ kind: "derived", metric: d.metric,
+                              ...(dEventType ? { eventType: dEventType } : {}), ...(dLineGap != null ? { lineGap: dLineGap } : {}),
                               range: { ...(b.gte != null ? { gte: b.gte } : {}), ...(b.lt != null ? { lt: b.lt } : {}) } })}>
                             <span className="vname">{b.label}</span>
                             <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * b.n / max)) + "%" }} /></span>
@@ -2312,23 +2376,46 @@ function Latency({ v }: { v: any }) {
               <div className="card">
                 <h2>Timeline events</h2>
                 {explore.events.length === 0 && <p className="note">This study has no clinical timeline events.</p>}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                  {explore.events.map(e => (
-                    <button key={e.type} className="facet" onClick={() => addClause({ kind: "event", a: { eventType: e.type }, rel: { type: "NONE" } })}>
-                      has {e.type} <span className="meta">{e.n.toLocaleString()}</span>
-                    </button>
-                  ))}
-                </div>
+                {(() => {
+                  const max = Math.max(...explore.events.map(e => e.n), 1);
+                  const dr = parseDraft();
+                  const isSel = (type: string) => ((dr && dr.all) || []).some((c: any) =>
+                    c && c.kind === "event" && c.rel?.type === "NONE" && c.a?.eventType === type);
+                  return (
+                    <div className="vallist">
+                      {explore.events.map(e => (
+                        <button key={e.type} className={isSel(e.type) ? "valrow on" : "valrow"}
+                          title={"has " + e.type + " — " + e.n.toLocaleString() + " patients (click to filter)"}
+                          onClick={() => addClause({ kind: "event", a: { eventType: e.type }, rel: { type: "NONE" } })}>
+                          <span className="vname">has {e.type}</span>
+                          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * e.n / max)) + "%" }} /></span>
+                          <span className="vn">{e.n.toLocaleString()}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="card">
                 <h2>Case lists</h2>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                  {explore.caseLists.map(l => (
-                    <button key={l.id} className="facet" title={l.name} onClick={() => addClause({ kind: "caseList", id: l.id })}>
-                      {l.id} <span className="meta">{l.n.toLocaleString()}</span>
-                    </button>
-                  ))}
-                </div>
+                {(() => {
+                  const max = Math.max(...explore.caseLists.map(l => l.n), 1);
+                  const dr = parseDraft();
+                  const isSel = (id: string) => ((dr && dr.all) || []).some((c: any) => c && c.kind === "caseList" && c.id === id);
+                  return (
+                    <div className="vallist">
+                      {explore.caseLists.map(l => (
+                        <button key={l.id} className={isSel(l.id) ? "valrow on" : "valrow"}
+                          title={l.name + " — " + l.n.toLocaleString() + " patients (click to filter)"}
+                          onClick={() => addClause({ kind: "caseList", id: l.id })}>
+                          <span className="vname">{l.id}</span>
+                          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * l.n / max)) + "%" }} /></span>
+                          <span className="vn">{l.n.toLocaleString()}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
                 <p className="note">Profiles here: {(explore.profiles || []).join(", ") || "none"}{explore.gaProfiles && explore.gaProfiles.length ? " · assays: " + explore.gaProfiles.join(", ") : ""} · facet counts {explore.draftCount != null ? "narrowed to your draft" : "study-wide"} · {explore.stats.ms}ms</p>
               </div>
             </div>
