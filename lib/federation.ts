@@ -22,7 +22,7 @@
 import { chQuery, DB, PRIMARY, connections, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { canonicalEventName } from "./event-names.ts";
-import { compileCohortDef } from "./cohort2.ts";
+import { compileCohortDef, eventTypeMatchSql } from "./cohort2.ts";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
   plotBinsSql, plotBoxSql, plotCountSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
@@ -576,16 +576,6 @@ export function survivalEndpointsSql(study: string, db: string = DB): string {
 
 /** Days per month, matching the constant survival already uses. */
 const DAYS_PER_MONTH = 30.4375;
-
-/**
- * Match an event type by CANONICAL name. Curators spell one concept several
- * ways (`Treatment` / `TREATMENT`), and the database stores those as distinct
- * literals, so a canonical name has to match case-insensitively at the column.
- * See lib/event-names.ts for why case+trim is the whole rule.
- */
-function eventTypeMatchSql(col: string, canonical: string): string {
-  return "lower(trim(" + col + ")) = " + sq(canonicalEventName(canonical));
-}
 
 /**
  * What a cohort's timeline looks like STRUCTURALLY, per event type: how many

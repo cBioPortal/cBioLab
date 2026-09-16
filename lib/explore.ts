@@ -3,10 +3,10 @@
 // Everything returned is designed to be clickable into a DSL clause.
 import { chQuery, DB, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
-import { derivedMetricSql, basePatientsSql } from "./cohort2.ts";
+import { derivedMetricSql, basePatientsSql, type DerivedMetric } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
-import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet } from "./types.ts";
+import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet, ExtraDerivedRequest } from "./types.ts";
 import { clinicalValueFoldSql } from "./event-names.ts";
 
 /**
@@ -122,7 +122,7 @@ async function attachHistograms(opts: {
   }));
 }
 
-export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, binEdges, attributes, geneCharts }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn; geneSearch?: string; skipBins?: boolean; skipGenes?: boolean; binEdges?: Record<string, { edges: number[]; interval: number }>; attributes?: string[]; geneCharts?: string[] }): Promise<ExploreResult> {
+export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, binEdges, attributes, geneCharts, extraDerived }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn; geneSearch?: string; skipBins?: boolean; skipGenes?: boolean; binEdges?: Record<string, { edges: number[]; interval: number }>; attributes?: string[]; geneCharts?: string[]; extraDerived?: ExtraDerivedRequest[] }): Promise<ExploreResult> {
   const db = conn.db;
   const t0 = Date.now();
   // An optional allow-list of attribute names. Exploring hundreds of studies at
@@ -146,7 +146,7 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
   // collect at the end — serially they cost ~400ms on a ~600ms page, overlapped
   // they cost almost nothing.
   const derivedP = buildDerivedFacets(db, study, conn, cond, draft,
-    { oncokbPin, profiles, gaProfiles });
+    { oncokbPin, profiles, gaProfiles }, extraDerived);
 
   // how many patients this study contributes under the current draft (or in total)
   const studyN = draftCount ?? Number((await chQuery<ChRow>(
@@ -356,11 +356,14 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
 }
 
 /** Bucket edges are ours, not the study's — stated in each facet's note. */
-const DERIVED_SPECS: {
-  metric: "followupMonths" | "historyMonths" | "alteredGenes";
+type DerivedSpec = {
+  metric: DerivedMetric;
   label: string; unit: string; note: string;
   cuts: { label: string; gte?: number; lt?: number }[];
-}[] = [
+  /** "lines" and "treatmentSpan" only — see DerivedMetricParams */
+  eventType?: string; lineGap?: number;
+};
+const DERIVED_SPECS: DerivedSpec[] = [
   { metric: "followupMonths", label: "Follow-up after day 0", unit: "months",
     note: "how far the timeline runs past its own day 0 — the observability an outcome or absence question depends on",
     cuts: [{ label: "< 6mo", lt: 6 }, { label: "6–12mo", gte: 6, lt: 12 }, { label: "1–2y", gte: 12, lt: 24 },
@@ -376,6 +379,31 @@ const DERIVED_SPECS: {
 ];
 
 /**
+ * A reader-requested "lines" or "treatmentSpan" facet, filled out to a full
+ * spec. Unlike the fixed three, these need an eventType supplied by the
+ * caller (Explore proposes one from the study's own event catalog — see
+ * app/lab/page.tsx) because there is no study-independent way to know which
+ * timeline event stands for "a therapy" here.
+ */
+function extraDerivedSpec(req: ExtraDerivedRequest): DerivedSpec {
+  const et = String(req.eventType || "").trim();
+  if (req.metric === "treatmentSpan") return {
+    metric: "treatmentSpan", eventType: et,
+    label: "Time in '" + et + "' records", unit: "months",
+    note: "span from the first to the last '" + et + "' record — the study's own clock for treatment, not a claim about continuous exposure",
+    cuts: [{ label: "< 3mo", lt: 3 }, { label: "3–12mo", gte: 3, lt: 12 }, { label: "1–2y", gte: 12, lt: 24 },
+           { label: "> 2y", gte: 24 }]
+  };
+  const gap = Math.max(1, Math.min(3650, Math.floor(Number(req.lineGap) || 90)));
+  return {
+    metric: "lines", eventType: et, lineGap: gap,
+    label: "Lines of '" + et + "'", unit: "lines",
+    note: "'" + et + "' records grouped into lines by a " + gap + "-day gap — the same scheme the treatment-sequence view uses; changing the gap changes the count",
+    cuts: [{ label: "1", lt: 2 }, { label: "2", gte: 2, lt: 3 }, { label: "3", gte: 3, lt: 4 }, { label: "4+", gte: 4 }]
+  };
+}
+
+/**
  * Does this top-level clause constrain the given derived metric — either as a
  * bare leaf, or as an `any` group of buckets of that one metric?
  *
@@ -383,24 +411,29 @@ const DERIVED_SPECS: {
  * `{any:[...]}`, and a check that only recognised the bare leaf treated that as
  * somebody else's clause, applied it, and collapsed the facet to the two chosen
  * buckets — the disappearing-options bug, back again by another route.
+ *
+ * eventType must match too, for "lines"/"treatmentSpan": a clause naming a
+ * different event type is a different metric that happens to share a name.
  */
-function isDerivedClauseFor(c: unknown, metric: string): boolean {
-  const l = c as { kind?: string; metric?: string; any?: unknown[] };
+function isDerivedClauseFor(c: unknown, metric: string, eventType?: string): boolean {
+  const l = c as { kind?: string; metric?: string; eventType?: string; any?: unknown[] };
+  const matches = (y: { kind?: string; metric?: string; eventType?: string } | null | undefined) =>
+    !!y && y.kind === "derived" && y.metric === metric && (y.eventType || "") === (eventType || "");
   if (!l) return false;
-  if (l.kind === "derived" && l.metric === metric) return true;
-  return Array.isArray(l.any) && l.any.length > 0 &&
-    l.any.every((x) => { const y = x as { kind?: string; metric?: string };
-      return !!y && y.kind === "derived" && y.metric === metric; });
+  if (matches(l)) return true;
+  return Array.isArray(l.any) && l.any.length > 0 && l.any.every((x) => matches(x as never));
 }
 
 async function buildDerivedFacets(
   db: string, study: string, conn: ChConn, cond: string,
   draft?: CohortDef | null,
-  ctx?: { oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[] }
+  ctx?: { oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[] },
+  extra?: ExtraDerivedRequest[]
 ): Promise<DerivedFacet[]> {
+  const specs = [...DERIVED_SPECS, ...(extra || []).map(extraDerivedSpec)];
   const out: DerivedFacet[] = [];
-  await Promise.all(DERIVED_SPECS.map(async (spec) => {
-    const per = derivedMetricSql(spec.metric, study, db);
+  await Promise.all(specs.map(async (spec) => {
+    const per = derivedMetricSql(spec.metric, study, db, { eventType: spec.eventType, lineGap: spec.lineGap });
     const cases = spec.cuts.map((c, i) => {
       const t: string[] = [];
       if (c.gte != null) t.push("v >= " + c.gte);
@@ -414,11 +447,11 @@ async function buildDerivedFacets(
     // filter below then deletes them — so the options vanish and the selection
     // cannot be widened or changed without clearing it.
     const ownClauses = (draft && Array.isArray(draft.all))
-      ? draft.all.filter((c) => isDerivedClauseFor(c, spec.metric)) : [];
+      ? draft.all.filter((c) => isDerivedClauseFor(c, spec.metric, spec.eventType)) : [];
     let gateCond = cond, disjunctive = false;
     if (ownClauses.length) {
       disjunctive = true;
-      const rest: CohortDef = { ...draft!, all: (draft!.all || []).filter((c) => !isDerivedClauseFor(c, spec.metric)) };
+      const rest: CohortDef = { ...draft!, all: (draft!.all || []).filter((c) => !isDerivedClauseFor(c, spec.metric, spec.eventType)) };
       gateCond = rest.all!.length
         ? "\n  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" +
           compileCohortDef(rest, { ...(ctx || {}), study, db }) + "))"
@@ -440,10 +473,12 @@ async function buildDerivedFacets(
         .filter((b) => b.n > 0);
       const covered = buckets.reduce((s2, b) => s2 + b.n, 0);
       if (covered > 0) out.push({ metric: spec.metric, label: spec.label, unit: spec.unit, note: spec.note,
-        covered, buckets, ...(disjunctive ? { disjunctive: true as const } : {}) });
+        covered, buckets, ...(disjunctive ? { disjunctive: true as const } : {}),
+        ...(spec.eventType ? { eventType: spec.eventType } : {}), ...(spec.lineGap != null ? { lineGap: spec.lineGap } : {}) });
     } catch { /* a study without the underlying table contributes no facet */ }
   }));
-  return DERIVED_SPECS.map((s2) => out.find((o) => o.metric === s2.metric)).filter((x): x is DerivedFacet => !!x);
+  return specs.map((s2) => out.find((o) => o.metric === s2.metric && (o.eventType || "") === (s2.eventType || "")))
+    .filter((x): x is DerivedFacet => !!x);
 }
 
 // ---- gene tables ----------------------------------------------------------
@@ -795,7 +830,7 @@ async function geneStateFacets(opts: {
 // whole harmonization). Numeric medians are patient-weighted approximations;
 // min/max are exact. An attribute classified differently across studies takes
 // the kind of the study with the most patients for it.
-export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>; connByStudy?: Map<string, ChConn>; geneSearch?: string; attributes?: string[]; geneCharts?: string[] }): Promise<ExploreResult> {
+export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, extraDerived }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>; connByStudy?: Map<string, ChConn>; geneSearch?: string; attributes?: string[]; geneCharts?: string[]; extraDerived?: ExtraDerivedRequest[] }): Promise<ExploreResult> {
   // Pass 1: facets per study, WITHOUT histograms — each study's own quartiles
   // would give it different bin edges, and bars over different ranges cannot be
   // summed. Skip the work rather than compute bins we would throw away.
@@ -819,7 +854,7 @@ export async function buildExploreFederated({ studies, draft, oncokbPin, profile
 
   const [parts, geneParts] = await Promise.all([
     Promise.all(studies.map(s =>
-      buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: poolGenes, attributes, geneCharts,
+      buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: poolGenes, attributes, geneCharts, extraDerived,
         conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}) }))),
     Promise.all([...connGroups.values()].map(async ({ conn, studies: ss }) => {
       const g = await geneTables({ studies: ss, db: conn.db, conn, geneSearch });
@@ -955,21 +990,38 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     return m;
   };
   // derived facets merge by summing bucket counts — the metric means the same
-  // thing in every study, which is the point of deriving it from shape
+  // thing in every study, which is the point of deriving it from shape.
+  // Keyed by (metric, eventType) rather than iterated from the fixed
+  // DERIVED_SPECS list: "lines"/"treatmentSpan" name a caller-chosen event
+  // type, so their full spec (label, cuts, ...) isn't known ahead of time —
+  // it's read from whichever participant actually computed one instead, and a
+  // remote peer that doesn't yet support the request simply contributes none.
   const derivedMerged: DerivedFacet[] = [];
-  for (const spec of DERIVED_SPECS) {
-    const mine = parts.map((p) => (p.derived || []).find((d) => d.metric === spec.metric)).filter((d): d is DerivedFacet => !!d);
+  const derivedKeys = new Set<string>();
+  for (const p of parts) for (const d of (p.derived || [])) derivedKeys.add(d.metric + "|" + (d.eventType || ""));
+  for (const key of derivedKeys) {
+    const sep = key.indexOf("|");
+    const metric = key.slice(0, sep), eventType = key.slice(sep + 1);
+    const mine = parts.map((p) => (p.derived || []).find((d) => d.metric === metric && (d.eventType || "") === eventType))
+      .filter((d): d is DerivedFacet => !!d);
     if (!mine.length) continue;
+    const first = mine[0];
     const counts = new Map<string, number>();
     for (const d of mine) for (const b of d.buckets) counts.set(b.label, (counts.get(b.label) || 0) + b.n);
-    const buckets = spec.cuts.map((c) => ({ label: c.label, n: counts.get(c.label) || 0,
+    // The bucket SHAPE (label + edges, in order) is the same across every
+    // participant asked for the same spec — take it from whichever one has
+    // the most buckets, so a participant that dropped an empty one doesn't
+    // truncate the merged shape.
+    const shape = mine.slice().sort((a, b) => b.buckets.length - a.buckets.length)[0].buckets;
+    const buckets = shape.map((c) => ({ label: c.label, n: counts.get(c.label) || 0,
       ...(c.gte != null ? { gte: c.gte } : {}), ...(c.lt != null ? { lt: c.lt } : {}) })).filter((b) => b.n > 0);
     // Carry the disjunctive marker through the merge, as the clinical facets do:
     // if any participant counted this metric without its own clauses, the merged
     // total is on that basis and the UI has to say so.
     const disjunctive = mine.some((d) => d.disjunctive) || undefined;
-    if (buckets.length) derivedMerged.push({ metric: spec.metric, label: spec.label, unit: spec.unit, note: spec.note,
-      covered: mine.reduce((n, d) => n + d.covered, 0), buckets, ...(disjunctive ? { disjunctive } : {}) });
+    if (buckets.length) derivedMerged.push({ metric: first.metric, label: first.label, unit: first.unit, note: first.note,
+      covered: mine.reduce((n, d) => n + d.covered, 0), buckets, ...(disjunctive ? { disjunctive } : {}),
+      ...(first.eventType ? { eventType: first.eventType } : {}), ...(first.lineGap != null ? { lineGap: first.lineGap } : {}) });
   }
 
   const evm = sumBy(parts.map(p => p.events), "type");

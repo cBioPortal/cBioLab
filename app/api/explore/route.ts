@@ -50,6 +50,19 @@ export async function POST(req: Request) {
     const attributes = Array.isArray(body.attributes) ? body.attributes.map(String).slice(0, 60) : undefined;
     // genes the reader has asked to chart as their own alteration facet
     const geneCharts = Array.isArray(body.geneCharts) ? body.geneCharts.map(String).slice(0, 6) : undefined;
+    // Derived facets beyond the fixed three (Explore's "show more derivations"
+    // popup) — local studies only for now: a remote peer answers over its own
+    // MCP tool, which does not yet accept this request, so it simply
+    // contributes none of these facets rather than erroring (mergeExplore).
+    const extraDerived = Array.isArray(body.extraDerived) ? body.extraDerived
+      .filter((x: unknown): x is { metric: string; eventType: string; lineGap?: number } => {
+        const r = x as { metric?: unknown; eventType?: unknown };
+        return !!r && (r.metric === "lines" || r.metric === "treatmentSpan") && typeof r.eventType === "string" && !!r.eventType.trim();
+      })
+      .slice(0, 4)
+      .map((x: { metric: string; eventType: string; lineGap?: number }) => ({ metric: x.metric as "lines" | "treatmentSpan",
+        eventType: x.eventType.slice(0, 200), ...(x.lineGap != null ? { lineGap: Number(x.lineGap) } : {}) }))
+      : undefined;
     const remoteParts = await Promise.all(remote.map((s) => {
       const peer = peerForStudy(s)!;
       return remoteFacets(s, peer.url, draft, peer.label, geneSearch);
@@ -58,9 +71,9 @@ export async function POST(req: Request) {
       return Response.json(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts));
     }
     const localResult = local.length === 1
-      ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch, attributes, geneCharts,
+      ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch, attributes, geneCharts, extraDerived,
           ...profilesByStudy.get(local[0]), conn: connByStudy.get(local[0]) })
-      : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts });
+      : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, extraDerived });
     return Response.json(remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult);
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });

@@ -15,7 +15,7 @@
 import { DB, STUDY } from "./ch.ts";
 import { compileCohort, sq } from "./compiler.ts";
 import { oqlLeafSql } from "./oql.ts";
-import { clinicalValueFoldSql } from "./event-names.ts";
+import { clinicalValueFoldSql, canonicalEventName } from "./event-names.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
@@ -105,12 +105,30 @@ const PROFILED_TYPE: Record<string, string> = { MUTATION: "MUTATION_EXTENDED", C
  *   followupMonths  how long the timeline runs after its own day 0
  *   historyMonths   how much of the timeline predates day 0
  *   alteredGenes    distinct genes altered in the patient
+ *
+ * `lines` and `treatmentSpan` are the deliberate exception: they DO read a
+ * study's own event-type vocabulary (which timeline event means "a therapy"),
+ * because there is no vocabulary-free way to ask "how many lines of treatment"
+ * at all. That is why they carry an explicit `eventType` rather than being a
+ * bare metric name — the caller names the event type this study uses (Explore
+ * suggests one from the study's own catalog), and a study with no event type
+ * resembling a therapy simply has none of this metric to report, the same way
+ * `alteredGenes` reports nothing for a study with no genomic profile.
  */
-export const DERIVED_METRICS = ["followupMonths", "historyMonths", "alteredGenes"] as const;
+export const DERIVED_METRICS = ["followupMonths", "historyMonths", "alteredGenes", "lines", "treatmentSpan"] as const;
 export type DerivedMetric = typeof DERIVED_METRICS[number];
+/** Metrics that need more than (study, db) to compute — see the comment above. */
+export const PARAMETERIZED_DERIVED_METRICS = new Set<DerivedMetric>(["lines", "treatmentSpan"]);
+
+export interface DerivedMetricParams {
+  /** the timeline event type that stands for "a line of treatment" here */
+  eventType?: string;
+  /** records within this many days of each other belong to the same line (metric "lines" only) */
+  lineGap?: number;
+}
 
 /** Per-patient value for a derived metric, as SQL yielding (pid, v). */
-export function derivedMetricSql(metric: DerivedMetric, study: string, db: string): string {
+export function derivedMetricSql(metric: DerivedMetric, study: string, db: string, params?: DerivedMetricParams): string {
   const evJoin =
     "  FROM " + db + ".clinical_event ce\n" +
     "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
@@ -121,6 +139,35 @@ export function derivedMetricSql(metric: DerivedMetric, study: string, db: strin
     return "SELECT p.stable_id AS pid, max(ce.start_date) / 30.4375 AS v\n" + evJoin;
   if (metric === "historyMonths")
     return "SELECT p.stable_id AS pid, greatest(0, -min(ce.start_date)) / 30.4375 AS v\n" + evJoin;
+  if (metric === "lines" || metric === "treatmentSpan") {
+    const et = canonicalEventName(String(params?.eventType || ""));
+    if (!et) throw new Error("derived clause: metric '" + metric + "' needs an eventType");
+    // Same shape of records as a study's timeline in general: possibly several
+    // rows per decision (combination therapy), which is exactly what grouping
+    // into lines (below) is for — see lib/federation.ts's sequenceSql, the
+    // Sankey view this shares its line-grouping scheme with.
+    const tx = "tx AS (\n" +
+      "  SELECT ce.clinical_event_id AS eid, p.stable_id AS pid, ce.start_date AS s,\n" +
+      "         coalesce(ce.stop_date, ce.start_date) AS e\n" +
+      "  FROM " + db + ".clinical_event ce\n" +
+      "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+      "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+      "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+      "    AND " + eventTypeMatchSql("ce.event_type", et) + "\n" +
+      ")";
+    if (metric === "treatmentSpan")
+      return "WITH " + tx + "\nSELECT pid, (max(e) - min(s)) / 30.4375 AS v FROM tx GROUP BY pid";
+    const gap = Math.max(1, Math.min(3650, Math.floor(Number(params?.lineGap) || 90)));
+    return "WITH " + tx + ",\n" +
+      // toNullable: over an empty frame max() on a non-nullable column returns 0,
+      // which corrupts first-row detection because day offsets are often <= 0
+      // (the same guard sequenceSql uses, for the same reason).
+      "flagged AS (\n  SELECT *, max(toNullable(e)) OVER (PARTITION BY pid\n" +
+      "    ORDER BY s, e, eid ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS pms\n  FROM tx\n),\n" +
+      "numbered AS (\n  SELECT *, sum(if(pms IS NULL OR s > pms + " + gap + ", 1, 0)) OVER (\n" +
+      "    PARTITION BY pid ORDER BY s, e, eid ROWS UNBOUNDED PRECEDING) AS line_no\n  FROM flagged\n)\n" +
+      "SELECT pid, max(line_no) AS v FROM numbered GROUP BY pid";
+  }
   // alteredGenes — high-level CNA only, matching the rest of the engine
   return "SELECT " + PID("patient_unique_id", study) + " AS pid, uniqExact(hugo_gene_symbol) AS v\n" +
     "  FROM " + db + ".genomic_event_derived\n" +
@@ -129,12 +176,23 @@ export function derivedMetricSql(metric: DerivedMetric, study: string, db: strin
     "  GROUP BY pid";
 }
 
-/** Validate a derived leaf and return its range predicate over `v`. */
-function derivedConds(leaf: any): { metric: DerivedMetric; conds: string } {
+/** Match an event type by CANONICAL name — see lib/event-names.ts for why case+trim is the whole rule. */
+export function eventTypeMatchSql(col: string, canonical: string): string {
+  return "lower(trim(" + col + ")) = " + sq(canonicalEventName(canonical));
+}
+
+/** Validate a derived leaf and return its range predicate over `v`, plus any params it carries. */
+function derivedConds(leaf: any): { metric: DerivedMetric; conds: string; params?: DerivedMetricParams } {
   const metric = String(leaf.metric || "");
   if (!(DERIVED_METRICS as readonly string[]).includes(metric))
     throw new Error("derived clause: metric must be one of " + DERIVED_METRICS.join(", ") +
       " (got '" + metric.slice(0, 40) + "')");
+  let params: DerivedMetricParams | undefined;
+  if (PARAMETERIZED_DERIVED_METRICS.has(metric as DerivedMetric)) {
+    const eventType = String(leaf.eventType || "").trim();
+    if (!eventType) throw new Error("derived clause: metric '" + metric + "' needs an eventType");
+    params = { eventType, ...(leaf.lineGap != null ? { lineGap: Number(leaf.lineGap) } : {}) };
+  }
   const r = leaf.range || {};
   const conds: string[] = [];
   for (const [op, sqlOp] of [["gte", ">="], ["gt", ">"], ["lte", "<="], ["lt", "<"]] as const)
@@ -144,7 +202,7 @@ function derivedConds(leaf: any): { metric: DerivedMetric; conds: string } {
       conds.push("v " + sqlOp + " " + num);
     }
   if (!conds.length) throw new Error("derived clause: needs a range, e.g. {\"gte\":24,\"lt\":60}");
-  return { metric: metric as DerivedMetric, conds: conds.join(" AND ") };
+  return { metric: metric as DerivedMetric, conds: conds.join(" AND "), params };
 }
 
 /**
@@ -161,14 +219,14 @@ function derivedConds(leaf: any): { metric: DerivedMetric; conds: string } {
 function derivedAnySql(leaves: any[], ctx: Ctx): string {
   const parts = leaves.map(derivedConds);
   const metric = parts[0].metric;
-  return "SELECT pid FROM (\n" + derivedMetricSql(metric, ctx.study, dbOf(ctx)) + "\n)\n" +
+  return "SELECT pid FROM (\n" + derivedMetricSql(metric, ctx.study, dbOf(ctx), parts[0].params) + "\n)\n" +
     "  WHERE " + parts.map((p) => "(" + p.conds + ")").join(" OR ");
 }
 
 function derivedLeafSql(leaf: any, ctx: Ctx): string {
-  const { metric, conds: condStr } = derivedConds(leaf);
+  const { metric, conds: condStr, params } = derivedConds(leaf);
   const conds = [condStr];
-  return "SELECT pid FROM (\n" + derivedMetricSql(metric as DerivedMetric, ctx.study, dbOf(ctx)) + "\n)\n" +
+  return "SELECT pid FROM (\n" + derivedMetricSql(metric as DerivedMetric, ctx.study, dbOf(ctx), params) + "\n)\n" +
     "  WHERE " + conds.join(" AND ");
 }
 
@@ -288,8 +346,12 @@ function clauseSql(clause: any, ctx: Ctx): string {
   if (clause.any) {
     if (!Array.isArray(clause.any) || !clause.any.length || clause.any.length > 8) throw new Error("any: 1-8 leaves");
     // Buckets of one derived metric share a single scan — see derivedAnySql.
+    // eventType must match too: two buckets of "lines" naming different event
+    // types are not buckets of the same scan, they're two different metrics
+    // that happen to share a name.
     const ls = clause.any;
-    if (ls.length > 1 && ls.every((l: any) => l && l.kind === "derived" && l.metric === ls[0].metric))
+    if (ls.length > 1 && ls.every((l: any) => l && l.kind === "derived" && l.metric === ls[0].metric
+      && (l.eventType || "") === (ls[0].eventType || "")))
       return derivedAnySql(ls, ctx);
     return clause.any.map((l: any) => "(" + leafSql(l, ctx) + ")").join("\nUNION DISTINCT\n");
   }
@@ -341,8 +403,12 @@ function leafText(leaf: any): string {
     const r = (leaf as any).range || {};
     const parts = [r.gte != null ? "\u2265 " + r.gte : null, r.gt != null ? "> " + r.gt : null,
                    r.lte != null ? "\u2264 " + r.lte : null, r.lt != null ? "< " + r.lt : null].filter(Boolean);
-    const unit = (leaf as any).metric === "alteredGenes" ? " genes" : " months";
-    return (leaf as any).metric + " " + parts.join(" and ") + unit;
+    const m = (leaf as any).metric;
+    // "lines" already names its own unit ("3 lines"), so it does not get a
+    // second unit word appended the way the others do.
+    const unit = m === "alteredGenes" ? " genes" : m === "lines" ? "" : " months";
+    const of = (leaf as any).eventType ? " of '" + (leaf as any).eventType + "'" : "";
+    return m + of + " " + parts.join(" and ") + unit;
   }
   if (leaf.kind === "caseList") return "in case list " + leaf.id;
   if (leaf.kind === "genomicData") return leaf.gene + " " + leaf.profileType + " " + JSON.stringify(leaf.range || leaf.values);
