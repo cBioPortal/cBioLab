@@ -28,6 +28,9 @@ instance reached both directly and as an MCP peer.
   and prior-treatment caveats, labeled non-deduplication
 - **One semantics owner, many cheap surfaces** — web UI, chat, and MCP all speak the same
   document; docs and grammars are generated from one source
+- **No frontend/backend release to coordinate** — the UI and the engine are one codebase and one
+  set of types, so a change to what's possible ships as a single commit and deploy, not a
+  backend version a frontend has to catch up to
 - **Cross-instance federation, built and verified** — one document fulfilled across ClickHouse
   instances or over MCP to a peer, with every visualization stating which participants answered
   and how (built-in, not roadmap)
@@ -67,6 +70,15 @@ the document, each new surface has been thin: the in-app chat is a small loop ar
 there is one semantics owner. The same property cuts the other way: since no SQL ever crosses a
 study boundary, the backends can multiply as cheaply as the surfaces did — cross-instance
 federation is a routing change, not a redesign (see *Cross-instance federation*, below).
+
+It cuts a third way, inward rather than outward: the UI and the engine are one codebase, sharing
+actual TypeScript types (`DerivedFacet`, `CohortDef`, every view's result shape) rather than a
+versioned API between two independently-released services. A change that spans both — a new DSL
+leaf, a new view, a new facet — is one commit, type-checked and tested as a single unit, not a
+backend release that a frontend release has to catch up to. There is no compatibility window
+where an old client speaks to a new server, and no version matrix to test across — the ordinary
+cost of the split the portal itself has, between its Java backend and its separately-released
+React frontend.
 
 **Visualization is layered accordingly**: server-rendered PNGs for any chat client
 (works everywhere, today), and a provenance/editor link that opens the fully interactive
