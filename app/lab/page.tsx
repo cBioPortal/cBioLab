@@ -2376,23 +2376,46 @@ function Latency({ v }: { v: any }) {
               <div className="card">
                 <h2>Timeline events</h2>
                 {explore.events.length === 0 && <p className="note">This study has no clinical timeline events.</p>}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                  {explore.events.map(e => (
-                    <button key={e.type} className="facet" onClick={() => addClause({ kind: "event", a: { eventType: e.type }, rel: { type: "NONE" } })}>
-                      has {e.type} <span className="meta">{e.n.toLocaleString()}</span>
-                    </button>
-                  ))}
-                </div>
+                {(() => {
+                  const max = Math.max(...explore.events.map(e => e.n), 1);
+                  const dr = parseDraft();
+                  const isSel = (type: string) => ((dr && dr.all) || []).some((c: any) =>
+                    c && c.kind === "event" && c.rel?.type === "NONE" && c.a?.eventType === type);
+                  return (
+                    <div className="vallist">
+                      {explore.events.map(e => (
+                        <button key={e.type} className={isSel(e.type) ? "valrow on" : "valrow"}
+                          title={"has " + e.type + " — " + e.n.toLocaleString() + " patients (click to filter)"}
+                          onClick={() => addClause({ kind: "event", a: { eventType: e.type }, rel: { type: "NONE" } })}>
+                          <span className="vname">has {e.type}</span>
+                          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * e.n / max)) + "%" }} /></span>
+                          <span className="vn">{e.n.toLocaleString()}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="card">
                 <h2>Case lists</h2>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                  {explore.caseLists.map(l => (
-                    <button key={l.id} className="facet" title={l.name} onClick={() => addClause({ kind: "caseList", id: l.id })}>
-                      {l.id} <span className="meta">{l.n.toLocaleString()}</span>
-                    </button>
-                  ))}
-                </div>
+                {(() => {
+                  const max = Math.max(...explore.caseLists.map(l => l.n), 1);
+                  const dr = parseDraft();
+                  const isSel = (id: string) => ((dr && dr.all) || []).some((c: any) => c && c.kind === "caseList" && c.id === id);
+                  return (
+                    <div className="vallist">
+                      {explore.caseLists.map(l => (
+                        <button key={l.id} className={isSel(l.id) ? "valrow on" : "valrow"}
+                          title={l.name + " — " + l.n.toLocaleString() + " patients (click to filter)"}
+                          onClick={() => addClause({ kind: "caseList", id: l.id })}>
+                          <span className="vname">{l.id}</span>
+                          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * l.n / max)) + "%" }} /></span>
+                          <span className="vn">{l.n.toLocaleString()}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
                 <p className="note">Profiles here: {(explore.profiles || []).join(", ") || "none"}{explore.gaProfiles && explore.gaProfiles.length ? " · assays: " + explore.gaProfiles.join(", ") : ""} · facet counts {explore.draftCount != null ? "narrowed to your draft" : "study-wide"} · {explore.stats.ms}ms</p>
               </div>
             </div>
