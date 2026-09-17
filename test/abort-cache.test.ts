@@ -23,6 +23,7 @@ import { readFileSync } from "node:fs";
 
 const src = (p: string) => readFileSync(new URL("../" + p, import.meta.url), "utf8");
 const federation = src("lib/federation.ts");
+const annotation = src("lib/annotation.ts");
 const analysis = src("lib/analysis.ts");
 const ch = src("lib/ch.ts");
 
@@ -59,6 +60,26 @@ describe("a cancelled query is never cached as an answer", () => {
     assert.match(fn, /if\s*\(\s*complete\s*\)\s*_routing\s*=\s*map/,
       "the routing map must be cached only when every instance answered — a partial map would " +
       "outlive the outage that produced it and make a transient failure look permanent");
+  });
+
+  // The same trap, at the other sites an abort can now reach. These were found by asking
+  // "where else does a catch feed a cached value?" rather than by another outage.
+  test("the OncoKB pin is not cached as null because a reader left", () => {
+    const i = annotation.indexOf("export async function oncokbPin(");
+    assert.ok(i > 0, "could not find oncokbPin in lib/annotation.ts");
+    const fn = annotation.slice(i, annotation.indexOf("\n}", i));
+    assert.match(fn, /isAbortError\s*\(\s*\w+\s*\)\s*\)?\s*throw/,
+      "oncokbPin must rethrow an abort: caching a null pin refuses every `OQL ... DRIVER` " +
+      "clause until the 5-minute TTL expires");
+  });
+
+  test("the synced-study list is not cached empty because a reader left", () => {
+    const i = annotation.indexOf("async function syncedStudies(");
+    assert.ok(i > 0, "could not find syncedStudies in lib/annotation.ts");
+    const fn = annotation.slice(i, annotation.indexOf("\n}", i));
+    assert.match(fn, /isAbortError\s*\(\s*\w+\s*\)\s*\)?\s*throw/,
+      "syncedStudies must rethrow an abort: this cache has NO TTL, so swallowing one would " +
+      "convince the process that no study is synced for the rest of its life");
   });
 
   test("validStudies does not keep a second cache that could outlive the routing map", () => {

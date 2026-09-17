@@ -344,6 +344,15 @@ halves):
 `validStudies()` lost its second cache for the same reason — a cache on top of a cache can
 outlive the bad value underneath it.
 
+Asking "where else does a `catch` feed a cached value?" found three more sites that the same
+signal can now reach, fixed before they bit anyone:
+
+| site | what it cached on any error | severity |
+|---|---|---|
+| `oncokbPin()` | a **null pin**, for a 5-minute TTL | every `OQL ... DRIVER` clause refused for 5 minutes |
+| `syncedStudies()` | an **empty list**, with **no TTL** | the process believes no study is synced, for its whole life — driver annotation silently thins |
+| `buildAnnotationIndex()` | not cached, but degrades to the **mock** annotator | a cancelled request would be answered with non-OncoKB calls |
+
 ## What did not work
 
 Raising `CLICKHOUSE_MAX_INFLIGHT` from 8 to 24 changed the rapid-click inflation from 2.0x to
