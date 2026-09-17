@@ -4,7 +4,7 @@
 //   conventions: {lineGap} }
 // Contract: sorted columns, typed cells (bitmask for gene tracks, NOT_PROFILED = -1),
 //   panel-aware track frequencies, group ranges. The renderer does zero data logic.
-import { chQuery, chQueryRows, DB, STUDY } from "./ch.ts";
+import { chQuery, chQueryRows, DB, STUDY, PRIMARY, type ChConn } from "./ch.ts";
 import { compileCohort, sq } from "./compiler.ts";
 import { heatmapTrackLabel } from "./profile-names.ts";
 import type { CohortDef, Contract, Track, GroupRange, OncoprintSpec, HeatmapSpec, ChRow } from "./types.ts";
@@ -82,11 +82,12 @@ export function cohortPatientsSql(dsl: PidsCarrier | null | undefined, study: st
 }
 
 async function cohortPatients(dsl: PidsCarrier | null | undefined, study: string,
-  log?: ContractOpts["log"], label = "oncoprint:columns", db: string = DB, unit: Unit = "patient", pin?: string | null): Promise<string[]> {
+  log?: ContractOpts["log"], label = "oncoprint:columns", db: string = DB, unit: Unit = "patient", pin?: string | null,
+  conn: ChConn = PRIMARY): Promise<string[]> {
   const sql = cohortColumnsSql(dsl, study, db, unit, pin);
   const entry = { label, sql, study } as { label: string; sql: string; ms?: number; study?: string };
   if (log) log.push(entry);
-  const r = await chQueryRows(sql);
+  const r = await chQueryRows(sql, conn);
   entry.ms = r._ms;
   return r.rows.map((x) => x[0] as string);
 }
@@ -152,10 +153,10 @@ export function clinicalSql(attrs: string[], study: string = STUDY, db: string =
 
 // per-study molecular-profile inventory (validation for heatmap tracks)
 const _profCache = new Map<string, Set<string>>();
-async function studyProfileTypes(study: string, db: string = DB): Promise<Set<string>> {
-  const key = db + "." + study;
+async function studyProfileTypes(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Set<string>> {
+  const key = conn.id + "." + db + "." + study;
   if (_profCache.has(key)) return _profCache.get(key)!;
-  const r = await chQuery("SELECT DISTINCT profile_type FROM " + db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study));
+  const r = await chQuery("SELECT DISTINCT profile_type FROM " + db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study), conn);
   const set = new Set((r.data as ChRow[]).map((x) => x.profile_type));
   _profCache.set(key, set);
   return set;
@@ -165,10 +166,10 @@ async function studyProfileTypes(study: string, db: string = DB): Promise<Set<st
 // counts (the portal's "Variant Allele Frequency in Selected Mutations Profile").
 // Patient-level value = max across the patient's mutations in the gene.
 const _vafCache = new Map<string, boolean>();
-async function vafAvailable(study: string, db: string = DB): Promise<boolean> {
-  const key = db + "." + study;
+async function vafAvailable(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<boolean> {
+  const key = conn.id + "." + db + "." + study;
   if (_vafCache.has(key)) return _vafCache.get(key)!;
-  const r = await chQuery("SELECT 1 FROM " + db + ".mutation_derived WHERE studyId = " + sq(study) + " AND tumorAltCount > 0 LIMIT 1");
+  const r = await chQuery("SELECT 1 FROM " + db + ".mutation_derived WHERE studyId = " + sq(study) + " AND tumorAltCount > 0 LIMIT 1", conn);
   const ok = r.data.length > 0;
   _vafCache.set(key, ok);
   return ok;
@@ -263,17 +264,19 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   // Record a query the same way the resolvers do: pushed before the await and
   // stamped after, so concurrent fetches each update their own entry.
   // the four hot fetches read columns by index: no object per row, ~45% fewer bytes
+  // A study's queries go to the instance that holds it, not merely to its database name: the
+  // two differ the moment a peer lives on another host.
   const lqRows = async (label: string, sql: string, study?: string) => {
     const entry = { label, sql, ...(study ? { study } : {}) } as { label: string; sql: string; ms?: number; study?: string };
     if (opts.log) opts.log.push(entry);
-    const r = await chQueryRows(sql);
+    const r = await chQueryRows(sql, study ? connOf(study) : PRIMARY);
     entry.ms = r._ms;
     return r;
   };
   const lq = async <R = ChRow>(label: string, sql: string, study?: string) => {
     const entry = { label, sql, ...(study ? { study } : {}) } as { label: string; sql: string; ms?: number; study?: string };
     if (opts.log) opts.log.push(entry);
-    const r = await chQuery<R>(sql);
+    const r = await chQuery<R>(sql, study ? connOf(study) : PRIMARY);
     entry.ms = r._ms;
     return r;
   };
@@ -290,9 +293,18 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   // carries the cohort DEFINITION, not compiled SQL, so an `OQL ... DRIVER` clause is compiled
   // here — and without the pin it would be refused for want of an annotation store.
   const pin = await oncokbPin();
-  // per-study database on the same instance (e.g. a GENIE release next to the public portal);
-  // studies not listed live in the app's default database
-  const dbOf = (s: string): string => String((spec.dbs || {})[s] || "").replace(/[^A-Za-z0-9_]/g, "") || DB;
+  // Where each study actually lives. `spec.dbs` stays as an explicit override, but nothing ever
+  // populated it, so every study fell back to the app's default database — and a study held by
+  // another instance (GENIE beside the public portal) then matched no rows at all and surfaced
+  // as "cohort is empty". Ask federation instead, which is the one place that knows.
+  //
+  // Imported dynamically on purpose: federation.ts imports this module's SQL builders, so a
+  // static import here would close a cycle.
+  const { studyRouting } = await import("./federation.ts");
+  const routing = await studyRouting();
+  const connOf = (s: string): ChConn => routing.get(s) || PRIMARY;
+  const dbOf = (s: string): string =>
+    String((spec.dbs || {})[s] || "").replace(/[^A-Za-z0-9_]/g, "") || connOf(s).db;
   const { genes, geneList, clinical, derivedEvents, lineGap, sort, heatmap, display, unit, overlays } = normalizeSpec(spec);
   if (multi && derivedEvents.length) throw new Error("derived-event tracks are single-study; drop them or the extra studies");
   if (unit === "sample" && derivedEvents.length)
@@ -318,7 +330,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
       } else {
         // no pre-compiled SQL: compile the definition against each study in turn
         const per = await Promise.all(studies.map(async (s) =>
-          ({ s, pids: await cohortPatients({ ...g.dsl, lineGap }, s, opts.log, "oncoprint:columns", dbOf(s), unit, pin) })));
+          ({ s, pids: await cohortPatients({ ...g.dsl, lineGap }, s, opts.log, "oncoprint:columns", dbOf(s), unit, pin, connOf(s)) })));
         for (const { s, pids } of per) for (const p of pids) { const id = qual(s, p); raw.push(id); studyOf.set(id, s); }
       }
       const pids = raw.filter(p => !seen.has(p));
@@ -334,7 +346,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
     for (const { s, r } of fetched) for (const x of r.rows) { const id = qual(s, x[0] as string); pids.push(id); studyOf.set(id, s); }
     groups = [{ name: "all patients", pids }];
   } else {
-    const pids = await cohortPatients(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, opts.log, "oncoprint:columns", dbOf(study), unit, pin);
+    const pids = await cohortPatients(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, opts.log, "oncoprint:columns", dbOf(study), unit, pin, connOf(study));
     for (const p of pids) studyOf.set(p, study);
     groups = [{ name: "cohort", pids }];
   }
@@ -379,13 +391,13 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   for (const h of heatmap) {
     const isVaf = /^vaf$/i.test(h.profileType);
     const avail = await Promise.all(studies.map(async (s) =>
-      (isVaf ? await vafAvailable(s, dbOf(s)) : (await studyProfileTypes(s, dbOf(s))).has(h.profileType)) ? s : null));
+      (isVaf ? await vafAvailable(s, dbOf(s), connOf(s)) : (await studyProfileTypes(s, dbOf(s), connOf(s))).has(h.profileType)) ? s : null));
     const okStudies = avail.filter((s): s is string => s !== null);
     if (!okStudies.length)
       throw new Error(isVaf
         ? "heatmap: 'VAF' needs mutation allele counts, which " + studies.join("/") + " did not load"
         : "heatmap: profile '" + h.profileType + "' not in " + studies.join("/") +
-          " (available: " + ([...(await studyProfileTypes(studies[0], dbOf(studies[0])))].join(", ") || "none") + ", VAF)");
+          " (available: " + ([...(await studyProfileTypes(studies[0], dbOf(studies[0]), connOf(studies[0])))].join(", ") || "none") + ", VAF)");
     const values = new Map<string, number>(); // columnId|gene -> value
     const hFetched = await Promise.all(okStudies.map(async (s) =>
       ({ s, r: await lqRows(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s, dbOf(s), unit) : heatmapSql(h.profileType, h.genes, s, dbOf(s), unit), s) })));
