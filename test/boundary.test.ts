@@ -21,7 +21,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
-  carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotStatsSql, plotTableSql, plotViolinSql,
+  carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql,
   geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
   clinicalCountsSql, clinicalMomentsSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
   timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql,
@@ -208,6 +208,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   "plotCountSql:numeric": () => plotCountSql(numAxis, numAxis2, cohortSql, true),
   "plotStatsSql": () => plotStatsSql(numAxis, numAxis2, cohortSql),
   "plotBinsSql": () => plotBinsSql(numAxis, numAxis2, cohortSql),
+  "plotBinsSql:sharedExtent": () => plotBinsSql(numAxis, numAxis2, cohortSql, undefined, { x0: 0, x1: 10, y0: 0, y1: 10 }),
+  "plotMomentsSql": () => plotMomentsSql(numAxis, numAxis2, cohortSql),
   "plotBoxSql": () => plotBoxSql(numAxis, catAxis, cohortSql),
   "plotTableSql": () => plotTableSql(catAxis, catAxis2, cohortSql),
   "plotViolinSql": () => plotViolinSql(numAxis, catAxis, cohortSql),

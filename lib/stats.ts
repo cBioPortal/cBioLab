@@ -405,6 +405,23 @@ export function normalP(z: number): number {
 
 export interface Correlation { r: number | null; n: number; t: number; df: number; p: number }
 
+/**
+ * The least-squares line from the same six sums Pearson's r uses — the ordinary closed-form OLS
+ * solution, identical to what ClickHouse's simpleLinearRegression(x,y) computes in one pass, so a
+ * federated slope/intercept is exact rather than a per-site average. Unlike r, this has no
+ * pooling-vs-per-site ambiguity to caveat: a single line drawn through the combined cloud of
+ * points is exactly what "the regression line" means, over however many sites contributed to it.
+ */
+export interface Regression { slope: number | null; intercept: number | null }
+export function regressionFromMoments(m: Moments): Regression {
+  const { n, sx, sy, sxy, sxx } = m;
+  if (n < 2) return { slope: null, intercept: null };
+  const vx = n * sxx - sx * sx;
+  if (vx <= 0) return { slope: null, intercept: null };  // a constant x has no slope
+  const slope = (n * sxy - sx * sy) / vx;
+  return { slope, intercept: (sy - slope * sx) / n };
+}
+
 export function pearsonFromMoments(m: Moments): Correlation {
   const { n, sx, sy, sxy, sxx, syy } = m;
   if (n < 3) return { r: null, n, t: 0, df: 0, p: 1 };
