@@ -1,7 +1,7 @@
 // Faceted study explorer: what exists, in what numbers — optionally conditioned on a
 // draft cohort so every count narrows as clauses are added (study-view-style feedback).
 // Everything returned is designed to be clickable into a DSL clause.
-import { chQuery, DB, PRIMARY, type ChConn } from "./ch.ts";
+import { chQuery, DB, PRIMARY, ensureChContext, registerChExternal, chExternalRegistered, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, type DerivedMetric } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";
@@ -30,6 +30,67 @@ const NUM_HISTOGRAM_LIMIT = 14;
  * payload; a facet that hits it says so.
  */
 const FACET_VALUE_LIMIT = 200;
+
+/**
+ * Above this many patients a resolved cohort is not worth shipping with every query, and the
+ * compiled predicate goes back inline. The ceiling is about payload, not correctness: both
+ * forms select the same patients, and the fallback is what this code always did.
+ *
+ * 50,000 ids is ~500KB of TSV per query. Measured against ClickHouse Cloud, an external table
+ * of 244KB (the whole of MSK-CHORD) costs no more wall clock than one of 18KB, so the bound is
+ * deliberately generous; what it exists to stop is a loose filter over a 240k-patient study
+ * turning every facet query into a multi-megabyte upload.
+ */
+const COHORT_EXTERNAL_LIMIT = Number(process.env.EXPLORE_COHORT_EXTERNAL_LIMIT || 50000);
+
+/** ClickHouse external-table name holding one study's resolved draft cohort. */
+const cohortTable = (study: string) => "_cohort_" + study.replace(/[^A-Za-z0-9_]/g, "_");
+
+/**
+ * The draft cohort, resolved ONCE per study per request.
+ *
+ * The compiled definition is a set expression over patient ids, and it used to be spliced into
+ * every facet query — so a four-clause draft was re-evaluated ~30 times to answer one screen,
+ * measured at 2x the cost of the same query unfiltered. Here it is evaluated once and the
+ * resulting ids ride along as an external table, which also sidesteps the 256KB `max_query_size`
+ * wall that an inlined id list hits at ~22,000 patients (measured: 15,872 ids still fit, the
+ * whole of MSK-CHORD at 24,950 does not — the same ceiling recorded in docs/PERFORMANCE.md).
+ *
+ * Returns the same three condition fragments as before, so every call site is unchanged.
+ */
+async function resolveCohort(
+  study: string, db: string, dsql: string, conn: ChConn
+): Promise<{ cond: string; sampleCond: string; panelSampleCond: string; count: number }> {
+  const pidExpr = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  const inlineCond = "\n  AND " + pidExpr + " IN (SELECT pid FROM (" + dsql + "))";
+  const inlinePanel = "\n  AND sample_unique_id IN (SELECT sample_unique_id FROM " + db + ".sample_derived" +
+    " WHERE cancer_study_identifier = " + sq(study) +
+    " AND " + pidExpr + " IN (SELECT pid FROM (" + dsql + ")))";
+
+  const table = cohortTable(study);
+  // One extra row tells us the cohort is over the bound without a second counting pass.
+  const r = await chQuery<ChRow>(
+    "SELECT DISTINCT pid FROM (" + dsql + ") LIMIT " + (COHORT_EXTERNAL_LIMIT + 1), conn);
+  const pids = r.data.map((x) => String(x.pid));
+
+  if (pids.length > COHORT_EXTERNAL_LIMIT || !registerChExternal(
+    { name: table, structure: "pid String", data: pids.length ? pids.join("\n") + "\n" : "" }
+  )) {
+    // Too large to ship, or no request context to hold it (MCP, scripts, tests): inline the
+    // predicate exactly as before, and pay one counting query for the size we did not learn.
+    const c = await chQuery<ChRow>("SELECT uniqExact(pid) AS n FROM (" + dsql + ")", conn);
+    return { cond: inlineCond, sampleCond: inlineCond, panelSampleCond: inlinePanel, count: Number(c.data[0].n) };
+  }
+
+  const cond = "\n  AND " + pidExpr + " IN (SELECT pid FROM " + table + ")";
+  return {
+    cond, sampleCond: cond,
+    // sample_to_gene_panel_derived has no patient column, so map through sample_derived
+    panelSampleCond: "\n  AND sample_unique_id IN (SELECT sample_unique_id FROM " + db + ".sample_derived" +
+      " WHERE cancer_study_identifier = " + sq(study) + cond + ")",
+    count: pids.length
+  };
+}
 
 /**
  * Bin edges for a numeric attribute, reproducing the portal's algorithm:
@@ -122,7 +183,23 @@ async function attachHistograms(opts: {
   }));
 }
 
-export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, binEdges, attributes, geneCharts, extraDerived }: { study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[]; conn?: ChConn; geneSearch?: string; skipBins?: boolean; skipGenes?: boolean; binEdges?: Record<string, { edges: number[]; interval: number }>; attributes?: string[]; geneCharts?: string[]; extraDerived?: ExtraDerivedRequest[] }): Promise<ExploreResult> {
+export interface ExploreArgs {
+  study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[];
+  gaProfiles?: string[]; conn?: ChConn; geneSearch?: string; skipBins?: boolean; skipGenes?: boolean;
+  binEdges?: Record<string, { edges: number[]; interval: number }>; attributes?: string[]; geneCharts?: string[];
+  extraDerived?: ExtraDerivedRequest[];
+}
+
+/**
+ * A request boundary, so the resolved cohort (and the reader's abort signal, when the caller
+ * supplied one) is visible to every query this produces. Inherited when there already is one,
+ * which is how a federated request keeps all its studies in a single context.
+ */
+export function buildExplore(args: ExploreArgs): Promise<ExploreResult> {
+  return ensureChContext(() => buildExploreOne(args));
+}
+
+async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, binEdges, attributes, geneCharts, extraDerived }: ExploreArgs): Promise<ExploreResult> {
   const db = conn.db;
   const t0 = Date.now();
   // An optional allow-list of attribute names. Exploring hundreds of studies at
@@ -133,14 +210,13 @@ export async function buildExplore({ study, draft, oncokbPin, profiles, gaProfil
   let cond = "", sampleCond = "", panelSampleCond = "", draftCount = null, dsql = null;
   if (draft && Array.isArray(draft.all) && draft.all.length) {
     dsql = compileCohortDef(draft, { oncokbPin, profiles, gaProfiles, study, db });
-    cond = "\n  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + dsql + "))";
-    sampleCond = cond; // sample_derived / genomic_event_derived both carry patient_unique_id
-    // sample_to_gene_panel_derived has no patient column, so map through sample_derived
-    panelSampleCond = "\n  AND sample_unique_id IN (SELECT sample_unique_id FROM " + db + ".sample_derived" +
-      " WHERE cancer_study_identifier = " + sq(study) +
-      " AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + dsql + ")))";
-    const c = await chQuery("SELECT uniqExact(pid) AS n FROM (" + dsql + ")", conn);
-    draftCount = Number(c.data[0].n);
+    // Resolved once here; every facet query below then reads the cohort rather than
+    // recomputing it. `count` is the same number the old uniqExact query returned.
+    const c = await resolveCohort(study, db, dsql, conn);
+    cond = c.cond;
+    sampleCond = c.sampleCond; // sample_derived / genomic_event_derived both carry patient_unique_id
+    panelSampleCond = c.panelSampleCond;
+    draftCount = c.count;
   }
   // Derived facets are independent of everything below, so start them here and
   // collect at the end — serially they cost ~400ms on a ~600ms page, overlapped
@@ -830,7 +906,19 @@ async function geneStateFacets(opts: {
 // whole harmonization). Numeric medians are patient-weighted approximations;
 // min/max are exact. An attribute classified differently across studies takes
 // the kind of the study with the most patients for it.
-export async function buildExploreFederated({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, extraDerived }: { studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null; profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>; connByStudy?: Map<string, ChConn>; geneSearch?: string; attributes?: string[]; geneCharts?: string[]; extraDerived?: ExtraDerivedRequest[] }): Promise<ExploreResult> {
+export interface ExploreFederatedArgs {
+  studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null;
+  profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>;
+  connByStudy?: Map<string, ChConn>; geneSearch?: string; attributes?: string[]; geneCharts?: string[];
+  extraDerived?: ExtraDerivedRequest[];
+}
+
+/** One context for the whole federated request, so pass 2 can still see pass 1's cohorts. */
+export function buildExploreFederated(args: ExploreFederatedArgs): Promise<ExploreResult> {
+  return ensureChContext(() => buildExploreFederatedInner(args));
+}
+
+async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, extraDerived }: ExploreFederatedArgs): Promise<ExploreResult> {
   // Pass 1: facets per study, WITHOUT histograms — each study's own quartiles
   // would give it different bin edges, and bars over different ranges cannot be
   // summed. Skip the work rather than compute bins we would throw away.
@@ -902,8 +990,13 @@ export async function buildExploreFederated({ studies, draft, oncokbPin, profile
 
 /** The draft predicate a given study would apply — needed for pass-2 binning. */
 function draftCondFor(study: string, db: string, draft: CohortDef, ctx: { oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[] }): string {
+  const pidExpr = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  // Pass 1 already resolved this study's cohort; read it rather than compiling and
+  // re-evaluating the same definition for every histogram.
+  const table = cohortTable(study);
+  if (chExternalRegistered(table)) return "\n  AND " + pidExpr + " IN (SELECT pid FROM " + table + ")";
   const dsql = compileCohortDef(draft, { ...ctx, study, db });
-  return "\n  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + dsql + "))";
+  return "\n  AND " + pidExpr + " IN (SELECT pid FROM (" + dsql + "))";
 }
 
 /**

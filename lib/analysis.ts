@@ -53,12 +53,16 @@ export async function studyProfiles(study: string): Promise<{ profiles: string[]
   return out;
 }
 
-let _studySet: Set<string> | null = null;
-/** Every study any configured instance holds (federation-aware). */
+/**
+ * Every study any configured instance holds (federation-aware).
+ *
+ * Deliberately NOT memoized here: `studyRouting()` already caches, and only when it got a
+ * complete answer. A second cache on top of it could outlive a bad routing map — which is how
+ * one cancelled request turned into a process that rejected every study as unknown until it was
+ * restarted. Rebuilding the set is a few hundred map keys.
+ */
 export async function validStudies(): Promise<Set<string>> {
-  if (_studySet) return _studySet;
-  _studySet = new Set((await studyRouting()).keys());
-  return _studySet;
+  return new Set((await studyRouting()).keys());
 }
 
 export async function resolveStudy(requested?: string | null, fallback?: string | null): Promise<string> {

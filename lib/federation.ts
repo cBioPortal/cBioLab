@@ -19,7 +19,7 @@
 // for the transport — a real deployment swaps in a second connection
 // (data-level federation) or an MCP client to a remote cbio-lab
 // (document-level federation) behind the same interface.
-import { chQuery, DB, PRIMARY, connections, type ChConn } from "./ch.ts";
+import { chQuery, DB, PRIMARY, connections, isAbortError, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { canonicalEventName } from "./event-names.ts";
 import { compileCohortDef, eventTypeMatchSql } from "./cohort2.ts";
@@ -128,6 +128,7 @@ export const restrictedStudies = new Set<string>();
 export async function studyRouting(): Promise<Map<string, ChConn>> {
   if (_routing) return _routing;
   const map = new Map<string, ChConn>();
+  let complete = true;
   for (const conn of connections()) {
     try {
       const r = await chQuery<{ id: string; name: string }>(
@@ -137,9 +138,17 @@ export async function studyRouting(): Promise<Map<string, ChConn>> {
         if (map.has(id)) { routingCollisions.push(id); continue; } // first instance wins; surfaced, not hidden
         map.set(id, conn);
       }
-    } catch { /* an unreachable instance simply contributes no studies */ }
+    } catch (e) {
+      // A CANCELLED query says nothing about the instance — the reader simply left. Swallowing
+      // it here and memoizing the result below poisoned the process: the map cached empty, every
+      // later request answered "unknown study <x>", and only a restart cleared it. Let it out.
+      if (isAbortError(e)) throw e;
+      complete = false; /* an unreachable instance simply contributes no studies */
+    }
   }
-  _routing = map;
+  // Only a complete answer is worth remembering; a partial one would outlive the outage that
+  // produced it, and a transient failure would look permanent.
+  if (complete) _routing = map;
   return map;
 }
 

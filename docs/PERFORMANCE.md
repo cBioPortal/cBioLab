@@ -214,12 +214,143 @@ on.
 - **We have no cache.** The portal's biggest advantage is one we have not tried
   to compete with. A result cache keyed on the compiled SQL would be
   straightforward and would close most of the single-chart gap.
-- **Post-load interactivity** is our weakest dimension and the one users feel
-  most.
+- **Post-load interactivity** was our weakest dimension and the one users feel
+  most. Two causes were found and fixed — see *Interactive filtering* below.
 - **`compare` at 916 ms** is the slowest view and the obvious optimisation
   target.
 - **The 20 k id ceiling** should be lifted before anyone tries a real
   sample-list workflow.
+
+---
+
+# Interactive filtering
+
+Measured 2026-09-16 against a cBioPortal **v7.0.0** instance pointed at *this project's own
+ClickHouse database*, with the same credentials, on this box — so data, hardware and engine are
+held constant and only the architecture differs. Production `cbioportal.org` reports
+`v7.1.1` / `dbVersion 3.0.0`, i.e. the same ClickHouse architecture one minor version ahead.
+
+**This supersedes the claim earlier in this document that `/api/column-store/*` 404s mean
+cbioportal.org "is not on its ClickHouse path".** v7 dropped the `column-store` path prefix; the
+404 means the prefix is gone, not the architecture. The portal computes its study-view counts in
+ClickHouse, as we do. The "36x less data" figure above was measured against the v6 architecture
+that shipped per-sample clinical data to the browser; against v7 the payload ratio is 3–9.5x.
+
+## What the portal's cache does and does not buy
+
+`persistence.cache_type` / `persistence.cache_type_clickhouse` (`no-cache` by default; Redis and
+Ehcache are the options). With Redis on, the same unfiltered request goes **6.14s → 0.026s**, a
+236x speedup — that is where a "27 ms warm" figure comes from, and any single-chart comparison
+against a warm portal is measuring the cache, not the design.
+
+It does not, however, help exploration. Running the filter ladder with a **new** combination at
+each step — which is what faceting is — cache-on and cache-off are indistinguishable:
+
+| depth | 0 | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|---|
+| portal, no cache | 4,865 | 3,651 | 4,038 | 3,760 | 4,483 |
+| portal, Redis | 4,292 | 3,226 | 3,647 | 4,105 | 5,043 |
+| cbio-lab | 1,346 | 590 | 939 | 864 | 1,039 |
+
+v7.0.1+ makes this explicit: all 21 `StudyViewService` methods carry
+`condition = "... && isUnfilteredQuery(#studyViewFilter)"`. It is a landing-page cache by design.
+On repeat-identical requests, where the cache works perfectly, the portal returns in 561–722ms
+against our **uncached** 724–840ms.
+
+Numbers agree: unfiltered, our top-10 mutated genes match the portal's exactly, to the sample
+(`TP53 13124/25040` both sides). Filtered they differ by <0.2 percentage points because the
+denominators differ — **the portal filters samples, we filter patients and include all their
+samples** (5,957 vs 6,007 for `ONCOTREE_CODE=LUAD`). Both are defensible; they are not the same
+question, and a reader comparing side by side will notice.
+
+## Two fixes, and what each was worth
+
+**1. Abandoned requests were run to completion.** `exFetchSeq` discarded superseded *results*,
+but the request kept running — all ~30 ClickHouse queries of an answer nobody would read, holding
+database capacity the live request then queued behind. Four facet clicks 250ms apart:
+
+| | final answer | that request | inflation vs isolated |
+|---|---|---|---|
+| before | t+3,826ms | 3,072ms | **2.0x** |
+| after | t+1,814ms | 1,049ms | **1.0x** |
+
+The client now aborts the previous request on every click; the route runs inside
+`withChContext({ signal: req.signal })`, so a query that reaches the front of the queue after its
+reader left is never started, and `cancel_http_readonly_queries_on_client_close=1` makes
+ClickHouse stop the ones already running. Isolated latency was never the problem — repeated
+measurement puts run-to-run spread at 1.1–1.6x — so this is entirely a contention fix.
+
+**2. The cohort was re-evaluated inside every facet query.** The compiled definition was spliced
+into each of ~30 queries per screen; measured on one facet query, carrying it cost **48ms → 94ms
+(2.0x)**. It is now resolved once per study per request and carried as a ClickHouse **external
+table** (`_cohort_<study>`), which also sidesteps the 256KB `max_query_size` wall an inlined id
+list hits at ~22,000 patients — the ceiling recorded earlier in this document, measured again
+here: 15,872 ids still fit in one statement, MSK-CHORD's 24,950 do not, and the external table
+carries all of them at no extra wall clock. Total database work for a two-study depth-4 request:
+**6,357ms → 3,568ms (-44%)**.
+
+End to end, 9 interleaved runs per cell, production builds of both versions:
+
+| | depth 0 | depth 2 | depth 4 |
+|---|---|---|---|
+| `msk_chord_2024` | +2% | **-8%** | **-21%** |
+| `msk_chord_2024` + `genie_public` | +2% | **-16%** | **-22%** |
+
+Depth 0 has no draft, so the change cannot affect it; the +2% on both rows is the harness's own
+noise floor and is what makes the filtered numbers trustworthy. The win grows with filter depth,
+because that is what makes the predicate expensive.
+
+Above `EXPLORE_COHORT_EXTERNAL_LIMIT` (50,000 patients) the resolved cohort is not shipped and
+the predicate goes back inline — the bound is about payload, not correctness, and the fallback is
+what this code always did. There is no context to hold the cohort in MCP tools, scripts and
+tests, which take the same inline path.
+
+Verified by comparing ~11,600 values — every facet count, bin, gene-table row, event, case list
+and gene-status slice — across 7 request shapes against the pre-change build: all identical.
+(Responses are *not* byte-identical run to run, before or after: `ORDER BY n DESC` ties resolve
+arbitrarily. Two runs of the same build differ the same way.)
+
+## The bug this introduced, and the rule that comes out of it
+
+Wiring the reader's abort signal through to ClickHouse created a new error that existing code
+had never had to consider, and one `catch` was waiting for it.
+
+`studyRouting()` asks each instance which studies it holds, tolerates a failure — "an
+unreachable instance simply contributes no studies" — and memoizes the result for the life of
+the process. That was correct while the only possible error meant the instance really was
+unreachable. An abort means something completely different: **the reader left**. It says nothing
+about the data.
+
+So one cancelled request — a facet ticked twice quickly, a browser navigating away — landing
+while the routing map was still being built would be swallowed, an **empty map cached**, and
+from then on *every request from every user* answered `unknown study <x>` with a 400. The page
+rendered no facets. Only a restart cleared it. In production that is an outage triggered by an
+ordinary click.
+
+It surfaced as a flaky e2e suite: 4 failures in 5 cold runs on the branch, 0 in 2 on master,
+and **never** on a warm server — because a process that had already cached a good map could not
+reproduce it. Three plausible explanations (memory pressure, a mid-suite kill, the external
+cohort table) each survived a round of evidence before being disproved; what found it was
+logging the error the route was swallowing into its 400.
+
+The rule, which is now guarded by `test/abort-cache.test.ts` (mutation-verified against both
+halves):
+
+> **A cancelled query is not an answer.** Any `catch` that folds an error into a remembered
+> value must first ask whether the error was a cancellation — `isAbortError()` in `lib/ch.ts`.
+> And memoize only a COMPLETE result: a partial one outlives the outage that produced it, so a
+> transient failure looks permanent.
+
+`validStudies()` lost its second cache for the same reason — a cache on top of a cache can
+outlive the bad value underneath it.
+
+## What did not work
+
+Raising `CLICKHOUSE_MAX_INFLIGHT` from 8 to 24 changed the rapid-click inflation from 2.0x to
+1.8x and isolated latency not at all. Fired 1/4/8/16/24 identical real queries at ClickHouse
+Cloud directly, throughput saturates at ~4–5x regardless of N. **The database is the ceiling, so
+the fix is doing less work, not scheduling it harder** — which is why both fixes above remove
+work rather than parallelise it.
 
 ## Clinical course (`course` view)
 
