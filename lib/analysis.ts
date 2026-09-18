@@ -15,7 +15,7 @@ import type { PlotView } from "./types.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, regressionFromMoments, fisherZMeta,
-  type Moments } from "./stats.ts";
+  applyCutoff, toIncidence, type Moments } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { viewToSvg } from "./view-svg.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc } from "./types.ts";
@@ -231,6 +231,27 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) {
         views.push({ kind: "survival", error: "bad survival endpoint '" + endpoint.slice(0, 40) + "'" }); continue;
       }
+      const rawCutoff = (view as SurvivalView).cutoffMonths;
+      let cutoffMonths: number | undefined;
+      if (rawCutoff != null) {
+        const c = Number(rawCutoff);
+        if (!Number.isFinite(c) || c <= 0 || c > 1200) {
+          views.push({ kind: "survival", endpoint, error: "bad cutoffMonths '" + String(rawCutoff).slice(0, 40) + "': must be a positive number of months (max 1200)" });
+          continue;
+        }
+        cutoffMonths = c;
+      }
+      const rawTick = (view as SurvivalView).tickMonths;
+      let tickMonths: number | undefined;
+      if (rawTick != null) {
+        const t = Number(rawTick);
+        if (!Number.isFinite(t) || t <= 0 || t > 600) {
+          views.push({ kind: "survival", endpoint, error: "bad tickMonths '" + String(rawTick).slice(0, 40) + "': must be a positive number of months" });
+          continue;
+        }
+        tickMonths = t;
+      }
+      const display: "survival" | "incidence" = (view as SurvivalView).display === "incidence" ? "incidence" : "survival";
       const rawAnchor = (view as SurvivalView).anchor;
       const anchor = rawAnchor && rawAnchor.eventType
         ? { eventType: String(rawAnchor.eventType).slice(0, 120),
@@ -271,12 +292,16 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           continue;
         }
       }
-      const pointsFor = (n: string, st?: string) => expandSurvivalCounts(
-        st ? (perSite.get(n)!.get(st) || []) : [...perSite.get(n)!.values()].flat());
-      const curves = vNames.map((n) => {
+      const pointsFor = (n: string, st?: string) => {
+        const data = expandSurvivalCounts(
+          st ? (perSite.get(n)!.get(st) || []) : [...perSite.get(n)!.values()].flat());
+        return cutoffMonths != null ? applyCutoff(data, cutoffMonths) : data;
+      };
+      const curvesRaw = vNames.map((n) => {
         const data = pointsFor(n);
         return { cohort: n, ...kaplanMeier(data), missing: cohorts[n].count - data.length };
       });
+      const curves = display === "incidence" ? curvesRaw.map((c) => toIncidence(c)) : curvesRaw;
       // Two cohorts is the case the log-rank test is defined for, matching the
       // compare view's Fisher p.
       let logrank: LogRank | undefined, logrankPooled: LogRank | undefined;
@@ -307,12 +332,26 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           entryMonths = { median: at(0.5), p90: at(0.9), max: at(1) };
         }
       }
+      const beyondCutoff = cutoffMonths != null
+        ? vNames.reduce((sum, n) => sum + expandSurvivalCounts([...perSite.get(n)!.values()].flat())
+            .filter((r) => r.t > cutoffMonths!).length, 0)
+        : 0;
       views.push({ kind: "survival", cohorts: vNames, curves, endpoint,
         ...(entryMonths ? { entryMonths } : {}),
         ...(anchor ? { anchoredTo: anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : ""), truncated: true } : {}),
+        ...(cutoffMonths != null ? { cutoffMonths } : {}), ...(tickMonths != null ? { tickMonths } : {}),
+        ...(display === "incidence" ? { display } : {}),
         participation: participationFor(vStudies, false),
         ...(logrank ? { logrank } : {}), ...(logrankPooled ? { logrankPooled } : {}),
-        caveat: (anchor
+        caveat: (display === "incidence"
+          ? "Cumulative incidence (1 - survival) shown, not survival. "
+          : "") +
+          (cutoffMonths != null
+            ? "Administratively censored at " + cutoffMonths + " months" +
+              (beyondCutoff ? " (" + beyondCutoff + " patient" + (beyondCutoff === 1 ? "" : "s") + " still under observation past this point)" : "") +
+              ". "
+            : "") +
+          (anchor
           ? endpoint + " re-anchored to " + anchor.occurrence!.toLowerCase() + " " + anchor.eventType +
             (anchor.key ? " where " + anchor.key + "=" + anchor.value : "") +
             ". LEFT TRUNCATION IS APPLIED: each patient enters the risk set only when the study could first observe them" +

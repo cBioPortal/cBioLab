@@ -18,6 +18,7 @@
 // inlined in the app follows the page theme while the same string rasterised
 // for a chat gets a fixed light figure.
 import { categoryColor, isAbsent, jitterFor } from "./plot.ts";
+import { survivalAxis } from "./stats.ts";
 import type { ViewResult, KmCurve, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind, PlotData } from "./types.ts";
 
 /** Cohort names and data values reach <text>; they must never reach it raw. */
@@ -71,12 +72,13 @@ function caption(text: string, w: number, y0: number, muted: string, perLine = 9
 function survivalSvg(v: ViewResult, o: SvgOpts): string {
   const p = palette(o.theme), W = o.width || 720;
   const curves = (v.curves || []) as KmCurve[];
+  const incidence = v.display === "incidence";
   const L = 46, R = 12, T = 12, PLOT = 250;
   const legendH = 16 * curves.length + 6;
   const stats = v.logrank ? 18 : 0;
   const cap = caption(v.caveat || "", W, T + PLOT + legendH + stats + 8, p.muted);
   const H = T + PLOT + legendH + stats + cap.height + 16;
-  const tMax = Math.max(12, ...curves.flatMap((c) => c.points.map((q) => q.t)));
+  const { tMax, step } = survivalAxis(curves, { cutoffMonths: v.cutoffMonths, tickMonths: v.tickMonths });
   const x = (t: number) => L + (W - L - R) * t / tMax;
   const y = (s: number) => T + PLOT * (1 - s);
   const out: string[] = [];
@@ -84,12 +86,11 @@ function survivalSvg(v: ViewResult, o: SvgOpts): string {
     out.push(`<line x1="${L}" y1="${num(y(s))}" x2="${W - R}" y2="${num(y(s))}" stroke="${p.line}" stroke-width="1"/>`);
     out.push(`<text x="8" y="${num(y(s) + 3)}" font-size="10" fill="${p.muted}">${Math.round(s * 100)}%</text>`);
   }
-  const step = tMax > 60 ? 24 : 12;
   for (let t = 0; t <= tMax; t += step)
     out.push(`<text x="${num(x(t) - 8)}" y="${T + PLOT + 14}" font-size="10" fill="${p.muted}">${t}mo</text>`);
   curves.forEach((c, i) => {
-    // a step function: hold the previous level to the event time, then drop
-    let d = `M ${num(x(0))} ${num(y(1))}`, py = y(1);
+    // a step function: hold the previous level to the event time, then drop (rise, for incidence)
+    let d = `M ${num(x(0))} ${num(y(incidence ? 0 : 1))}`, py = y(incidence ? 0 : 1);
     for (const q of c.points) { d += ` L ${num(x(q.t))} ${num(py)} L ${num(x(q.t))} ${num(y(q.s))}`; py = y(q.s); }
     d += ` L ${num(x(tMax))} ${num(py)}`;
     out.push(`<path d="${d}" fill="none" stroke="${SERIES[i % SERIES.length]}" stroke-width="2"/>`);
@@ -97,8 +98,8 @@ function survivalSvg(v: ViewResult, o: SvgOpts): string {
   curves.forEach((c, i) => {
     const ly = T + PLOT + 24 + i * 16;
     out.push(`<rect x="8" y="${ly}" width="9" height="9" rx="2" fill="${SERIES[i % SERIES.length]}"/>`);
-    out.push(`<text x="22" y="${ly + 8}" font-size="11" fill="${p.ink}">${esc(c.cohort)}: median ` +
-      `${c.median == null ? "not reached" : num(c.median) + "mo"} (n=${fmt(c.n)}, ${fmt(c.events)} events)</text>`);
+    out.push(`<text x="22" y="${ly + 8}" font-size="11" fill="${p.ink}">${esc(c.cohort)}: ` +
+      `${incidence ? "50% incidence by " : "median "}${c.median == null ? "not reached" : num(c.median) + "mo"} (n=${fmt(c.n)}, ${fmt(c.events)} events)</text>`);
   });
   if (v.logrank) {
     const ly = T + PLOT + 24 + curves.length * 16;

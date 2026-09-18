@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { logRank, chiSquareP1df, fisherExact, kaplanMeier,
   benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareP, studentTP, chiSquareTest, welchT, varianceFromMoments,
-  pearsonFromMoments, fisherZMeta, normalP } from "../lib/stats.ts";
+  pearsonFromMoments, fisherZMeta, normalP, applyCutoff, toIncidence, survivalAxis } from "../lib/stats.ts";
 
 /** Freireich et al. (1963), 6-MP vs placebo in acute leukaemia. `+` = censored. */
 const SIXMP = [
@@ -79,6 +79,52 @@ describe("log-rank", () => {
     assert.equal(r.chi2, 0);
     assert.equal(r.p, 1);
     assert.equal(r.strata, 0, "a stratum with no events must not count as informative");
+  });
+});
+
+describe("applyCutoff (administrative censoring at a fixed month)", () => {
+  test("events beyond the cutoff become censoring at the cutoff, not deletion", () => {
+    const cut = applyCutoff(SIXMP, 20);
+    assert.equal(cut.length, SIXMP.length, "truncation must not drop rows");
+    assert.ok(cut.every((r) => r.t <= 20), "no record should exit after the cutoff");
+    const km = kaplanMeier(cut);
+    assert.equal(km.events, 7, "only the 7 events at or before 20mo (6,6,6,7,10,13,16) should count");
+    assert.equal(km.n, 21, "rows are censored, not removed, so n is unchanged");
+  });
+  test("the risk set and curve level before the cutoff are unaffected", () => {
+    const uncut = kaplanMeier(SIXMP).points;
+    const cut = kaplanMeier(applyCutoff(SIXMP, 20)).points;
+    const levelAt16 = uncut.find((p) => p.t === 16)!.s;
+    assert.equal(cut.find((p) => p.t === 16)!.s, levelAt16, "cutoff must not change the level reached before it");
+    assert.ok(cut.every((p) => p.t <= 20), "no plotted point should fall past the cutoff");
+  });
+});
+
+describe("toIncidence (cumulative incidence, the complement of a KM curve)", () => {
+  test("every point is 1 - survival, and 'median' keeps the same crossing month", () => {
+    const km = kaplanMeier(SIXMP);
+    const ci = toIncidence(km);
+    for (let i = 0; i < km.points.length; i++) {
+      assert.equal(ci.points[i].t, km.points[i].t);
+      assert.ok(Math.abs(ci.points[i].s - (1 - km.points[i].s)) < 1e-9);
+    }
+    assert.equal(ci.median, km.median, "S(t) <= 0.5 and 1-S(t) >= 0.5 cross at the same t");
+  });
+});
+
+describe("survivalAxis (shared x-axis domain for both KM renderers)", () => {
+  test("defaults to the latest EVENT time and the existing 12/24mo tick rule", () => {
+    // kaplanMeier only emits a point where an event actually occurred (SIXMP's last two
+    // rows are pure censoring at 34 and 35mo), so the domain — like the pre-existing
+    // renderer code this replaces — runs to the last event, not the last censoring.
+    const a = survivalAxis([kaplanMeier(SIXMP)]);
+    assert.equal(a.tMax, 23, "SIXMP's latest event time");
+    assert.equal(a.step, 12, "23mo is under the 60mo threshold, so ticks stay at 12");
+  });
+  test("an explicit cutoff or tick spacing overrides both defaults", () => {
+    const a = survivalAxis([kaplanMeier(SIXMP)], { cutoffMonths: 20, tickMonths: 6 });
+    assert.equal(a.tMax, 20);
+    assert.equal(a.step, 6);
   });
 });
 

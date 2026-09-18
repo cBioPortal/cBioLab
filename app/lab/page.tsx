@@ -9,6 +9,7 @@ import { parameterize } from "../../lib/params.ts";
 import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
 import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
 import type { ViewParticipation } from "../../lib/types.ts";
+import { survivalAxis } from "../../lib/stats.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -137,7 +138,8 @@ const EXAMPLES: Example[] = [
     def: { study: "brca_tcga_pan_can_atlas_2018", all: [{ kind: "oql", q: "ERBB2: EXP>2" }] } }
 ];
 
-function KMChart({ curves }: { curves: KmCurve[] }) {
+function KMChart({ curves, cutoffMonths, tickMonths, incidence }:
+  { curves: KmCurve[]; cutoffMonths?: number; tickMonths?: number; incidence?: boolean }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const c = ref.current; if (!c) return;
@@ -148,23 +150,40 @@ function KMChart({ curves }: { curves: KmCurve[] }) {
     const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const grid = dark ? "#2a353c" : "#dde4e8", muted = dark ? "#93a3ad" : "#5b6b76";
     const L = 44, R = 10, T = 10, B = 28;
-    const tMax = Math.max(12, ...curves.flatMap((cv) => cv.points.map((p) => p.t)));
+    const { tMax, step } = survivalAxis(curves, { cutoffMonths, tickMonths });
     const x = (t: number) => L + (W - L - R) * t / tMax, y = (s: number) => T + (H - T - B) * (1 - s);
     ctx.strokeStyle = grid; ctx.fillStyle = muted; ctx.font = "10px 'IBM Plex Sans',sans-serif";
     for (const s of [0, 0.25, 0.5, 0.75, 1]) {
       ctx.beginPath(); ctx.moveTo(L, y(s)); ctx.lineTo(W - R, y(s)); ctx.stroke();
       ctx.fillText(Math.round(s * 100) + "%", 8, y(s) + 3);
     }
-    const step = tMax > 60 ? 24 : 12;
     for (let t = 0; t <= tMax; t += step) ctx.fillText(t + "mo", x(t) - 8, H - 10);
     curves.forEach((cv, i: number) => {
       ctx.strokeStyle = CAT_COLORS[i % CAT_COLORS.length]; ctx.lineWidth = 2; ctx.beginPath();
-      let py = y(1); ctx.moveTo(x(0), py);
+      let py = y(incidence ? 0 : 1); ctx.moveTo(x(0), py);
       for (const p of cv.points) { const nx = x(p.t), ny = y(p.s); ctx.lineTo(nx, py); ctx.lineTo(nx, ny); py = ny; }
       ctx.lineTo(x(tMax), py); ctx.stroke();
     });
-  }, [curves]);
+  }, [curves, cutoffMonths, tickMonths, incidence]);
   return <canvas ref={ref} style={{ width: "100%", display: "block" }} />;
+}
+
+/**
+ * A gene symbol box + button: the fastest way to compare two survival curves by mutation
+ * status without hand-editing cohort definitions. Submitting hands the gene up to the caller,
+ * which builds the mutant/wildtype cohort pair and re-points the survival view at them.
+ */
+function GeneSplitControl({ busy, onSplit }: { busy?: boolean; onSplit: (gene: string) => void }) {
+  const [gene, setGene] = useState("");
+  const submit = () => { const g = gene.trim().toUpperCase(); if (g) { onSplit(g); setGene(""); } };
+  return (
+    <span style={{ display: "inline-flex", gap: "0.3rem" }}>
+      <input value={gene} disabled={busy} placeholder="gene" style={{ width: "5.5rem" }}
+        onChange={e => setGene(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") submit(); }} />
+      <button type="button" className="tbbtn" disabled={busy || !gene.trim()} onClick={submit}>split</button>
+    </span>
+  );
 }
 
 /** Explore opens on these: one deeply-annotated MSK study and one large
@@ -1569,6 +1588,24 @@ function Latency({ v }: { v: any }) {
   const setCohortNotes = (name: string, text: string) => {
     const d = { ...doc, cohorts: { ...doc.cohorts, [name]: { ...doc.cohorts[name], notes: text } } };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));   // no re-run: prose changes no numbers
+  };
+
+  /**
+   * The "split by gene" shortcut for cumulative-incidence/KM-by-genotype: define the two
+   * cohorts an analyst would otherwise hand-write (mutant, and its DSL complement) and point
+   * the given survival view at them, replacing whatever cohorts it named before.
+   */
+  const splitSurvivalByGene = (vi: number, gene: string) => {
+    const taken = new Set(Object.keys(doc.cohorts || {}));
+    const uniq = (base: string) => { let n = base, i = 2; while (taken.has(n)) n = base + " " + i++; taken.add(n); return n; };
+    const mutName = uniq(gene + "-mutant"), wtName = uniq(gene + "-wildtype");
+    const cohorts = { ...doc.cohorts,
+      [mutName]: { all: [{ kind: "oql", q: gene + ": MUT" } as const] },
+      [wtName]: { all: [{ not: { kind: "oql", q: gene + ": MUT" } } as const] } };
+    const views = (doc.views || []).map((v: any, j: number) => j === vi ? { ...v, cohorts: [mutName, wtName] } : v);
+    const d = { ...doc, cohorts, views };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    run(d);
   };
 
   const clearAnalysis = () => {
@@ -3112,13 +3149,32 @@ function Latency({ v }: { v: any }) {
                             </select>
                           )}
                         </>}
+                        <span className="meta">display</span>
+                        <select value={sv.display === "incidence" ? "incidence" : "survival"} disabled={busy}
+                          onChange={e => patchView(vi, { display: e.target.value === "incidence" ? "incidence" : undefined })}>
+                          <option value="survival">survival</option>
+                          <option value="incidence">cumulative incidence</option>
+                        </select>
+                        <span className="meta">ticks</span>
+                        <select value={sv.tickMonths || ""} disabled={busy}
+                          onChange={e => patchView(vi, { tickMonths: e.target.value ? Number(e.target.value) : undefined })}>
+                          <option value="">auto</option>
+                          {[6, 12, 24, 60].map(m => <option key={m} value={m}>{m}mo</option>)}
+                        </select>
+                        <span className="meta">cutoff</span>
+                        <input type="number" min={1} placeholder="none" disabled={busy}
+                          value={sv.cutoffMonths ?? ""} style={{ width: "5rem" }}
+                          onChange={e => patchView(vi, { cutoffMonths: e.target.value ? Number(e.target.value) : undefined })} />
+                        <span className="meta">mo</span>
+                        <span className="meta">split by gene</span>
+                        <GeneSplitControl busy={busy} onSplit={(gene) => splitSurvivalByGene(vi, gene)} />
                         {busy && <span className="spinner" />}
                       </div>
                     );
                   })()}
-                  <KMChart curves={v.curves!} />
+                  <KMChart curves={v.curves!} cutoffMonths={v.cutoffMonths} tickMonths={v.tickMonths} incidence={v.display === "incidence"} />
                   <div style={{ display: "flex", gap: "1.2rem", fontSize: "var(--t-sm)", color: "var(--muted)", marginTop: "0.4rem", flexWrap: "wrap" }}>
-                    {v.curves!.map((c, i: number) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: median {c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}
+                    {v.curves!.map((c, i: number) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: {v.display === "incidence" ? "50% incidence by " : "median "}{c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}
                   </div>
                   {v.logrank && (
                     <div className="logrank" title={"observed " + v.logrank.observed.join(" / ") + " events vs expected " + v.logrank.expected.join(" / ") + " under the null"}>

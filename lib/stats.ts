@@ -77,6 +77,39 @@ export function kaplanMeier(data: SurvRecord[]): Omit<KmCurve, "cohort"> {
   return { points, median, n: n0, events };
 }
 
+/**
+ * Administrative censoring at a fixed month: anyone still under observation past `cutoff`
+ * is treated as censored AT the cutoff rather than dropped. Dropping would bias the risk set
+ * (their at-risk time up to the cutoff is real and must still count); this only removes what
+ * happens after it.
+ */
+export function applyCutoff(data: SurvRecord[], cutoff: number): SurvRecord[] {
+  return data.map(d => d.t > cutoff ? { t: cutoff, event: 0, entry: d.entry } : d);
+}
+
+/**
+ * The complement of a KM curve: cumulative incidence, 1 - S(t) — "how much of the cohort has
+ * had the event by t" instead of "how much hasn't". Same points, same censoring, just flipped;
+ * an event's uptick reads as a rise instead of a drop, and "median" becomes the month by which
+ * half the cohort's events have happened.
+ */
+export function toIncidence<T extends { points: KmPoint[] }>(curve: T): T {
+  return { ...curve, points: curve.points.map(p => ({ t: p.t, s: Math.round((1 - p.s) * 10000) / 10000 })) };
+}
+
+/**
+ * Shared x-axis domain for both KM renderers (SVG and canvas), so a cutoff or a tick-interval
+ * choice can't visually drift between them. `tMax` is the cutoff when one is set, otherwise the
+ * latest observed event/censoring time (floored at 12mo so a very short curve doesn't collapse
+ * to a sliver); `step` is the requested tick spacing, otherwise the existing 12/24mo default.
+ */
+export function survivalAxis(curves: { points: { t: number }[] }[], opts?: { cutoffMonths?: number; tickMonths?: number }): { tMax: number; step: number } {
+  const observed = Math.max(12, ...curves.flatMap(c => c.points.map(p => p.t)));
+  const tMax = opts?.cutoffMonths || observed;
+  const step = opts?.tickMonths || (tMax > 60 ? 24 : 12);
+  return { tMax, step };
+}
+
 // ---------------------------------------------------------------------------
 // Log-rank test.
 //

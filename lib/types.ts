@@ -197,6 +197,12 @@ export interface SurvivalView {
    * day 0 manufactures immortal time.
    */
   anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
+  /** administratively censor everyone still at risk past this month; truncates the plot too */
+  cutoffMonths?: number;
+  /** x-axis tick spacing in months (default: 12, or 24 past 60mo of plotted range) */
+  tickMonths?: number;
+  /** draw 1 - S(t), cumulative incidence, instead of survival (default "survival") */
+  display?: "survival" | "incidence";
 }
 /**
  * A plot: two axes over the same cases. The shape — scatter, box, contingency — follows from
@@ -497,6 +503,9 @@ export interface ViewResult {
   truncated?: boolean;                      // survival: delayed entry was applied
   /** survival: how long after the anchor patients became observable */
   entryMonths?: { median: number; p90: number; max: number };
+  cutoffMonths?: number;                    // survival: administrative censoring applied, echoed for the renderers
+  tickMonths?: number;                      // survival: requested x-axis tick spacing, echoed for the renderers
+  display?: "survival" | "incidence";       // survival: which curve was drawn
   logrank?: LogRank; logrankPooled?: LogRank;
   pairs?: CooccurRow[];                     // cooccurrence
   clinical?: ClinicalRow[];                 // clinical comparison
