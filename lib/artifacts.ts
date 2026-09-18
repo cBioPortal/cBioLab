@@ -10,6 +10,7 @@
 // version, so migrate() is the identity function — but the column and the
 // call site exist now, while adding them costs nothing, rather than being
 // retrofitted under pressure the day the DSL makes a breaking change.
+import { randomUUID } from "node:crypto";
 import { dbQuery } from "./db.ts";
 
 export const CURRENT_SCHEMA_VERSION = 1;
@@ -56,27 +57,110 @@ function validateName(name: unknown): string {
   return s;
 }
 
+// ---------------------------------------------------------------------------
+// Storage backend. Real Postgres normally — but a session/branch (or the e2e
+// gate) without SUPABASE_DB_URL configured falls back to an in-process store
+// instead of failing outright, so nothing here requires a live Supabase
+// project just to run. Two things this must never do quietly:
+//   - use the fallback in real Vercel production (VERCEL_ENV — set by Vercel
+//     itself on every deployment, unlike NODE_ENV, which `next start` also
+//     sets to "production" locally): losing "shared" state on every
+//     serverless cold start would be far worse than the loud error it
+//     replaces, so that case still throws.
+//   - fall back silently anywhere else: the first use logs a clear warning,
+//     once, so a forgotten .env.local entry is visible rather than a mystery.
+// ---------------------------------------------------------------------------
+interface Backend {
+  list(kind?: ArtifactKind): Promise<Row[]>;
+  get(id: string): Promise<Row | null>;
+  insert(kind: ArtifactKind, name: string, definition: unknown): Promise<Row>;
+  update(id: string, name: string, definition: unknown): Promise<Row | null>;
+  remove(id: string): Promise<boolean>;
+}
+
+const memoryRows = new Map<string, Row>();
+const memoryBackend: Backend = {
+  async list(kind) {
+    return [...memoryRows.values()]
+      .filter(r => !kind || r.kind === kind)
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+      .slice(0, 500);
+  },
+  async get(id) { return memoryRows.get(id) ?? null; },
+  async insert(kind, name, definition) {
+    const now = new Date().toISOString();
+    const row: Row = { id: randomUUID(), kind, name, schema_version: CURRENT_SCHEMA_VERSION, definition, created_at: now, updated_at: now };
+    memoryRows.set(row.id, row);
+    return row;
+  },
+  async update(id, name, definition) {
+    const existing = memoryRows.get(id);
+    if (!existing) return null;
+    const row: Row = { ...existing, name, definition, schema_version: CURRENT_SCHEMA_VERSION, updated_at: new Date().toISOString() };
+    memoryRows.set(id, row);
+    return row;
+  },
+  async remove(id) { return memoryRows.delete(id); }
+};
+
+const pgBackend: Backend = {
+  async list(kind) {
+    return kind
+      ? dbQuery<Row>("select * from saved_artifacts where kind = $1 order by updated_at desc limit 500", [kind])
+      : dbQuery<Row>("select * from saved_artifacts order by updated_at desc limit 500");
+  },
+  async get(id) {
+    const rows = await dbQuery<Row>("select * from saved_artifacts where id = $1", [id]);
+    return rows[0] ?? null;
+  },
+  async insert(kind, name, definition) {
+    const rows = await dbQuery<Row>(
+      "insert into saved_artifacts (kind, name, schema_version, definition) values ($1, $2, $3, $4) returning *",
+      [kind, name, CURRENT_SCHEMA_VERSION, JSON.stringify(definition)]
+    );
+    return rows[0];
+  },
+  async update(id, name, definition) {
+    const rows = await dbQuery<Row>(
+      "update saved_artifacts set name = $2, schema_version = $3, definition = $4 where id = $1 returning *",
+      [id, name, CURRENT_SCHEMA_VERSION, JSON.stringify(definition)]
+    );
+    return rows[0] ?? null;
+  },
+  async remove(id) {
+    const rows = await dbQuery<{ id: string }>("delete from saved_artifacts where id = $1 returning id", [id]);
+    return rows.length > 0;
+  }
+};
+
+let warned = false;
+function backend(): Backend {
+  if (process.env.SUPABASE_DB_URL) return pgBackend;
+  if (process.env.VERCEL_ENV === "production")
+    throw new Error("SUPABASE_DB_URL is not set — the artifact store is not configured for production");
+  if (!warned) {
+    warned = true;
+    console.warn("[artifacts] SUPABASE_DB_URL not set — saved cohorts/workspaces are using an in-process store; nothing will persist across a restart.");
+  }
+  return memoryBackend;
+}
+
 export async function listArtifacts(kind?: ArtifactKind): Promise<SavedArtifact[]> {
-  const rows = kind
-    ? await dbQuery<Row>("select * from saved_artifacts where kind = $1 order by updated_at desc limit 500", [kind])
-    : await dbQuery<Row>("select * from saved_artifacts order by updated_at desc limit 500");
+  const rows = await backend().list(kind);
   return rows.map(fromRow);
 }
 
 export async function getArtifact(id: string): Promise<SavedArtifact | null> {
-  const rows = await dbQuery<Row>("select * from saved_artifacts where id = $1", [id]);
-  return rows[0] ? fromRow(rows[0]) : null;
+  const row = await backend().get(id);
+  return row ? fromRow(row) : null;
 }
 
 export async function createArtifact(kind: ArtifactKind, name: unknown, definition: unknown): Promise<SavedArtifact> {
   if (!isArtifactKind(kind)) throw new Error("kind must be 'cohort' or 'workspace'");
   const n = validateName(name);
   if (!definition || typeof definition !== "object") throw new Error("definition must be an object");
-  const rows = await dbQuery<Row>(
-    "insert into saved_artifacts (kind, name, schema_version, definition) values ($1, $2, $3, $4) returning *",
-    [kind, n, CURRENT_SCHEMA_VERSION, JSON.stringify(definition)]
-  );
-  return fromRow(rows[0]);
+  const row = await backend().insert(kind, n, definition);
+  return fromRow(row);
 }
 
 /** Rename and/or replace the definition. Either field may be omitted to leave it as-is. */
@@ -87,14 +171,10 @@ export async function updateArtifact(id: string, patch: { name?: unknown; defini
   if (patch.definition !== undefined && (!patch.definition || typeof patch.definition !== "object"))
     throw new Error("definition must be an object");
   const definition = patch.definition === undefined ? existing.definition : patch.definition;
-  const rows = await dbQuery<Row>(
-    "update saved_artifacts set name = $2, schema_version = $3, definition = $4 where id = $1 returning *",
-    [id, name, CURRENT_SCHEMA_VERSION, JSON.stringify(definition)]
-  );
-  return rows[0] ? fromRow(rows[0]) : null;
+  const row = await backend().update(id, name, definition);
+  return row ? fromRow(row) : null;
 }
 
 export async function deleteArtifact(id: string): Promise<boolean> {
-  const rows = await dbQuery<{ id: string }>("delete from saved_artifacts where id = $1 returning id", [id]);
-  return rows.length > 0;
+  return backend().remove(id);
 }
