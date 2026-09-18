@@ -19,17 +19,18 @@
 // for the transport — a real deployment swaps in a second connection
 // (data-level federation) or an MCP client to a remote cbio-lab
 // (document-level federation) behind the same interface.
-import { chQuery, DB, PRIMARY, connections, type ChConn } from "./ch.ts";
+import { chQuery, DB, PRIMARY, connections, isAbortError, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { canonicalEventName } from "./event-names.ts";
 import { compileCohortDef, eventTypeMatchSql } from "./cohort2.ts";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
-  plotBinsSql, plotBoxSql, plotCountSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
-  type PlotAxis, type PlotData, type PlotPoint, type PlotRequest } from "./plot.ts";
+  plotBinsSql, plotBoxSql, plotCountSql, plotMomentsSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
+  type AxisKind, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
-export { plotBinsSql, plotBoxSql, plotCountSql, plotStatsSql, plotTableSql, plotViolinSql };
+export { plotBinsSql, plotBoxSql, plotCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
 export type { PlotData, PlotRequest, PlotGroup, PlotPoint } from "./plot.ts";
+import type { Moments } from "./stats.ts";
 
 /** the colour key: the commonest categories, capped, each with the colour every renderer uses */
 export function legendFor(values: string[], ring = false): { label: string; color: string; ring?: boolean }[] {
@@ -128,6 +129,7 @@ export const restrictedStudies = new Set<string>();
 export async function studyRouting(): Promise<Map<string, ChConn>> {
   if (_routing) return _routing;
   const map = new Map<string, ChConn>();
+  let complete = true;
   for (const conn of connections()) {
     try {
       const r = await chQuery<{ id: string; name: string }>(
@@ -137,9 +139,17 @@ export async function studyRouting(): Promise<Map<string, ChConn>> {
         if (map.has(id)) { routingCollisions.push(id); continue; } // first instance wins; surfaced, not hidden
         map.set(id, conn);
       }
-    } catch { /* an unreachable instance simply contributes no studies */ }
+    } catch (e) {
+      // A CANCELLED query says nothing about the instance — the reader simply left. Swallowing
+      // it here and memoizing the result below poisoned the process: the map cached empty, every
+      // later request answered "unknown study <x>", and only a restart cleared it. Let it out.
+      if (isAbortError(e)) throw e;
+      complete = false; /* an unreachable instance simply contributes no studies */
+    }
   }
-  _routing = map;
+  // Only a complete answer is worth remembering; a partial one would outlive the outage that
+  // produced it, and a transient failure would look permanent.
+  if (complete) _routing = map;
   return map;
 }
 
@@ -971,6 +981,30 @@ export function isPatientLevel(r: Resolver): r is PatientLevelCapable {
   return r.instance.mode === "patient-level";
 }
 
+/**
+ * The per-site pieces a federated plot needs (see BaseResolver's "a federated plot" methods,
+ * below) — available on every local participant, patient-level or aggregate-only alike, but not
+ * yet on a remote MCP peer (RemoteAggregateResolver.plot() itself still refuses even a single
+ * study). Kept as its own capability interface rather than optional methods on AggregateCapable,
+ * the same way PatientLevelCapable is kept separate from it: a caller should be told which
+ * participants lack a capability, not find out from an undefined method call.
+ */
+export interface FederatedPlotCapable {
+  plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string }>;
+  plotExtent(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ n: number; x0: number; x1: number; y0: number; y1: number }>;
+  plotBinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]>;
+  plotMoments(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<Moments>;
+  plotTableCells(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ cx: string; cy: string; n: number }[]>;
+  plotBoxRows(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]>;
+}
+export function hasFederatedPlot(r: Resolver): r is Resolver & FederatedPlotCapable {
+  return typeof (r as unknown as Partial<FederatedPlotCapable>).plotAxisKinds === "function";
+}
+
 // NOTE: no TS parameter properties / enums / namespaces anywhere in this repo —
 // Node runs the scripts and MCP server through strip-only type removal, which
 // rejects any TypeScript syntax that would emit code.
@@ -1239,6 +1273,93 @@ abstract class BaseResolver implements AggregateCapable {
       violin, violinBins: VIOLIN_BINS, overlay: "violin",
       ...(vx0 != null && vx1 != null ? { violinExtent: [vx0, vx1] as [number, number] } : {}),
       ...(spec.colorBy ? { colorLabel: axisLabel(spec.colorBy), legend: legendFor(violin.map((v) => v.c || "")) } : {}) };
+  }
+
+  // ---- a federated plot: one pass per site, pooled by lib/analysis.ts --------
+  //
+  // plot() above answers a single study end to end. A cohort spanning several studies cannot
+  // just call plot() per site and stack the results — a scatter's bin grid is scaled to
+  // whichever study computed it, a table's category set may differ, and a box's quartiles are
+  // per-site statistics, not additive ones. The methods below expose the smaller pieces a
+  // federated plot needs instead, mirroring the shape pairMoments() already uses for
+  // co-expression: each site answers a cheap, self-contained question, and lib/analysis.ts pools
+  // the answers using the same sufficient-statistic arguments this file already relies on
+  // elsewhere (shared bin edges, moment sums).
+
+  /**
+   * Which shape a pair draws as, and its axis labels — decided from THIS site's own clinical
+   * metadata, the same way plot() decides it for one study. A federated plot calls this on one
+   * reference site (the first) and hands the SAME xk/yk to every other site's calls below, so a
+   * site whose metadata classifies an attribute differently cannot quietly split the combined
+   * figure into two incompatible shapes.
+   */
+  async plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string }> {
+    validateAxis(spec.x, "x"); validateAxis(spec.y, "y");
+    const kinds = await this.clinicalKinds([spec.x, spec.y]);
+    const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
+    return { xk, yk, shape: plotShape(xk, yk), xLabel: axisLabel(spec.x), yLabel: axisLabel(spec.y) };
+  }
+
+  private plotCtx(def: CohortDef | null | undefined, spec: PlotRequest) {
+    return { study: this.study, db: this.instance.conn.db,
+      unit: spec.unit === "sample" ? "sample" as const : "patient" as const, cohortSql: this.cohortSql(def) };
+  }
+
+  /** Pass 1 of a federated numeric pair: this site's count and extent (plotBinsSql's `extent` arg). */
+  async plotExtent(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ n: number; x0: number; x1: number; y0: number; y1: number }> {
+    const ctx = this.plotCtx(def, spec);
+    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const r = await this.runLogged<ChRow>("plot:extent", plotCountSql(xSel, ySel, ctx.cohortSql, true), this.instance.conn);
+    const row = r.data[0] || {};
+    return { n: Number(row.n || 0), x0: Number(row.x0), x1: Number(row.x1), y0: Number(row.y0), y1: Number(row.y1) };
+  }
+
+  /** Pass 2: this site's bin counts against the shared extent every participant was given. */
+  async plotBinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
+    const ctx = this.plotCtx(def, spec);
+    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const r = await this.runLogged<ChRow>("plot:bins", plotBinsSql(xSel, ySel, ctx.cohortSql, bins, extent), this.instance.conn);
+    return r.data.map((b) => ({ bx: Number(b.bx), by: Number(b.by), n: Number(b.n) }));
+  }
+
+  /** This site's six sums for the pair — sufficient for a federated Pearson/regression (lib/stats.ts). */
+  async plotMoments(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<Moments> {
+    const ctx = this.plotCtx(def, spec);
+    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const r = await this.runLogged<ChRow>("plot:moments", plotMomentsSql(xSel, ySel, ctx.cohortSql), this.instance.conn);
+    const row = r.data[0] || {};
+    return { n: Number(row.n || 0), sx: Number(row.sx || 0), sy: Number(row.sy || 0),
+      sxy: Number(row.sxy || 0), sxx: Number(row.sxx || 0), syy: Number(row.syy || 0) };
+  }
+
+  /** This site's contingency cells for a categorical pair — exact sums, no shared-scale issue at all. */
+  async plotTableCells(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ cx: string; cy: string; n: number }[]> {
+    const ctx = this.plotCtx(def, spec);
+    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const r = await this.runLogged<ChRow>("plot:cells", plotTableSql(xSel, ySel, ctx.cohortSql), this.instance.conn);
+    return r.data.map((row) => ({ cx: String(row.cx), cy: String(row.cy), n: Number(row.n) }));
+  }
+
+  /**
+   * This site's per-group quartile summary for a numeric x categorical pair. n/lo/hi sum and
+   * pool exactly; q1/median/q3 do not decompose exactly across sites and are approximated by
+   * lib/analysis.ts with the same size-weighted mean Explore's federated numeric histograms
+   * already use for the same reason — stated as an approximation, never silent.
+   */
+  async plotBoxRows(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
+    const ctx = this.plotCtx(def, spec);
+    const numFirst = xk === "num";
+    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const r = await this.runLogged<ChRow>("plot:box",
+      plotBoxSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql), this.instance.conn);
+    return r.data.map((row) => {
+      const q = (row.q as unknown as number[]).map(Number);
+      return { g: String(row.g), n: Number(row.n), lo: Number(row.lo), hi: Number(row.hi), q1: q[0], median: q[1], q3: q[2] };
+    });
   }
 
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {

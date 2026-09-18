@@ -2,7 +2,7 @@ import { buildExplore, buildExploreFederated } from "../../../lib/explore.ts";
 import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/federation.ts";
 import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
 import { mergeExplore } from "../../../lib/explore.ts";
-import { PRIMARY } from "../../../lib/ch.ts";
+import { PRIMARY, withChContext } from "../../../lib/ch.ts";
 import { studyProfiles, resolveStudy } from "../../../lib/analysis.ts";
 import { chQuery } from "../../../lib/ch.ts";
 
@@ -16,6 +16,13 @@ async function oncokbPin() {
 }
 
 export async function POST(req: Request) {
+  // Every query this request issues runs inside the reader's connection: when they supersede
+  // it by ticking another facet, the queries it still owes are abandoned instead of run to
+  // completion for an answer nobody will read. See withChContext in lib/ch.ts.
+  return withChContext({ signal: req.signal }, () => handle(req));
+}
+
+async function handle(req: Request) {
   try {
     const body = await req.json();
     const requested = Array.isArray(body.studies) && body.studies.length
@@ -76,6 +83,9 @@ export async function POST(req: Request) {
       : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, extraDerived });
     return Response.json(remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult);
   } catch (e) {
+    // The reader superseded this request: not a failure, and there is nobody left to tell.
+    if ((e as { name?: string })?.name === "AbortError" || req.signal.aborted)
+      return new Response(null, { status: 499 });
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
   }
 }

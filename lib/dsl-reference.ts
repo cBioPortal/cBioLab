@@ -629,12 +629,22 @@ number × number draws a **density scatter**, number × category a **box**, cate
 every case, not over what fits in a browser: n, Pearson and Spearman with their two-sided t-test
 p-values, and the least-squares line. Quartiles use Tukey's 1.5×IQR fences.
 
-Three things are refused rather than approximated. A molecular axis **must name one gene** — a
+Two things are refused rather than approximated. A molecular axis **must name one gene** — a
 whole profile is 630 million values in this warehouse, and reading them to draw one picture is
-never what was meant. A categorical axis with more than 150 distinct values is refused, because a
-truncated contingency table is a wrong one. And a plot whose cohort spans **more than one study**
-is refused, because bins from two studies are counted on two scales and pooling them would draw a
-picture of neither.
+never what was meant. And a categorical axis with more than 150 distinct values is refused,
+because a truncated contingency table is a wrong one.
+
+**A cohort spanning more than one study federates.** Each site answers a smaller, self-contained
+question rather than its own complete plot: its own extent, its own bin counts against one shared
+grid (a scatter's bins would otherwise mean a different range at every site — the reason this was
+refused outright before), its own six sums (n, Σx, Σy, Σxy, Σx², Σy²) for Pearson and the
+regression line, and its own contingency cells or per-group quartiles. All of that pools exactly
+except one thing: **Spearman rank correlation is not reported for a federated plot**, because a
+rank needs the pooled *global* ordering, which no per-site aggregate can reconstruct — reported
+as absent, not approximated. A federated box plot draws only points behind it, never the density
+overlay a single-study box can fall back to (that needs the same shared-scale binning a scatter
+uses, not yet built for a box); its quartiles are a size-weighted approximation across sites, the
+same one Explore's federated numeric histograms already disclose.
 
 **What sits behind the boxes.** cBioPortal draws every value as a jittered point over its box.
 So does this, up to 5,000 values, and only when the study is one this participant may see cases

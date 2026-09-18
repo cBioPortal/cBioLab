@@ -228,17 +228,45 @@ export function plotStatsSql(xSel: string, ySel: string, cohortSql: string): str
 }
 
 /**
+ * Six sums over every point — the federated counterpart of plotStatsSql. n, Σx, Σy, Σxy, Σx², Σy²
+ * are additive across sites and sufficient for Pearson's r and the OLS line (lib/stats.ts's
+ * pearsonFromMoments / regressionFromMoments), the same sufficient-statistic argument
+ * pairMomentsSql already makes for co-expression. Spearman is deliberately not here: a rank
+ * correlation needs the pooled GLOBAL ranking, which no per-site aggregate can reconstruct.
+ */
+export function plotMomentsSql(xSel: string, ySel: string, cohortSql: string): string {
+  return pairCte(xSel, ySel, cohortSql) +
+    "SELECT count() AS n, sum(x) AS sx, sum(y) AS sy, sum(x * y) AS sxy, sum(x * x) AS sxx, sum(y * y) AS syy\n" +
+    "FROM pair";
+}
+
+/**
  * The scatter, as counts per cell. The grid is fixed, so the answer is bounded: 240x160 can
  * hold 38,400 cells and real data fills a couple of thousand of them.
+ *
+ * `extent`, when given, replaces each site's own min/max with a caller-supplied one shared across
+ * every participant in a federated plot — otherwise cell (5,3) means a different (x,y) range at
+ * each site, and summing them draws a picture of neither. Omitted for a single-study plot, which
+ * still bins over its own range exactly as before.
  */
-export function plotBinsSql(xSel: string, ySel: string, cohortSql: string, bins: [number, number] = DEFAULT_BINS): string {
+export function plotBinsSql(xSel: string, ySel: string, cohortSql: string, bins: [number, number] = DEFAULT_BINS,
+  extent?: { x0: number; x1: number; y0: number; y1: number }): string {
   const [bx, by] = [Math.max(2, Math.min(600, Math.round(bins[0]))), Math.max(2, Math.min(600, Math.round(bins[1])))];
-  return pairCte(xSel, ySel, cohortSql) +
-    ",    e AS (SELECT min(x) x0, max(x) x1, min(y) y0, max(y) y1 FROM pair)\n" +
+  const eCte = extent
+    ? ",    e AS (SELECT " + num(extent.x0) + " AS x0, " + num(extent.x1) + " AS x1, " +
+        num(extent.y0) + " AS y0, " + num(extent.y1) + " AS y1)\n"
+    : ",    e AS (SELECT min(x) x0, max(x) x1, min(y) y0, max(y) y1 FROM pair)\n";
+  return pairCte(xSel, ySel, cohortSql) + eCte +
     "SELECT least(" + (bx - 1) + ", toUInt32(floor((x - x0) / nullIf(x1 - x0, 0) * " + bx + "))) AS bx,\n" +
     "       least(" + (by - 1) + ", toUInt32(floor((y - y0) / nullIf(y1 - y0, 0) * " + by + "))) AS by,\n" +
     "       count() AS n\n" +
     "FROM pair, e GROUP BY bx, by";
+}
+
+/** a finite number as a SQL literal — extents cross this module's boundary as numbers, never strings */
+function num(x: number): string {
+  if (!Number.isFinite(x)) throw new Error("plotBinsSql: extent must be finite numbers");
+  return String(x);
 }
 
 /** per category: the count, the quartiles and the extremes — everything a box needs */

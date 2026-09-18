@@ -8,7 +8,7 @@
 // grant is revoked (or the store is empty) this degrades to the rule-based MOCK below,
 // clearly labeled as such. Pin a specific release with ONCOKB_PIN; default is the
 // most recently synced version in the store.
-import { chQuery } from "./ch.ts";
+import { chQuery, isAbortError} from "./ch.ts";
 import type { ChRow } from "./types.ts";
 import { sq } from "./compiler.ts";
 
@@ -24,7 +24,12 @@ export async function oncokbPin(): Promise<string | null> {
     const r = await chQuery(
       `SELECT oncokb_version FROM ${ANNOT_DB}.variant_annotation GROUP BY oncokb_version ORDER BY max(resolved_at) DESC LIMIT 1`);
     pinCache = { at: Date.now(), pin: (r.data[0] as { oncokb_version?: string })?.oncokb_version || null };
-  } catch { pinCache = { at: Date.now(), pin: null }; }
+  } catch (e) {
+    // A cancelled query is not an answer: caching a null pin here would refuse every
+    // `OQL ... DRIVER` clause for the next five minutes because one reader walked away.
+    if (isAbortError(e)) throw e;
+    pinCache = { at: Date.now(), pin: null };
+  }
   return pinCache.pin;
 }
 
@@ -72,7 +77,12 @@ async function syncedStudies(): Promise<string[]> {
   try {
     const r = await chQuery("SELECT DISTINCT study FROM oncokb_annotation.sync_run WHERE annotated_new > 0 OR already_stored > 0");
     _syncedStudies = (r.data as ChRow[]).map(x => x.study);
-  } catch { _syncedStudies = []; }
+  } catch (e) {
+    // This cache has no TTL, so swallowing a cancellation here would convince the process
+    // that NO study is synced for the rest of its life, silently thinning driver annotation.
+    if (isAbortError(e)) throw e;
+    _syncedStudies = [];
+  }
   return _syncedStudies;
 }
 
@@ -122,7 +132,10 @@ export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], 
       : unsynced.length + " of " + list.length + " studies";
     return { isDriver, source: "OncoKB " + pin + " (pinned)" +
       (partial ? " — variants synced from " + synced.join("/") + "; coverage for " + where + " may be partial" : "") };
-  } catch {
+  } catch (e) {
+    // A cancelled request must not be answered with mock annotations — it is not a licensing
+    // or availability problem, and nobody is waiting for the answer anyway.
+    if (isAbortError(e)) throw e;
     // not licensed / store empty / db absent -> degrade loudly to the mock
     return mockIndex(eventRows);
   }
