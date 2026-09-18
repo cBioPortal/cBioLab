@@ -1566,6 +1566,11 @@ function Latency({ v }: { v: any }) {
     if (Object.keys(cs).length) run(d); else setResult(null);
   };
 
+  const setCohortNotes = (name: string, text: string) => {
+    const d = { ...doc, cohorts: { ...doc.cohorts, [name]: { ...doc.cohorts[name], notes: text } } };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));   // no re-run: prose changes no numbers
+  };
+
   const clearAnalysis = () => {
     const d = { ...EMPTY_DOC, study };
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setError(null);
@@ -2653,6 +2658,9 @@ function Latency({ v }: { v: any }) {
                         <button className="linklike" disabled={busy} title="remove this cohort from the analysis" onClick={() => removeCohort(n)}>remove</button>
                       </div>
                       {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} />}
+                      <textarea className="cohortnotes" value={doc.cohorts?.[n]?.notes || ""} spellCheck
+                        placeholder="note on this cohort (optional)"
+                        onChange={e => setCohortNotes(n, e.target.value)} />
                     </div>
                   ))}
             </div>

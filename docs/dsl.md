@@ -25,7 +25,8 @@ Sent to `POST /api/analysis`, edited by the in-app chat, and encoded in shareabl
 cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient in the study
                "study"?:   "<id>",            // evaluate in another study
                "studies"?: ["<id>", ...],     // union across studies (federated, no count limit)
-               "lineGap"?: 90 }               // derived-treatment-line gap, days
+               "lineGap"?: 90,                // derived-treatment-line gap, days
+               "notes"?:   "<prose>" }        // the analyst's own note on this cohort; never compiled
 clause    := leaf | { "any": [leaf × 1-8] }   // OR (UNION DISTINCT)
                   | { "not": leaf }           // study base EXCEPT leaf
 ```
@@ -319,8 +320,10 @@ if the values had been typed in.
 - The parameters that produced a result are echoed back in it, the same way the OncoKB pin is.
 
 `notes` is the analyst's prose about the whole document; each view may carry its own
-`note`. Both are stored with the document and travel in a `?doc=` link, so they are
-rendered as **plain text, never markdown** — a shared link is untrusted input.
+`note`, and each cohort may carry its own `notes`. All three are stored with the
+document and travel in a `?doc=` link, so they are rendered as **plain text, never
+markdown** — a shared link is untrusted input. None of them are compiled: a cohort's
+`notes` never reaches SQL or the compiled readback.
 
 ## Examples
 

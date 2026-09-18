@@ -161,6 +161,8 @@ export interface CohortDef {
   lineGap?: number;
   /** v1 sugar: a bare event definition */
   a?: EventSelector; b?: EventSelector | null; rel?: EventRel; priorGuard?: boolean;
+  /** the analyst's own prose about this cohort: why it's defined this way, what to read */
+  notes?: string;
 }
 
 /** Context threaded into every leaf compiler. */
