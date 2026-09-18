@@ -625,6 +625,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const VIEW_KINDS: { kind: string; label: string; why?: () => string | null }[] = [
     { kind: "compare", label: "Compare genes" },
     { kind: "survival", label: "Survival" },
+    { kind: "cox", label: "Cox regression (forest plot)" },
     { kind: "oncoprint", label: "Oncoprint" },
     { kind: "hotspots", label: "Lollipop (hotspots)" },
     { kind: "plot", label: "Plot",
@@ -715,6 +716,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
         })()
       : kind === "cooccurrence" ? { kind, genes: genes.slice(0, 6) }
       : kind === "oncoprint" ? { kind, genes: genes.slice(0, 5) }
+      : kind === "cox" ? { kind, covariates: [{ source: "alteration", gene: genes[0] || "TP53", by: "mutated" }] }
       : { kind, genes };
     const d = { ...doc, views: [v, ...(doc.views || [])] };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
@@ -3189,6 +3191,58 @@ function Latency({ v }: { v: any }) {
                     </div>
                   )}
                   <p className="note">{v.caveat}</p>
+                </>}
+                {v.kind === "cox" && <>
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Cox regression" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                    sub={<>Multivariate Cox, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}</>} />
+                  {(() => {
+                    const sv: any = (doc.views || [])[vi] || {};
+                    const covariates: any[] = Array.isArray(sv.covariates) ? sv.covariates : [];
+                    const eps: string[] = (cat && cat.survivalEndpoints) || [];
+                    const setCovariate = (ci: number, next: any) => {
+                      const nc = covariates.map((c, j) => j === ci ? next : c);
+                      patchView(vi, { covariates: nc });
+                    };
+                    const removeCovariate = (ci: number) => patchView(vi, { covariates: covariates.filter((_, j) => j !== ci) });
+                    const addCovariate = () => patchView(vi, { covariates: [...covariates, { source: "clinical", attribute: (trackAttrs.attrs[0] || {}).attribute || "" }] });
+                    return (
+                      <div className="basis" style={{ flexWrap: "wrap" }}>
+                        <span className="meta">endpoint</span>
+                        <select value={sv.endpoint || "OS"} disabled={busy}
+                          onChange={e => patchView(vi, { endpoint: e.target.value })}>
+                          {(eps.length ? eps : [sv.endpoint || "OS"]).map(x => <option key={x} value={x}>{x}</option>)}
+                          {!cat && <option disabled>loading…</option>}
+                        </select>
+                        <span className="meta">cutoff</span>
+                        <input type="number" min={1} placeholder="none" disabled={busy}
+                          value={sv.cutoffMonths ?? ""} style={{ width: "5rem" }}
+                          onChange={e => patchView(vi, { cutoffMonths: e.target.value ? Number(e.target.value) : undefined })} />
+                        <span className="meta">mo</span>
+                        <label className="chk" title="fit a separate baseline hazard per study instead of pooling them">
+                          <input type="checkbox" checked={!!sv.stratifyByStudy} disabled={busy}
+                            onChange={e => patchView(vi, { stratifyByStudy: e.target.checked || undefined })} />
+                          stratify by study
+                        </label>
+                        {busy && <span className="spinner" />}
+                        <div style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "0.3rem", marginTop: "0.3rem" }}>
+                          {covariates.map((c, ci) => (
+                            <span key={ci} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                              <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={trackAttrs.attrs || []}
+                                profiles={(explore && explore.profiles) || []} busy={busy}
+                                onChange={(next) => setCovariate(ci, next)} />
+                              <button type="button" className="tbbtn" disabled={busy} title="remove this covariate"
+                                onClick={() => removeCovariate(ci)}>remove</button>
+                            </span>
+                          ))}
+                          <button type="button" className="tbbtn" disabled={busy} style={{ alignSelf: "flex-start" }}
+                            onClick={addCovariate}>+ add covariate</button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {v.svg
+                    ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
+                    : !v.error && <p className="note">nothing to draw</p>}
                 </>}
                 {v.kind === "sequence" && !v.svg && v.error && v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
                   <div className="basis">

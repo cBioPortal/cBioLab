@@ -565,6 +565,42 @@ export function anchoredSurvivalSql(
   );
 }
 
+/**
+ * Per-patient rows for a Cox fit: one row per patient with a valid endpoint measurement AND
+ * every requested covariate defined (a patient missing any covariate is left out entirely, the
+ * usual listwise-deletion rule for a multivariate fit). No patient identifier is SELECTed —
+ * `os.pid` only joins the CTEs together — so this can only ever leave the resolver as fitted
+ * coefficients, never as a roster; that is also why, unlike survivalCountsSql, this is
+ * patient-level only (see PatientLevelResolver.coxRows) rather than something every
+ * participant can answer.
+ */
+export function coxRowsSql(
+  cohortSql: string, study: string, db: string, endpoint: string, covariates: { label: string; sel: string }[]
+): string {
+  if (!ENDPOINT_RE.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
+  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  const months = endpoint + "_MONTHS", status = endpoint + "_STATUS";
+  const covCtes = covariates.map((c) => c.label + " AS (\n" + c.sel + "\n)").join(",\n");
+  const joins = covariates.map((c) => "INNER JOIN " + c.label + " ON " + c.label + ".id = os.pid").join("\n  ");
+  const select = covariates.map((c) => c.label + ".v AS " + c.label).join(", ");
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "os AS (\n" +
+    "  SELECT " + pid + " AS pid,\n" +
+    "         toFloat64OrNull(anyIf(attribute_value, attribute_name=" + sq(months) + ")) AS months,\n" +
+    "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
+    "  FROM " + db + ".clinical_data_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
+    "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    ")" + (covCtes ? ",\n" + covCtes : "") + "\n" +
+    "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev" + (select ? ", " + select : "") + "\n" +
+    "FROM os\n" + (joins ? "  " + joins + "\n" : "") +
+    "WHERE os.months IS NOT NULL"
+  );
+}
+
 /** Which (<X>_MONTHS, <X>_STATUS) pairs a study actually declares. Metadata only. */
 export function survivalEndpointsSql(study: string, db: string = DB): string {
   return (
@@ -975,6 +1011,9 @@ export interface PatientLevelCapable extends AggregateCapable {
   plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number): Promise<PlotPoint[]>;
   readonly instance: Instance & { mode: "patient-level" };
   members(def: CohortDef | null | undefined): Promise<string[]>;
+  /** per-patient rows for a Cox fit — see PatientLevelResolver.coxRows for why this is here and not on AggregateCapable */
+  coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[]):
+    Promise<{ rows: { t: number; event: number; values: (number | string)[] }[]; kinds: AxisKind[] }>;
 }
 
 export type Resolver = AggregateCapable | PatientLevelCapable;
@@ -1421,6 +1460,30 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   async members(def: CohortDef | null | undefined): Promise<string[]> {
     const r = await chQuery<ChRow>("SELECT pid FROM (" + this.cohortSql(def) + ")", this.instance.conn);
     return r.data.map((x) => x.pid);
+  }
+
+  /**
+   * Per-patient (time, event, covariate values) rows for a Cox fit — patient-level only, for
+   * the same reason plotPoints() is: it lives nowhere on AggregateResolver, so a participant
+   * that may not disclose a case structurally cannot be asked for these rows, even though no
+   * single row carries an identifier. `kinds` says which covariates came back numeric so the
+   * caller (which dummy-codes categoricals) doesn't have to re-derive it.
+   */
+  async coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[]):
+    Promise<{ rows: { t: number; event: number; values: (number | string)[] }[]; kinds: AxisKind[] }> {
+    covariates.forEach((c, i) => validateAxis(c, "covariate " + (i + 1)));
+    const db = this.instance.conn.db, conn = this.instance.conn;
+    const kindsMap = await this.clinicalKinds(covariates);
+    const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
+    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def) };
+    const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
+    const sql = coxRowsSql(ctx.cohortSql, this.study, db, endpoint, sels);
+    const r = await this.runLogged<ChRow>("coxRows:" + endpoint, sql, conn);
+    const rows = r.data.map((row) => ({
+      t: Number(row.m), event: Number(row.ev),
+      values: covariates.map((_, i) => kinds[i] === "num" ? Number(row["c" + i]) : String(row["c" + i]))
+    }));
+    return { rows, kinds };
   }
 }
 

@@ -624,6 +624,35 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
   return "";
 }
 
+/** A forest plot: one row per covariate/level, its hazard ratio and Wald CI on a log axis. */
+function coxSvg(v: ViewResult, o: SvgOpts): string {
+  const p = palette(o.theme), W = o.width || 760;
+  const coefs = v.cox?.coefficients || [];
+  const L = 175, R = 215, T = 30, rowH = 22;
+  const plotH = rowH * coefs.length;
+  const cap = caption(v.caveat || "", W, T + plotH + 20, p.muted);
+  const H = T + plotH + 20 + cap.height + 16;
+  const allHr = coefs.flatMap((c) => [c.ciLow, c.ciHigh, c.hr, 1]).filter((n) => Number.isFinite(n) && n > 0);
+  const lo = Math.max(1e-3, Math.min(...allHr) * 0.85), hi = Math.max(...allHr) * 1.15;
+  const lLo = Math.log(lo), lHi = Math.log(Math.max(hi, lo * 1.01));
+  const x = (hr: number) => L + (W - L - R) * (Math.log(Math.max(hr, 1e-6)) - lLo) / (lHi - lLo);
+  const out: string[] = [];
+  out.push(`<line x1="${num(x(1))}" y1="${T - 10}" x2="${num(x(1))}" y2="${num(T + plotH)}" stroke="${p.line}" stroke-width="1" stroke-dasharray="3,3"/>`);
+  out.push(`<text x="${num(x(1))}" y="${T - 14}" font-size="10" fill="${p.muted}" text-anchor="middle">HR=1</text>`);
+  coefs.forEach((c, i) => {
+    const cy = T + rowH * i + rowH / 2;
+    const label = c.label + (c.reference ? " vs " + c.reference : "");
+    out.push(`<text x="${L - 10}" y="${num(cy + 3)}" font-size="11" fill="${p.ink}" text-anchor="end">` +
+      `${esc(label.length > 26 ? label.slice(0, 25) + "…" : label)}</text>`);
+    out.push(`<line x1="${num(x(c.ciLow))}" y1="${num(cy)}" x2="${num(x(c.ciHigh))}" y2="${num(cy)}" stroke="${SERIES[0]}" stroke-width="2"/>`);
+    out.push(`<circle cx="${num(x(c.hr))}" cy="${num(cy)}" r="4" fill="${SERIES[0]}"/>`);
+    out.push(`<text x="${num(W - R + 10)}" y="${num(cy + 3)}" font-size="10" fill="${p.muted}">` +
+      `${num(c.hr)} (${num(c.ciLow)}–${num(c.ciHigh)}), ${pFmt(c.p)}</text>`);
+  });
+  out.push(cap.svg);
+  return frame(W, H, out.join(""), p.bg);
+}
+
 export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {
   if (!v || v.error) return null;
   if (v.kind === "oncoprint") return v.svg || null;   // already rendered by the contract
@@ -631,6 +660,7 @@ export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {
   if (v.kind === "course" && v.course && v.course.length) return courseSvg(v, o);
   if (v.kind === "sequence" && v.sequence && v.sequence.panels.some((z) => z.flows.length)) return sequenceSvg(v, o);
   if (v.kind === "survival" && v.curves && v.curves.length) return survivalSvg(v, o);
+  if (v.kind === "cox" && v.cox && v.cox.coefficients.length) return coxSvg(v, o);
   if (v.kind === "hotspots" && v.hotspots && v.hotspots.length) return hotspotsSvg(v, o);
   if (v.kind === "cooccurrence" && v.pairs && v.pairs.length) return cooccurrenceSvg(v, o);
   if (v.kind === "compare" && v.rows && v.rows.length) return compareSvg(v, o);
@@ -643,6 +673,7 @@ export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {
 export function viewTitle(v: ViewResult): string {
   const c = (v.cohorts || []).join(" vs ");
   const base = v.kind === "survival" ? (v.endpoint || "OS") + " survival" + (v.anchoredTo ? " from " + v.anchoredTo : "")
+    : v.kind === "cox" ? "Cox regression — " + (v.endpoint || "OS")
     : v.kind === "hotspots" ? "Recurrent protein changes"
     : v.kind === "cooccurrence" ? "Co-occurrence and mutual exclusivity"
     : v.kind === "coexpression" ? "Co-expression"

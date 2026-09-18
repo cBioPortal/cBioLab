@@ -10,7 +10,8 @@ import assert from "node:assert/strict";
 import { logRank, chiSquareP1df, fisherExact, kaplanMeier,
   benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareP, studentTP, chiSquareTest, welchT, varianceFromMoments,
-  pearsonFromMoments, fisherZMeta, normalP, applyCutoff, toIncidence, survivalAxis } from "../lib/stats.ts";
+  pearsonFromMoments, fisherZMeta, normalP, applyCutoff, toIncidence, survivalAxis,
+  coxRegression, coxPartialLogLik, type CoxRow } from "../lib/stats.ts";
 
 /** Freireich et al. (1963), 6-MP vs placebo in acute leukaemia. `+` = censored. */
 const SIXMP = [
@@ -125,6 +126,82 @@ describe("survivalAxis (shared x-axis domain for both KM renderers)", () => {
     const a = survivalAxis([kaplanMeier(SIXMP)], { cutoffMonths: 20, tickMonths: 6 });
     assert.equal(a.tMax, 20);
     assert.equal(a.step, 6);
+  });
+});
+
+describe("coxRegression (multivariate Cox, Efron partial likelihood)", () => {
+  test("matches a hand-derived MLE on a tiny no-ties, no-censoring dataset", () => {
+    // 4 subjects, distinct event times, covariate x alternating 1/0: the partial likelihood
+    // is short enough to write out and differentiate by hand —
+    //   log PL(b) = 2b - log(2e^b+2) - log(e^b+2) - log(e^b+1)
+    //   d/db      = 2 - 2e^b/(e^b+1) - e^b/(e^b+2)
+    // solved here by bisection on that closed form, entirely independent of lib/stats.ts, as
+    // the reference coxRegression's Newton-Raphson answer must agree with.
+    const rows: CoxRow[] = [
+      { t: 1, event: 1, x: [1] }, { t: 2, event: 1, x: [0] },
+      { t: 3, event: 1, x: [1] }, { t: 4, event: 1, x: [0] },
+    ];
+    const dLogLik = (b: number) => { const e = Math.exp(b); return 2 - 2 * e / (e + 1) - e / (e + 2); };
+    let lo = 0, hi = 2;
+    for (let i = 0; i < 100; i++) { const mid = (lo + hi) / 2; if (dLogLik(mid) > 0) lo = mid; else hi = mid; }
+    const reference = (lo + hi) / 2;
+    const fit = coxRegression(rows);
+    assert.ok(Math.abs(fit.beta[0] - reference) < 1e-6,
+      "beta should match the hand-derived root: " + fit.beta[0] + " vs " + reference);
+    assert.ok(fit.hr[0] > 1, "x=1 fails earlier here, so its hazard ratio should exceed 1");
+  });
+
+  test("the fitted beta is a local maximum of its own partial likelihood", () => {
+    // A generic property any correct optimizer must satisfy, checked without assuming
+    // anything about the specific numbers: nudging the fit in either direction along any
+    // coordinate should never increase the likelihood it was fit to maximize.
+    const rows: CoxRow[] = [
+      { t: 4, event: 1, x: [1, 0] }, { t: 4, event: 1, x: [0, 1] }, { t: 6, event: 0, x: [1, 1] },
+      { t: 7, event: 1, x: [0, 0] }, { t: 9, event: 1, x: [1, 0] }, { t: 9, event: 0, x: [0, 1] },
+      { t: 12, event: 1, x: [1, 1] }, { t: 15, event: 1, x: [0, 0] },
+    ];
+    const fit = coxRegression(rows);
+    const atFit = coxPartialLogLik(rows, fit.beta);
+    const eps = 1e-4;
+    for (let a = 0; a < fit.beta.length; a++) {
+      for (const d of [-eps, eps]) {
+        const perturbed = fit.beta.slice(); perturbed[a] += d;
+        assert.ok(coxPartialLogLik(rows, perturbed) <= atFit + 1e-9,
+          "perturbing coordinate " + a + " by " + d + " must not increase the likelihood");
+      }
+    }
+  });
+
+  test("stratifying by a constant label changes nothing (one stratum = unstratified)", () => {
+    const rows: CoxRow[] = [
+      { t: 4, event: 1, x: [1] }, { t: 6, event: 1, x: [0] },
+      { t: 9, event: 0, x: [1] }, { t: 12, event: 1, x: [0] },
+    ];
+    const plain = coxRegression(rows);
+    const stratified = coxRegression(rows.map((r) => ({ ...r, stratum: "only" })));
+    assert.ok(Math.abs(plain.beta[0] - stratified.beta[0]) < 1e-9);
+  });
+
+  test("a genuinely stratified fit only compares within each stratum", () => {
+    // Two strata with opposite baseline risk but the SAME within-stratum covariate effect;
+    // pooling them unstratified would blend two different baselines, stratifying should not.
+    const siteA: CoxRow[] = [
+      { t: 1, event: 1, x: [1], stratum: "A" }, { t: 2, event: 1, x: [0], stratum: "A" },
+      { t: 3, event: 1, x: [1], stratum: "A" }, { t: 4, event: 1, x: [0], stratum: "A" },
+    ];
+    const siteB: CoxRow[] = siteA.map((r) => ({ ...r, t: r.t + 100, stratum: "B" }));
+    const stratified = coxRegression([...siteA, ...siteB]);
+    const singleSite = coxRegression(siteA);
+    assert.ok(Math.abs(stratified.beta[0] - singleSite.beta[0]) < 1e-6,
+      "two copies of the same within-stratum pattern should fit the same effect as one copy alone");
+  });
+
+  test("a collinear covariate is refused rather than fit into nonsense", () => {
+    const rows: CoxRow[] = [
+      { t: 1, event: 1, x: [1, 1] }, { t: 2, event: 1, x: [0, 0] },
+      { t: 3, event: 1, x: [1, 1] }, { t: 4, event: 1, x: [0, 0] },
+    ];
+    assert.throws(() => coxRegression(rows), /collinear|not identifiable/);
   });
 });
 

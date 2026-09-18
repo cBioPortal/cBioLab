@@ -111,6 +111,159 @@ export function survivalAxis(curves: { points: { t: number }[] }[], opts?: { cut
 }
 
 // ---------------------------------------------------------------------------
+// Multivariate Cox proportional-hazards regression (Efron partial likelihood).
+//
+// Unlike KM/log-rank, this takes one row per SUBJECT rather than per-site
+// counts — see cohort-lab's CLAUDE.md and the PR notes for why that's fine
+// here: it never leaves the resolver that already holds those rows, and
+// federating it across untrusted remote peers isn't a goal. Ties are handled
+// with Efron's approximation (the modern default — R's coxph, lifelines),
+// which is exact for distinct event times and only approximate, not wrong,
+// when several subjects fail at once.
+// ---------------------------------------------------------------------------
+
+export interface CoxRow { t: number; event: number; x: number[]; stratum?: string }
+export interface CoxFit {
+  beta: number[]; se: number[]; hr: number[]; ciLow: number[]; ciHigh: number[]; p: number[];
+  loglik: number; n: number; events: number; iterations: number;
+}
+
+function zeros(n: number): number[] { return new Array(n).fill(0); }
+function zerosMat(n: number): number[][] { return Array.from({ length: n }, () => zeros(n)); }
+function dot(a: number[], b: number[]): number { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+
+/** Solve H·delta = U by Gauss-Jordan elimination with partial pivoting; H is modified in place. */
+function solveLinear(H: number[][], U: number[]): number[] {
+  const n = U.length;
+  const A = H.map((row, i) => [...row, U[i]]);
+  for (let col = 0; col < n; col++) {
+    let piv = col;
+    for (let r = col + 1; r < n; r++) if (Math.abs(A[r][col]) > Math.abs(A[piv][col])) piv = r;
+    if (Math.abs(A[piv][col]) < 1e-12) throw new Error("Cox model is not identifiable: covariates are collinear or a category has no variation");
+    [A[col], A[piv]] = [A[piv], A[col]];
+    const pv = A[col][col];
+    for (let c = col; c <= n; c++) A[col][c] /= pv;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = A[r][col];
+      if (f === 0) continue;
+      for (let c = col; c <= n; c++) A[r][c] -= f * A[col][c];
+    }
+  }
+  return A.map((row) => row[n]);
+}
+
+/** Diagonal of H^-1, i.e. the Wald variances, without forming the full inverse. */
+function inverseDiagonal(H: number[][]): number[] {
+  const n = H.length, out = zeros(n);
+  for (let i = 0; i < n; i++) {
+    const e = zeros(n); e[i] = 1;
+    out[i] = solveLinear(H.map((r) => [...r]), e)[i];
+  }
+  return out;
+}
+
+/**
+ * Log partial likelihood, gradient and observed-information Hessian at `beta`, Efron-tied,
+ * summed over strata (each stratum's risk set is its own — the same additive-over-strata shape
+ * the stratified log-rank already relies on). Rows need not be pre-sorted.
+ */
+function coxScore(rows: CoxRow[], beta: number[]): { ll: number; grad: number[]; hess: number[][] } {
+  const p = beta.length;
+  let ll = 0;
+  const grad = zeros(p), hess = zerosMat(p);
+  const strata = new Map<string, CoxRow[]>();
+  for (const r of rows) {
+    const s = r.stratum ?? "";
+    if (!strata.has(s)) strata.set(s, []);
+    strata.get(s)!.push(r);
+  }
+  for (const srows of strata.values()) {
+    const sorted = srows.slice().sort((a, b) => a.t - b.t);
+    // Walk from the latest time to the earliest, accumulating a running risk-set sum — the
+    // risk set for time t is everyone with t' >= t, which is exactly what's been folded in
+    // by the time the sweep reaches t, since the sweep goes from large t to small t.
+    let cumExp = 0; const cumX = zeros(p), cumXX = zerosMat(p);
+    let i = sorted.length - 1;
+    while (i >= 0) {
+      const t = sorted[i].t;
+      let j = i;
+      while (j >= 0 && sorted[j].t === t) j--;
+      // members of this tie group are indices (j, i]
+      let tieExp = 0, dCount = 0;
+      const tieX = zeros(p), tieXX = zerosMat(p), eventX = zeros(p);
+      for (let k = j + 1; k <= i; k++) {
+        const row = sorted[k], eb = Math.exp(dot(beta, row.x));
+        cumExp += eb;
+        for (let a = 0; a < p; a++) cumX[a] += eb * row.x[a];
+        for (let a = 0; a < p; a++) for (let b = 0; b < p; b++) cumXX[a][b] += eb * row.x[a] * row.x[b];
+        if (row.event) {
+          dCount++; tieExp += eb;
+          for (let a = 0; a < p; a++) { tieX[a] += eb * row.x[a]; eventX[a] += row.x[a]; }
+          for (let a = 0; a < p; a++) for (let b = 0; b < p; b++) tieXX[a][b] += eb * row.x[a] * row.x[b];
+        }
+      }
+      if (dCount > 0) {
+        ll += dot(beta, eventX);
+        for (let a = 0; a < p; a++) grad[a] += eventX[a];
+        for (let l = 0; l < dCount; l++) {
+          const frac = l / dCount;
+          const denom = cumExp - frac * tieExp;
+          const numer = cumX.map((v, a) => v - frac * tieX[a]);
+          ll -= Math.log(denom);
+          for (let a = 0; a < p; a++) grad[a] -= numer[a] / denom;
+          for (let a = 0; a < p; a++) for (let b = 0; b < p; b++) {
+            const xxTerm = (cumXX[a][b] - frac * tieXX[a][b]) / denom;
+            hess[a][b] += xxTerm - (numer[a] / denom) * (numer[b] / denom);
+          }
+        }
+      }
+      i = j;
+    }
+  }
+  return { ll, grad, hess };
+}
+
+/** The Efron partial log-likelihood at a given beta — exposed for diagnostics and tests. */
+export function coxPartialLogLik(rows: CoxRow[], beta: number[]): number { return coxScore(rows, beta).ll; }
+
+/**
+ * Fit a (possibly stratified) multivariate Cox model by Newton-Raphson on the Efron partial
+ * likelihood. Every `x` must be the same length (dummy-code categoricals before calling this —
+ * this function only ever sees numbers, so it doesn't need to know which covariate was which).
+ */
+export function coxRegression(rows: CoxRow[]): CoxFit {
+  const p = rows[0]?.x.length ?? 0;
+  const events = rows.reduce((n, r) => n + (r.event ? 1 : 0), 0);
+  if (!rows.length || p === 0) return { beta: [], se: [], hr: [], ciLow: [], ciHigh: [], p: [], loglik: 0, n: rows.length, events, iterations: 0 };
+  let beta = zeros(p), ll = -Infinity, iterations = 0;
+  for (; iterations < 25; iterations++) {
+    const s = coxScore(rows, beta);
+    const delta = solveLinear(s.hess.map((r) => [...r]), s.grad);
+    // step-halve if the update overshoots into a worse likelihood — Newton-Raphson on a
+    // partial likelihood is usually well-behaved, but a large first step from beta=0 with a
+    // small or separated sample can overshoot
+    let step = 1, next = beta.map((b, a) => b + delta[a]);
+    for (let tries = 0; tries < 10; tries++) {
+      const llNext = coxScore(rows, next).ll;
+      if (llNext >= s.ll || tries === 9) { ll = llNext; break; }
+      step /= 2; next = beta.map((b, a) => b + step * delta[a]);
+    }
+    const converged = Math.max(...delta.map((d) => Math.abs(d) * step)) < 1e-7;
+    beta = next;
+    if (converged) { iterations++; break; }
+  }
+  const finalHess = coxScore(rows, beta).hess;
+  const variances = inverseDiagonal(finalHess);
+  const se = variances.map((v) => Math.sqrt(Math.max(0, v)));
+  const hr = beta.map((b) => Math.exp(b));
+  const ciLow = beta.map((b, a) => Math.exp(b - 1.96 * se[a]));
+  const ciHigh = beta.map((b, a) => Math.exp(b + 1.96 * se[a]));
+  const pvals = beta.map((b, a) => se[a] > 0 ? chiSquareP1df((b / se[a]) * (b / se[a])) : 1);
+  return { beta, se, hr, ciLow, ciHigh, p: pvals, loglik: ll, n: rows.length, events, iterations };
+}
+
+// ---------------------------------------------------------------------------
 // Log-rank test.
 //
 // The federation-relevant property: the test statistic is a SUM over event

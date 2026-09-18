@@ -204,6 +204,41 @@ export interface SurvivalView {
   /** draw 1 - S(t), cumulative incidence, instead of survival (default "survival") */
   display?: "survival" | "incidence";
 }
+/** A Cox covariate is exactly a plot axis: clinical, molecular, or a gene's alteration status. */
+export type CoxCovariate = PlotAxis;
+/**
+ * Multivariate Cox proportional-hazards regression: several covariates at once, each
+ * reported as a hazard ratio with a confidence interval (drawn as a forest plot), rather than
+ * KM's one categorical split. Fit from real per-patient rows within each LOCAL study — unlike
+ * survival/compare, this does not pool aggregate counts across remote peers, so a participant
+ * without patient-level access simply cannot contribute to it (see CoxResult.excludedRemote).
+ */
+export interface CoxView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string;
+  kind: "cox"; cohorts?: string[];
+  /** endpoint prefix: OS (default), PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS */
+  endpoint?: string;
+  /** one or more covariates to fit simultaneously; each becomes one or more forest-plot rows */
+  covariates: CoxCovariate[];
+  /** fit separate baseline hazards per study rather than pooling them (default false) */
+  stratifyByStudy?: boolean;
+  /** administratively censor everyone still at risk past this month, same semantics as SurvivalView */
+  cutoffMonths?: number;
+}
+export interface CoxCoefficient {
+  /** covariate name, or "<covariate>: <level>" for a categorical level */
+  label: string;
+  /** the baseline level this coefficient is measured against, for a categorical covariate */
+  reference?: string;
+  beta: number; se: number; hr: number; ciLow: number; ciHigh: number; p: number;
+}
+export interface CoxResult {
+  coefficients: CoxCoefficient[];
+  n: number; events: number;
+  /** studies whose patients were left out of the fit for lacking patient-level access */
+  excludedRemote?: { study: string; patients: number }[];
+}
 /**
  * A plot: two axes over the same cases. The shape — scatter, box, contingency — follows from
  * what the axes are, exactly as it does in the portal, rather than being asked for.
@@ -355,7 +390,7 @@ export interface SequenceView {
 }
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView;
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -527,6 +562,7 @@ export interface ViewResult {
   eventOptions?: { canonical: string; label: string; patients: number; perPatient: number; hasDurations: boolean }[];
   svg?: string; nColumns?: number;          // oncoprint
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
+  cox?: CoxResult;                          // multivariate Cox
 }
 /**
  * Therapy transitions, ready to draw: nodes in columns, flows between them.

@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
-  "oncokbPin": "v7.4",
-  "generated": "2026-09-09",
+  "oncokbPin": "v7.5",
+  "generated": "2026-09-18",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -18,6 +18,9 @@
     "Genomic status via OQL, compared": {
       "STK11 driver": 1113,
       "STK11 wt": 23592
+    },
+    "Multivariate Cox: gene status alongside a clinical covariate": {
+      "all patients": 24950
     },
     "Clinical + timeline event composition": {
       "never-smoker fast progressors": 502
