@@ -315,7 +315,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const [contracts, setContracts] = useState<Record<string, UnpackedContract>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState<Record<string, { def: CohortDef; savedAt: string; lastEval?: { count: number; text: string } | null }>>({});
+  const [saved, setSaved] = useState<Record<string, { id: string; def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null }>>({});
   const [cName, setCName] = useState("");
   const [cDefText, setCDefText] = useState(JSON.stringify({ studies: [...DEFAULT_EXPLORE_STUDIES], all: [] }, null, 2));
   const [cPreview, setCPreview] = useState<{ error?: string; count?: number; text?: string } | null>(null);
@@ -390,20 +390,57 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
    * saved cohorts already are. Nothing is normalised, so a document written by a
    * newer build still loads, and anything the app cannot interpret survives a
    * round trip instead of being dropped.
+   *
+   * Both this and saved cohorts now live in the shared Postgres artifact store
+   * (lib/artifacts.ts) rather than localStorage — server-side, so a save
+   * outlives the browser that made it, but SHARED: there is no per-user
+   * ownership yet (see HANDOFF.local.md), so anyone using the app can see,
+   * rename or delete anything saved here. Naming stays the identity a person
+   * types (upsert by name, matching the old localStorage behaviour); the real
+   * identity is the server-assigned id, kept alongside it.
    */
-  const WS_KEY = "cohortlab.workspaces";
-  type Workspace = { doc: AnalysisDoc; savedAt: string };
+  type Workspace = { id: string; doc: AnalysisDoc; savedAt: string };
   const [spaces, setSpaces] = useState<Record<string, Workspace>>({});
   const [wsName, setWsName] = useState("");
   const [openWs, setOpenWs] = useState(true);
+  const [wsError, setWsError] = useState<string | null>(null);
   const wsDialog = useRef<HTMLDialogElement | null>(null);
-  const persistSpaces = (next: Record<string, Workspace>) => {
-    setSpaces(next);
-    try { localStorage.setItem(WS_KEY, JSON.stringify(next)); } catch {}
+
+  /** Postgres timestamptz -> the same "YYYY-MM-DD HH:MM" the app has always shown. */
+  const fmtDate = (iso: string) => iso.slice(0, 16).replace("T", " ");
+
+  async function apiSaveArtifact(kind: "cohort" | "workspace", existingId: string | undefined, name: string, definition: unknown) {
+    const res = existingId
+      ? await fetch("/api/artifacts/" + existingId, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, definition }) })
+      : await fetch("/api/artifacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, name, definition }) });
+    const j = await res.json();
+    if (!res.ok || j.error) throw new Error(j.error || res.statusText);
+    return j.artifact as { id: string; name: string; definition: unknown; updatedAt: string };
+  }
+  async function apiDeleteArtifact(id: string) {
+    const res = await fetch("/api/artifacts/" + id, { method: "DELETE" });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || res.statusText); }
+  }
+
+  const persistSpaces = async (name: string, docToSave: AnalysisDoc) => {
+    const a = await apiSaveArtifact("workspace", spaces[name]?.id, name, docToSave);
+    setSpaces(prev => ({ ...prev, [name]: { id: a.id, doc: a.definition as AnalysisDoc, savedAt: fmtDate(a.updatedAt) } }));
+  };
+  const removeSpace = async (name: string) => {
+    const id = spaces[name]?.id;
+    if (id) await apiDeleteArtifact(id);
+    setSpaces(prev => { const nx = { ...prev }; delete nx[name]; return nx; });
   };
 
-  const LS_KEY = "cohortlab.savedCohorts";
-  const persist = (next: typeof saved) => { setSaved(next); try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {} };
+  const persist = async (name: string, def: CohortDef, lastEval: { count: number; text?: string } | null) => {
+    const a = await apiSaveArtifact("cohort", saved[name]?.id, name, def);
+    setSaved(prev => ({ ...prev, [name]: { id: a.id, def: a.definition as CohortDef, savedAt: fmtDate(a.updatedAt), lastEval } }));
+  };
+  const removeSaved = async (name: string) => {
+    const id = saved[name]?.id;
+    if (id) await apiDeleteArtifact(id);
+    setSaved(prev => { const nx = { ...prev }; delete nx[name]; return nx; });
+  };
 
   const run = async (d: AnalysisDoc = doc) => {
     if (!Object.keys(d.cohorts || {}).length) { setResult(null); return; }
@@ -425,8 +462,16 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   };
 
   useEffect(() => {
-    try { setSaved(JSON.parse(localStorage.getItem(LS_KEY) || "{}")); } catch {}
-    try { setSpaces(JSON.parse(localStorage.getItem(WS_KEY) || "{}")); } catch {}
+    fetch("/api/artifacts?kind=cohort").then(r => r.json()).then(j => {
+      const map: typeof saved = {};
+      for (const a of j.artifacts || []) map[a.name] = { id: a.id, def: a.definition, savedAt: fmtDate(a.updatedAt), lastEval: null };
+      setSaved(map);
+    }).catch(() => {});
+    fetch("/api/artifacts?kind=workspace").then(r => r.json()).then(j => {
+      const map: typeof spaces = {};
+      for (const a of j.artifacts || []) map[a.name] = { id: a.id, doc: a.definition, savedAt: fmtDate(a.updatedAt) };
+      setSpaces(map);
+    }).catch(() => {});
     fetch("/api/studies").then(r => r.json()).then(j => {
       const list = j.studies || [];
       setStudies(list);
@@ -508,7 +553,8 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     if (!name) { setCPreview({ error: "give the cohort a name" }); return; }
     const r = await previewCohort();
     if (!r) return;
-    persist({ ...saved, [name]: { def: r.def, savedAt: new Date().toISOString().slice(0, 16).replace("T", " "), lastEval: r.ev } });
+    try { await persist(name, r.def, r.ev); }
+    catch (e) { setCPreview({ error: "could not save: " + String((e as Error)?.message || e) }); }
   };
 
   /** Explore's top action bar: acting on the draft you have built by clicking facets. */
@@ -568,7 +614,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     try {
       const ev = await evalDef(name, def);
       setCName(name);
-      persist({ ...saved, [name]: { def, savedAt: new Date().toISOString().slice(0, 16).replace("T", " "), lastEval: ev } });
+      await persist(name, def, ev);
       setExMsg("saved \u201c" + name + "\u201d to Cohorts \u2014 " + ev.count.toLocaleString() + " patients");
     } catch (e) {
       setExMsg("could not save: " + String((e as Error)?.message || e));
@@ -1095,14 +1141,17 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     setWsName(doc.title || Object.keys(doc.cohorts || {})[0] || "workspace");
     wsDialog.current?.showModal();
   };
-  const confirmWorkspaceSave = () => {
+  const confirmWorkspaceSave = async () => {
     const name = wsName.trim();
     if (!name) return;
     wsDialog.current?.close();
     const d = { ...doc, title: name };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    persistSpaces({ ...spaces, [name]: { doc: d, savedAt: new Date().toISOString().slice(0, 16).replace("T", " ") } });
-    setOpenWs(true);   // a just-saved workspace opens on the section it created
+    setWsError(null);
+    try {
+      await persistSpaces(name, d);
+      setOpenWs(true);   // a just-saved workspace opens on the section it created
+    } catch (e) { setWsError("could not save: " + String((e as Error)?.message || e)); }
   };
   const openWorkspace = (name: string) => {
     const w = spaces[name];
@@ -1114,9 +1163,10 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     goTab("analysis");
     run(d);
   };
-  const deleteWorkspace = (name: string) => {
-    const next = { ...spaces }; delete next[name];
-    persistSpaces(next);
+  const deleteWorkspace = async (name: string) => {
+    setWsError(null);
+    try { await removeSpace(name); }
+    catch (e) { setWsError("could not delete: " + String((e as Error)?.message || e)); }
   };
   /** Lift the study and a shared gene list into parameters — see lib/params.ts. */
   const makeTemplate = () => {
@@ -1671,7 +1721,8 @@ function Latency({ v }: { v: any }) {
   const saveExample = async (ex: any) => {
     let ev: { count?: number; error?: string; busy?: boolean } | null = exEvals[ex.name] && exEvals[ex.name]!.count != null ? exEvals[ex.name] : null;
     if (!ev) { try { ev = await evalDef(ex.name, ex.def); setExEvals(s => ({ ...s, [ex.name]: ev })); } catch { ev = null; } }
-    persist({ ...saved, [ex.name]: { def: ex.def, savedAt: new Date().toISOString().slice(0, 16).replace("T", " "), lastEval: ev } });
+    const lastEval = ev && ev.count != null ? { count: ev.count } : null;
+    try { await persist(ex.name, ex.def, lastEval); } catch { /* the Examples tab has no error banner of its own */ }
   };
 
   // ---- chat ---------------------------------------------------------------
@@ -2588,7 +2639,7 @@ function Latency({ v }: { v: any }) {
                 </div>
               );
             })}
-            <h2 style={{ marginTop: "1.2rem" }}>Saved cohorts <span className="plain">— this browser (localStorage)</span></h2>
+            <h2 style={{ marginTop: "1.2rem" }}>Saved cohorts <span className="plain">— shared with everyone using this app; no per-user ownership yet</span></h2>
             {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, create one on the left, or ask chat.</p>}
             {Object.entries(saved).map(([n, s2]) => (
               <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
@@ -2601,7 +2652,7 @@ function Latency({ v }: { v: any }) {
                   <span className="meta">saved {s2.savedAt}</span>
                   <span className="spacer" />
                   <button className="linklike" onClick={() => { setCName(n); setCDefText(JSON.stringify(s2.def, null, 2)); setCPreview(s2.lastEval || null); }}>edit</button>
-                  <button className="linklike" onClick={() => { const nx = { ...saved }; delete nx[n]; persist(nx); }}>delete</button>
+                  <button className="linklike" onClick={() => removeSaved(n)}>delete</button>
                 </div>
                 <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} /></div>
               </div>
@@ -2703,31 +2754,20 @@ function Latency({ v }: { v: any }) {
                     </div>
                   ))}
             </div>
-            {/* Workspace controls (save/open/template): hidden for now. */}
-            {false && (
-              <div className="card">
-                <h2>Workspace</h2>
-                <div className="wsbar" style={{ marginBottom: 0, paddingBottom: 0, border: "none" }}>
-                  <strong>{doc.title || "Untitled workspace"}</strong>
-                  <button disabled={busy} onClick={openWorkspaceSave}
-                    title="save this whole document — views, notes and parameters — under a name">
-                    {doc.title ? "Save" : "Save workspace"}
-                  </button>
-                  {!doc.params && (doc.views || []).length > 0 && (
-                    <button className="linklike" disabled={busy} onClick={makeTemplate}
-                      title="lift the study and a shared gene list into parameters, so this can be re-pointed in one edit">
-                      make a template
-                    </button>
-                  )}
-                  {Object.keys(spaces).length > 0 && (
-                    <select value="" disabled={busy}
-                      onChange={e => { if (e.target.value) openWorkspace(e.target.value); }}>
-                      <option value="">open…</option>
-                      {Object.entries(spaces)
-                        .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
-                        .map(([n, w]) => <option key={n} value={n}>{n} — {w.savedAt}</option>)}
-                    </select>
-                  )}
+            {/* Opening a saved workspace from a blank/unsaved document — once
+                a document already has a title, opening a DIFFERENT one instead
+                belongs in the workspace card below, next to Save/delete. */}
+            {!doc.title && Object.keys(spaces).length > 0 && (
+              <div className="card" style={{ marginTop: "0.7rem" }}>
+                <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
+                  <strong style={{ fontSize: "var(--t-md)" }}>Open a saved workspace</strong>
+                  <select value="" disabled={busy}
+                    onChange={e => { if (e.target.value) openWorkspace(e.target.value); }}>
+                    <option value="">choose…</option>
+                    {Object.entries(spaces)
+                      .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
+                      .map(([n, w]) => <option key={n} value={n}>{n} — {w.savedAt}</option>)}
+                  </select>
                 </div>
               </div>
             )}
@@ -2783,7 +2823,7 @@ function Latency({ v }: { v: any }) {
                 notes that say what it is for. It sits at the TOP of the column
                 it describes, and collapses because it is read when setting the
                 workspace up and rarely while reading the figures. */}
-            {(doc.title || doc.params || doc.notes) && (
+            {(doc.title || doc.params || doc.notes || (doc.views || []).length > 0) && (
               <details className="card wscard" open={!!openWs}
                 onToggle={e => setOpenWs((e.currentTarget as HTMLDetailsElement).open)}>
                 <summary>
@@ -2836,10 +2876,20 @@ function Latency({ v }: { v: any }) {
                         title={"delete the saved workspace \u201c" + doc.title + "\u201d"}
                         onClick={() => deleteWorkspace(doc.title!)}>delete</button>
                     )}
+                    {Object.keys(spaces).length > (doc.title && spaces[doc.title] ? 1 : 0) && (
+                      <select value="" disabled={busy} title="open a different saved workspace"
+                        onChange={e => { if (e.target.value) openWorkspace(e.target.value); }}>
+                        <option value="">open a different one\u2026</option>
+                        {Object.entries(spaces).filter(([n]) => n !== doc.title)
+                          .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
+                          .map(([n, w]) => <option key={n} value={n}>{n} \u2014 {w.savedAt}</option>)}
+                      </select>
+                    )}
                     {doc.params && (
                       <span className="meta">Parameters are stored with the workspace, so reopening it restores them.</span>
                     )}
                   </div>
+                  {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
                 </div>
               </details>
             )}
