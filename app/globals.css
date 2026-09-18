@@ -734,6 +734,13 @@ details.gearmenu.inline[open] > summary {
   padding: 0.55rem 0.7rem; flex: 1 1 18rem; max-width: 26rem;
 }
 .cohortbox-head { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.35rem; }
+.cohortnotes {
+  display: block; width: 100%; box-sizing: border-box; margin-top: 0.4rem;
+  height: 2.4rem; padding: 0.35rem 0.5rem; resize: vertical;
+  font: 0.76rem/1.4 'IBM Plex Sans', system-ui, sans-serif;
+  background: var(--code-bg); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+}
 
 /* ---- workspaces: a saved document, its parameters, and its notes ---------- */
 .wsbar {
