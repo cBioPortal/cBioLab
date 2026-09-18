@@ -88,7 +88,7 @@ async function mcpCall<T = RemoteAggregates>(url: string, name: string, args: un
  */
 export async function remoteFacets(study: string, url: string, draft: CohortDef | null | undefined, label: string, geneSearch?: string): Promise<ExploreResult> {
   if (carriesPatientIds(draft))
-    throw new Error("this draft contains an explicit patient list, which is not sent to remote peer " + label);
+    throw new Error("this draft contains an explicit sample or patient list, which is not sent to remote peer " + label);
   const facets = await mcpCall<ExploreResult>(url, "federated_facets", { study, draft: draft || null, geneSearch });
   // stamp provenance so the UI can badge peer-held rows
   return {
@@ -136,7 +136,7 @@ export class RemoteAggregateResolver implements AggregateCapable {
   /** nothing carrying identifiers is allowed to leave for a remote peer */
   private guard(def: CohortDef | null | undefined): void {
     if (carriesPatientIds(def))
-      throw new Error("this cohort contains an explicit patient list, which is not sent to remote peer " + this.instance.label);
+      throw new Error("this cohort contains an explicit sample or patient list, which is not sent to remote peer " + this.instance.label);
   }
   async count(def: CohortDef | null | undefined): Promise<number> {
     this.guard(def);

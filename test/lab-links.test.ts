@@ -23,12 +23,13 @@ test("an ordinary figure travels whole, in both lab links", () => {
 });
 
 test("an explicit id list too long for a URL is cut, and the cut is stated", () => {
-  const ids = Array.from({ length: 40000 }, (_, i) => "P-" + String(i).padStart(7, "0"));
-  const l = labLinks({ study: "s", cohort: { dsl: { patients: ids } } })!;
+  const ids = Array.from({ length: 40000 }, (_, i) => "s:P-" + String(i).padStart(7, "0"));
+  const l = labLinks({ study: "s", cohort: { dsl: { all: [{ kind: "patientList", ids }] } } })!;
   assert.ok(l.cut && /the first [\d,]+ of 40,000 ids/.test(l.cut), String(l.cut));
   const back = decodeSpec(new URL("http://x" + l.cli).searchParams.get("spec")!) as any;
-  assert.ok(back.cohort.dsl.patients.length < ids.length);
-  assert.equal(back.cohort.dsl.patients[0], ids[0]);
+  const backIds = back.cohort.dsl.all[0].ids;
+  assert.ok(backIds.length < ids.length);
+  assert.equal(backIds[0], ids[0]);
   assert.ok(l.cli.length < SPEC_URL_MAX + 200);
 });
 

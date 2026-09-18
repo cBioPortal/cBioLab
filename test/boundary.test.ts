@@ -88,22 +88,22 @@ function assertAggregateOnly(sql: string, what: string) {
 
 // ---------------------------------------------------------------------------
 describe("carriesPatientIds: detects identifiers anywhere in a definition", () => {
-  test("top-level patient list (v1 sugar)", () => {
-    assert.equal(carriesPatientIds({ patients: ["P-0000123"] }), true);
+  test("sampleList leaf in all[]", () => {
+    assert.equal(carriesPatientIds({ all: [{ kind: "sampleList", ids: ["s:S-1"] }] }), true);
   });
-  test("patients leaf in all[]", () => {
-    assert.equal(carriesPatientIds({ all: [{ kind: "patients", ids: ["P-1"] }] }), true);
+  test("patientList leaf in all[]", () => {
+    assert.equal(carriesPatientIds({ all: [{ kind: "patientList", ids: ["s:P-1"] }] }), true);
   });
-  test("patients leaf nested in any[]", () => {
-    assert.equal(carriesPatientIds({ all: [{ any: [{ kind: "oql", q: "TP53: MUT" }, { kind: "patients", ids: ["P-1"] }] }] }), true);
+  test("patientList leaf nested in any[]", () => {
+    assert.equal(carriesPatientIds({ all: [{ any: [{ kind: "oql", q: "TP53: MUT" }, { kind: "patientList", ids: ["s:P-1"] }] }] }), true);
   });
-  test("patients leaf nested in not", () => {
-    assert.equal(carriesPatientIds({ all: [{ not: { kind: "patients", ids: ["P-1"] } }] }), true);
+  test("patientList leaf nested in not", () => {
+    assert.equal(carriesPatientIds({ all: [{ not: { kind: "patientList", ids: ["s:P-1"] } }] }), true);
   });
   test("ordinary clauses do not trip it", () => {
     assert.equal(carriesPatientIds({ all: [{ kind: "oql", q: "TP53: MUT" }, { kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] }), false);
     assert.equal(carriesPatientIds(null), false);
-    assert.equal(carriesPatientIds({ all: [{ kind: "patients", ids: [] }] }), false); // empty list carries nothing
+    assert.equal(carriesPatientIds({ all: [{ kind: "patientList", ids: [] }] }), false); // empty list carries nothing
   });
 });
 
@@ -123,8 +123,8 @@ describe("aggregate-only resolvers cannot expose patient-level data", () => {
   });
 
   test("refuses to compile SQL embedding patient ids", () => {
-    assert.throws(() => agg.cohortSql({ all: [{ kind: "patients", ids: ["P-0000123"] }] }),
-      /explicit patient list/i);
+    assert.throws(() => agg.cohortSql({ all: [{ kind: "patientList", ids: ["s:P-0000123"] }] }),
+      /explicit sample or patient list/i);
   });
 
   test("still compiles ordinary definitions", () => {
@@ -134,7 +134,7 @@ describe("aggregate-only resolvers cannot expose patient-level data", () => {
   });
 
   test("a patient-level instance may use an explicit list (that is its entitlement)", () => {
-    const sql = pl.cohortSql({ all: [{ kind: "patients", ids: ["P-0000123"] }] });
+    const sql = pl.cohortSql({ all: [{ kind: "patientList", ids: ["s:P-0000123"] }] });
     assert.match(sql, /P-0000123/);
   });
 });
@@ -147,15 +147,15 @@ describe("remote peers: nothing identifying leaves before the network is touched
     globalThis.fetch = (async () => { calls++; throw new Error("network must not be reached"); }) as typeof fetch;
     try {
       const r = new RemoteAggregateResolver("s", "http://peer.invalid/api/mcp", AGG);
-      const def = { all: [{ kind: "patients" as const, ids: ["P-0000123"] }] };
-      await assert.rejects(() => r.count(def), /explicit patient list/i);
-      await assert.rejects(() => r.geneCounts(def, ["TP53"]), /explicit patient list/i);
-      await assert.rejects(() => r.survivalCounts(def), /explicit patient list/i);
-      await assert.rejects(() => r.pairCounts(def, [["TP53", "KRAS"]]), /explicit patient list/i);
-      await assert.rejects(() => r.attributeStats(def, ["SEX"]), /explicit patient list/i);
-      await assert.rejects(() => r.pairMoments(def, [["ERBB2", "GRB7"]], "p"), /explicit patient list/i);
-      await assert.rejects(() => r.variantCounts(def, ["KRAS"]), /explicit patient list/i);
-      await assert.rejects(() => r.profileMoments(def, ["ERBB2"], "p"), /explicit patient list/i);
+      const def = { all: [{ kind: "patientList" as const, ids: ["s:P-0000123"] }] };
+      await assert.rejects(() => r.count(def), /explicit sample or patient list/i);
+      await assert.rejects(() => r.geneCounts(def, ["TP53"]), /explicit sample or patient list/i);
+      await assert.rejects(() => r.survivalCounts(def), /explicit sample or patient list/i);
+      await assert.rejects(() => r.pairCounts(def, [["TP53", "KRAS"]]), /explicit sample or patient list/i);
+      await assert.rejects(() => r.attributeStats(def, ["SEX"]), /explicit sample or patient list/i);
+      await assert.rejects(() => r.pairMoments(def, [["ERBB2", "GRB7"]], "p"), /explicit sample or patient list/i);
+      await assert.rejects(() => r.variantCounts(def, ["KRAS"]), /explicit sample or patient list/i);
+      await assert.rejects(() => r.profileMoments(def, ["ERBB2"], "p"), /explicit sample or patient list/i);
       assert.equal(calls, 0, "the guard must run before any request is made");
     } finally {
       globalThis.fetch = original;
