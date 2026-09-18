@@ -6,7 +6,8 @@
 //   leaf   := { kind: "oql", q: "KRAS: MUT=G12C; STK11: DRIVER" } // genomic status (OQL)
 //          | { kind: "clinical", attribute, op, value }           // patient attribute
 //          | { kind: "event", a, b?, rel, priorGuard? }           // timeline sub-DSL (v1 shape)
-//          | { kind: "patients", ids: [...] }                     // explicit list
+//          | { kind: "sampleList", ids: ["<study>:<id>", ...] }    // explicit, cross-study sample list
+//          | { kind: "patientList", ids: ["<study>:<id>", ...] }   // explicit, cross-study patient list
 //
 // Depth is capped by construction (all -> any/not -> leaf): everything compiles to
 // per-leaf CTEs over patient stable ids combined with INTERSECT / UNION / EXCEPT,
@@ -19,7 +20,7 @@ import { clinicalValueFoldSql, canonicalEventName } from "./event-names.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
-  PatientsLeaf, AlterationLeaf, EventLeafFields
+  SampleListLeaf, PatientListLeaf, AlterationLeaf, EventLeafFields
 } from "./types.ts";
 
 /** Every leaf compiler receives a fully-resolved context. */
@@ -320,9 +321,45 @@ function eventLeafSql(leaf: EventLeafFields, ctx: Ctx): string {
   return patientsSql;
 }
 
-function patientsLeafSql(leaf: PatientsLeaf, ctx: Ctx): string {
-  const ids = (leaf.ids || []).map(String).filter(p => /^[A-Za-z0-9._-]{1,64}$/.test(p)).slice(0, 50000);
-  if (!ids.length) throw new Error("patients clause has no valid ids");
+/**
+ * Splits "<study>:<id>" and keeps only the ids that belong to `study` —
+ * everything else in the list is for a study compiled in a different pass
+ * (see SampleListLeaf's doc comment in lib/types.ts) and is silently dropped
+ * here, not an error. A colon is the delimiter, not an underscore, because a
+ * bare id may itself contain one; it matches the legacy portal's own
+ * study-qualified id convention.
+ */
+function idsForStudy(raw: string[] | undefined, study: string): string[] {
+  return (raw || []).map(String).map((s): { study: string; id: string } | null => {
+    const i = s.indexOf(":");
+    return i > 0 && i < s.length - 1 ? { study: s.slice(0, i), id: s.slice(i + 1) } : null;
+  }).filter((p): p is { study: string; id: string } => !!p && p.study === study && /^[A-Za-z0-9._-]{1,64}$/.test(p.id))
+    .map(p => p.id)
+    .slice(0, 50000);
+}
+
+function requireQualifiedIds(raw: string[] | undefined, kind: string): void {
+  const any = (raw || []).some(s => { const i = String(s).indexOf(":"); return i > 0 && i < String(s).length - 1; });
+  if (!any) throw new Error(kind + ' clause needs ids as "<study>:<id>" — none of the given ids parsed');
+}
+
+function sampleListLeafSql(leaf: SampleListLeaf, ctx: Ctx): string {
+  requireQualifiedIds(leaf.ids, "sampleList");
+  const ids = idsForStudy(leaf.ids, ctx.study);
+  // No ids for THIS study is a normal, expected shape for a cross-study list
+  // (most of it belongs to other studies in the fan-out) — it contributes
+  // zero patients here, not an error.
+  if (!ids.length) return "SELECT " + PID("patient_unique_id", ctx.study) + " AS pid FROM " + dbOf(ctx) + ".sample_derived WHERE 1=0";
+  return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
+    "  FROM " + dbOf(ctx) + ".sample_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(ctx.study) + "\n" +
+    "    AND " + PID("sample_unique_id", ctx.study) + " IN (" + ids.map(sq).join(",") + ")";
+}
+
+function patientListLeafSql(leaf: PatientListLeaf, ctx: Ctx): string {
+  requireQualifiedIds(leaf.ids, "patientList");
+  const ids = idsForStudy(leaf.ids, ctx.study);
+  if (!ids.length) return "SELECT " + PID("patient_unique_id", ctx.study) + " AS pid FROM " + dbOf(ctx) + ".sample_derived WHERE 1=0";
   return basePatientsSql(ctx.study, dbOf(ctx)) + "\n    AND " + PID("patient_unique_id", ctx.study) + " IN (" + ids.map(sq).join(",") + ")";
 }
 
@@ -336,7 +373,8 @@ function leafSql(leaf: any, ctx: Ctx): string {
   if (leaf.kind === "genericAssay") return genericAssayLeafSql(leaf, ctx);
   if (leaf.kind === "event") return eventLeafSql(leaf, ctx);
   if (leaf.kind === "derived") return derivedLeafSql(leaf, ctx);
-  if (leaf.kind === "patients") return patientsLeafSql(leaf, ctx);
+  if (leaf.kind === "sampleList") return sampleListLeafSql(leaf, ctx);
+  if (leaf.kind === "patientList") return patientListLeafSql(leaf, ctx);
   // v1 flat event shape without kind
   if (leaf.a && leaf.rel) return eventLeafSql(leaf, ctx);
   throw new Error("unknown clause kind: " + JSON.stringify(Object.keys(leaf)));
@@ -361,10 +399,9 @@ function clauseSql(clause: any, ctx: Ctx): string {
   return leafSql(clause, ctx);
 }
 
-/** v1 sugar: a bare event definition, or an explicit patient list, becomes {all:[...]}. */
+/** v1 sugar: a bare event definition becomes {all:[...]}. */
 function normalizeSugar(def: CohortDef): CohortDef {
   if (def.a && def.rel && !def.all) return { all: [def as unknown as Leaf], lineGap: def.lineGap };
-  if (def.patients && !def.all) return { all: [{ kind: "patients", ids: def.patients }] };
   return def;
 }
 
@@ -413,7 +450,13 @@ function leafText(leaf: any): string {
   if (leaf.kind === "caseList") return "in case list " + leaf.id;
   if (leaf.kind === "genomicData") return leaf.gene + " " + leaf.profileType + " " + JSON.stringify(leaf.range || leaf.values);
   if (leaf.kind === "genericAssay") return leaf.entity + " " + JSON.stringify(leaf.range || leaf.values);
-  if (leaf.kind === "patients") return "in a list of " + (leaf.ids || []).length + " patients";
+  if (leaf.kind === "sampleList" || leaf.kind === "patientList") {
+    const ids: string[] = leaf.ids || [];
+    const noun = leaf.kind === "sampleList" ? "sample" : "patient";
+    const studies = new Set(ids.map((s) => String(s).split(":")[0]).filter(Boolean));
+    return "in a list of " + ids.length + " " + noun + (ids.length === 1 ? "" : "s") +
+      (studies.size > 1 ? " across " + studies.size + " studies" : "");
+  }
   if (leaf.kind === "event" || (leaf.a && leaf.rel)) {
     const rel = leaf.rel || {};
     const selText = (s: any): string => {

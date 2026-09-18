@@ -430,7 +430,8 @@ async function main() {
           const m = document.body.innerText.match(/dragged\s+([\d,]+)\s+patients/);
           return m ? Number(m[1].replace(/,/g, "")) : null;
         });
-        dragOk = claimed > 0 && leaf.kind === "patients" && leaf.ids.length === claimed && counted === claimed;
+        dragOk = claimed > 0 && leaf.kind === "patientList" && leaf.ids.length === claimed && counted === claimed
+          && leaf.ids.every((id) => id.startsWith("msk_chord_2024:"));
         dragWhat = said + " -> " + leaf.ids.length + " ids -> compiler counted " + counted;
       } catch (e) { dragWhat = String(e.message).split("\n")[0]; }
       ok("a drag across the oncoprint becomes a cohort of exactly those patients", dragOk, dragWhat);

@@ -31,7 +31,20 @@ export interface ClinicalLeaf {
   op?: ClinicalOp;
   value?: string | number;
 }
-export interface PatientsLeaf { kind: "patients"; ids: string[] }
+/**
+ * An explicit, cross-study list of ids. Each id is "<study>:<bare-id>" — the
+ * legacy portal's own study-qualified id convention, chosen over the
+ * database's internal "<study>_<bare-id>" join key specifically because a
+ * bare id may itself contain underscores (a colon cannot appear in a study
+ * id or a stable id, so splitting on it is unambiguous). Compiled once per
+ * study (cohorts already fan out that way for any `studies: [...]`
+ * definition) — ids for other studies are simply inert in that compile, not
+ * an error, so one list can span as many studies as it likes. Never sent to
+ * a remote or aggregate-only participant: see carriesPatientIds in
+ * lib/federation.ts.
+ */
+export interface SampleListLeaf { kind: "sampleList"; ids: string[] }
+export interface PatientListLeaf { kind: "patientList"; ids: string[] }
 export interface GeneStateFacet {
   gene: string;
   type: "MUTATION" | "CNA";
@@ -127,7 +140,7 @@ export interface DerivedLeaf {
   lineGap?: number;
 }
 export type Leaf =
-  | OqlLeaf | ClinicalLeaf | EventLeaf | PatientsLeaf | ProfiledLeaf
+  | OqlLeaf | ClinicalLeaf | EventLeaf | SampleListLeaf | PatientListLeaf | ProfiledLeaf
   | CaseListLeaf | GenomicDataLeaf | GenericAssayLeaf | AlterationLeaf | DerivedLeaf
   /** back-compat: the flat v1 event shape, accepted without a `kind` */
   | EventLeafFields;
@@ -146,9 +159,8 @@ export interface CohortDef {
   /** union across studies (federated; members stay study-qualified) */
   studies?: string[];
   lineGap?: number;
-  /** v1 sugar: a bare event definition, or an explicit patient list */
+  /** v1 sugar: a bare event definition */
   a?: EventSelector; b?: EventSelector | null; rel?: EventRel; priorGuard?: boolean;
-  patients?: string[];
 }
 
 /** Context threaded into every leaf compiler. */

@@ -907,16 +907,18 @@ export function sequenceKeysSql(cohortSql: string, study: string, db: string, ev
 // ---------------------------------------------------------------------------
 
 /**
- * Does this definition carry explicit patient identifiers? A `patients` leaf
- * embeds ids directly into the compiled SQL, so sending one to an instance
- * that is not entitled to patient-level data would push identifiers across
- * exactly the boundary this design exists to respect — and the ids are
- * study-scoped anyway, so they could never match there.
+ * Does this definition carry explicit sample or patient identifiers? A
+ * `sampleList`/`patientList` leaf embeds ids directly into the compiled SQL,
+ * so sending one to an instance that is not entitled to patient-level data
+ * would push identifiers across exactly the boundary this design exists to
+ * respect — and the ids are study-qualified anyway, so they could never
+ * match there. These leaves are refused for federation entirely: they
+ * simply never reach an aggregate-only or remote participant.
  */
 export function carriesPatientIds(def: CohortDef | null | undefined): boolean {
   if (!def) return false;
-  if (Array.isArray(def.patients) && def.patients.length) return true;
-  const leafHasIds = (l: any): boolean => !!l && l.kind === "patients" && Array.isArray(l.ids) && l.ids.length > 0;
+  const leafHasIds = (l: any): boolean =>
+    !!l && (l.kind === "sampleList" || l.kind === "patientList") && Array.isArray(l.ids) && l.ids.length > 0;
   for (const c of def.all || []) {
     const any = (c as any).any, not = (c as any).not;
     if (Array.isArray(any) ? any.some(leafHasIds) : false) return true;
@@ -927,7 +929,7 @@ export function carriesPatientIds(def: CohortDef | null | undefined): boolean {
 }
 
 const NO_IDS_MSG =
-  "this cohort contains an explicit patient list, which cannot be sent to an instance that is not entitled to patient-level data";
+  "this cohort contains an explicit sample or patient list, which cannot be sent to an instance that is not entitled to patient-level data";
 
 /** What every participant can answer, whatever its trust level. */
 export interface AggregateCapable {

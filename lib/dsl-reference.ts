@@ -548,12 +548,23 @@ say so in their captions.
 | \`clinical\` | \`{"kind":"clinical","attribute":A, ...predicate, "per"?:"sample"}\` | clinical attribute; predicate is \`values:[≤50]\` (OR), \`range:{gt,gte,lt,lte}\` (numeric via toFloat64OrNull), or \`op\`(\`= != > >= < <=\`)+\`value\`; \`per:"sample"\` = patient matches if ANY sample matches |
 | \`derived\` | \`{"kind":"derived","metric":"followupMonths"|"historyMonths"|"alteredGenes"|"lines"|"treatmentSpan","range":{gte?,gt?,lte?,lt?},"eventType"?,"lineGap"?:90}\` | filters on a value computed from the **shape** of the data rather than a study's vocabulary. Event-type names and attribute keys are study-specific \u2014 this database spells one concept \`Treatment\` in 87 studies and \`TREATMENT\` in 10, and the key MSK-CHORD calls \`SUBTYPE\` exists in only 27 of 131 timeline studies \u2014 so these read dates and gene symbols instead and mean the same thing everywhere. \`followupMonths\`: how far the timeline runs past its own day 0. \`historyMonths\`: how much predates it. \`alteredGenes\`: distinct genes altered (panel size bounds it, so not comparable across studies with different panels). \`lines\` and \`treatmentSpan\` are the deliberate exception \u2014 they need \`eventType\` (which timeline event stands for "a therapy" here; Explore proposes one from the study's own catalog), because there is no vocabulary-free way to ask "how many lines of treatment". \`lines\`: distinct treatment lines, grouped by a \`lineGap\`-day gap. \`treatmentSpan\`: months from the first to the last record of that event type |
 | \`event\` | \`{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}\` | timeline sub-DSL (below) |
-| \`patients\` | \`{"kind":"patients","ids":[≤50000]}\` | explicit list, intersected with the study |
+| \`sampleList\` | \`{"kind":"sampleList","ids":["<study>:<id>", ...]}\` | explicit, cross-study list of sample ids — up to ~22,000 total (measured ClickHouse query-size ceiling; not enforced as a hard cap yet) |
+| \`patientList\` | \`{"kind":"patientList","ids":["<study>:<id>", ...]}\` | explicit, cross-study list of patient ids, same shape and ceiling |
 | \`profiled\` | \`{"kind":"profiled","type":"MUTATION"\\|"CNA"\\|"SV"}\` | patient has a sample on a gene panel for that data type — combine with \`not\` to separate wild-type from not-profiled |
 | \`caseList\` | \`{"kind":"caseList","id":"sequenced"}\` | portal sample list; bare ids get the study prefix |
 | \`genomicData\` | \`{"kind":"genomicData","gene":G,"profileType":P,"range"\\|"values"}\` | continuous per-gene values (cna, mrna z-scores, …); unknown profiles error listing what the study has |
 | \`genericAssay\` | \`{"kind":"genericAssay","profileType":P,"entity":E,"range"\\|"values"}\` | generic assay values (mutational signatures, …) |
 | \`alteration\` | *(deprecated)* | translated to OQL internally; do not write new ones |
+
+**\`sampleList\`/\`patientList\` ids.** Each id is \`"<study>:<bare-id>"\` — a colon, not the
+database's internal underscore, because a bare id may itself contain one (this is also the
+legacy portal's own study-qualified id convention). A single list can span every study named in
+the cohort's \`studies\`: it compiles once per study (the same fan-out \`studies\` already does for
+every other clause) and an id meant for a different study is simply inert in that pass, not an
+error — so the list itself never needs to be split up by study. These two leaves are the one
+kind of clause that can **never** leave for a remote or aggregate-only participant: an id-carrying
+cohort is refused before any request is made, the same guarantee \`docs/DATA-BOUNDARY.md\`
+describes for every other identifier-bearing path.
 
 ### OQL subset
 
@@ -885,7 +896,9 @@ Leaf kinds:
   For absence queries ALWAYS set observed:true (else "no event" conflates with lost-to-follow-up).
   priorGuard:true restricts to treatment-naive patients — REQUIRED for honest "first-line" claims
   (~20% of patients had prior treatment elsewhere, ~20% undetermined).
-- {"kind":"patients","ids":[...]} — explicit list.
+- {"kind":"sampleList"|"patientList","ids":["<study>:<id>",...]} — explicit, cross-study list; ids
+  are "<study>:<bare-id>" (colon, matching the legacy portal's convention — not the database's
+  internal underscore, since a bare id may contain one).
 - {"kind":"clinical",...} also supports "values":[...] (OR across values), "range":{"gte":60,"lt":80}
   (numeric), and "per":"sample" (patient matches if ANY sample matches — say so when used).
 - {"kind":"profiled","type":"MUTATION"|"CNA"|"SV"} — patient was profiled for that data type

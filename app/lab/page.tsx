@@ -1549,7 +1549,8 @@ function Latency({ v }: { v: any }) {
     const taken = new Set(Object.keys(doc.cohorts || {}));
     let name = sel.name || "selection";
     for (let i = 2; taken.has(name); i++) name = (sel.name || "selection") + " " + i;
-    const d: AnalysisDoc = { ...doc, cohorts: { ...doc.cohorts, [name]: { all: [{ kind: "patients", ids }] } } };
+    const qualified = ids.map(id => one + ":" + id);
+    const d: AnalysisDoc = { ...doc, cohorts: { ...doc.cohorts, [name]: { all: [{ kind: "patientList", ids: qualified }] } } };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
     run(d);
   };

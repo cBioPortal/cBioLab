@@ -9,7 +9,8 @@ const KIND_META: Record<string, { label: string; color: string }> = {
   oql: { label: "OQL", color: "#CC79A7" },
   clinical: { label: "clinical", color: "#0072B2" },
   event: { label: "timeline", color: "#009E73" },
-  patients: { label: "patients", color: "#999999" },
+  sampleList: { label: "samples", color: "#999999" },
+  patientList: { label: "patients", color: "#999999" },
   profiled: { label: "profiled", color: "#56B4E9" },
   caseList: { label: "case list", color: "#999999" },
   genomicData: { label: "data", color: "#CC79A7" },
@@ -69,7 +70,11 @@ function leafText(leaf: any) {
   if (k === "caseList") return leaf.id;
   if (k === "genomicData") return `${leaf.gene} ${leaf.profileType} ` + (leaf.range ? Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ") : "");
   if (k === "genericAssay") return `${leaf.entity} ` + JSON.stringify(leaf.range || leaf.values);
-  if (k === "patients") return `${(leaf.ids || []).length} listed`;
+  if (k === "sampleList" || k === "patientList") {
+    const ids = leaf.ids || [];
+    const studies = new Set(ids.map((s: string) => String(s).split(":")[0]).filter(Boolean));
+    return `${ids.length} listed` + (studies.size > 1 ? ` (${studies.size} studies)` : "");
+  }
   // event
   const rel = leaf.rel || {};
   let t;
@@ -97,7 +102,6 @@ function Pill({ leaf, negated, onRemove }: { leaf: any; negated?: boolean; onRem
 export function normalizeDef(def: any) {
   if (!def) return null;
   if (def.a && def.rel && !def.all) return { ...def, all: [{ ...def }] };
-  if (def.patients && !def.all) return { all: [{ kind: "patients", ids: def.patients }] };
   return def;
 }
 

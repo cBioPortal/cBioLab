@@ -57,18 +57,8 @@ export function cohortPatientsSql(dsl: PidsCarrier | null | undefined, study: st
   const pre = dsl?.[PIDS_SQL];
   if (typeof pre === "string") return pre;
   // SQL for a cohort's stable_ids (null dsl = every patient with a sample).
-  // dsl.patients = explicit patient list (e.g. imported from a portal custom case
-  // list / session); membership is intersected with the study so unknown ids drop out.
-  if (dsl && Array.isArray(dsl.patients)) {
-    const ids = dsl.patients.map(String).filter((p: string) => /^[A-Za-z0-9._-]{1,64}$/.test(p)).slice(0, 50000);
-    if (!ids.length) throw new Error("patient list is empty or invalid");
-    return "SELECT DISTINCT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid\n" +
-      "FROM " + db + ".sample_derived\n" +
-      "WHERE cancer_study_identifier = " + sq(study) + "\n" +
-      "  AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (" + ids.map(sq).join(",") + ")\n" +
-      "ORDER BY pid";
-  }
-  // DSL v2 definition ({all: [...]}) — the analysis document's cohort language
+  // DSL v2 definition ({all: [...]}) — the analysis document's cohort language,
+  // including an explicit sample/patient list ({kind:"sampleList"|"patientList"}).
   if (dsl && Array.isArray((dsl as { all?: unknown }).all)) return compileCohortDef(dsl as CohortDef, { study, db, oncokbPin: pin });
   if (!dsl) {
     return "SELECT DISTINCT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid\n" +
@@ -240,8 +230,7 @@ export function specToQueries(spec: OncoprintSpec, pin?: string | null) {
     for (const g of gb.groups.slice(0, 4))
       queries.push({ label: "column group \u201c" + (g.name || "group") + "\u201d \u2014 cohort " + unit + "s", sql: cohortColumnsSql({ ...g.dsl, lineGap }, study, DB, unit, pin) });
   } else {
-    const listN = spec.cohort && spec.cohort.dsl && Array.isArray(spec.cohort.dsl.patients) ? spec.cohort.dsl.patients.length : 0;
-    queries.push({ label: listN ? "explicit patient list (" + listN + " ids, intersected with the study)" : (spec.cohort ? "cohort " + unit + "s" : "all study " + unit + "s"),
+    queries.push({ label: spec.cohort ? "cohort " + unit + "s" : "all study " + unit + "s",
       sql: cohortColumnsSql(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, DB, unit, pin) });
   }
   queries.push({ label: "genomic events (mutations, CNA, SV) for the gene tracks", sql: genomicEventsSql(genes, study, DB, unit) });

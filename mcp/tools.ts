@@ -160,7 +160,7 @@ export function registerTools(server: any): void {
       try {
         const s = await resolveStudy(study);
         if (carriesPatientIds(draft))
-          throw new Error("draft contains an explicit patient list; identifiers are not accepted across instances");
+          throw new Error("draft contains an explicit sample or patient list; identifiers are not accepted across instances");
         const { profiles, gaProfiles } = await studyProfiles(s);
         const conn = (await studyRouting()).get(s) || PRIMARY;
         const facets = await buildExplore({
