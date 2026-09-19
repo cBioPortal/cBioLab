@@ -11,7 +11,7 @@ import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-referen
 import type { ViewParticipation } from "../../lib/types.ts";
 import { survivalAxis } from "../../lib/stats.ts";
 
-const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
+const TABS = ["explore", "cohorts", "saved", "analysis", "examples"] as const;
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -254,7 +254,7 @@ function ParamRow({ name, value, busy, onChange }:
 
 export default function AnalysisPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = use(searchParams);
-  const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">(() => tabFromParams(sp));
+  const [tab, setTab] = useState<"explore" | "cohorts" | "saved" | "analysis" | "examples">(() => tabFromParams(sp));
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   const [copied, setCopied] = useState<string | null>(null);
   const [exMsg, setExMsg] = useState<string | null>(null);
@@ -1789,6 +1789,7 @@ function Latency({ v }: { v: any }) {
         <div className="tabs">
           <button className={tab === "explore" ? "active" : ""} onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
           <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Cohorts</button>
+          <button className={tab === "saved" ? "active" : ""} onClick={() => goTab("saved")}>Saved</button>
           <button className={tab === "analysis" ? "active" : ""} onClick={() => goTab("analysis")}>Analysis</button>
           <button className={tab === "examples" ? "active" : ""} onClick={() => goTab("examples")}>Examples</button>
         </div>
@@ -2639,24 +2640,65 @@ function Latency({ v }: { v: any }) {
                 </div>
               );
             })}
-            <h2 style={{ marginTop: "1.2rem" }}>Saved cohorts <span className="plain">— shared with everyone using this app; no per-user ownership yet</span></h2>
+            <h2 style={{ marginTop: "1.2rem" }}>
+              Saved cohorts <span className="plain">— tick any to include below; manage (rename, delete) on the <button className="linklike" onClick={() => goTab("saved")}>Saved tab</button></span>
+            </h2>
             {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, create one on the left, or ask chat.</p>}
             {Object.entries(saved).map(([n, s2]) => (
               <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
-                <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                  <label className="pick">
-                    <input type="checkbox" checked={picked.includes("saved:" + n)} onChange={() => togglePick("saved:" + n)} />
-                    <strong>{n}</strong>
-                  </label>
+                <label className="pick">
+                  <input type="checkbox" checked={picked.includes("saved:" + n)} onChange={() => togglePick("saved:" + n)} />
+                  <strong>{n}</strong>
                   {s2.lastEval && <span className="meta">{s2.lastEval.count.toLocaleString()} pts</span>}
-                  <span className="meta">saved {s2.savedAt}</span>
-                  <span className="spacer" />
-                  <button className="linklike" onClick={() => { setCName(n); setCDefText(JSON.stringify(s2.def, null, 2)); setCPreview(s2.lastEval || null); }}>edit</button>
-                  <button className="linklike" onClick={() => removeSaved(n)}>delete</button>
-                </div>
+                </label>
                 <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} /></div>
               </div>
             ))}
+          </div>
+        </div>}
+
+        {/* ================= Saved tab ================= */}
+        {tab === "saved" && <div className="grid2">
+          <div className="card">
+            <h2>Saved cohorts <span className="plain">— shared with everyone using this app; no per-user ownership yet</span></h2>
+            {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — build one on the Cohorts tab, or save an example there.</p>}
+            {Object.entries(saved)
+              .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
+              .map(([n, s2]) => (
+                <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
+                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
+                    <strong>{n}</strong>
+                    {s2.lastEval && <span className="meta">{s2.lastEval.count.toLocaleString()} pts</span>}
+                    <span className="meta">saved {s2.savedAt}</span>
+                    <span className="spacer" />
+                    <button className="linklike"
+                      onClick={() => { setCName(n); setCDefText(JSON.stringify(s2.def, null, 2)); setCPreview(s2.lastEval || null); goTab("cohorts"); }}>
+                      edit
+                    </button>
+                    <button className="linklike" onClick={() => removeSaved(n)}>delete</button>
+                  </div>
+                  <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} /></div>
+                </div>
+              ))}
+          </div>
+          <div className="card">
+            <h2>Saved workspaces <span className="plain">— shared with everyone using this app; no per-user ownership yet</span></h2>
+            {Object.keys(spaces).length === 0 && <p className="note">Nothing saved yet — build an analysis with at least one view, then "Save workspace" on the Analysis tab.</p>}
+            {Object.entries(spaces)
+              .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
+              .map(([n, w]) => (
+                <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
+                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
+                    <strong>{n}</strong>
+                    <span className="meta">{(w.doc.views || []).length} view{(w.doc.views || []).length === 1 ? "" : "s"}</span>
+                    <span className="meta">saved {w.savedAt}</span>
+                    <span className="spacer" />
+                    <button className="linklike" onClick={() => openWorkspace(n)}>open</button>
+                    <button className="linklike" onClick={() => deleteWorkspace(n)}>delete</button>
+                  </div>
+                </div>
+              ))}
+            {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
           </div>
         </div>}
 
@@ -2754,22 +2796,14 @@ function Latency({ v }: { v: any }) {
                     </div>
                   ))}
             </div>
-            {/* Opening a saved workspace from a blank/unsaved document — once
-                a document already has a title, opening a DIFFERENT one instead
-                belongs in the workspace card below, next to Save/delete. */}
+            {/* Browsing/opening a previously saved workspace lives on the Saved
+                tab now, alongside saved cohorts — this tab is only ever about
+                the ONE document currently open. */}
             {!doc.title && Object.keys(spaces).length > 0 && (
-              <div className="card" style={{ marginTop: "0.7rem" }}>
-                <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
-                  <strong style={{ fontSize: "var(--t-md)" }}>Open a saved workspace</strong>
-                  <select value="" disabled={busy}
-                    onChange={e => { if (e.target.value) openWorkspace(e.target.value); }}>
-                    <option value="">choose…</option>
-                    {Object.entries(spaces)
-                      .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
-                      .map(([n, w]) => <option key={n} value={n}>{n} — {w.savedAt}</option>)}
-                  </select>
-                </div>
-              </div>
+              <p className="note" style={{ marginTop: "0.7rem" }}>
+                {Object.keys(spaces).length} saved workspace{Object.keys(spaces).length === 1 ? "" : "s"} — open one from the{" "}
+                <button className="linklike" onClick={() => goTab("saved")}>Saved tab</button>.
+              </p>
             )}
           </div>
           {/* The document's JSON, generated SQL and run/clear controls: a dialog
@@ -2876,15 +2910,7 @@ function Latency({ v }: { v: any }) {
                         title={"delete the saved workspace \u201c" + doc.title + "\u201d"}
                         onClick={() => deleteWorkspace(doc.title!)}>delete</button>
                     )}
-                    {Object.keys(spaces).length > (doc.title && spaces[doc.title] ? 1 : 0) && (
-                      <select value="" disabled={busy} title="open a different saved workspace"
-                        onChange={e => { if (e.target.value) openWorkspace(e.target.value); }}>
-                        <option value="">open a different one\u2026</option>
-                        {Object.entries(spaces).filter(([n]) => n !== doc.title)
-                          .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
-                          .map(([n, w]) => <option key={n} value={n}>{n} \u2014 {w.savedAt}</option>)}
-                      </select>
-                    )}
+                    <button className="linklike" disabled={busy} onClick={() => goTab("saved")}>open a different one\u2026</button>
                     {doc.params && (
                       <span className="meta">Parameters are stored with the workspace, so reopening it restores them.</span>
                     )}
