@@ -242,6 +242,12 @@ export function registerTools(server: any): void {
           out.push("Survival (KM, overall survival):\n" + v.curves!.map((c) =>
             `  ${c.cohort}: median ${c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n=${c.n}, ${c.events} events${c.missing ? ", " + c.missing + " missing OS" : ""})`).join("\n") +
             "\nCAVEAT (tell the user): " + v.caveat);
+        } else if (v.kind === "cox") {
+          out.push(`Cox regression (${v.endpoint || "OS"}, n=${v.cox!.n.toLocaleString()}, ${v.cox!.events.toLocaleString()} events):\n` +
+            v.cox!.coefficients.map((c) =>
+              `  ${c.label}${c.reference ? " vs " + c.reference : ""}: HR ${c.hr.toFixed(2)} ` +
+              `(95% CI ${c.ciLow.toFixed(2)}-${c.ciHigh.toFixed(2)}) p=${pFmt(c.p)}`).join("\n") +
+            caveatOf(v));
         } else if (v.kind === "cooccurrence") {
           out.push("Co-occurrence (2x2 per pair, among patients profiled for BOTH genes):\n" +
             (v.pairs || []).slice(0, 20).map((x) =>

@@ -15,16 +15,16 @@ import type { PlotView } from "./types.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, regressionFromMoments, fisherZMeta,
-  type Moments } from "./stats.ts";
+  applyCutoff, toIncidence, coxRegression, type Moments, type CoxRow } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { viewToSvg } from "./view-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
   type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments,
   type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, type FederatedPlotCapable, legendFor } from "./federation.ts";
-import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, type PlotData, type PlotGroup } from "./plot.ts";
+import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis, type PlotData, type PlotGroup, type AxisKind } from "./plot.ts";
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 
@@ -231,6 +231,27 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) {
         views.push({ kind: "survival", error: "bad survival endpoint '" + endpoint.slice(0, 40) + "'" }); continue;
       }
+      const rawCutoff = (view as SurvivalView).cutoffMonths;
+      let cutoffMonths: number | undefined;
+      if (rawCutoff != null) {
+        const c = Number(rawCutoff);
+        if (!Number.isFinite(c) || c <= 0 || c > 1200) {
+          views.push({ kind: "survival", endpoint, error: "bad cutoffMonths '" + String(rawCutoff).slice(0, 40) + "': must be a positive number of months (max 1200)" });
+          continue;
+        }
+        cutoffMonths = c;
+      }
+      const rawTick = (view as SurvivalView).tickMonths;
+      let tickMonths: number | undefined;
+      if (rawTick != null) {
+        const t = Number(rawTick);
+        if (!Number.isFinite(t) || t <= 0 || t > 600) {
+          views.push({ kind: "survival", endpoint, error: "bad tickMonths '" + String(rawTick).slice(0, 40) + "': must be a positive number of months" });
+          continue;
+        }
+        tickMonths = t;
+      }
+      const display: "survival" | "incidence" = (view as SurvivalView).display === "incidence" ? "incidence" : "survival";
       const rawAnchor = (view as SurvivalView).anchor;
       const anchor = rawAnchor && rawAnchor.eventType
         ? { eventType: String(rawAnchor.eventType).slice(0, 120),
@@ -271,12 +292,16 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           continue;
         }
       }
-      const pointsFor = (n: string, st?: string) => expandSurvivalCounts(
-        st ? (perSite.get(n)!.get(st) || []) : [...perSite.get(n)!.values()].flat());
-      const curves = vNames.map((n) => {
+      const pointsFor = (n: string, st?: string) => {
+        const data = expandSurvivalCounts(
+          st ? (perSite.get(n)!.get(st) || []) : [...perSite.get(n)!.values()].flat());
+        return cutoffMonths != null ? applyCutoff(data, cutoffMonths) : data;
+      };
+      const curvesRaw = vNames.map((n) => {
         const data = pointsFor(n);
         return { cohort: n, ...kaplanMeier(data), missing: cohorts[n].count - data.length };
       });
+      const curves = display === "incidence" ? curvesRaw.map((c) => toIncidence(c)) : curvesRaw;
       // Two cohorts is the case the log-rank test is defined for, matching the
       // compare view's Fisher p.
       let logrank: LogRank | undefined, logrankPooled: LogRank | undefined;
@@ -307,12 +332,26 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           entryMonths = { median: at(0.5), p90: at(0.9), max: at(1) };
         }
       }
+      const beyondCutoff = cutoffMonths != null
+        ? vNames.reduce((sum, n) => sum + expandSurvivalCounts([...perSite.get(n)!.values()].flat())
+            .filter((r) => r.t > cutoffMonths!).length, 0)
+        : 0;
       views.push({ kind: "survival", cohorts: vNames, curves, endpoint,
         ...(entryMonths ? { entryMonths } : {}),
         ...(anchor ? { anchoredTo: anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : ""), truncated: true } : {}),
+        ...(cutoffMonths != null ? { cutoffMonths } : {}), ...(tickMonths != null ? { tickMonths } : {}),
+        ...(display === "incidence" ? { display } : {}),
         participation: participationFor(vStudies, false),
         ...(logrank ? { logrank } : {}), ...(logrankPooled ? { logrankPooled } : {}),
-        caveat: (anchor
+        caveat: (display === "incidence"
+          ? "Cumulative incidence (1 - survival) shown, not survival. "
+          : "") +
+          (cutoffMonths != null
+            ? "Administratively censored at " + cutoffMonths + " months" +
+              (beyondCutoff ? " (" + beyondCutoff + " patient" + (beyondCutoff === 1 ? "" : "s") + " still under observation past this point)" : "") +
+              ". "
+            : "") +
+          (anchor
           ? endpoint + " re-anchored to " + anchor.occurrence!.toLowerCase() + " " + anchor.eventType +
             (anchor.key ? " where " + anchor.key + "=" + anchor.value : "") +
             ". LEFT TRUNCATION IS APPLIED: each patient enters the risk set only when the study could first observe them" +
@@ -336,6 +375,133 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             : logrank
               ? " Log-rank on a single study, so no stratification applies."
               : " Log-rank needs exactly two cohorts.") });
+
+    } else if (view.kind === "cox") {
+      // Multivariate Cox: unlike survival/compare, this is fit from real per-patient rows
+      // within each LOCAL study rather than pooled aggregate counts, so an aggregate-only or
+      // remote participant simply cannot contribute (isPatientLevel gates it) — see the PR
+      // notes for why that tradeoff is fine here.
+      const cx = view as CoxView;
+      const endpoint = String(cx.endpoint || "OS").toUpperCase().trim();
+      if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) {
+        views.push({ kind: "cox", error: "bad survival endpoint '" + endpoint.slice(0, 40) + "'" }); continue;
+      }
+      const covariates = Array.isArray(cx.covariates) ? cx.covariates.slice(0, 8) : [];
+      if (!covariates.length) { views.push({ kind: "cox", endpoint, error: "a cox view needs at least one covariate" }); continue; }
+      try { covariates.forEach((c, i) => validateAxis(c, "covariate " + (i + 1))); }
+      catch (e) { views.push({ kind: "cox", endpoint, error: (e as Error).message }); continue; }
+      const rawCutoff = cx.cutoffMonths;
+      let cutoffMonths: number | undefined;
+      if (rawCutoff != null) {
+        const c = Number(rawCutoff);
+        if (!Number.isFinite(c) || c <= 0 || c > 1200) {
+          views.push({ kind: "cox", endpoint, error: "bad cutoffMonths '" + String(rawCutoff).slice(0, 40) + "': must be a positive number of months (max 1200)" });
+          continue;
+        }
+        cutoffMonths = c;
+      }
+      const cohortTotal = vNames.reduce((n, cn) => n + cohorts[cn].count, 0);
+      if (cohortTotal === 0) {
+        views.push({ kind: "cox", endpoint, cohorts: vNames,
+          error: "nothing to fit: " + (vNames.length === 1 ? "cohort “" + vNames[0] + "” is" : "all cohorts are") + " empty." });
+        continue;
+      }
+
+      const excludedRemote: { study: string; patients: number }[] = [];
+      type RawCoxRow = { t: number; event: number; values: (number | string)[]; study: string };
+      const rawRows: RawCoxRow[] = [];
+      let kinds: AxisKind[] | null = null;
+      let patientLevelTotal = 0;
+      for (const n of vNames) {
+        for (const st of cohorts[n].studies) {
+          const res = resolvers[st];
+          if (!isPatientLevel(res)) {
+            excludedRemote.push({ study: st, patients: cohorts[n].perStudy[st]?.count || 0 });
+            continue;
+          }
+          patientLevelTotal += cohorts[n].perStudy[st]?.count || 0;
+          const { rows, kinds: k } = await res.coxRows(doc.cohorts[n], endpoint, covariates);
+          if (!kinds) kinds = k;
+          for (const r of rows) rawRows.push({ ...r, study: st });
+        }
+      }
+      if (!rawRows.length) {
+        views.push({ kind: "cox", endpoint, cohorts: vNames,
+          error: excludedRemote.length && patientLevelTotal === 0
+            ? "no patient-level participant could answer this — " + excludedRemote.map((e) => e.study).join(", ") +
+              (excludedRemote.length === 1 ? " is" : " are") + " aggregate-only, and multivariate Cox needs patient-level covariates"
+            : "no patient had both a " + endpoint + " measurement and every requested covariate defined" });
+        continue;
+      }
+      const kindsFinal = kinds!;
+
+      // administrative censoring, same semantics as the KM view
+      const rowsCut = cutoffMonths != null
+        ? rawRows.map((r) => r.t > cutoffMonths! ? { ...r, t: cutoffMonths!, event: 0 } : r)
+        : rawRows;
+
+      // Dummy-code categorical covariates (reference = the most common level); a numeric
+      // covariate (clinical number, or a molecular value) is a single column as-is.
+      interface Column { axisIndex: number; label: string; reference?: string; level?: string }
+      const columns: Column[] = [];
+      covariates.forEach((cov, ci) => {
+        if (kindsFinal[ci] === "num") {
+          columns.push({ axisIndex: ci, label: axisLabel(cov) });
+        } else {
+          const counts = new Map<string, number>();
+          for (const r of rowsCut) { const v = String(r.values[ci]); counts.set(v, (counts.get(v) || 0) + 1); }
+          const levels = [...counts.keys()].sort((a, b) => (counts.get(b)! - counts.get(a)!) || (a < b ? -1 : 1));
+          const reference = levels[0];
+          for (const level of levels.slice(1)) columns.push({ axisIndex: ci, label: axisLabel(cov) + ": " + level, reference, level });
+        }
+      });
+      if (!columns.length) {
+        views.push({ kind: "cox", endpoint, cohorts: vNames,
+          error: "every covariate had only one observed level across these patients — there is nothing to estimate a hazard ratio against" });
+        continue;
+      }
+      if (columns.length > 20) {
+        views.push({ kind: "cox", endpoint, cohorts: vNames,
+          error: "these covariates expand to " + columns.length + " terms (capped at 20) — narrow a high-cardinality categorical covariate first" });
+        continue;
+      }
+      const toX = (r: RawCoxRow): number[] => columns.map((col) =>
+        kindsFinal[col.axisIndex] === "num" ? Number(r.values[col.axisIndex]) : (String(r.values[col.axisIndex]) === col.level ? 1 : 0));
+      const coxInput: CoxRow[] = rowsCut
+        .filter((r) => Number.isFinite(r.t) && r.t >= 0)
+        .map((r) => ({ t: r.t, event: r.event, x: toX(r), ...(cx.stratifyByStudy ? { stratum: r.study } : {}) }));
+
+      let fit;
+      try { fit = coxRegression(coxInput); }
+      catch (e) { views.push({ kind: "cox", endpoint, cohorts: vNames, error: (e as Error).message }); continue; }
+
+      const missing = patientLevelTotal - fit.n;
+      const coefficients: CoxCoefficient[] = columns.map((col, i) => ({
+        label: col.label, ...(col.reference ? { reference: col.reference } : {}),
+        beta: fit.beta[i], se: fit.se[i], hr: fit.hr[i], ciLow: fit.ciLow[i], ciHigh: fit.ciHigh[i], p: fit.p[i]
+      }));
+      const coxResult: ViewResult = { kind: "cox", cohorts: vNames, endpoint,
+        ...(cutoffMonths != null ? { cutoffMonths } : {}),
+        cox: { coefficients, n: fit.n, events: fit.events, ...(excludedRemote.length ? { excludedRemote } : {}) },
+        participation: participationFor(vStudies, false),
+        caveat: "Cox proportional-hazards regression (Efron ties) on " + fit.n + " patients, " + fit.events + " events, " +
+          columns.length + " term" + (columns.length === 1 ? "" : "s") + "." +
+          (missing > 0 ? " " + missing + " patient" + (missing === 1 ? "" : "s") + " from patient-level participants lacked the endpoint or a covariate and were excluded." : "") +
+          (cutoffMonths != null ? " Administratively censored at " + cutoffMonths + " months." : "") +
+          (cx.stratifyByStudy
+            ? " Stratified by study: each study fits its own baseline hazard, so a case-mix difference between studies cannot masquerade as a covariate effect."
+            : vStudies.length > 1 ? " Pooled across studies WITHOUT stratifying — a case-mix difference between studies could be absorbed into a covariate's estimated effect; consider stratifyByStudy." : "") +
+          (vStudies.length > 1 ? " Clinical-attribute vocabularies and declared types are NOT harmonized across studies." : "") +
+          (excludedRemote.length
+            ? " " + excludedRemote.map((e) => e.study + " (" + e.patients + " patients)").join(", ") +
+              " could not contribute: aggregate-only participants have no patient-level covariates to fit on."
+            : "") +
+          " Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers, unlike KM/log-rank." };
+      // Rendered here, by the SAME renderer the chat and MCP use — the app draws the
+      // forest plot as this SVG rather than a second, hand-rolled chart (the pattern
+      // the clinical course and treatment-sequence views already follow).
+      coxResult.svg = viewToSvg(coxResult) || undefined;
+      views.push(coxResult);
 
     } else if (view.kind === "course") {
       const cv = view as CourseView;
