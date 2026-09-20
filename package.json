@@ -18,7 +18,12 @@
     "denominators:pin": "UPDATE_DENOM=1 node --env-file=.env.local scripts/check-denominators.ts"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/state": "^6.7.5",
+    "@codemirror/view": "^6.43.12",
     "@modelcontextprotocol/sdk": "^1.26.0",
+    "@uiw/react-codemirror": "^4.25.11",
     "express": "^5.2.1",
     "marked": "^18.0.11",
     "mcp-handler": "^1.1.0",

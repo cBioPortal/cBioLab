@@ -1,6 +1,7 @@
 "use client";
 import { use, useEffect, useLayoutEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
+import DslEditor from "./DslEditor.tsx";
 import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
 import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
@@ -2546,8 +2547,8 @@ function Latency({ v }: { v: any }) {
             <label>Name</label>
             <input style={{ width: "100%" }} value={cName} onChange={e => setCName(e.target.value)} placeholder="e.g. KRAS-driver never-smokers" />
             <label>Definition</label>
-            <textarea value={cDefText} onChange={e => setCDefText(e.target.value)} spellCheck={false}
-              style={{ width: "100%", height: "16rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
+            <DslEditor value={cDefText} onChange={setCDefText} minHeight="16rem"
+              genes={geneChoices()} attributes={explore ? explore.clinical.map(a => a.attribute) : []} />
             {explore && (
               <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.4rem" }}>
                 <span className="meta">quick add:</span>
@@ -2814,11 +2815,18 @@ function Latency({ v }: { v: any }) {
               <h3 style={{ margin: 0 }}>The document <span className="plain">— views</span></h3>
               <button className="linklike" onClick={() => docDialog.current?.close()}>close</button>
             </div>
-            {/* id, because the notes textarea above it also matches "textarea" —
-                anything reading the document from outside React needs to be
-                able to say WHICH one. */}
-            <textarea id="docjson" value={docText} onChange={e => setDocText(e.target.value)} spellCheck={false}
-              style={{ width: "100%", height: "20rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
+            <DslEditor value={docText} onChange={setDocText} minHeight="20rem"
+              genes={geneChoices()} attributes={explore ? explore.clinical.map(a => a.attribute) : []} />
+            {/* A hidden mirror, kept byte-for-byte in sync with the state
+                that also drives the editor above. The editor's own DOM is a
+                CodeMirror content-editable div, not a form control, so
+                anything outside React that used to read "the document's raw
+                JSON" via a plain textarea's .value (this app's own e2e suite,
+                CLI/notebook tooling) still has one real textarea to read —
+                id kept here since it, not the visible editor, is the stable
+                contract those readers depend on. Never edited directly. */}
+            <textarea id="docjson" value={docText} readOnly hidden />
+
             <div className="row" style={{ marginTop: "0.6rem" }}>
               <button className="primary" disabled={busy} onClick={applyText}>{busy && <span className="spinner onprimary" />}{busy ? "Running…" : "Run document"}</button>
               {doc.cohorts && Object.keys(doc.cohorts).length > 0 &&
