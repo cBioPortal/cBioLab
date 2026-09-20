@@ -282,6 +282,17 @@ async function main() {
         saveFlow = "prefilled '" + prefilled + "', esc closed: " + closedOnEsc + ", in Cohorts: " + (inList > 0);
       } catch (e) { saveFlow = String(e.message).split("\n")[0]; }
       ok("Save asks for a name in a dialog and stores the cohort", savedOk, saveFlow);
+      // Self-cleaning: this test writes into the real shared artifact store
+      // (Supabase, or its in-process fallback), and nothing else here can
+      // reliably tell "a gate run made this" from "a person saved something
+      // with a similar name" after the fact — so the fix is to never need to
+      // guess: delete exactly the one row this test itself created, by the
+      // exact name it used, right after proving it exists.
+      try {
+        const list = await (await fetch(BASE + "/api/artifacts?kind=cohort")).json();
+        const mine = (list.artifacts || []).find((a) => a.name === "e2e dialog cohort");
+        if (mine) await fetch(BASE + "/api/artifacts/" + mine.id, { method: "DELETE" });
+      } catch { /* best-effort; a leftover row here is harmless, just noisy */ }
 
       // Analyze REPLACES the document rather than merging into it. Load a
       // DIFFERENTLY-named cohort first, so replacement is provable: the bar now
