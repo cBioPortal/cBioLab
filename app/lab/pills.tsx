@@ -24,14 +24,26 @@ function leafKind(leaf: any) {
   return "clinical";
 }
 
+const LINE_TYPE = "Treatment line (derived)";
+const NUM_SYM: Record<string, string> = { ">": ">", ">=": "≥", "<": "<", "<=": "≤", "=": "" };
+
 function selText(s: any) {
   if (!s) return "?";
   const attrs = (s.attrs || []).map((a: any) => a.value).filter(Boolean).join(" ");
-  let base = s.eventType === "Treatment line (derived)"
-    ? "line " + (((s.attrs || []).find((a: any) => a.key === "LINE_NO") || {}).value || "n")
+  // A treatment line's LINE_NO can arrive as an attrs equality ({key:"LINE_NO",value:"2"})
+  // or a numeric predicate ({key:"LINE_NO",op:">=",value:2}) — "line 2" vs "line ≥2" —
+  // so this reads whichever is present rather than always falling back to "line n".
+  const lineNo = s.eventType === LINE_TYPE
+    ? (((s.attrs || []).find((a: any) => a.key === "LINE_NO") || {}).value
+        ?? (s.numeric && s.numeric.key === "LINE_NO" ? (NUM_SYM[s.numeric.op] ?? s.numeric.op) + s.numeric.value : null))
+    : null;
+  let base = s.eventType === LINE_TYPE ? "line " + (lineNo ?? "n")
     : (attrs ? attrs + " " : "") + String(s.eventType || "").replace("Lab_Test", "lab").toLowerCase();
   if ((s.attrs || []).some((a: any) => a.key === "PROGRESSION" && a.value === "Y")) base = "progression";
-  if (s.numeric && s.numeric.key) base += ` ${s.numeric.key}${s.numeric.op}${s.numeric.value}`;
+  // The LINE_NO numeric predicate is already folded into `base` above; any other
+  // numeric predicate (e.g. a duration) still gets the raw key/op/value readout.
+  if (s.numeric && s.numeric.key && !(s.eventType === LINE_TYPE && s.numeric.key === "LINE_NO"))
+    base += ` ${s.numeric.key}${s.numeric.op}${s.numeric.value}`;
   return (s.occurrence === "FIRST" ? "first " : s.occurrence === "LAST" ? "last " : "") + base;
 }
 
