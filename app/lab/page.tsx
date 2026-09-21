@@ -111,6 +111,8 @@ const pCell = (p: number): string =>
 /** true when two p-values land on opposite sides of the conventional threshold */
 const crossesThreshold = (a: number, b: number): boolean => (a < 0.05) !== (b < 0.05);
 const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
+/** the synthetic eventType the server's derived treatment-line logic (lib/compiler.ts LINE_TYPE) recognizes */
+const LINE_TYPE = "Treatment line (derived)";
 
 interface Example { name: string; desc: string; def: CohortDef }
 const EXAMPLES: Example[] = [
@@ -291,6 +293,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
   const menuOpenRef = useRef(new Map<string, boolean>());
   const moreDerivedMenu = useGearmenuOpen("explore:more-derivations", menuOpenRef.current);
+  const seqFilterMenu = useGearmenuOpen("explore:sequence-filter", menuOpenRef.current);
   const keyFor = (v: object): number => {
     let k = viewKeys.current.get(v);
     if (k == null) { k = nextViewKey.current++; viewKeys.current.set(v, k); }
@@ -382,6 +385,20 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const [geneFilter, setGeneFilter] = useState<Record<string, string>>({});   // per-table gene box, client-side
   const [clinFilter, setClinFilter] = useState("");                            // matches an attribute name OR one of its values
   const [attrCoverage, setAttrCoverage] = useState(0);                       // clinical attributes shown
+  /**
+   * The "sequence / line filter" popover's draft — an A/[B] pair plus a
+   * temporal relation, built into one `event` clause on submit. Kept as its
+   * own form state (not applied to the draft until "add filter") because,
+   * unlike every other facet, it has several fields that only mean something
+   * together — a lone eventType pick here is not itself a valid clause.
+   */
+  const [seq, setSeq] = useState<{
+    aType: string; aOcc: "ANY" | "FIRST" | "LAST"; aLineOp: "=" | ">=" | "<="; aLineNo: string;
+    rel: "NONE" | "BEFORE" | "DURING" | "NOT_FOLLOWED_BY";
+    bType: string; bOcc: "ANY" | "FIRST" | "LAST"; bLineOp: "=" | ">=" | "<="; bLineNo: string;
+    days: string; priorGuard: boolean; lineGap: number;
+  }>({ aType: "", aOcc: "ANY", aLineOp: "=", aLineNo: "", rel: "NONE",
+       bType: "", bOcc: "ANY", bLineOp: "=", bLineNo: "", days: "180", priorGuard: false, lineGap: 90 });
 
   /**
    * Saved workspaces. A workspace IS the analysis document — several views,
@@ -977,8 +994,13 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const treatmentEventType = (): { canonical: string; label: string } | null =>
     exploreEventTypes().find((e) => /treat|therap|regimen|drug|medicat/.test(e.canonical)) || null;
 
+  // "lines" is not offered here: it is added automatically (see the effect
+  // below) once a treatment-like event is detected, because it is cheap
+  // enough to always compute (measured ~0-700ms on top of an Explore fetch
+  // that already takes 0.7-3s) and answers exactly what the "Derived timeline
+  // filters" card wants to show by default. "treatmentSpan" is a second,
+  // separate query with a narrower audience, so it stays opt-in.
   const EXTRA_DERIVED_KINDS: { metric: "lines" | "treatmentSpan"; label: (name: string) => string }[] = [
-    { metric: "lines", label: (name) => "Lines of '" + name + "'" },
     { metric: "treatmentSpan", label: (name) => "Time in '" + name + "' records" }
   ];
   const extraDerivedOn = (metric: string) => exExtraDerived.some((x) => x.metric === metric);
@@ -992,6 +1014,75 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     setExExtraDerived(next);
     fetchExplore();
   };
+
+  /**
+   * One side of the sequence-filter form -> an EventSelector, or null while
+   * that side is incomplete. A treatment-line pick reads LINE_NO as an
+   * attrs-equality (exact line) or a numeric predicate (>=/<=) — the same two
+   * shapes lib/compiler.ts's lineSelectorCte accepts, see EXAMPLES's
+   * "Reached 2nd line" for the equality form.
+   */
+  const seqSelector = (type: string, occ: "ANY" | "FIRST" | "LAST", lineOp: "=" | ">=" | "<=", lineNo: string): any => {
+    if (type === LINE_TYPE) {
+      const n = Number(lineNo);
+      if (!Number.isFinite(n) || lineNo.trim() === "") return null;
+      return lineOp === "="
+        ? { eventType: LINE_TYPE, attrs: [{ key: "LINE_NO", value: String(n) }] }
+        : { eventType: LINE_TYPE, numeric: { key: "LINE_NO", op: lineOp, value: n } };
+    }
+    if (!type) return null;
+    return { eventType: type, ...(occ !== "ANY" ? { occurrence: occ } : {}) };
+  };
+  const seqReady = (() => {
+    const a = seqSelector(seq.aType, seq.aOcc, seq.aLineOp, seq.aLineNo);
+    if (!a) return false;
+    if (seq.rel === "NONE") return true;
+    if ((seq.rel === "BEFORE" || seq.rel === "NOT_FOLLOWED_BY") && !(Number(seq.days) > 0)) return false;
+    return !!seqSelector(seq.bType, seq.bOcc, seq.bLineOp, seq.bLineNo);
+  })();
+  const addSeqFilter = () => {
+    const a = seqSelector(seq.aType, seq.aOcc, seq.aLineOp, seq.aLineNo);
+    if (!a) return;
+    const clause: any = { kind: "event", a, rel: { type: seq.rel } };
+    if (seq.rel !== "NONE") {
+      const b = seqSelector(seq.bType, seq.bOcc, seq.bLineOp, seq.bLineNo);
+      if (!b) return;
+      clause.b = b;
+      if (seq.rel === "BEFORE") clause.rel = { type: "BEFORE", maxDays: Number(seq.days) };
+      else if (seq.rel === "NOT_FOLLOWED_BY") clause.rel = { type: "NOT_FOLLOWED_BY", withinDays: Number(seq.days) };
+    }
+    if (seq.priorGuard) clause.priorGuard = true;
+    if (seq.lineGap !== 90 && (a.eventType === LINE_TYPE || (clause.b && clause.b.eventType === LINE_TYPE)))
+      clause.lineGap = seq.lineGap;
+    addClause(clause);
+    setSeq(s => ({ ...s, aType: "", aLineNo: "", rel: "NONE", bType: "", bLineNo: "" }));
+  };
+
+  /**
+   * The real, per-study "lines" bucket counts the "Derived timeline filters"
+   * card shows are just the existing "lines" derived metric — the same one
+   * "show more derivations" used to offer manually — kept in sync here
+   * instead: the study's own event vocabulary (and so `treatmentEventType()`)
+   * is only known once the FIRST Explore response lands, so this fires once
+   * that response reveals a treatment-like event, and again whenever it
+   * changes (switching studies). It is a no-op once `exExtraDerived` already
+   * matches, so it does not loop and does not refetch on every narrowing
+   * click — only on the transitions that actually change what "lines" means.
+   */
+  useEffect(() => {
+    if (!explore) return;
+    const tx = treatmentEventType();
+    const current = exExtraDerivedRef.current;
+    const inSync = tx
+      ? current.some((x) => x.metric === "lines" && x.eventType === tx.label)
+      : !current.some((x) => x.metric === "lines");
+    if (inSync) return;
+    const next = current.filter((x) => x.metric !== "lines");
+    if (tx) next.push({ metric: "lines", eventType: tx.label, lineGap: 90 });
+    exExtraDerivedRef.current = next;
+    setExExtraDerived(next);
+    fetchExplore();
+  }, [explore]); // eslint-disable-line
 
   const removeDraftClause = (i: number) => {
     try {
@@ -2109,7 +2200,10 @@ function Latency({ v }: { v: any }) {
                 </details>
               </div>
               <div className="derivedgrid">
-                {explore.derived.map(d => {
+                {/* "lines" is excluded here — it shows in its own "Derived timeline
+                    filters" card below (with the treatment-naive example and the
+                    custom builder alongside it) rather than twice on the page. */}
+                {explore.derived.filter(d => d.metric !== "lines").map(d => {
                   const max = Math.max(...d.buckets.map(b => b.n), 1);
                   const dEventType = (d as any).eventType as string | undefined;
                   const dLineGap = (d as any).lineGap as number | undefined;
@@ -2152,6 +2246,148 @@ function Latency({ v }: { v: any }) {
               </div>
             </div>
           )}
+          {explore && explore.events.length > 0 && (() => {
+            const tx = treatmentEventType();
+            const dr = parseDraft();
+            const leaves = ((dr && dr.all) || []);
+            const linesFacet = tx && explore.derived
+              ? explore.derived.find((d) => d.metric === "lines" && d.eventType === tx.label) : null;
+            const naiveFirst = (): any => tx && ({ kind: "event",
+              a: { eventType: tx.label, occurrence: "FIRST" }, rel: { type: "NONE" }, priorGuard: true });
+            const isNaiveFirst = tx && leaves.some((c: any) => c && c.kind === "event" &&
+              c.a?.eventType === tx.label && c.a?.occurrence === "FIRST" && c.priorGuard === true);
+            const isLineBucket = (b: { gte?: number; lt?: number }) => tx && leaves.some((c: any) => c && c.kind === "derived" &&
+              c.metric === "lines" && c.eventType === tx.label && (c.range || {}).gte === b.gte && (c.range || {}).lt === b.lt);
+            return (
+              <div className="card">
+                <div className="row" style={{ alignItems: "baseline" }}>
+                  <h2 style={{ margin: 0 }}>Derived timeline filters <span className="plain">— found from a sequence of events, not a single recorded fact</span></h2>
+                </div>
+                {!tx && (
+                  <p className="note" style={{ margin: "0.3rem 0" }}>This study records no treatment-like timeline events, so there is no generic "lines" example to offer — build a custom sequence below instead.</p>
+                )}
+                {tx && !linesFacet && (
+                  <p className="note" style={{ margin: "0.3rem 0" }}>computing this study's line-count breakdown…</p>
+                )}
+                {tx && linesFacet && (() => {
+                  const max = Math.max(...linesFacet.buckets.map((b) => b.n), 1);
+                  return (
+                    <div style={{ margin: "0.3rem 0" }}>
+                      <span className="meta">{linesFacet.label} <span title={linesFacet.note}>· {linesFacet.covered.toLocaleString()} patients</span></span>
+                      <div className="vallist">
+                        {linesFacet.buckets.map((b) => (
+                          <button key={b.label} className={isLineBucket(b) ? "valrow on" : "valrow"}
+                            title={linesFacet.note + " — click to filter"}
+                            onClick={() => addClause({ kind: "derived", metric: "lines", eventType: tx!.label, lineGap: linesFacet.lineGap,
+                              range: { ...(b.gte != null ? { gte: b.gte } : {}), ...(b.lt != null ? { lt: b.lt } : {}) } })}>
+                            <span className="vname">{b.label} line{b.label === "1" ? "" : "s"}</span>
+                            <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * b.n / max)) + "%" }} /></span>
+                            <span className="vn">{b.n.toLocaleString()}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <button className={isNaiveFirst ? "facet on" : "facet"} style={{ marginTop: "0.4rem" }}
+                        title={"first '" + tx.label + "' event, with no treatment recorded before it — exact count shown once added"}
+                        onClick={() => addClause(naiveFirst())}>first '{tx.label}', treatment-naive</button>
+                    </div>
+                  );
+                })()}
+                <details className="gearmenu inline" ref={seqFilterMenu.ref} onToggle={seqFilterMenu.onToggle}>
+                  <summary title="build any A/B temporal relationship — followed-by, during, not-followed-by — with a duration constraint">custom…</summary>
+                  <div className="gearmenu-items wide">
+                    <span className="meta">one event, or two related in time — built from this study's own timeline</span>
+                    <div className="setrow">
+                      <span className="meta">event</span>
+                      <select value={seq.aType} onChange={e => setSeq(s => ({ ...s, aType: e.target.value }))}>
+                        <option value="">choose…</option>
+                        {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
+                        {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
+                          <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
+                        ))}
+                      </select>
+                      {seq.aType === LINE_TYPE ? (
+                        <>
+                          <select value={seq.aLineOp} onChange={e => setSeq(s => ({ ...s, aLineOp: e.target.value as any }))}>
+                            <option value="=">line #</option>
+                            <option value=">=">line ≥</option>
+                            <option value="<=">line ≤</option>
+                          </select>
+                          <input type="number" min={1} placeholder="n" value={seq.aLineNo}
+                            onChange={e => setSeq(s => ({ ...s, aLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
+                        </>
+                      ) : seq.aType && (
+                        <select value={seq.aOcc} onChange={e => setSeq(s => ({ ...s, aOcc: e.target.value as any }))}>
+                          <option value="ANY">any occurrence</option>
+                          <option value="FIRST">first</option>
+                          <option value="LAST">last</option>
+                        </select>
+                      )}
+                    </div>
+                    <div className="setrow">
+                      <span className="meta">relationship</span>
+                      <select value={seq.rel} onChange={e => setSeq(s => ({ ...s, rel: e.target.value as any }))}>
+                        <option value="NONE">just has this event</option>
+                        <option value="BEFORE">→ followed by, within</option>
+                        <option value="DURING">happens during</option>
+                        <option value="NOT_FOLLOWED_BY">not followed by, within</option>
+                      </select>
+                      {(seq.rel === "BEFORE" || seq.rel === "NOT_FOLLOWED_BY") && (
+                        <>
+                          <input type="number" min={1} value={seq.days}
+                            onChange={e => setSeq(s => ({ ...s, days: e.target.value }))} style={{ width: "4rem" }} />
+                          <span className="meta">days</span>
+                        </>
+                      )}
+                    </div>
+                    {seq.rel !== "NONE" && (
+                      <div className="setrow">
+                        <span className="meta">{seq.rel === "DURING" ? "during" : "second event"}</span>
+                        <select value={seq.bType} onChange={e => setSeq(s => ({ ...s, bType: e.target.value }))}>
+                          <option value="">choose…</option>
+                          {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
+                          {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
+                            <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
+                          ))}
+                        </select>
+                        {seq.bType === LINE_TYPE ? (
+                          <>
+                            <select value={seq.bLineOp} onChange={e => setSeq(s => ({ ...s, bLineOp: e.target.value as any }))}>
+                              <option value="=">line #</option>
+                              <option value=">=">line ≥</option>
+                              <option value="<=">line ≤</option>
+                            </select>
+                            <input type="number" min={1} placeholder="n" value={seq.bLineNo}
+                              onChange={e => setSeq(s => ({ ...s, bLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
+                          </>
+                        ) : seq.bType && (
+                          <select value={seq.bOcc} onChange={e => setSeq(s => ({ ...s, bOcc: e.target.value as any }))}>
+                            <option value="ANY">any occurrence</option>
+                            <option value="FIRST">first</option>
+                            <option value="LAST">last</option>
+                          </select>
+                        )}
+                      </div>
+                    )}
+                    {(seq.aType === LINE_TYPE || seq.bType === LINE_TYPE) && (
+                      <div className="setrow">
+                        <span className="meta">new line after</span>
+                        <select value={String(seq.lineGap)} onChange={e => setSeq(s => ({ ...s, lineGap: Number(e.target.value) }))}>
+                          {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
+                        </select>
+                      </div>
+                    )}
+                    <label className="chk" title="restricts the first event to patients with no treatment recorded before it">
+                      <input type="checkbox" checked={seq.priorGuard}
+                        onChange={e => setSeq(s => ({ ...s, priorGuard: e.target.checked }))} />
+                      treatment-naive before the first event
+                    </label>
+                    <hr />
+                    <button className="facet" disabled={!seqReady} onClick={addSeqFilter}>add filter</button>
+                  </div>
+                </details>
+              </div>
+            );
+          })()}
           {explore && <div className="two-col" style={{ alignItems: "start" }}>
             <div>
               <div className="card">

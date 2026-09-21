@@ -14,7 +14,7 @@
 // and everything stays renderable as a sentence. Back-compat: the v1 flat event
 // shape {a, b?, rel, ...} is accepted anywhere a definition is expected.
 import { DB, STUDY } from "./ch.ts";
-import { compileCohort, sq } from "./compiler.ts";
+import { compileCohort, sq, LINE_TYPE } from "./compiler.ts";
 import { oqlLeafSql } from "./oql.ts";
 import { clinicalValueFoldSql, canonicalEventName } from "./event-names.ts";
 import type {
@@ -459,11 +459,21 @@ function leafText(leaf: any): string {
   }
   if (leaf.kind === "event" || (leaf.a && leaf.rel)) {
     const rel = leaf.rel || {};
+    const NUM_SYM: Record<string, string> = { ">": ">", ">=": "≥", "<": "<", "<=": "≤", "=": "" };
     const selText = (s: any): string => {
       if (!s) return "?";
+      const occ = s.occurrence === "FIRST" ? "first " : s.occurrence === "LAST" ? "last " : "";
+      // A treatment line's LINE_NO can arrive as an attrs equality or a numeric
+      // predicate (>=/<=) — "line 2" vs "line ≥2" — so read whichever is present
+      // rather than dropping the number the way a plain attrs/eventType join would.
+      if (s.eventType === LINE_TYPE) {
+        const eq = (s.attrs || []).find((a: any) => a.key === "LINE_NO");
+        const lineNo = eq ? eq.value
+          : s.numeric && s.numeric.key === "LINE_NO" ? (NUM_SYM[s.numeric.op] ?? s.numeric.op) + s.numeric.value : "n";
+        return occ + "line " + lineNo;
+      }
       const attrs = (s.attrs || []).map((a: any) => a.value).join(" ");
-      const base = (attrs ? attrs + " " : "") + s.eventType.replace(" (derived)", "").toLowerCase();
-      return (s.occurrence === "FIRST" ? "first " : s.occurrence === "LAST" ? "last " : "") + base;
+      return occ + (attrs ? attrs + " " : "") + s.eventType.replace(" (derived)", "").toLowerCase();
     };
     if (rel.type === "BEFORE") return selText(leaf.a) + " then " + selText(leaf.b) + " ≤" + rel.maxDays + "d";
     if (rel.type === "DURING") return selText(leaf.b) + " during " + selText(leaf.a);
