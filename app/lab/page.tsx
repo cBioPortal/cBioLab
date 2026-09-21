@@ -2,6 +2,7 @@
 import { use, useEffect, useLayoutEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
 import DslEditor from "./DslEditor.tsx";
+import QuickFilterBar from "./QuickFilterBar.tsx";
 import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
 import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
@@ -319,6 +320,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const [saved, setSaved] = useState<Record<string, { id: string; def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null }>>({});
   const [cName, setCName] = useState("");
   const [cDefText, setCDefText] = useState(JSON.stringify({ studies: [...DEFAULT_EXPLORE_STUDIES], all: [] }, null, 2));
+  const [cAdvanced, setCAdvanced] = useState(false); // Cohorts tab: raw-JSON escape hatch, off by default
   const [cPreview, setCPreview] = useState<{ error?: string; count?: number; text?: string } | null>(null);
   const [cBusy, setCBusy] = useState(false);
   const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
@@ -2546,9 +2548,33 @@ function Latency({ v }: { v: any }) {
             <h2>Create a cohort</h2>
             <label>Name</label>
             <input style={{ width: "100%" }} value={cName} onChange={e => setCName(e.target.value)} placeholder="e.g. KRAS-driver never-smokers" />
-            <label>Definition</label>
-            <DslEditor value={cDefText} onChange={setCDefText} minHeight="16rem"
-              genes={geneChoices()} attributes={explore ? explore.clinical.map(a => a.attribute) : []} />
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+              <label style={{ margin: 0 }}>Definition</label>
+              <button className="linklike" onClick={() => setCAdvanced(!cAdvanced)}>
+                {cAdvanced ? "back to filters" : "edit as JSON"}
+              </button>
+            </div>
+            {cAdvanced ? (
+              <DslEditor value={cDefText} onChange={setCDefText} minHeight="16rem"
+                genes={geneChoices()} attributes={explore ? explore.clinical.map(a => a.attribute) : []} />
+            ) : (
+              <QuickFilterBar
+                clauses={(() => { try { const d = normalizeDef(JSON.parse(cDefText)); return Array.isArray(d?.all) ? d.all : []; } catch { return []; } })()}
+                onAdd={addClause}
+                onRemove={(i) => {
+                  let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
+                  if (!d || !Array.isArray(d.all)) return;
+                  d.all = d.all.filter((_: unknown, j: number) => j !== i);
+                  setCDefText(JSON.stringify(d, null, 2)); setCPreview(null);
+                }}
+                ctx={{
+                  genes: geneChoices(),
+                  attributes: explore ? explore.clinical.map(a => a.attribute) : [],
+                  eventTypes: cat?.types ? cat.types.map((t: any) => t.t) : [],
+                  eventKeys: cat?.keys, eventValues: cat?.values
+                }}
+              />
+            )}
             {explore && (
               <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.4rem" }}>
                 <span className="meta">quick add:</span>
@@ -2588,7 +2614,10 @@ function Latency({ v }: { v: any }) {
                   onClick={() => { addClause({ kind: "oql", q: qaGene.trim().toUpperCase() + ":" }); setQaGene(""); }}>add gene</button>
               </div>
             )}
-            {(() => { let d = null; try { d = JSON.parse(cDefText); } catch {} return d ? (
+            {/* Only when editing raw JSON: QuickFilterBar already renders its
+                own live pills above, so showing a second copy here would just
+                duplicate it. */}
+            {cAdvanced && (() => { let d = null; try { d = JSON.parse(cDefText); } catch {} return d ? (
               <div style={{ margin: "0.55rem 0" }}>
                 <CohortPills def={d} onRemoveClause={(i: any) => {
                   const nd = normalizeDef(JSON.parse(cDefText));
@@ -2603,7 +2632,11 @@ function Latency({ v }: { v: any }) {
             {cPreview && (cPreview.error
               ? <div className="error">{cPreview.error}</div>
               : <p className="qdesc" style={{ marginTop: "0.6rem" }}><strong>{cPreview.count?.toLocaleString()}</strong> patients — {cPreview.text}</p>)}
-            <p className="note">Clause kinds: <code>oql</code> (genomic status, portal OQL syntax), <code>clinical</code> (attribute/op/value), <code>event</code> (timeline), <code>patients</code>; composed with <code>all</code> / <code>any</code> / <code>not</code>. Start from an example on the right, or ask chat above.</p>
+            {cAdvanced ? (
+              <p className="note">Clause kinds: <code>oql</code> (genomic status, portal OQL syntax), <code>clinical</code> (attribute/op/value), <code>event</code> (timeline), <code>sampleList</code> / <code>patientList</code>; composed with <code>all</code> / <code>any</code> / <code>not</code>. Start from an example on the right, or ask chat above.</p>
+            ) : (
+              <p className="note">Type a gene (<code>TP53: MUT</code>), an attribute (<code>SEX = Female</code>), or an event (<code>Treatment</code>, or <code>Diagnosis before Treatment &lt;=90d</code>) — prefix with <code>!</code> to negate. Start from an example on the right, or ask chat above.</p>
+            )}
           </div>
           <div className="card">
             <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.2rem" }}>
