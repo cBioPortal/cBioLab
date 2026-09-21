@@ -245,7 +245,7 @@ function suggestOqlAfterGene(text: string, ctx: QuickFilterContext): Suggestion[
       // A complete gene: the qualifier this app's docs lead with, plus the
       // one thing typing a bare gene can't express on its own — a second one.
       return [
-        ...OQL_MODIFIERS.map((m) => ({ label: m, apply: lead + exact + ": " + m, type: "oql" as const, detail: "OQL modifier" })),
+        ...OQL_MODIFIERS.map((m) => ({ label: ": " + m, apply: lead + exact + ": " + m, type: "oql" as const, detail: "OQL modifier" })),
         { label: exact + ";", apply: lead + exact + "; ", type: "oql" as const, detail: "OR another gene" }
       ];
     }
@@ -329,21 +329,103 @@ export function suggestToken(raw: string, ctx: QuickFilterContext = {}): Suggest
   if (exactAttr) {
     const values = (ctx.attributeValues || {})[exactAttr] || [];
     if (values.length)
-      return withPrefix(values.slice(0, 25).map((v) => ({ label: v, apply: bareLead + exactAttr + " = " + v, type: "value" })));
+      return withPrefix(values.slice(0, 25).map((v) => ({ label: "= " + v, apply: bareLead + exactAttr + " = " + v, type: "value" })));
     return withPrefix(CLIN_OPS.map((op) => ({ label: exactAttr + " " + op, apply: bareLead + exactAttr + " " + op + " ", type: "attribute", detail: "operator" })));
   }
   const exactGene = (ctx.genes || []).find((g) => g.toLowerCase() === bare.toLowerCase());
   if (exactGene) {
     return withPrefix([
-      ...OQL_MODIFIERS.map((m) => ({ label: m, apply: bareLead + exactGene + ": " + m, type: "oql" as const, detail: "OQL modifier" })),
+      ...OQL_MODIFIERS.map((m) => ({ label: ": " + m, apply: bareLead + exactGene + ": " + m, type: "oql" as const, detail: "OQL modifier" })),
       { label: exactGene + ";", apply: bareLead + exactGene + "; ", type: "oql" as const, detail: "OR another gene" }
     ]);
   }
 
   // No exact match yet: mix event types, attribute names and genes — the
-  // same "any facet could start here" list a Datadog-style bar shows.
-  const events = byPrefix(ctx.eventTypes || [], bare).map((t) => ({ label: t, apply: bareLead + t + ": ", type: "event", detail: "timeline event" }));
-  const attrs = byPrefix(ctx.attributes || [], bare).map((a) => ({ label: a, apply: bareLead + a, type: "attribute", detail: "clinical attribute" }));
-  const genes = byPrefix(ctx.genes || [], bare).map((g) => ({ label: g, apply: bareLead + g, type: "gene", detail: "gene" }));
+  // same "any facet could start here" list a Datadog-style bar shows. Each
+  // label carries the symbol that qualifies it (":" for an event or gene,
+  // " =" for an attribute) so the list itself says "there's more after
+  // this" — apply still only completes the word, not the symbol: typing it
+  // is what the exact-match branches above are watching for, and jumping
+  // straight to "TP53: " here would skip past the OQL-modifier suggestions
+  // that showing the bare, complete gene name triggers on the next keystroke.
+  const events = byPrefix(ctx.eventTypes || [], bare).map((t) => ({ label: t + ":", apply: bareLead + t + ": ", type: "event", detail: "timeline event" }));
+  const attrs = byPrefix(ctx.attributes || [], bare).map((a) => ({ label: a + " =", apply: bareLead + a, type: "attribute", detail: "clinical attribute" }));
+  const genes = byPrefix(ctx.genes || [], bare).map((g) => ({ label: g + ":", apply: bareLead + g, type: "gene", detail: "gene" }));
   return withPrefix([...events, ...attrs, ...genes].slice(0, 30));
+}
+
+// A fixed illustrative set, used only when live catalog data isn't loaded
+// yet (so the panel is never empty on first paint) — every real example
+// below prefers actual data instead. Deliberately covers the full grammar,
+// not just the two or three most common shapes — this panel is the
+// documentation, so it should read like a tour, not a teaser.
+const STATIC_EXAMPLES: Suggestion[] = [
+  { label: "TP53: MUT", apply: "TP53: MUT", type: "example", detail: "gene mutated" },
+  { label: "STK11: DRIVER", apply: "STK11: DRIVER", type: "example", detail: "OncoKB driver call" },
+  { label: "EGFR: AMP", apply: "EGFR: AMP", type: "example", detail: "amplified" },
+  { label: "TP53: MUT; KRAS: MUT", apply: "TP53: MUT; KRAS: MUT", type: "example", detail: "either gene (OR)" },
+  { label: "SEX = Female", apply: "SEX = Female", type: "example", detail: "clinical attribute" },
+  { label: "CURRENT_AGE_DEID > 65", apply: "CURRENT_AGE_DEID > 65", type: "example", detail: "numeric attribute" },
+  { label: "Treatment", apply: "Treatment", type: "example", detail: "has this event" },
+  { label: "first Diagnosis", apply: "first Diagnosis", type: "example", detail: "first occurrence" },
+  { label: "Diagnosis before Treatment <=90d", apply: "Diagnosis before Treatment <=90d", type: "example", detail: "A, then B within 90 days" },
+  { label: "Treatment during Diagnosis", apply: "Treatment during Diagnosis", type: "example", detail: "A falls within B's span" },
+  { label: "Treatment not_followed_by Progression <=180d", apply: "Treatment not_followed_by Progression <=180d", type: "example", detail: "A, with no B after" },
+  { label: "!TP53: MUT", apply: "!TP53: MUT", type: "example", detail: "negated" }
+];
+
+/**
+ * What the empty input shows before anyone types — real, clickable examples
+ * built from THIS study's own catalog wherever possible, so every one of
+ * them is guaranteed to actually parse and match something here, not just
+ * be illustrative. Falls back to STATIC_EXAMPLES only while that catalog
+ * data hasn't loaded yet, and tops up with it too if this study's own data
+ * doesn't stretch to cover every shape (e.g. too few event types for a
+ * relation example) — a shorter but still-real list beats padding with
+ * invented ones, but a mostly-empty panel teaches nothing.
+ */
+export function exampleSuggestions(ctx: QuickFilterContext = {}): Suggestion[] {
+  const genes = ctx.genes || [];
+  const attributes = ctx.attributes || [];
+  const eventTypes = ctx.eventTypes || [];
+  const catAttr = attributes.find((a) => ((ctx.attributeValues || {})[a] || []).length > 0);
+  const catVal = catAttr ? (ctx.attributeValues || {})[catAttr][0] : undefined;
+  const numAttr = attributes.find((a) => !((ctx.attributeValues || {})[a] || []).length);
+  const ev1 = eventTypes[0];
+  const ev2 = eventTypes.find((e) => e !== ev1);
+  const ev3 = eventTypes.find((e) => e !== ev1 && e !== ev2);
+  const evWithKey = eventTypes.find((e) => ((ctx.eventKeys || {})[e] || []).length > 0);
+  const key = evWithKey ? (ctx.eventKeys || {})[evWithKey][0] : undefined;
+  const val = evWithKey && key ? ((ctx.eventValues || {})[evWithKey] || {})[key]?.[0] : undefined;
+
+  const out: Suggestion[] = [];
+  if (genes[0]) out.push({ label: genes[0] + ": MUT", apply: genes[0] + ": MUT", type: "example", detail: "gene mutated" });
+  if (genes[1]) out.push({ label: genes[1] + ": DRIVER", apply: genes[1] + ": DRIVER", type: "example", detail: "OncoKB driver call" });
+  if (genes[2]) out.push({ label: genes[2] + ": AMP", apply: genes[2] + ": AMP", type: "example", detail: "amplified" });
+  if (genes[0] && genes[1]) out.push({ label: genes[0] + ": MUT; " + genes[1] + ": MUT", apply: genes[0] + ": MUT; " + genes[1] + ": MUT", type: "example", detail: "either gene (OR)" });
+  // Kept right after the other gene examples (not appended at the end):
+  // genes and clinical attributes both load from the one `explore` fetch,
+  // but event types load from a separate, later `cat` fetch. If this stayed
+  // last, it would visibly jump further down the list the moment events
+  // arrive — new rows should only ever append below, never reorder one
+  // that's already on screen while someone's looking at it.
+  if (genes[0]) out.push({ label: "!" + genes[0] + ": MUT", apply: "!" + genes[0] + ": MUT", type: "example", detail: "negated" });
+  if (catAttr && catVal) out.push({ label: catAttr + " = " + catVal, apply: catAttr + " = " + catVal, type: "example", detail: "clinical attribute" });
+  if (numAttr) out.push({ label: numAttr + " > 50", apply: numAttr + " > 50", type: "example", detail: "numeric attribute" });
+  if (ev1) out.push({ label: ev1, apply: ev1, type: "example", detail: "has this event" });
+  if (ev1) out.push({ label: "first " + ev1, apply: "first " + ev1, type: "example", detail: "first occurrence" });
+  if (evWithKey && key && val) out.push({ label: evWithKey + ": " + key + "=" + val, apply: evWithKey + ": " + key + "=" + val, type: "example", detail: "event with a filter" });
+  if (ev1 && ev2) out.push({ label: ev1 + " before " + ev2 + " <=90d", apply: ev1 + " before " + ev2 + " <=90d", type: "example", detail: "A, then B within 90 days" });
+  if (ev1 && ev2) out.push({ label: ev2 + " during " + ev1, apply: ev2 + " during " + ev1, type: "example", detail: "A falls within B's span" });
+  if (ev1 && (ev3 || ev2)) {
+    const other = ev3 || ev2!;
+    out.push({ label: ev1 + " not_followed_by " + other + " <=180d", apply: ev1 + " not_followed_by " + other + " <=180d", type: "example", detail: "A, with no B after" });
+  }
+
+  // Top up with STATIC_EXAMPLES only when there's no real data at all —
+  // mixing in a hardcoded "Diagnosis"/"Treatment"/"STK11" once ctx is
+  // PARTIALLY loaded would risk showing an example that doesn't actually
+  // exist in THIS study, breaking the one guarantee this list makes. A
+  // shorter but entirely real list is correct; a longer one that lies isn't.
+  return out.length ? out : STATIC_EXAMPLES;
 }

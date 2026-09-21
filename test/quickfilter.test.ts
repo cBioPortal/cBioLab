@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { parseToken, suggestToken, type QuickFilterContext } from "../lib/quickfilter.ts";
+import { parseToken, suggestToken, exampleSuggestions, type QuickFilterContext } from "../lib/quickfilter.ts";
 
 const ctx: QuickFilterContext = {
   genes: ["TP53", "KRAS", "STK11"],
@@ -109,11 +109,25 @@ describe("parseToken: event relations", () => {
 });
 
 describe("suggestToken", () => {
-  test("bare partial word suggests matching events, attributes and genes together", () => {
+  test("bare partial word suggests matching events, attributes and genes together, labeled with their qualifying symbol", () => {
     const s = suggestToken("T", ctx);
     const labels = s.map((x) => x.label);
-    assert.ok(labels.includes("Treatment"));
-    assert.ok(labels.includes("TP53"));
+    // ":" for an event or gene (both take a qualifier after a colon), " =" for
+    // an attribute — the label says what's next; picking one still only
+    // completes the bare word (see the "apply" assertions below), so the
+    // exact-match branches get a chance to offer the real next-step options.
+    assert.ok(labels.includes("Treatment:"));
+    assert.ok(labels.includes("TP53:"));
+    const treatment = s.find((x) => x.label === "Treatment:")!;
+    assert.equal(treatment.apply, "Treatment: ");
+    const tp53 = s.find((x) => x.label === "TP53:")!;
+    assert.equal(tp53.apply, "TP53");
+  });
+  test("bare partial word matching an attribute is labeled with a trailing '=' too", () => {
+    const s = suggestToken("SE", ctx);
+    const sex = s.find((x) => x.label === "SEX =");
+    assert.ok(sex);
+    assert.equal(sex!.apply, "SEX"); // completes the word only; typing it further triggers the value suggestions
   });
   test("after a known event type + colon, suggest its attribute keys", () => {
     const s = suggestToken("Treatment: SUB", ctx);
@@ -133,9 +147,11 @@ describe("suggestToken", () => {
   test("a complete gene (no colon yet) suggests OQL qualifiers and a second gene", () => {
     const s = suggestToken("TP53", ctx);
     const labels = s.map((x) => x.label);
-    assert.ok(labels.includes("MUT"));
-    assert.ok(labels.includes("DRIVER"));
-    assert.equal(s.find((x) => x.label === "MUT")!.apply, "TP53: MUT");
+    // labels carry the leading ":" since the user hasn't typed it yet — the
+    // suggestion is the whole qualifier, not just the bare modifier word.
+    assert.ok(labels.includes(": MUT"));
+    assert.ok(labels.includes(": DRIVER"));
+    assert.equal(s.find((x) => x.label === ": MUT")!.apply, "TP53: MUT");
     const chain = s.find((x) => x.label === "TP53;");
     assert.ok(chain);
     assert.equal(chain!.apply, "TP53; ");
@@ -165,12 +181,13 @@ describe("suggestToken", () => {
   });
   test("a second gene typed in full (no colon yet) offers its own OQL qualifiers", () => {
     const s = suggestToken("TP53; KRAS", ctx);
-    assert.ok(s.map((x) => x.label).includes("MUT"));
-    assert.equal(s.find((x) => x.label === "MUT")!.apply, "TP53; KRAS: MUT");
+    assert.ok(s.map((x) => x.label).includes(": MUT"));
+    assert.equal(s.find((x) => x.label === ": MUT")!.apply, "TP53; KRAS: MUT");
   });
   test("a complete attribute name (no operator yet) suggests real values", () => {
     const s = suggestToken("SEX", ctx);
-    assert.deepEqual(s.map((x) => x.label), ["Female", "Male"]);
+    // labels carry the leading "=" since the user hasn't typed it yet.
+    assert.deepEqual(s.map((x) => x.label), ["= Female", "= Male"]);
     assert.equal(s[0].apply, "SEX = Female");
   });
   test("a complete NUMERIC attribute (no known values) suggests operators instead", () => {
@@ -186,8 +203,43 @@ describe("suggestToken", () => {
   });
   test("negation prefix survives into applied suggestions", () => {
     const s1 = suggestToken("!TP53", ctx);
-    assert.equal(s1.find((x) => x.label === "MUT")!.apply, "!TP53: MUT");
+    assert.equal(s1.find((x) => x.label === ": MUT")!.apply, "!TP53: MUT");
     const s2 = suggestToken("NOT SEX", ctx);
     assert.equal(s2[0].apply, "NOT SEX = Female");
+  });
+});
+
+describe("exampleSuggestions: shown before anyone types", () => {
+  test("built from real catalog data, and every one of them actually parses", () => {
+    const examples = exampleSuggestions(ctx);
+    assert.ok(examples.length >= 5);
+    for (const ex of examples) {
+      // guarantees the taught example isn't a lie: everything shown as "try
+      // this" must survive parseToken against the SAME context
+      assert.doesNotThrow(() => parseToken(ex.apply, ctx), `example "${ex.apply}" does not parse`);
+    }
+    const labels = examples.map((e) => e.label);
+    assert.ok(labels.some((l) => l.startsWith("TP53")));
+    assert.ok(labels.some((l) => l.startsWith("SEX =")));
+  });
+  test("falls back to a fixed illustrative set when no catalog data is loaded yet", () => {
+    const examples = exampleSuggestions({});
+    assert.ok(examples.length > 0);
+    assert.equal(examples[0].label, "TP53: MUT");
+  });
+  test("a partially-loaded, unrelated study never mixes in the hardcoded fallback names", () => {
+    // real data, but for a DIFFERENT study than the fallback examples assume
+    // (no "TP53"/"Diagnosis"/"Treatment"/"STK11" anywhere) — every returned
+    // example must still parse against THIS context, never borrow a name
+    // from the fallback set just to pad the list out
+    const otherCtx: QuickFilterContext = {
+      genes: ["EGFR"],
+      attributes: ["RACE"],
+      attributeValues: { RACE: ["White", "Black"] },
+      eventTypes: ["Surgery"] // only one type: no relation example is possible
+    };
+    const examples = exampleSuggestions(otherCtx);
+    for (const ex of examples) assert.doesNotThrow(() => parseToken(ex.apply, otherCtx), `example "${ex.apply}" does not parse against otherCtx`);
+    assert.ok(!examples.some((e) => /TP53|STK11|Diagnosis|Treatment|SEX|CURRENT_AGE_DEID/.test(e.apply)));
   });
 });

@@ -27,7 +27,7 @@
 // the other.
 import { useRef, useState } from "react";
 import CohortPills from "./pills";
-import { parseToken, suggestToken, type QuickFilterContext, type Suggestion } from "../../lib/quickfilter.ts";
+import { parseToken, suggestToken, exampleSuggestions, type QuickFilterContext, type Suggestion } from "../../lib/quickfilter.ts";
 import type { Clause } from "../../lib/types.ts";
 
 export default function QuickFilterBar({
@@ -45,7 +45,13 @@ export default function QuickFilterBar({
   const [highlighted, setHighlighted] = useState(-1);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const suggestions: Suggestion[] = draft.trim() ? suggestToken(draft, ctx) : [];
+  // Before anyone types, the panel teaches by example rather than sitting
+  // empty — every example is built from this study's own real data (or a
+  // fixed fallback while that hasn't loaded yet) and is guaranteed to
+  // actually parse, so "try this" is never a lie. Once typing starts, real
+  // matching suggestions take over exactly as before.
+  const isExamples = !draft.trim();
+  const suggestions: Suggestion[] = isExamples ? exampleSuggestions(ctx) : suggestToken(draft, ctx);
   const showSuggestions = open && suggestions.length > 0;
 
   const commit = () => {
@@ -97,6 +103,7 @@ export default function QuickFilterBar({
         </div>
         {showSuggestions && (
           <div className="qf-suggest" role="listbox">
+            {isExamples && <div className="qf-suggest-header">Examples — click one to try it</div>}
             {suggestions.map((s, i) => (
               <div key={s.type + s.label + i} role="option" aria-selected={i === highlighted}
                 className={"qf-suggest-row" + (i === highlighted ? " on" : "")}

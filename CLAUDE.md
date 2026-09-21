@@ -161,6 +161,14 @@ still holds, against a running server.
   `node e2e.cjs` needs a fresh production build and a real browser, so it's slow. While iterating,
   use `next dev`'s hot reload for visual changes and `npm test` (fast, no build) for logic
   changes; run the full build+e2e gate once, right before commit/push.
+  **A live correction loop is still "iterating," even across several distinct-feeling fixes.**
+  When the user is actively steering something just built ("make it taller", "add the leading
+  symbol", "that's not quite it") — each reply is a correction on the SAME piece of work, not a
+  new finished feature, however complete any one step feels on its own. Keep using `npm test` +
+  Playwright-against-`next dev` to verify each correction; do not run the full build+e2e gate
+  between them. Gate once, only when the user says the feature itself is done (asking to commit,
+  merge, or move to something unrelated) — not preemptively "just in case," and not because a
+  sub-step reached a natural stopping point.
 - **Branch from `master`, work on a feature branch, and leave the merge to a person.** There is
   no staging trunk: the `analysis` branch was retired once it stopped being a distinct line of
   development and became a second name for `master`. Name a branch after the work, push it, and
