@@ -10,7 +10,8 @@ const ctx: QuickFilterContext = {
   eventValues: {
     Treatment: { SUBTYPE: ["Immunotherapy", "Chemotherapy"] },
     Lab_Test: { TEST: ["PSA", "CEA"] }
-  }
+  },
+  attributeValues: { SEX: ["Female", "Male"], CANCER_TYPE: ["Non-Small Cell Lung Cancer", "Breast Cancer"] }
 };
 
 describe("parseToken: OQL", () => {
@@ -128,4 +129,65 @@ describe("suggestToken", () => {
     assert.deepEqual(suggestToken("Diagnosis before Tre", ctx), []);
   });
   test("empty draft suggests nothing", () => assert.deepEqual(suggestToken("", ctx), []));
+
+  test("a complete gene (no colon yet) suggests OQL qualifiers and a second gene", () => {
+    const s = suggestToken("TP53", ctx);
+    const labels = s.map((x) => x.label);
+    assert.ok(labels.includes("MUT"));
+    assert.ok(labels.includes("DRIVER"));
+    assert.equal(s.find((x) => x.label === "MUT")!.apply, "TP53: MUT");
+    const chain = s.find((x) => x.label === "TP53;");
+    assert.ok(chain);
+    assert.equal(chain!.apply, "TP53; ");
+  });
+  test("after GENE:, suggest OQL modifiers", () => {
+    const s = suggestToken("TP53: MU", ctx);
+    assert.ok(s.map((x) => x.label).includes("MUT"));
+    assert.equal(s.find((x) => x.label === "MUT")!.apply, "TP53: MUT");
+  });
+  test("MUT= continues into protein-change classes in suggestions too", () => {
+    const s = suggestToken("TP53: MUT=TRU", ctx);
+    assert.deepEqual(s.map((x) => x.label), ["TRUNC"]);
+    assert.equal(s[0].apply, "TP53: MUT=TRUNC");
+  });
+  test("a second gene after ';' suggests modifiers for THAT gene, not the first", () => {
+    const s = suggestToken("TP53: MUT; KRAS: MU", ctx);
+    assert.ok(s.map((x) => x.label).includes("MUT"));
+    assert.equal(s.find((x) => x.label === "MUT")!.apply, "TP53: MUT; KRAS: MUT");
+  });
+  test("typing the second gene's NAME (no colon yet) still gets gene suggestions, not silence", () => {
+    // this is the state right after picking "TP53;" from the chain-suggestion
+    // and starting to type the next gene — must not fall through to nothing
+    // just because there's no colon anywhere in the CURRENT entry yet
+    const s = suggestToken("TP53; KRA", ctx);
+    assert.deepEqual(s.map((x) => x.label), ["KRAS"]);
+    assert.equal(s[0].apply, "TP53; KRAS");
+  });
+  test("a second gene typed in full (no colon yet) offers its own OQL qualifiers", () => {
+    const s = suggestToken("TP53; KRAS", ctx);
+    assert.ok(s.map((x) => x.label).includes("MUT"));
+    assert.equal(s.find((x) => x.label === "MUT")!.apply, "TP53; KRAS: MUT");
+  });
+  test("a complete attribute name (no operator yet) suggests real values", () => {
+    const s = suggestToken("SEX", ctx);
+    assert.deepEqual(s.map((x) => x.label), ["Female", "Male"]);
+    assert.equal(s[0].apply, "SEX = Female");
+  });
+  test("a complete NUMERIC attribute (no known values) suggests operators instead", () => {
+    const s = suggestToken("CURRENT_AGE_DEID", ctx);
+    const labels = s.map((x) => x.label);
+    assert.ok(labels.includes("CURRENT_AGE_DEID >"));
+    assert.equal(s.find((x) => x.label === "CURRENT_AGE_DEID >")!.apply, "CURRENT_AGE_DEID > ");
+  });
+  test("after ATTR =, filters values by what's typed so far", () => {
+    const s = suggestToken("CANCER_TYPE = Non", ctx);
+    assert.deepEqual(s.map((x) => x.label), ["Non-Small Cell Lung Cancer"]);
+    assert.equal(s[0].apply, "CANCER_TYPE = Non-Small Cell Lung Cancer");
+  });
+  test("negation prefix survives into applied suggestions", () => {
+    const s1 = suggestToken("!TP53", ctx);
+    assert.equal(s1.find((x) => x.label === "MUT")!.apply, "!TP53: MUT");
+    const s2 = suggestToken("NOT SEX", ctx);
+    assert.equal(s2[0].apply, "NOT SEX = Female");
+  });
 });

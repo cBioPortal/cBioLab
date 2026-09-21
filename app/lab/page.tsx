@@ -2567,6 +2567,9 @@ function Latency({ v }: { v: any }) {
                 ctx={{
                   genes: geneChoices(),
                   attributes: explore ? explore.clinical.map(a => a.attribute) : [],
+                  attributeValues: explore
+                    ? Object.fromEntries(explore.clinical.filter(a => a.kind === "cat").map(a => [a.attribute, a.values.map(v => v.v)]))
+                    : {},
                   eventTypes: cat?.types ? cat.types.map((t: any) => t.t) : [],
                   eventKeys: cat?.keys, eventValues: cat?.values
                 }}

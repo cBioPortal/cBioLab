@@ -22,6 +22,7 @@
 // short alphanumeric token and would otherwise swallow a mistyped event type
 // or attribute name as a nonsense gene symbol.
 import type { Clause, Leaf, EventSelector, EventRel, ClinicalOp } from "./types.ts";
+import { OQL_MODIFIERS, OQL_PCHANGE_CLASSES } from "./dsl-completions.ts";
 
 export interface QuickFilterContext {
   genes?: string[];
@@ -31,6 +32,8 @@ export interface QuickFilterContext {
   eventKeys?: Record<string, string[]>;
   /** eventType -> key -> known values (from GET /api/catalog's `values`) */
   eventValues?: Record<string, Record<string, string[]>>;
+  /** attribute -> known categorical values (numeric attributes have none) */
+  attributeValues?: Record<string, string[]>;
 }
 
 export interface Suggestion {
@@ -223,11 +226,58 @@ function byPrefix<T extends string>(candidates: T[], prefix: string): T[] {
   return candidates.filter((c) => c.toLowerCase().startsWith(p));
 }
 
-export function suggestToken(raw: string, ctx: QuickFilterContext = {}): Suggestion[] {
-  const text = raw.replace(/^!\s*|^not\s+/i, "");
-  if (!text) return [];
+/**
+ * Suggestions for OQL text after a gene, handling ";"-separated multi-gene
+ * entries the same way lib/oql.ts's own grammar does: "TP53: MUT; KRAS<cursor>"
+ * suggests a SECOND gene, not a continuation of TP53's modifier.
+ */
+function suggestOqlAfterGene(text: string, ctx: QuickFilterContext): Suggestion[] {
+  const entries = text.split(/[;\n]/);
+  const current = entries[entries.length - 1];
+  const base = text.slice(0, text.length - current.length);
+  const colon = current.indexOf(":");
 
-  // Inside an event's filter clause (after "EventType:")?
+  if (colon < 0) {
+    const partial = current.replace(/^\s+/, "");
+    const lead = base + current.slice(0, current.length - partial.length);
+    const exact = (ctx.genes || []).find((g) => g.toLowerCase() === partial.toLowerCase());
+    if (exact) {
+      // A complete gene: the qualifier this app's docs lead with, plus the
+      // one thing typing a bare gene can't express on its own — a second one.
+      return [
+        ...OQL_MODIFIERS.map((m) => ({ label: m, apply: lead + exact + ": " + m, type: "oql" as const, detail: "OQL modifier" })),
+        { label: exact + ";", apply: lead + exact + "; ", type: "oql" as const, detail: "OR another gene" }
+      ];
+    }
+    if (!partial) return [];
+    return byPrefix(ctx.genes || [], partial).slice(0, 20).map((g) => ({ label: g, apply: lead + g, type: "gene" as const }));
+  }
+
+  const afterColon = current.slice(colon + 1);
+  const m = /([A-Za-z0-9=<>._-]*)$/.exec(afterColon);
+  const partial = m ? m[1] : "";
+  const lead = text.slice(0, text.length - partial.length);
+  if (/^MUT=/i.test(partial)) {
+    const rest = partial.slice(4);
+    return byPrefix(OQL_PCHANGE_CLASSES, rest).map((o) => ({ label: o, apply: lead + "MUT=" + o, type: "keyword" as const }));
+  }
+  if (!partial) return [];
+  return byPrefix(OQL_MODIFIERS, partial).map((o) => ({ label: o, apply: lead + o, type: "keyword" as const, detail: "OQL modifier" }));
+}
+
+export function suggestToken(raw: string, ctx: QuickFilterContext = {}): Suggestion[] {
+  const negMatch = /^(!\s*|not\s+)/i.exec(raw);
+  const prefix = negMatch ? negMatch[0] : "";
+  const text = raw.slice(prefix.length);
+  if (!text) return [];
+  // apply-strings below are built relative to `text` (negation already
+  // stripped); reattach it here so picking a suggestion never silently drops
+  // a "!"/"NOT " the user already typed.
+  const withPrefix = (list: Suggestion[]): Suggestion[] => (prefix ? list.map((s) => ({ ...s, apply: prefix + s.apply })) : list);
+
+  // Inside an event's filter clause (after "EventType:"), OR after a gene's
+  // colon (OQL modifier) — same delimiter, disambiguated by which kind of
+  // real name precedes it.
   const colon = text.indexOf(":");
   if (colon >= 0) {
     const typeWord = text.slice(0, colon).replace(/^(first|last)\s+/i, "").trim();
@@ -240,26 +290,60 @@ export function suggestToken(raw: string, ctx: QuickFilterContext = {}): Suggest
       if (eq) {
         const [, key, , valPartial] = eq;
         const values = ((ctx.eventValues || {})[eventType] || {})[key] || [];
-        return byPrefix(values, valPartial).slice(0, 20).map((v) => ({ label: v, apply: base + key + "=" + v, type: "value" }));
+        return withPrefix(byPrefix(values, valPartial).slice(0, 20).map((v) => ({ label: v, apply: base + key + "=" + v, type: "value" })));
       }
       const keys = (ctx.eventKeys || {})[eventType] || [];
-      return byPrefix(keys, lastTok).slice(0, 20).map((k) => ({ label: k, apply: base + k + "=", type: "key" }));
+      return withPrefix(byPrefix(keys, lastTok).slice(0, 20).map((k) => ({ label: k, apply: base + k + "=", type: "key" })));
     }
+    if (GENE_RE.test(typeWord)) return withPrefix(suggestOqlAfterGene(text, ctx));
+    return [];
   }
+
+  // A ";" is OQL-only syntax (multiple genes, ORed) — an unambiguous signal
+  // to route into the entry-aware OQL suggester even before the new entry
+  // has grown its OWN colon yet, i.e. while still typing the second gene's
+  // NAME ("TP53: MUT; KRA") rather than its modifier.
+  if (text.includes(";")) return withPrefix(suggestOqlAfterGene(text, ctx));
 
   // A relation keyword already typed: nothing further to suggest here — the
   // right-hand event and the day window are free text.
   if (REL_WORDS.some(({ re }) => re.test(text))) return [];
 
-  // Composing a clinical predicate already past the attribute name?
-  const clinMatch = (ctx.attributes || []).find((a) => new RegExp("^" + a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*(!=|>=|<=|=|>|<)", "i").test(text));
-  if (clinMatch) return [];
+  // Composing a clinical predicate already past the attribute name + operator?
+  for (const attr of ctx.attributes || []) {
+    const re = new RegExp("^" + attr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*(!=|>=|<=|=|>|<)\\s*(.*)$", "i");
+    const m = re.exec(text);
+    if (!m) continue;
+    const [, , valPartial] = m;
+    const values = (ctx.attributeValues || {})[attr] || [];
+    if (!values.length) return []; // numeric attribute: nothing to suggest for a typed-in number
+    return withPrefix(byPrefix(values, valPartial).slice(0, 25).map((v) => ({ label: v, apply: attr + " = " + v, type: "value" })));
+  }
 
-  // Bare word so far: mix event types, attribute names and genes/OQL — the
-  // same "any facet could start here" list a Datadog-style bar shows.
+  // Bare word so far: an EXACT match on a known attribute or gene jumps
+  // straight to "what comes next" (values, or OQL qualifiers) instead of
+  // just re-listing the one word already typed.
   const bare = text.replace(/^(first|last)\s+/i, "");
-  const events = byPrefix(ctx.eventTypes || [], bare).map((t) => ({ label: t, apply: t + ": ", type: "event", detail: "timeline event" }));
-  const attrs = byPrefix(ctx.attributes || [], bare).map((a) => ({ label: a, apply: a + " = ", type: "attribute", detail: "clinical attribute" }));
-  const genes = byPrefix(ctx.genes || [], bare).map((g) => ({ label: g, apply: g + ": ", type: "gene", detail: "gene" }));
-  return [...events, ...attrs, ...genes].slice(0, 30);
+  const bareLead = text.slice(0, text.length - bare.length);
+  const exactAttr = (ctx.attributes || []).find((a) => a.toLowerCase() === bare.toLowerCase());
+  if (exactAttr) {
+    const values = (ctx.attributeValues || {})[exactAttr] || [];
+    if (values.length)
+      return withPrefix(values.slice(0, 25).map((v) => ({ label: v, apply: bareLead + exactAttr + " = " + v, type: "value" })));
+    return withPrefix(CLIN_OPS.map((op) => ({ label: exactAttr + " " + op, apply: bareLead + exactAttr + " " + op + " ", type: "attribute", detail: "operator" })));
+  }
+  const exactGene = (ctx.genes || []).find((g) => g.toLowerCase() === bare.toLowerCase());
+  if (exactGene) {
+    return withPrefix([
+      ...OQL_MODIFIERS.map((m) => ({ label: m, apply: bareLead + exactGene + ": " + m, type: "oql" as const, detail: "OQL modifier" })),
+      { label: exactGene + ";", apply: bareLead + exactGene + "; ", type: "oql" as const, detail: "OR another gene" }
+    ]);
+  }
+
+  // No exact match yet: mix event types, attribute names and genes — the
+  // same "any facet could start here" list a Datadog-style bar shows.
+  const events = byPrefix(ctx.eventTypes || [], bare).map((t) => ({ label: t, apply: bareLead + t + ": ", type: "event", detail: "timeline event" }));
+  const attrs = byPrefix(ctx.attributes || [], bare).map((a) => ({ label: a, apply: bareLead + a, type: "attribute", detail: "clinical attribute" }));
+  const genes = byPrefix(ctx.genes || [], bare).map((g) => ({ label: g, apply: bareLead + g, type: "gene", detail: "gene" }));
+  return withPrefix([...events, ...attrs, ...genes].slice(0, 30));
 }

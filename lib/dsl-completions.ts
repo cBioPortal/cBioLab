@@ -53,12 +53,12 @@ const DERIVED_METRICS = ["followupMonths", "historyMonths", "alteredGenes", "lin
 // file has no exported token list of its own (parseSpec branches on string
 // literals inline). A token offered here that parseOql would reject is worse
 // than no suggestion, so this must never drift ahead of what actually compiles.
-const OQL_MODIFIERS = [
+export const OQL_MODIFIERS = [
   "MUT", "MUT=", "MISSENSE", "NONSENSE", "TRUNC", "INFRAME", "SPLICE",
   "AMP", "HOMDEL", "CNA", "FUSION", "DRIVER",
   "EXP>", "EXP<", "EXP>=", "EXP<=", "PROT>", "PROT<", "PROT>=", "PROT<="
 ];
-const OQL_PCHANGE_CLASSES = ["MISSENSE", "NONSENSE", "TRUNC", "INFRAME", "SPLICE"];
+export const OQL_PCHANGE_CLASSES = ["MISSENSE", "NONSENSE", "TRUNC", "INFRAME", "SPLICE"];
 
 function byPrefix(candidates: string[], prefix: string): string[] {
   const p = prefix.toUpperCase();
