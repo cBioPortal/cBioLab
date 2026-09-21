@@ -773,26 +773,12 @@ details.gearmenu.inline[open] > summary {
   background: var(--code-bg); border-left: 3px solid var(--accent-ink); border-radius: 0 5px 5px 0;
 }
 
-/* The workspace section: what this saved analysis is called, its parameters and
-   its notes, at the top of the column of figures it describes. Collapsible,
-   because it is read when setting the workspace up and rarely after. */
-.wscard { padding: 0.7rem 0.9rem; }
-.wscard > summary {
-  cursor: pointer; list-style: none; display: flex; align-items: baseline;
-  gap: 0.5rem; flex-wrap: wrap; user-select: none;
-}
-.wscard > summary::-webkit-details-marker { display: none; }
-/* a disclosure triangle that turns, so open/closed is legible without a library */
-.wscard > summary::before {
-  content: "\25B8"; color: var(--muted); font-size: var(--t-md);
-  transition: transform 0.12s ease; display: inline-block;
-}
-.wscard[open] > summary::before { transform: rotate(90deg); }
-.wscard > summary > strong { font-size: var(--t-base); letter-spacing: 0.02em; }
-.wscard-body { margin-top: 0.7rem; }
-.wscard .params { margin-bottom: 0.6rem; }
+/* The workspace editor dialog: name, parameters and notes for the analysis
+   document currently open. Lives behind the "Save workspace" button on the
+   Analysis tab rather than a permanent card, since it is read when setting
+   the workspace up and almost never while reading the figures it describes. */
 .wslabel { display: block; font-size: var(--t-sm); color: var(--muted); margin-bottom: 0.25rem; }
-.wscard textarea {
+.wsdialog textarea {
   width: 100%; box-sizing: border-box; height: 4.5rem; padding: 0.45rem;
   font: 0.8rem/1.5 'IBM Plex Sans', system-ui, sans-serif;
   background: var(--code-bg); color: var(--ink);

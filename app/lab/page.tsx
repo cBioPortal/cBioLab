@@ -431,7 +431,6 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   type Workspace = { id: string; doc: AnalysisDoc; savedAt: string };
   const [spaces, setSpaces] = useState<Record<string, Workspace>>({});
   const [wsName, setWsName] = useState("");
-  const [openWs, setOpenWs] = useState(true);
   const [wsError, setWsError] = useState<string | null>(null);
   const wsDialog = useRef<HTMLDialogElement | null>(null);
 
@@ -1330,7 +1329,6 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     setWsError(null);
     try {
       await persistSpaces(name, d);
-      setOpenWs(true);   // a just-saved workspace opens on the section it created
     } catch (e) { setWsError("could not save: " + String((e as Error)?.message || e)); }
   };
   const openWorkspace = (name: string) => {
@@ -1654,6 +1652,33 @@ function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove }: { menuI
   );
 }
 
+/**
+ * The gear at the top-right of a cohort box: give it a note, or drop it from
+ * the analysis. Editing the FILTERS themselves isn't here yet — a cohort's
+ * clauses come from Explore or hand-typed JSON, and neither has a form this
+ * menu could hold; see the comment above the "Cohorts" heading for why that
+ * is deliberately a separate, unscoped piece of work.
+ */
+function CohortEditMenu({ name, notes, busy, onNotes, onRemove, menuId, menuStore }: {
+  name: string; notes: string; busy?: boolean; onNotes: (text: string) => void; onRemove: () => void;
+  menuId: string; menuStore: Map<string, boolean>;
+}) {
+  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
+  return (
+    <details className="gearmenu" ref={ref} onToggle={onToggle}>
+      <summary className="tbbtn" title="edit this cohort" aria-label="edit this cohort">⋯</summary>
+      <div className="gearmenu-items wide">
+        <label className="wslabel" htmlFor={"cohortnote:" + name}>Note</label>
+        <textarea id={"cohortnote:" + name} className="cohortnotes" value={notes} spellCheck disabled={busy}
+          placeholder="What is this cohort? Why is it defined this way?"
+          onChange={e => onNotes(e.target.value)} />
+        <hr />
+        <button className="linklike" disabled={busy} onClick={onRemove}>remove this cohort</button>
+      </div>
+    </details>
+  );
+}
+
 /** the server-side wall clock for one view, and what that number does and does not include */
 function Latency({ v }: { v: any }) {
   if (v.ms == null) return null;
@@ -1935,22 +1960,77 @@ function Latency({ v }: { v: any }) {
         {/* One popup shared by every gene-bearing view — a modal rather than a
             dropdown, because picking several genes is a task you settle into,
             and a menu that closes on an outside click fights that. */}
+        {/* The workspace editor: name, parameters, notes, and what to do with
+            it, all behind the "Save workspace" button on the Analysis tab.
+            Used to be a permanent card there; a dialog is read when setting
+            the workspace up, not while reading the figures it describes. */}
         <dialog ref={wsDialog} className="namedialog wsdialog"
           onClose={() => setWsName("")}
           onClick={e => { if (e.target === wsDialog.current) wsDialog.current?.close(); }}>
           <form method="dialog" onSubmit={e => { e.preventDefault(); confirmWorkspaceSave(); }}>
-            <h3>Save workspace</h3>
+            <h3>{doc.title && spaces[doc.title] ? "Workspace" : "Save workspace"}</h3>
             <p className="meta">
               {(doc.views || []).length} view{(doc.views || []).length === 1 ? "" : "s"}
               {doc.params ? " · " + Object.keys(doc.params).length + " parameter" + (Object.keys(doc.params).length === 1 ? "" : "s") : ""}
-              {doc.notes ? " · with notes" : ""}
+              {!doc.title || !spaces[doc.title]
+                ? " · not saved yet"
+                : JSON.stringify(spaces[doc.title].doc) !== JSON.stringify(doc)
+                  ? " · unsaved changes"
+                  : " · saved " + spaces[doc.title].savedAt}
             </p>
             <input autoFocus placeholder="workspace name…" value={wsName}
               onChange={e => setWsName(e.target.value)} />
-            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", gap: "0.4rem" }}>
-              <button type="button" className="linklike" onClick={() => wsDialog.current?.close()}>cancel</button>
-              <button className="primary" type="submit" disabled={!wsName.trim()}>Save</button>
+
+            {doc.params && Object.keys(doc.params).length > 0 ? (
+              <div className="params" style={{ marginTop: "0.7rem" }}>
+                <div className="row" style={{ alignItems: "baseline" }}>
+                  <strong style={{ fontSize: "var(--t-md)" }}>Parameters</strong>
+                  <span className="meta">— change one here and every view that uses it re-runs</span>
+                </div>
+                {Object.entries(doc.params).map(([k, v]) => (
+                  <ParamRow key={k} name={k} value={v} busy={busy} onChange={val => setParam(k, val)} />
+                ))}
+                {result?.unusedParams?.length ? (
+                  <p className="note" style={{ margin: "0.3rem 0 0" }}>
+                    Declared but never used: {result.unusedParams.map(x => "$" + x).join(", ")} — usually a
+                    rename that missed a reference.
+                  </p>
+                ) : null}
+              </div>
+            ) : (doc.views || []).length > 0 && (
+              <p className="note" style={{ margin: "0.7rem 0 0" }}>
+                No parameters yet — “make a template” beside the document lifts the study and a
+                shared gene list out, so this workup can be re-pointed in one edit.
+              </p>
+            )}
+
+            <label className="wslabel" htmlFor="wsnotes" style={{ marginTop: "0.7rem", display: "block" }}>Notes</label>
+            <textarea id="wsnotes" value={doc.notes || ""} spellCheck
+              placeholder="What is this analysis for? What should a reader look at first?"
+              onChange={e => setNotes(e.target.value)} />
+
+            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "space-between", gap: "0.4rem", flexWrap: "wrap" }}>
+              <div className="row" style={{ gap: "0.4rem" }}>
+                {doc.title && spaces[doc.title] && (
+                  <button type="button" className="linklike" disabled={busy}
+                    title={"delete the saved workspace “" + doc.title + "”"}
+                    onClick={() => deleteWorkspace(doc.title!)}>delete</button>
+                )}
+                {Object.keys(spaces).length > 0 && (
+                  <button type="button" className="linklike" disabled={busy}
+                    onClick={() => { wsDialog.current?.close(); goTab("saved"); }}>
+                    open a different one…
+                  </button>
+                )}
+              </div>
+              <div className="row" style={{ gap: "0.4rem" }}>
+                <button type="button" className="linklike" onClick={() => wsDialog.current?.close()}>cancel</button>
+                <button className="primary" type="submit" disabled={!wsName.trim()}>
+                  {doc.title && spaces[doc.title] ? "Save changes" : "Save"}
+                </button>
+              </div>
             </div>
+            {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
           </form>
         </dialog>
         <dialog ref={genesDialog} className="genedialog"
@@ -3097,7 +3177,14 @@ function Latency({ v }: { v: any }) {
         {tab === "analysis" && <div className="ana-grid">
           <div>
             {/* Cohorts, bare: each is its own labelled, bordered box, with no
-                enclosing card — they ARE the leftbar, not a section within it. */}
+                enclosing card — they ARE the leftbar, not a section within it.
+                Each box's gear menu (CohortEditMenu) covers a note and
+                removing the cohort. It deliberately does NOT cover the
+                cohort's own filters yet: those are pills built from Explore's
+                facets or hand-typed JSON, and editing them in place would mean
+                either Explore or the JSON editor opening ON TOP of an
+                analysis already in progress (a modal, most likely) — a bigger
+                piece of work than this pass, and not yet scoped. */}
             <h2 className="vtitle" style={{ marginBottom: "0.9rem" }}>
               Cohorts{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
             </h2>
@@ -3112,12 +3199,20 @@ function Latency({ v }: { v: any }) {
                         <span className="qchip"><span className="qletter" style={{ color: CAT_COLORS[i % CAT_COLORS.length] }}>■</span>{n}</span>
                         <strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span>
                         <span className="spacer" />
-                        <button className="linklike" disabled={busy} title="remove this cohort from the analysis" onClick={() => removeCohort(n)}>remove</button>
+                        <CohortEditMenu name={n} notes={doc.cohorts?.[n]?.notes || ""} busy={busy}
+                          onNotes={(text) => setCohortNotes(n, text)} onRemove={() => removeCohort(n)}
+                          menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
                       </div>
                       {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} />}
-                      <textarea className="cohortnotes" value={doc.cohorts?.[n]?.notes || ""} spellCheck
-                        placeholder="note on this cohort (optional)"
-                        onChange={e => setCohortNotes(n, e.target.value)} />
+                      {/* A note only shows here — passively, read-only — once the
+                          cohort is actually saved as a reusable artifact AND
+                          someone bothered to write one; an ad-hoc cohort that
+                          might be gone in a minute doesn't need an invitation to
+                          write prose about it. Writing or changing the note
+                          itself always happens through the gear menu above. */}
+                      {saved[n] && doc.cohorts?.[n]?.notes && (
+                        <p className="note">{doc.cohorts[n].notes}</p>
+                      )}
                     </div>
                   ))}
             </div>
@@ -3166,7 +3261,20 @@ function Latency({ v }: { v: any }) {
             )}
           </dialog>
           <div>
-            <div className="row" style={{ alignItems: "baseline", marginBottom: "0.9rem" }}>
+            <div className="row" style={{ alignItems: "baseline", marginBottom: "0.9rem", gap: "0.6rem" }}>
+              {/* The workspace lives behind this one button + a dialog now, not a
+                  permanent card at the top of the column — it is read when setting
+                  the workspace up and almost never while reading the figures, and
+                  it doubles as the current workspace's name (or an invitation to
+                  give it one), so there is exactly one place to look for "what is
+                  this, and is it saved". */}
+              {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
+                <button className={doc.title ? "linklike" : undefined} disabled={busy} onClick={openWorkspaceSave}
+                  title={doc.title ? "edit this workspace's name, parameters and notes" : "save this analysis as a named, reopenable workspace"}>
+                  {doc.title || "Save workspace"}
+                  {doc.title && (!spaces[doc.title] || JSON.stringify(spaces[doc.title].doc) !== JSON.stringify(doc)) && " *"}
+                </button>
+              )}
               <h2 className="vtitle">
                 Analysis{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
               </h2>
@@ -3177,73 +3285,6 @@ function Latency({ v }: { v: any }) {
                 </button>
               </div>
             </div>
-            {/* The workspace itself: what this saved analysis is called, the
-                parameters that point it at a study and a gene panel, and the
-                notes that say what it is for. It sits at the TOP of the column
-                it describes, and collapses because it is read when setting the
-                workspace up and rarely while reading the figures. */}
-            {(doc.title || doc.params || doc.notes || (doc.views || []).length > 0) && (
-              <details className="card wscard" open={!!openWs}
-                onToggle={e => setOpenWs((e.currentTarget as HTMLDetailsElement).open)}>
-                <summary>
-                  <strong>{doc.title || "Untitled workspace"}</strong>
-                  <span className="meta">
-                    {doc.params ? " · " + Object.keys(doc.params).length + " parameter" + (Object.keys(doc.params).length === 1 ? "" : "s") : ""}
-                    {doc.notes ? " · notes" : ""}
-                    {!doc.title || !spaces[doc.title]
-                      ? " · not saved yet"
-                      : JSON.stringify(spaces[doc.title].doc) !== JSON.stringify(doc)
-                        ? " · unsaved changes"
-                        : " · saved " + spaces[doc.title].savedAt}
-                  </span>
-                </summary>
-                <div className="wscard-body">
-                  {doc.params && Object.keys(doc.params).length > 0 ? (
-                    <div className="params">
-                      <div className="row" style={{ alignItems: "baseline" }}>
-                        <strong style={{ fontSize: "var(--t-md)" }}>Parameters</strong>
-                        <span className="meta">— change one here and every view that uses it re-runs</span>
-                      </div>
-                      {Object.entries(doc.params).map(([k, v]) => (
-                        <ParamRow key={k} name={k} value={v} busy={busy} onChange={val => setParam(k, val)} />
-                      ))}
-                      {result?.unusedParams?.length ? (
-                        <p className="note" style={{ margin: "0.3rem 0 0" }}>
-                          Declared but never used: {result.unusedParams.map(x => "$" + x).join(", ")} — usually a
-                          rename that missed a reference.
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : (doc.views || []).length > 0 && (
-                    <p className="note" style={{ margin: "0 0 0.5rem" }}>
-                      No parameters yet — “make a template” beside the document lifts the study and a
-                      shared gene list out, so this workup can be re-pointed in one edit.
-                    </p>
-                  )}
-
-                  <label className="wslabel" htmlFor="wsnotes">Notes</label>
-                  <textarea id="wsnotes" value={doc.notes || ""} spellCheck
-                    placeholder="What is this analysis for? What should a reader look at first?"
-                    onChange={e => setNotes(e.target.value)} />
-
-                  <div className="row" style={{ marginTop: "0.5rem", gap: "0.5rem" }}>
-                    <button disabled={busy} onClick={openWorkspaceSave}>
-                      {doc.title && spaces[doc.title] ? "Save changes" : "Save workspace"}
-                    </button>
-                    {doc.title && spaces[doc.title] && (
-                      <button className="linklike" disabled={busy}
-                        title={"delete the saved workspace \u201c" + doc.title + "\u201d"}
-                        onClick={() => deleteWorkspace(doc.title!)}>delete</button>
-                    )}
-                    <button className="linklike" disabled={busy} onClick={() => goTab("saved")}>open a different one\u2026</button>
-                    {doc.params && (
-                      <span className="meta">Parameters are stored with the workspace, so reopening it restores them.</span>
-                    )}
-                  </div>
-                  {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
-                </div>
-              </details>
-            )}
             {busy && !result && <div className="skeleton skeleton-addview" />}
             {busy && !result && Array.from({ length: Math.max(1, (doc.views || []).length) }).map((_, i) => (
               <div key={i} className="skeleton skeleton-view" />
