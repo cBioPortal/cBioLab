@@ -2543,13 +2543,10 @@ function Latency({ v }: { v: any }) {
         </div>}
 
         {/* ================= Cohorts tab ================= */}
-        {tab === "cohorts" && <div className="grid2">
-          <div className="card">
-            <h2>Create a cohort</h2>
-            <label>Name</label>
-            <input style={{ width: "100%" }} value={cName} onChange={e => setCName(e.target.value)} placeholder="e.g. KRAS-driver never-smokers" />
+        {tab === "cohorts" && <div>
+          <div className="card" style={{ marginBottom: "0.9rem" }}>
             <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-              <label style={{ margin: 0 }}>Definition</label>
+              <h2 style={{ margin: 0 }}>Build a cohort</h2>
               <button className="linklike" onClick={() => setCAdvanced(!cAdvanced)}>
                 {cAdvanced ? "back to filters" : "edit as JSON"}
               </button>
@@ -2575,6 +2572,12 @@ function Latency({ v }: { v: any }) {
                 }}
               />
             )}
+          </div>
+          <div className="grid2">
+          <div className="card">
+            <h2>Save this cohort</h2>
+            <label>Name</label>
+            <input style={{ width: "100%" }} value={cName} onChange={e => setCName(e.target.value)} placeholder="e.g. KRAS-driver never-smokers" />
             {explore && (
               <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.4rem" }}>
                 <span className="meta">quick add:</span>
@@ -2688,6 +2691,7 @@ function Latency({ v }: { v: any }) {
                 <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} /></div>
               </div>
             ))}
+          </div>
           </div>
         </div>}
 
