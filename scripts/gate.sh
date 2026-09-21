@@ -26,6 +26,9 @@ echo "== $(git branch --show-current 2>/dev/null || echo detached) @ $(git rev-p
 echo "== build (-> $NEXT_DIST_DIR) ==" && npm run build 2>&1 | tail -3
 echo "== unit =="                      && npm test 2>&1 | grep -E "^# (tests|pass|fail)"
 echo "== method scripts =="            && npm run check:methods 2>&1 | grep -E "^FAIL|method records present|FAILED"
+echo "== python conformance (lib/oncoprint-*.ts vs python/cohortlab) =="
+[ -d python/.venv ] || { python3 -m venv python/.venv && python/.venv/bin/pip install -q -e python; }
+python/.venv/bin/python -m unittest discover -s python/tests -v 2>&1 | tail -20
 echo "== e2e =="
 fuser -k $PORT/tcp 2>/dev/null || true
 sleep 2

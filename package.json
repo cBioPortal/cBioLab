@@ -13,6 +13,7 @@
     "check:methods": "node --env-file=.env.local scripts/check-method-scripts.ts",
     "test": "node --test \"test/**/*.test.ts\"",
     "test:boundary": "node --test test/boundary.test.ts",
+    "test:python": "python/.venv/bin/python -m unittest discover -s python/tests -v",
     "check:genefacets": "node --env-file=.env.local scripts/check-gene-facets.ts",
     "check:values": "node --env-file=.env.local scripts/check-value-folding.ts",
     "check:denominators": "node --env-file=.env.local scripts/check-denominators.ts",

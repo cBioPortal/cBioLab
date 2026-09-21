@@ -75,8 +75,8 @@ class Binary(unittest.TestCase):
             self.assertTrue(np.array_equal(a.cells, b.cells))
             self.assertEqual(a.meta.get("freqPct"), b.meta.get("freqPct"))
 
-    @unittest.skipUnless(shutil.which("node"), "node not on PATH")
     def test_reads_what_node_writes(self):
+        self.assertTrue(shutil.which("node"), "node is required to check conformance against the TypeScript implementation")
         with tempfile.TemporaryDirectory() as d:
             out = os.path.join(d, "fx.opb1")
             subprocess.run(["node", os.path.join(ROOT, "scripts", "oncoprint-cli.ts"), "--events", os.path.join(FIX, "events.tsv"),
@@ -90,8 +90,8 @@ class Binary(unittest.TestCase):
 class Conformance(unittest.TestCase):
     """The Python assembler must produce the same contract as lib/oncoprint-assemble.ts."""
 
-    @unittest.skipUnless(shutil.which("node"), "node not on PATH")
     def test_same_contract_as_typescript(self):
+        self.assertTrue(shutil.which("node"), "node is required to check conformance against the TypeScript implementation")
         cases = [
             dict(group_by="CANCER_TYPE", sort="STAGE"),
             dict(sort="-AGE,CANCER_TYPE"),
@@ -125,8 +125,8 @@ class Conformance(unittest.TestCase):
 class LevelOfDetailConformance(unittest.TestCase):
     """Bucket codes must match lib/oncoprint-lod.ts at several widths, including the 400k-style case."""
 
-    @unittest.skipUnless(shutil.which("node"), "node not on PATH")
     def test_bucket_codes_match_typescript(self):
+        self.assertTrue(shutil.which("node"), "node is required to check conformance against the TypeScript implementation")
         from cohortlab.render import bucket_codes
         op = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), os.path.join(FIX, "clinical.tsv"), os.path.join(FIX, "coverage.tsv"), group_by="CANCER_TYPE")
         with tempfile.TemporaryDirectory() as d:
