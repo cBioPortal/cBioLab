@@ -299,6 +299,18 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     if (k == null) { k = nextViewKey.current++; viewKeys.current.set(v, k); }
     return k;
   };
+  /**
+   * Which view cards are mid-recompute from a ONE-view delta request (see
+   * runViewDelta below) — not the same thing as `busy`, which also covers a
+   * full run() of the whole document. Keyed by the same stable `keyFor` id
+   * as `resultViewKeys`, so a card's own spinner tracks whether ITS query is
+   * running, not whether some unrelated view's is.
+   */
+  const [pendingKeys, setPendingKeys] = useState<Set<number>>(new Set());
+  // per-key generation counter: a delta response only applies if it's still
+  // the newest one requested for that key, so firing a second edit before
+  // the first one's response lands can't have the first response clobber it
+  const deltaGen = useRef(new Map<number, number>());
   const [cat, setCat] = useState<any>(null);                 // event/endpoint catalog for the survival control
   const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>"
   /**
@@ -476,6 +488,60 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
       syncUrl(undefined, d);
     } catch (e) { setError(String((e as Error)?.message || e)); }
     setBusy(false);
+  };
+
+  /**
+   * Recompute ONE view instead of the whole document. `runAnalysis` doesn't
+   * care how many views it's given — it just loops over `doc.views` — so a
+   * request carrying only `view` still re-evaluates the cohorts (cheap, and
+   * kept authoritative rather than trusting a client-cached count) but skips
+   * every OTHER view's queries entirely. That's a real cost saved, not just
+   * a cosmetic one: a full run() re-hits ClickHouse for every cohort AND
+   * every other view on the page, every time, because nothing in
+   * runAnalysis is cached across calls.
+   *
+   * Deliberately does NOT touch the global `busy` flag — that's what made
+   * Survival/Cox show a spinner for edits to a completely different view,
+   * since both read `busy` for their own "recomputing" indicator. This sets
+   * `pendingKeys` instead, scoped to just this view's stable key.
+   *
+   * The response is spliced into `result.views` by KEY, found via
+   * `resultViewKeys.current` at the moment the response lands — not the
+   * index captured when the request was made. addView/patchView/updateView
+   * all keep `resultViewKeys.current` in lockstep with `doc.views`
+   * synchronously, before this fetch even starts, so this finds the right
+   * slot even if another view was added, removed or reordered while this
+   * one was still in flight. If the key is gone (the view was removed
+   * before its answer came back), the response is just discarded.
+   */
+  const runViewDelta = async (d: AnalysisDoc, view: any) => {
+    const key = keyFor(view);
+    const gen = (deltaGen.current.get(key) ?? 0) + 1;
+    deltaGen.current.set(key, gen);
+    setPendingKeys(prev => new Set(prev).add(key));
+    const applyToSlot = (vr: unknown) => setResult(prev => {
+      if (!prev) return prev;
+      const idx = resultViewKeys.current.indexOf(key);
+      if (idx < 0) return prev; // removed before this delta came back
+      const views = [...prev.views];
+      views[idx] = vr as typeof views[number];
+      return { ...prev, views };
+    });
+    try {
+      const payload = { ...d, views: [view] };
+      const res = await fetch("/api/analysis?oncoprint=spec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const j = await res.json();
+      if (deltaGen.current.get(key) !== gen) return; // superseded by a later edit to this same view
+      if (j.error) throw new Error(j.error);
+      const vr = j.views && j.views[0];
+      if (!vr) throw new Error("no result for this view");
+      applyToSlot(vr);
+    } catch (e) {
+      if (deltaGen.current.get(key) !== gen) return;
+      applyToSlot({ kind: view.kind, error: String((e as Error)?.message || e) });
+    } finally {
+      if (deltaGen.current.get(key) === gen) setPendingKeys(prev => { if (!prev.has(key)) return prev; const nx = new Set(prev); nx.delete(key); return nx; });
+    }
   };
 
   useEffect(() => {
@@ -706,13 +772,19 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
         : "this study records no treatment events, so there are no lines of therapy to sequence" }
   ];
 
-  /** Drop one view from the document and re-run what is left. */
+  /** Drop one view from the document. Removing a view can't change any OTHER
+   *  view's answer — each view's result depends only on its own definition
+   *  and the cohort definitions it draws from, neither of which removal
+   *  touches — so this splices `result.views` locally instead of re-running
+   *  everything, the same way moveView (below) already does. */
   const removeView = (i: number) => {
     const views = (doc.views || []).filter((_: any, j: number) => j !== i);
     const d = { ...doc, views };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    if (views.length) run(d);
-    else { setResult(null); syncUrl(undefined, d); }   // nothing left to run
+    syncUrl(undefined, d);
+    if (!views.length) { setResult(null); return; }   // nothing left to show
+    setResult(prev => prev ? { ...prev, views: prev.views.filter((_, j) => j !== i) } : prev);
+    resultViewKeys.current = resultViewKeys.current.filter((_, j) => j !== i);
   };
 
   /** Swap a view with its neighbour. Order is cosmetic — the computed result for
@@ -783,7 +855,19 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
       : { kind, genes };
     const d = { ...doc, views: [v, ...(doc.views || [])] };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    run(d);
+    syncUrl(undefined, d);
+    // No prior result to keep the OTHER cards from — a fresh analysis's
+    // very first view has nothing to diff against, so it needs a real run().
+    if (!result) { run(d); return; }
+    // Otherwise: every existing card already has a valid answer that adding
+    // one more view doesn't change, so only the new view goes to the server.
+    // resultViewKeys.current is kept in lockstep with doc.views right here,
+    // synchronously, before the request even starts — see runViewDelta's
+    // comment for why that matters once the response comes back.
+    const key = keyFor(v);
+    resultViewKeys.current = [key, ...resultViewKeys.current];
+    setResult(prev => prev ? { ...prev, views: [{ kind: v.kind, pending: true } as any, ...prev.views] } : prev);
+    runViewDelta(d, v);
   };
 
   const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
@@ -1160,7 +1244,9 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     return () => { dead = true; };
   }, [study]);
 
-  /** Rewrite one view in the document and re-run. */
+  /** Rewrite one view in the document and recompute just that one (see
+   *  runViewDelta) — editing this view's settings can't change any OTHER
+   *  view's answer, only its own. */
   const patchView = (i: number, patch: Record<string, unknown>) => {
     const views = (doc.views || []).map((v: any, j: number) => {
       if (j !== i) return v;
@@ -1175,7 +1261,8 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     for (const v of views as any[]) if (v.anchor == null) delete v.anchor;   // null means "study baseline"
     const d = { ...doc, views };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    run(d);
+    syncUrl(undefined, d);
+    runViewDelta(d, views[i]);
   };
 
   // the creator's quick-add row needs the study catalog even before Explore is visited
@@ -1197,7 +1284,9 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
       return nv;
     });
     const d = { ...doc, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    syncUrl(undefined, d);
+    runViewDelta(d, views[vi]);
   };
 
   /**
@@ -3198,6 +3287,13 @@ function Latency({ v }: { v: any }) {
             )}
             {result && result.views.map((v, vi) => (
               <div className="card viewcard" key={resultViewKeys.current[vi] ?? vi}>
+                {/* addView's placeholder for a brand-new view that has no prior
+                    result to keep showing while its own delta request is in
+                    flight (see addView) — every v.kind===… block below is
+                    already guarded on a kind-specific data field, so this
+                    placeholder object just falls through all of them silently;
+                    this is the only thing that needs to render for it. */}
+                {(v as any).pending && <div className="skeleton skeleton-view" />}
                 {/* The author's own note about this figure, plain text by design —
                     see .viewnote in globals.css for why it is never markdown. */}
                 {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
@@ -3482,7 +3578,7 @@ function Latency({ v }: { v: any }) {
                         <span className="meta">mo</span>
                         <span className="meta">split by gene</span>
                         <GeneSplitControl busy={busy} onSplit={(gene) => splitSurvivalByGene(vi, gene)} />
-                        {busy && <span className="spinner" />}
+                        {pendingKeys.has(resultViewKeys.current[vi]) && <span className="spinner" />}
                       </div>
                     );
                   })()}
@@ -3535,7 +3631,7 @@ function Latency({ v }: { v: any }) {
                             onChange={e => patchView(vi, { stratifyByStudy: e.target.checked || undefined })} />
                           stratify by study
                         </label>
-                        {busy && <span className="spinner" />}
+                        {pendingKeys.has(resultViewKeys.current[vi]) && <span className="spinner" />}
                         <div style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "0.3rem", marginTop: "0.3rem" }}>
                           {covariates.map((c, ci) => (
                             <span key={ci} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
