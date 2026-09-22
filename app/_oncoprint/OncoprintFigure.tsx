@@ -14,8 +14,16 @@ import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, gro
 import { geneLegendFor, resolveStyle, styleForDisplay, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { jupyterLiteUrl, labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
+import { setPngDpi } from "../../lib/png-dpi.ts";
 
 const MAX_ZOOM = 24;
+/** common page widths for the export dialog's preset picker; the number field beside it takes any value */
+const EXPORT_PRESETS: { label: string; in: number }[] = [
+  { label: "Half page (5.5\")", in: 5.5 }, { label: "A4 (8.27\")", in: 8.27 }, { label: "Letter (8.5\")", in: 8.5 }, { label: "Poster (24\")", in: 24 },
+];
+/** the layout is computed in this reference density regardless of the raster DPI chosen for a PNG,
+ * so a figure at a given inch width has the same proportions whether exported as SVG or PNG */
+const EXPORT_LAYOUT_DPI = 96;
 
 /** unaltered cells drawn white; not-profiled keeps its stripe, which is what still tells them apart */
 function withBackground(S: ReturnType<typeof resolveStyle>, white?: boolean) {
@@ -128,6 +136,16 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const miniRef = useRef<HTMLCanvasElement>(null);
   const [showMini, setShowMini] = useState(false);
+  // Export sizing is a one-off action, not a view of the figure — nobody else reading a shared
+  // link needs to know what page width someone once exported it at — so it stays local state,
+  // not a `display` field.
+  const exportDialog = useRef<HTMLDialogElement | null>(null);
+  const exportCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"png" | "svg">("png");
+  const [exportWidthIn, setExportWidthIn] = useState(8.5);
+  const [exportDpi, setExportDpi] = useState(150);
+  const openExport = () => { setExportOpen(true); exportDialog.current?.showModal(); };
   const perfRef = useRef<Perf>({ frames: 0 });
   const bump = (p: Partial<Perf>) => {
     perfRef.current = { ...perfRef.current, ...p };
@@ -289,6 +307,22 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     ctx.fillRect(0, 0, x0, H); ctx.fillRect(x0 + w, 0, cssW - x0 - w, H);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, visible, view, cssW, gapPx, showMini, display]);
+
+  // ---- export preview: the same draw() the PNG download uses, at the dialog's chosen width ----
+  useEffect(() => {
+    if (!exportOpen || !data || !visible) return;
+    const cv = exportCanvasRef.current; if (!cv) return;
+    const w = Math.max(200, Math.round(exportWidthIn * EXPORT_LAYOUT_DPI));
+    const H = canvasHeight(data.tracks.length);
+    cv.width = w; cv.height = H;
+    cv.style.width = w + "px"; cv.style.height = H + "px";
+    const ctx = cv.getContext("2d")!;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const S2 = withBackground(styleForDisplay(resolveStyle(data.display?.style), display), display.whiteBackground);
+    draw(ctx, data, visible.order, visible.groups, { zoom: fitZoom(visible.groups, w - GEOM.gutter, gapPx), scrollX: 0, whitespace: display.whitespace },
+      w, paletteOf(S2), { gap: gapPx, pctLabels: gapMode === "pct", style: S2, colors: display.colors ?? data.display?.colors });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exportOpen, exportWidthIn, data, visible, gapPx, gapMode, display]);
 
   /**
    * The scrollbar is ours rather than the browser's. A native one over a virtual width of
@@ -594,19 +628,32 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         const ids = visible.order.length === data.n ? data.columns() : Array.from(visible.order, (i) => data.columns()[i]);
         save(new Blob([data.unit + " order in the oncoprint is:\n" + ids.join("\n") + "\n"], { type: "text/plain" }), stem + "-" + data.unit + "-order.txt");
       } else if (what === "png") {
-        // drawn offscreen at full width so the file is the whole figure, not the visible window
-        const w = 2000, S2 = resolveStyle(data.display?.style);
+        // the layout is computed at the reference density, then supersampled to the chosen DPI —
+        // so 8.5in looks like a page at any resolution, and the pixel count is exactly widthIn*dpi
+        const w = Math.max(200, Math.round(exportWidthIn * EXPORT_LAYOUT_DPI));
+        const scale = exportDpi / EXPORT_LAYOUT_DPI;
+        const S2 = withBackground(styleForDisplay(resolveStyle(data.display?.style), display), display.whiteBackground);
         const cv = document.createElement("canvas");
         const H = canvasHeight(data.tracks.length);
-        cv.width = w * 2; cv.height = H * 2;
+        cv.width = Math.round(w * scale); cv.height = Math.round(H * scale);
         const ctx = cv.getContext("2d")!;
-        ctx.setTransform(2, 0, 0, 2, 0, 0);
+        ctx.setTransform(scale, 0, 0, scale, 0, 0);
         draw(ctx, data, visible.order, visible.groups, { zoom: fitZoom(visible.groups, w - GEOM.gutter, gapPx), scrollX: 0, whitespace: display.whitespace },
-          w, paletteOf(S2), { gap: gapPx, pctLabels: gapMode === "pct", style: S2 });
+          w, paletteOf(S2), { gap: gapPx, pctLabels: gapMode === "pct", style: S2, colors: display.colors ?? data.display?.colors });
         const blob: Blob = await new Promise((res) => cv.toBlob((b) => res(b!), "image/png"));
-        save(blob, stem + ".png");
+        // canvas.toBlob writes bare pixels; a pHYs chunk is what lets Word/Photoshop/Preview
+        // print this at exportWidthIn rather than guessing 72 or 96 dpi.
+        const out = setPngDpi(new Uint8Array(await blob.arrayBuffer()), exportDpi);
+        const sized = new Blob([out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer], { type: "image/png" });
+        save(sized, stem + "-" + exportWidthIn + "in.png");
+      } else if (what === "svg") {
+        const w = Math.max(200, Math.round(exportWidthIn * EXPORT_LAYOUT_DPI));
+        const res = await fetch((props.endpoint || "/api/oncoprint") + "?format=svg&width=" + w + "&widthIn=" + exportWidthIn,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(specOnScreen()) });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+        save(await res.blob(), stem + "-" + exportWidthIn + "in.svg");
       } else {
-        const res = await fetch((props.endpoint || "/api/oncoprint") + "?format=" + what + (what === "svg" ? "&width=1600" : ""),
+        const res = await fetch((props.endpoint || "/api/oncoprint") + "?format=" + what,
           { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(specOnScreen()) });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
         save(await res.blob(), stem + "." + what);
@@ -690,8 +737,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               <summary className="tbbtn" title="download or open this figure elsewhere" aria-label="download or open this figure elsewhere">{saving ? "saving…" : "⋯"}</summary>
               <div className="gearmenu-items">
                 <span className="meta">download figures</span>
-                <button className="linklike" onClick={() => download("png")}>PNG — the whole figure at 4000px</button>
-                <button className="linklike" onClick={() => download("svg")}>SVG — re-rendered on the server from this spec</button>
+                <button className="linklike" onClick={openExport}>Export image (PNG or SVG)… — choose a page width</button>
                 <button className="linklike" onClick={() => download("tsv")}>Tabular TSV — one row per track, one column per {data.unit}</button>
                 <button className="linklike" onClick={() => download("ids")}>{data.unit} order — the ids as drawn</button>
                 {/* Not a download: the same spec, opened where it can be run rather than looked at.
@@ -882,6 +928,50 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             </tbody></table>
           </details>
         )}
+        <dialog ref={exportDialog} className="exportdialog"
+          onClose={() => setExportOpen(false)}
+          onClick={(e) => { if (e.target === exportDialog.current) exportDialog.current?.close(); }}>
+          {exportOpen && <>
+            <h3>Export image</h3>
+            <label className="setrow">
+              <span className="meta">format</span>
+              <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value as "png" | "svg")}>
+                <option value="png">PNG — raster</option>
+                <option value="svg">SVG — vector, sharp at any size</option>
+              </select>
+            </label>
+            <label className="setrow">
+              <span className="meta">page width</span>
+              <select value={EXPORT_PRESETS.some((p) => p.in === exportWidthIn) ? String(exportWidthIn) : "custom"}
+                onChange={(e) => { if (e.target.value !== "custom") setExportWidthIn(Number(e.target.value)); }}>
+                {EXPORT_PRESETS.map((p) => <option key={p.label} value={p.in}>{p.label}</option>)}
+                <option value="custom">custom</option>
+              </select>
+              <input type="number" min={1} max={60} step={0.25} value={exportWidthIn} style={{ width: "4.5rem" }}
+                onChange={(e) => setExportWidthIn(Math.max(1, Math.min(60, Number(e.target.value) || 1)))} />
+              <span className="meta">in</span>
+            </label>
+            {exportFormat === "png" ? (
+              <label className="setrow">
+                <span className="meta">resolution</span>
+                <select value={exportDpi} onChange={(e) => setExportDpi(Number(e.target.value))}>
+                  <option value={96}>96 dpi — screen</option>
+                  <option value={150}>150 dpi — print</option>
+                  <option value={300}>300 dpi — high-res print</option>
+                </select>
+                <span className="meta">{(Math.round(exportWidthIn * exportDpi)).toLocaleString()}px wide</span>
+              </label>
+            ) : <p className="meta">vector — the same file prints sharp at 8.5in or 48in alike</p>}
+            <div className="onco-export-preview">
+              <canvas ref={exportCanvasRef} />
+            </div>
+            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", gap: "0.4rem" }}>
+              <button type="button" className="linklike" onClick={() => exportDialog.current?.close()}>cancel</button>
+              <button className="primary" disabled={!!saving} onClick={() => download(exportFormat)}>
+                {saving ? "exporting…" : "Export " + exportFormat.toUpperCase()}</button>
+            </div>
+          </>}
+        </dialog>
       </>}
     </>
   );

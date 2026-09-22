@@ -21,7 +21,8 @@ export async function POST(req: Request) {
     if (fmt === "svg" || fmt === "tsv") {
       // the page asks for these to download; the spec it sends carries its sort and display,
       // so the file is the figure on screen and not a differently-ordered one
-      const body = fmt === "svg" ? contractToSvg(contract, Number(sp.get("width")) || 1600) : contractToTsv(contract);
+      const widthIn = Number(sp.get("widthIn")) || undefined;
+      const body = fmt === "svg" ? contractToSvg(contract, Number(sp.get("width")) || 1600, undefined, widthIn) : contractToTsv(contract);
       return new Response(body, { headers: {
         "Content-Type": fmt === "svg" ? "image/svg+xml" : "text/tab-separated-values",
         "X-Engine-Ms": String(engineMs)

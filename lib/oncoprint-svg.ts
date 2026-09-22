@@ -20,7 +20,7 @@ function wrap(text: string, perLine: number): string[] {
   return out;
 }
 
-export function contractToSvg(contract: Contract, width = 1200, style?: Style): string {
+export function contractToSvg(contract: Contract, width = 1200, style?: Style, physicalWidthIn?: number): string {
   // the figure's own style: an override travels in the contract, so callers need pass nothing
   const S0 = styleForDisplay(style ?? resolveStyle(contract.display?.style), contract.display);
   const S = contract.display?.whiteBackground
@@ -52,7 +52,14 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style): 
   for (const g of contract.groups) { groupX.push(gx); gx += g.count * colW + GROUP_GAP; }
 
   const parts: string[] = [];
-  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" font-family="IBM Plex Sans,Helvetica,Arial,sans-serif" font-size="11">`);
+  // A caller printing to a physical page passes physicalWidthIn: the internal layout stays in
+  // the same px units (so nothing else in this function changes), but the root element declares
+  // its size in inches with a viewBox tying that back to the px coordinate space, so opening the
+  // file in a page-layout tool places it at exactly that width rather than at 1px-per-SVG-unit.
+  const svgW = physicalWidthIn != null ? `${r2(physicalWidthIn)}in` : String(width);
+  const svgH = physicalWidthIn != null ? `${r2(physicalWidthIn * height / width)}in` : String(height);
+  const viewBox = physicalWidthIn != null ? ` viewBox="0 0 ${width} ${height}"` : "";
+  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}"${viewBox} font-family="IBM Plex Sans,Helvetica,Arial,sans-serif" font-size="11">`);
   parts.push(`<rect width="${width}" height="${height}" fill="${P.paper}"/>`);
 
   contract.groups.forEach((g, gi: number) => {
