@@ -698,13 +698,13 @@ details.gearmenu.inline[open] > summary {
 
 /* Name-a-cohort dialog. Native <dialog>, so Esc, focus trapping and the
    backdrop are the platform's rather than ours. */
-.namedialog, .genedialog, .docdialog {
+.namedialog, .genedialog, .docdialog, .exportdialog {
   border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card);
   color: var(--ink); padding: 1rem 1.1rem; min-width: 20rem; max-width: 26rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
 }
-.namedialog::backdrop, .genedialog::backdrop, .docdialog::backdrop { background: rgba(0, 0, 0, 0.32); }
-.namedialog h3, .genedialog h3, .docdialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
+.namedialog::backdrop, .genedialog::backdrop, .docdialog::backdrop, .exportdialog::backdrop { background: rgba(0, 0, 0, 0.32); }
+.namedialog h3, .genedialog h3, .docdialog h3, .exportdialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
 /* The document's JSON, run/clear controls and generated SQL — wide enough for
    both, and tall enough to scroll internally rather than push past the viewport. */
 .docdialog { width: min(90vw, 48rem); max-width: 48rem; max-height: 85vh; overflow: auto; }
@@ -719,8 +719,18 @@ details.gearmenu.inline[open] > summary {
   border-radius: var(--r-pill); padding: 0 0.3rem 0 0; }
 .genedialog .pill-merged .pill { border: none; background: none; }
 .genedialog textarea { width: 100%; box-sizing: border-box; }
-.genedialog .setrow { display: flex; gap: 0.4rem; margin-top: 0.5rem; align-items: center; }
+.genedialog .setrow, .exportdialog .setrow { display: flex; gap: 0.4rem; margin-top: 0.5rem; align-items: center; }
 .genedialog .setrow input { flex: 1; min-width: 0; }
+/* most of the viewport, so the preview is big enough to actually judge the export by — capped
+   and scrollable so a poster-sized export never pushes the dialog itself past the viewport.
+   Scoped to [open]: an author `display` on a bare .exportdialog would beat the UA stylesheet's
+   `dialog:not([open]) { display: none }` (origin outranks specificity in the cascade), leaving
+   an empty box on the page even while closed. */
+.exportdialog[open] { width: min(96vw, 90rem); max-width: 90rem; height: min(94vh, 60rem); max-height: 94vh;
+  display: flex; flex-direction: column; overflow: hidden; }
+.onco-export-preview { margin-top: 0.7rem; border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--paper); flex: 1; min-height: 0; overflow: auto; padding: 0.4rem; }
+.onco-export-preview canvas { display: block; }
 /* the gene button sits at the end of a view header, beside the gear */
 .genesbtn { font-size: var(--t-md); font-weight: 500; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 0.18em; }
 

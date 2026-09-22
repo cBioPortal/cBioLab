@@ -44,6 +44,17 @@ test("a figure's style override and per-track colours reach the SVG", () => {
   assert.ok(!themed.includes(">Lung</text>") === false, "labels are untouched");
 });
 
+test("a physical width prints in inches but leaves the internal layout, and the default call, untouched", () => {
+  const c = fixture();
+  const plain = contractToSvg(c, 800);
+  const sized = contractToSvg(c, 800, undefined, 8.5);
+  assert.ok(plain.startsWith('<svg xmlns="http://www.w3.org/2000/svg" width="800" height='), "no viewBox added when physicalWidthIn is absent");
+  assert.ok(!plain.includes("viewBox"));
+  assert.ok(sized.includes('width="8.5in"') && sized.includes('viewBox="0 0 800 '), sized.slice(0, 200));
+  // same px coordinates either way — only the outer declared size changes
+  assert.equal(sized.replace(/^<svg[^>]*>/, ""), plain.replace(/^<svg[^>]*>/, ""));
+});
+
 test("clinicalLegends: 'none' drops the per-track keys and shrinks the canvas", () => {
   const c = fixture();
   const all = contractToSvg(c, 800);
