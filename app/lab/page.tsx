@@ -434,6 +434,18 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const [wsError, setWsError] = useState<string | null>(null);
   const wsDialog = useRef<HTMLDialogElement | null>(null);
 
+  // ---- editing a cohort's name/note (the gear menu's "edit…") -------------
+  const [cohortEditing, setCohortEditing] = useState<string | null>(null); // the name AS IT IS in doc.cohorts right now
+  const [ceName, setCeName] = useState("");
+  const [ceNotes, setCeNotes] = useState("");
+  const [ceError, setCeError] = useState<string | null>(null);
+  const cohortEditDialog = useRef<HTMLDialogElement | null>(null);
+
+  // ---- editing a view's note (the gear menu's "add note…" / "edit note…") -
+  const [viewNoteEditing, setViewNoteEditing] = useState<number | null>(null); // index into doc.views / result.views
+  const [vnText, setVnText] = useState("");
+  const viewNoteDialog = useRef<HTMLDialogElement | null>(null);
+
   /** Postgres timestamptz -> the same "YYYY-MM-DD HH:MM" the app has always shown. */
   const fmtDate = (iso: string) => iso.slice(0, 16).replace("T", " ");
 
@@ -1317,7 +1329,12 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   };
   // ---- workspaces ----------------------------------------------------------
   const openWorkspaceSave = () => {
-    setWsName(doc.title || Object.keys(doc.cohorts || {})[0] || "workspace");
+    // Only ever prefills with the workspace's OWN name, if it already has
+    // one — never a cohort name or a generic fallback standing in for a
+    // real name, which read as though the app had already named it for you.
+    // An untitled workspace opens to an empty field with just the
+    // placeholder text.
+    setWsName(doc.title || "");
     wsDialog.current?.showModal();
   };
   const confirmWorkspaceSave = async () => {
@@ -1608,34 +1625,48 @@ function PickMenu({ label, title, options, chosen, onChange, min, max, busy, men
  * Before this each view kind built its own, so the timing chip landed in a different place
  * in each card.
  */
-function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown, onRemove, menuStore }: {
+function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown, onRemove, onEditNote, menuStore }: {
   v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode;
-  onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void; menuStore: Map<string, boolean>;
+  onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void; onEditNote?: () => void; menuStore: Map<string, boolean>;
   /** which cohorts this view draws; absent when the document has only one */
   cohorts?: { chosen: string[]; all: string[]; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void };
 }) {
   const menuKey = cohorts?.viewKey ?? "vh";
   return (
-    <div className="vhead">
-      <h2 className="vtitle">{title}{sub != null && <span className="plain"> — {sub}</span>}</h2>
-      <div className="vmeta">
-        {cohorts && cohorts.all.length > 1 && (
-          <PickMenu label="cohorts" title="which cohorts this view draws; all of them unless you say otherwise"
-            options={cohorts.all.map((n) => ({ value: n, label: n }))} chosen={cohorts.chosen}
-            onChange={cohorts.onChange} min={1} max={cohorts.max} busy={cohorts.busy} menuId={"pick:" + menuKey} menuStore={menuStore} />
-        )}
-        {actions}
-        {chips}
-        <Latency v={v} />
-        <Participation p={v.participation} />
-        {(onMoveUp || onMoveDown || onRemove) && <ViewMenu menuId={"reorder:" + menuKey} menuStore={menuStore} onMoveUp={onMoveUp} onMoveDown={onMoveDown} onRemove={onRemove} />}
+    <>
+      <div className="vhead">
+        <h2 className="vtitle">{title}{sub != null && <span className="plain"> — {sub}</span>}</h2>
+        <div className="vmeta">
+          {cohorts && cohorts.all.length > 1 && (
+            <PickMenu label="cohorts" title="which cohorts this view draws; all of them unless you say otherwise"
+              options={cohorts.all.map((n) => ({ value: n, label: n }))} chosen={cohorts.chosen}
+              onChange={cohorts.onChange} min={1} max={cohorts.max} busy={cohorts.busy} menuId={"pick:" + menuKey} menuStore={menuStore} />
+          )}
+          {actions}
+          {chips}
+          <Latency v={v} />
+          <Participation p={v.participation} />
+          {(onMoveUp || onMoveDown || onRemove || onEditNote) && (
+            <ViewMenu menuId={"reorder:" + menuKey} menuStore={menuStore} onMoveUp={onMoveUp} onMoveDown={onMoveDown}
+              onRemove={onRemove} onEditNote={onEditNote} hasNote={!!v.annotationNote} />
+          )}
+        </div>
       </div>
-    </div>
+      {/* The analyst's own one-line annotation (doc.views[i].note, echoed
+          through as v.annotationNote) — below the title, not above: it's a
+          reader's aside about the figure ViewHead just named, not something
+          that competes with the title for the first thing read. Plain text
+          by design, see .viewnote in globals.css for why it's never markdown. */}
+      {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
+    </>
   );
 }
 
 /** The gear at the end of every card's header: reorder this view, or drop it. */
-function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove }: { menuId: string; menuStore: Map<string, boolean>; onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void }) {
+function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove, onEditNote, hasNote }: {
+  menuId: string; menuStore: Map<string, boolean>; onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void;
+  onEditNote?: () => void; hasNote?: boolean;
+}) {
   const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   return (
     <details className="gearmenu" ref={ref} onToggle={onToggle}>
@@ -1643,6 +1674,10 @@ function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove }: { menuI
       <div className="gearmenu-items">
         <button className="linklike" disabled={!onMoveUp} onClick={onMoveUp}>move up</button>
         <button className="linklike" disabled={!onMoveDown} onClick={onMoveDown}>move down</button>
+        {onEditNote && <>
+          <hr />
+          <button className="linklike" onClick={onEditNote}>{hasNote ? "edit note…" : "add note…"}</button>
+        </>}
         {onRemove && <>
           <hr />
           <button className="linklike" onClick={onRemove}>remove</button>
@@ -1653,26 +1688,32 @@ function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove }: { menuI
 }
 
 /**
- * The gear at the top-right of a cohort box: give it a note, or drop it from
- * the analysis. Editing the FILTERS themselves isn't here yet — a cohort's
- * clauses come from Explore or hand-typed JSON, and neither has a form this
- * menu could hold; see the comment above the "Cohorts" heading for why that
- * is deliberately a separate, unscoped piece of work.
+ * The gear at the top-right of a cohort box: rename it, note it, or drop it
+ * from the analysis — "edit…" opens a small dialog for the name and note
+ * together (see cohortEditDialog), rather than a form crammed into this
+ * dropdown. "edit…" is left OUT of the menu entirely (not just disabled)
+ * until the workspace itself is saved: a rename/note on a cohort inside a
+ * document that isn't saved anywhere yet has nothing to attach to, and a
+ * greyed-out option in an otherwise-live menu reads as broken rather than
+ * as "do something else first". Editing the FILTERS themselves isn't here
+ * yet — a cohort's clauses come from Explore or hand-typed JSON, and
+ * neither has a form this menu could hold; see the comment above the
+ * "Cohorts" heading for why that is deliberately a separate, unscoped piece
+ * of work.
  */
-function CohortEditMenu({ name, notes, busy, onNotes, onRemove, menuId, menuStore }: {
-  name: string; notes: string; busy?: boolean; onNotes: (text: string) => void; onRemove: () => void;
+function CohortEditMenu({ busy, canEdit, onEdit, onRemove, menuId, menuStore }: {
+  busy?: boolean; canEdit: boolean; onEdit: () => void; onRemove: () => void;
   menuId: string; menuStore: Map<string, boolean>;
 }) {
   const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   return (
-    <details className="gearmenu" ref={ref} onToggle={onToggle}>
+    <details className="gearmenu cohortgear" ref={ref} onToggle={onToggle}>
       <summary className="tbbtn" title="edit this cohort" aria-label="edit this cohort">⋯</summary>
-      <div className="gearmenu-items wide">
-        <label className="wslabel" htmlFor={"cohortnote:" + name}>Note</label>
-        <textarea id={"cohortnote:" + name} className="cohortnotes" value={notes} spellCheck disabled={busy}
-          placeholder="What is this cohort? Why is it defined this way?"
-          onChange={e => onNotes(e.target.value)} />
-        <hr />
+      <div className="gearmenu-items">
+        {canEdit && <>
+          <button className="linklike" disabled={busy} onClick={onEdit}>edit…</button>
+          <hr />
+        </>}
         <button className="linklike" disabled={busy} onClick={onRemove}>remove this cohort</button>
       </div>
     </details>
@@ -1842,9 +1883,81 @@ function Latency({ v }: { v: any }) {
     if (Object.keys(cs).length) run(d); else setResult(null);
   };
 
-  const setCohortNotes = (name: string, text: string) => {
-    const d = { ...doc, cohorts: { ...doc.cohorts, [name]: { ...doc.cohorts[name], notes: text } } };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));   // no re-run: prose changes no numbers
+  const openCohortEdit = (name: string) => {
+    setCohortEditing(name);
+    setCeName(name);
+    setCeNotes(doc.cohorts?.[name]?.notes || "");
+    setCeError(null);
+    cohortEditDialog.current?.showModal();
+  };
+
+  /** Rename a cohort and/or change its note, from the gear menu's "edit…" dialog.
+   *  Renaming rewrites every `view.cohorts` reference too, so a view already
+   *  scoped to this cohort keeps drawing it under its new name — and since
+   *  the server keys everything (result.cohorts, every row/curve) by name,
+   *  a rename needs a real run(), unlike a note-only edit, which changes no
+   *  number and so never re-runs (matching what a plain note edit did before
+   *  this had its own dialog). */
+  const confirmCohortEdit = () => {
+    if (!cohortEditing) return;
+    const oldName = cohortEditing;
+    const newName = ceName.trim();
+    if (!newName) return;
+    if (newName !== oldName && doc.cohorts?.[newName]) {
+      setCeError("a cohort named “" + newName + "” already exists");
+      return;
+    }
+    cohortEditDialog.current?.close();
+    const nextCohorts: Record<string, CohortDef> = {};
+    for (const [k, v] of Object.entries(doc.cohorts || {})) {
+      nextCohorts[k === oldName ? newName : k] = k === oldName ? { ...v, notes: ceNotes } : v;
+    }
+    if (newName === oldName) {
+      const d = { ...doc, cohorts: nextCohorts };
+      setDoc(d); setDocText(JSON.stringify(d, null, 2));
+      return;
+    }
+    const views = (doc.views || []).map(v => Array.isArray(v.cohorts)
+      ? { ...v, cohorts: v.cohorts.map(c => c === oldName ? newName : c) }
+      : v);
+    const d = { ...doc, cohorts: nextCohorts, views };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    run(d);
+  };
+
+  const openViewNoteEdit = (vi: number) => {
+    setViewNoteEditing(vi);
+    setVnText((doc.views || [])[vi]?.note || "");
+    viewNoteDialog.current?.showModal();
+  };
+
+  /** A view's note is exactly like a cohort's or the workspace's: prose the
+   *  server never computes anything from, so this never re-runs — it patches
+   *  `doc.views[vi].note` (what gets saved/shared) AND mirrors the same text
+   *  straight into `result.views[vi].annotationNote` (what ViewHead actually
+   *  reads to display it), since nothing else would otherwise tell the
+   *  already-rendered card that its own annotation changed. */
+  const confirmViewNoteEdit = () => {
+    if (viewNoteEditing == null) return;
+    const vi = viewNoteEditing;
+    viewNoteDialog.current?.close();
+    const trimmed = vnText.trim();
+    const views = (doc.views || []).map((v: any, i: number) => {
+      if (i !== vi) return v;
+      const nv = { ...v };
+      if (trimmed) nv.note = trimmed; else delete nv.note;
+      const k = viewKeys.current.get(v);
+      if (k != null) viewKeys.current.set(nv, k);
+      return nv;
+    });
+    const d = { ...doc, views };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    setResult(prev => {
+      if (!prev || !prev.views[vi]) return prev;
+      const rviews = [...prev.views];
+      rviews[vi] = { ...rviews[vi], annotationNote: trimmed || undefined };
+      return { ...prev, views: rviews };
+    });
   };
 
   /**
@@ -2009,21 +2122,15 @@ function Latency({ v }: { v: any }) {
               placeholder="What is this analysis for? What should a reader look at first?"
               onChange={e => setNotes(e.target.value)} />
 
-            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "space-between", gap: "0.4rem", flexWrap: "wrap" }}>
+            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "space-between", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
               <div className="row" style={{ gap: "0.4rem" }}>
                 {doc.title && spaces[doc.title] && (
                   <button type="button" className="linklike" disabled={busy}
                     title={"delete the saved workspace “" + doc.title + "”"}
                     onClick={() => deleteWorkspace(doc.title!)}>delete</button>
                 )}
-                {Object.keys(spaces).length > 0 && (
-                  <button type="button" className="linklike" disabled={busy}
-                    onClick={() => { wsDialog.current?.close(); goTab("saved"); }}>
-                    open a different one…
-                  </button>
-                )}
               </div>
-              <div className="row" style={{ gap: "0.4rem" }}>
+              <div className="row" style={{ gap: "0.4rem", alignItems: "center" }}>
                 <button type="button" className="linklike" onClick={() => wsDialog.current?.close()}>cancel</button>
                 <button className="primary" type="submit" disabled={!wsName.trim()}>
                   {doc.title && spaces[doc.title] ? "Save changes" : "Save"}
@@ -2031,6 +2138,45 @@ function Latency({ v }: { v: any }) {
               </div>
             </div>
             {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
+          </form>
+        </dialog>
+        {/* The cohort gear menu's "edit…": name and note together, since
+            renaming is the one cohort-level edit this app supports without
+            reopening Explore or the JSON editor. */}
+        <dialog ref={cohortEditDialog} className="namedialog cohortdialog"
+          onClose={() => { setCohortEditing(null); setCeError(null); }}
+          onClick={e => { if (e.target === cohortEditDialog.current) cohortEditDialog.current?.close(); }}>
+          <form method="dialog" onSubmit={e => { e.preventDefault(); confirmCohortEdit(); }}>
+            <h3>Edit cohort</h3>
+            <label className="wslabel" htmlFor="cename">Name</label>
+            <input id="cename" autoFocus value={ceName} onChange={e => setCeName(e.target.value)} />
+            <label className="wslabel" htmlFor="cenotes" style={{ marginTop: "0.6rem", display: "block" }}>Note</label>
+            <textarea id="cenotes" value={ceNotes} spellCheck
+              placeholder="What is this cohort? Why is it defined this way?"
+              onChange={e => setCeNotes(e.target.value)} />
+            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
+              <button type="button" className="linklike" onClick={() => cohortEditDialog.current?.close()}>cancel</button>
+              <button className="primary" type="submit" disabled={!ceName.trim()}>Save</button>
+            </div>
+            {ceError && <p className="error" style={{ marginTop: "0.4rem" }}>{ceError}</p>}
+          </form>
+        </dialog>
+        {/* A view's gear menu's "add note…" / "edit note…": one line of prose
+            drawn below its title (see ViewHead) — what this figure shows, or
+            what to read first, not a second title. */}
+        <dialog ref={viewNoteDialog} className="namedialog cohortdialog"
+          onClose={() => setViewNoteEditing(null)}
+          onClick={e => { if (e.target === viewNoteDialog.current) viewNoteDialog.current?.close(); }}>
+          <form method="dialog" onSubmit={e => { e.preventDefault(); confirmViewNoteEdit(); }}>
+            <h3>View note</h3>
+            <label className="wslabel" htmlFor="vntext">Note</label>
+            <textarea id="vntext" autoFocus value={vnText} spellCheck
+              placeholder="What does this figure show? What should a reader look at first?"
+              onChange={e => setVnText(e.target.value)} />
+            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
+              <button type="button" className="linklike" onClick={() => viewNoteDialog.current?.close()}>cancel</button>
+              <button className="primary" type="submit">Save</button>
+            </div>
           </form>
         </dialog>
         <dialog ref={genesDialog} className="genedialog"
@@ -2104,7 +2250,7 @@ function Latency({ v }: { v: any }) {
                 {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
                 {/* A native <dialog> so Esc, focus trapping and the backdrop come
                     from the platform rather than being re-implemented. */}
-                <dialog ref={saveDialog} className="namedialog"
+                <dialog ref={saveDialog} className="namedialog savedialog"
                   onClose={() => setSaveName("")}
                   onClick={e => { if (e.target === saveDialog.current) saveDialog.current?.close(); }}>
                   <form method="dialog" onSubmit={e => { e.preventDefault(); confirmSave(); }}>
@@ -2112,7 +2258,7 @@ function Latency({ v }: { v: any }) {
                     <p className="meta">{clauses ? clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies") : "every patient in " + (exStudies.length === 1 ? exStudies[0] : exStudies.length + " selected studies")}</p>
                     <input autoFocus placeholder="cohort name…" value={saveName}
                       onChange={e => setSaveName(e.target.value)} />
-                    <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", gap: "0.4rem" }}>
+                    <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
                       <button type="button" className="linklike" onClick={() => saveDialog.current?.close()}>cancel</button>
                       <button className="primary" type="submit" disabled={!saveName.trim()}>Save</button>
                     </div>
@@ -3195,13 +3341,12 @@ function Latency({ v }: { v: any }) {
                   ))
                 : result && Object.entries(result.cohorts).map(([n, c], i) => (
                     <div key={n} className="cohortbox">
+                      <CohortEditMenu busy={busy} canEdit={!!(doc.title && spaces[doc.title])}
+                        onEdit={() => openCohortEdit(n)} onRemove={() => removeCohort(n)}
+                        menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
                       <div className="cohortbox-head">
                         <span className="qchip"><span className="qletter" style={{ color: CAT_COLORS[i % CAT_COLORS.length] }}>■</span>{n}</span>
                         <strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span>
-                        <span className="spacer" />
-                        <CohortEditMenu name={n} notes={doc.cohorts?.[n]?.notes || ""} busy={busy}
-                          onNotes={(text) => setCohortNotes(n, text)} onRemove={() => removeCohort(n)}
-                          menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
                       </div>
                       {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} />}
                       {/* A note only shows here — passively, read-only — once the
@@ -3262,23 +3407,32 @@ function Latency({ v }: { v: any }) {
           </dialog>
           <div>
             <div className="row" style={{ alignItems: "baseline", marginBottom: "0.9rem", gap: "0.6rem" }}>
-              {/* The workspace lives behind this one button + a dialog now, not a
-                  permanent card at the top of the column — it is read when setting
-                  the workspace up and almost never while reading the figures, and
-                  it doubles as the current workspace's name (or an invitation to
-                  give it one), so there is exactly one place to look for "what is
-                  this, and is it saved". */}
-              {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
-                <button className={doc.title ? "linklike" : undefined} disabled={busy} onClick={openWorkspaceSave}
-                  title={doc.title ? "edit this workspace's name, parameters and notes" : "save this analysis as a named, reopenable workspace"}>
-                  {doc.title || "Save workspace"}
-                  {doc.title && (!spaces[doc.title] || JSON.stringify(spaces[doc.title].doc) !== JSON.stringify(doc)) && " *"}
-                </button>
-              )}
               <h2 className="vtitle">
                 Analysis{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
               </h2>
               <div className="vmeta">
+                {/* The workspace lives behind this one button + a dialog, not
+                    a permanent card at the top of the column — it is read
+                    when setting the workspace up and almost never while
+                    reading the figures. What it's called and whether it's
+                    saved is what the dialog it opens is for; this button's
+                    own label stays fixed. */}
+                {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
+                  <button disabled={busy} onClick={openWorkspaceSave}
+                    style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
+                    title={doc.title
+                      ? "“" + doc.title + "” — " + (spaces[doc.title] && JSON.stringify(spaces[doc.title].doc) === JSON.stringify(doc)
+                          ? "saved " + spaces[doc.title].savedAt : "unsaved changes")
+                      : "save this analysis as a named, reopenable workspace"}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+                      <path d="M17 21v-8H7v8" />
+                      <path d="M7 3v5h8" />
+                    </svg>
+                    Save analysis
+                  </button>
+                )}
                 <button className="linklike" onClick={() => docDialog.current?.showModal()}
                   title="open the document's raw JSON — edit it, run it, or view generated SQL">
                   show document json
@@ -3335,11 +3489,8 @@ function Latency({ v }: { v: any }) {
                     placeholder object just falls through all of them silently;
                     this is the only thing that needs to render for it. */}
                 {(v as any).pending && <div className="skeleton skeleton-view" />}
-                {/* The author's own note about this figure, plain text by design —
-                    see .viewnote in globals.css for why it is never markdown. */}
-                {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
                 {v.kind === "compare" && v.rows && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                     style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
@@ -3361,7 +3512,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Hotspots" cohorts={cohortChoice(vi, docView(vi))} sub="recurrent protein changes, counted per patient" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Hotspots" cohorts={cohortChoice(vi, docView(vi))} sub="recurrent protein changes, counted per patient" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   {v.hotspots.map(h => {
@@ -3419,7 +3570,7 @@ function Latency({ v }: { v: any }) {
                   })}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<>
                       <label className="tbfield" title="the molecular profile the correlation is computed over">profile <select
                         value={docView(vi).profileType || ""} disabled={busy}
@@ -3463,7 +3614,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "clinical" && v.clinical && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<PickMenu label="attributes" title="which clinical attributes this view compares" busy={busy}
                       menuId={"attrs:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current}
                       options={(trackAttrs.attrs || []).map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind }))}
@@ -3507,7 +3658,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
@@ -3547,7 +3698,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "survival" && v.curves && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     sub={<>Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}{v.anchoredTo && <> — from {v.anchoredTo}</>}</>}
                     chips={v.truncated ? <span className="trunc" title={
                       "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
@@ -3642,7 +3793,7 @@ function Latency({ v }: { v: any }) {
                   <p className="note">{v.caveat}</p>
                 </>}
                 {v.kind === "cox" && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Cox regression" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Cox regression" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     sub={<>Multivariate Cox, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}</>} />
                   {(() => {
                     const sv: any = (doc.views || [])[vi] || {};
@@ -3705,7 +3856,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 )}
                 {v.kind === "plot" && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
                   {/* Every control here changes what is DRAWN and costs a query, so there is one
                       zone and it says so — the same toolbar the oncoprint uses. */}
@@ -3792,9 +3943,10 @@ function Latency({ v }: { v: any }) {
                       </details>
                     )}
                     <Latency v={v} /><Participation p={v.participation} />
-                    <ViewMenu menuId={"reorder:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} />
+                    <ViewMenu menuId={"reorder:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)} hasNote={!!v.annotationNote} />
                     </div>
                   </div>
+                  {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
                 {v.kind === "course" && v.svg && <>
@@ -3877,9 +4029,10 @@ function Latency({ v }: { v: any }) {
                   })()}
                     </details>
                     <Latency v={v} /><Participation p={v.participation} />
-                    <ViewMenu menuId={"reorder:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} />
+                    <ViewMenu menuId={"reorder:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)} hasNote={!!v.annotationNote} />
                     </div>
                     </div>
+                  {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
                   {/* The same SVG the chat and MCP clients receive \u2014 one renderer,
                       so the figure cannot differ between surfaces. */}
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
@@ -3889,7 +4042,7 @@ function Latency({ v }: { v: any }) {
                   const vNames = ocView(vi).cohorts || Object.keys(result.cohorts);
                   const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];
                   return <>
-                    <ViewHead menuStore={menuOpenRef.current} v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)}
+                    <ViewHead menuStore={menuOpenRef.current} v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                       cohorts={cohortChoice(vi, docView(vi), 4)}
                       sub={c ? <>{c.stats.nColumns.toLocaleString()} {c.unit}s · {c.conventions.annotation}</> : "loading…"} />
                     <OncoprintFigure
