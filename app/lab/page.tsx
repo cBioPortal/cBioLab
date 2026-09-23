@@ -771,10 +771,23 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     return ps.find((p: string) => /zscore/i.test(p)) || ps.find((p: string) => /mrna|rna_seq/i.test(p)) || null;
   };
 
+  /**
+   * Survival and Cox both fit a <X>_MONTHS/<X>_STATUS endpoint. When every cohort lives in one
+   * study and that study's catalog says it declares none (AACR GENIE's public release, say),
+   * adding either view can only produce an error card, so the button says why instead. Unknown
+   * (catalog not loaded, lookup failed, cohorts spanning several studies) leaves them enabled.
+   */
+  const noSurvivalWhy = (): string | null => {
+    const studies = new Set(Object.values(doc.cohorts || {}).flatMap((c: any) =>
+      Array.isArray(c?.studies) && c.studies.length ? c.studies : [c?.study || doc.study]));
+    if (studies.size !== 1 || !cat || cat.study !== [...studies][0]) return null;
+    if (!Array.isArray(cat.survivalEndpoints) || cat.survivalEndpoints.length) return null;
+    return cat.study + " has no survival data (no <X>_MONTHS/<X>_STATUS pair), so there is no endpoint to fit";
+  };
   const VIEW_KINDS: { kind: string; label: string; why?: () => string | null }[] = [
     { kind: "compare", label: "Compare genes" },
-    { kind: "survival", label: "Survival" },
-    { kind: "cox", label: "Cox regression (forest plot)" },
+    { kind: "survival", label: "Survival", why: noSurvivalWhy },
+    { kind: "cox", label: "Cox regression (forest plot)", why: noSurvivalWhy },
     { kind: "oncoprint", label: "Oncoprint" },
     { kind: "hotspots", label: "Lollipop (hotspots)" },
     { kind: "plot", label: "Plot",
@@ -791,6 +804,18 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
       why: () => viewEvents().some(e => /treat|therap|regimen|drug|medicat/.test(e.canonical)) ? null
         : "this study records no treatment events, so there are no lines of therapy to sequence" }
   ];
+
+  /**
+   * Whether this view's own block renders its header (and with it the remove/move controls).
+   * Most kinds only draw theirs once they have data, so a view that came back with only an error
+   * would otherwise be a bare red box the reader can't remove without editing the JSON.
+   */
+  const drawsOwnHead = (v: any): boolean =>
+    v.kind === "cox" || v.kind === "plot" ||
+    (v.kind === "compare" && !!v.rows) || (v.kind === "hotspots" && !!v.hotspots) ||
+    (v.kind === "coexpression" && !!v.coexpression) || (v.kind === "clinical" && !!v.clinical) ||
+    (v.kind === "cooccurrence" && !!v.pairs) || (v.kind === "survival" && !!v.curves) ||
+    ((v.kind === "sequence" || v.kind === "course") && !!v.svg) || (v.kind === "oncoprint" && !!v.spec);
 
   /** Drop one view from the document. Removing a view can't change any OTHER
    *  view's answer — each view's result depends only on its own definition
@@ -1448,7 +1473,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     const commit = () => {
       const g = add.trim().toUpperCase();
       if (!g || symbols.includes(g)) { setAdd(""); return; }
-      setViewGenes(vi, [...list, g].slice(0, 12));
+      setViewGenes(vi, [...list, g]);
       setAdd("");
     };
     const applyText = () => {
@@ -2036,7 +2061,13 @@ function Latency({ v }: { v: any }) {
       if (def) chosen.push([name, def]);
     }
     if (!chosen.length) return;
-    const nd: AnalysisDoc = { study, cohorts: Object.fromEntries(chosen.slice(0, 6)), views: DEFAULT_VIEWS };
+    // refused rather than cut to the first six: the reader ticked these, so analysing some of
+    // them without saying which would answer a different question than the one asked
+    if (chosen.length > 6) {
+      setError("an analysis takes at most 6 cohorts; " + chosen.length + " are ticked — untick " + (chosen.length - 6) + " and analyse again");
+      return;
+    }
+    const nd: AnalysisDoc = { study, cohorts: Object.fromEntries(chosen), views: DEFAULT_VIEWS };
     setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
     setResult(null); setError(null);
     goTab("analysis");
@@ -4020,16 +4051,17 @@ function Latency({ v }: { v: any }) {
                     const anchor = cv.anchor || null;
                     const toggle = (canon: string) => {
                       const next = chosen.includes(canon) ? chosen.filter(x => x !== canon) : [...chosen, canon];
-                      if (next.length) patchView(vi, { eventTypes: next.slice(0, 6) });
+                      if (next.length && next.length <= 6) patchView(vi, { eventTypes: next });
                     };
                     return (
                       <div className="gearmenu-items wide">
                         <div className="setcol"><span className="meta">measuring</span><div className="pillwrap">
                         {v.eventOptions.map(e => (
-                          <button key={e.canonical} type="button" disabled={busy}
+                          <button key={e.canonical} type="button" disabled={busy || (!chosen.includes(e.canonical) && chosen.length >= 6)}
                             className={"pill" + (chosen.includes(e.canonical) ? " on" : "")}
                             onClick={() => toggle(e.canonical)}
-                            title={e.patients.toLocaleString() + " patients · " + e.perPatient + " events each · " +
+                            title={(!chosen.includes(e.canonical) && chosen.length >= 6 ? "a course view measures at most 6 event types — drop one first. " : "") +
+                              e.patients.toLocaleString() + " patients · " + e.perPatient + " events each · " +
                               (e.hasDurations ? "carries durations, so it is drawn as a state patients are IN"
                                 : e.perPatient < 1.5 ? "about one per patient and no duration — likely a filing record rather than a clinical course"
                                 : "no durations, so it is drawn as an event that HAPPENED")}>
@@ -4172,6 +4204,11 @@ function Latency({ v }: { v: any }) {
                     ))}
                   </details>
                 )}
+                {v.error && !drawsOwnHead(v) && <ViewHead menuStore={menuOpenRef.current} v={v}
+                  title={(VIEW_KINDS.find((k) => k.kind === v.kind) || { label: v.kind }).label}
+                  onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined}
+                  onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined}
+                  onRemove={() => removeView(vi)} />}
                 {v.error && <div className="error">{v.kind}: {v.error}{v.participation ? <> <>{v.ms != null && (
                       <span className="lat" title={
                         "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +

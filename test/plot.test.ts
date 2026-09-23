@@ -4,7 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotBinsSql, plotBoxSql, plotCountSql,
   plotShape, plotStatsSql, plotTableSql, plotPointsSql, plotViolinSql, categoryColor, isAbsent,
-  tukey, validateAxis, CATEGORY_CAP, DEFAULT_BINS } from "../lib/plot.ts";
+  tukey, validateAxis, CATEGORY_CAP, DEFAULT_BINS , coverageNote } from "../lib/plot.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
 
 const ctx = { study: "x", db: "db", unit: "sample" as const, cohortSql: "SELECT pid FROM p" };
@@ -142,4 +142,13 @@ test("colour reaches the query only when it was asked for", () => {
   assert.match(plotViolinSql(numSel, catSel, "SELECT '' AS pid", 40, colSel), /GROUP BY g, b, c/);
   // and it is cut over the middle 99%, so one outlier cannot put every value in one bin
   assert.match(plotViolinSql(numSel, catSel, "SELECT '' AS pid"), /quantileExact\(0\.005\)/);
+});
+
+test("a plot says how many cases the pair left out, and on which axis", () => {
+  const d: any = { shape: "box", n: 145220, x: { label: "CANCER_TYPE", kind: "cat" }, y: { label: "FRACTION_GENOME_ALTERED", kind: "num" },
+    coverage: { total: 289869, nx: 282755, ny: 151504 } };
+  assert.equal(coverageNote(d, "sample"),
+    "145,220 of 289,869 samples have a value on both axes (7,114 have no CANCER_TYPE; 138,365 have no FRACTION_GENOME_ALTERED); only those are drawn.");
+  assert.equal(coverageNote({ ...d, n: 289869, coverage: { total: 289869, nx: 289869, ny: 289869 } }, "sample"), "", "nothing left out, nothing said");
+  assert.equal(coverageNote({ ...d, coverage: undefined }, "patient"), "", "no coverage known, no claim made");
 });

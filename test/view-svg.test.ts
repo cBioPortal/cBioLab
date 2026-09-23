@@ -240,3 +240,55 @@ describe("sequence Sankey keeps everyone accounted for", () => {
     assert.equal(viewTitle(mk() as any), "Treatment sequence by SUBTYPE — A");
   });
 });
+
+// A renderer never drops data on its own: past what fits at the requested width the figure
+// grows (and the app's container scrolls), and past the colour key the rest is one disclosed
+// "other". Each of these used to be a silent cut — 24 box groups, a 12×12 table, a 6-line
+// caption — so each is pinned here by counting what the SVG actually draws.
+describe("plot figures draw every group and category they are given", () => {
+  const box = (nGroups: number, extra: Partial<any> = {}): ViewResult => ({
+    kind: "plot", plot: {
+      shape: "box", n: nGroups * 10,
+      x: { label: "CANCER_TYPE", kind: "cat" }, y: { label: "FRACTION_GENOME_ALTERED", kind: "num" },
+      groups: Array.from({ length: nGroups }, (_, i) => ({ g: "group" + i, n: 10, lo: 0, hi: 1, q1: 0.2, median: 0.5, q3: 0.8, loWhisker: 0, hiWhisker: 1 })),
+      overlay: "none", ...extra
+    } as any
+  });
+
+  test("a box plot with 108 groups draws all 108, widening past the requested width", () => {
+    const svg = viewToSvg(box(108), { width: 960 })!;
+    for (const i of [0, 23, 24, 107]) assert.ok(svg.includes(">group" + i + "<"), "group" + i + " is drawn");
+    const w = Number(/viewBox="0 0 (\d+)/.exec(svg)![1]);
+    assert.ok(w > 960, "figure grew to " + w);
+    assert.match(svg, /min-width:\d+px/, "a grown figure keeps its width so the container scrolls rather than shrinking it");
+  });
+
+  test("a box plot that fits keeps the requested width and still scales to its container", () => {
+    const svg = viewToSvg(box(10), { width: 960 })!;
+    assert.match(svg, /viewBox="0 0 960 /);
+    assert.doesNotMatch(svg, /min-width/);
+  });
+
+  test("a contingency table draws every category on both axes, not the first 12", () => {
+    const cats = (p: string, n: number) => Array.from({ length: n }, (_, i) => p + i);
+    const cells = cats("x", 20).flatMap((cx, i) => cats("y", 18).map((cy, j) => ({ cx, cy, n: 1 + ((i * 7 + j) % 5) })));
+    const svg = viewToSvg({ kind: "plot", plot: { shape: "table", n: cells.reduce((a, c) => a + c.n, 0),
+      x: { label: "A", kind: "cat" }, y: { label: "B", kind: "cat" }, cells } as any }, { width: 960 })!;
+    for (let i = 0; i < 20; i++) assert.ok(svg.includes(">x" + i + "<"), "column x" + i);
+    for (let j = 0; j < 18; j++) assert.ok(svg.includes(">y" + j + "<"), "row y" + j);
+  });
+
+  test("colour categories past the key pool into one disclosed 'other', in the key and the violins", () => {
+    const legend = Array.from({ length: 12 }, (_, i) => ({ label: "c" + i, color: "#00000" + (i % 10) }));
+    const violin = Array.from({ length: 15 }, (_, i) => ({ g: "group0", b: 3, n: 5, c: "c" + i })).concat([{ g: "group0", b: 3, n: 4, c: "" }]);
+    const svg = viewToSvg(box(2, { overlay: "violin", violin, violinBins: 10, violinExtent: [0, 1], legend, colorLabel: "SEX" }), { width: 960 })!;
+    assert.match(svg, /other \(3 more categories, no value\)/);
+    assert.ok(svg.includes('fill="#9aa5ad"'), "the pooled share is drawn in the violin, not left as a gap");
+  });
+
+  test("a long caption is never cut", () => {
+    const note = Array.from({ length: 40 }, (_, i) => "caveat" + i + " applies here and must be read").join(" ");
+    const svg = viewToSvg({ ...box(3), note } as any, { width: 960 })!;
+    assert.ok(svg.includes("caveat39"), "the last line of the caption is present");
+  });
+});

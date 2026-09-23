@@ -24,7 +24,7 @@ import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
   type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments,
   type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, type FederatedPlotCapable, legendFor } from "./federation.ts";
-import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis, type PlotData, type PlotGroup, type AxisKind } from "./plot.ts";
+import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis, coverageNote, type PlotData, type PlotGroup, type AxisKind } from "./plot.ts";
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 
@@ -39,6 +39,16 @@ async function oncokbPin(): Promise<string | null> {
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
 /** 12 genes = 66 pairs; beyond this the multiplicity correction eats the signal */
 const COOCCUR_GENE_LIMIT = 12;
+
+/**
+ * A request past a view's limit is refused, naming the limit, rather than cut to its first N:
+ * a document (or a chat/MCP client writing one) that asks for 25 genes and silently gets 20
+ * reads the result as an answer about all 25.
+ */
+function overLimit(what: string, max: number, given: number): string | null {
+  return given > max ? what + " takes at most " + max + "; this asks for " + given + " — remove " + (given - max) +
+    " rather than have the rest silently ignored" : null;
+}
 
 const _profileCache = new Map<string, { profiles: string[]; gaProfiles: string[] }>(); // per-study
 export async function studyProfiles(study: string): Promise<{ profiles: string[]; gaProfiles: string[] }> {
@@ -101,8 +111,10 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   const { doc, params: usedParams, unused: unusedParams } = resolveParams(template);
   const docStudy = await resolveStudy(doc.study);
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
-  const names = Object.keys(doc.cohorts || {}).slice(0, 6);
+  const names = Object.keys(doc.cohorts || {});
   if (!names.length) throw new Error("document has no cohorts");
+  { const e = overLimit("an analysis document", 6, names.length); if (e) throw new Error(e.replace("at most 6", "at most 6 cohorts")); }
+  { const e = overLimit("an analysis document", 6, (doc.views || []).length); if (e) throw new Error(e.replace("at most 6", "at most 6 views")); }
 
   // ---- evaluate cohorts: per study, sum the counts ------------------------
   const cohorts: Record<string, { studies: string[]; perStudy: Record<string, { sql: string; count: number; mode: string }>; count: number; text: string }> = {};
@@ -169,14 +181,15 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   };
 
   const views: ViewResult[] = [];
-  for (const view of (doc.views || []).slice(0, 6)) {
+  for (const view of (doc.views || [])) {
     const vNames = (view.cohorts && view.cohorts.length ? view.cohorts : names).filter((n) => cohorts[n]);
     const vStudies = [...new Set(vNames.flatMap((n) => cohorts[n].studies))];
     const mark = queryMark(), pushedBefore = views.length, viewT0 = Date.now();
 
     if (view.kind === "compare") {
-      const genes = geneSymbols((view as CompareView).genes).slice(0, 20);
+      const genes = geneSymbols((view as CompareView).genes);
       if (!genes.length) { views.push({ kind: "compare", error: "compare view needs genes" }); continue; }
+      { const e = overLimit("a compare view", 20, genes.length); if (e) { views.push({ kind: "compare", error: e.replace("at most 20", "at most 20 genes") }); continue; } }
       // Every participant answers with per-gene counts computed in its own
       // database; the analysis layer only sums. Identical arithmetic whether the
       // instance is patient-level or aggregate-only — which is what makes mixed
@@ -282,10 +295,22 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         vNames.every((n) => !(perSite.get(n)!.get(st) || []).length));
       let endpointHelp = "";
       if (silent.length) {
-        const avail = await Promise.all(silent.map(async (st) =>
-          st + ": " + ((await resolvers[st].survivalEndpoints().catch(() => [])).join(", ") || "none declared")));
+        const declared = await Promise.all(silent.map(async (st) =>
+          ({ st, eps: await resolvers[st].survivalEndpoints().catch(() => [] as string[]) })));
+        // One study is not a federation: "1 of 1 study … participating" reads as though the
+        // analysis were pooling sites, so a single study gets a plain statement instead.
+        if (vStudies.length === 1) {
+          const { st, eps } = declared[0];
+          views.push({ kind: "survival", endpoint,
+            error: eps.length
+              ? st + " has no " + endpoint + " data (no " + endpoint + "_MONTHS/" + endpoint + "_STATUS). It does declare " +
+                eps.join(", ") + " — pick one of those as the endpoint."
+              : st + " has no survival data: it declares no <X>_MONTHS/<X>_STATUS pair, so there is no endpoint to plot." });
+          continue;
+        }
+        const avail = declared.map(({ st, eps }) => st + ": " + (eps.join(", ") || "none declared"));
         endpointHelp = " " + silent.length + " of " + vStudies.length + " stud" + (silent.length === 1 ? "y has" : "ies have") +
-          " no " + endpoint + " data and contribute no patients here (" + avail.join("; ") + ").";
+          " no " + endpoint + " data and contribute" + (silent.length === 1 ? "s" : "") + " no patients here (" + avail.join("; ") + ").";
         if (silent.length === vStudies.length) {
           views.push({ kind: "survival", endpoint,
             error: "no participating study defines " + endpoint + "_MONTHS/" + endpoint + "_STATUS." + endpointHelp });
@@ -386,8 +411,9 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) {
         views.push({ kind: "cox", error: "bad survival endpoint '" + endpoint.slice(0, 40) + "'" }); continue;
       }
-      const covariates = Array.isArray(cx.covariates) ? cx.covariates.slice(0, 8) : [];
+      const covariates = Array.isArray(cx.covariates) ? cx.covariates : [];
       if (!covariates.length) { views.push({ kind: "cox", endpoint, error: "a cox view needs at least one covariate" }); continue; }
+      { const e = overLimit("a cox view", 8, covariates.length); if (e) { views.push({ kind: "cox", endpoint, error: e.replace("at most 8", "at most 8 covariates") }); continue; } }
       try { covariates.forEach((c, i) => validateAxis(c, "covariate " + (i + 1))); }
       catch (e) { views.push({ kind: "cox", endpoint, error: (e as Error).message }); continue; }
       const rawCutoff = cx.cutoffMonths;
@@ -548,7 +574,9 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
 
       // Fold spellings, and let structure pick the measure.
       const folded = foldEventNames(allSpans.map((s) => ({ name: s.eventType, n: s.patients })));
-      const wanted = [...new Set((cv.eventTypes || []).map(canonicalEventName).filter(Boolean))].slice(0, 6);
+      const wanted = [...new Set((cv.eventTypes || []).map(canonicalEventName).filter(Boolean))];
+      { const e = overLimit("a course view", 6, wanted.length);
+        if (e) { views.push({ kind: "course", cohorts: vNames, studies: vStudies, error: e.replace("at most 6", "at most 6 event types") }); continue; } }
       if (!wanted.length) {
         views.push({ kind: "course", cohorts: vNames, studies: vStudies,
           error: "a course view needs at least one event type. This cohort has: " +
@@ -794,8 +822,9 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
 
     } else if (view.kind === "hotspots") {
       const hv = view as HotspotsView;
-      const uniq = geneSymbols(hv.genes).slice(0, 12);
+      const uniq = geneSymbols(hv.genes);
       if (!uniq.length) { views.push({ kind: "hotspots", error: "hotspots view needs genes" }); continue; }
+      { const e = overLimit("a hotspots view", 12, uniq.length); if (e) { views.push({ kind: "hotspots", error: e.replace("at most 12", "at most 12 genes") }); continue; } }
       const minCount = Math.max(1, Math.min(1000, Math.floor(Number(hv.minCount) || 1)));
       const cn = vNames[0];
       const reports = await Promise.all(cohorts[cn].studies.map((st) =>
@@ -861,10 +890,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               if (pv.ringBy) data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true)];
             }
           }
-          const pr: ViewResult = {
-            kind: "plot", plot: data, cohorts: [cn], studies: sites,
-            participation: participationFor(sites, false),
-            note: data.shape === "box" && data.overlay === "violin"
+          const shapeNote = data.shape === "box" && data.overlay === "violin"
               ? "Drawn as a density per group: " + data.n.toLocaleString("en-US") + " values is past what a cloud of dots can show, " +
                 "and the quartiles are over every one of them."
               : data.shape === "box" && data.overlay === "points"
@@ -873,7 +899,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               ? "Drawn as density: " + data.n.toLocaleString("en-US") + " " + (unit === "sample" ? "samples" : "patients") +
                 " counted into " + (data.bins || []).length.toLocaleString("en-US") + " cells. The coefficients are over every " +
                 (unit === "sample" ? "sample" : "patient") + ", not over what you can see."
-              : undefined
+              : undefined;
+          // what the pair left out leads: cases missing either axis are not on the figure at all
+          const pr: ViewResult = {
+            kind: "plot", plot: data, cohorts: [cn], studies: sites,
+            participation: participationFor(sites, false),
+            note: [coverageNote(data, unit), shapeNote].filter(Boolean).join(" ") || undefined
           };
           // drawn on the server, like every view but the oncoprint, so chat and MCP get the figure
           const tPlot = Date.now();
@@ -950,7 +981,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             else if (kx > CATEGORY_CAP || ky > CATEGORY_CAP)
               throw new Error("this pair has " + Math.max(kx, ky) + " distinct categories on one axis and " + CATEGORY_CAP +
                 " is the most a contingency table stays readable (and testable) at; narrow the cohort or pick another attribute");
-            else data = { shape, n, ...label, cells: cells.slice(0, 10000),
+            else data = { shape, n, ...label, cells,
               note: scaleNote + ". Contingency counts are exact sums — a category means the same thing whichever" +
                 " site records it, so there is no shared-scale question here the way there is for a numeric axis." };
           } else {
@@ -993,8 +1024,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             }
           }
 
+          // each site counts its own cases and their axes; the sums are exact
+          const covs = await Promise.all(sites.map((s) => fr[s].plotCoverage(doc.cohorts[cn], spec, xk, yk).catch(() => null)));
+          if (covs.every(Boolean)) data.coverage = covs.reduce<{ total: number; nx: number; ny: number }>(
+            (a, c) => ({ total: a.total + c!.total, nx: a.nx + c!.nx, ny: a.ny + c!.ny }), { total: 0, nx: 0, ny: 0 });
           const pr: ViewResult = { kind: "plot", plot: data, cohorts: [cn], studies: sites,
-            participation: participationFor(sites, false), note: data.note };
+            participation: participationFor(sites, false), note: [coverageNote(data, unit), data.note].filter(Boolean).join(" ") || undefined };
           const tPlot = Date.now();
           pr.svg = viewToSvg(pr, { width: 960 }) || undefined;
           pr.renderMs = Date.now() - tPlot;
@@ -1006,8 +1041,9 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     } else if (view.kind === "coexpression") {
       const v = view as CoexpressionView;
       const profileType = String(v.profileType || "").trim();
-      const uniq = geneSymbols(v.genes)
-        .slice(0, COOCCUR_GENE_LIMIT);
+      const uniq = geneSymbols(v.genes);
+      { const e = overLimit("a coexpression view", COOCCUR_GENE_LIMIT, uniq.length);
+        if (e) { views.push({ kind: "coexpression", error: e.replace("at most " + COOCCUR_GENE_LIMIT, "at most " + COOCCUR_GENE_LIMIT + " genes") }); continue; } }
       if (!profileType) { views.push({ kind: "coexpression", error: "coexpression view needs a profileType (e.g. rna_seq_v2_mrna_median_Zscores)" }); continue; }
       if (uniq.length < 2) { views.push({ kind: "coexpression", error: "coexpression needs at least 2 distinct genes" }); continue; }
       const pairs: [string, string][] = [];
@@ -1054,8 +1090,9 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
 
     } else if (view.kind === "clinical") {
       const attrs = ((view as ClinicalView).attributes || [])
-        .map((a) => String(a).trim()).filter((a) => /^[A-Za-z0-9_]{1,64}$/.test(a)).slice(0, 20);
+        .map((a) => String(a).trim()).filter((a) => /^[A-Za-z0-9_]{1,64}$/.test(a));
       if (!attrs.length) { views.push({ kind: "clinical", error: "clinical view needs attributes" }); continue; }
+      { const e = overLimit("a clinical view", 20, attrs.length); if (e) { views.push({ kind: "clinical", error: e.replace("at most 20", "at most 20 attributes") }); continue; } }
       if (vNames.length < 2) { views.push({ kind: "clinical", error: "clinical comparison needs at least 2 cohorts" }); continue; }
       // cohort -> study -> that site's description of each attribute
       const stats = new Map<string, AttrStats[]>();  // "cohort|study"
@@ -1134,7 +1171,9 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     } else if (view.kind === "cooccurrence") {
       // Co-occurrence is a property of ONE cohort, not a comparison between two,
       // so it reads the first cohort in the view and says which.
-      const uniq = geneSymbols((view as CooccurrenceView).genes).slice(0, COOCCUR_GENE_LIMIT);
+      const uniq = geneSymbols((view as CooccurrenceView).genes);
+      { const e = overLimit("a co-occurrence view", COOCCUR_GENE_LIMIT, uniq.length);
+        if (e) { views.push({ kind: "cooccurrence", error: e.replace("at most " + COOCCUR_GENE_LIMIT, "at most " + COOCCUR_GENE_LIMIT + " genes") }); continue; } }
       if (uniq.length < 2) { views.push({ kind: "cooccurrence", error: "co-occurrence needs at least 2 distinct genes" }); continue; }
       const pairs: [string, string][] = [];
       for (let i = 0; i < uniq.length; i++) for (let j = i + 1; j < uniq.length; j++) pairs.push([uniq[i], uniq[j]]);
@@ -1218,7 +1257,9 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         continue;
       }
       const multi = okStudies.length > 1;
-      const genes = ((view as OncoprintView).genes || []).slice(0, 12);
+      const genes = (view as OncoprintView).genes || [];
+      { const e = overLimit("an oncoprint view", 12, genes.length) || overLimit("an oncoprint view", 3, ((view as OncoprintView).derivedCohorts || []).length);
+        if (e) { views.push({ kind: "oncoprint", error: e.replace("at most 12", "at most 12 gene rows").replace("at most 3", "at most 3 derived-cohort rows") }); continue; } }
       // Federated z-score reference: a heatmap track marked reference:"federation"
       // is scored against a distribution pooled from EVERY participating study,
       // including the aggregate-only ones that contribute no columns. Each of
@@ -1264,7 +1305,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         // document cohorts the view asked to draw as binary rows; the engine refuses them
         // across studies and in sample mode, which are exactly the cases where "is this
         // patient in that cohort" has no single answer per column
-        derivedEvents: (((view as OncoprintView).derivedCohorts || []).slice(0, 3))
+        derivedEvents: ((view as OncoprintView).derivedCohorts || [])
           .filter((n) => doc.cohorts[n])
           .map((n) => ({ label: n, expression: doc.cohorts[n] })),
         conventions: { lineGap: 90 }
@@ -1327,7 +1368,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
 
   // An author's note belongs to the VIEW, not to the run, so it is copied across
   // by position rather than being threaded through every branch above.
-  (doc.views || []).slice(0, 6).forEach((v, i) => {
+  (doc.views || []).forEach((v, i) => {
     const note = v.note;
     if (views[i] && typeof note === "string" && note.trim()) views[i].annotationNote = note.trim();
   });

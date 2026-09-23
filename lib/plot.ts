@@ -219,6 +219,35 @@ export function plotCountSql(xSel: string, ySel: string, cohortSql: string, nume
       : "SELECT count() AS n, uniqExact(x) AS kx, uniqExact(y) AS ky FROM pair");
 }
 
+/**
+ * How many cases the cohort has and how many carry each axis. Only cases measured on BOTH axes
+ * are plotted — an inner join, which is right — but a plot that doesn't say how many fell out,
+ * and on which axis, reads as being about the whole cohort. Counts only; no id leaves.
+ */
+export function plotCoverageSql(xSel: string, ySel: string, ctx: AxisCtx): string {
+  const db = ctx.db || DB;
+  const universe = ctx.unit === "sample"
+    ? "SELECT DISTINCT " + strip("sample_unique_id", ctx.study) + " AS id FROM " + db + ".sample_derived\n" +
+      "  WHERE cancer_study_identifier = " + sq(ctx.study) + " AND " + strip("patient_unique_id", ctx.study) + " IN (SELECT pid FROM cohort)"
+    : "SELECT pid AS id FROM cohort";
+  return "WITH cohort AS (" + ctx.cohortSql + "),\n     cases AS (" + universe + "),\n" +
+    "     xs AS (" + xSel + "),\n     ys AS (" + ySel + ")\n" +
+    "SELECT count() AS total, countIf(id IN (SELECT id FROM xs)) AS nx, countIf(id IN (SELECT id FROM ys)) AS ny FROM cases";
+}
+
+/** The sentence a plot leads its caption with when the pair left cases out; empty when none were. */
+export function coverageNote(d: PlotData, unit: "patient" | "sample"): string {
+  const c = d.coverage;
+  if (!c || !(c.total > d.n)) return "";
+  const f = (n: number) => n.toLocaleString("en-US");
+  const miss = [
+    c.total - c.nx > 0 ? f(c.total - c.nx) + " have no " + d.x.label : "",
+    c.total - c.ny > 0 ? f(c.total - c.ny) + " have no " + d.y.label : ""
+  ].filter(Boolean);
+  return f(d.n) + " of " + f(c.total) + " " + unit + "s have a value on both axes" +
+    (miss.length ? " (" + miss.join("; ") + ")" : "") + "; only those are drawn.";
+}
+
 /** exact statistics over every point: both coefficients and the least-squares line */
 export function plotStatsSql(xSel: string, ySel: string, cohortSql: string): string {
   return pairCte(xSel, ySel, cohortSql) +
@@ -341,7 +370,9 @@ export function jitterFor(id: string): number {
 /** the contingency table, one row per occupied cell */
 export function plotTableSql(xSel: string, ySel: string, cohortSql: string): string {
   return pairCte(xSel, ySel, cohortSql) +
-    "SELECT x AS cx, y AS cy, count() AS n FROM pair GROUP BY cx, cy ORDER BY n DESC LIMIT 10000";
+    // no row cap below the whole table: callers refuse a pair past CATEGORY_CAP per axis first,
+    // so CATEGORY_CAP² bounds it, and a table missing its smallest cells would be a wrong one
+    "SELECT x AS cx, y AS cy, count() AS n FROM pair GROUP BY cx, cy ORDER BY n DESC LIMIT " + CATEGORY_CAP * CATEGORY_CAP;
 }
 
 // ---- pure helpers, shared with the renderers -------------------------------
@@ -433,4 +464,6 @@ export interface PlotData {
   overlay?: "points" | "violin" | "none";
   cells?: { cx: string; cy: string; n: number }[];
   note?: string;
+  /** cases in the cohort, and how many carry each axis — what the inner join left out, and why */
+  coverage?: { total: number; nx: number; ny: number };
 }
