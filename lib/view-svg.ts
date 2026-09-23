@@ -569,6 +569,13 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
     });
     for (const t of [lo, (lo + hi) / 2, hi]) out.push(axisText(num(t), L - 6, sy(t) + 3, "end", 10));
     out.push(`<rect x="${L}" y="${T}" width="${num(plotW)}" height="${PLOT}" fill="none" stroke="${p.line}"/>`);
+    // Whichever of x/y the document names as the numeric one, the box is always drawn grouped
+    // by the categorical axis with the numeric axis vertical — so the two attribute names are
+    // the only way to tell a reader which is which; without them a swapped x/y is invisible.
+    const numLabel = d.x.kind === "num" ? d.x.label : d.y.label, catLabel = d.x.kind === "num" ? d.y.label : d.x.label;
+    out.push(axisText(catLabel, L + plotW / 2, T + PLOT + 46),
+      `<text x="14" y="${T + PLOT / 2}" font-size="11" fill="${p.muted}" text-anchor="middle" ` +
+      `transform="rotate(-90 14 ${T + PLOT / 2})">${esc(numLabel)}</text>`);
     let keyY = T + PLOT + 74;
     if (colorKey.length || ringKey.length) {
       let kx = L;

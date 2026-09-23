@@ -754,8 +754,17 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     return [...by.values()].sort((a, b) => b.n - a.n);
   };
   /** a continuous profile for co-expression / heatmaps, if this study has one */
+  /**
+   * The clinical attribute catalog, for a plot's default axes. `trackAttrs` is the richer,
+   * multi-study union (populated once a plot/clinical/cox/oncoprint view exists in the result),
+   * but the very FIRST plot added to an empty document runs before any result exists to trigger
+   * that fetch — so it falls back to Explore's own per-study facets, already in hand by the time
+   * a reader has gotten as far as adding a view.
+   */
+  const catalogAttrs = (): { attribute: string; kind: string }[] =>
+    trackAttrs.attrs.length ? trackAttrs.attrs : ((explore && explore.clinical) || []);
   /** the numeric clinical attributes this study declares, for a plot's default axes */
-  const numericAttrs = (): string[] => (trackAttrs.attrs || []).filter((a) => a.kind === "num").map((a) => a.attribute);
+  const numericAttrs = (): string[] => catalogAttrs().filter((a) => a.kind === "num").map((a) => a.attribute);
 
   const contProfile = (): string | null => {
     const ps = (explore && explore.profiles) || [];
@@ -831,7 +840,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
           // alteration axis, which every study can answer
           const nums = numericAttrs();
           if (nums.length >= 2) return { kind, x: { source: "clinical", attribute: nums[0] }, y: { source: "clinical", attribute: nums[1] }, unit: "sample" };
-          const cat = (trackAttrs.attrs || []).find((a) => a.kind !== "num");
+          const cat = catalogAttrs().find((a) => a.kind !== "num");
           return { kind, unit: "sample",
             x: { source: "alteration", gene: genes[0] || "TP53", by: "mutationType" },
             y: cat ? { source: "clinical", attribute: cat.attribute } : { source: "alteration", gene: genes[1] || "KRAS", by: "mutated" } };
@@ -1217,10 +1226,12 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     exFetchTimer.current = setTimeout(() => fetchExplore(d.all!.length ? d : null, ids), 350);
   };
 
-  // clinical-track options for oncoprint views: union of attribute names across the
-  // result's involved studies (an attribute absent in one study just renders gaps there)
+  // clinical-attribute catalog: union of attribute names across the result's involved
+  // studies (an attribute absent in one study just renders gaps there). Every kind that
+  // offers a clinical-attribute picker shares this one fetch — the oncoprint's track menu,
+  // a plot's axis pickers, the clinical view's attribute menu, and Cox's covariate picker.
   useEffect(() => {
-    if (!result || !result.views.some(v => v.kind === "oncoprint" && v.spec)) return;
+    if (!result || !result.views.some(v => (v.kind === "oncoprint" && v.spec) || v.kind === "plot" || v.kind === "clinical" || v.kind === "cox")) return;
     const studies = result.involvedStudies && result.involvedStudies.length ? result.involvedStudies : [result.study];
     const key = studies.join(",");
     if (trackAttrs.key === key) return;
@@ -1514,10 +1525,14 @@ function AxisPicker({ side, axis, attrs, profiles, busy, onChange, allowNone, ca
       <select value={src} disabled={busy} title="what this axis measures"
         onChange={(e) => {
           const s = e.target.value;
+          // Keep whatever this axis last held for each source (spreading `a` rather than
+          // starting fresh), so switching away and back round-trips instead of always
+          // reverting to the catalog's first entry — a molecular axis already did this for
+          // its gene; clinical's attribute and molecular's profile now do too.
           set(s === "none" ? undefined
-            : s === "clinical" ? { source: "clinical", attribute: (attrs[0] || {}).attribute || "" }
-            : s === "molecular" ? { source: "molecular", profileType: profiles[0] || "", gene: a.gene || "TP53" }
-            : { source: "alteration", gene: a.gene || "TP53", by: "mutationType" });
+            : s === "clinical" ? { ...a, source: "clinical", attribute: a.attribute || (attrs[0] || {}).attribute || "" }
+            : s === "molecular" ? { ...a, source: "molecular", profileType: a.profileType || profiles[0] || "", gene: a.gene || "TP53" }
+            : { ...a, source: "alteration", gene: a.gene || "TP53", by: a.by || "mutationType" });
         }}>
         {allowNone && <option value="none">none</option>}
         <option value="clinical">clinical</option>
@@ -1537,12 +1552,10 @@ function AxisPicker({ side, axis, attrs, profiles, busy, onChange, allowNone, ca
           {!profiles.includes(a.profileType || "") && <option value={a.profileType || ""}>{a.profileType || "(none)"}</option>}
           {profiles.map((pt) => <option key={pt} value={pt}>{pt}</option>)}
         </select>
-        <input className="axisgene" value={a.gene || ""} disabled={busy} placeholder="gene"
-          onChange={(e) => set({ ...a, gene: e.target.value.toUpperCase() })} />
+        <GeneInput gene={a.gene || ""} busy={busy} onCommit={(gene) => set({ ...a, gene })} />
       </>}
       {src === "alteration" && <>
-        <input className="axisgene" value={a.gene || ""} disabled={busy} placeholder="gene"
-          onChange={(e) => set({ ...a, gene: e.target.value.toUpperCase() })} />
+        <GeneInput gene={a.gene || ""} busy={busy} onCommit={(gene) => set({ ...a, gene })} />
         <select value={a.by || "mutationType"} disabled={busy} title="how the gene's alterations are grouped"
           onChange={(e) => set({ ...a, by: e.target.value })}>
           <option value="mutationType">mutation type</option>
@@ -1551,6 +1564,30 @@ function AxisPicker({ side, axis, attrs, profiles, busy, onChange, allowNone, ca
         </select>
       </>}
     </span>
+  );
+}
+
+/**
+ * A gene name typed into a plot axis, debounced before it reaches the document/URL. Committing
+ * on every keystroke (as the rest of this axis picker does for selects) meant an in-progress
+ * edit — including the empty string between deleting the old gene and typing the new one —
+ * briefly became the shareable link, which the compiler then rejects ("a molecular axis needs
+ * one gene"). A short pause before committing keeps that mid-edit state local to the input.
+ */
+function GeneInput({ gene, busy, onCommit }: { gene: string; busy?: boolean; onCommit: (gene: string) => void }) {
+  const [draft, setDraft] = useState(gene);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => setDraft(gene), [gene]);
+  const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); onCommit(v); };
+  return (
+    <input className="axisgene" value={draft} disabled={busy} placeholder="gene"
+      onChange={(e) => {
+        const v = e.target.value.toUpperCase();
+        setDraft(v);
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => onCommit(v), 500);
+      }}
+      onBlur={() => commit(draft)} />
   );
 }
 
@@ -3870,22 +3907,31 @@ function Latency({ v }: { v: any }) {
                       <AxisPicker side="y" axis={docView(vi).y} attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
                         onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, y: a }))} />
                     </div>
-                    <div className="tbz">
-                      <span className="tbl" title="a category colours each value; above the points cap it splits the density instead">colour</span>
+                    {/* colour/ring only affect a box plot's violin — a scatter's density and a
+                        contingency table have no per-case colour to split, so the controls would
+                        sit there doing nothing until a box shape is actually on screen */}
+                    {v.plot?.shape === "box" && <div className="tbz">
+                      <span className="tbl" title="colours each group's violin by a category">colour</span>
                       <AxisPicker side="fill" axis={docView(vi).colorBy} allowNone categorical
                         attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
                         onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
                       <AxisPicker side="ring" axis={docView(vi).ringBy} allowNone categorical
                         attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
                         onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
-                    </div>
+                    </div>}
                     <div className="tbz">
                       <label className="tbfield" title="what a point is; patient mode averages a patient's samples">unit <select
                         value={docView(vi).unit || "patient"} disabled={busy}
                         onChange={(e) => updateView(vi, (vv: any) => ({ ...vv, unit: e.target.value }))}>
                         <option value="patient">patients</option><option value="sample">samples</option>
                       </select></label>
-                      <button className="tbbtn" disabled={busy} title="put the x axis on y and the y axis on x"
+                      {/* a box plot is always drawn categories-on-x, values-on-y regardless of
+                          which axis is which in the document (lib/federation.ts's box branch
+                          routes by kind, not by x/y) — swapping which is "x" changes nothing a
+                          reader can see, so the button is disabled rather than pretending to act */}
+                      <button className="tbbtn" disabled={busy || v.plot?.shape === "box"}
+                        title={v.plot?.shape === "box" ? "a box plot is always drawn by category, whichever axis holds it — nothing to swap"
+                          : "put the x axis on y and the y axis on x"}
                         onClick={() => updateView(vi, (vv: any) => ({ ...vv, x: vv.y, y: vv.x }))}>swap</button>
                     </div>
                   </div>
