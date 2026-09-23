@@ -25,10 +25,10 @@ import { canonicalEventName } from "./event-names.ts";
 import { compileCohortDef, eventTypeMatchSql } from "./cohort2.ts";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
-  plotBinsSql, plotBoxSql, plotCountSql, plotMomentsSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
+  plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
   type AxisKind, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
-export { plotBinsSql, plotBoxSql, plotCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
+export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
 export type { PlotData, PlotRequest, PlotGroup, PlotPoint } from "./plot.ts";
 import type { Moments } from "./stats.ts";
 
@@ -1041,6 +1041,8 @@ export interface FederatedPlotCapable {
     Promise<{ cx: string; cy: string; n: number }[]>;
   plotBoxRows(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]>;
+  plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ total: number; nx: number; ny: number }>;
 }
 export function hasFederatedPlot(r: Resolver): r is Resolver & FederatedPlotCapable {
   return typeof (r as unknown as Partial<FederatedPlotCapable>).plotAxisKinds === "function";
@@ -1257,37 +1259,42 @@ abstract class BaseResolver implements AggregateCapable {
     if (shape === "waterfall") throw new Error("an ordered-cases axis (a waterfall) is not implemented yet; give both axes a source");
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
     const label = { x: { label: axisLabel(spec.x), kind: xk }, y: { label: axisLabel(spec.y), kind: yk } };
+    // alongside the plot's own queries, never failing it: a missing coverage just means no note
+    const coverage = this.runLogged<ChRow>("plot:coverage", plotCoverageSql(xSel, ySel, ctx), conn)
+      .then((r) => ({ total: Number(r.data[0]?.total || 0), nx: Number(r.data[0]?.nx || 0), ny: Number(r.data[0]?.ny || 0) }))
+      .catch(() => undefined);
+    const done = async (d: PlotData): Promise<PlotData> => { const c = await coverage; return c ? { ...d, coverage: c } : d; };
 
     if (shape === "scatter") {
       const c = await this.runLogged<ChRow>("plot:extent", plotCountSql(xSel, ySel, ctx.cohortSql, true), conn);
       const n = Number(c.data[0]?.n || 0);
-      if (!n) return { shape, n: 0, ...label, note: "no " + unit + " has a value on both axes" };
+      if (!n) return done({ shape, n: 0, ...label, note: "no " + unit + " has a value on both axes" });
       const [st, bins] = await Promise.all([
         this.runLogged<ChRow>("plot:stats", plotStatsSql(xSel, ySel, ctx.cohortSql), conn),
         this.runLogged<ChRow>("plot:bins", plotBinsSql(xSel, ySel, ctx.cohortSql, spec.bins), conn)
       ]);
       const r = st.data[0] || {};
       const pearson = num(r.pearson), spearman = num(r.spearman);
-      return {
+      return done({
         shape, n, ...label,
         extent: { x0: Number(c.data[0].x0), x1: Number(c.data[0].x1), y0: Number(c.data[0].y0), y1: Number(c.data[0].y1) },
         grid: [spec.bins?.[0] ?? DEFAULT_BINS[0], spec.bins?.[1] ?? DEFAULT_BINS[1]],
         bins: bins.data.map((b) => ({ bx: Number(b.bx), by: Number(b.by), n: Number(b.n) })),
         stats: { pearson, spearman, slope: num(r.slope), intercept: num(r.intercept),
           pPearson: corrPValue(pearson, n), pSpearman: corrPValue(spearman, n) }
-      };
+      });
     }
 
     if (shape === "table") {
       const c = await this.runLogged<ChRow>("plot:extent", plotCountSql(xSel, ySel, ctx.cohortSql, false), conn);
       const n = Number(c.data[0]?.n || 0), kx = Number(c.data[0]?.kx || 0), ky = Number(c.data[0]?.ky || 0);
-      if (!n) return { shape, n: 0, ...label, note: "no " + unit + " has a value on both axes" };
+      if (!n) return done({ shape, n: 0, ...label, note: "no " + unit + " has a value on both axes" });
       // a truncated contingency table is a wrong contingency table, so it is refused
       if (kx > CATEGORY_CAP || ky > CATEGORY_CAP)
         throw new Error("this pair has " + Math.max(kx, ky) + " distinct categories on one axis and " + CATEGORY_CAP +
           " is the most a contingency table stays readable (and testable) at; narrow the cohort or pick another attribute");
       const cells = await this.runLogged<ChRow>("plot:cells", plotTableSql(xSel, ySel, ctx.cohortSql), conn);
-      return { shape, n, ...label, cells: cells.data.map((r) => ({ cx: String(r.cx), cy: String(r.cy), n: Number(r.n) })) };
+      return done({ shape, n, ...label, cells: cells.data.map((r) => ({ cx: String(r.cx), cy: String(r.cy), n: Number(r.n) })) });
     }
 
     // box: the numeric axis grouped by the categorical one, whichever way round they were given
@@ -1310,10 +1317,10 @@ abstract class BaseResolver implements AggregateCapable {
     const violin = vio.data.map((r) => ({ g: String(r.g), b: Number(r.b), n: Number(r.n),
       ...(spec.colorBy ? { c: String(r.c ?? "") } : {}) }));
     const vx0 = num(vio.data[0]?.vx0), vx1 = num(vio.data[0]?.vx1);
-    return { shape, n: groups.reduce((a, g) => a + g.n, 0), ...label, groups,
+    return done({ shape, n: groups.reduce((a, g) => a + g.n, 0), ...label, groups,
       violin, violinBins: VIOLIN_BINS, overlay: "violin",
       ...(vx0 != null && vx1 != null ? { violinExtent: [vx0, vx1] as [number, number] } : {}),
-      ...(spec.colorBy ? { colorLabel: axisLabel(spec.colorBy), legend: legendFor(violin.map((v) => v.c || "")) } : {}) };
+      ...(spec.colorBy ? { colorLabel: axisLabel(spec.colorBy), legend: legendFor(violin.map((v) => v.c || "")) } : {}) });
   }
 
   // ---- a federated plot: one pass per site, pooled by lib/analysis.ts --------
@@ -1344,6 +1351,16 @@ abstract class BaseResolver implements AggregateCapable {
   private plotCtx(def: CohortDef | null | undefined, spec: PlotRequest) {
     return { study: this.study, db: this.instance.conn.db,
       unit: spec.unit === "sample" ? "sample" as const : "patient" as const, cohortSql: this.cohortSql(def) };
+  }
+
+  /** This site's cases, and how many carry each axis — summed across sites by lib/analysis.ts. */
+  async plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ total: number; nx: number; ny: number }> {
+    const ctx = this.plotCtx(def, spec);
+    const r = await this.runLogged<ChRow>("plot:coverage",
+      plotCoverageSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx), this.instance.conn);
+    const row = r.data[0] || {};
+    return { total: Number(row.total || 0), nx: Number(row.nx || 0), ny: Number(row.ny || 0) };
   }
 
   /** Pass 1 of a federated numeric pair: this site's count and extent (plotBinsSql's `extent` arg). */

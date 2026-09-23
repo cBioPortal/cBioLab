@@ -44,14 +44,20 @@ const num = (n: number): string => (Math.round(n * 100) / 100).toString();
 const fmt = (n: number): string => n.toLocaleString("en-US");
 const pFmt = (p: number): string => p === 0 ? "p < 1e-300" : p < 1e-4 ? "p=" + p.toExponential(1) : "p=" + p.toFixed(4);
 
-function frame(w: number, h: number, body: string, bg: string): string {
+/**
+ * `grown`: the renderer widened the figure past the width it was asked for, to fit every group
+ * or category rather than drop some. Such a figure must not be scaled back down to the
+ * container (every label would shrink below legibility), so it keeps its width as a minimum and
+ * the container scrolls. A figure at its requested width still scales to fit, as before.
+ */
+function frame(w: number, h: number, body: string, bg: string, grown = false): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" ` +
-    `style="max-width:${w}px;height:auto;display:block;font-family:'IBM Plex Sans',system-ui,sans-serif">` +
+    `style="max-width:${w}px;${grown ? `min-width:${w}px;` : ""}height:auto;display:block;font-family:'IBM Plex Sans',system-ui,sans-serif">` +
     `<rect width="${w}" height="${h}" fill="${bg}"/>${body}</svg>`;
 }
 
 /** Wrapped caption lines — the caveat travels WITH the figure, never separately. */
-function caption(text: string, w: number, y0: number, muted: string, perLine = 96, maxLines = 6): { svg: string; height: number } {
+function caption(text: string, w: number, y0: number, muted: string, perLine = 96): { svg: string; height: number } {
   const words = String(text).split(/\s+/);
   const lines: string[] = [];
   let line = "";
@@ -60,10 +66,9 @@ function caption(text: string, w: number, y0: number, muted: string, perLine = 9
     else line += " " + word;
   }
   if (line.trim()) lines.push(line.trim());
-  const capped = lines.slice(0, maxLines);
   return {
-    svg: capped.map((l, i) => `<text x="8" y="${y0 + 12 + i * 13}" font-size="10" fill="${muted}">${esc(l)}</text>`).join(""),
-    height: capped.length * 13 + 8
+    svg: lines.map((l, i) => `<text x="8" y="${y0 + 12 + i * 13}" font-size="10" fill="${muted}">${esc(l)}</text>`).join(""),
+    height: lines.length * 13 + 8
   };
 }
 
@@ -177,7 +182,7 @@ function barsSvg(title: string, rows: { label: string; v: number; text: string; 
 }
 
 function cooccurrenceSvg(v: ViewResult, o: SvgOpts): string {
-  const pairs = ((v.pairs || []) as CooccurRow[]).slice(0, 14);
+  const pairs = ((v.pairs || []) as CooccurRow[]);
   return barsSvg("Co-occurrence — log₂ odds ratio", pairs.map((r) => {
     const lor = r.oddsRatioMH != null ? Math.log2(r.oddsRatioMH) : (r.log2Odds ?? 0);
     return { label: r.a + " / " + r.b, v: lor, signed: true,
@@ -187,7 +192,7 @@ function cooccurrenceSvg(v: ViewResult, o: SvgOpts): string {
 }
 
 function compareSvg(v: ViewResult, o: SvgOpts): string {
-  const rows = ((v.rows || []) as CompareRow[]).slice(0, 14);
+  const rows = ((v.rows || []) as CompareRow[]);
   const names = v.cohorts || [];
   const out: { label: string; v: number; text: string; colour?: string }[] = [];
   for (const r of rows)
@@ -199,7 +204,7 @@ function compareSvg(v: ViewResult, o: SvgOpts): string {
 }
 
 function coexpressionSvg(v: ViewResult, o: SvgOpts): string {
-  const rows = ((v.coexpression || []) as CoexprRow[]).slice(0, 14);
+  const rows = ((v.coexpression || []) as CoexprRow[]);
   return barsSvg("Co-expression — Pearson r", rows.map((r) => {
     const rr = r.rMeta ?? r.r ?? 0;
     return { label: r.a + " / " + r.b, v: rr, signed: true,
@@ -208,7 +213,7 @@ function coexpressionSvg(v: ViewResult, o: SvgOpts): string {
 }
 
 function clinicalSvg(v: ViewResult, o: SvgOpts): string {
-  const rows = ((v.clinical || []) as ClinicalRow[]).filter((r) => !r.skipped).slice(0, 14);
+  const rows = ((v.clinical || []) as ClinicalRow[]).filter((r) => !r.skipped);
   return barsSvg("Clinical comparison — −log₁₀ q", rows.map((r) => ({
     label: r.attribute, v: r.q ? Math.min(50, -Math.log10(Math.max(r.q, 1e-50))) : 0,
     text: r.test + "  q=" + (r.q == null ? "—" : r.q < 1e-4 ? r.q.toExponential(1) : r.q.toFixed(4))
@@ -251,7 +256,7 @@ function courseSvg(v: ViewResult, o: SvgOpts): string {
   const plotsH = panels.length * BLOCK;
   const truncated = series.some((s) => s.points.some((q) => q.atRisk > 0 && q.atRisk < RISK_FLOOR));
   const foot = (truncated ? " Lines stop where fewer than " + RISK_FLOOR + " patients remain observable." : "");
-  const cap = caption((v.caveat || "") + foot, W, T + plotsH + riskH + legendH + 6, p.muted, 96, 12);
+  const cap = caption((v.caveat || "") + foot, W, T + plotsH + riskH + legendH + 6, p.muted);
   const H = T + plotsH + riskH + legendH + cap.height + 14;
 
   const x = (t: number) => L + (W - L - R) * (t - axis.from) / Math.max(1, axis.to - axis.from);
@@ -351,7 +356,7 @@ function sequenceSvg(v: ViewResult, o: SvgOpts): string {
   const colX = (c: number) => cols.length < 2 ? L
     : L + (W - L - R - NODE_W) * (cols.indexOf(c) / (cols.length - 1));
   const bodyH = panels.length * (HEAD + PANEL_H) + (panels.length - 1) * PANEL_GAP;
-  const cap = caption(v.caveat || "", W, bodyH + 30, p.muted, 96, 14);
+  const cap = caption(v.caveat || "", W, bodyH + 30, p.muted);
   const H = bodyH + 30 + cap.height + 12;
 
   const out: string[] = [];
@@ -480,10 +485,15 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
   }
 
   if (d.shape === "box" && d.groups && d.groups.length) {
-    const gs = d.groups.slice(0, 24);
+    // Every group is drawn. Past what fits at the requested width the figure widens (and the
+    // app's container scrolls) rather than dropping the smaller groups: 108 cancer types used to
+    // be cut to the 24 largest here, silently, with the other 18,543 samples missing.
+    const gs = d.groups;
+    const MIN_BW = 26;
+    const Wb = Math.max(W, L + R + gs.length * MIN_BW), plotWb = Wb - L - R;
     const lo = Math.min(...gs.map((g) => g.loWhisker)), hi = Math.max(...gs.map((g) => g.hiWhisker));
     const span = Math.max(1e-9, hi - lo);
-    const bw = plotW / gs.length;
+    const bw = plotWb / gs.length;
     const sy = (val: number) => T + PLOT - PLOT * (val - lo) / span;
     // the values behind the boxes: every point when the reader may see cases and there are few
     // enough of them, otherwise the density of the same values
@@ -508,7 +518,22 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
     const colorKey = (d.legend || []).filter((k) => !k.ring);
     const ringKey = (d.legend || []).filter((k) => k.ring);
     const byLabel = new Map((d.legend || []).map((k) => [k.label, k.color]));
-    const colorOf = (label: string) => byLabel.get(label) || categoryColor(label, 0);
+    // The key names the commonest COLOR_CAP categories. Everything past it — and a case with no
+    // value — is one grey "other" with a key entry of its own, rather than a colour nobody can
+    // look up (points) or a gap in the violin where its share should be.
+    const OTHER = "#9aa5ad";
+    const fillKeyed = new Set(colorKey.map((k) => k.label)), ringKeyed = new Set(ringKey.map((k) => k.label));
+    const fillOthers = new Set<string>(), ringOthers = new Set<string>();
+    let fillNoValue = false;
+    for (const b of d.violin || []) if (b.c != null && !fillKeyed.has(b.c)) { if (b.c === "") fillNoValue = true; else fillOthers.add(b.c); }
+    for (const pt of d.points || []) {
+      if (pt.c != null && !fillKeyed.has(pt.c)) { if (pt.c === "") fillNoValue = true; else fillOthers.add(pt.c); }
+      if (pt.r != null && !isAbsent(pt.r) && !ringKeyed.has(pt.r)) ringOthers.add(pt.r);
+    }
+    const fillOf = (label: string) => fillKeyed.has(label) ? byLabel.get(label)! : OTHER;
+    const ringOf = (label: string) => ringKeyed.has(label) ? byLabel.get(label)! : OTHER;
+    const otherLabel = (n: number, noValue: boolean) =>
+      "other (" + [n ? n + " more categor" + (n === 1 ? "y" : "ies") : "", noValue ? "no value" : ""].filter(Boolean).join(", ") + ")";
     const vBins = d.violinBins || 40;
 
     gs.forEach((g, i) => {
@@ -535,12 +560,13 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
             continue;
           }
           let x = cx - w;
-          for (const k of colorKey) {
-            const n = byClass.get(k.label) || 0;
-            if (!n) continue;
-            const seg = 2 * w * (n / total);
+          const segs = colorKey.map((k) => ({ n: byClass.get(k.label) || 0, color: k.color }));
+          segs.push({ n: [...byClass.entries()].reduce((a, [c, n]) => fillKeyed.has(c) ? a : a + n, 0), color: OTHER });
+          for (const sg of segs) {
+            if (!sg.n) continue;
+            const seg = 2 * w * (sg.n / total);
             out.push(`<rect x="${num(x)}" y="${num(yTop)}" width="${num(seg)}" height="${num(step)}" ` +
-              `fill="${k.color}" fill-opacity="0.75"/>`);
+              `fill="${sg.color}" fill-opacity="0.75"/>`);
             x += seg;
           }
         }
@@ -551,8 +577,8 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
         const nPts = d.points!.length;
         const rBase = Math.max(1.3, Math.min(4.5, 90 / Math.sqrt(Math.max(1, nPts))));
         for (const pt of byGroup.get(g.g)!) {
-          const fill = pt.c != null ? colorOf(pt.c) : SERIES[0];
-          const ring = pt.r != null && !isAbsent(pt.r) ? colorOf(pt.r) : null;
+          const fill = pt.c != null && colorKey.length ? fillOf(pt.c) : SERIES[0];
+          const ring = pt.r != null && !isAbsent(pt.r) ? ringOf(pt.r) : null;
           out.push(`<circle cx="${num(cx + jitterFor(pt.id) * half * 0.9)}" cy="${num(sy(pt.v))}" ` +
             `r="${num(ring ? rBase * 1.25 : rBase)}" fill="${fill}" fill-opacity="0.85"` +
             (ring ? ` stroke="${ring}" stroke-width="${num(Math.max(0.6, rBase * 0.28))}"` : "") + `/>`);
@@ -568,12 +594,12 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
       out.push(`<text x="${num(cx)}" y="${T + PLOT + 12}" font-size="8" fill="${p.muted}" text-anchor="middle">${fmt(g.n)}</text>`);
     });
     for (const t of [lo, (lo + hi) / 2, hi]) out.push(axisText(num(t), L - 6, sy(t) + 3, "end", 10));
-    out.push(`<rect x="${L}" y="${T}" width="${num(plotW)}" height="${PLOT}" fill="none" stroke="${p.line}"/>`);
+    out.push(`<rect x="${L}" y="${T}" width="${num(plotWb)}" height="${PLOT}" fill="none" stroke="${p.line}"/>`);
     // Whichever of x/y the document names as the numeric one, the box is always drawn grouped
     // by the categorical axis with the numeric axis vertical — so the two attribute names are
     // the only way to tell a reader which is which; without them a swapped x/y is invisible.
     const numLabel = d.x.kind === "num" ? d.x.label : d.y.label, catLabel = d.x.kind === "num" ? d.y.label : d.x.label;
-    out.push(axisText(catLabel, L + plotW / 2, T + PLOT + 46),
+    out.push(axisText(catLabel, L + plotWb / 2, T + PLOT + 46),
       `<text x="14" y="${T + PLOT / 2}" font-size="11" fill="${p.muted}" text-anchor="middle" ` +
       `transform="rotate(-90 14 ${T + PLOT / 2})">${esc(numLabel)}</text>`);
     let keyY = T + PLOT + 74;
@@ -581,37 +607,50 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
       let kx = L;
       const chip = (k: { label: string; color: string; ring?: boolean }) => {
         const w = 12 + k.label.length * 5.4;
-        if (kx + w > W - R) { kx = L; keyY += 14; }
+        if (kx + w > Wb - R) { kx = L; keyY += 14; }
         const g = k.ring
           ? `<circle cx="${num(kx + 4)}" cy="${num(keyY - 3)}" r="3.4" fill="none" stroke="${k.color}" stroke-width="1.6"/>`
           : `<circle cx="${num(kx + 4)}" cy="${num(keyY - 3)}" r="3.4" fill="${k.color}"/>`;
         out.push(g + `<text x="${num(kx + 11)}" y="${num(keyY)}" font-size="9" fill="${p.muted}">${esc(k.label)}</text>`);
         kx += w;
       };
-      if (colorKey.length) { out.push(`<text x="${L}" y="${num(keyY - 14)}" font-size="9" fill="${p.muted}">${esc(d.colorLabel || "colour")}</text>`); colorKey.forEach(chip); }
+      if (colorKey.length) { out.push(`<text x="${L}" y="${num(keyY - 14)}" font-size="9" fill="${p.muted}">${esc(d.colorLabel || "colour")}</text>`); colorKey.forEach(chip);
+        if (fillOthers.size || fillNoValue) chip({ label: otherLabel(fillOthers.size, fillNoValue), color: OTHER }); }
       // a ring means "this case also has that", so absence gets no ring and no key entry
       if (ringKey.some((k) => !isAbsent(k.label))) {
         kx = L; keyY += 16;
         out.push(`<text x="${L}" y="${num(keyY - 14)}" font-size="9" fill="${p.muted}">${esc(d.ringLabel || "ring")}</text>`);
         ringKey.filter((k) => !isAbsent(k.label)).forEach(chip);
+        if (ringOthers.size) chip({ label: otherLabel(ringOthers.size, false), color: OTHER, ring: true });
       }
       keyY += 8;
     }
-    const cap = caption("Box: quartiles with Tukey whiskers, computed over every case in the group. The count is above each name." +
+    // the engine's note leads, as it does under the scatter — it is where the view says what it
+    // drew over (and what it had to leave out), so a box plot without it hid exactly that
+    const cap = caption((v.note ? v.note + "  " : "") + "Box: quartiles with Tukey whiskers, computed over every case in the group. The count is above each name." +
       (d.overlay === "points" ? " Every value is drawn over its box; the jitter is fixed per case."
         : d.overlay === "violin" ? " The shaded width is the share of that group's values sitting at that height, scaled per group."
         : ""),
-      W, Math.max(T + PLOT + 84, keyY), p.muted);
+      Wb, Math.max(T + PLOT + 84, keyY), p.muted);
     const bottom = Math.max(T + PLOT + 84, keyY);
-    return frame(W, bottom + cap.height + 10, out.join("") + cap.svg, p.bg);
+    return frame(Wb, bottom + cap.height + 10, out.join("") + cap.svg, p.bg, Wb > W);
   }
 
   if (d.shape === "table" && d.cells && d.cells.length) {
-    const xs = [...new Set(d.cells.map((c) => c.cx))].slice(0, 12);
-    const ys = [...new Set(d.cells.map((c) => c.cy))].slice(0, 12);
+    // Every category on both axes — the engine refuses a pair past CATEGORY_CAP, so what arrives
+    // is already the whole table; this used to draw the first 12 of each and drop the rest.
+    // Ordered by marginal total so the big categories still read first.
+    const marg = (key: "cx" | "cy") => {
+      const t = new Map<string, number>();
+      for (const c of d.cells!) t.set(c[key], (t.get(c[key]) || 0) + c.n);
+      return [...t.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).map(([k]) => k);
+    };
+    const xs = marg("cx"), ys = marg("cy");
     const at = new Map(d.cells.map((c) => [c.cx + "\u0000" + c.cy, c.n]));
     const maxN = Math.max(1, ...d.cells.map((c) => c.n));
-    const LX = 130, cw = (W - LX - R) / xs.length, chh = Math.min(30, PLOT / Math.max(1, ys.length));
+    const LX = 130, MIN_CW = 30, MIN_CH = 16;
+    const Wt = Math.max(W, LX + R + xs.length * MIN_CW);
+    const cw = (Wt - LX - R) / xs.length, chh = Math.max(MIN_CH, Math.min(30, PLOT / Math.max(1, ys.length)));
     ys.forEach((yv, r) => {
       out.push(`<text x="${LX - 6}" y="${num(T + chh * r + chh * 0.66)}" font-size="10" fill="${p.muted}" text-anchor="end">${esc(yv.length > 20 ? yv.slice(0, 19) + "…" : yv)}</text>`);
       xs.forEach((xv, c) => {
@@ -625,8 +664,8 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
     xs.forEach((xv, c) => out.push(`<text x="${num(LX + cw * (c + 0.5))}" y="${num(T + chh * ys.length + 12)}" font-size="9" ` +
       `fill="${p.muted}" text-anchor="end" transform="rotate(-40 ${num(LX + cw * (c + 0.5))} ${num(T + chh * ys.length + 12)})">${esc(xv.length > 16 ? xv.slice(0, 15) + "…" : xv)}</text>`));
     const h = T + chh * ys.length + 86;
-    const cap = caption(d.x.label + " across, " + d.y.label + " down. " + fmt(d.n) + " cases counted in the database.", W, h, p.muted);
-    return frame(W, h + cap.height + 10, out.join("") + cap.svg, p.bg);
+    const cap = caption((v.note ? v.note + "  " : "") + d.x.label + " across, " + d.y.label + " down. " + fmt(d.n) + " cases counted in the database.", Wt, h, p.muted);
+    return frame(Wt, h + cap.height + 10, out.join("") + cap.svg, p.bg, Wt > W);
   }
   return "";
 }

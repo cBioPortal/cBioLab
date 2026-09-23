@@ -998,7 +998,8 @@ function Legend({ data, colorByType, colors, white }: { data: UnpackedContract; 
       {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (
         <span key={t.label}>{t.label}: {t.numeric
           ? <>{sw(t.center != null ? "linear-gradient(90deg,#2166ac,#fff,#b2182b)" : "linear-gradient(90deg,#deebf7,#084887)", 44)}{t.min} → {t.max}</>
-          : (t.categories || []).slice(0, 8).map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw((colors && colors[t.label] && colors[t.label][c]) || CAT_COLORS[i % CAT_COLORS.length])}{c}</span>)}</span>
+          : <>{(t.categories || []).slice(0, 8).map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw((colors && colors[t.label] && colors[t.label][c]) || CAT_COLORS[i % CAT_COLORS.length])}{c}</span>)}
+            {(t.categories || []).length > 8 && <span className="meta">+{(t.categories || []).length - 8} more</span>}</>}</span>
       ))}
     </div>
   );

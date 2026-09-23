@@ -21,7 +21,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
-  carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql,
+  carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql,
   geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
   clinicalCountsSql, clinicalMomentsSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
   timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql, coxRowsSql,
@@ -213,6 +213,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   "plotBoxSql": () => plotBoxSql(numAxis, catAxis, cohortSql),
   "plotTableSql": () => plotTableSql(catAxis, catAxis2, cohortSql),
   "plotViolinSql": () => plotViolinSql(numAxis, catAxis, cohortSql),
+  "plotCoverageSql": () => plotCoverageSql(numAxis, catAxis, axisCtx),
+  "plotCoverageSql:patient": () => plotCoverageSql(numAxis, catAxis, { ...axisCtx, unit: "patient" as const }),
   "geneCountsSql": () => geneCountsSql(cohortSql, ["TP53", "KRAS"], "x", "v7.4", "db"),
     "geneCountsSql:no-annotation-pin": () => geneCountsSql(cohortSql, ["TP53"], "x", null, "db"),
     "survivalCountsSql": () => survivalCountsSql(cohortSql, "x", "db"),
