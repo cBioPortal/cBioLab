@@ -486,8 +486,8 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
 
   if (d.shape === "box" && d.groups && d.groups.length) {
     // Every group is drawn. Past what fits at the requested width the figure widens (and the
-    // app's container scrolls) rather than dropping the smaller groups: 108 cancer types used to
-    // be cut to the 24 largest here, silently, with the other 18,543 samples missing.
+    // app's container scrolls) rather than dropping the smaller groups, whose cases would
+    // otherwise be missing from a figure that still claims the full count.
     const gs = d.groups;
     const MIN_BW = 26;
     const Wb = Math.max(W, L + R + gs.length * MIN_BW), plotWb = Wb - L - R;
@@ -638,7 +638,7 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
 
   if (d.shape === "table" && d.cells && d.cells.length) {
     // Every category on both axes — the engine refuses a pair past CATEGORY_CAP, so what arrives
-    // is already the whole table; this used to draw the first 12 of each and drop the rest.
+    // is already the whole table, and a table missing rows or columns is a wrong one.
     // Ordered by marginal total so the big categories still read first.
     const marg = (key: "cx" | "cy") => {
       const t = new Map<string, number>();

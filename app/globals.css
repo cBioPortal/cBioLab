@@ -171,6 +171,17 @@ button.primary { display: inline-flex; align-items: center; gap: 0.5rem; }
 .skeleton-cohort { flex: 1 1 18rem; max-width: 26rem; height: 4.6rem; }
 .skeleton-view { height: 16rem; margin-bottom: 1rem; }
 .skeleton-addview { height: 3.4rem; margin-bottom: 1rem; }
+/* A view recomputing after a settings change: the figure area only (Updating measures where
+   the header and toolbars end), opaque so the stale answer can't be read as the new one. */
+.view-updating {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+  display: flex; flex-direction: column; gap: var(--s2);
+  padding: 0 1.15rem 1rem; background: var(--card); border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+.view-updating .loading-block { padding: var(--s2) 0 0; }
+.view-updating .skeleton { flex: 1; min-height: 3rem; }
+/* A control whose options are still being fetched, standing where the control will be. */
+.waiting { display: inline-flex; align-items: center; gap: var(--s1); color: var(--muted); font-size: var(--t-sm); white-space: nowrap; }
 
 /* analysis page: 3 panes, responsive */
 /* The analysis page earns its width: an oncoprint is the densest thing here, and capping

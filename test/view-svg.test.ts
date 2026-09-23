@@ -243,8 +243,8 @@ describe("sequence Sankey keeps everyone accounted for", () => {
 
 // A renderer never drops data on its own: past what fits at the requested width the figure
 // grows (and the app's container scrolls), and past the colour key the rest is one disclosed
-// "other". Each of these used to be a silent cut — 24 box groups, a 12×12 table, a 6-line
-// caption — so each is pinned here by counting what the SVG actually draws.
+// "other". Each is pinned here by counting what the SVG actually draws, so a fixed cap on
+// groups, categories or caption lines fails a test rather than hiding cases.
 describe("plot figures draw every group and category they are given", () => {
   const box = (nGroups: number, extra: Partial<any> = {}): ViewResult => ({
     kind: "plot", plot: {

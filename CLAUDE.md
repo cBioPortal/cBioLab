@@ -145,6 +145,47 @@ still holds, against a running server.
 - **Geometry stays inline, styling does not.** A tooltip's position and a legend swatch's colour
   are data computed from the drawing; borders, padding and type are classes.
 
+## UI conventions — waiting, and never hiding what isn't shown
+
+Every screen answers "is this current?" and "is this everything?" without the reader having to
+ask. These hold for every view kind, and for the chat/MCP figures that share its renderers.
+
+- **A settings change that waits on the server shows the view waiting.** The header and its
+  controls stay visible and usable, so the reader sees what they just changed and can change it
+  again; the figure area below is covered by a skeleton with an "updating…" spinner until the
+  new answer lands (`Updating` in `app/lab/page.tsx`, `.view-updating`). A stale figure left on
+  screen reads as the new answer. The same cover goes over every view during a full document
+  run, and over the oncoprint's plot during its own contract fetch. A change applied in the
+  browser alone (the oncoprint's display options, zoom) is instant and gets none.
+- **A control whose options come from a fetch shows a loader while it is in flight** — `Waiting`
+  ("loading attributes…") in place of the select, a spinner on a menu's summary. Loading, empty
+  and failed are three different states and each must say which it is: an empty select during a
+  fetch reads as "this study has none". A button gated on fetched data (the add-view buttons'
+  `why`) waits with a spinner via its `loading` predicate rather than guessing either way.
+- **A loader must be tied to a request that will end it.** Before showing "loading…", make sure
+  something is actually fetching (that is why the clinical-attribute catalog loads for any
+  result, not only once a plot exists) and that failure clears it (`.finally`), or the spinner
+  never stops. A failed lookup reads as unknown, never as "none" (`survivalEndpoints: null`).
+- **A disabled control says why** in its title — what it is waiting for, or what the data lacks
+  ("genie_public has no survival data…"), never an instruction to go somewhere else to make it
+  work.
+- **First render is a skeleton shaped like what it stands in for** (`.skeleton-view`,
+  `.skeleton-cohort`), so the page doesn't collapse to a spinner and jump back to full height.
+- **Nothing is dropped without saying so — in the engine, the renderers, or the UI.** A figure
+  that cannot fit everything widens and scrolls (`frame(…, grown)` keeps a `min-width`), pools the
+  remainder into a disclosed "other", or refuses; it never draws the first N. Captions are never
+  cut — they are where the caveats live. A view states what its inputs left out (a plot's
+  coverage: "145,220 of 289,869 samples have a value on both axes…"). The oncoprint legend's
+  "+N more" and the sequence view's pooled "other" are the pattern to copy.
+- **A request past a limit is refused with the limit named** ("a compare view takes at most 20
+  genes; this asks for 25"), never cut to its first N, in the engine (`overLimit` in
+  `lib/analysis.ts`) and in the UI (ticked cohorts, event pills).
+- **An errored view keeps its header** (`drawsOwnHead`), so it can still be removed or moved
+  without editing the JSON.
+- **Verify waiting states by holding the request.** A loader that flashes past in a normal run
+  proves nothing; in Playwright, `page.route()` the endpoint and hold it, check the loader is on
+  screen and the controls are still usable, then release it and check the loader is gone.
+
 ## Workflows
 
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
