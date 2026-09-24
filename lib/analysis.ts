@@ -17,6 +17,7 @@ import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaen
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, regressionFromMoments, fisherZMeta,
   applyCutoff, toIncidence, coxRegression, type Moments, type CoxRow } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
+import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
 import { viewToSvg } from "./view-svg.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
@@ -827,42 +828,37 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       { const e = overLimit("a hotspots view", 12, uniq.length); if (e) { views.push({ kind: "hotspots", error: e.replace("at most 12", "at most 12 genes") }); continue; } }
       const minCount = Math.max(1, Math.min(1000, Math.floor(Number(hv.minCount) || 1)));
       const cn = vNames[0];
-      const reports = await Promise.all(cohorts[cn].studies.map((st) =>
-        resolvers[st].variantCounts(doc.cohorts[cn], uniq, minCount)));
-      const hotspots: HotspotGene[] = uniq.map((gene) => {
-        const merged = new Map<string, { variant: string; type: string; pos: number | null; n: number }>();
-        for (const rep of reports)
-          for (const v of rep.variants) {
-            if (v.gene !== gene) continue;
-            const cur = merged.get(v.variant);
-            if (cur) cur.n += v.n; else merged.set(v.variant, { variant: v.variant, type: v.type, pos: v.pos, n: v.n });
-          }
-        const mutated = reports.reduce((n, rep) => n + (rep.totals.find((t2) => t2.gene === gene)?.n || 0), 0);
-        // uniqExact counts cannot be merged across studies — a change seen at both
-        // sites is counted twice — so the summed figure is an UPPER BOUND, and
-        // "withheld" is only knowable when a single study answered.
-        const distinctVariants = reports.reduce((n, rep) => n + (rep.totals.find((t2) => t2.gene === gene)?.distinctVariants || 0), 0);
-        const variants = [...merged.values()].sort((a, b) => b.n - a.n)
-          .map((v) => ({ ...v, pct: mutated ? Math.round((1000 * v.n) / mutated) / 10 : 0 }));
-        return { gene, mutated, distinctVariants, variants,
-          ...(reports.length === 1 && distinctVariants > variants.length
-            ? { withheld: distinctVariants - variants.length } : {}) };
-      }).filter((h) => h.mutated > 0);
-      const unpositioned = hotspots.reduce((n, h) => n + h.variants.filter((v) => v.pos == null).length, 0);
-      views.push({ kind: "hotspots", cohorts: [cn], hotspots, studies: cohorts[cn].studies,
-        participation: participationFor(cohorts[cn].studies, false),
-        note: "Recurrent protein changes in “" + cn + "”, counted per patient. Percentages are of the patients" +
-          " carrying ANY mutation in that gene, not of the cohort." +
-          " The codon is parsed from the protein-change string (the schema stores no position), so " +
-          (unpositioned ? unpositioned + " change(s) here have no parseable codon and are listed without a position" : "every change here has a parseable codon") + "." +
+      const studies = cohorts[cn].studies;
+      // the sites' counts and the proteins (length, Pfam domains) are independent, so both at once
+      const [reports, proteins] = await Promise.all([
+        Promise.all(studies.map((st) => resolvers[st].lollipopCounts(doc.cohorts[cn], uniq, minCount))),
+        Promise.all(uniq.map((g) => fetchProteinInfo(g)))
+      ]);
+      const hotspots: HotspotGene[] = uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]))
+        .filter((h) => h.mutated > 0);
+      const f = (n: number) => n.toLocaleString("en-US");
+      const unpositioned = hotspots.reduce((n, h) => n + h.unpositioned, 0);
+      const withheld = hotspots.reduce((n, h) => n + h.withheld, 0);
+      const observed = hotspots.filter((h) => h.lengthSource === "observed").map((h) => h.gene);
+      const annotated = reports.every((r) => r.annotated);
+      const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies,
+        participation: participationFor(studies, false),
+        note: "Mutations in “" + cn + "” by protein position, as cBioPortal's mutation tab draws them: one stem per codon" +
+          " (the stored protein start position), its height the number of distinct patient + protein change pairs there." +
+          " Colour is the codon's dominant mutation type, putative drivers before VUS" +
+          (annotated ? " (driver = OncoKB oncogenic, pinned; the portal also counts hotspots and custom annotations)." : " (no OncoKB pin, so every mutation is coloured as a driver, as the portal does with annotation off).") +
+          " VUS and germline mutations are included, as they are by default on the portal." +
+          (unpositioned ? " " + f(unpositioned) + " mutation" + (unpositioned === 1 ? " has" : "s have") + " no protein position (or one past the protein) and " +
+            (unpositioned === 1 ? "is" : "are") + " not drawn; the portal drops these without saying so." : "") +
+          (observed.length ? " Genome Nexus could not be reached for " + observed.join(", ") + ", so the axis runs to the highest codon seen and no domains are drawn." : "") +
           (minCount > 1
-            ? " A suppression floor of " + minCount + " was applied BY EACH SITE before returning anything, so variants carried by fewer patients never left the database holding them."
-            : " NOTE: with no suppression floor set (minCount), a variant carried by a single patient is reported —" +
-              " the most disclosive aggregate this system produces. Set minCount to have each site withhold rare variants at source.") +
-          " Counts are per patient and sum across studies without deduplication." +
-          (cohorts[cn].studies.length > 1
-            ? " With more than one study the distinct-change count is an UPPER BOUND: per-study distinct counts cannot be merged exactly (a change seen at both sites is counted twice), so the number withheld by the display cap is not reported."
-            : "") });
+            ? " A suppression floor of " + minCount + " patients per change was applied BY EACH SITE before returning anything" +
+              (withheld ? ", withholding " + f(withheld) + " mutation" + (withheld === 1 ? "" : "s") : "") + "."
+            : " NOTE: with no suppression floor set (minCount), a change carried by a single patient is reported —" +
+              " the most disclosive aggregate this system produces. Set minCount to have each site withhold rare changes at source.") +
+          (studies.length > 1 ? " Counts sum across studies; a patient enrolled in more than one is not deduplicated." : "") };
+      hr.svg = viewToSvg(hr, { width: 960 }) || undefined;
+      views.push(hr);
 
     } else if (view.kind === "plot") {
       const pv = view as PlotView;

@@ -76,6 +76,19 @@ export interface VariantCount {
 /** Per-gene mutation totals — the denominator, and how much the cap withheld. */
 export interface GeneMutationTotal { gene: string; n: number; distinctVariants: number }
 export interface VariantReport { variants: VariantCount[]; totals: GeneMutationTotal[]; minCount: number }
+/** One (codon, protein change) of a gene: distinct patients carrying it, and raw mutation rows. */
+export interface LollipopChange { gene: string; pos: number | null; change: string; n: number; rows: number; driver: boolean }
+/** Raw mutation rows of one type at one codon — what a lollipop's colour is decided from. */
+export interface LollipopType { gene: string; pos: number | null; mtype: string; driver: boolean; rows: number }
+export interface LollipopTotal { gene: string; patients: number; pairs: number; somaticSamples: number }
+/**
+ * A site's per-codon lollipop counts. `annotated` is false when no OncoKB pin was available, in
+ * which case every change reads as a driver — cBioPortal's own rule when driver annotation is off.
+ */
+export interface LollipopReport {
+  changes: LollipopChange[]; types: LollipopType[]; totals: LollipopTotal[];
+  cohortSamples: number; minCount: number; annotated: boolean;
+}
 /** Six sums for one gene pair on a continuous profile. Sufficient for Pearson's r. */
 export interface PairMoments {
   a: string; b: string;
@@ -354,6 +367,58 @@ export function variantCountsSql(cohortSql: string, genes: string[], study: stri
     "ORDER BY n DESC\n" +
     "LIMIT " + VARIANT_LIMIT + " BY gene"
   );
+}
+
+/**
+ * The lollipop's rows, counted the way cBioPortal's results-page mutation tab counts them
+ * (react-mutation-mapper): one stem per codon — the stored proteinPosStart, never parsed from
+ * the change string — whose height is the number of distinct (patient, protein change) pairs
+ * there. The four builders below share this CTE. The suppression floor applies to a
+ * (codon, change) pair's patient count, at the data holder, before anything leaves.
+ */
+function lollipopCte(cohortSql: string, genes: string[], study: string, minCount: number, pin: string | null, db: string): string {
+  const floor = Math.max(1, Math.floor(minCount));
+  // with no pin there is no annotation to split drivers from VUS, and cBioPortal then colours
+  // everything as a driver; the report says which happened
+  const driver = pin
+    ? "if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM oncokb_annotation.variant_annotation\n" +
+      "        WHERE oncokb_version = " + sq(pin) + " AND is_driver AND alteration_type = 'MUTATION'), 1, 0)"
+    : "1";
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "     m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,\n" +
+    "                  patientId AS pid, sampleId AS sid, mutationStatus AS status, " + driver + " AS driver\n" +
+    "           FROM " + db + ".mutation_derived\n" +
+    "           WHERE studyId = " + sq(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
+    "             AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''\n" +
+    "             AND patientId IN (SELECT pid FROM cohort)),\n" +
+    "     kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= " + floor + ")\n"
+  );
+}
+/** Per (codon, change): distinct patients (the height), raw rows (the label's ordering). */
+export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB): string {
+  return lollipopCte(cohortSql, genes, study, minCount, pin, db) +
+    "SELECT gene, pos, change, uniqExact(pid) AS n, count() AS rows, max(driver) AS driver\n" +
+    "FROM m GROUP BY gene, pos, change HAVING n >= " + Math.max(1, Math.floor(minCount));
+}
+/** Per (codon, mutation type, driver): raw rows — the colour is decided from these. */
+export function lollipopTypesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB): string {
+  return lollipopCte(cohortSql, genes, study, minCount, pin, db) +
+    "SELECT gene, pos, mtype, driver, count() AS rows\n" +
+    "FROM m WHERE (gene, pos, change) IN (SELECT gene, pos, change FROM kept) GROUP BY gene, pos, mtype, driver";
+}
+/** Per gene: mutated patients, distinct (patient, change) pairs, and samples with a somatic one. */
+export function lollipopTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB): string {
+  return lollipopCte(cohortSql, genes, study, 1, null, db) +
+    "SELECT gene, uniqExact(pid) AS patients, uniqExact((pid, change)) AS pairs,\n" +
+    "       uniqExactIf(sid, status != 'GERMLINE') AS somatic_samples\n" +
+    "FROM m GROUP BY gene";
+}
+/** Samples in the cohort — the somatic mutation frequency's denominator. */
+export function cohortSampleCountSql(cohortSql: string, study: string, db: string = DB): string {
+  return "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT uniqExact(sample_unique_id) AS n FROM " + db + ".sample_derived\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + " AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM cohort)";
 }
 
 /** Patients carrying ANY mutation in each gene — the lollipop's denominator. */
@@ -991,6 +1056,8 @@ export interface AggregateCapable {
   attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]>;
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
   variantCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<VariantReport>;
+  /** per-codon counts for the lollipop (see lollipopCte) — aggregates only */
+  lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<LollipopReport>;
   profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]>;
   /** the SQL this participant would run, for provenance */
   cohortSql(def: CohortDef | null | undefined): string;
@@ -1152,6 +1219,26 @@ abstract class BaseResolver implements AggregateCapable {
         pos: x.pos == null || x.pos === "" ? null : Number(x.pos), n: Number(x.n)
       })),
       totals: t.data.map((x) => ({ gene: x.gene, n: Number(x.n), distinctVariants: Number(x.distinct_variants) }))
+    };
+  }
+
+  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1): Promise<LollipopReport> {
+    const pin = this.ctx.oncokbPin ?? null;
+    const empty: LollipopReport = { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: !!pin };
+    if (!genes.length) return empty;
+    const cohort = this.cohortSql(def), db = this.instance.conn.db, conn = this.instance.conn;
+    const pos = (x: unknown) => x == null || x === "" ? null : Number(x);
+    const [c, t, tot, cs] = await Promise.all([
+      this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db), conn),
+      this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db), conn),
+      this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db), conn),
+      this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort, this.study, db), conn)
+    ]);
+    return {
+      minCount, annotated: !!pin, cohortSamples: Number(cs.data[0]?.n || 0),
+      changes: c.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), change: String(x.change), n: Number(x.n), rows: Number(x.rows), driver: Number(x.driver) === 1 })),
+      types: t.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), mtype: String(x.mtype), driver: Number(x.driver) === 1, rows: Number(x.rows) })),
+      totals: tot.data.map((x) => ({ gene: String(x.gene), patients: Number(x.patients), pairs: Number(x.pairs), somaticSamples: Number(x.somatic_samples) }))
     };
   }
 

@@ -459,13 +459,35 @@ export interface CooccurRow {
   tendency: "co-occurrence" | "mutual exclusivity" | null;
 }
 /** Recurrent protein changes in one gene, with the cohort's mutated total. */
+/** One drawn stem: a codon, its height (distinct patient + change pairs), and how it is coloured. */
+export interface LollipopPosition {
+  pos: number; n: number; color: string; impact: string; driver: boolean;
+  /** every change at this codon, by raw rows then name — the label and tooltip read these */
+  changes: { change: string; n: number; rows: number }[];
+}
+export interface LollipopDomain { accession: string; name: string; start: number; end: number; color: string }
+/**
+ * One gene's lollipop, drawn the way cBioPortal's results-page mutation tab draws it (see
+ * lib/lollipop.ts): one stem per codon, height = distinct (patient, protein change) pairs.
+ */
 export interface HotspotGene {
   gene: string;
-  /** patients with ANY mutation in this gene, and how many distinct changes */
-  mutated: number; distinctVariants: number;
-  variants: { variant: string; type: string; pos: number | null; n: number; pct: number }[];
-  /** variants withheld by the display cap, and by the suppression floor */
-  cappedAt?: number; withheld?: number;
+  /** patients with any mutation in the gene, and distinct (patient, change) pairs */
+  mutated: number; mutations: number;
+  positions: LollipopPosition[];
+  domains: LollipopDomain[];
+  proteinLength: number;
+  /** genome-nexus: the canonical transcript; observed: the service was unreachable, so the highest codon seen */
+  lengthSource: "genome-nexus" | "observed"; transcript?: string;
+  /** pairs not drawn because they have no codon (or one past the protein) */
+  unpositioned: number;
+  /** pairs a site withheld under its suppression floor */
+  withheld: number;
+  label?: { pos: number; text: string };
+  /** the commonest changes, for text summaries (chat, MCP) */
+  topChanges: { change: string; pos: number | null; n: number; pct: number }[];
+  /** samples with a somatic mutation in the gene, and samples in the cohort */
+  somaticSamples: number; cohortSamples: number;
 }
 /** One gene pair's correlation on a continuous profile, from six sums per site. */
 export interface CoexprRow {

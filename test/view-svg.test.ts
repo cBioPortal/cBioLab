@@ -4,6 +4,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg, viewTitle, esc } from "../lib/view-svg.ts";
+import { buildLollipopGene } from "../lib/lollipop.ts";
 import type { ViewResult } from "../lib/types.ts";
 
 const survival = (cohort: string): ViewResult => ({
@@ -49,11 +50,7 @@ describe("figures scale uniformly", () => {
   // preserveAspectRatio="none" shears circles and slants text; it forced the
   // lollipop out of SVG once already and must not come back.
   test("no renderer disables aspect-ratio preservation", () => {
-    const svg = viewToSvg(survival("A"))! + (viewToSvg({
-      kind: "hotspots", cohorts: ["A"],
-      hotspots: [{ gene: "KRAS", mutated: 10, distinctVariants: 2,
-        variants: [{ variant: "G12D", type: "Missense_Mutation", pos: 12, n: 6, pct: 60 }] }]
-    }) || "");
+    const svg = viewToSvg(survival("A"))! + (viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [kras()] }) || "");
     assert.equal(/preserveAspectRatio\s*=\s*"none"/.test(svg), false);
   });
   test("titles name the view and its cohorts", () => {
@@ -79,22 +76,40 @@ describe("survival: cumulative incidence display mode", () => {
   });
 });
 
-describe("hotspots figures disclose the same caps the app UI does", () => {
-  test("a gene at the variant cap says so, matching the app's own wording", () => {
-    const v = { kind: "hotspots", cohorts: ["A"],
-      hotspots: [{ gene: "TP53", mutated: 4080, distinctVariants: 867,
-        withheld: 100,
-        variants: Array.from({ length: 100 }, (_, i) => ({ variant: "V" + i, type: "Missense_Mutation", pos: i + 1, n: 5, pct: 1 })) }] };
-    const svg = viewToSvg(v as any)!;
-    assert.ok(svg.includes("100 shown of 200 distinct changes"),
-      "must disclose the withheld count the same way the app UI does, not silently show a capped list");
+// A site report for buildLollipopGene: one change per codon unless given
+function report(changes: { pos: number | null; change: string; n: number; mtype?: string; driver?: boolean }[], extra: Partial<any> = {}) {
+  return {
+    changes: changes.map((c) => ({ gene: "G", pos: c.pos, change: c.change, n: c.n, rows: c.n, driver: c.driver ?? true })),
+    types: changes.map((c) => ({ gene: "G", pos: c.pos, mtype: c.mtype || "Missense_Mutation", driver: c.driver ?? true, rows: c.n })),
+    totals: [{ gene: "G", patients: changes.reduce((a, c) => a + c.n, 0), pairs: changes.reduce((a, c) => a + c.n, 0), somaticSamples: 5 }],
+    cohortSamples: 50, minCount: 1, annotated: true, ...extra
+  };
+}
+function kras() {
+  const g = buildLollipopGene("G", [report([{ pos: 12, change: "G12D", n: 6 }, { pos: 12, change: "G12V", n: 3 }, { pos: 61, change: "Q61H", n: 1 }])],
+    { proteinLength: 189, transcriptId: "ENST00000311936", domains: [{ accession: "PF00071", name: "Ras", start: 5, end: 164 }] });
+  return { ...g, gene: "KRAS" };
+}
+
+describe("the lollipop draws every codon, the way the portal's mutation tab does", () => {
+  test("one head per codon — 150 codons, 150 heads, with no cap", () => {
+    const g = buildLollipopGene("G", [report(Array.from({ length: 150 }, (_, i) => ({ pos: i + 1, change: "X" + (i + 1) + "Y", n: 1 + (i % 4) })))],
+      { proteinLength: 400, transcriptId: "T", domains: [] });
+    const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [g] } as any)!;
+    assert.equal((svg.match(/<circle [^>]*r="2\.8"/g) || []).length, 150);
   });
-  test("a gene under the cap says nothing extra", () => {
-    const v = { kind: "hotspots", cohorts: ["A"],
-      hotspots: [{ gene: "KRAS", mutated: 10, distinctVariants: 2,
-        variants: [{ variant: "G12D", type: "Missense_Mutation", pos: 12, n: 6, pct: 60 }] }] };
-    const svg = viewToSvg(v as any)!;
-    assert.equal(svg.includes("distinct changes"), false);
+  test("the tallest codon is labelled, its changes factored the portal's way", () => {
+    const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [kras()] } as any)!;
+    assert.ok(svg.includes(">G12D/V<"), "G12D and G12V share the prefix G12");
+  });
+  test("the protein runs to its length, with its Pfam domain named on the backbone", () => {
+    const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [kras()] } as any)!;
+    assert.ok(svg.includes(">189aa<") && svg.includes(">Ras<"));
+    assert.ok(svg.includes("># KRAS Mutations<"), "the portal's y-axis label");
+  });
+  test("a codon's tooltip lists its changes with their counts", () => {
+    const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [kras()] } as any)!;
+    assert.match(svg, /<title>codon 12: 9 mutations\nG12D 6\nG12V 3<\/title>/);
   });
 });
 

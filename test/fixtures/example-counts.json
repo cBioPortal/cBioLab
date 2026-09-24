@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-09-18",
+  "generated": "2026-09-24",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -74,7 +74,7 @@
       "TP53 mut": 13105,
       "TP53 wt": 11594
     },
-    "Lollipop plot: recurrent protein changes, with a suppression floor": {
+    "Lollipop plot: mutations by protein position, with a suppression floor": {
       "CRC": 5543
     },
     "Co-expression from sums alone": {

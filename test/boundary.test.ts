@@ -24,6 +24,7 @@ import {
   carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql,
   geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
   clinicalCountsSql, clinicalMomentsSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
+  lollipopChangesSql, lollipopTypesSql, lollipopTotalsSql, cohortSampleCountSql,
   timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql, coxRowsSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
@@ -228,6 +229,11 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "variantCountsSql": () => variantCountsSql(cohortSql, ["KRAS", "BRAF"], "x", 1, "db"),
     "variantCountsSql:suppressed": () => variantCountsSql(cohortSql, ["KRAS"], "x", 5, "db"),
     "geneMutationTotalsSql": () => geneMutationTotalsSql(cohortSql, ["KRAS"], "x", "db"),
+    "lollipopChangesSql": () => lollipopChangesSql(cohortSql, ["KRAS", "BRAF"], "x", 1, "v7.5", "db"),
+    "lollipopChangesSql:suppressed-unannotated": () => lollipopChangesSql(cohortSql, ["KRAS"], "x", 5, null, "db"),
+    "lollipopTypesSql": () => lollipopTypesSql(cohortSql, ["KRAS"], "x", 3, "v7.5", "db"),
+    "lollipopTotalsSql": () => lollipopTotalsSql(cohortSql, ["KRAS"], "x", "db"),
+    "cohortSampleCountSql": () => cohortSampleCountSql(cohortSql, "x", "db"),
     "profileMomentsSql": () => profileMomentsSql(cohortSql, ["ERBB2"], "rna_seq_v2_mrna_median_Zscores", "x", "db"),
     "timelineSpanSql": () => timelineSpanSql(cohortSql, "x", "db"),
     // A course aligned on an event, and one aligned on the study's own day 0 —
