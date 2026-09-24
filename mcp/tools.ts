@@ -96,19 +96,21 @@ export function registerTools(server: any): void {
           .describe("With `profileType`, genes for per-gene (n, sum, sum of squares) on that profile — enough to define a z-score reference distribution without disclosing any value"),
         variantGenes: z.array(z.string()).max(12).nullish()
           .describe("Genes for per-protein-change (lollipop) counts: how many patients carry each variant, plus per-gene totals"),
+        lollipopGenes: z.array(z.string()).max(12).nullish()
+          .describe("Genes for per-codon (lollipop) counts, the way cBioPortal's mutation tab counts them: distinct (patient, protein change) pairs per protein start position, raw rows per mutation type for the colour, per-gene totals and the cohort's sample count"),
         minCount: z.number().int().min(1).max(1000).nullish()
           .describe("Suppression floor applied by THIS instance before returning variant counts; variants carried by fewer patients are withheld"),
         profileType: z.string().max(120).nullish()
           .describe("With `pairs`, a continuous molecular profile (e.g. an mRNA z-score profile): returns the six sums (n, Sx, Sy, Sxy, Sxx, Syy) per pair, which are sufficient for a correlation and carry no individual value")
       }
     },
-    async ({ study, cohort, genes, survival, pairs, attributes, profileType, variantGenes, minCount, momentGenes, endpoint, survivalEndpoints, anchor }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; profileType?: string | null; variantGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; survivalEndpoints?: boolean | null; anchor?: any }) => {
+    async ({ study, cohort, genes, survival, pairs, attributes, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, survivalEndpoints, anchor }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; survivalEndpoints?: boolean | null; anchor?: any }) => {
       try {
         const s = await resolveStudy(study);
         const { profiles, gaProfiles } = await studyProfiles(s);
         const pin = process.env.ONCOKB_PIN || null;
         const res = await resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
-        const [count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, endpointList] = await Promise.all([
+        const [count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, endpointList, lollipopCounts] = await Promise.all([
           res.count(cohort),
           genes && genes.length ? res.geneCounts(cohort, genes) : Promise.resolve([]),
           survival ? res.survivalCounts(cohort, endpoint || "OS", anchor || null) : Promise.resolve([]),
@@ -120,7 +122,8 @@ export function registerTools(server: any): void {
             : Promise.resolve({ variants: [], totals: [], minCount: minCount || 1 }),
           momentGenes && momentGenes.length && profileType
             ? res.profileMoments(cohort, momentGenes, profileType) : Promise.resolve([]),
-          survivalEndpoints ? res.survivalEndpoints() : Promise.resolve([] as string[])
+          survivalEndpoints ? res.survivalEndpoints() : Promise.resolve([] as string[]),
+          lollipopGenes && lollipopGenes.length ? res.lollipopCounts(cohort, lollipopGenes, minCount || 1) : Promise.resolve(null)
         ]);
         // SQL text carries no patient data, and an id-carrying definition was already
         // refused, so disclosing what we ran restores end-to-end provenance for the
@@ -128,7 +131,7 @@ export function registerTools(server: any): void {
         // FEDERATION_HIDE_SQL=1 and the caller degrades gracefully.
         const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
         const cohortSql = hideSql ? null : res.cohortSql(cohort);
-        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, survivalEndpoints: endpointList, cohortSql, queries: hideSql ? null : res.queries, oncokbPin: pin };
+        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, survivalEndpoints: endpointList, ...(lollipopCounts ? { lollipopCounts } : {}), cohortSql, queries: hideSql ? null : res.queries, oncokbPin: pin };
         return {
           content: [{ type: "text" as const, text: `aggregates for ${s}: ${count.toLocaleString()} patients` +
             (geneCounts.length ? `, ${geneCounts.length} gene counts` : "") +
@@ -277,11 +280,12 @@ export function registerTools(server: any): void {
               (x.rMeta != null ? `  meta-r=${x.rMeta.toFixed(3)} across ${x.sites} sites` : "")).join("\n") +
             caveatOf(v) + noteOf(v));
         } else if (v.kind === "hotspots") {
-          out.push("Recurrent protein changes (share of patients mutated in THAT gene):\n" +
+          out.push("Mutations by protein position (commonest changes; share of patients mutated in THAT gene):\n" +
             (v.hotspots || []).map((g) =>
-              `  ${g.gene}: ${g.mutated.toLocaleString()} mutated — ` +
-              (g.variants.slice(0, 6).map((x) => `${x.variant} ${x.n.toLocaleString()} (${x.pct}%)`).join(", ") || "no change above the floor") +
-              (g.withheld ? `  [+${g.withheld.toLocaleString()} distinct changes below the suppression floor]` : "")).join("\n") +
+              `  ${g.gene}: ${g.mutated.toLocaleString()} mutated, ${g.mutations.toLocaleString()} mutations on ${g.positions.length.toLocaleString()} codons — ` +
+              (g.topChanges.slice(0, 6).map((x) => `${x.change} ${x.n.toLocaleString()} (${x.pct}%)`).join(", ") || "no change above the floor") +
+              (g.unpositioned ? `  [${g.unpositioned.toLocaleString()} with no protein position, not drawn]` : "") +
+              (g.withheld ? `  [${g.withheld.toLocaleString()} below the suppression floor]` : "")).join("\n") +
             caveatOf(v) + noteOf(v));
         } else if (v.kind === "course") {
           const axis = v.courseAxis;

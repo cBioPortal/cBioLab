@@ -12,12 +12,12 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, ExploreResult } from "./types.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest } from "./federation.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest } from "./federation.ts";
 import { carriesPatientIds } from "./federation.ts";
 
 interface RemoteAggregates {
   study: string; instance: string; count: number;
-  geneCounts: GeneCounts[]; survivalCounts: SurvivalCount[]; survivalEndpoints?: string[] | null; pairCounts: PairCounts[]; attributeStats: AttrStats[]; pairMoments: PairMoments[]; variantCounts: VariantReport; profileMoments: ProfileMoments[];
+  geneCounts: GeneCounts[]; survivalCounts: SurvivalCount[]; survivalEndpoints?: string[] | null; pairCounts: PairCounts[]; attributeStats: AttrStats[]; pairMoments: PairMoments[]; variantCounts: VariantReport; lollipopCounts?: LollipopReport; profileMoments: ProfileMoments[];
   timelineSpan?: TimelineSpan[] | null; eventCourse?: CourseCount[] | null;
   treatmentSequence?: SequenceFlow[] | null;
   sequenceKeys?: { key: string; label: string; patients: number; values: number }[] | null;
@@ -232,6 +232,17 @@ export class RemoteAggregateResolver implements AggregateCapable {
       { study: this.study, cohort: def || {}, variantGenes: genes, minCount });
     this.remember(r);
     return r.variantCounts || { variants: [], totals: [], minCount };
+  }
+  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1): Promise<LollipopReport> {
+    this.guard(def);
+    if (!genes.length) return { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: false };
+    const r = await mcpCall(this.url, "federated_aggregates",
+      { study: this.study, cohort: def || {}, lollipopGenes: genes, minCount });
+    this.remember(r);
+    // a peer on an older build answers without these; refuse by name rather than draw nothing
+    if (!r.lollipopCounts)
+      throw new Error("peer " + this.study + " does not report per-codon lollipop counts (it predates them); update that instance");
+    return r.lollipopCounts;
   }
   async pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]> {
     this.guard(def);

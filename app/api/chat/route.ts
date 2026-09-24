@@ -112,7 +112,7 @@ export async function POST(req: Request) {
             else if (v.kind === "cooccurrence" && v.pairs)
               lines.push("cooccurrence: " + v.pairs.slice(0, 5).map((x) => `${x.a}/${x.b} ${x.tendency ?? "-"} q=${x.q.toExponential(1)}`).join(", "));
             else if (v.kind === "hotspots" && v.hotspots)
-              lines.push("hotspots: " + v.hotspots.map((h) => `${h.gene} (${h.mutated} mutated) ` + h.variants.slice(0, 4).map((x) => `${x.variant} ${x.pct}%`).join(" ")).join(" | "));
+              lines.push("hotspots: " + v.hotspots.map((h) => `${h.gene} (${h.mutated} mutated) ` + h.topChanges.slice(0, 4).map((x) => `${x.change} ${x.pct}%`).join(" ")).join(" | "));
             else if (v.kind === "clinical" && v.clinical)
               lines.push("clinical: " + v.clinical.filter((x) => !x.skipped).slice(0, 5).map((x) => `${x.attribute} q=${x.q?.toExponential(1)}`).join(", "));
             else if (v.kind === "coexpression" && v.coexpression)

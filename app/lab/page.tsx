@@ -3658,62 +3658,13 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Hotspots" cohorts={cohortChoice(vi, docView(vi))} sub="recurrent protein changes, counted per patient" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi))} sub="lollipop by protein position, as the portal's mutation tab draws it" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
-                  {v.note && <p className="note">{v.note}</p>}
-                  {v.hotspots.map(h => {
-                    const positioned = h.variants.filter(x => x.pos != null);
-                    const maxPos = Math.max(1, ...positioned.map(x => x.pos!));
-                    const maxN = Math.max(1, ...h.variants.map(x => x.n));
-                    // axis ticks on round codon numbers rather than fractions of the max
-                    const rawStep = maxPos / 4;
-                    const mag = Math.pow(10, Math.floor(Math.log10(Math.max(1, rawStep))));
-                    const step = Math.max(1, [1, 2, 2.5, 5, 10].map(m => m * mag).find(v2 => v2 >= rawStep) ?? mag * 10);
-                    const axisMax = Math.ceil(maxPos / step) * step;
-                    const ticks: number[] = [];
-                    for (let t = 0; t <= axisMax + 1e-9; t += step) ticks.push(Math.round(t));
-                    return (
-                      <div key={h.gene} className="lolli">
-                        <div className="row" style={{ alignItems: "baseline" }}>
-                          <strong style={{ fontSize: "var(--t-md)" }}>{h.gene}</strong>
-                          <span className="meta">{h.mutated.toLocaleString()} mutated patients · {h.variants.length} shown
-                            {h.withheld ? " of " + (h.variants.length + h.withheld) + " distinct changes" : ""}</span>
-                          <span className="spacer" />
-                          <span className="meta">by codon · tallest = {maxN.toLocaleString()} patients</span>
-                        </div>
-                        {/* laid out in HTML, not a stretched SVG: a viewBox scaled to the
-                            container turns circles into ellipses and shears any label */}
-                        <div className="lolliplot">
-                          {positioned.map((x, i2) => (
-                            <span key={i2} className="stem"
-                              style={{ left: (100 * x.pos!) / axisMax + "%", height: (12 + 52 * x.n / maxN) + "px" }}
-                              title={x.variant + " · " + x.n.toLocaleString() + " patients (" + x.pct + "% of those mutated in " + h.gene + ") · codon " + x.pos + " · " + x.type}>
-                              <i className="dot" style={{
-                                width: Math.max(6, Math.min(13, 5 + 9 * x.n / maxN)) + "px",
-                                height: Math.max(6, Math.min(13, 5 + 9 * x.n / maxN)) + "px",
-                                background: x.type && x.type.startsWith("Missense") ? "#0072B2" : "#D55E00" }} />
-                            </span>
-                          ))}
-                          <div className="axis" />
-                        </div>
-                        <div className="lolliaxis">
-                          {ticks.map((t, ti) => (
-                            <span key={t} className={ti === ticks.length - 1 ? "last" : undefined}
-                              style={{ left: (100 * t) / axisMax + "%" }}>{t || "1"}</span>
-                          ))}
-                        </div>
-                        <div className="lollilist">
-                          {h.variants.slice(0, 6).map((x, i2) => (
-                            <span key={i2} title={x.type + (x.pos == null ? " · no parseable codon" : " · codon " + x.pos)}>
-                              <b>{x.variant}</b> {x.n.toLocaleString()} <span className="meta">({x.pct}%)</span>
-                            </span>
-                          ))}
-                          {h.variants.some(x => x.pos == null) &&
-                            <span className="meta">{h.variants.filter(x => x.pos == null).length} change(s) with no parseable codon, not plotted</span>}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {/* one renderer (lib/view-svg.ts) for this figure everywhere: the app, chat and MCP;
+                      the caption under it carries the note, so it isn't repeated above */}
+                  {v.svg
+                    ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
+                    : <p className="note">{v.note || "no mutations in these genes for this cohort"}</p>}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
                   <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}

@@ -540,9 +540,9 @@ async function main() {
       try {
         await page.waitForSelector(".addview", { timeout: 120000 });
         await page.locator(".addview button:has-text('Lollipop')").click();
-        await page.waitForSelector(".lolliplot .dot", { timeout: 300000 });
+        await page.waitForSelector(".viewfig circle.lollipop-head", { timeout: 300000 });
         added = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).map(v => v.kind);
-        dots = await page.locator(".lolliplot .dot").count();
+        dots = await page.locator(".viewfig circle.lollipop-head").count();
       } catch { /* left empty */ }
       ok("a lollipop view can be added from the UI", added.includes("hotspots") && dots > 0,
         added.length ? added.join(", ") + " · " + dots + " dots" : "view was not added");
@@ -628,7 +628,7 @@ async function main() {
       const launches = [
         ["Co-occurrence and mutual exclusivity in NSCLC", ".tend", "cooccurrence"],
         ["Co-expression from sums alone", ".rbar", "coexpression"],
-        ["Lollipop plot: recurrent protein changes", ".lolliplot .dot", "hotspots lollipop"],
+        ["Lollipop plot: mutations by protein position", ".viewfig circle.lollipop-head", "hotspots lollipop"],
         ["Study-stratified survival across two studies", ".logrank", "survival log-rank"],
         ["Clinical attributes compared between cohorts", "h2:has-text('Clinical comparison')", "clinical"]
       ];
@@ -639,7 +639,7 @@ async function main() {
       await page.locator(".excard").filter({ hasText: "One cohort, five ways" }).first()
         .locator("button:has-text('Run')").click();
       const multiWanted = [
-        [".lolliplot .dot", "hotspots"], [".tend", "cooccurrence"],
+        [".viewfig circle.lollipop-head", "hotspots"], [".tend", "cooccurrence"],
         [".logrank", "survival log-rank"], ["h2:has-text('Clinical comparison')", "clinical"],
         ["h2:has-text('Compare')", "compare"]
       ];
@@ -655,7 +655,7 @@ async function main() {
       // A new view kind that forgets the marker fails here rather than shipping
       // a chart whose provenance the reader has to guess at.
       const marker = await page.evaluate(() => {
-        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Hotspots", "Oncoprint"];
+        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Mutations", "Oncoprint"];
         const missing = [], seen = [];
         for (const card of document.querySelectorAll(".ana-grid .card")) {
           const h = card.querySelector("h2");
@@ -670,7 +670,7 @@ async function main() {
       });
       // and each must show the aggregate SQL that produced its numbers
       const prov = await page.evaluate(() => {
-        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Hotspots", "Oncoprint"];
+        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Mutations", "Oncoprint"];
         const missing = [], counts = [];
         for (const card of document.querySelectorAll(".ana-grid .card")) {
           const h = card.querySelector("h2");
@@ -684,7 +684,7 @@ async function main() {
       });
       // ...and what it cost, at every level: per view, per query, and in total
       const lat = await page.evaluate(() => {
-        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Hotspots", "Oncoprint"];
+        const KNOWN = ["Compare", "Survival", "Co-occurrence", "Clinical comparison", "Co-expression", "Mutations", "Oncoprint"];
         const per = [], missing = [];
         for (const card of document.querySelectorAll(".ana-grid .card")) {
           const h = card.querySelector("h2");
