@@ -69,6 +69,48 @@ const fmtP = (p: number): string =>
  * producing it. "aggregate-only" means no participant returned an identifier —
  * the chart was built from counts computed inside each owning database.
  */
+/**
+ * A control whose options are still being fetched. It stands where the select will be, so the
+ * toolbar doesn't jump when the options arrive, and it says what it is waiting for — an empty
+ * select would read as "this study has none".
+ */
+function Waiting({ what }: { what: string }) {
+  return <span className="waiting" role="status"><span className="spinner" /> loading {what}…</span>;
+}
+
+/**
+ * Over a view whose answer is being recomputed. Its header and controls stay visible and usable
+ * — so the reader sees the setting they just changed, and can change it again — while the figure
+ * below is covered by a skeleton with a spinner: a figure still showing the previous answer
+ * reads as the new one. Measures where the card's header/toolbars end rather than assuming it,
+ * since every view kind lays those out differently; a card with none is covered whole.
+ */
+function Updating() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [top, setTop] = useState(0);
+  useLayoutEffect(() => {
+    const card = ref.current?.parentElement;
+    if (!card) return;
+    const measure = () => {
+      const at = card.getBoundingClientRect().top;
+      let bottom = 0;
+      card.querySelectorAll(":scope > .vhead, :scope > .viewtb, :scope > .viewtb-more, :scope > .basis")
+        .forEach((n) => { bottom = Math.max(bottom, n.getBoundingClientRect().bottom - at); });
+      setTop(bottom ? bottom + 6 : 0);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(card);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="view-updating" style={{ top }} role="status" aria-live="polite">
+      <div className="loading-block"><span className="spinner" /> updating…</div>
+      <div className="skeleton" />
+    </div>
+  );
+}
+
 function Participation({ p }: { p?: ViewParticipation }) {
   if (!p || !p.studies.length) return null;
   // Two ORTHOGONAL facts, deliberately not merged into one word. The method is
@@ -341,6 +383,10 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const [explore, setExplore] = useState<ExploreResult | null>(null);
   const [exploreBusy, setExploreBusy] = useState(false);
   const [trackAttrs, setTrackAttrs] = useState<{ key: string; attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[] }>({ key: "", attrs: [], profiles: [] }); // track picker options
+  /** the clinical-attribute catalog above is being fetched — a picker shows a loader, not "none" */
+  const [trackAttrsLoading, setTrackAttrsLoading] = useState(false);
+  /** the study catalog (`cat`: endpoints, event types) is being fetched */
+  const [catLoading, setCatLoading] = useState(false);
   const [sQuery, setSQuery] = useState("");                             // study-panel search
   const [sCaps, setSCaps] = useState<Set<string>>(() => new Set());                  // study-panel capability filters
   const [exStudies, setExStudies] = useState<string[]>([...DEFAULT_EXPLORE_STUDIES]); // studies being explored (checkboxes)
@@ -728,8 +774,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const viewAttrs = (): string[] => {
     const inDoc = (doc.views || []).flatMap((v: any) => v.attributes || []).map(String);
     if (inDoc.length) return [...new Set(inDoc)].slice(0, 5);
-    if (explore && explore.clinical) return explore.clinical.slice(0, 4).map((c: any) => c.attribute);
-    return [];
+    return catalogAttrs().slice(0, 4).map((c) => c.attribute);
   };
   /**
    * Timeline event types this study actually has, most common first, folded by
@@ -742,7 +787,12 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     const fromResult = (result && result.views || []).find((v: any) => v.eventOptions && v.eventOptions.length);
     if (fromResult) return (fromResult as any).eventOptions.map((e: any) =>
       ({ canonical: e.canonical, label: e.label, n: e.patients, perPatient: e.perPatient, hasDurations: e.hasDurations }));
-    const raw: { type: string; n: number }[] = (explore && explore.events) || [];
+    // Explore's events if it has been opened, else the study catalog's — a shared ?doc= link lands
+    // on Analysis without ever fetching Explore, and the course/sequence buttons would otherwise
+    // report "no timeline events" for a study that has plenty. The derived treatment-line type is
+    // the catalog's own synthesis, not a recorded event type, so it isn't offered here.
+    const raw: { type: string; n: number }[] = (explore && explore.events && explore.events.length) ? explore.events
+      : ((cat && cat.types) || []).filter((t: any) => t.t !== "Treatment line (derived)").map((t: any) => ({ type: String(t.t), n: Number(t.n_pat) || 0 }));
     const by = new Map<string, { canonical: string; label: string; n: number }>();
     for (const e of raw) {
       const c = String(e.type).trim().toLowerCase();
@@ -765,9 +815,13 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     trackAttrs.attrs.length ? trackAttrs.attrs : ((explore && explore.clinical) || []);
   /** the numeric clinical attributes this study declares, for a plot's default axes */
   const numericAttrs = (): string[] => catalogAttrs().filter((a) => a.kind === "num").map((a) => a.attribute);
+  /** still waiting on an attribute catalog, and nothing to offer yet — show a loader, not "none" */
+  const attrsLoading = (): boolean => !catalogAttrs().length && (trackAttrsLoading || exploreBusy);
+  /** continuous molecular profiles for an axis picker: Explore's if loaded, else the shared catalog's */
+  const profileOptions = (): string[] => (explore && explore.profiles && explore.profiles.length ? explore.profiles : trackAttrs.profiles);
 
   const contProfile = (): string | null => {
-    const ps = (explore && explore.profiles) || [];
+    const ps = profileOptions();
     return ps.find((p: string) => /zscore/i.test(p)) || ps.find((p: string) => /mrna|rna_seq/i.test(p)) || null;
   };
 
@@ -784,23 +838,28 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     if (!Array.isArray(cat.survivalEndpoints) || cat.survivalEndpoints.length) return null;
     return cat.study + " has no survival data (no <X>_MONTHS/<X>_STATUS pair), so there is no endpoint to fit";
   };
-  const VIEW_KINDS: { kind: string; label: string; why?: () => string | null }[] = [
+  /**
+   * `loading`: the data this button's `why` decides on is still being fetched. The button waits
+   * with a spinner rather than guessing — enabling it could add a view that can only error, and
+   * `why` alone would call a study empty when its catalog simply hasn't arrived.
+   */
+  const VIEW_KINDS: { kind: string; label: string; why?: () => string | null; loading?: () => boolean }[] = [
     { kind: "compare", label: "Compare genes" },
-    { kind: "survival", label: "Survival", why: noSurvivalWhy },
-    { kind: "cox", label: "Cox regression (forest plot)", why: noSurvivalWhy },
+    { kind: "survival", label: "Survival", why: noSurvivalWhy, loading: () => catLoading },
+    { kind: "cox", label: "Cox regression (forest plot)", why: noSurvivalWhy, loading: () => catLoading },
     { kind: "oncoprint", label: "Oncoprint" },
     { kind: "hotspots", label: "Lollipop (hotspots)" },
-    { kind: "plot", label: "Plot",
-      why: () => viewAttrs().length ? null : "no clinical attributes known yet — open Explore once so the app can read this study's attributes" },
+    { kind: "plot", label: "Plot", loading: attrsLoading,
+      why: () => viewAttrs().length ? null : "this study declares no clinical attributes to plot" },
     { kind: "cooccurrence", label: "Co-occurrence" },
-    { kind: "clinical", label: "Clinical comparison",
-      why: () => viewAttrs().length ? null : "no clinical attributes known yet — open Explore once so the app can read this study's attributes" },
-    { kind: "coexpression", label: "Co-expression",
+    { kind: "clinical", label: "Clinical comparison", loading: attrsLoading,
+      why: () => viewAttrs().length ? null : "this study declares no clinical attributes to compare" },
+    { kind: "coexpression", label: "Co-expression", loading: () => !contProfile() && (trackAttrsLoading || exploreBusy),
       why: () => contProfile() ? null : "this study has no continuous molecular profile (mRNA z-scores) to correlate" },
-    { kind: "course", label: "Clinical course",
+    { kind: "course", label: "Clinical course", loading: () => !viewEvents().length && (catLoading || exploreBusy),
       why: () => viewEvents().length ? null
-        : "no timeline events known yet — open Explore once so the app can read this study's event types (only 131 of 545 studies have any)" },
-    { kind: "sequence", label: "Treatment sequence",
+        : "this study records no timeline events (only 131 of 545 studies have any)" },
+    { kind: "sequence", label: "Treatment sequence", loading: () => !viewEvents().length && (catLoading || exploreBusy),
       why: () => viewEvents().some(e => /treat|therap|regimen|drug|medicat/.test(e.canonical)) ? null
         : "this study records no treatment events, so there are no lines of therapy to sequence" }
   ];
@@ -1254,12 +1313,17 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   // clinical-attribute catalog: union of attribute names across the result's involved
   // studies (an attribute absent in one study just renders gaps there). Every kind that
   // offers a clinical-attribute picker shares this one fetch — the oncoprint's track menu,
-  // a plot's axis pickers, the clinical view's attribute menu, and Cox's covariate picker.
+  // a plot's axis pickers, the clinical view's attribute menu, Cox's covariate picker — and so
+  // do the add-view buttons, which is why it runs for any result rather than waiting for one of
+  // those views to exist.
+  const trackAttrsWant = useRef("");
   useEffect(() => {
-    if (!result || !result.views.some(v => (v.kind === "oncoprint" && v.spec) || v.kind === "plot" || v.kind === "clinical" || v.kind === "cox")) return;
+    if (!result) return;
     const studies = result.involvedStudies && result.involvedStudies.length ? result.involvedStudies : [result.study];
     const key = studies.join(",");
-    if (trackAttrs.key === key) return;
+    if (trackAttrs.key === key || trackAttrsWant.current === key) return;
+    trackAttrsWant.current = key;
+    setTrackAttrsLoading(true);
     Promise.all(studies.map(s =>
       fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ study: s }) })
         .then(r => r.json()).catch(() => null)))
@@ -1274,9 +1338,11 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
           for (const p of j.profiles || []) if (p !== "cna") profs.add(p); // discrete cna isn't a heatmap
         }
         // most-covered first, the way the portal orders its picker
+        if (trackAttrsWant.current !== key) return; // a newer study set was asked for meanwhile
         setTrackAttrs({ key, attrs: [...seen.entries()].map(([attribute, v]) => ({ attribute, ...v }))
           .sort((x, y) => y.patients - x.patients || (x.attribute < y.attribute ? -1 : 1)), profiles: [...profs].sort() });
-      });
+      })
+      .finally(() => { if (trackAttrsWant.current === key) setTrackAttrsLoading(false); });
   }, [result]); // eslint-disable-line
 
   // the survival "measured from" control needs this study's event types,
@@ -1286,8 +1352,10 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     // for a study by that name is a question with no answer, so it is not asked
     if (!study || study.startsWith("$")) return;
     let dead = false;
+    setCatLoading(true);
     fetch("/api/catalog?study=" + encodeURIComponent(study))
-      .then(r => r.json()).then(j => { if (!dead && !j.error) setCat(j); }).catch(() => {});
+      .then(r => r.json()).then(j => { if (!dead && !j.error) setCat(j); }).catch(() => {})
+      .finally(() => { if (!dead) setCatLoading(false); });
     return () => { dead = true; };
   }, [study]);
 
@@ -1532,9 +1600,11 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
  * in a molecular profile, or a gene's alterations. It is the same vocabulary the engine uses,
  * so what the reader picks is what the document says.
  */
-function AxisPicker({ side, axis, attrs, profiles, busy, onChange, allowNone, categorical }: {
+function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChange, allowNone, categorical }: {
   side: string; axis: any; busy?: boolean;
   attrs: { attribute: string; kind: string }[]; profiles: string[];
+  /** the attribute/profile catalog is still being fetched: its select waits with a loader */
+  loading?: boolean;
   onChange: (a: any) => void;
   /** a colour is optional in a way an axis is not */
   allowNone?: boolean;
@@ -1564,7 +1634,8 @@ function AxisPicker({ side, axis, attrs, profiles, busy, onChange, allowNone, ca
         {!categorical && <option value="molecular">molecular</option>}
         <option value="alteration">alteration</option>
       </select>
-      {src === "clinical" && (
+      {src === "clinical" && loading && !attrs.length && <Waiting what="attributes" />}
+      {src === "clinical" && !(loading && !attrs.length) && (
         <select value={a.attribute || ""} disabled={busy} title="which clinical attribute"
           onChange={(e) => set({ ...a, attribute: e.target.value })}>
           {!attrs.some((x) => x.attribute === a.attribute) && <option value={a.attribute || ""}>{a.attribute || "(none)"}</option>}
@@ -1572,11 +1643,12 @@ function AxisPicker({ side, axis, attrs, profiles, busy, onChange, allowNone, ca
         </select>
       )}
       {src === "molecular" && <>
+        {loading && !profiles.length ? <Waiting what="profiles" /> :
         <select value={a.profileType || ""} disabled={busy} title="which molecular profile"
           onChange={(e) => set({ ...a, profileType: e.target.value })}>
           {!profiles.includes(a.profileType || "") && <option value={a.profileType || ""}>{a.profileType || "(none)"}</option>}
           {profiles.map((pt) => <option key={pt} value={pt}>{pt}</option>)}
-        </select>
+        </select>}
         <GeneInput gene={a.gene || ""} busy={busy} onCommit={(gene) => set({ ...a, gene })} />
       </>}
       {src === "alteration" && <>
@@ -1650,8 +1722,10 @@ function useGearmenuOpen(id: string, store: Map<string, boolean>) {
  * A checkbox menu in a view's header: which cohorts it uses, which attributes it compares.
  * One component, because these were the settings you could only reach by editing the JSON.
  */
-function PickMenu({ label, title, options, chosen, onChange, min, max, busy, menuId, menuStore }: {
+function PickMenu({ label, title, options, chosen, onChange, min, max, busy, loading, menuId, menuStore }: {
   label: string; title: string; busy?: boolean; min?: number; max?: number; menuId: string; menuStore: Map<string, boolean>;
+  /** the options are still being fetched */
+  loading?: boolean;
   options: { value: string; label: string; hint?: string }[];
   chosen: string[]; onChange: (next: string[]) => void;
 }) {
@@ -1663,9 +1737,9 @@ function PickMenu({ label, title, options, chosen, onChange, min, max, busy, men
   const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   return (
     <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title={title}>{label} ({chosen.length})</summary>
+      <summary className="tbbtn" title={title}>{label} ({chosen.length}){loading && !options.length && <span className="spinner" />}</summary>
       <div className="gearmenu-items">
-        {options.length === 0 && <span className="meta">nothing to choose from</span>}
+        {options.length === 0 && (loading ? <Waiting what={label} /> : <span className="meta">nothing to choose from</span>)}
         {options.map((o) => {
           const on = chosen.includes(o.value);
           const stuck = on ? (min != null && chosen.length <= min) : (max != null && chosen.length >= max);
@@ -3535,14 +3609,16 @@ function Latency({ v }: { v: any }) {
                   <strong className="addview-title">Add a view</strong>
                   <span className="meta">{(doc.views || []).length} of 6 in this document</span>
                   <span className="spacer" />
-                  {VIEW_KINDS.map(({ kind, label, why }) => {
-                    const blocked = (doc.views || []).length >= 6
-                      ? "this document already has the maximum of 6 views"
+                  {VIEW_KINDS.map(({ kind, label, why, loading }) => {
+                    const full = (doc.views || []).length >= 6;
+                    const waiting = !full && !!loading && loading();
+                    const blocked = full ? "this document already has the maximum of 6 views"
+                      : waiting ? "loading this study's catalog — a moment"
                       : (why ? why() : null);
                     return (
                       <button key={kind} className="facet" disabled={!!blocked}
                         title={blocked || ("add a " + label.toLowerCase() + " view and run it")}
-                        onClick={() => addView(kind)}>+ {label}</button>
+                        onClick={() => addView(kind)}>+ {label}{waiting && <span className="spinner" />}</button>
                     );
                   })}
                 </div>
@@ -3550,6 +3626,8 @@ function Latency({ v }: { v: any }) {
             )}
             {result && result.views.map((v, vi) => (
               <div className="card viewcard" key={resultViewKeys.current[vi] ?? vi}>
+                {/* recomputing this view (a settings change), or the whole document */}
+                {!(v as any).pending && (busy || pendingKeys.has(resultViewKeys.current[vi])) && <Updating />}
                 {/* addView's placeholder for a brand-new view that has no prior
                     result to keep showing while its own delta request is in
                     flight (see addView) — every v.kind===… block below is
@@ -3684,8 +3762,8 @@ function Latency({ v }: { v: any }) {
                 {v.kind === "clinical" && v.clinical && <>
                   <ViewHead menuStore={menuOpenRef.current} v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<PickMenu label="attributes" title="which clinical attributes this view compares" busy={busy}
-                      menuId={"attrs:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current}
-                      options={(trackAttrs.attrs || []).map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind }))}
+                      menuId={"attrs:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} loading={attrsLoading()}
+                      options={catalogAttrs().map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind }))}
                       chosen={(docView(vi).attributes || []).map(String)} min={1} max={20}
                       onChange={(next) => setViewAttrs(vi, next)} />} />
                   {v.note && <p className="note">{v.note}</p>}
@@ -3791,6 +3869,7 @@ function Latency({ v }: { v: any }) {
                           {(eps.length ? eps : [sv.endpoint || "OS"]).map(x => <option key={x} value={x}>{x}</option>)}
                         {!cat && <option disabled>loading…</option>}
                         </select>
+                        {catLoading && !cat && <Waiting what="endpoints" />}
                         <span className="meta">measured from</span>
                         <select value={a ? a.eventType : ""} disabled={busy}
                           onChange={e => patchView(vi, { anchor: e.target.value
@@ -3838,7 +3917,6 @@ function Latency({ v }: { v: any }) {
                         <span className="meta">mo</span>
                         <span className="meta">split by gene</span>
                         <GeneSplitControl busy={busy} onSplit={(gene) => splitSurvivalByGene(vi, gene)} />
-                        {pendingKeys.has(resultViewKeys.current[vi]) && <span className="spinner" />}
                       </div>
                     );
                   })()}
@@ -3881,6 +3959,7 @@ function Latency({ v }: { v: any }) {
                           {(eps.length ? eps : [sv.endpoint || "OS"]).map(x => <option key={x} value={x}>{x}</option>)}
                           {!cat && <option disabled>loading…</option>}
                         </select>
+                        {catLoading && !cat && <Waiting what="endpoints" />}
                         <span className="meta">cutoff</span>
                         <input type="number" min={1} placeholder="none" disabled={busy}
                           value={sv.cutoffMonths ?? ""} style={{ width: "5rem" }}
@@ -3891,12 +3970,11 @@ function Latency({ v }: { v: any }) {
                             onChange={e => patchView(vi, { stratifyByStudy: e.target.checked || undefined })} />
                           stratify by study
                         </label>
-                        {pendingKeys.has(resultViewKeys.current[vi]) && <span className="spinner" />}
                         <div style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "0.3rem", marginTop: "0.3rem" }}>
                           {covariates.map((c, ci) => (
                             <span key={ci} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-                              <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={trackAttrs.attrs || []}
-                                profiles={(explore && explore.profiles) || []} busy={busy}
+                              <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={catalogAttrs()}
+                                profiles={profileOptions()} loading={attrsLoading()} busy={busy}
                                 onChange={(next) => setCovariate(ci, next)} />
                               <button type="button" className="tbbtn" disabled={busy} title="remove this covariate"
                                 onClick={() => removeCovariate(ci)}>remove</button>
@@ -3931,11 +4009,11 @@ function Latency({ v }: { v: any }) {
                   <div className="viewtb">
                     <div className="tbz">
                       <span className="tbl" title="these change what is drawn, and re-run the query">data</span>
-                      <AxisPicker side="x" axis={docView(vi).x} attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
+                      <AxisPicker side="x" axis={docView(vi).x} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
                         onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, x: a }))} />
                     </div>
                     <div className="tbz">
-                      <AxisPicker side="y" axis={docView(vi).y} attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
+                      <AxisPicker side="y" axis={docView(vi).y} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
                         onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, y: a }))} />
                     </div>
                     {/* colour/ring only affect a box plot's violin — a scatter's density and a
@@ -3944,10 +4022,10 @@ function Latency({ v }: { v: any }) {
                     {v.plot?.shape === "box" && <div className="tbz">
                       <span className="tbl" title="colours each group's violin by a category">colour</span>
                       <AxisPicker side="fill" axis={docView(vi).colorBy} allowNone categorical
-                        attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
+                        attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
                         onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
                       <AxisPicker side="ring" axis={docView(vi).ringBy} allowNone categorical
-                        attrs={trackAttrs.attrs || []} profiles={(explore && explore.profiles) || []} busy={busy}
+                        attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
                         onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
                     </div>}
                     <div className="tbz">
@@ -4153,7 +4231,7 @@ function Latency({ v }: { v: any }) {
                             onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "hideVUS", e.target.checked || undefined))} /> drivers only</label>
                       </>}
                       tracksMenu={<TracksMenu
-                        attrs={trackAttrs.attrs} profiles={trackAttrs.profiles}
+                        attrs={trackAttrs.attrs} profiles={trackAttrs.profiles} loading={trackAttrsLoading}
                         clinical={ocView(vi).clinical || []} heatmap={ocView(vi).heatmap || []}
                         cohorts={Object.keys(result.cohorts)} derivedCohorts={ocView(vi).derivedCohorts || []}
                         busy={busy}
@@ -4232,8 +4310,10 @@ function Latency({ v }: { v: any }) {
  * because a study can declare sixty attributes; the count of cases carrying each one, most
  * first, because that is what decides whether a track is worth a row.
  */
-function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohorts, busy, onClinical, onHeatmap, onDerived }: {
+function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohorts, busy, loading, onClinical, onHeatmap, onDerived }: {
   attrs: { attribute: string; kind: string; patients: number }[];
+  /** the attribute/profile catalog is still being fetched */
+  loading?: boolean;
   profiles: string[];
   clinical: string[];
   heatmap: { profileType: string; genes?: string[] }[];
@@ -4276,7 +4356,8 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
           : tab === "heatmap" ? " · a profile draws one row per gene; leave the genes blank to follow the figure"
           : " · any cohort in this document can be a binary row (patients only, one study)"}</span>
         <div style={{ maxHeight: 260, overflowY: "auto", marginTop: "0.3rem" }}>
-          {!shown.length && <span className="meta">{attrs.length ? "nothing matches" : "loading…"}</span>}
+          {!shown.length && (loading && !attrs.length ? <Waiting what="tracks" />
+            : <span className="meta">{q.trim() ? "nothing matches" : "nothing to choose from"}</span>)}
           {shown.map((name) => {
             const on = chosen.includes(name);
             const a = tab === "clinical" ? attrs.find((x) => x.attribute === name) : undefined;

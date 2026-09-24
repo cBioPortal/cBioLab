@@ -664,7 +664,12 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   return (
     <>
       {error && <div className="error">oncoprint: {error}</div>}
-      {loading && !error && <p className="meta">querying and building the contract…</p>}
+      {/* the figure's own fetch (its spec changed): a skeleton the size of a figure when there is
+          none yet, and over the plot when there is one, so the old picture isn't read as the new */}
+      {loading && !error && !data && <>
+        <div className="loading-block" role="status"><span className="spinner" /> querying and building the oncoprint…</div>
+        <div className="skeleton skeleton-view" />
+      </>}
       {data && visible && !error && <>
         {/* The toolbar is two kinds of control, and they are kept apart on purpose. DATA changes
             what is drawn and costs a query; VIEW changes how it is drawn and is instant. Each zone
@@ -769,6 +774,10 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           ))}
         </div>}
         <div ref={wrapRef} className="onco-plot">
+          {loading && <div className="view-updating" style={{ top: 0, borderRadius: 0 }} role="status" aria-live="polite">
+            <div className="loading-block"><span className="spinner" /> updating…</div>
+            <div className="skeleton" />
+          </div>}
           <canvas ref={canvasRef} className="onco-canvas"
             onPointerDown={onSelDown} onPointerMove={onSelMove} onPointerUp={onSelUp} onPointerCancel={onSelUp}
             onMouseMove={onMove} onMouseLeave={() => { setHover(null); setLabelHover(null); }}
