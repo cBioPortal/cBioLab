@@ -168,7 +168,9 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   never stops. A failed lookup reads as unknown, never as "none" (`survivalEndpoints: null`).
 - **A disabled control says why** in its title — what it is waiting for, or what the data lacks
   ("genie_public has no survival data…"), never an instruction to go somewhere else to make it
-  work.
+  work. The exception is an action that belongs to a *saved* analysis — editing a cohort, adding
+  or editing a view's note: it is **hidden**, not disabled, until the analysis is saved
+  (`analysisSaved`, `CohortEditMenu`'s `canEdit`), by the user's choice.
 - **First render is a skeleton shaped like what it stands in for** (`.skeleton-view`,
   `.skeleton-cohort`), so the page doesn't collapse to a spinner and jump back to full height.
 - **Nothing is dropped without saying so — in the engine, the renderers, or the UI.** A figure
@@ -182,6 +184,11 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   `lib/analysis.ts`) and in the UI (ticked cohorts, event pills).
 - **An errored view keeps its header** (`drawsOwnHead`), so it can still be removed or moved
   without editing the JSON.
+- **Keystrokes stay in the field.** A text field on the analysis page must not keep what is being
+  typed in page state: `AnalysisPage` is one very large component, so every keystroke re-renders
+  every view card, the oncoprint and the inlined figures (a dialog's textarea measured ~350 ms a
+  key). Use `DraftText` — local state, the page reads a ref on save — or a small component that
+  owns its own draft. An edit that re-runs nothing must still `syncUrl`, or it is lost on refresh.
 - **Verify waiting states by holding the request.** A loader that flashes past in a normal run
   proves nothing; in Playwright, `page.route()` the endpoint and hold it, check the loader is on
   screen and the controls are still usable, then release it and check the loader is gone.
