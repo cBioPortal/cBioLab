@@ -488,6 +488,13 @@ export interface HotspotGene {
   topChanges: { change: string; pos: number | null; n: number; pct: number }[];
   /** samples with a somatic mutation in the gene, and samples in the cohort */
   somaticSamples: number; cohortSamples: number;
+  /**
+   * Mutation rows by protein impact type, putative driver vs VUS — the portal's badge tally
+   * beside the lollipop. Every row counts, drawn or not; `other` covers silent and unknown types.
+   */
+  tally: Record<"missense" | "truncating" | "inframe" | "splice" | "fusion" | "other", { driver: number; vus: number }>;
+  /** the transcript's other identifiers, as the portal's gene summary lists them */
+  ids?: { refseq?: string; ensembl?: string; ccds?: string; uniprotAccession?: string; uniprotName?: string };
 }
 /** One gene pair's correlation on a continuous profile, from six sums per site. */
 export interface CoexprRow {
