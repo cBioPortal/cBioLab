@@ -15,7 +15,7 @@ test("display defaults", () => {
 
 test("display rejects unknown options and bad values, naming what is accepted", () => {
   assert.throws(() => normalizeDisplay({ showUnalterd: true } as never), /unknown option 'showUnalterd'.*showUnaltered/s);
-  assert.throws(() => normalizeDisplay({ gaps: "yes" } as never), /display.gaps.*none, gaps, pct/);
+  assert.throws(() => normalizeDisplay({ gaps: "yes" } as never), /display.gaps.*none, gaps, pct, pct-left/);
   assert.throws(() => normalizeDisplay({ whitespace: "yes" } as never), /must be true or false/);
   assert.throws(() => normalizeDisplay({ colors: { TYPE: { x: "red" } } }), /not a #rrggbb colour/);
   assert.throws(() => normalizeDisplay({ colors: { TYPE: "#ff0000" } } as never), /must be \{value: color\}/);

@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
-  virtualWidth, type Hit, type View, type VisibleGroup } from "./canvas.ts";
+  virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { geneLegendFor, resolveStyle, styleForDisplay, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { jupyterLiteUrl, labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
@@ -38,7 +38,7 @@ function withBackground(S: ReturnType<typeof resolveStyle>, white?: boolean) {
  * annotate — live in the spec and are the page's business.
  */
 export interface FigureDisplay {
-  showUnaltered: boolean; whitespace: boolean; gaps: "none" | "gaps" | "pct"; colorByType: boolean;
+  showUnaltered: boolean; whitespace: boolean; gaps: "none" | "gaps" | "pct" | "pct-left"; colorByType: boolean;
   /** per track, per value: the portal's Edit Colors, applied in the browser */
   colors?: Record<string, Record<string, string>>;
   /**
@@ -196,7 +196,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const primaryKey = data ? (((sortKeys[0] || "").startsWith("cluster:") ? data.conventions.sort[0] : sortKeys[0]) || data.conventions.sort[0] || "genomic").replace(/^-/, "") : "";
   const gapTrack = data ? data.tracks.find((t) => t.label === primaryKey && t.categories && t.categories.length) : undefined;
   const gapMode = gapTrack ? display.gaps : "none";
-  const gapPx = gapMode === "none" ? GEOM.groupGap : gapMode === "pct" ? 40 : 8;
+  const pctMode = gapMode === "pct" || gapMode === "pct-left";
+  const gapPx: Gap = useMemo(() => gapMode === "none" ? GEOM.groupGap : gapMode === "pct" || gapMode === "pct-left"
+    ? { px: 40, edge: gapMode === "pct-left" ? "left" : "right" } : 8, [gapMode]);
 
   const visible = useMemo(() => {
     if (!data || !base) return null;
@@ -229,7 +231,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     }
     if (gapMode !== "none" && gapTrack) {
       const t0 = performance.now();
-      groups = segmentByTrack(data, order, groups, gapTrack.label, gapMode === "pct");
+      groups = segmentByTrack(data, order, groups, gapTrack.label, pctMode);
       bump({ gapMs: performance.now() - t0 });
     }
     return { order, groups };
@@ -274,7 +276,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const S = withBackground(styleForDisplay(resolveStyle(data.display?.style), display), display.whiteBackground);
     const r = draw(ctx, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, Math.max(0, view.scrollX)) },
-      cssW, paletteOf(S), { gap: gapPx, pctLabels: gapMode === "pct", style: S, colors: display.colors ?? data.display?.colors });
+      cssW, paletteOf(S), { gap: gapPx, pctLabels: pctMode, style: S, colors: display.colors ?? data.display?.colors });
     const mem = (performance as any).memory;
     bump({ drawMs: r.ms, cellsDrawn: r.cellsDrawn, bucketsDrawn: r.bucketsDrawn, frames: perfRef.current.frames + 1, heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : undefined });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -320,7 +322,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const S2 = withBackground(styleForDisplay(resolveStyle(data.display?.style), display), display.whiteBackground);
     draw(ctx, data, visible.order, visible.groups, { zoom: fitZoom(visible.groups, w - GEOM.gutter, gapPx), scrollX: 0, whitespace: display.whitespace },
-      w, paletteOf(S2), { gap: gapPx, pctLabels: gapMode === "pct", style: S2, colors: display.colors ?? data.display?.colors });
+      w, paletteOf(S2), { gap: gapPx, pctLabels: pctMode, style: S2, colors: display.colors ?? data.display?.colors });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportOpen, exportWidthIn, data, visible, gapPx, gapMode, display]);
 
@@ -639,7 +641,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         const ctx = cv.getContext("2d")!;
         ctx.setTransform(scale, 0, 0, scale, 0, 0);
         draw(ctx, data, visible.order, visible.groups, { zoom: fitZoom(visible.groups, w - GEOM.gutter, gapPx), scrollX: 0, whitespace: display.whitespace },
-          w, paletteOf(S2), { gap: gapPx, pctLabels: gapMode === "pct", style: S2, colors: display.colors ?? data.display?.colors });
+          w, paletteOf(S2), { gap: gapPx, pctLabels: pctMode, style: S2, colors: display.colors ?? data.display?.colors });
         const blob: Blob = await new Promise((res) => cv.toBlob((b) => res(b!), "image/png"));
         // canvas.toBlob writes bare pixels; a pHYs chunk is what lets Word/Photoshop/Preview
         // print this at exportWidthIn rather than guessing 72 or 96 dpi.
@@ -700,7 +702,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 <label className="setrow" title={gapTrack ? "split each cohort into runs of " + gapTrack.label : "choose a categorical track as the sort key first"}>
                   <span className="meta">gaps</span>
                   <select value={display.gaps} disabled={busy || !gapTrack} onChange={(e) => set({ gaps: e.target.value as FigureDisplay["gaps"] })}>
-                    <option value="none">none</option><option value="gaps">gaps</option><option value="pct">gaps with %</option>
+                    <option value="none">none</option><option value="gaps">gaps</option><option value="pct">gaps with % on the right</option><option value="pct-left">gaps with % on the left</option>
                   </select>
                 </label>
                 <span className="meta">{view.zoom >= 1 ? view.zoom.toFixed(1) + " px per column" : (1 / view.zoom).toFixed(0) + " columns per pixel"} · {data.tracks.length} tracks</span>
@@ -817,7 +819,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 {t.categories && t.categories.length > 0 && primaryKey === t.label &&
                   item(display.gaps === "none" ? "Show gaps" : "Hide gaps", display.gaps !== "none", () => set({ gaps: display.gaps === "none" ? "gaps" : "none" }))}
                 {t.categories && t.categories.length > 0 && primaryKey === t.label &&
-                  item("Show gaps (w/%)", display.gaps === "pct", () => set({ gaps: "pct" }))}
+                  item("Show gaps (w/% on right)", display.gaps === "pct", () => set({ gaps: "pct" }))}
+                {t.categories && t.categories.length > 0 && primaryKey === t.label &&
+                  item("Show gaps (w/% on left)", display.gaps === "pct-left", () => set({ gaps: "pct-left" }))}
                 {t.categories && t.categories.length > 0 && (
                   <details>
                     <summary className="meta" style={{ cursor: "pointer", padding: "0.2rem 0.3rem" }}>Edit colours</summary>

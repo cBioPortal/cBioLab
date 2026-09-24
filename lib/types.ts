@@ -323,8 +323,11 @@ export interface DisplaySpec {
   showUnaltered?: boolean;
   /** whitespace between columns once they are wide enough (default true) */
   whitespace?: boolean;
-  /** split each cohort into runs of the primary categorical sort key (default "none") */
-  gaps?: "none" | "gaps" | "pct";
+  /**
+   * split each cohort into runs of the primary categorical sort key (default "none"); "pct" labels
+   * each run with its altered percentages to its right, "pct-left" to its left
+   */
+  gaps?: "none" | "gaps" | "pct" | "pct-left";
   /** category keys under the figure (default "all") */
   clinicalLegends?: "all" | "none";
   /** colour each mutation class separately (default true); off draws them all as one */
