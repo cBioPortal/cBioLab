@@ -116,7 +116,12 @@ const DOMAIN_COLORS = ["#2dcf00", "#ff5353", "#5b5bff", "#ebd61d", "#ba21e0", "#
 
 // ---- the protein: Genome Nexus, as the portal asks it --------------------------------------
 
-export interface ProteinInfo { proteinLength: number; transcriptId: string; domains: { accession: string; name: string; start: number; end: number }[] }
+export interface ProteinInfo {
+  proteinLength: number; transcriptId: string;
+  domains: { accession: string; name: string; start: number; end: number }[];
+  /** RefSeq mRNA, versioned Ensembl transcript, CCDS, and the UniProt accession and entry name */
+  ids?: { refseq?: string; ensembl?: string; ccds?: string; uniprotAccession?: string; uniprotName?: string };
+}
 const PROTEIN_CACHE = new Map<string, Promise<ProteinInfo | null>>();
 const GN = () => (process.env.GENOME_NEXUS_URL || "https://www.genomenexus.org").replace(/\/+$/, "");
 
@@ -133,7 +138,8 @@ export function fetchProteinInfo(gene: string): Promise<ProteinInfo | null> {
     const t = await fetch(GN() + "/ensembl/canonical-transcript/hgnc/" + encodeURIComponent(key) + "?isoformOverrideSource=mskcc",
       { signal: AbortSignal.timeout(8000) });
     if (!t.ok) return null;
-    const tx = await t.json() as { transcriptId?: string; proteinLength?: number; pfamDomains?: { pfamDomainId: string; pfamDomainStart: number; pfamDomainEnd: number }[] };
+    const tx = await t.json() as { transcriptId?: string; transcriptIdVersion?: string; refseqMrnaId?: string; ccdsId?: string; uniprotId?: string;
+      proteinLength?: number; pfamDomains?: { pfamDomainId: string; pfamDomainStart: number; pfamDomainEnd: number }[] };
     if (!tx.proteinLength) return null;
     const ids = [...new Set((tx.pfamDomains || []).map((d) => d.pfamDomainId))];
     let names = new Map<string, string>();
@@ -142,7 +148,18 @@ export function fetchProteinInfo(gene: string): Promise<ProteinInfo | null> {
         body: JSON.stringify(ids), signal: AbortSignal.timeout(8000) }).catch(() => null);
       if (r && r.ok) names = new Map((await r.json() as { pfamAccession: string; name: string }[]).map((d) => [d.pfamAccession, d.name]));
     }
+    // the UniProt entry name (RASK_HUMAN), as the portal fetches it: from UniProt, by the
+    // Swiss-Prot accession without its isoform suffix
+    const accession = (tx.uniprotId || "").replace(/-\d+$/, "");
+    let uniprotName: string | undefined;
+    if (accession) {
+      const u = await fetch("https://rest.uniprot.org/uniprotkb/search?query=accession:" + encodeURIComponent(accession) + "&format=tsv&fields=id",
+        { signal: AbortSignal.timeout(8000) }).catch(() => null);
+      if (u && u.ok) uniprotName = (await u.text()).split("\n")[1]?.trim() || undefined;
+    }
     return { proteinLength: tx.proteinLength, transcriptId: tx.transcriptId || "",
+      ids: { refseq: tx.refseqMrnaId || undefined, ccds: tx.ccdsId || undefined, uniprotAccession: accession || undefined, uniprotName,
+        ensembl: tx.transcriptId ? tx.transcriptId + (tx.transcriptIdVersion ? "." + tx.transcriptIdVersion : "") : undefined },
       domains: (tx.pfamDomains || []).map((d) => ({ accession: d.pfamDomainId, name: names.get(d.pfamDomainId) || d.pfamDomainId,
         start: d.pfamDomainStart, end: d.pfamDomainEnd })) };
   })().catch(() => null);
@@ -201,6 +218,10 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
   });
   const lp = labelledPosition(positions, domains);
   const at = positions.find((p) => p.pos === lp);
+  // the badge tally: every mutation row by impact type and driver status, drawn or not
+  const tally: HotspotGene["tally"] = { missense: { driver: 0, vus: 0 }, truncating: { driver: 0, vus: 0 }, inframe: { driver: 0, vus: 0 },
+    splice: { driver: 0, vus: 0 }, fusion: { driver: 0, vus: 0 }, other: { driver: 0, vus: 0 } };
+  for (const t of types.values()) tally[impactType(canonicalType(t.mtype))][t.driver ? "driver" : "vus"] += t.rows;
   const topChanges = [...changes.values()].sort((a, b) => b.n - a.n).slice(0, 10)
     .map((c) => ({ change: c.change, pos: c.pos, n: c.n, pct: mutated ? Math.round((1000 * c.n) / mutated) / 10 : 0 }));
   return {
@@ -210,6 +231,6 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
     // one is about the data and the other about what a site chose not to disclose
     unpositioned, withheld: Math.max(0, pairs - returned),
     ...(at ? { label: { pos: at.pos, text: lollipopLabelText(at.changes) } } : {}),
-    somaticSamples, cohortSamples
+    somaticSamples, cohortSamples, tally, ...(protein?.ids ? { ids: protein.ids } : {})
   };
 }

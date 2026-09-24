@@ -401,11 +401,16 @@ export function lollipopChangesSql(cohortSql: string, genes: string[], study: st
     "SELECT gene, pos, change, uniqExact(pid) AS n, count() AS rows, max(driver) AS driver\n" +
     "FROM m GROUP BY gene, pos, change HAVING n >= " + Math.max(1, Math.floor(minCount));
 }
-/** Per (codon, mutation type, driver): raw rows — the colour is decided from these. */
+/**
+ * Per (codon, mutation type, driver): raw rows — a codon's colour is decided from these, and the
+ * gene's Driver/VUS tally by type is their sum. A mutation with no codon has pos NULL and still
+ * counts toward the tally (the portal's badges count every mutation row), so the floor's
+ * membership test compares pos through ifNull rather than letting NULL fail the tuple match.
+ */
 export function lollipopTypesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB): string {
   return lollipopCte(cohortSql, genes, study, minCount, pin, db) +
     "SELECT gene, pos, mtype, driver, count() AS rows\n" +
-    "FROM m WHERE (gene, pos, change) IN (SELECT gene, pos, change FROM kept) GROUP BY gene, pos, mtype, driver";
+    "FROM m WHERE (gene, ifNull(pos, -1), change) IN (SELECT gene, ifNull(pos, -1), change FROM kept) GROUP BY gene, pos, mtype, driver";
 }
 /** Per gene: mutated patients, distinct (patient, change) pairs, and samples with a somatic one. */
 export function lollipopTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB): string {

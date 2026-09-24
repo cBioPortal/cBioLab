@@ -111,6 +111,28 @@ function Updating() {
   );
 }
 
+/**
+ * A dialog's text field that keeps its keystrokes to itself. As page state, every keystroke
+ * re-rendered the whole analysis page — every view card, the oncoprint, the inlined figures —
+ * about 350 ms a key with a few views open. The page reads the text from `draft` (a ref, so
+ * writing it renders nothing) when the dialog is saved, and hears only when the field turns
+ * empty or non-empty, which is all a Save button's disabled state needs. Give it a fresh `key`
+ * each time its dialog opens so it starts from `initial`.
+ */
+function DraftText({ draft, initial, multiline, onFilled, ...rest }: {
+  draft: React.MutableRefObject<string>; initial: string; multiline?: boolean; onFilled?: (filled: boolean) => void;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement> & React.TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange" | "defaultValue">) {
+  const [v, setV] = useState(() => { draft.current = initial; return initial; });
+  const change = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const next = e.target.value;
+    if (onFilled && !!next.trim() !== !!draft.current.trim()) onFilled(!!next.trim());
+    draft.current = next;
+    setV(next);
+  };
+  return multiline ? <textarea {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)} value={v} onChange={change} />
+    : <input {...(rest as React.InputHTMLAttributes<HTMLInputElement>)} value={v} onChange={change} />;
+}
+
 function Participation({ p }: { p?: ViewParticipation }) {
   if (!p || !p.studies.length) return null;
   // Two ORTHOGONAL facts, deliberately not merged into one word. The method is
@@ -490,6 +512,11 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   // ---- editing a view's note (the gear menu's "add note…" / "edit note…") -
   const [viewNoteEditing, setViewNoteEditing] = useState<number | null>(null); // index into doc.views / result.views
   const [vnText, setVnText] = useState("");
+  // what the text dialogs' fields hold while being typed in (see DraftText), a generation
+  // bumped on every open so each field starts fresh, and whether the gating field is non-empty
+  const saveDraft = useRef(""), wsDraft = useRef(""), ceNameDraft = useRef(""), ceNotesDraft = useRef(""), vnDraft = useRef("");
+  const [draftGen, setDraftGen] = useState(0);
+  const [draftFilled, setDraftFilled] = useState(false);
   const viewNoteDialog = useRef<HTMLDialogElement | null>(null);
 
   /** Postgres timestamptz -> the same "YYYY-MM-DD HH:MM" the app has always shown. */
@@ -742,10 +769,11 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     if (!barDef()) { setExMsg("select at least one study first"); return; }
     setExMsg(null);
     setSaveName(cName.trim() || barDefaultName());
+    setDraftFilled(!!(cName.trim() || barDefaultName()).trim()); setDraftGen((g) => g + 1);
     saveDialog.current?.showModal();
   };
   const confirmSave = async () => {
-    const name = saveName.trim();
+    const name = saveDraft.current.trim();
     const def = barDef();
     if (!name || !def) return;
     saveDialog.current?.close();
@@ -1439,10 +1467,11 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     // An untitled workspace opens to an empty field with just the
     // placeholder text.
     setWsName(doc.title || "");
+    setDraftFilled(!!(doc.title || "").trim()); setDraftGen((g) => g + 1);
     wsDialog.current?.showModal();
   };
   const confirmWorkspaceSave = async () => {
-    const name = wsName.trim();
+    const name = wsDraft.current.trim();
     if (!name) return;
     wsDialog.current?.close();
     const d = { ...doc, title: name };
@@ -1810,7 +1839,9 @@ function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove, onEditNot
       <div className="gearmenu-items">
         <button className="linklike" disabled={!onMoveUp} onClick={onMoveUp}>move up</button>
         <button className="linklike" disabled={!onMoveDown} onClick={onMoveDown}>move down</button>
-        {onEditNote && <>
+        {/* a note belongs to a saved analysis, as a cohort's edits do (see CohortEditMenu), so the
+            item only exists once there is a saved analysis for it to belong to */}
+        {onEditNote && analysisSaved && <>
           <hr />
           <button className="linklike" onClick={onEditNote}>{hasNote ? "edit note…" : "add note…"}</button>
         </>}
@@ -2023,6 +2054,7 @@ function Latency({ v }: { v: any }) {
     setCohortEditing(name);
     setCeName(name);
     setCeNotes(doc.cohorts?.[name]?.notes || "");
+    setDraftFilled(!!name.trim()); setDraftGen((g) => g + 1);
     setCeError(null);
     cohortEditDialog.current?.showModal();
   };
@@ -2037,7 +2069,7 @@ function Latency({ v }: { v: any }) {
   const confirmCohortEdit = () => {
     if (!cohortEditing) return;
     const oldName = cohortEditing;
-    const newName = ceName.trim();
+    const newName = ceNameDraft.current.trim();
     if (!newName) return;
     if (newName !== oldName && doc.cohorts?.[newName]) {
       setCeError("a cohort named “" + newName + "” already exists");
@@ -2046,11 +2078,12 @@ function Latency({ v }: { v: any }) {
     cohortEditDialog.current?.close();
     const nextCohorts: Record<string, CohortDef> = {};
     for (const [k, v] of Object.entries(doc.cohorts || {})) {
-      nextCohorts[k === oldName ? newName : k] = k === oldName ? { ...v, notes: ceNotes } : v;
+      nextCohorts[k === oldName ? newName : k] = k === oldName ? { ...v, notes: ceNotesDraft.current } : v;
     }
     if (newName === oldName) {
+      // a note-only edit re-runs nothing, so nothing else would put it in the shareable link
       const d = { ...doc, cohorts: nextCohorts };
-      setDoc(d); setDocText(JSON.stringify(d, null, 2));
+      setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
       return;
     }
     const views = (doc.views || []).map(v => Array.isArray(v.cohorts)
@@ -2061,9 +2094,13 @@ function Latency({ v }: { v: any }) {
     run(d);
   };
 
+  /** the analysis exists as a saved workspace — what a view's note, like a cohort's, belongs to */
+  const analysisSaved = !!(doc.title && spaces[doc.title]);
   const openViewNoteEdit = (vi: number) => {
+    if (!analysisSaved) return;
     setViewNoteEditing(vi);
     setVnText((doc.views || [])[vi]?.note || "");
+    setDraftGen((g) => g + 1);
     viewNoteDialog.current?.showModal();
   };
 
@@ -2077,7 +2114,7 @@ function Latency({ v }: { v: any }) {
     if (viewNoteEditing == null) return;
     const vi = viewNoteEditing;
     viewNoteDialog.current?.close();
-    const trimmed = vnText.trim();
+    const trimmed = vnDraft.current.trim();
     const views = (doc.views || []).map((v: any, i: number) => {
       if (i !== vi) return v;
       const nv = { ...v };
@@ -2087,7 +2124,8 @@ function Latency({ v }: { v: any }) {
       return nv;
     });
     const d = { ...doc, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    // no re-run follows, so the link has to be told here or the note is lost on refresh/share
+    setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
     setResult(prev => {
       if (!prev || !prev.views[vi]) return prev;
       const rviews = [...prev.views];
@@ -2233,8 +2271,7 @@ function Latency({ v }: { v: any }) {
                   ? " · unsaved changes"
                   : " · saved " + spaces[doc.title].savedAt}
             </p>
-            <input autoFocus placeholder="workspace name…" value={wsName}
-              onChange={e => setWsName(e.target.value)} />
+            <DraftText key={draftGen} draft={wsDraft} initial={wsName} onFilled={setDraftFilled} autoFocus placeholder="workspace name…" />
 
             {doc.params && Object.keys(doc.params).length > 0 ? (
               <div className="params" style={{ marginTop: "0.7rem" }}>
@@ -2274,7 +2311,7 @@ function Latency({ v }: { v: any }) {
               </div>
               <div className="row" style={{ gap: "0.4rem", alignItems: "center" }}>
                 <button type="button" className="linklike" onClick={() => wsDialog.current?.close()}>cancel</button>
-                <button className="primary" type="submit" disabled={!wsName.trim()}>
+                <button className="primary" type="submit" disabled={!draftFilled}>
                   {doc.title && spaces[doc.title] ? "Save changes" : "Save"}
                 </button>
               </div>
@@ -2291,14 +2328,13 @@ function Latency({ v }: { v: any }) {
           <form method="dialog" onSubmit={e => { e.preventDefault(); confirmCohortEdit(); }}>
             <h3>Edit cohort</h3>
             <label className="wslabel" htmlFor="cename">Name</label>
-            <input id="cename" autoFocus value={ceName} onChange={e => setCeName(e.target.value)} />
+            <DraftText key={"n" + draftGen} draft={ceNameDraft} initial={ceName} onFilled={setDraftFilled} id="cename" autoFocus />
             <label className="wslabel" htmlFor="cenotes" style={{ marginTop: "0.6rem", display: "block" }}>Note</label>
-            <textarea id="cenotes" value={ceNotes} spellCheck
-              placeholder="What is this cohort? Why is it defined this way?"
-              onChange={e => setCeNotes(e.target.value)} />
+            <DraftText multiline key={"t" + draftGen} draft={ceNotesDraft} initial={ceNotes} id="cenotes" spellCheck
+              placeholder="What is this cohort? Why is it defined this way?" />
             <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
               <button type="button" className="linklike" onClick={() => cohortEditDialog.current?.close()}>cancel</button>
-              <button className="primary" type="submit" disabled={!ceName.trim()}>Save</button>
+              <button className="primary" type="submit" disabled={!draftFilled}>Save</button>
             </div>
             {ceError && <p className="error" style={{ marginTop: "0.4rem" }}>{ceError}</p>}
           </form>
@@ -2312,9 +2348,8 @@ function Latency({ v }: { v: any }) {
           <form method="dialog" onSubmit={e => { e.preventDefault(); confirmViewNoteEdit(); }}>
             <h3>View note</h3>
             <label className="wslabel" htmlFor="vntext">Note</label>
-            <textarea id="vntext" autoFocus value={vnText} spellCheck
-              placeholder="What does this figure show? What should a reader look at first?"
-              onChange={e => setVnText(e.target.value)} />
+            <DraftText multiline key={draftGen} draft={vnDraft} initial={vnText} id="vntext" autoFocus spellCheck
+              placeholder="What does this figure show? What should a reader look at first?" />
             <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
               <button type="button" className="linklike" onClick={() => viewNoteDialog.current?.close()}>cancel</button>
               <button className="primary" type="submit">Save</button>
@@ -2398,11 +2433,10 @@ function Latency({ v }: { v: any }) {
                   <form method="dialog" onSubmit={e => { e.preventDefault(); confirmSave(); }}>
                     <h3>Save as a cohort</h3>
                     <p className="meta">{clauses ? clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies") : "every patient in " + (exStudies.length === 1 ? exStudies[0] : exStudies.length + " selected studies")}</p>
-                    <input autoFocus placeholder="cohort name…" value={saveName}
-                      onChange={e => setSaveName(e.target.value)} />
+                    <DraftText key={draftGen} draft={saveDraft} initial={saveName} onFilled={setDraftFilled} autoFocus placeholder="cohort name…" />
                     <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
                       <button type="button" className="linklike" onClick={() => saveDialog.current?.close()}>cancel</button>
-                      <button className="primary" type="submit" disabled={!saveName.trim()}>Save</button>
+                      <button className="primary" type="submit" disabled={!draftFilled}>Save</button>
                     </div>
                   </form>
                 </dialog>

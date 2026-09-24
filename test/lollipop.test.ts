@@ -57,3 +57,17 @@ test("pooling sites sums counts, and nothing undrawable is lost silently", () =>
   assert.equal(g.withheld, 3, "13 pairs reported by the sites' totals, 10 returned: 3 were under the floor");
   assert.equal(g.cohortSamples, 200);
 });
+
+test("the badge tally counts every mutation row by impact type and driver status, drawn or not", () => {
+  const g = buildLollipopGene("G", [{
+    changes: [{ gene: "G", pos: 12, change: "G12D", n: 5, rows: 6, driver: true }, { gene: "G", pos: null, change: "X10_splice", n: 2, rows: 2, driver: false }],
+    types: [{ gene: "G", pos: 12, mtype: "Missense_Mutation", driver: true, rows: 6 }, { gene: "G", pos: 30, mtype: "Nonsense_Mutation", driver: false, rows: 1 },
+            { gene: "G", pos: null, mtype: "Splice_Site", driver: false, rows: 2 }, { gene: "G", pos: 40, mtype: "Silent", driver: false, rows: 3 }],
+    totals: [{ gene: "G", patients: 7, pairs: 7, somaticSamples: 7 }], cohortSamples: 20, minCount: 1, annotated: true }],
+    { proteinLength: 189, transcriptId: "T", domains: [] });
+  assert.deepEqual(g.tally.missense, { driver: 6, vus: 0 });
+  assert.deepEqual(g.tally.truncating, { driver: 0, vus: 1 });
+  assert.deepEqual(g.tally.splice, { driver: 0, vus: 2 }, "the unpositioned splice rows still count");
+  assert.deepEqual(g.tally.other, { driver: 0, vus: 3 });
+  assert.deepEqual(g.tally.fusion, { driver: 0, vus: 0 });
+});

@@ -107,6 +107,16 @@ describe("the lollipop draws every codon, the way the portal's mutation tab does
     assert.ok(svg.includes(">189aa<") && svg.includes(">Ras<"));
     assert.ok(svg.includes("># KRAS Mutations<"), "the portal's y-axis label");
   });
+  test("beside the plot: transcript ids as links, somatic frequency, and the Driver/VUS badges", () => {
+    const g = { ...kras(), ids: { refseq: "NM_004985", ensembl: "ENST00000311936.3", ccds: "CCDS8702", uniprotAccession: "P01116", uniprotName: "RASK_HUMAN" } };
+    const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [g] } as any)!;
+    for (const id of ["NM_004985", "ENST00000311936.3", "CCDS8702", "RASK_HUMAN"]) assert.ok(svg.includes(">" + id + "</tspan></a>"), id + " is a link");
+    assert.ok(svg.includes('href="https://www.uniprot.org/uniprot/P01116"'));
+    assert.ok(svg.includes(">Somatic Mutation Frequency<") && svg.includes(">10.0%<"), "5 of 50 samples");
+    assert.ok(svg.includes(">Missense<") && svg.includes(">Truncating<") && svg.includes(">Fusion<"));
+    assert.ok(!svg.includes(">Other<"), "no Other row when nothing is 'other'");
+    assert.ok(svg.includes(">10</text>"), "10 missense driver rows");
+  });
   test("a codon's tooltip lists its changes with their counts", () => {
     const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [kras()] } as any)!;
     assert.match(svg, /<title>codon 12: 9 mutations\nG12D 6\nG12V 3<\/title>/);
