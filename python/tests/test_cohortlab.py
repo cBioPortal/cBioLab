@@ -163,7 +163,7 @@ class StyleOverrides(unittest.TestCase):
         self.assertEqual(normalize_display(None), {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all", "colorByType": True, "hideVUS": False, "annotate": "oncokb", "whiteBackground": False})
         with self.assertRaisesRegex(ValueError, "unknown option 'showUnalterd'"):
             normalize_display({"showUnalterd": True})
-        with self.assertRaisesRegex(ValueError, "is not one of none, gaps, pct"):
+        with self.assertRaisesRegex(ValueError, "is not one of none, gaps, pct, pct-left"):
             normalize_display({"gaps": "yes"})
         with self.assertRaisesRegex(ValueError, "#rrggbb"):
             normalize_display({"colors": {"TYPE": {"x": "red"}}})

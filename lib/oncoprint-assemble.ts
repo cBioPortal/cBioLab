@@ -47,7 +47,7 @@ export function normalizeSort(sort: SortKeySpec[] | undefined): { track: string;
 }
 
 const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "hideVUS", "annotate", "whiteBackground", "style", "colors"] as const;
-const GAP_MODES = ["none", "gaps", "pct"] as const;
+const GAP_MODES = ["none", "gaps", "pct", "pct-left"] as const;
 const LEGEND_MODES = ["all", "none"] as const;
 const ANNOTATE_MODES = ["oncokb", "none"] as const;
 

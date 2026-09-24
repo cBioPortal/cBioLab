@@ -714,7 +714,7 @@ all reproduce the same picture. Unknown keys are rejected loudly.
 | --- | --- | --- |
 | \`showUnaltered\` | \`true\` | draw columns with no alteration in any gene track |
 | \`whitespace\` | \`true\` | gaps between columns once they are wide enough |
-| \`gaps\` | \`"none"\` | \`"gaps"\` / \`"pct"\`: split each cohort into runs of the primary categorical sort key |
+| \`gaps\` | \`"none"\` | \`"gaps"\` / \`"pct"\` / \`"pct-left"\`: split each cohort into runs of the primary categorical sort key; the \`pct\` modes label each run with its altered % on its right or left |
 | \`colorByType\` | \`true\` | colour each mutation class separately; off draws them as one |
 | \`whiteBackground\` | \`false\` | white instead of grey for unaltered cells, for print |
 | \`clinicalLegends\` | \`"all"\` | \`"none"\` drops the category keys under the figure |
