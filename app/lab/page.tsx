@@ -392,7 +392,14 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
    * clearing on every run left the header and the provenance panel permanently empty.
    */
   const [contracts, setContracts] = useState<Record<string, UnpackedContract>>({});
-  const [busy, setBusy] = useState(false);
+  // Starts true exactly when a ?doc= link means the mount effect below is
+  // about to call run(d) — same reasoning, and the same `sp` (not a
+  // client-only re-read of window.location), as tabFromParams above: without
+  // this, the first render shows "Nothing here yet" (busy=false, no result
+  // yet) for one frame before that effect flips busy on, which is the flash.
+  // A malformed link's catch block below resets this, so a bad ?doc= doesn't
+  // leave the page stuck on the loading skeleton forever.
+  const [busy, setBusy] = useState(() => typeof sp.doc === "string");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Record<string, { id: string; def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null }>>({});
   const [cName, setCName] = useState("");
@@ -556,7 +563,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   };
 
   const run = async (d: AnalysisDoc = doc) => {
-    if (!Object.keys(d.cohorts || {}).length) { setResult(null); return; }
+    if (!Object.keys(d.cohorts || {}).length) { setBusy(false); setResult(null); return; }
     setBusy(true); setError(null);
     try {
       const payload = { study: d.study || study, ...d };
@@ -666,7 +673,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
         if (tabRef.current === "explore") fetchExplore();
         run(d);
       } else if (tabRef.current === "explore") fetchExplore();
-    } catch (e) { setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
+    } catch (e) { setBusy(false); setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
   }, []); // eslint-disable-line
 
   /**
@@ -3537,15 +3544,6 @@ function Latency({ v }: { v: any }) {
                     </div>
                   ))}
             </div>
-            {/* Browsing/opening a previously saved workspace lives on the Saved
-                tab now, alongside saved cohorts — this tab is only ever about
-                the ONE document currently open. */}
-            {!doc.title && Object.keys(spaces).length > 0 && (
-              <p className="note" style={{ marginTop: "0.7rem" }}>
-                {Object.keys(spaces).length} saved workspace{Object.keys(spaces).length === 1 ? "" : "s"} — open one from the{" "}
-                <button className="linklike" onClick={() => goTab("saved")}>Saved tab</button>.
-              </p>
-            )}
           </div>
           {/* The document's JSON, generated SQL and run/clear controls: a dialog
               rather than a permanent column, so the leftbar can just be cohorts. */}
