@@ -567,6 +567,7 @@ say so in their captions.
 | \`caseList\` | \`{"kind":"caseList","id":"sequenced"}\` | portal sample list; bare ids get the study prefix |
 | \`genomicData\` | \`{"kind":"genomicData","gene":G,"profileType":P,"range"\\|"values"}\` | continuous per-gene values (cna, mrna z-scores, …); unknown profiles error listing what the study has |
 | \`genericAssay\` | \`{"kind":"genericAssay","profileType":P,"entity":E,"range"\\|"values"}\` | generic assay values (mutational signatures, …) |
+| \`proteinPosition\` | \`{"kind":"proteinPosition","gene":G,"range":{gt,gte,lt,lte}}\` | patient carries a mutation in \`gene\` whose protein position (the stored proteinPosStart, same column the lollipop draws from) falls in \`range\` — for an N-/C-terminal split when a study doesn't deposit one as a clinical attribute. Position-only: AND with an \`oql\` leaf (e.g. \`{"kind":"oql","q":"APC: TRUNC"}\`) to also restrict by mutation type |
 | \`alteration\` | *(deprecated)* | translated to OQL internally; do not write new ones |
 
 **\`sampleList\`/\`patientList\` ids.** Each id is \`"<study>:<bare-id>"\` — a colon, not the
@@ -925,6 +926,9 @@ Leaf kinds:
 - {"kind":"caseList","id":"sequenced"|"cna"|full stable id} — portal case lists.
 - {"kind":"genomicData","gene":"CDKN2A","profileType":"cna","range":{"lte":-2}} — continuous
   per-gene values; profile must exist in the study or it errors listing what does.
+- {"kind":"proteinPosition","gene":"APC","range":{"lt":1400}} — mutated in gene with protein
+  position (proteinPosStart) in range, for an N-/C-terminal split; AND with an oql leaf
+  ({"kind":"oql","q":"APC: TRUNC"}) to also require a mutation type.
 - OQL EXP>z / PROT>z work only if the study has mRNA/protein profiles (msk_chord does not).
 - OQL details for {"kind":"oql"}: per gene MUT,
   MUT=<pchange>, MISSENSE/NONSENSE/TRUNC/INFRAME/SPLICE, AMP, HOMDEL, FUSION, DRIVER and _DRIVER

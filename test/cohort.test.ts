@@ -113,3 +113,37 @@ describe("derived buckets OR into one scan", () => {
       /needs a range/);
   });
 });
+
+describe("proteinPosition: an N-/C-terminal split without a clinical attribute for it", () => {
+  test("compiles against mutation_derived's proteinPosStart, keyed by bare patientId", () => {
+    const sql = compileCohortDef({ all: [{ kind: "proteinPosition", gene: "APC", range: { lt: 1400 } }] }, ctx);
+    assert.match(sql, /FROM db\.mutation_derived/);
+    assert.match(sql, /`GENE\.hugoGeneSymbol` = 'APC'/);
+    assert.match(sql, /proteinPosStart < 1400/);
+    assert.match(sql, /SELECT DISTINCT patientId AS pid/); // bare — no PID()/study-prefix stripping, unlike patient_unique_id tables
+  });
+  test("range can combine both ends", () => {
+    const sql = compileCohortDef({ all: [{ kind: "proteinPosition", gene: "APC", range: { gte: 1400, lt: 1600 } }] }, ctx);
+    assert.match(sql, /proteinPosStart >= 1400/);
+    assert.match(sql, /proteinPosStart < 1600/);
+  });
+  test("a bad gene symbol is refused", () => {
+    assert.throws(() => compileCohortDef({ all: [{ kind: "proteinPosition", gene: "not a gene!", range: { lt: 1400 } }] }, ctx),
+      /bad gene/);
+  });
+  test("an empty range is refused rather than matching everyone", () => {
+    assert.throws(() => compileCohortDef({ all: [{ kind: "proteinPosition", gene: "APC", range: {} }] }, ctx),
+      /needs range/);
+  });
+  test("composes with an oql leaf to also require a mutation type (AND, not a new taxonomy)", () => {
+    const sql = compileCohortDef({ all: [
+      { kind: "oql", q: "APC: TRUNC" },
+      { kind: "proteinPosition", gene: "APC", range: { lt: 1400 } }
+    ] }, ctx);
+    assert.match(sql, /INTERSECT DISTINCT/); // how `all` ANDs its clauses together
+  });
+  test("reads back in plain language", () => {
+    assert.equal(describeCohortDef({ all: [{ kind: "proteinPosition", gene: "APC", range: { lt: 1400 } }] }),
+      'APC protein position {"lt":1400}');
+  });
+});

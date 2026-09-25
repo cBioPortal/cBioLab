@@ -93,6 +93,26 @@ export interface GenericAssayLeaf {
   kind: "genericAssay"; profileType: string; entity: string;
   range?: ClinicalRange; values?: (string | number)[];
 }
+/**
+ * A patient carries a mutation in `gene` whose protein position falls in
+ * `range` — the stored proteinPosStart, same column the lollipop draws from,
+ * never parsed from the change string. For splitting a cohort by where along
+ * a protein a mutation falls (e.g. an N-terminal/C-terminal truncating-domain
+ * split) when a study doesn't deposit that split as its own clinical
+ * attribute. Position-only by design: AND it with an `oql` leaf
+ * (`{"kind":"oql","q":"APC: TRUNC"}`) to also restrict by mutation type,
+ * rather than this leaf growing a second, parallel type taxonomy.
+ *
+ * Not a partition: a patient with two separate qualifying mutations on
+ * either side of a cutoff matches BOTH an N-terminal and a C-terminal
+ * leaf, the same way the CNA amp/del "overlap" is a real, disclosed
+ * count rather than an error (see GeneStateFacet.overlap). Two
+ * "disjoint" cohorts built from complementary ranges can both count
+ * such a patient, so their sizes may not add up to the ungrouped total.
+ */
+export interface ProteinPositionLeaf {
+  kind: "proteinPosition"; gene: string; range: ClinicalRange;
+}
 /** deprecated alias, translated to OQL internally */
 export interface AlterationLeaf {
   kind: "alteration"; gene: string;
@@ -142,6 +162,7 @@ export interface DerivedLeaf {
 export type Leaf =
   | OqlLeaf | ClinicalLeaf | EventLeaf | SampleListLeaf | PatientListLeaf | ProfiledLeaf
   | CaseListLeaf | GenomicDataLeaf | GenericAssayLeaf | AlterationLeaf | DerivedLeaf
+  | ProteinPositionLeaf
   /** back-compat: the flat v1 event shape, accepted without a `kind` */
   | EventLeafFields;
 
