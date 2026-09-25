@@ -225,8 +225,17 @@ export interface SurvivalView {
   /** draw 1 - S(t), cumulative incidence, instead of survival (default "survival") */
   display?: "survival" | "incidence";
 }
-/** A Cox covariate is exactly a plot axis: clinical, molecular, or a gene's alteration status. */
-export type CoxCovariate = PlotAxis;
+/**
+ * A Cox covariate is exactly a plot axis: clinical, molecular, or a gene's alteration
+ * status — plus, only here, an optional declared reference level for a categorical
+ * covariate. Without it the most-frequent observed level becomes the reference (see
+ * runAnalysis's Cox branch), which silently decided which direction a hazard ratio points;
+ * a mutated/wild-type covariate came out "not-mutated vs mutated" whenever mutants were the
+ * majority, backwards from how a paper usually reports it. `reference` must name a level the
+ * data actually has — an unobserved value falls back to the frequency default rather than
+ * silently doing nothing.
+ */
+export type CoxCovariate = PlotAxis & { reference?: string };
 /**
  * Multivariate Cox proportional-hazards regression: several covariates at once, each
  * reported as a hazard ratio with a confidence interval (drawn as a forest plot), rather than

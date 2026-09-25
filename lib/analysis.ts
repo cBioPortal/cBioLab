@@ -19,7 +19,7 @@ import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaen
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
 import { viewToSvg } from "./view-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
@@ -49,6 +49,35 @@ const COOCCUR_GENE_LIMIT = 12;
 function overLimit(what: string, max: number, given: number): string | null {
   return given > max ? what + " takes at most " + max + "; this asks for " + given + " — remove " + (given - max) +
     " rather than have the rest silently ignored" : null;
+}
+
+export interface CoxColumn { axisIndex: number; label: string; reference?: string; level?: string }
+/**
+ * Dummy-codes Cox covariates into fit columns: a numeric covariate (clinical number, or a
+ * molecular value) is a single column as-is. A categorical one becomes one column per
+ * non-reference level, where the reference is the covariate's declared `reference` (see
+ * CoxCovariate) if it names an observed level, else the most-frequent one — same rule either
+ * way, just which level goes first. Pulled out of the Cox branch below so it's a pure
+ * function testable without a database.
+ */
+export function buildCoxColumns(covariates: CoxCovariate[], kindsFinal: AxisKind[], rows: { values: (number | string)[] }[]): CoxColumn[] {
+  const columns: CoxColumn[] = [];
+  covariates.forEach((cov, ci) => {
+    if (kindsFinal[ci] === "num") {
+      columns.push({ axisIndex: ci, label: axisLabel(cov) });
+    } else {
+      const counts = new Map<string, number>();
+      for (const r of rows) { const v = String(r.values[ci]); counts.set(v, (counts.get(v) || 0) + 1); }
+      const byFreq = [...counts.keys()].sort((a, b) => (counts.get(b)! - counts.get(a)!) || (a < b ? -1 : 1));
+      // A declared reference (must be an observed level, or it's ignored rather than
+      // silently matching nothing) goes first; everything else keeps its frequency order.
+      const declared = cov.reference;
+      const levels = declared && counts.has(declared) ? [declared, ...byFreq.filter((l) => l !== declared)] : byFreq;
+      const reference = levels[0];
+      for (const level of levels.slice(1)) columns.push({ axisIndex: ci, label: axisLabel(cov) + ": " + level, reference, level });
+    }
+  });
+  return columns;
 }
 
 const _profileCache = new Map<string, { profiles: string[]; gaProfiles: string[] }>(); // per-study
@@ -467,21 +496,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         ? rawRows.map((r) => r.t > cutoffMonths! ? { ...r, t: cutoffMonths!, event: 0 } : r)
         : rawRows;
 
-      // Dummy-code categorical covariates (reference = the most common level); a numeric
-      // covariate (clinical number, or a molecular value) is a single column as-is.
-      interface Column { axisIndex: number; label: string; reference?: string; level?: string }
-      const columns: Column[] = [];
-      covariates.forEach((cov, ci) => {
-        if (kindsFinal[ci] === "num") {
-          columns.push({ axisIndex: ci, label: axisLabel(cov) });
-        } else {
-          const counts = new Map<string, number>();
-          for (const r of rowsCut) { const v = String(r.values[ci]); counts.set(v, (counts.get(v) || 0) + 1); }
-          const levels = [...counts.keys()].sort((a, b) => (counts.get(b)! - counts.get(a)!) || (a < b ? -1 : 1));
-          const reference = levels[0];
-          for (const level of levels.slice(1)) columns.push({ axisIndex: ci, label: axisLabel(cov) + ": " + level, reference, level });
-        }
-      });
+      const columns = buildCoxColumns(covariates, kindsFinal, rowsCut);
       if (!columns.length) {
         views.push({ kind: "cox", endpoint, cohorts: vNames,
           error: "every covariate had only one observed level across these patients — there is nothing to estimate a hazard ratio against" });
