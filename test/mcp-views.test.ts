@@ -43,6 +43,20 @@ describe("MCP run_analysis describes every view the engine can produce", () => {
       "mcp/tools.ts run_analysis: " + missing.join(", "));
   });
 
+  test("the tool description and describe_dsl's views table name every kind", () => {
+    // A client reads the tool description before anything else; a kind missing from it
+    // is one the model will not think to ask for.
+    const desc = /"run_analysis",\s*"([^"]+)"/.exec(tools);
+    assert.ok(desc, "could not find the run_analysis description in mcp/tools.ts");
+    const ref = reference.replace(/\\`/g, "`");
+    const table = ref.slice(ref.indexOf("\n## Views"), ref.indexOf("\n### Plot axes"));
+    assert.ok(table.length > 100, "could not find the views table in lib/dsl-reference.ts");
+    for (const k of engineViewKinds()) {
+      assert.match(desc![1], new RegExp("\\b" + k + "\\b"), "run_analysis's description never mentions the " + k + " view");
+      assert.match(table, new RegExp("\\n\\| `" + k + "` \\|"), "describe_dsl's views table has no " + k + " row");
+    }
+  });
+
   test("and an unknown kind still says so rather than vanishing", () => {
     // Belt and braces: even if someone adds a view and forgets the branch, the
     // response must admit it rather than quietly drop the figure.
