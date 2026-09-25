@@ -2180,10 +2180,10 @@ function Latency({ v }: { v: any }) {
       if (def) chosen.push([name, def]);
     }
     if (!chosen.length) return;
-    // refused rather than cut to the first six: the reader ticked these, so analysing some of
-    // them without saying which would answer a different question than the one asked
-    if (chosen.length > 6) {
-      setError("an analysis takes at most 6 cohorts; " + chosen.length + " are ticked — untick " + (chosen.length - 6) + " and analyse again");
+    // refused rather than cut to the first sixteen: the reader ticked these, so analysing some
+    // of them without saying which would answer a different question than the one asked
+    if (chosen.length > 16) {
+      setError("an analysis takes at most 16 cohorts; " + chosen.length + " are ticked — untick " + (chosen.length - 16) + " and analyse again");
       return;
     }
     const nd: AnalysisDoc = { study, cohorts: Object.fromEntries(chosen), views: DEFAULT_VIEWS };
@@ -3344,7 +3344,7 @@ function Latency({ v }: { v: any }) {
               <span className="spacer" />
               <span className="meta">
                 {picked.length === 0 ? "none selected"
-                  : picked.length + " selected" + (picked.length > 6 ? " — only the first 6 are analysed" : "")}
+                  : picked.length + " selected" + (picked.length > 16 ? " — untick some first, an analysis takes at most 16" : "")}
               </span>
               <button className="primary" disabled={!picked.length} onClick={analyzePicked}
                 title={picked.length ? "analyse the ticked cohorts together (replaces the current document)" : "tick at least one cohort"}>

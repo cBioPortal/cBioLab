@@ -143,7 +143,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
   const names = Object.keys(doc.cohorts || {});
   if (!names.length) throw new Error("document has no cohorts");
-  { const e = overLimit("an analysis document", 6, names.length); if (e) throw new Error(e.replace("at most 6", "at most 6 cohorts")); }
+  // 16, not 6: a real multi-arm workup (e.g. splitting one population by a categorical
+  // attribute with several levels, crossed with a base filter) routinely needs a dozen-plus
+  // named cohorts, and 6 forced one such analysis into four separate documents. Views stay
+  // at 6 — each one issues its own set of queries per cohort, so raising cohorts already
+  // multiplies real query cost without also multiplying the view count.
+  { const e = overLimit("an analysis document", 16, names.length); if (e) throw new Error(e.replace("at most 16", "at most 16 cohorts")); }
   { const e = overLimit("an analysis document", 6, (doc.views || []).length); if (e) throw new Error(e.replace("at most 6", "at most 6 views")); }
 
   // ---- evaluate cohorts: per study, sum the counts ------------------------

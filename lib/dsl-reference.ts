@@ -529,7 +529,7 @@ SQL each cohort compiled to.
 
 \`\`\`
 { "study":   "<default study id>",            // validated against cancer_study
-  "cohorts": { "<name>": cohortDef, ... },    // max 6
+  "cohorts": { "<name>": cohortDef, ... },    // max 16
   "views":   [ view, ... ] }                  // max 6
 \`\`\`
 
@@ -861,7 +861,7 @@ export const CHAT_GRAMMAR = `Document shape:
   "params"?: { "<name>": <any JSON> },   // optional; a value that is EXACTLY "$name" is replaced by it
   "notes"?: "<the analyst's own prose about this workspace>",
   "title"?: "<name, when saved as a workspace>",
-  "cohorts": { "<name>": <cohortDef>, ... (max 6) },
+  "cohorts": { "<name>": <cohortDef>, ... (max 16) },
   "views": [ {"kind":"compare","genes":[...(max 20)],"cohorts":[names?]},
              {"kind":"survival","endpoint":"OS|PFS|DFS|…","anchor":{"eventType":"Treatment","key":"SUBTYPE","value":"Chemo","occurrence":"FIRST"},"cohorts":[names?]},
              {"kind":"cox","endpoint":"OS|PFS|DFS|...","covariates":[axis, ...(max 8)],"stratifyByStudy":true?,"cutoffMonths":number?,"cohorts":[names?]},

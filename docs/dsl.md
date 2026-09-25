@@ -12,7 +12,7 @@ SQL each cohort compiled to.
 
 ```
 { "study":   "<default study id>",            // validated against cancer_study
-  "cohorts": { "<name>": cohortDef, ... },    // max 6
+  "cohorts": { "<name>": cohortDef, ... },    // max 16
   "views":   [ view, ... ] }                  // max 6
 ```
 
