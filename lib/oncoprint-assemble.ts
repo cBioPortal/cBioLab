@@ -433,20 +433,33 @@ export function assembleContract(input: AssembleInput): Contract {
   phase("sort");
   // ---- track meta (panel-aware frequencies) -----------------------------
   const tracks: Track[] = [];
+  // an overlay is evidence about the gene, not an alteration of it: expression does not
+  // enter the altered fraction, which is what the portal reports too
+  const ALT = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
+  // Shared by the pooled numbers below and the per-group breakdown: same formula, just
+  // over a slice of columns instead of all of them.
+  const geneCounts = (slice: number[]) => {
+    const profiled = slice.filter((c) => c !== NOT_PROFILED).length;
+    const altered = slice.filter((c) => c > 0 && (c & ALT)).length;
+    const driverAltered = slice.filter((c) => c > 0 && (c & ALT) && (c & BITS.DRIVER)).length;
+    return { profiled, altered, driverAltered,
+      freqPct: profiled ? Math.round(1000 * altered / profiled) / 10 : null,
+      driverPct: profiled ? Math.round(1000 * driverAltered / profiled) / 10 : null };
+  };
   for (const gt of geneTracks) {
     const cells = remap(geneCells.get(gt.label)!);
-    const profiled = cells.filter((c) => c !== NOT_PROFILED).length;
-    // an overlay is evidence about the gene, not an alteration of it: expression does not
-    // enter the altered fraction, which is what the portal reports too
-    const ALT = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
-    const altered = cells.filter((c) => c > 0 && (c & ALT)).length;
-    const driverAltered = cells.filter((c) => c > 0 && (c & ALT) && (c & BITS.DRIVER)).length;
+    const { profiled, altered, driverAltered, freqPct, driverPct } = geneCounts(cells);
     tracks.push({
       kind: "gene", label: gt.label, cells,
       ...(gt.members.length > 1 ? { members: gt.members } : {}),
-      altered, profiled, driverAltered,
-      freqPct: profiled ? Math.round(1000 * altered / profiled) / 10 : null,
-      driverPct: profiled ? Math.round(1000 * driverAltered / profiled) / 10 : null
+      altered, profiled, driverAltered, freqPct, driverPct,
+      // Pooled is enough on its own with one group; with several, the figure already
+      // draws a boundary between them, so the text/provenance side gets the same split
+      // rather than only ever reporting the number pooled across all of them.
+      ...(groupRanges.length > 1 ? { byGroup: groupRanges.map((g) => {
+        const { profiled, altered, freqPct, driverPct } = geneCounts(cells.slice(g.start, g.start + g.count));
+        return { group: g.name, altered, profiled, freqPct, driverPct };
+      }) } : {})
     });
   }
   for (const t of devTracks) {

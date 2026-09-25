@@ -698,6 +698,14 @@ export interface Track {
   /** a merged gene row: the symbols it pools, in order. Absent on a single-gene row. */
   members?: string[];
   freqPct?: number | null; driverPct?: number | null;
+  /**
+   * The same altered/profiled/freqPct/driverPct, but sliced to one column group
+   * (see Contract.groups) instead of pooled across all of them — the text/provenance
+   * side of what the figure already draws with a group boundary. Present only on gene
+   * tracks when the oncoprint has more than one group; absent (not zero-length) for a
+   * single-group oncoprint, where a per-group breakdown would just repeat the pooled row.
+   */
+  byGroup?: { group: string; altered: number; profiled: number; freqPct: number | null; driverPct: number | null }[];
   /** categorical clinical tracks */
   categories?: string[];
   /** numeric clinical + heatmap tracks (cells scaled 0..255; -1 = no data) */
