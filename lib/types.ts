@@ -145,7 +145,7 @@ export type Leaf =
   /** back-compat: the flat v1 event shape, accepted without a `kind` */
   | EventLeafFields;
 
-export type Clause = Leaf | { any: Leaf[] } | { not: Leaf };
+export type Clause = Leaf | { any: Leaf[] } | { not: Leaf | { any: Leaf[] } };
 
 /** Narrow a clause to a clinical leaf (clauses may also be any/not groups). */
 export function isClinicalLeaf(c: Clause | null | undefined): c is ClinicalLeaf {

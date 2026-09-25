@@ -28,7 +28,7 @@ cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient 
                "lineGap"?: 90,                // derived-treatment-line gap, days
                "notes"?:   "<prose>" }        // the analyst's own note on this cohort; never compiled
 clause    := leaf | { "any": [leaf × 1-8] }   // OR (UNION DISTINCT)
-                  | { "not": leaf }           // study base EXCEPT leaf
+                  | { "not": leaf | { "any": [leaf × 1-8] } }  // study base EXCEPT leaf, or EXCEPT the OR of several (De Morgan's, in one clause instead of one "not" per leaf)
 ```
 
 **Cross-study semantics.** A cohort with `studies` is compiled per study (compilers are
@@ -64,7 +64,7 @@ describes for every other identifier-bearing path.
 
 ### OQL subset
 
-`q` is 1–10 entries separated by `;`, each `GENE` (any alteration) or `GENE: spec spec ...`.
+`q` is 1–30 entries separated by `;`, each `GENE` (any alteration) or `GENE: spec spec ...`.
 A patient matches if **any** entry matches (portal "altered in query" semantics).
 
 - Mutations: `MUT`, `MUT=<protein change>` (e.g. `MUT=G12C`), classes `MISSENSE NONSENSE TRUNC INFRAME SPLICE`; bare `G12C` is protein-change shorthand.

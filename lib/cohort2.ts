@@ -394,7 +394,10 @@ function clauseSql(clause: any, ctx: Ctx): string {
     return clause.any.map((l: any) => "(" + leafSql(l, ctx) + ")").join("\nUNION DISTINCT\n");
   }
   if (clause.not) {
-    return "(" + basePatientsSql(ctx.study, dbOf(ctx)) + ")\nEXCEPT DISTINCT\n(" + leafSql(clause.not, ctx) + ")";
+    // clauseSql, not leafSql: {not: {any: [...]}} needs the same any/leaf dispatch a bare
+    // clause gets, not just a single leaf — De Morgan's otherwise forces two separate `not`s
+    // to express "none of these" (e.g. "DDR intact" needed !A and !B and !C by hand).
+    return "(" + basePatientsSql(ctx.study, dbOf(ctx)) + ")\nEXCEPT DISTINCT\n(" + clauseSql(clause.not, ctx) + ")";
   }
   return leafSql(clause, ctx);
 }
@@ -489,7 +492,9 @@ export function describeCohortDef(def: CohortDef | null | undefined): string {
   if (Array.isArray(d.all) && d.all.length === 0) return "all patients in the study";
   return (d.all || []).map((c: any) => {
     if (c.any) return "(" + c.any.map(leafText).join(" OR ") + ")";
-    if (c.not) return "NOT " + leafText(c.not);
+    if (c.not) return c.not.any
+      ? "NOT (" + c.not.any.map(leafText).join(" OR ") + ")"
+      : "NOT " + leafText(c.not);
     return leafText(c);
   }).join(" AND ");
 }

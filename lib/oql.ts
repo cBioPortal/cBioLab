@@ -35,9 +35,13 @@ const REJECT: Record<string, string> = {
 // -> [{gene, specs: [{type:'MUT'|'CNA'|'SV'|'ANY', pchange?, cls?, cna?, driver}]}]
 export function parseOql(q: string): OqlEntry[] {
   if (typeof q !== "string" || !q.trim()) throw new Error("empty OQL");
-  if (q.length > 500) throw new Error("OQL too long");
+  if (q.length > 1000) throw new Error("OQL too long");
   const entries = q.split(/[;\n]/).map(s => s.trim()).filter(Boolean);
-  if (!entries.length || entries.length > 10) throw new Error("OQL: 1-10 gene entries");
+  // Each entry compiles to its own UNION-DISTINCT'd subquery (see below), so cost scales
+  // roughly linearly rather than sitting at a wall near any particular number — 30 covers a
+  // full pathway gene set (e.g. a 20-30 gene DDR panel) with room to spare, not a measured
+  // ceiling.
+  if (!entries.length || entries.length > 30) throw new Error("OQL: 1-30 gene entries");
   return entries.map(entry => {
     const m = entry.match(/^([A-Za-z0-9.-]+)\s*(?::\s*(.*))?$/);
     if (!m || !GENE_RE.test(m[1])) throw new Error("OQL: bad gene entry '" + entry.slice(0, 40) + "'");
