@@ -3678,12 +3678,14 @@ function Latency({ v }: { v: any }) {
                         <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>gene</th>
                         {v.cohorts!.map((n, i: number) => <th key={n} style={{ textAlign: "right", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}<br /><span style={{ fontWeight: 400, color: "var(--muted)" }}>driver / any</span></th>)}
                         {v.rows![0] && v.rows![0].pAny != null && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p (any)</th>}
+                        {v.rows![0] && v.rows![0].qAny != null && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q (any)</th>}
                       </tr></thead>
                       <tbody>{v.rows.map(r => (
                         <tr key={r.gene} style={{ borderTop: "1px solid var(--line)" }}>
                           <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600 }}>{r.gene}</td>
                           {r.cells.map(c => <td key={c.cohort} style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{c.driverPct}% / {c.anyPct}%</td>)}
                           {r.pAny != null && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: r.pAny < 0.001 ? 600 : 400 }}>{r.pAny < 1e-4 ? r.pAny.toExponential(1) : r.pAny.toFixed(3)}</td>}
+                          {r.qAny != null && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: r.qAny < 0.05 ? 600 : 400 }}>{r.qAny < 1e-4 ? r.qAny.toExponential(1) : r.qAny.toFixed(3)}</td>}
                         </tr>))}
                       </tbody>
                     </table>

@@ -252,17 +252,43 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           const [x, y] = cells;
           row.pAny = fisherExact(x.any, x.profiled - x.any, y.any, y.profiled - y.any);
           row.pDriver = fisherExact(x.driver, x.profiled - x.driver, y.driver, y.profiled - y.driver);
+        } else if (vNames.length > 2) {
+          // Fisher exact is 2x2-only; an N>2-cohort comparison is a 2xN contingency
+          // table (altered vs not, one column per cohort), so it gets a chi-squared
+          // instead. minExpected — the classic "each cell should expect >=5" rule of
+          // thumb — is disclosed via the note below rather than silently trusted.
+          row.pAny = chiSquareTest(cells.map((c) => [c.any, c.profiled - c.any])).p;
+          row.pDriver = chiSquareTest(cells.map((c) => [c.driver, c.profiled - c.driver])).p;
         }
         return row;
       });
-      if (vNames.length === 2) rows.sort((a, b) => (a.pAny ?? 1) - (b.pAny ?? 1));
+      if (vNames.length >= 2) {
+        rows.sort((a, b) => (a.pAny ?? 1) - (b.pAny ?? 1));
+        // Two separate hypothesis families (any-alteration, driver-only) each get their
+        // own Benjamini–Hochberg pass across the genes tested here — mixing the two
+        // into one correction would understate significance for whichever family has
+        // fewer real signals.
+        const testedAny = rows.filter((r) => r.pAny != null);
+        benjaminiHochberg(testedAny.map((r) => r.pAny!)).forEach((q, i) => { testedAny[i].qAny = q; });
+        const testedDriver = rows.filter((r) => r.pDriver != null);
+        benjaminiHochberg(testedDriver.map((r) => r.pDriver!)).forEach((q, i) => { testedDriver[i].qDriver = q; });
+      }
+      const noteParts: string[] = [];
+      if (vNames.length > 2) {
+        noteParts.push(vNames.length + " cohorts compared per gene with a Pearson chi-squared (2×" + vNames.length +
+          " table: altered vs not, one column per cohort) — a two-cohort compare uses an exact Fisher test instead." +
+          " q-values are Benjamini–Hochberg across the " + genes.length + " genes tested here, separately for any-alteration and driver-only");
+      }
+      if (vStudies.length > 1) {
+        noteParts.push("cross-study comparison" + (vStudies.length <= 2 ? " (" + vStudies.join(", ") + ")" : " across " + vStudies.length + " studies") +
+          ": denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated" +
+          "; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic" +
+          (aggOnly.length ? "; " + aggOnly.join(", ") + " contributed aggregate counts only (no patient-level access)" : ""));
+      }
       views.push({ kind: "compare", cohorts: vNames, annotation: annSource, rows,
         participation: participationFor(vStudies, false),
-        ...(vStudies.length > 1 ? { studies: vStudies,
-          note: "cross-study comparison" + (vStudies.length <= 2 ? " (" + vStudies.join(", ") + ")" : " across " + vStudies.length + " studies") +
-            ": denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated" +
-            "; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic" +
-            (aggOnly.length ? "; " + aggOnly.join(", ") + " contributed aggregate counts only (no patient-level access)" : "") } : {}) });
+        ...(vStudies.length > 1 ? { studies: vStudies } : {}),
+        ...(noteParts.length ? { note: noteParts.join(". ") } : {}) });
 
     } else if (view.kind === "survival") {
       // Each participant returns (months, event, n) triples for its own patients:

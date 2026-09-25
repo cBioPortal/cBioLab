@@ -465,6 +465,9 @@ export interface CompareCell {
 }
 export interface CompareRow {
   gene: string; cells: CompareCell[]; pAny?: number; pDriver?: number;
+  /** Benjamini–Hochberg across the genes tested in this view, computed separately for
+   *  each of pAny/pDriver — only present once 2+ cohorts produce a p-value to correct. */
+  qAny?: number; qDriver?: number;
 }
 export interface KmPoint { t: number; s: number }
 export interface KmCurve {
