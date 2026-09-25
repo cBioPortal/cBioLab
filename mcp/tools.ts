@@ -190,7 +190,7 @@ export function registerTools(server: any): void {
 
   server.tool(
     "run_analysis",
-    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), survival (Kaplan-Meier), and oncoprint (returned as a PNG). Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
+    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes) and oncoprint. Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
     {
       document: z.object({}).passthrough()
         .describe("The Analysis document: {study, cohorts: {name: def, ...}, views: [...]}. Grammar and examples: describe_dsl.")
