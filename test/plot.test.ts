@@ -35,11 +35,36 @@ test("an axis that would read a whole profile is refused by name", () => {
   // 630 million values live in one profile of this warehouse; a plot of "all genes" is not a plot
   assert.throws(() => validateAxis({ source: "molecular", profileType: "log2CNA" } as never, "x"),
     /needs one gene.*name the gene you mean/s);
-  assert.throws(() => validateAxis({ source: "alteration" } as never, "y"), /needs one gene/);
+  assert.throws(() => validateAxis({ source: "alteration" } as never, "y"), /needs a gene, or a gene set/);
   assert.throws(() => validateAxis({ source: "clinical", attribute: "not a name!" }, "x"), /not a clinical attribute name/);
   assert.throws(() => validateAxis({ source: "alteration", gene: "TP53", by: "driver" } as never, "x"), /not supported yet/);
   validateAxis(num, "x");   // the ordinary cases do not throw
   validateAxis(mol, "y");
+});
+
+test("a gene-set alteration axis: any-of-N genes as one category, mutated only", () => {
+  const geneSet = { source: "alteration" as const, genes: ["TP53", "KRAS", "APC"] };
+  validateAxis(geneSet, "x");   // by defaults to "mutated" — does not throw
+  validateAxis({ ...geneSet, by: "mutated" as const }, "x");
+  assert.throws(() => validateAxis({ ...geneSet, by: "cna" } as never, "x"),
+    /gene SET only supports by:"mutated"/);
+  assert.throws(() => validateAxis({ ...geneSet, by: "mutationType" } as never, "x"),
+    /gene SET only supports by:"mutated"/);
+  assert.throws(() => validateAxis({ source: "alteration", genes: Array.from({ length: 21 }, (_, i) => "G" + i) } as never, "x"),
+    /at most 20 genes; this asks for 21/);
+  assert.throws(() => validateAxis({ source: "alteration", genes: ["TP53", "not a gene!"] } as never, "x"),
+    /is not a valid gene symbol/);
+});
+
+test("a gene-set axis names itself by its genes, or by count once there are too many to list", () => {
+  assert.equal(axisLabel({ source: "alteration", genes: ["TP53", "KRAS"] }), "TP53/KRAS (any) mutation status");
+  assert.equal(axisLabel({ source: "alteration", genes: ["A", "B", "C", "D", "E", "F"] }), "6 genes (any) mutation status");
+});
+
+test("a gene-set axis compiles to hugo_gene_symbol IN (...), not a single =", () => {
+  const sql = axisSelect({ source: "alteration", genes: ["TP53", "KRAS"] }, ctx, "cat");
+  assert.match(sql, /hugo_gene_symbol IN \('TP53','KRAS'\)/);
+  assert.doesNotMatch(sql, /hugo_gene_symbol = /);
 });
 
 test("an axis names itself the way the figure labels it", () => {

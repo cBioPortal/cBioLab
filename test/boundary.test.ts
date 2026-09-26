@@ -201,6 +201,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   const numAxis2 = axisSelect({ source: "molecular", profileType: "rna_seq_mrna", gene: "TP53" }, axisCtx, "num");
   const catAxis = axisSelect({ source: "clinical", attribute: "CANCER_TYPE" }, axisCtx, "cat");
   const catAxis2 = axisSelect({ source: "alteration", gene: "TP53", by: "mutationType" }, axisCtx, "cat");
+  const catAxisGeneSet = axisSelect({ source: "alteration", genes: ["TP53", "KRAS", "APC"], by: "mutated" }, axisCtx, "cat");
 
   const BUILDERS: Record<string, () => string> = {
     // Plots: an axis selects (id, value) per case, but every builder here groups the id away.
@@ -213,6 +214,9 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   "plotMomentsSql": () => plotMomentsSql(numAxis, numAxis2, cohortSql),
   "plotBoxSql": () => plotBoxSql(numAxis, catAxis, cohortSql),
   "plotTableSql": () => plotTableSql(catAxis, catAxis2, cohortSql),
+  // A gene-SET alteration axis (item 2b) is still just a WHERE ... IN (...) — never a
+  // per-gene identifier — so it must pass the same aggregate-only check as a single gene.
+  "plotTableSql:gene-set": () => plotTableSql(catAxis, catAxisGeneSet, cohortSql),
   "plotViolinSql": () => plotViolinSql(numAxis, catAxis, cohortSql),
   "plotCoverageSql": () => plotCoverageSql(numAxis, catAxis, axisCtx),
   "plotCoverageSql:patient": () => plotCoverageSql(numAxis, catAxis, { ...axisCtx, unit: "patient" as const }),

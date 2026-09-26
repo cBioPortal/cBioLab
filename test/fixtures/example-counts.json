@@ -102,6 +102,9 @@
     "Median/IQR and a rank-sum test, single-study only": {
       "liver mets": 227,
       "no liver mets": 98
+    },
+    "Cox with a gene-SET covariate: any of three genes, one term": {
+      "all patients": 471
     }
   }
 }

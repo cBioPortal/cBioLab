@@ -20,9 +20,22 @@ import { STYLE } from "./oncoprint-style.ts";
 export type PlotAxis =
   | { source: "clinical"; attribute: string; log?: boolean }
   | { source: "molecular"; profileType: string; gene: string; log?: boolean }
+  /**
+   * `genes` (2+) asks "is ANY of these altered" as one categorical — a pathway rollup (e.g. a
+   * DDR gene set) instead of one gene at a time — and only for `by:"mutated"`: combining several
+   * genes' mutation TYPES or copy-number states into one label has no single honest reading, so
+   * that combination is refused rather than guessed at. `gene` (singular) is unchanged.
+   */
   | { source: "alteration"; gene: string; by?: AlterationBy }
+  | { source: "alteration"; genes: string[]; by?: "mutated" }
   | { source: "none" };
 export type AlterationBy = "mutated" | "mutationType" | "cna";
+/** every gene named on an alteration axis, singular or set, uppercased */
+function alterationGenes(a: { gene?: string; genes?: string[] }): string[] {
+  return (a.genes && a.genes.length ? a.genes : a.gene != null ? [a.gene] : []).map((g) => String(g).toUpperCase());
+}
+/** a gene-set alteration axis takes at most this many genes */
+export const ALTERATION_GENE_SET_CAP = 20;
 export type AxisKind = "num" | "cat" | "none";
 export type PlotShape = "scatter" | "box" | "table" | "waterfall";
 
@@ -82,7 +95,11 @@ export function plotShape(x: AxisKind, y: AxisKind): PlotShape {
 export function axisLabel(a: PlotAxis): string {
   if (a.source === "clinical") return a.attribute;
   if (a.source === "molecular") return a.gene + " " + a.profileType;
-  if (a.source === "alteration") return a.gene + (a.by === "cna" ? " copy number" : a.by === "mutationType" ? " mutation type" : " mutation status");
+  if (a.source === "alteration") {
+    const genes = alterationGenes(a);
+    const name = genes.length > 1 ? (genes.length <= 4 ? genes.join("/") + " (any)" : genes.length + " genes (any)") : genes[0];
+    return name + (a.by === "cna" ? " copy number" : a.by === "mutationType" ? " mutation type" : " mutation status");
+  }
   return "ordered cases";
 }
 
@@ -111,10 +128,17 @@ export function validateAxis(a: PlotAxis, which: string): void {
     if (!GENE_RE.test(String(a.gene || "").toUpperCase()))
       throw new Error(which + " axis: a molecular axis needs one gene. Plotting a whole profile would read every gene of every case; name the gene you mean.");
   }
-  if (a.source === "alteration" && !GENE_RE.test(String(a.gene || "").toUpperCase()))
-    throw new Error(which + " axis: an alteration axis needs one gene");
-  if (a.source === "alteration" && (a.by as string) === "driver")
-    throw new Error("driver-vs-VUS colouring is not supported yet: it needs the version-pinned annotation store joined per event");
+  if (a.source === "alteration") {
+    const genes = alterationGenes(a);
+    if (!genes.length) throw new Error(which + " axis: an alteration axis needs a gene, or a gene set");
+    for (const g of genes) if (!GENE_RE.test(g)) throw new Error(which + " axis: '" + g + "' is not a valid gene symbol");
+    if (genes.length > ALTERATION_GENE_SET_CAP)
+      throw new Error(which + " axis: a gene-set alteration axis takes at most " + ALTERATION_GENE_SET_CAP + " genes; this asks for " + genes.length);
+    if ("genes" in a && genes.length > 1 && a.by && a.by !== "mutated")
+      throw new Error(which + " axis: a gene SET only supports by:\"mutated\" (any gene altered) — combining several genes' mutation types or copy-number states into one category has no single honest reading");
+    if ((a.by as string) === "driver")
+      throw new Error("driver-vs-VUS colouring is not supported yet: it needs the version-pinned annotation store joined per event");
+  }
 }
 
 // ---- one axis as a subquery of (id, value) --------------------------------
@@ -169,12 +193,12 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
   }
 
   if (a.source === "alteration") {
-    const gene = String(a.gene).toUpperCase(), by = a.by || "mutated";
+    const genes = alterationGenes(a), by = a.by || "mutated";
     const idCol = strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study);
     // every case in the cohort appears, because "no alteration" is an answer and not a missing value
     const events = "SELECT sample_unique_id, mutation_type, variant_type, cna_alteration\n" +
       "     FROM " + db + ".genomic_event_derived\n" +
-      "     WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol = " + sq(gene);
+      "     WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")";
     const value = by === "cna"
       ? "if(countIf(g.cna_alteration >= 2) > 0, 'Amplification', if(countIf(g.cna_alteration <= -2) > 0, 'Deep deletion', 'Neutral'))"
       : by === "mutationType"
