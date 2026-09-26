@@ -605,6 +605,17 @@ export interface LogRank {
   /** how many strata contributed events — >1 means the test is site-stratified */
   strata: number;
 }
+/**
+ * The k-group generalization (k>2): a (k-1)-df chi-squared from the full covariance matrix,
+ * not the single scalar variance the 2-group LogRank carries. df reflects however many groups
+ * actually had data — an entirely empty group doesn't inflate it.
+ */
+export interface LogRankK {
+  chi2: number; p: number; df: number;
+  observed: number[]; expected: number[];
+  groups: number;
+  strata: number;
+}
 export interface ViewResult {
   kind: string; error?: string; note?: string; studies?: string[];
   /** the analyst's own annotation, carried through from the view spec */
@@ -633,6 +644,8 @@ export interface ViewResult {
   tickMonths?: number;                      // survival: requested x-axis tick spacing, echoed for the renderers
   display?: "survival" | "incidence";       // survival: which curve was drawn
   logrank?: LogRank; logrankPooled?: LogRank;
+  /** survival, 3+ cohorts: the k-group generalization (tests whether the groups differ AT ALL) */
+  logrankK?: LogRankK; logrankKPooled?: LogRankK;
   pairs?: CooccurRow[];                     // cooccurrence
   clinical?: ClinicalRow[];                 // clinical comparison
   coexpression?: CoexprRow[];

@@ -13,13 +13,13 @@ import { genomicEventsSql, coverageSql, buildContract, PIDS_SQL } from "./oncopr
 import { geneSymbols } from "./gene-tracks.ts";
 import type { PlotView } from "./types.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
-import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
+import { fisherExact, kaplanMeier, logRank, logRankK, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, regressionFromMoments, fisherZMeta,
   applyCutoff, toIncidence, coxRegression, mannWhitneyU, quantilesFromHistogram, type Moments, type CoxRow } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
 import { viewToSvg } from "./view-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, LogRankK, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
@@ -392,9 +392,13 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         return { cohort: n, ...kaplanMeier(data), missing: cohorts[n].count - data.length };
       });
       const curves = display === "incidence" ? curvesRaw.map((c) => toIncidence(c)) : curvesRaw;
-      // Two cohorts is the case the log-rank test is defined for, matching the
-      // compare view's Fisher p.
+      // Two cohorts is the case the 2-arm log-rank test is defined for, matching the compare
+      // view's Fisher p; 3+ uses the k-group generalization (a (k-1)-df chi-squared from the
+      // full covariance matrix) instead of running the 2-arm test pairwise, which would need
+      // its own multiple-testing correction and answers a different question ("which PAIRS
+      // differ") than "do these groups differ at all".
       let logrank: LogRank | undefined, logrankPooled: LogRank | undefined;
+      let logrankK: LogRankK | undefined, logrankKPooled: LogRankK | undefined;
       let sites: string[] = [];
       if (vNames.length === 2) {
         const [A, B] = vNames;
@@ -405,6 +409,15 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           logrankPooled = pooledTest;   // shown for contrast: the two can disagree
         } else {
           logrank = pooledTest;
+        }
+      } else if (vNames.length >= 3) {
+        sites = [...new Set(vNames.flatMap((n) => [...perSite.get(n)!.keys()]))];
+        const pooledTest = logRankK([{ groups: vNames.map((n) => pointsFor(n)) }]);
+        if (sites.length > 1) {
+          logrankK = logRankK(sites.map((st) => ({ groups: vNames.map((n) => pointsFor(n, st)) })));
+          logrankKPooled = pooledTest;
+        } else {
+          logrankK = pooledTest;
         }
       }
       // How long after the anchor patients actually became observable. A long
@@ -433,6 +446,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         ...(display === "incidence" ? { display } : {}),
         participation: participationFor(vStudies, false),
         ...(logrank ? { logrank } : {}), ...(logrankPooled ? { logrankPooled } : {}),
+        ...(logrankK ? { logrankK } : {}), ...(logrankKPooled ? { logrankKPooled } : {}),
         caveat: (display === "incidence"
           ? "Cumulative incidence (1 - survival) shown, not survival. "
           : "") +
@@ -464,7 +478,15 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               " Every site contributes only (months, event, n) counts; no patient-level survival time crosses an instance boundary."
             : logrank
               ? " Log-rank on a single study, so no stratification applies."
-              : " Log-rank needs exactly two cohorts.") });
+            : logrankKPooled
+              ? " The k-group log-rank test (" + logrankK!.groups + " groups, " + logrankK!.df + " df) is STRATIFIED by study (" +
+                logrankK!.strata + " strata contributed events): each study is compared only against itself. The pooled p is" +
+                " shown alongside — where the two disagree, the stratified one is the honest answer. This tests whether the" +
+                " groups differ AT ALL, not which pair does; every site contributes only (months, event, n) counts."
+              : logrankK
+                ? " " + logrankK.groups + "-group log-rank (" + logrankK.df + " df) on a single study — tests whether the" +
+                  " groups differ at all, not which pair does. No stratification applies."
+                : " Log-rank needs at least two cohorts.") });
 
     } else if (view.kind === "cox") {
       // Multivariate Cox: unlike survival/compare, this is fit from real per-patient rows

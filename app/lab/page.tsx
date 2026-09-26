@@ -3959,6 +3959,19 @@ function Latency({ v }: { v: any }) {
                       )}
                     </div>
                   )}
+                  {v.logrankK && (
+                    <div className="logrank" title={"observed " + v.logrankK.observed.join(" / ") + " events vs expected " + v.logrankK.expected.join(" / ") + " under the null, across " + v.logrankK.groups + " groups"}>
+                      <strong>{v.logrankK.groups}-group log-rank</strong> χ²={v.logrankK.chi2.toFixed(2)} ({v.logrankK.df} df) · <strong>{fmtP(v.logrankK.p)}</strong>
+                      <span className="meta"> — tests whether the groups differ at all, not which pair does</span>
+                      {v.logrankK.strata > 1 && <span className="meta"> · stratified by study, {v.logrankK.strata} strata</span>}
+                      {v.logrankKPooled && (
+                        <span className="meta" title="the unstratified test, which pools risk sets across studies and assumes a common baseline hazard">
+                          {"  ·  pooled " + fmtP(v.logrankKPooled.p)}
+                          {crossesThreshold(v.logrankK.p, v.logrankKPooled.p) && <strong style={{ color: "var(--warn, #b45309)" }}> — the two disagree at p=0.05</strong>}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <p className="note">{v.caveat}</p>
                 </>}
                 {v.kind === "cox" && <>

@@ -105,6 +105,11 @@
     },
     "Cox with a gene-SET covariate: any of three genes, one term": {
       "all patients": 471
+    },
+    "Survival split three ways: the k-group log-rank": {
+      "stable": 428,
+      "instable": 27,
+      "indeterminate": 15
     }
   }
 }

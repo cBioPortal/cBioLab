@@ -1,5 +1,5 @@
 // Small, dependency-free stats for comparison views.
-import type { KmCurve, KmPoint, LogRank, Cmh } from "./types.ts";
+import type { KmCurve, KmPoint, LogRank, LogRankK, Cmh } from "./types.ts";
 
 // log(n!) via Lanczos-free cumulative sum with memo
 const LF: number[] = [0, 0];
@@ -351,6 +351,94 @@ export function logRank(strata: { a: SurvPoint[]; b: SurvPoint[] }[]): LogRank {
     expected: [Math.round(E1 * 10) / 10, Math.round((O1 + O2 - E1) * 10) / 10],
     variance: Math.round(V * 1e4) / 1e4,
     strata: used
+  };
+}
+
+/**
+ * One stratum's contribution for k groups at once: observed/expected events per group, and the
+ * k×k covariance matrix of the deviations — the direct generalization of stratumTerms's single
+ * (o1, e1, v) triple. At i=l this reduces to exactly stratumTerms's scalar variance formula
+ * (verified algebraically and by test below); off-diagonal terms are the covariance between two
+ * groups' deviations, needed because they are not independent (one more event in group A is one
+ * fewer possible in the others at that same risk set).
+ */
+function stratumTermsK(groups: SurvPoint[][]): { o: number[]; e: number[]; v: number[][]; events: number } {
+  const ok = (d: SurvPoint) => Number.isFinite(d.t) && d.t >= 0;
+  const k = groups.length;
+  const G = groups.map((g) => g.filter(ok).slice().sort((x, y) => x.t - y.t));
+  const risk = G.map((g) => riskSweep(g));
+  const idx = zeros(k);
+  const o = zeros(k), e = zeros(k), v = zerosMat(k);
+  let events = 0;
+  const allTimes = [...new Set(G.flatMap((g) => g.map((d) => d.t)))].sort((a, b) => a - b);
+  for (const t of allTimes) {
+    const d = zeros(k);
+    for (let i = 0; i < k; i++)
+      while (idx[i] < G[i].length && G[i][idx[i]].t === t) { if (G[i][idx[i]].event) d[i]++; idx[i]++; }
+    const n = G.map((_, i) => risk[i](t));
+    const dTotal = d.reduce((a, b) => a + b, 0), nTotal = n.reduce((a, b) => a + b, 0);
+    if (dTotal > 0 && nTotal > 1) {
+      events += dTotal;
+      const w = (dTotal * (nTotal - dTotal)) / (nTotal - 1); // hypergeometric weight, this time
+      const p = n.map((ni) => ni / nTotal);
+      for (let i = 0; i < k; i++) {
+        o[i] += d[i];
+        e[i] += (dTotal * n[i]) / nTotal;
+        for (let l = 0; l < k; l++) v[i][l] += w * ((i === l ? p[i] : 0) - p[i] * p[l]);
+      }
+    }
+  }
+  return { o, e, v, events };
+}
+
+/**
+ * K-group log-rank (the Peto & Peto / Mantel-Cox generalization — the same statistic R's
+ * survdiff() reports for 3+ groups): at each distinct event time, compares every group's observed
+ * events against what its share of the risk set predicts, then tests the whole deviation vector
+ * against its covariance with a chi-squared on (groups with data − 1) degrees of freedom, rather
+ * than the single scalar variance the 2-group logRank() uses. Pass one stratum for the pooled
+ * test, one per site for the stratified test — same shape as logRank(), same reason (a federated
+ * caller computes it from per-site aggregates, never a pooled risk set).
+ *
+ * A group with no records in ANY stratum is dropped before the test rather than left in as an
+ * all-zero row — it would make the covariance matrix singular and says nothing anyway.
+ */
+export function logRankK(strata: { groups: SurvPoint[][] }[]): LogRankK {
+  const k0 = strata[0]?.groups.length || 0;
+  if (strata.some((s) => s.groups.length !== k0))
+    throw new Error("logRankK: every stratum must name the same number of groups");
+  const present = Array.from({ length: k0 }, (_, i) => strata.some((s) => s.groups[i].length > 0));
+  const keep = present.map((p, i) => p ? i : -1).filter((i) => i >= 0);
+  const k = keep.length;
+  if (k < 2) return { chi2: 0, p: 1, df: 0, observed: [], expected: [], groups: k, strata: 0 };
+
+  const O = zeros(k), E = zeros(k), V = zerosMat(k);
+  let used = 0;
+  for (const s of strata) {
+    const g = keep.map((i) => s.groups[i]);
+    const { o, e, v, events } = stratumTermsK(g);
+    if (!events) continue;
+    for (let i = 0; i < k; i++) E[i] += e[i], O[i] += o[i];
+    for (let i = 0; i < k; i++) for (let l = 0; l < k; l++) V[i][l] += v[i][l];
+    used++;
+  }
+
+  // The full (O-E) vector and V are singular by construction (both sum to zero across every
+  // group) — drop the last group's row/column and solve the (k-1)-dimensional system, the
+  // standard reduction. Which group is dropped does not change the resulting chi2 (tested below).
+  const d = O.map((o, i) => o - E[i]).slice(0, k - 1);
+  const Vsub = V.slice(0, k - 1).map((row) => row.slice(0, k - 1));
+  let chi2 = 0;
+  if (used > 0 && d.some((x) => x !== 0)) {
+    try { chi2 = Math.max(0, dot(d, solveLinear(Vsub, d))); }
+    catch { chi2 = 0; } // a degenerate covariance (e.g. one group with data but zero variation) says nothing, not an error
+  }
+  return {
+    chi2: Math.round(chi2 * 1e4) / 1e4,
+    p: chiSquareP(chi2, k - 1),
+    df: k - 1,
+    observed: O, expected: E.map((x) => Math.round(x * 10) / 10),
+    groups: k, strata: used
   };
 }
 
