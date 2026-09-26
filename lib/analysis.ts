@@ -447,10 +447,18 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       // full covariance matrix) instead of running the 2-arm test pairwise, which would need
       // its own multiple-testing correction and answers a different question ("which PAIRS
       // differ") than "do these groups differ at all".
+      //
+      // A log-rank test from a handful of patients is not wrong, exactly, but a chi2/p computed
+      // from (say) 1 vs 2 patients is statistically vacuous and a fully-formatted number reads
+      // as a real result regardless — the same "loud refusal, not a silently thin answer" this
+      // codebase applies everywhere else. MIN_ARM_N is a floor below which the test is refused
+      // outright; the KM curves themselves still draw (they are descriptive, not a test).
+      const MIN_ARM_N = 10;
+      const thinArms = curves.filter((c) => c.n < MIN_ARM_N).map((c) => c.cohort + " (n=" + c.n + ")");
       let logrank: LogRank | undefined, logrankPooled: LogRank | undefined;
       let logrankK: LogRankK | undefined, logrankKPooled: LogRankK | undefined;
       let sites: string[] = [];
-      if (vNames.length === 2) {
+      if (thinArms.length === 0 && vNames.length === 2) {
         const [A, B] = vNames;
         sites = [...new Set([...perSite.get(A)!.keys(), ...perSite.get(B)!.keys()])];
         const pooledTest = logRank([{ a: pointsFor(A), b: pointsFor(B) }]);
@@ -460,7 +468,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         } else {
           logrank = pooledTest;
         }
-      } else if (vNames.length >= 3) {
+      } else if (thinArms.length === 0 && vNames.length >= 3) {
         sites = [...new Set(vNames.flatMap((n) => [...perSite.get(n)!.keys()]))];
         const pooledTest = logRankK([{ groups: vNames.map((n) => pointsFor(n)) }]);
         if (sites.length > 1) {
@@ -536,7 +544,11 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               : logrankK
                 ? " " + logrankK.groups + "-group log-rank (" + logrankK.df + " df) on a single study — tests whether the" +
                   " groups differ at all, not which pair does. No stratification applies."
-                : " Log-rank needs at least two cohorts.") });
+                : thinArms.length
+                  ? " Log-rank not computed: " + thinArms.join(", ") + (thinArms.length === 1 ? " has" : " have") +
+                    " fewer than " + MIN_ARM_N + " patients — a chi-squared from this few is not a meaningful test, only a" +
+                    " number shaped like one. The curves above are still drawn; they are descriptive, not a test."
+                  : " Log-rank needs at least two cohorts.") });
 
     } else if (view.kind === "cox") {
       // Multivariate Cox: unlike survival/compare, this is fit from real per-patient rows
