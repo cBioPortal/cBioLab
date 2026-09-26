@@ -79,6 +79,14 @@ export interface SurvivalCount {
 export interface SurvivalAnchor {
   eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST";
 }
+/**
+ * Explicit (months, status) column names, overriding the `<endpoint>_MONTHS`/`<endpoint>_STATUS`
+ * naming convention — for a study whose outcome columns don't follow it (a real, not hypothetical,
+ * gap: several MSK papers store e.g. `PFS_MONTHS_FIRST_LINE_TX`/`PROGRESSION_STATUS`, which the
+ * convention-based endpoint discovery has no way to find). `endpoint` is then purely a display
+ * label, not something the engine derives column names from.
+ */
+export interface EndpointColumns { months: string; status: string }
 /** Additive moments for one gene on a continuous profile. */
 export interface ProfileMoments { gene: string; n: number; sum: number; sumsq: number }
 /** One protein change and how many patients carry it. */
@@ -632,10 +640,10 @@ export const ENDPOINT_RE = /^[A-Z][A-Z0-9_]{0,39}$/;
  * told when a study has nothing for the endpoint asked for rather than seeing
  * its patients quietly vanish from a curve.
  */
-export function survivalCountsSql(cohortSql: string, study: string, db: string = DB, endpoint = "OS"): string {
+export function survivalCountsSql(cohortSql: string, study: string, db: string = DB, endpoint = "OS", columns?: EndpointColumns): string {
   if (!ENDPOINT_RE.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
-  const months = endpoint + "_MONTHS", status = endpoint + "_STATUS";
+  const months = columns?.months || (endpoint + "_MONTHS"), status = columns?.status || (endpoint + "_STATUS");
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
@@ -670,11 +678,12 @@ export function survivalCountsSql(cohortSql: string, study: string, db: string =
  */
 export function anchoredSurvivalSql(
   cohortSql: string, study: string, db: string, endpoint: string,
-  anchor: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" }
+  anchor: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" },
+  columns?: EndpointColumns
 ): string {
   if (!ENDPOINT_RE.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
-  const months = endpoint + "_MONTHS", status = endpoint + "_STATUS";
+  const months = columns?.months || (endpoint + "_MONTHS"), status = columns?.status || (endpoint + "_STATUS");
   const pick = anchor.occurrence === "LAST" ? "max" : "min";
   const attrCond = anchor.key
     ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data\n" +
@@ -723,11 +732,12 @@ export function anchoredSurvivalSql(
  * participant can answer.
  */
 export function coxRowsSql(
-  cohortSql: string, study: string, db: string, endpoint: string, covariates: { label: string; sel: string }[]
+  cohortSql: string, study: string, db: string, endpoint: string, covariates: { label: string; sel: string }[],
+  columns?: EndpointColumns
 ): string {
   if (!ENDPOINT_RE.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
-  const months = endpoint + "_MONTHS", status = endpoint + "_STATUS";
+  const months = columns?.months || (endpoint + "_MONTHS"), status = columns?.status || (endpoint + "_STATUS");
   const covCtes = covariates.map((c) => c.label + " AS (\n" + c.sel + "\n)").join(",\n");
   const joins = covariates.map((c) => "INNER JOIN " + c.label + " ON " + c.label + ".id = os.pid").join("\n  ");
   const select = covariates.map((c) => c.label + ".v AS " + c.label).join(", ");
@@ -1122,7 +1132,7 @@ export interface AggregateCapable {
   /** cohort size — a count, not a roster */
   count(def: CohortDef | null | undefined): Promise<number>;
   geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]>;
-  survivalCounts(def: CohortDef | null | undefined, endpoint?: string, anchor?: SurvivalAnchor | null): Promise<SurvivalCount[]>;
+  survivalCounts(def: CohortDef | null | undefined, endpoint?: string, anchor?: SurvivalAnchor | null, columns?: EndpointColumns): Promise<SurvivalCount[]>;
   /** endpoints this participant can answer for; [] when it cannot say */
   survivalEndpoints(): Promise<string[]>;
   /** structural shape of this cohort's timeline, per event type */
@@ -1162,7 +1172,7 @@ export interface PatientLevelCapable extends AggregateCapable {
   readonly instance: Instance & { mode: "patient-level" };
   members(def: CohortDef | null | undefined): Promise<string[]>;
   /** per-patient rows for a Cox fit — see PatientLevelResolver.coxRows for why this is here and not on AggregateCapable */
-  coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[]):
+  coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[], columns?: EndpointColumns):
     Promise<{ rows: { t: number; event: number; values: (number | string)[] }[]; kinds: AxisKind[] }>;
 }
 
@@ -1249,10 +1259,10 @@ abstract class BaseResolver implements AggregateCapable {
     }
     return genes.map((g) => byGene.get(g)!);
   }
-  async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS", anchor?: SurvivalAnchor | null): Promise<SurvivalCount[]> {
+  async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS", anchor?: SurvivalAnchor | null, columns?: EndpointColumns): Promise<SurvivalCount[]> {
     const sql = anchor
-      ? anchoredSurvivalSql(this.cohortSql(def), this.study, this.instance.conn.db, endpoint, anchor)
-      : survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db, endpoint);
+      ? anchoredSurvivalSql(this.cohortSql(def), this.study, this.instance.conn.db, endpoint, anchor, columns)
+      : survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db, endpoint, columns);
     const r = await this.runLogged<ChRow>("survivalCounts:" + endpoint + (anchor ? "@" + anchor.eventType : ""), sql, this.instance.conn);
     return r.data.map((x) => ({
       months: Number(x.m), event: Number(x.ev), n: Number(x.n),
@@ -1679,7 +1689,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * single row carries an identifier. `kinds` says which covariates came back numeric so the
    * caller (which dummy-codes categoricals) doesn't have to re-derive it.
    */
-  async coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[]):
+  async coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[], columns?: EndpointColumns):
     Promise<{ rows: { t: number; event: number; values: (number | string)[] }[]; kinds: AxisKind[] }> {
     covariates.forEach((c, i) => validateAxis(c, "covariate " + (i + 1)));
     const db = this.instance.conn.db, conn = this.instance.conn;
@@ -1687,7 +1697,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
     const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def) };
     const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
-    const sql = coxRowsSql(ctx.cohortSql, this.study, db, endpoint, sels);
+    const sql = coxRowsSql(ctx.cohortSql, this.study, db, endpoint, sels, columns);
     const r = await this.runLogged<ChRow>("coxRows:" + endpoint, sql, conn);
     const rows = r.data.map((row) => ({
       t: Number(row.m), event: Number(row.ev),

@@ -81,6 +81,8 @@ export function registerTools(server: any): void {
         survival: z.boolean().nullish().describe("Also return (months, event, n) survival triples"),
         endpoint: z.string().max(40).nullish()
           .describe("Survival endpoint prefix for `survival` — OS, PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS (default OS)"),
+        endpointColumns: z.object({ months: z.string().max(64), status: z.string().max(64) }).nullish()
+          .describe("Override the <endpoint>_MONTHS/<endpoint>_STATUS naming convention with exact column names, for a study whose outcome columns don't follow it — `endpoint` is then just a display label"),
         anchor: z.object({
           eventType: z.string().max(120),
           key: z.string().max(120).nullish(), value: z.string().max(200).nullish(),
@@ -106,7 +108,7 @@ export function registerTools(server: any): void {
           .describe("With `pairs`, a continuous molecular profile (e.g. an mRNA z-score profile): returns the six sums (n, Sx, Sy, Sxy, Sxx, Syy) per pair, which are sufficient for a correlation and carry no individual value")
       }
     },
-    async ({ study, cohort, genes, survival, pairs, attributes, attributeHistograms, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, survivalEndpoints, anchor }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; attributeHistograms?: boolean | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; survivalEndpoints?: boolean | null; anchor?: any }) => {
+    async ({ study, cohort, genes, survival, pairs, attributes, attributeHistograms, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, endpointColumns, survivalEndpoints, anchor }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; attributeHistograms?: boolean | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; endpointColumns?: { months: string; status: string } | null; survivalEndpoints?: boolean | null; anchor?: any }) => {
       try {
         const s = await resolveStudy(study);
         const { profiles, gaProfiles } = await studyProfiles(s);
@@ -115,7 +117,7 @@ export function registerTools(server: any): void {
         const [count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, endpointList, lollipopCounts] = await Promise.all([
           res.count(cohort),
           genes && genes.length ? res.geneCounts(cohort, genes) : Promise.resolve([]),
-          survival ? res.survivalCounts(cohort, endpoint || "OS", anchor || null) : Promise.resolve([]),
+          survival ? res.survivalCounts(cohort, endpoint || "OS", anchor || null, endpointColumns || undefined) : Promise.resolve([]),
           pairs && pairs.length ? res.pairCounts(cohort, pairs) : Promise.resolve([]),
           attributes && attributes.length ? res.attributeStats(cohort, attributes, { histograms: !!attributeHistograms }) : Promise.resolve([]),
           pairs && pairs.length && profileType ? res.pairMoments(cohort, pairs, profileType) : Promise.resolve([]),

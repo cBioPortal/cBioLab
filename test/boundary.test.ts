@@ -224,8 +224,12 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "geneCountsSql:no-annotation-pin": () => geneCountsSql(cohortSql, ["TP53"], "x", null, "db"),
     "survivalCountsSql": () => survivalCountsSql(cohortSql, "x", "db"),
     "survivalCountsSql:PFS": () => survivalCountsSql(cohortSql, "x", "db", "PFS"),
+    // A custom monthsAttribute/statusAttribute override (item: non-standard endpoint naming)
+    // still projects only aggregates — same query shape, just different literal column names.
+    "survivalCountsSql:customColumns": () => survivalCountsSql(cohortSql, "x", "db", "CUSTOM", { months: "PFS_MONTHS_FIRST_LINE_TX", status: "PROGRESSION_STATUS" }),
     "survivalEndpointsSql": () => survivalEndpointsSql("x", "db"),
     "anchoredSurvivalSql": () => anchoredSurvivalSql(cohortSql, "x", "db", "OS", { eventType: "Treatment", key: "SUBTYPE", value: "Chemo", occurrence: "FIRST" }),
+    "anchoredSurvivalSql:customColumns": () => anchoredSurvivalSql(cohortSql, "x", "db", "CUSTOM", { eventType: "Treatment" }, { months: "IO_PFS_MONTHS", status: "IO_PFS_STATUS" }),
     "pairCountsSql": () => pairCountsSql(cohortSql, [["TP53", "KRAS"], ["EGFR", "ALK"]], "x", "db"),
     "clinicalCountsSql": () => clinicalCountsSql(cohortSql, ["SEX", "CANCER_TYPE"], "x", "db"),
     "clinicalMomentsSql": () => clinicalMomentsSql(cohortSql, ["CURRENT_AGE_DEID"], "x", "db"),
@@ -254,7 +258,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "sequenceKeysSql": () => sequenceKeysSql(cohortSql, "x", "db", "Treatment"),
     // Cox rows are per-patient (unlike every other builder above), but still project no
     // identifier: `os.pid` only ever appears in a JOIN ON clause, never in the outer SELECT.
-    "coxRowsSql": () => coxRowsSql(cohortSql, "x", "db", "OS", [{ label: "c0", sel: catAxis }, { label: "c1", sel: numAxis }])
+    "coxRowsSql": () => coxRowsSql(cohortSql, "x", "db", "OS", [{ label: "c0", sel: catAxis }, { label: "c1", sel: numAxis }]),
+    "coxRowsSql:customColumns": () => coxRowsSql(cohortSql, "x", "db", "CUSTOM", [{ label: "c0", sel: catAxis }], { months: "PFS_MONTHS_FIRST_LINE_TX", status: "PROGRESSION_STATUS" })
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

@@ -23,7 +23,7 @@ import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, Co
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
-  type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments,
+  type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments, type EndpointColumns,
   type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, type FederatedPlotCapable, legendFor } from "./federation.ts";
 import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis, coverageNote, type PlotData, type PlotGroup, type AxisKind } from "./plot.ts";
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
@@ -359,6 +359,23 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) {
         views.push({ kind: "survival", error: "bad survival endpoint '" + endpoint.slice(0, 40) + "'" }); continue;
       }
+      // Escape hatch for a study whose outcome columns don't follow the <endpoint>_MONTHS/
+      // <endpoint>_STATUS convention (a real gap, not hypothetical — several MSK papers store
+      // e.g. PFS_MONTHS_FIRST_LINE_TX/PROGRESSION_STATUS). Both must be given together; endpoint
+      // becomes purely a display label rather than something column names are derived from.
+      const rawMonthsAttr = (view as SurvivalView).monthsAttribute, rawStatusAttr = (view as SurvivalView).statusAttribute;
+      let columns: EndpointColumns | undefined;
+      if (rawMonthsAttr != null || rawStatusAttr != null) {
+        const monthsAttr = String(rawMonthsAttr || "").trim(), statusAttr = String(rawStatusAttr || "").trim();
+        if (!/^[A-Za-z0-9_]{1,64}$/.test(monthsAttr) || !/^[A-Za-z0-9_]{1,64}$/.test(statusAttr)) {
+          views.push({ kind: "survival", endpoint,
+            error: "monthsAttribute and statusAttribute must both be given as valid attribute names (letters, digits, underscore, ≤64 chars): got '" +
+              monthsAttr.slice(0, 40) + "'/'" + statusAttr.slice(0, 40) + "'" });
+          continue;
+        }
+        columns = { months: monthsAttr, status: statusAttr };
+      }
+      const columnsLabel = columns ? columns.months + "/" + columns.status : endpoint + "_MONTHS/" + endpoint + "_STATUS";
       const rawCutoff = (view as SurvivalView).cutoffMonths;
       let cutoffMonths: number | undefined;
       if (rawCutoff != null) {
@@ -390,7 +407,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       for (const n of vNames) perSite.set(n, new Map());
       await Promise.all(vNames.flatMap((n) =>
         cohorts[n].studies.map(async (st) => {
-          perSite.get(n)!.set(st, await resolvers[st].survivalCounts(doc.cohorts[n], endpoint, anchor));
+          perSite.get(n)!.set(st, await resolvers[st].survivalCounts(doc.cohorts[n], endpoint, anchor, columns));
         })));
       // An EMPTY COHORT also yields no rows, and must not be reported as a
       // missing endpoint — that sends the reader (or a model) off to conclude the
@@ -417,18 +434,21 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         if (vStudies.length === 1) {
           const { st, eps } = declared[0];
           views.push({ kind: "survival", endpoint,
-            error: eps.length
-              ? st + " has no " + endpoint + " data (no " + endpoint + "_MONTHS/" + endpoint + "_STATUS). It does declare " +
-                eps.join(", ") + " — pick one of those as the endpoint."
-              : st + " has no survival data: it declares no <X>_MONTHS/<X>_STATUS pair, so there is no endpoint to plot." });
+            error: columns
+              ? st + " has no data in " + columnsLabel + " (checked because monthsAttribute/statusAttribute were given explicitly)." +
+                (eps.length ? " It does declare " + eps.join(", ") + " under the standard naming convention, if that's what was meant instead." : "")
+              : eps.length
+                ? st + " has no " + endpoint + " data (no " + columnsLabel + "). It does declare " +
+                  eps.join(", ") + " — pick one of those as the endpoint."
+                : st + " has no survival data: it declares no <X>_MONTHS/<X>_STATUS pair, so there is no endpoint to plot." });
           continue;
         }
         const avail = declared.map(({ st, eps }) => st + ": " + (eps.join(", ") || "none declared"));
         endpointHelp = " " + silent.length + " of " + vStudies.length + " stud" + (silent.length === 1 ? "y has" : "ies have") +
-          " no " + endpoint + " data and contribute" + (silent.length === 1 ? "s" : "") + " no patients here (" + avail.join("; ") + ").";
+          " no " + (columns ? columnsLabel : endpoint) + " data and contribute" + (silent.length === 1 ? "s" : "") + " no patients here (" + avail.join("; ") + ").";
         if (silent.length === vStudies.length) {
           views.push({ kind: "survival", endpoint,
-            error: "no participating study defines " + endpoint + "_MONTHS/" + endpoint + "_STATUS." + endpointHelp });
+            error: "no participating study has data in " + columnsLabel + "." + endpointHelp });
           continue;
         }
       }
@@ -560,6 +580,19 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) {
         views.push({ kind: "cox", error: "bad survival endpoint '" + endpoint.slice(0, 40) + "'" }); continue;
       }
+      // Same escape hatch as SurvivalView, for the same reason — see the survival branch above.
+      let endpointColumns: EndpointColumns | undefined;
+      if (cx.monthsAttribute != null || cx.statusAttribute != null) {
+        const monthsAttr = String(cx.monthsAttribute || "").trim(), statusAttr = String(cx.statusAttribute || "").trim();
+        if (!/^[A-Za-z0-9_]{1,64}$/.test(monthsAttr) || !/^[A-Za-z0-9_]{1,64}$/.test(statusAttr)) {
+          views.push({ kind: "cox", endpoint,
+            error: "monthsAttribute and statusAttribute must both be given as valid attribute names (letters, digits, underscore, ≤64 chars): got '" +
+              monthsAttr.slice(0, 40) + "'/'" + statusAttr.slice(0, 40) + "'" });
+          continue;
+        }
+        endpointColumns = { months: monthsAttr, status: statusAttr };
+      }
+      const endpointLabel = endpointColumns ? endpointColumns.months + "/" + endpointColumns.status : endpoint;
       const covariates = Array.isArray(cx.covariates) ? cx.covariates : [];
       if (!covariates.length) { views.push({ kind: "cox", endpoint, error: "a cox view needs at least one covariate" }); continue; }
       { const e = overLimit("a cox view", 8, covariates.length); if (e) { views.push({ kind: "cox", endpoint, error: e.replace("at most 8", "at most 8 covariates") }); continue; } }
@@ -595,7 +628,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             continue;
           }
           patientLevelTotal += cohorts[n].perStudy[st]?.count || 0;
-          const { rows, kinds: k } = await res.coxRows(doc.cohorts[n], endpoint, covariates);
+          const { rows, kinds: k } = await res.coxRows(doc.cohorts[n], endpoint, covariates, endpointColumns);
           if (!kinds) kinds = k;
           for (const r of rows) rawRows.push({ ...r, study: st });
         }
@@ -605,7 +638,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           error: excludedRemote.length && patientLevelTotal === 0
             ? "no patient-level participant could answer this — " + excludedRemote.map((e) => e.study).join(", ") +
               (excludedRemote.length === 1 ? " is" : " are") + " aggregate-only, and multivariate Cox needs patient-level covariates"
-            : "no patient had both a " + endpoint + " measurement and every requested covariate defined" });
+            : "no patient had both a " + endpointLabel + " measurement and every requested covariate defined" });
         continue;
       }
       const kindsFinal = kinds!;

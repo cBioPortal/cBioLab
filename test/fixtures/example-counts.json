@@ -119,6 +119,10 @@
       "TNBC": 167,
       "HR+/HER2+": 132,
       "HR-/HER2+": 61
+    },
+    "A non-standard survival endpoint, named directly": {
+      "MSI-H": 28,
+      "MSS": 148
     }
   }
 }

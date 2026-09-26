@@ -222,6 +222,13 @@ export interface SurvivalView {
   /** endpoint prefix: OS (default), PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS */
   endpoint?: string;
   /**
+   * Override the <endpoint>_MONTHS/<endpoint>_STATUS naming convention with the exact clinical
+   * attribute names, for a study whose outcome columns don't follow it (some do not — e.g.
+   * PFS_MONTHS_FIRST_LINE_TX/PROGRESSION_STATUS). Both must be given together; `endpoint`, if
+   * also given, is then just a display label, not something column names are derived from.
+   */
+  monthsAttribute?: string; statusAttribute?: string;
+  /**
    * Re-anchor the clock to a timeline event instead of the study's day 0.
    * Delayed entry is applied automatically — without it, anchoring earlier than
    * day 0 manufactures immortal time.
@@ -258,6 +265,8 @@ export interface CoxView {
   kind: "cox"; cohorts?: string[];
   /** endpoint prefix: OS (default), PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS */
   endpoint?: string;
+  /** same escape hatch as SurvivalView.monthsAttribute/statusAttribute, for the same reason */
+  monthsAttribute?: string; statusAttribute?: string;
   /** one or more covariates to fit simultaneously; each becomes one or more forest-plot rows */
   covariates: CoxCovariate[];
   /** fit separate baseline hazards per study rather than pooling them (default false) */
