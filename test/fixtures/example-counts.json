@@ -123,6 +123,11 @@
     "A non-standard survival endpoint, named directly": {
       "MSI-H": 28,
       "MSS": 148
+    },
+    "Top 20% TMB, within one cancer type: a percentile cutoff": {
+      "NSCLC": 350,
+      "NSCLC high-TMB": 69,
+      "NSCLC low-TMB": 281
     }
   }
 }

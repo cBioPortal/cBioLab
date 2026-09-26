@@ -23,7 +23,7 @@ import { readFileSync } from "node:fs";
 import {
   carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql,
   geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
-  clinicalCountsSql, clinicalMomentsSql, clinicalHistogramSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
+  clinicalCountsSql, clinicalMomentsSql, clinicalHistogramSql, attributeQuantileSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
   lollipopChangesSql, lollipopTypesSql, lollipopTotalsSql, cohortSampleCountSql,
   timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql, coxRowsSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
@@ -234,6 +234,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "clinicalCountsSql": () => clinicalCountsSql(cohortSql, ["SEX", "CANCER_TYPE"], "x", "db"),
     "clinicalMomentsSql": () => clinicalMomentsSql(cohortSql, ["CURRENT_AGE_DEID"], "x", "db"),
     "clinicalHistogramSql": () => clinicalHistogramSql(cohortSql, ["CURRENT_AGE_DEID"], "x", "db"),
+    "attributeQuantileSql": () => attributeQuantileSql(cohortSql, "TMB_NONSYNONYMOUS", "patient", 0.8, "x", "db"),
     "momentPairsSql": () => momentPairsSql(cohortSql, [["ERBB2", "GRB7"]], "rna_seq_v2_mrna_median_Zscores", "x", "db"),
     "variantCountsSql": () => variantCountsSql(cohortSql, ["KRAS", "BRAF"], "x", 1, "db"),
     "variantCountsSql:suppressed": () => variantCountsSql(cohortSql, ["KRAS"], "x", 5, "db"),

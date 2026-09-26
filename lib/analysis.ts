@@ -29,6 +29,7 @@ import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis,
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
+import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -164,8 +165,16 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   // for the same reason: by the time anything else looks at doc.cohorts, every
   // cohort's `all` is already the full, flattened list.
   const { doc: paramsDoc, params: usedParams, unused: unusedParams } = resolveParams(template);
-  const doc = resolveExtends(paramsDoc);
-  const docStudy = await resolveStudy(doc.study);
+  const extendsDoc = resolveExtends(paramsDoc);
+  const docStudy = await resolveStudy(extendsDoc.study);
+  // A percentile leaf needs a real query (a percentile is a fact about the data, not the
+  // document's own JSON), so this runs after extends/params but before anything compiles a
+  // cohort — by the time compileCohortDef sees a leaf, `percentile` has already become an
+  // ordinary `value`.
+  const doc = await resolveCohortPercentiles(extendsDoc, docStudy, async (study, refDef, attribute, per, p) => {
+    const res = await resolverFor(study, {});
+    return res.attributeQuantile(refDef, attribute, per, p);
+  });
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
   const names = Object.keys(doc.cohorts || {});
   if (!names.length) throw new Error("document has no cohorts");

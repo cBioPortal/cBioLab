@@ -624,6 +624,26 @@ export function clinicalHistogramSql(cohortSql: string, attrs: string[], study: 
 }
 
 /**
+ * One number: the exact p-th quantile of a numeric clinical attribute within one cohort, in one
+ * study — the reference population for a percentile-based cohort cutoff (item 4 of the CRC/APC
+ * roadmap's "features that would have helped", e.g. Samstein's "top 20% TMB per cancer type").
+ * A single ClickHouse aggregate; no individual value leaves the database, only the resolved
+ * threshold — same shape as every other aggregate here.
+ */
+export function attributeQuantileSql(cohortSql: string, attribute: string, per: "patient" | "sample", p: number, study: string, db: string = DB): string {
+  if (!(p > 0 && p < 1)) throw new Error("attributeQuantileSql: p must be between 0 and 1 (exclusive), got " + p);
+  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  return (
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT quantileExact(" + p + ")(toFloat64OrNull(attribute_value)) AS q\n" +
+    "FROM " + db + ".clinical_data_derived\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attribute) + "\n" +
+    "  AND type = " + sq(per) + " AND attribute_value != ''\n" +
+    "  AND " + pid + " IN (SELECT pid FROM cohort)"
+  );
+}
+
+/**
  * (months, event, n) triples for one cohort in one study. Aggregate — pools
  * exactly with other instances' triples to give a correct pooled KM curve.
  */
@@ -1147,6 +1167,9 @@ export interface AggregateCapable {
   /** a plot's aggregated contract: bins, groups or cells — never points */
   plot(def: CohortDef | null | undefined, spec: PlotRequest): Promise<PlotData>;
   attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean }): Promise<AttrStats[]>;
+  /** the p-th quantile of a numeric clinical attribute in this cohort — the reference population
+   *  for a percentile-based cohort cutoff. null when the attribute has no values here. */
+  attributeQuantile(def: CohortDef | null | undefined, attribute: string, per: "patient" | "sample", p: number): Promise<number | null>;
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
   variantCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<VariantReport>;
   /** per-codon counts for the lollipop (see lollipopCte) — aggregates only */
@@ -1421,6 +1444,12 @@ abstract class BaseResolver implements AggregateCapable {
     return out;
   }
 
+  async attributeQuantile(def: CohortDef | null | undefined, attribute: string, per: "patient" | "sample", p: number): Promise<number | null> {
+    const r = await this.runLogged<ChRow>("attributeQuantile",
+      attributeQuantileSql(this.cohortSql(def), attribute, per, p, this.study, this.instance.conn.db), this.instance.conn);
+    const v = r.data[0]?.q;
+    return v == null || v === "" ? null : Number(v);
+  }
 
   /**
    * Which of these axes' clinical attributes the STUDY declares as numbers. Only it knows: it

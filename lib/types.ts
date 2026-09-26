@@ -30,6 +30,21 @@ export interface ClinicalLeaf {
   range?: ClinicalRange;
   op?: ClinicalOp;
   value?: string | number;
+  /**
+   * Resolve `value` from a live percentile of this attribute's distribution instead of a literal
+   * number — e.g. `{op:">=", percentile:0.8}` = "at or above the 80th percentile" ("top 20%").
+   * Requires `op` (not `values`/`range`) and must not be combined with an explicit `value`.
+   * Resolved once per document, before compilation (lib/analysis.ts's resolveCohortPercentiles),
+   * so cohort2.ts's compiler always sees an ordinary, already-numeric op+value leaf — `percentile`
+   * is gone by the time it gets there, exactly like a `$param` is gone after lib/params.ts.
+   */
+  percentile?: number;
+  /**
+   * The reference population the percentile is computed against: another cohort's name in this
+   * same document. Omit for the whole study. That cohort must not itself use `percentile` — no
+   * chaining — and must resolve to a single study, same as the cohort this leaf lives in.
+   */
+  percentileOf?: string;
 }
 /**
  * An explicit, cross-study list of ids. Each id is "<study>:<bare-id>" — the

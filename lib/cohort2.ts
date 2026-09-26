@@ -451,7 +451,8 @@ function leafText(leaf: any): string {
     const bits: string[] = [];
     if (leaf.values && leaf.values.length) bits.push("in [" + leaf.values.join(", ") + "]");
     if (leaf.range) bits.push(Object.entries(leaf.range).map(([k, v]) => k + " " + v).join(", "));
-    if (leaf.op != null) bits.push(leaf.op + " " + leaf.value);
+    if (leaf.op != null) bits.push(leaf.op + " " + leaf.value +
+      (leaf.percentile != null ? " (" + Math.round(leaf.percentile * 100) + "th percentile" + (leaf.percentileOf ? " of " + leaf.percentileOf : "") + ")" : ""));
     return leaf.attribute + " " + bits.join(" ") + (leaf.per === "sample" ? " (any sample)" : "");
   }
   if (leaf.kind === "profiled") return "profiled for " + leaf.type;

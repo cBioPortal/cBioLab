@@ -203,6 +203,12 @@ export class RemoteAggregateResolver implements AggregateCapable {
       "on two scales, and pooling them needs a shared one");
   }
 
+  async attributeQuantile(def: CohortDef | null | undefined, _attribute: string, _per: "patient" | "sample", _p: number): Promise<number | null> {
+    this.guard(def);
+    throw new Error("a percentile-based cutoff is not supported against " + this.study + " yet: it is served by a remote peer, " +
+      "and this needs its own MCP method rather than guessing at one");
+  }
+
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
     this.guard(def);
     if (!pairs.length) return [];
