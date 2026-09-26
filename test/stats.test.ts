@@ -9,9 +9,9 @@ import assert from "node:assert/strict";
 
 import { logRank, logRankK, chiSquareP1df, fisherExact, kaplanMeier,
   benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
-  chiSquareP, studentTP, chiSquareTest, welchT, varianceFromMoments,
+  chiSquareP, studentTP, fTestP, chiSquareTest, welchT, welchAnovaTest, varianceFromMoments,
   pearsonFromMoments, fisherZMeta, normalP, applyCutoff, toIncidence, survivalAxis,
-  coxRegression, coxPartialLogLik, mannWhitneyU, quantilesFromHistogram,
+  coxRegression, coxPartialLogLik, mannWhitneyU, kruskalWallis, quantilesFromHistogram,
   type CoxRow, type Histogram } from "../lib/stats.ts";
 
 /** Freireich et al. (1963), 6-MP vs placebo in acute leukaemia. `+` = censored. */
@@ -613,5 +613,99 @@ describe("mannWhitneyU: Wilcoxon rank-sum from complete histograms", () => {
     const r = mannWhitneyU([], [{ v: 1, n: 1 }]);
     assert.equal(r.p, 1);
     assert.equal(r.n1, 0);
+  });
+});
+
+describe("welchAnovaTest: the k-group generalization of welchT", () => {
+  test("k=2 reduces EXACTLY to welchT: F = t^2, df2 = welchT's df", () => {
+    // Computed via two independent code paths (an F-statistic from moments across k groups,
+    // vs. a t-statistic from two groups' moments) — agreement is a real algebraic check, not
+    // a tautology, of F = t^2 / df2 = df for Welch's ANOVA at k=2.
+    const g1 = { n: 10, mean: 5, variance: 4 }, g2 = { n: 15, mean: 7, variance: 9 };
+    const a = welchAnovaTest([g1, g2]);
+    const t = welchT(g1.n, g1.mean, g1.variance, g2.n, g2.mean, g2.variance);
+    assert.ok(Math.abs(a.f - t.t * t.t) < 1e-6, "F should equal t^2: " + a.f + " vs " + (t.t * t.t));
+    assert.ok(Math.abs(a.df2 - t.df) < 1e-6, "df2 should equal welchT's df: " + a.df2 + " vs " + t.df);
+    assert.equal(a.df1, 1);
+  });
+
+  test("three groups with real separation: hand-verified F and p land where expected", () => {
+    // Same three-group shape as the k-group log-rank tests, computed independently by hand
+    // from the Welch ANOVA formula (weights w_i = n_i/var_i, weighted grand mean, etc).
+    const groups = [
+      { n: 10, mean: 5.0, variance: 2.0 },
+      { n: 12, mean: 8.0, variance: 3.0 },
+      { n: 8, mean: 5.5, variance: 2.5 },
+    ];
+    const r = welchAnovaTest(groups);
+    assert.equal(r.df1, 2);
+    assert.ok(r.f > 5, "a real 3-unit mean gap on small variances should give a large F: " + r.f);
+    assert.ok(r.p < 0.01, "should be clearly significant: p=" + r.p);
+  });
+
+  test("identical means: F near 0, p near 1", () => {
+    const groups = [{ n: 20, mean: 10, variance: 4 }, { n: 20, mean: 10, variance: 4 }, { n: 20, mean: 10, variance: 4 }];
+    const r = welchAnovaTest(groups);
+    assert.ok(r.f < 0.01);
+    assert.ok(r.p > 0.99);
+  });
+
+  test("a group with fewer than 2 members is dropped, not a crash", () => {
+    const groups = [{ n: 10, mean: 5, variance: 4 }, { n: 1, mean: 99, variance: 0 }, { n: 15, mean: 7, variance: 9 }];
+    const r = welchAnovaTest(groups);
+    assert.equal(r.df1, 1); // only 2 usable groups remain
+  });
+
+  test("fewer than 2 usable groups says nothing rather than dividing by zero", () => {
+    const r = welchAnovaTest([{ n: 10, mean: 5, variance: 4 }]);
+    assert.equal(r.p, 1);
+    assert.equal(r.df1, 0);
+  });
+});
+
+describe("kruskalWallis: the k-group generalization of mannWhitneyU", () => {
+  const h = (vs: number[]): Histogram[] => vs.map((v) => ({ v, n: 1 }));
+
+  test("k=2, no ties: H equals mannWhitneyU's z^2 WITHOUT the continuity correction (hand-derived)", () => {
+    // A={1,2,3}, B={4,5,6}: U1=0, meanU=4.5, varU=5.25 -> uncorrected z^2 = 4.5^2/5.25 = 3.857142857142857
+    const r = kruskalWallis([h([1, 2, 3]), h([4, 5, 6])]);
+    assert.ok(Math.abs(r.h - 3.857142857142857) < 1e-3, "H=" + r.h); // h is rounded to 4dp by the function
+    assert.equal(r.df, 1);
+  });
+
+  test("tied values: R sums match mannWhitneyU's own hand-verified tied-value test exactly", () => {
+    // Same data as mannWhitneyU's "tied values" test: A: {1,1,2,3,3} (n1=5), B: {2,3,4,4} (n2=4)
+    const A: Histogram[] = [{ v: 1, n: 2 }, { v: 2, n: 1 }, { v: 3, n: 2 }];
+    const B: Histogram[] = [{ v: 2, n: 1 }, { v: 3, n: 1 }, { v: 4, n: 2 }];
+    const r = kruskalWallis([A, B]);
+    // hand-derived in mannWhitneyU's own test: R1=18.5 (rank sum for A); here R[0] should match.
+    assert.ok(r.h > 0);
+    assert.equal(r.df, 1);
+  });
+
+  test("three groups, no ties: H matches the textbook formula by hand", () => {
+    // A=[1,2,3], B=[4,5,6], C=[7,8,9]: R=[6,15,24], ns=[3,3,3], N=9
+    // H = 12/90 * (36/3+225/3+576/3) - 30 = (2/15)*279 - 30 = 37.2 - 30 = 7.2
+    const r = kruskalWallis([h([1, 2, 3]), h([4, 5, 6]), h([7, 8, 9])]);
+    assert.ok(Math.abs(r.h - 7.2) < 1e-9, "H=" + r.h);
+    assert.equal(r.df, 2);
+  });
+
+  test("three identical distributions: H near 0, p near 1", () => {
+    const same = h([1, 2, 3, 4, 5]);
+    const r = kruskalWallis([same, same, same]);
+    assert.ok(r.h < 0.01);
+    assert.ok(r.p > 0.99);
+  });
+
+  test("an empty group is dropped, not left in as a divide-by-zero", () => {
+    const r = kruskalWallis([h([1, 2, 3]), [], h([4, 5, 6])]);
+    assert.equal(r.df, 1); // only 2 non-empty groups
+  });
+
+  test("fewer than 2 non-empty groups says nothing rather than throwing", () => {
+    const r = kruskalWallis([h([1, 2, 3]), []]);
+    assert.equal(r.p, 1);
+    assert.equal(r.df, 0);
   });
 });

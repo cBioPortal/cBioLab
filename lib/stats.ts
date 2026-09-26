@@ -597,6 +597,13 @@ export function studentTP(t: number, df: number): number {
   return Math.min(1, betaI(df / 2, 0.5, df / (df + t * t)));
 }
 
+/** Upper-tail p-value for the F distribution, via its relation to the regularized incomplete
+ *  beta function: P(F(df1,df2) > f) = I_{df2/(df2+df1*f)}(df2/2, df1/2). */
+export function fTestP(f: number, df1: number, df2: number): number {
+  if (!Number.isFinite(f) || f <= 0 || df1 <= 0 || df2 <= 0) return 1;
+  return Math.min(1, betaI(df2 / 2, df1 / 2, df2 / (df2 + df1 * f)));
+}
+
 export interface ChiSquareTest { chi2: number; df: number; p: number; minExpected: number }
 
 /**
@@ -651,6 +658,34 @@ export function welchT(
   const t = (mean1 - mean2) / Math.sqrt(denom);
   const df = (denom * denom) / ((s1 * s1) / (n1 - 1) + (s2 * s2) / (n2 - 1));
   return { t: Math.round(t * 1e4) / 1e4, df: Math.round(df * 100) / 100, p: studentTP(t, df) };
+}
+
+export interface WelchAnovaTest { f: number; df1: number; df2: number; p: number }
+
+/**
+ * Welch's one-way ANOVA (the unequal-variance F test) for k >= 2 groups — the same (n, mean,
+ * variance) sufficient statistics welchT() uses, so it needs nothing a federated site doesn't
+ * already report, and generalizes to any number of cohorts the same way logRankK generalizes
+ * logRank. At k=2 this reduces EXACTLY to welchT (F = t², df2 = welchT's df) — verified in
+ * test/stats.test.ts, a real check since the two are computed by entirely different formulas.
+ * A group with fewer than 2 members or zero variance is dropped, mirroring logRankK's handling
+ * of an empty group; fewer than 2 usable groups says nothing rather than dividing by zero.
+ */
+export function welchAnovaTest(groups: { n: number; mean: number; variance: number }[]): WelchAnovaTest {
+  const gs = groups.filter((g) => g.n >= 2 && g.variance > 0);
+  const k = gs.length;
+  if (k < 2) return { f: 0, df1: 0, df2: 0, p: 1 };
+  const w = gs.map((g) => g.n / g.variance);
+  const W = w.reduce((a, b) => a + b, 0);
+  const grandMean = gs.reduce((s, g, i) => s + w[i] * g.mean, 0) / W;
+  const numerSS = gs.reduce((s, g, i) => s + w[i] * (g.mean - grandMean) * (g.mean - grandMean), 0);
+  const A = numerSS / (k - 1);
+  const S = gs.reduce((s, g, i) => s + ((1 - w[i] / W) * (1 - w[i] / W)) / (g.n - 1), 0);
+  const denomF = 1 + (2 * (k - 2) / (k * k - 1)) * S;
+  const f = denomF > 0 ? A / denomF : 0;
+  const df1 = k - 1;
+  const df2 = S > 0 ? (k * k - 1) / (3 * S) : Infinity;
+  return { f: Math.round(f * 1e4) / 1e4, df1, df2: Math.round(df2 * 100) / 100, p: fTestP(f, df1, df2) };
 }
 
 /** Sample variance from the additive moments a federated site can report. */
@@ -812,4 +847,45 @@ export function mannWhitneyU(histA: Histogram[], histB: Histogram[]): RankSumTes
   const cc = diff > 0 ? -0.5 : diff < 0 ? 0.5 : 0; // continuity correction, toward the mean
   const z = (diff + cc) / sd;
   return { u: Math.round(u * 1e3) / 1e3, z: Math.round(z * 1e4) / 1e4, p: normalP(z), n1, n2 };
+}
+
+export interface KruskalWallisTest { h: number; df: number; p: number }
+
+/**
+ * Kruskal-Wallis — the k-group generalization of mannWhitneyU, same reason: single-study only,
+ * complete histograms, tie-averaged ranks with the usual tie correction. At k=2, without ties,
+ * H equals the SQUARE of mannWhitneyU's z computed WITHOUT its continuity correction — a real
+ * algebraic identity, checked by hand in test/stats.test.ts (mannWhitneyU always applies the
+ * correction, by design, so the two are not expected to match exactly once ties are involved or
+ * the correction is applied — only the underlying rank machinery is shared and checked).
+ * An empty group is dropped, same as logRankK/mannWhitneyU; fewer than 2 non-empty groups says
+ * nothing rather than dividing by zero.
+ */
+export function kruskalWallis(histograms: Histogram[][]): KruskalWallisTest {
+  const nonEmpty = histograms.filter((h) => h.reduce((s, x) => s + x.n, 0) > 0);
+  const k = nonEmpty.length;
+  if (k < 2) return { h: 0, df: 0, p: 1 };
+  const ns = nonEmpty.map((h) => h.reduce((s, x) => s + x.n, 0));
+  const N = ns.reduce((a, b) => a + b, 0);
+  const merged = new Map<number, number[]>(); // value -> per-group counts
+  for (let gi = 0; gi < k; gi++) for (const { v, n } of nonEmpty[gi]) {
+    if (!merged.has(v)) merged.set(v, new Array(k).fill(0));
+    merged.get(v)![gi] += n;
+  }
+  const values = [...merged.keys()].sort((a, b) => a - b);
+  let cum = 0, tieSum = 0;
+  const R = new Array(k).fill(0);
+  for (const v of values) {
+    const counts = merged.get(v)!;
+    const t = counts.reduce((a, b) => a + b, 0);
+    const avgRank = cum + (t + 1) / 2;
+    for (let gi = 0; gi < k; gi++) R[gi] += avgRank * counts[gi];
+    tieSum += t * t * t - t;
+    cum += t;
+  }
+  const rawH = (12 / (N * (N + 1))) * R.reduce((s, Ri, gi) => s + (Ri * Ri) / ns[gi], 0) - 3 * (N + 1);
+  const tieCorrection = 1 - tieSum / (N * N * N - N);
+  const h = tieCorrection > 0 ? rawH / tieCorrection : rawH;
+  const df = k - 1;
+  return { h: Math.round(h * 1e4) / 1e4, df, p: chiSquareP(h, df) };
 }

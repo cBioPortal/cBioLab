@@ -3828,8 +3828,8 @@ function Latency({ v }: { v: any }) {
                                 </td>
                               ))}
                               <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", whiteSpace: "nowrap" }}
-                                title={r.statistic != null ? r.test + " = " + r.statistic + ", df = " + r.df + (r.minExpected != null ? ", smallest expected cell = " + r.minExpected : "") +
-                                  (r.rankP != null ? "; Mann-Whitney U = " + r.rankStatistic + ", p = " + r.rankP + " (single-study only, not part of the q-value correction)" : "") : undefined}>
+                                title={r.statistic != null ? r.test + " = " + r.statistic + ", df = " + r.df + (r.df2 != null ? ", " + r.df2 : "") + (r.minExpected != null ? ", smallest expected cell = " + r.minExpected : "") +
+                                  (r.rankP != null ? "; " + (r.test === "Welch ANOVA" ? "Kruskal-Wallis H = " : "Mann-Whitney U = ") + r.rankStatistic + ", p = " + r.rankP + " (single-study only, not part of the q-value correction)" : "") : undefined}>
                                 <span className="meta">{r.test}{r.rankP != null && "*"}</span>
                               </td>
                               <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: (r.p ?? 1) < 0.001 ? 600 : 400 }}>{r.p != null ? pCell(r.p) : "—"}</td>

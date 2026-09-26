@@ -14,8 +14,8 @@ import { geneSymbols } from "./gene-tracks.ts";
 import type { PlotView } from "./types.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, logRankK, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
-  chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, regressionFromMoments, fisherZMeta,
-  applyCutoff, toIncidence, coxRegression, mannWhitneyU, quantilesFromHistogram, type Moments, type CoxRow } from "./stats.ts";
+  chiSquareTest, welchT, welchAnovaTest, varianceFromMoments, pearsonFromMoments, regressionFromMoments, fisherZMeta,
+  applyCutoff, toIncidence, coxRegression, mannWhitneyU, kruskalWallis, quantilesFromHistogram, type Moments, type CoxRow } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
 import { viewToSvg } from "./view-svg.ts";
@@ -1275,7 +1275,15 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               row.rankStatistic = rk.u; row.rankP = rk.p;
             }
           } else {
-            row.skipped = "a numeric attribute is tested only for exactly 2 cohorts";
+            // Welch's ANOVA needs nothing beyond the same (n, mean, variance) moments Welch's t
+            // already uses, so — unlike the median/rank tests below — it works at any study
+            // count, the same reason chi-squared and the survival view's k-group log-rank do.
+            const a = welchAnovaTest(cells.map((c) => ({ n: c.n, mean: c.mean ?? 0, variance: c.variance })));
+            row.test = "Welch ANOVA"; row.statistic = a.f; row.df = a.df1; row.df2 = a.df2; row.p = a.p;
+            if (singleStudy && cells.every((c) => c.valueCounts)) {
+              const kw = kruskalWallis(cells.map((c) => c.valueCounts!));
+              row.rankStatistic = kw.h; row.rankP = kw.p;
+            }
           }
           rows.push(row);
         }
@@ -1286,12 +1294,16 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       views.push({ kind: "clinical", cohorts: vNames, clinical: rows, studies: vStudies,
         participation: participationFor(vStudies, false),
         note: "Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary;" +
-          " numeric ones with Welch's unequal-variance t-test computed from (n, Σx, Σx²) — those three totals are" +
-          " ADDITIVE across sites, so the pooled mean and variance are exact from per-site aggregates and no" +
-          " individual value is ever transmitted. Counting unit follows the attribute: patients for patient-level," +
-          " samples for sample-level. q-values are Benjamini–Hochberg across the " + tested.length + " tested attributes." +
+          " numeric ones with Welch's unequal-variance t-test (2 cohorts) or Welch's ANOVA (3+) computed from" +
+          " (n, Σx, Σx²) per cohort — those totals are ADDITIVE across sites, so the pooled mean and variance are" +
+          " exact from per-site aggregates and no individual value is ever transmitted. Counting unit follows the" +
+          " attribute: patients for patient-level, samples for sample-level. q-values are Benjamini–Hochberg across" +
+          " the " + tested.length + " tested attributes." +
           (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged." :
-            " Numeric attributes also show median/IQR and, for exactly 2 cohorts, a Mann-Whitney U alongside Welch's t (not itself part of the q-value correction) — computed from the attribute's complete value distribution, which is only exact and only requested because this view is confined to a single study.") });
+            " Numeric attributes also show median/IQR and a rank-based test alongside the moment-based one — a" +
+            " Mann-Whitney U for 2 cohorts, Kruskal-Wallis for 3+ (neither itself part of the q-value correction) —" +
+            " computed from the attribute's complete value distribution, which is only exact and only requested" +
+            " because this view is confined to a single study.") });
 
     } else if (view.kind === "cooccurrence") {
       // Co-occurrence is a property of ONE cohort, not a comparison between two,

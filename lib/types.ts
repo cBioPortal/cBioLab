@@ -582,11 +582,14 @@ export interface ClinicalRow {
   attribute: string; per: "patient" | "sample"; kind: "cat" | "num";
   cells: ClinicalCell[];
   test?: string; statistic?: number; df?: number; p?: number; q?: number;
+  /** Welch's ANOVA (3+ numeric cohorts) only: the denominator degrees of freedom — `df` above
+   *  holds df1 (groups − 1), an F-test's other, non-integer, Welch-Satterthwaite-style df */
+  df2?: number;
   /**
-   * numeric, single-study, exactly 2 cohorts: Mann-Whitney U alongside Welch's t (never in place
-   * of it) — a check worth having when the attribute is skewed or has outliers the mean can
-   * mislead on. Deliberately not itself part of the q-value correction above, which stays
-   * Welch's t only.
+   * numeric, single-study: a rank-based test alongside the moment-based one (never in place of
+   * it) — Mann-Whitney U for exactly 2 cohorts, Kruskal-Wallis for 3+ — a check worth having when
+   * the attribute is skewed or has outliers the mean can mislead on. Deliberately not itself part
+   * of the q-value correction above, which stays Welch's t/ANOVA only.
    */
   rankStatistic?: number; rankP?: number;
   /** categorical only: vocabulary size, and the smallest expected cell */

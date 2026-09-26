@@ -116,7 +116,7 @@ rel      := { "type": "NONE" }                                                 /
 | kind | fields | semantics |
 |---|---|---|
 | `compare` | `genes:[≤20], cohorts?:[names]` | per-gene driver% / altered% per cohort with **panel-aware denominators** (profiled patients only); two-sided Fisher p for exactly 2 cohorts, a Pearson chi-squared (2×N table, altered vs not) for 3+; either way, q-values are Benjamini–Hochberg across the genes tested, separately for any-alteration and driver-only. `altered%` combines mutation/CNA/structural-variant, matching the oncoprint's "any alteration" convention; each cell also carries the same three counts split by type, and if a WHOLE type was never assayed anywhere in the participating studies (e.g. no copy-number data at all) the view says so rather than let a false 0% for that type alone read as a real negative |
-| `clinical` | `attributes:[≤1-20], cohorts?:[names]` | compares clinical attribute distributions across cohorts. Categorical: Pearson chi-squared over the **full** value vocabulary. Numeric: Welch's t from (n, Σx, Σx²) — additive across sites, so pooled mean/variance are exact and no individual value is transmitted. BH q across attributes. Each site types its own attributes from `clinical_attribute_meta`; disagreements are refused, not merged. **Single-study views only:** numeric attributes also report median/IQR, and (exactly 2 cohorts) a Mann-Whitney U alongside Welch's t — a check worth having when the mean is misleading (skew, outliers); computed from the complete value distribution, which is exact only when the whole comparison stays within one study, so it is not offered otherwise, and not part of the q-value correction above |
+| `clinical` | `attributes:[≤1-20], cohorts?:[names]` | compares clinical attribute distributions across cohorts. Categorical: Pearson chi-squared over the **full** value vocabulary, any number of cohorts. Numeric: Welch's unequal-variance t-test for exactly 2 cohorts, **Welch's ANOVA for 3+** — both from (n, Σx, Σx²) per cohort, additive across sites, so pooled mean/variance are exact and no individual value is transmitted, at any study count. BH q across attributes (moment-based test only). Each site types its own attributes from `clinical_attribute_meta`; disagreements are refused, not merged. **Single-study views only:** numeric attributes also report median/IQR, and a rank-based test alongside the moment-based one — a Mann-Whitney U for exactly 2 cohorts, **Kruskal-Wallis for 3+** — a check worth having when the mean is misleading (skew, outliers); computed from the complete value distribution, which is exact only when the whole comparison stays within one study, so it is not offered otherwise, and not part of the q-value correction above |
 | `cooccurrence` | `genes:[2-12], cohorts?:[names]` | pairwise co-occurrence / mutual exclusivity **within one cohort** (the first named). Each pair's 2×2 is counted among patients profiled for **both** genes, per study against that study's own panels; log₂ odds ratio, two-sided Fisher, Benjamini–Hochberg q across pairs. Across studies the test is **stratified by study** (Cochran–Mantel–Haenszel). Pairs no panel covers are reported as not assessable, never as a null result |
 | `hotspots` | `genes:[≤12], cohorts?:[names], minCount?` | the lollipop, as cBioPortal's results-page mutation tab draws it: one stem per codon (the stored protein start position) whose height is the distinct patient + protein change pairs there, coloured by the codon's dominant mutation type (putative drivers first), on the canonical transcript with its Pfam domains (Genome Nexus); mutations with no protein position are counted and disclosed, not drawn. `minCount` is a suppression floor each site applies **before returning anything** — a change carried by one patient is the most disclosive aggregate here |
 | `coexpression` | `genes:[2-12], profileType, cohorts?:[names]` | Pearson correlation between gene pairs on a continuous molecular profile, **within one cohort** (the first named). Each site reports only six sums (n, Σx, Σy, Σxy, Σx², Σy²), which are additive — so the federated correlation is exact, not approximate. Across studies a Fisher-z meta-analysis of per-study correlations is reported alongside the pooled one |
@@ -2045,6 +2045,75 @@ TP53 (a real mutation hotspot here) and MDM2 (never assayed for copy-number in t
       "genes": [
         "MDM2",
         "TP53"
+      ]
+    }
+  ]
+}
+```
+
+### Example 32: Four receptor subtypes, one real test: Welch's ANOVA
+
+Breast cancer's four receptor subtypes, compared on genomic instability (FRACTION_GENOME_ALTERED) and mutation burden (TMB_NONSYNONYMOUS). Triple-negative's markedly higher genomic instability is exactly the known biology, and both the parametric (ANOVA) and rank-based (Kruskal-Wallis) tests agree emphatically; TMB does not differ significantly by subtype here, and again both tests agree.
+
+```json
+{
+  "study": "breast_msk_2018",
+  "cohorts": {
+    "HR+/HER2-": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "RECEPTOR_STATUS_PRIMARY",
+          "values": [
+            "HR+/HER2-"
+          ],
+          "per": "sample"
+        }
+      ]
+    },
+    "TNBC": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "RECEPTOR_STATUS_PRIMARY",
+          "values": [
+            "Triple Negative"
+          ],
+          "per": "sample"
+        }
+      ]
+    },
+    "HR+/HER2+": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "RECEPTOR_STATUS_PRIMARY",
+          "values": [
+            "HR+/HER2+"
+          ],
+          "per": "sample"
+        }
+      ]
+    },
+    "HR-/HER2+": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "RECEPTOR_STATUS_PRIMARY",
+          "values": [
+            "HR-/HER2+"
+          ],
+          "per": "sample"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "clinical",
+      "attributes": [
+        "TMB_NONSYNONYMOUS",
+        "FRACTION_GENOME_ALTERED"
       ]
     }
   ]
