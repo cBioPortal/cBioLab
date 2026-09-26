@@ -101,6 +101,16 @@ export interface AttrStats {
   values?: { v: string; n: number }[];
   /** numeric: additive moments, from which mean and variance are exact */
   n?: number; sum?: number; sumsq?: number; min?: number; max?: number;
+  /**
+   * numeric, single-study callers only (attributeStats' `histograms` option): the complete
+   * (value, count) distribution — enough for an exact median/IQR or a rank-sum test, computed
+   * by the caller. Not requested (and not meaningful to combine across sites) otherwise.
+   */
+  valueCounts?: { v: number; n: number }[];
+  /** true when histograms were requested but this attribute had more than HISTOGRAM_CAP distinct
+   *  values — valueCounts is omitted rather than sent truncated, since a quantile or rank sum
+   *  from a partial histogram would be wrong, not merely approximate */
+  histogramTruncated?: boolean;
   /** set when THIS site declines to describe it, with the reason */
   skipped?: string;
 }
@@ -534,6 +544,41 @@ export function clinicalMomentsSql(cohortSql: string, attrs: string[], study: st
     ")\n" +
     "WHERE x IS NOT NULL AND isFinite(x)\n" +
     "GROUP BY a, per"
+  );
+}
+
+/** Cap on distinct numeric values before a rank-sum test is refused rather than run on a truncated
+ *  histogram — mirrors ATTR_VALUE_CAP's "refuse, don't truncate" for the categorical case, at a
+ *  much larger bound since a real numeric attribute's distinct-value count is legitimately close
+ *  to cohort size (ages, scores, lab values), not the small closed vocabulary a category has. */
+export const HISTOGRAM_CAP = 20000;
+
+/**
+ * The COMPLETE (value, count) distribution for NUMERIC clinical attributes in one cohort/study —
+ * every distinct value, not a sample. This is what a median, an IQR, or a rank-based test needs:
+ * unlike (n, sum, sumsq), those are not additive across sites, so this is only ever requested for
+ * a single-study view, where "the histogram" and "the whole distribution" are the same thing.
+ * Capped at HISTOGRAM_CAP + 1 rows per attribute; the caller refuses (attributeStats sets
+ * histogramTruncated) rather than compute a quantile or a rank sum from a partial histogram.
+ */
+export function clinicalHistogramSql(cohortSql: string, attrs: string[], study: string, db: string = DB): string {
+  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "     raw AS (\n" +
+    "       SELECT attribute_name AS a, type AS per, toFloat64OrNull(attribute_value) AS x\n" +
+    "       FROM " + db + ".clinical_data_derived\n" +
+    "       WHERE cancer_study_identifier = " + sq(study) + "\n" +
+    "         AND attribute_name IN (" + attrs.map(sq).join(",") + ")\n" +
+    "         AND attribute_value != ''\n" +
+    "         AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "     )\n" +
+    "SELECT a, per, x, count() AS n\n" +
+    "FROM raw\n" +
+    "WHERE x IS NOT NULL AND isFinite(x)\n" +
+    "GROUP BY a, per, x\n" +
+    "ORDER BY n DESC\n" +
+    "LIMIT " + (HISTOGRAM_CAP + 1) + " BY a, per"
   );
 }
 
@@ -1058,7 +1103,7 @@ export interface AggregateCapable {
   pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
   /** a plot's aggregated contract: bins, groups or cells — never points */
   plot(def: CohortDef | null | undefined, spec: PlotRequest): Promise<PlotData>;
-  attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]>;
+  attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean }): Promise<AttrStats[]>;
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
   variantCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<VariantReport>;
   /** per-codon counts for the lollipop (see lollipopCte) — aggregates only */
@@ -1263,7 +1308,7 @@ abstract class BaseResolver implements AggregateCapable {
    * declared. An attribute it does not declare is reported as skipped rather
    * than sniffed from the data and silently mis-typed.
    */
-  async attributeStats(def: CohortDef | null | undefined, attributes: string[]): Promise<AttrStats[]> {
+  async attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean }): Promise<AttrStats[]> {
     const attrs = [...new Set(attributes)].filter((a) => /^[A-Za-z0-9_]{1,64}$/.test(a)).slice(0, 20);
     if (!attrs.length) return [];
     const db = this.instance.conn.db, conn = this.instance.conn;
@@ -1280,9 +1325,12 @@ abstract class BaseResolver implements AggregateCapable {
     const numAttrs = attrs.filter((a) => kindOf.get(a) === "num");
     const cohort = this.cohortSql(def);
     const empty = { data: [] as ChRow[] };
-    const [cats, nums] = await Promise.all([
+    const [cats, nums, hist] = await Promise.all([
       catAttrs.length ? this.runLogged<ChRow>("clinicalCounts", clinicalCountsSql(cohort, catAttrs, this.study, db), conn) : Promise.resolve(empty),
-      numAttrs.length ? this.runLogged<ChRow>("clinicalMoments", clinicalMomentsSql(cohort, numAttrs, this.study, db), conn) : Promise.resolve(empty)
+      numAttrs.length ? this.runLogged<ChRow>("clinicalMoments", clinicalMomentsSql(cohort, numAttrs, this.study, db), conn) : Promise.resolve(empty),
+      opts?.histograms && numAttrs.length
+        ? this.runLogged<ChRow>("clinicalHistogram", clinicalHistogramSql(cohort, numAttrs, this.study, db), conn)
+        : Promise.resolve(empty)
     ]);
     const out: AttrStats[] = [];
     const grouped = new Map<string, { per: string; values: { v: string; n: number }[] }>();
@@ -1299,9 +1347,18 @@ abstract class BaseResolver implements AggregateCapable {
             skipped: "more than " + ATTR_VALUE_CAP + " distinct values in " + this.study + "; a contingency test on a truncated table would be wrong" }
         : { attribute: a, per: g.per as "patient" | "sample", kind: "cat", values: g.values });
     }
+    const histGrouped = new Map<string, { v: number; n: number }[]>();
+    for (const r of hist.data) {
+      const key = r.a + "|" + r.per;
+      if (!histGrouped.has(key)) histGrouped.set(key, []);
+      histGrouped.get(key)!.push({ v: Number(r.x), n: Number(r.n) });
+    }
     for (const r of nums.data) {
+      const vc = histGrouped.get(r.a + "|" + r.per);
+      const truncated = !!vc && vc.length > HISTOGRAM_CAP;
       out.push({ attribute: r.a, per: r.per as "patient" | "sample", kind: "num",
-        n: Number(r.n), sum: Number(r.sx), sumsq: Number(r.sxx), min: Number(r.mn), max: Number(r.mx) });
+        n: Number(r.n), sum: Number(r.sx), sumsq: Number(r.sxx), min: Number(r.mn), max: Number(r.mx),
+        ...(opts?.histograms ? { valueCounts: truncated ? undefined : vc, histogramTruncated: truncated } : {}) });
     }
     for (const a of attrs) {
       if (!kindOf.has(a))

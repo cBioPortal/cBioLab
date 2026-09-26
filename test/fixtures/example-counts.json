@@ -98,6 +98,10 @@
     "extends: a nested cohort without repeating its parent's filter": {
       "APC-mutant": 325,
       "APC-mutant, liver mets": 227
+    },
+    "Median/IQR and a rank-sum test, single-study only": {
+      "liver mets": 227,
+      "no liver mets": 98
     }
   }
 }

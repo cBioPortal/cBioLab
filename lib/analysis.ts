@@ -15,7 +15,7 @@ import type { PlotView } from "./types.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, regressionFromMoments, fisherZMeta,
-  applyCutoff, toIncidence, coxRegression, type Moments, type CoxRow } from "./stats.ts";
+  applyCutoff, toIncidence, coxRegression, mannWhitneyU, quantilesFromHistogram, type Moments, type CoxRow } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
 import { viewToSvg } from "./view-svg.ts";
@@ -1141,10 +1141,15 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       { const e = overLimit("a clinical view", 20, attrs.length); if (e) { views.push({ kind: "clinical", error: e.replace("at most 20", "at most 20 attributes") }); continue; } }
       if (vNames.length < 2) { views.push({ kind: "clinical", error: "clinical comparison needs at least 2 cohorts" }); continue; }
       // cohort -> study -> that site's description of each attribute
+      // A median or a rank sum is not additive the way (n, sum, sumsq) is — there is no honest
+      // way to combine two sites' histograms into one — so the complete per-value histogram is
+      // only ever requested when the whole view is confined to a single study, where "this
+      // cohort's histogram" and "the view's histogram" are the same thing.
+      const singleStudy = vStudies.length === 1;
       const stats = new Map<string, AttrStats[]>();  // "cohort|study"
       await Promise.all(vNames.flatMap((n) =>
         cohorts[n].studies.map(async (st) => {
-          stats.set(n + "|" + st, await resolvers[st].attributeStats(doc.cohorts[n], attrs));
+          stats.set(n + "|" + st, await resolvers[st].attributeStats(doc.cohorts[n], attrs, { histograms: singleStudy }));
         })));
       const rows: ClinicalRow[] = [];
       for (const attribute of attrs) {
@@ -1180,22 +1185,32 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         } else {
           const cells = vNames.map((n) => {
             let n0 = 0, sum = 0, sumsq = 0, mn = Infinity, mx = -Infinity;
+            let valueCounts: { v: number; n: number }[] | null = null;
+            let histogramTruncated = false;
             for (const st of cohorts[n].studies) {
               const s = pick(n, st); if (!s || !s.n) continue;
               n0 += s.n!; sum += s.sum!; sumsq += s.sumsq!;
               mn = Math.min(mn, s.min!); mx = Math.max(mx, s.max!);
+              if (singleStudy && s.valueCounts) valueCounts = s.valueCounts;
+              if (singleStudy && s.histogramTruncated) histogramTruncated = true;
             }
             const variance = varianceFromMoments(n0, sum, sumsq);
+            const [median, q1, q3] = valueCounts ? quantilesFromHistogram(valueCounts, [0.5, 0.25, 0.75]) : [null, null, null];
             return { cohort: n, n: n0, mean: n0 ? Math.round((sum / n0) * 1e3) / 1e3 : null,
               sd: Math.round(Math.sqrt(variance) * 1e3) / 1e3,
-              min: Number.isFinite(mn) ? mn : null, max: Number.isFinite(mx) ? mx : null, variance };
+              min: Number.isFinite(mn) ? mn : null, max: Number.isFinite(mx) ? mx : null, variance,
+              median, q1, q3, histogramTruncated, valueCounts };
           });
           const row: ClinicalRow = { attribute, per, kind, q: 1,
-            cells: cells.map(({ variance, ...c }) => c) };
+            cells: cells.map(({ variance, valueCounts, ...c }) => c) };
           if (vNames.length === 2) {
             const [x, y] = cells;
             const w = welchT(x.n, x.mean ?? 0, x.variance, y.n, y.mean ?? 0, y.variance);
             row.test = "Welch t"; row.statistic = w.t; row.df = w.df; row.p = w.p;
+            if (x.valueCounts && y.valueCounts) {
+              const rk = mannWhitneyU(x.valueCounts, y.valueCounts);
+              row.rankStatistic = rk.u; row.rankP = rk.p;
+            }
           } else {
             row.skipped = "a numeric attribute is tested only for exactly 2 cohorts";
           }
@@ -1212,7 +1227,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           " ADDITIVE across sites, so the pooled mean and variance are exact from per-site aggregates and no" +
           " individual value is ever transmitted. Counting unit follows the attribute: patients for patient-level," +
           " samples for sample-level. q-values are Benjamini–Hochberg across the " + tested.length + " tested attributes." +
-          (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged." : "") });
+          (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged." :
+            " Numeric attributes also show median/IQR and, for exactly 2 cohorts, a Mann-Whitney U alongside Welch's t (not itself part of the q-value correction) — computed from the attribute's complete value distribution, which is only exact and only requested because this view is confined to a single study.") });
 
     } else if (view.kind === "cooccurrence") {
       // Co-occurrence is a property of ONE cohort, not a comparison between two,

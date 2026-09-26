@@ -11,7 +11,8 @@ import { logRank, chiSquareP1df, fisherExact, kaplanMeier,
   benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareP, studentTP, chiSquareTest, welchT, varianceFromMoments,
   pearsonFromMoments, fisherZMeta, normalP, applyCutoff, toIncidence, survivalAxis,
-  coxRegression, coxPartialLogLik, type CoxRow } from "../lib/stats.ts";
+  coxRegression, coxPartialLogLik, mannWhitneyU, quantilesFromHistogram,
+  type CoxRow, type Histogram } from "../lib/stats.ts";
 
 /** Freireich et al. (1963), 6-MP vs placebo in acute leukaemia. `+` = censored. */
 const SIXMP = [
@@ -482,5 +483,60 @@ describe("left truncation (delayed entry)", () => {
     const t = kaplanMeier([...A, ...B]);
     assert.equal(t.n, 10);
     assert.equal(t.events, 10);
+  });
+});
+
+describe("quantilesFromHistogram", () => {
+  const h = (vs: number[]): Histogram[] => vs.map((v) => ({ v, n: 1 }));
+
+  test("odd N: the middle order statistic, no interpolation needed", () => {
+    assert.deepEqual(quantilesFromHistogram(h([1, 2, 3, 4, 5]), [0.25, 0.5, 0.75]), [2, 3, 4]);
+  });
+
+  test("even N: the median interpolates between the two middle values", () => {
+    assert.deepEqual(quantilesFromHistogram(h([1, 2, 3, 4]), [0.5]), [2.5]);
+  });
+
+  test("a repeated value (count > 1) is weighted correctly, without expanding it", () => {
+    // {1,1,1,2,3} written as a histogram: median is the 3rd of 5 order statistics = 1
+    assert.deepEqual(quantilesFromHistogram([{ v: 1, n: 3 }, { v: 2, n: 1 }, { v: 3, n: 1 }], [0.5]), [1]);
+  });
+
+  test("an empty histogram reports null rather than NaN", () => {
+    assert.deepEqual(quantilesFromHistogram([], [0.5]), [null]);
+  });
+});
+
+describe("mannWhitneyU: Wilcoxon rank-sum from complete histograms", () => {
+  test("two completely separated groups, no ties — hand-verified against the U statistic and z formula", () => {
+    // A={1,2,3}, B={4,5,6}: ranks 1..6, R1=1+2+3=6, U1=R1-n1(n1+1)/2=6-6=0, meanU=4.5,
+    // varU (no ties) = n1*n2/12*(N+1) = 9/12*7 = 5.25, z (continuity-corrected) = (0-4.5+0.5)/sqrt(5.25)
+    const r = mannWhitneyU([{ v: 1, n: 1 }, { v: 2, n: 1 }, { v: 3, n: 1 }], [{ v: 4, n: 1 }, { v: 5, n: 1 }, { v: 6, n: 1 }]);
+    assert.equal(r.u, 0);
+    assert.ok(Math.abs(r.z - -1.7457) < 1e-3, "z=" + r.z);
+    assert.ok(Math.abs(r.p - 0.08086) < 1e-4, "p=" + r.p);
+  });
+
+  test("two identical distributions: U sits exactly at its null mean, z=0, p=1", () => {
+    const same = [{ v: 1, n: 1 }, { v: 2, n: 1 }, { v: 3, n: 1 }, { v: 4, n: 1 }, { v: 5, n: 1 }];
+    const r = mannWhitneyU(same, same);
+    assert.equal(r.u, 12.5); // = n1*n2/2 = meanU exactly
+    assert.equal(r.z, 0);
+    assert.equal(r.p, 1);
+  });
+
+  test("tied values: the tie-corrected variance, hand-verified", () => {
+    // A: {1,1,2,3,3} (n1=5), B: {2,3,4,4} (n2=4) — hand-derived R1=18.5, U1=3.5, tieSum=42
+    const A: Histogram[] = [{ v: 1, n: 2 }, { v: 2, n: 1 }, { v: 3, n: 2 }];
+    const B: Histogram[] = [{ v: 2, n: 1 }, { v: 3, n: 1 }, { v: 4, n: 2 }];
+    const r = mannWhitneyU(A, B);
+    assert.equal(r.u, 3.5);
+    assert.ok(Math.abs(r.z - -1.5145) < 1e-3, "z=" + r.z);
+  });
+
+  test("an empty group refuses rather than dividing by zero", () => {
+    const r = mannWhitneyU([], [{ v: 1, n: 1 }]);
+    assert.equal(r.p, 1);
+    assert.equal(r.n1, 0);
   });
 });

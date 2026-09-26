@@ -653,3 +653,75 @@ export function fisherZMeta(parts: { r: number | null; n: number }[]): Correlati
     sites
   };
 }
+
+// ---------------------------------------------------------------------------
+// Median/IQR and a rank-based test, from a value HISTOGRAM alone — (value, count)
+// pairs are the complete, lossless distribution for a single-study cohort (nothing was
+// sampled or capped), so quantiles and ranks computed from them are exact, not approximated.
+// This is deliberately single-study only: unlike (n, sum, sumsq), a median or a rank is not
+// additive across sites, so there is no honest way to combine two sites' histograms into one
+// without merging raw values across a boundary that must not be crossed.
+// ---------------------------------------------------------------------------
+
+export interface Histogram { v: number; n: number }
+
+/**
+ * Quantiles by linear interpolation between order statistics (the "R-7"/numpy-default method),
+ * from a histogram instead of an expanded array — same result, without materializing N values.
+ */
+export function quantilesFromHistogram(hist: Histogram[], qs: number[]): (number | null)[] {
+  const N = hist.reduce((s, h) => s + h.n, 0);
+  if (!N) return qs.map(() => null);
+  const sorted = [...hist].sort((a, b) => a.v - b.v);
+  const at = (rank0: number): number => {
+    let cum = 0;
+    for (const h of sorted) { cum += h.n; if (rank0 < cum) return h.v; }
+    return sorted[sorted.length - 1].v;
+  };
+  return qs.map((q) => {
+    const idx = q * (N - 1);
+    const lo = Math.floor(idx), hi = Math.ceil(idx), frac = idx - lo;
+    const vlo = at(lo), vhi = at(hi);
+    return Math.round((vlo + frac * (vhi - vlo)) * 1e3) / 1e3;
+  });
+}
+
+export interface RankSumTest { u: number; z: number; p: number; n1: number; n2: number }
+
+/**
+ * Wilcoxon rank-sum / Mann-Whitney U between two cohorts' complete value histograms. Ranks are
+ * averaged within a tied value (the standard treatment), and the variance carries the usual tie
+ * correction. This is the large-sample NORMAL APPROXIMATION every stats package falls back to
+ * once there are ties or the sample isn't tiny — not the exact permutation p a small, tie-free
+ * sample gets from e.g. R's wilcox.test by default.
+ */
+export function mannWhitneyU(histA: Histogram[], histB: Histogram[]): RankSumTest {
+  const n1 = histA.reduce((s, h) => s + h.n, 0);
+  const n2 = histB.reduce((s, h) => s + h.n, 0);
+  if (!n1 || !n2) return { u: 0, z: 0, p: 1, n1, n2 };
+  const merged = new Map<number, { a: number; b: number }>();
+  for (const h of histA) merged.set(h.v, { a: (merged.get(h.v)?.a || 0) + h.n, b: merged.get(h.v)?.b || 0 });
+  for (const h of histB) merged.set(h.v, { a: merged.get(h.v)?.a || 0, b: (merged.get(h.v)?.b || 0) + h.n });
+  const values = [...merged.keys()].sort((x, y) => x - y);
+  let cum = 0, r1 = 0, tieSum = 0;
+  for (const v of values) {
+    const { a, b } = merged.get(v)!;
+    const t = a + b;
+    const avgRank = cum + (t + 1) / 2; // average of ranks cum+1 .. cum+t
+    r1 += avgRank * a;
+    tieSum += t * t * t - t;
+    cum += t;
+  }
+  const N = n1 + n2;
+  const u1 = r1 - (n1 * (n1 + 1)) / 2;
+  const u2 = n1 * n2 - u1;
+  const u = Math.min(u1, u2);
+  const meanU = (n1 * n2) / 2;
+  const varU = (n1 * n2 / 12) * ((N + 1) - tieSum / (N * (N - 1)));
+  if (varU <= 0) return { u, z: 0, p: 1, n1, n2 };
+  const sd = Math.sqrt(varU);
+  const diff = u1 - meanU;
+  const cc = diff > 0 ? -0.5 : diff < 0 ? 0.5 : 0; // continuity correction, toward the mean
+  const z = (diff + cc) / sd;
+  return { u: Math.round(u * 1e3) / 1e3, z: Math.round(z * 1e4) / 1e4, p: normalP(z), n1, n2 };
+}

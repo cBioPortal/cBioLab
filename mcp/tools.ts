@@ -92,6 +92,8 @@ export function registerTools(server: any): void {
           .describe("Gene pairs for co-occurrence: returns each pair's 2x2 (both/onlyA/onlyB/neither) among patients profiled for BOTH genes"),
         attributes: z.array(z.string()).max(20).nullish()
           .describe("Clinical attributes to describe: value counts for categorical, (n, sum, sum of squares, min, max) for numeric. Never individual values."),
+        attributeHistograms: z.boolean().nullish()
+          .describe("With `attributes`, also return each numeric attribute's complete (value, count) distribution — an exact median/IQR or rank-sum test needs it, and it is safe only because the caller is comparing cohorts confined to THIS one study (a median is not additive across sites the way sum/sumsq is)"),
         momentGenes: z.array(z.string()).max(12).nullish()
           .describe("With `profileType`, genes for per-gene (n, sum, sum of squares) on that profile — enough to define a z-score reference distribution without disclosing any value"),
         variantGenes: z.array(z.string()).max(12).nullish()
@@ -104,7 +106,7 @@ export function registerTools(server: any): void {
           .describe("With `pairs`, a continuous molecular profile (e.g. an mRNA z-score profile): returns the six sums (n, Sx, Sy, Sxy, Sxx, Syy) per pair, which are sufficient for a correlation and carry no individual value")
       }
     },
-    async ({ study, cohort, genes, survival, pairs, attributes, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, survivalEndpoints, anchor }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; survivalEndpoints?: boolean | null; anchor?: any }) => {
+    async ({ study, cohort, genes, survival, pairs, attributes, attributeHistograms, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, survivalEndpoints, anchor }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; attributeHistograms?: boolean | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; survivalEndpoints?: boolean | null; anchor?: any }) => {
       try {
         const s = await resolveStudy(study);
         const { profiles, gaProfiles } = await studyProfiles(s);
@@ -115,7 +117,7 @@ export function registerTools(server: any): void {
           genes && genes.length ? res.geneCounts(cohort, genes) : Promise.resolve([]),
           survival ? res.survivalCounts(cohort, endpoint || "OS", anchor || null) : Promise.resolve([]),
           pairs && pairs.length ? res.pairCounts(cohort, pairs) : Promise.resolve([]),
-          attributes && attributes.length ? res.attributeStats(cohort, attributes) : Promise.resolve([]),
+          attributes && attributes.length ? res.attributeStats(cohort, attributes, { histograms: !!attributeHistograms }) : Promise.resolve([]),
           pairs && pairs.length && profileType ? res.pairMoments(cohort, pairs, profileType) : Promise.resolve([]),
           variantGenes && variantGenes.length
             ? res.variantCounts(cohort, variantGenes, minCount || 1)
