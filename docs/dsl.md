@@ -23,6 +23,7 @@ Sent to `POST /api/analysis`, edited by the in-app chat, and encoded in shareabl
 
 ```
 cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient in the study
+               "extends"?: "<cohort name>",   // splice that cohort's own "all" in AHEAD of this one's, resolved before anything is compiled
                "study"?:   "<id>",            // evaluate in another study
                "studies"?: ["<id>", ...],     // union across studies (federated, no count limit)
                "lineGap"?: 90,                // derived-treatment-line gap, days
@@ -35,6 +36,14 @@ clause    := leaf | { "any": [leaf × 1-8] }   // OR (UNION DISTINCT)
 single-study by design); members are study-qualified patient ids. Patient overlap across studies
 is deliberately **not** deduplicated, and clinical vocabularies are **not** harmonized — views
 say so in their captions.
+
+**`extends`.** A cohort naming another cohort in `extends` inherits that cohort's `all`
+clauses, spliced in ahead of its own — so a family of nested cohorts (e.g. "APC-mutated", then
+"APC-mutated AND liver mets") can share one definition instead of two copies of the same clause
+drifting apart when one gets edited. Only `all` is inherited — `study`/`studies`/`lineGap`/
+`notes` are always the child's own. Resolved (and a cycle, direct or through a chain, rejected by
+name) before compilation, so every downstream reader — compiled SQL, the plain-language readback,
+provenance — sees the fully flattened `all` list, exactly as if it had been written out by hand.
 
 ### Leaf kinds
 
@@ -107,12 +116,12 @@ rel      := { "type": "NONE" }                                                 /
 | kind | fields | semantics |
 |---|---|---|
 | `compare` | `genes:[≤20], cohorts?:[names]` | per-gene driver% / altered% per cohort with **panel-aware denominators** (profiled patients only); two-sided Fisher p for exactly 2 cohorts, a Pearson chi-squared (2×N table, altered vs not) for 3+; either way, q-values are Benjamini–Hochberg across the genes tested, separately for any-alteration and driver-only |
-| `clinical` | `attributes:[≤1-20], cohorts?:[names]` | compares clinical attribute distributions across cohorts. Categorical: Pearson chi-squared over the **full** value vocabulary. Numeric: Welch's t from (n, Σx, Σx²) — additive across sites, so pooled mean/variance are exact and no individual value is transmitted. BH q across attributes. Each site types its own attributes from `clinical_attribute_meta`; disagreements are refused, not merged |
+| `clinical` | `attributes:[≤1-20], cohorts?:[names]` | compares clinical attribute distributions across cohorts. Categorical: Pearson chi-squared over the **full** value vocabulary. Numeric: Welch's t from (n, Σx, Σx²) — additive across sites, so pooled mean/variance are exact and no individual value is transmitted. BH q across attributes. Each site types its own attributes from `clinical_attribute_meta`; disagreements are refused, not merged. **Single-study views only:** numeric attributes also report median/IQR, and (exactly 2 cohorts) a Mann-Whitney U alongside Welch's t — a check worth having when the mean is misleading (skew, outliers); computed from the complete value distribution, which is exact only when the whole comparison stays within one study, so it is not offered otherwise, and not part of the q-value correction above |
 | `cooccurrence` | `genes:[2-12], cohorts?:[names]` | pairwise co-occurrence / mutual exclusivity **within one cohort** (the first named). Each pair's 2×2 is counted among patients profiled for **both** genes, per study against that study's own panels; log₂ odds ratio, two-sided Fisher, Benjamini–Hochberg q across pairs. Across studies the test is **stratified by study** (Cochran–Mantel–Haenszel). Pairs no panel covers are reported as not assessable, never as a null result |
 | `hotspots` | `genes:[≤12], cohorts?:[names], minCount?` | the lollipop, as cBioPortal's results-page mutation tab draws it: one stem per codon (the stored protein start position) whose height is the distinct patient + protein change pairs there, coloured by the codon's dominant mutation type (putative drivers first), on the canonical transcript with its Pfam domains (Genome Nexus); mutations with no protein position are counted and disclosed, not drawn. `minCount` is a suppression floor each site applies **before returning anything** — a change carried by one patient is the most disclosive aggregate here |
 | `coexpression` | `genes:[2-12], profileType, cohorts?:[names]` | Pearson correlation between gene pairs on a continuous molecular profile, **within one cohort** (the first named). Each site reports only six sums (n, Σx, Σy, Σxy, Σx², Σy²), which are additive — so the federated correlation is exact, not approximate. Across studies a Fisher-z meta-analysis of per-study correlations is reported alongside the pooled one |
-| `survival` | `endpoint?:"OS"|"PFS"|…, anchor?:{eventType,key?,value?,occurrence?}, cohorts?:[names]` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts. Across studies the test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. `anchor` resets the clock to a timeline event (first chemotherapy, initial diagnosis) instead of the study's day 0, and **applies left truncation automatically**: a patient joins the risk set when the study could first observe them, never at the anchor — otherwise everyone appears to survive from the anchor to their own entry, which is exactly what put them in the study. The reported entry distribution warns when an anchor is matching earlier events than intended. Cross-study baselines are not harmonized |
-| `cox` | `endpoint?:"OS"|"PFS"|..., covariates:[axis, ...(max 8)], stratifyByStudy?, cutoffMonths?, cohorts?:[names]` | multivariate Cox proportional-hazards regression: several covariates fit simultaneously (a categorical covariate is dummy-coded against its most common level, unless a covariate names its own `reference`, see below), reported as hazard ratios with Wald confidence intervals, drawn as a forest plot. Each `covariate` is a plot axis (clinical, molecular, or a gene's alteration status -- see Plot axes below). Unlike every other view, this is fit from real per-patient rows within each LOCAL study, not pooled aggregate counts, so a remote or aggregate-only participant cannot contribute to it and is named as excluded rather than silently dropped. `stratifyByStudy` fits a separate baseline hazard per study instead of pooling them. A categorical covariate axis may add `"reference":"<level>"` to declare which level the hazard ratio is measured against, instead of always the most-frequently-observed one — without it, a mutated/wild-type covariate reports "wild-type vs mutated" whenever wild-type is the majority, which is backwards from how most papers report it; a `reference` naming a level the data doesn't have is ignored (falls back to the frequency default) rather than silently matching nothing |
+| `survival` | `endpoint?:"OS"|"PFS"|…, anchor?:{eventType,key?,value?,occurrence?}, cohorts?:[names]` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts, or the **k-group generalization** (a (k-1)-df chi-squared from the full covariance matrix, not a scalar variance — the same statistic R's `survdiff()` reports) when 3+, testing whether the groups differ AT ALL rather than which pair does. Across studies either test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. `anchor` resets the clock to a timeline event (first chemotherapy, initial diagnosis) instead of the study's day 0, and **applies left truncation automatically**: a patient joins the risk set when the study could first observe them, never at the anchor — otherwise everyone appears to survive from the anchor to their own entry, which is exactly what put them in the study. The reported entry distribution warns when an anchor is matching earlier events than intended. Cross-study baselines are not harmonized |
+| `cox` | `endpoint?:"OS"|"PFS"|..., covariates:[axis, ...(max 8)], stratifyByStudy?, cutoffMonths?, cohorts?:[names]` | multivariate Cox proportional-hazards regression: several covariates fit simultaneously (a categorical covariate is dummy-coded against its most common level, unless a covariate names its own `reference`, see below), reported as hazard ratios with Wald confidence intervals, drawn as a forest plot. Each `covariate` is a plot axis (clinical, molecular, or a gene's — or a gene SET's — alteration status; see Plot axes below). Unlike every other view, this is fit from real per-patient rows within each LOCAL study, not pooled aggregate counts, so a remote or aggregate-only participant cannot contribute to it and is named as excluded rather than silently dropped. `stratifyByStudy` fits a separate baseline hazard per study instead of pooling them. A categorical covariate axis may add `"reference":"<level>"` to declare which level the hazard ratio is measured against, instead of always the most-frequently-observed one — without it, a mutated/wild-type covariate reports "wild-type vs mutated" whenever wild-type is the majority, which is backwards from how most papers report it; a `reference` naming a level the data doesn't have is ignored (falls back to the frequency default) rather than silently matching nothing |
 | `course` | `eventTypes:[≤6], anchor?:{eventType,key?,value?,occurrence?}, binMonths?:3, fromMonths?:-12, toMonths?:60, cohorts?:[names]` | the **clinical course**: per time bin, the share of the cohort in each event state. Two things it refuses to fake. (1) The denominator is the patients still under observation in that bin — first recorded event to last contact (the later of their last event and their OS follow-up) — never the whole cohort, which would make a curve fall merely because follow-up ran out. (2) `anchor` is optional for one study but **required across studies**: day 0 is birth in some studies and first sequencing in others, and nothing in the schema records which, so raw day 0 compares incomparable clocks. Event types that carry real durations are drawn as a state the patient is IN; the rest as an event that HAPPENED — read from the data, not from the name. Bins are half-open [t, t+w). Event-name spellings differing only in case are folded (`Treatment`/`TREATMENT`) and the fold is named in the caveat; nothing else is merged |
 | `sequence` | `labelKey?:"SUBTYPE", eventType?:"treatment", exclude?:[values], lineGap?:90, maxSteps?:3, topN?:8, cohorts?:[names]` | **what follows what**: therapy transitions as lines, drawn as a Sankey. Records are first grouped into LINES — therapies less than `lineGap` days apart are one line, labelled by their whole combination (sorted, so `A + B` and `B + A` are one regimen). That grouping is the point: a patient has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision. Paths that end flow into TWO explicit terminals, never one: **no further line** (the study watched for at least one `lineGap` and saw no further therapy) and **record ends here** (it did not, so nothing can be concluded). Measured on MSK-CHORD, 68% of patients have under three months of observation after their last therapy and the median is 15 days — so collapsing the two would turn record-keeping into an apparent clinical decision. Flows out of a node sum to it, so nobody vanishes. Up to two cohorts are drawn as panels sharing one scale and one colour per regimen. `exclude` drops label values that are not therapies; it is a parameter and not an engine rule because such markers are **not structurally distinguishable** (MSK’s `Prior Medications to MSK` carries no duration, but neither do `Radiation Therapy` or `Investigational`), so the choice belongs in the document where a reader can see it. One cohort only |
 | `plot` | `x:axis, y:axis, unit?:"patient"\|"sample", bins?:[240,160], points?:true, colorBy?:axis, ringBy?:axis, cohorts?:[names]` | two axes over the same cases, aggregated **inside the database**: a scatter comes back as counts per grid cell, a box as quartiles per group, two categoricals as a contingency table. The payload is a few kilobytes whatever the cohort's size |
@@ -133,12 +142,19 @@ An axis is one of four things, and the pair decides the shape — the portal's o
 | --- | --- | --- |
 | `clinical` | number or category, **as the study declared it** | `attribute` |
 | `molecular` | number | `profileType`, `gene` |
-| `alteration` | category | `gene`, `by`: `"mutationType"` (default) \| `"mutated"` \| `"cna"` |
+| `alteration` | category | `gene` **or** `genes` (2-20), `by`: `"mutationType"` (default) \| `"mutated"` \| `"cna"` |
 
 number × number draws a **density scatter**, number × category a **box**, category × category a
 **contingency table**. Every statistic is computed where the rows are and is therefore exact over
 every case, not over what fits in a browser: n, Pearson and Spearman with their two-sided t-test
 p-values, and the least-squares line. Quartiles use Tukey's 1.5×IQR fences.
+
+**`genes` (a gene set, not one gene).** An alteration axis normally names one gene; `genes`
+names 2-20 and asks "is ANY of these altered" as a single category — a pathway rollup (e.g. a DDR
+gene set) for a Cox covariate, a compare-style axis, or any other consumer of a plot axis, without
+inventing a second mechanism. Only `by:"mutated"` (the default when `genes` is used) is
+supported for a set — combining several genes' mutation TYPES or copy-number states into one
+category has no single honest reading, so that combination is refused rather than guessed at.
 
 Two things are refused rather than approximated. A molecular axis **must name one gene** — a
 whole profile is 630 million values in this warehouse, and reading them to draw one picture is
@@ -1812,6 +1828,184 @@ TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers w
         {
           "kind": "profiled",
           "type": "MUTATION"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "survival"
+    }
+  ]
+}
+```
+
+### Example 27: extends: a nested cohort without repeating its parent's filter
+
+APC-mutant colorectal cancer, then the same population restricted to liver metastasis — without re-stating the APC clause. `compare` shows both share the same APC-mutant base, so a difference between them is attributable to the liver-mets split, not to two independently-typed cohort definitions quietly drifting apart.
+
+```json
+{
+  "study": "crc_apc_impact_2020",
+  "cohorts": {
+    "APC-mutant": {
+      "all": [
+        {
+          "kind": "oql",
+          "q": "APC: MUT"
+        }
+      ]
+    },
+    "APC-mutant, liver mets": {
+      "extends": "APC-mutant",
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "METASTASIS_LIVER",
+          "values": [
+            "Yes"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "genes": [
+        "TP53",
+        "KRAS",
+        "PIK3CA"
+      ]
+    }
+  ]
+}
+```
+
+### Example 28: Median/IQR and a rank-sum test, single-study only
+
+APC-mutant colorectal cancer, split by liver metastasis. Alongside mean/SD, numeric attributes report an exact median/IQR and a Mann-Whitney U — available here only because both cohorts stay within one study (crc_apc_impact_2020): median and rank are not additive across sites the way (n, Σx, Σx²) is, so this is refused rather than approximated the moment a cohort spans more than one study.
+
+```json
+{
+  "study": "crc_apc_impact_2020",
+  "cohorts": {
+    "liver mets": {
+      "all": [
+        {
+          "kind": "oql",
+          "q": "APC: MUT"
+        },
+        {
+          "kind": "clinical",
+          "attribute": "METASTASIS_LIVER",
+          "values": [
+            "Yes"
+          ]
+        }
+      ]
+    },
+    "no liver mets": {
+      "all": [
+        {
+          "kind": "oql",
+          "q": "APC: MUT"
+        },
+        {
+          "kind": "clinical",
+          "attribute": "METASTASIS_LIVER",
+          "values": [
+            "No"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "clinical",
+      "attributes": [
+        "MSI_SCORE",
+        "AGE_AT_MET"
+      ]
+    }
+  ]
+}
+```
+
+### Example 29: Cox with a gene-SET covariate: any of three genes, one term
+
+Every patient in the study, one term: mutated in any of TP53/KRAS/PIK3CA versus none of them. Compiles to a single hugo_gene_symbol IN (...) — the same shape as a single-gene covariate, just with a broader gene list, so it costs nothing extra downstream (dummy-coding, the forest plot, the reference-level override all just work).
+
+```json
+{
+  "study": "crc_apc_impact_2020",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "cox",
+      "endpoint": "OS",
+      "covariates": [
+        {
+          "source": "alteration",
+          "genes": [
+            "TP53",
+            "KRAS",
+            "PIK3CA"
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Example 30: Survival split three ways: the k-group log-rank
+
+MSI status in three groups (stable / instable / indeterminate) instead of the usual two-arm split. The test asks whether the three curves differ AT ALL, not which pair does — a different question from running the 2-arm test three times pairwise, which would need its own multiple-testing correction.
+
+```json
+{
+  "study": "crc_apc_impact_2020",
+  "cohorts": {
+    "stable": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "MSI_TYPE",
+          "values": [
+            "Stable"
+          ],
+          "per": "sample"
+        }
+      ]
+    },
+    "instable": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "MSI_TYPE",
+          "values": [
+            "Instable"
+          ],
+          "per": "sample"
+        }
+      ]
+    },
+    "indeterminate": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "MSI_TYPE",
+          "values": [
+            "Indeterminate",
+            "Do not report"
+          ],
+          "per": "sample"
         }
       ]
     }

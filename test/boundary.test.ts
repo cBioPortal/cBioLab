@@ -23,7 +23,7 @@ import { readFileSync } from "node:fs";
 import {
   carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql,
   geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
-  clinicalCountsSql, clinicalMomentsSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
+  clinicalCountsSql, clinicalMomentsSql, clinicalHistogramSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
   lollipopChangesSql, lollipopTypesSql, lollipopTotalsSql, cohortSampleCountSql,
   timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql, coxRowsSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
@@ -201,6 +201,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   const numAxis2 = axisSelect({ source: "molecular", profileType: "rna_seq_mrna", gene: "TP53" }, axisCtx, "num");
   const catAxis = axisSelect({ source: "clinical", attribute: "CANCER_TYPE" }, axisCtx, "cat");
   const catAxis2 = axisSelect({ source: "alteration", gene: "TP53", by: "mutationType" }, axisCtx, "cat");
+  const catAxisGeneSet = axisSelect({ source: "alteration", genes: ["TP53", "KRAS", "APC"], by: "mutated" }, axisCtx, "cat");
 
   const BUILDERS: Record<string, () => string> = {
     // Plots: an axis selects (id, value) per case, but every builder here groups the id away.
@@ -213,6 +214,9 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   "plotMomentsSql": () => plotMomentsSql(numAxis, numAxis2, cohortSql),
   "plotBoxSql": () => plotBoxSql(numAxis, catAxis, cohortSql),
   "plotTableSql": () => plotTableSql(catAxis, catAxis2, cohortSql),
+  // A gene-SET alteration axis (item 2b) is still just a WHERE ... IN (...) — never a
+  // per-gene identifier — so it must pass the same aggregate-only check as a single gene.
+  "plotTableSql:gene-set": () => plotTableSql(catAxis, catAxisGeneSet, cohortSql),
   "plotViolinSql": () => plotViolinSql(numAxis, catAxis, cohortSql),
   "plotCoverageSql": () => plotCoverageSql(numAxis, catAxis, axisCtx),
   "plotCoverageSql:patient": () => plotCoverageSql(numAxis, catAxis, { ...axisCtx, unit: "patient" as const }),
@@ -225,6 +229,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "pairCountsSql": () => pairCountsSql(cohortSql, [["TP53", "KRAS"], ["EGFR", "ALK"]], "x", "db"),
     "clinicalCountsSql": () => clinicalCountsSql(cohortSql, ["SEX", "CANCER_TYPE"], "x", "db"),
     "clinicalMomentsSql": () => clinicalMomentsSql(cohortSql, ["CURRENT_AGE_DEID"], "x", "db"),
+    "clinicalHistogramSql": () => clinicalHistogramSql(cohortSql, ["CURRENT_AGE_DEID"], "x", "db"),
     "momentPairsSql": () => momentPairsSql(cohortSql, [["ERBB2", "GRB7"]], "rna_seq_v2_mrna_median_Zscores", "x", "db"),
     "variantCountsSql": () => variantCountsSql(cohortSql, ["KRAS", "BRAF"], "x", 1, "db"),
     "variantCountsSql:suppressed": () => variantCountsSql(cohortSql, ["KRAS"], "x", 5, "db"),

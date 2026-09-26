@@ -7,11 +7,12 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
-import { logRank, chiSquareP1df, fisherExact, kaplanMeier,
+import { logRank, logRankK, chiSquareP1df, fisherExact, kaplanMeier,
   benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareP, studentTP, chiSquareTest, welchT, varianceFromMoments,
   pearsonFromMoments, fisherZMeta, normalP, applyCutoff, toIncidence, survivalAxis,
-  coxRegression, coxPartialLogLik, type CoxRow } from "../lib/stats.ts";
+  coxRegression, coxPartialLogLik, mannWhitneyU, quantilesFromHistogram,
+  type CoxRow, type Histogram } from "../lib/stats.ts";
 
 /** Freireich et al. (1963), 6-MP vs placebo in acute leukaemia. `+` = censored. */
 const SIXMP = [
@@ -80,6 +81,81 @@ describe("log-rank", () => {
     assert.equal(r.chi2, 0);
     assert.equal(r.p, 1);
     assert.equal(r.strata, 0, "a stratum with no events must not count as informative");
+  });
+});
+
+describe("logRankK: the k-group generalization", () => {
+  // A third, clearly-intermediate synthetic arm — distinct from both SIXMP and PLACEBO, no
+  // ties with either, so a real 3-group test has genuine information in all three directions.
+  const MID = [2, 3, 5, 9, 12, 12, 14, 18, 18, 21, 24, 26, 29, 33]
+    .map((t) => ({ t, event: 1 }));
+
+  test("k=2 reduces EXACTLY to logRank() on the same published dataset (chi2=16.79)", () => {
+    // Freireich et al.: logRank() was checked against the textbook chi2/p directly. logRankK
+    // computes the identical statistic through a completely different code path (a covariance
+    // MATRIX inverted via Gauss-Jordan, vs one scalar variance) — agreement here is not a
+    // tautology, it is the algebraic identity V_11 = d(n-d)/(n-1) * (n1/n)(n2/n) actually holding
+    // in code, for every event time in a real, non-trivial dataset.
+    const two = logRank([{ a: SIXMP, b: PLACEBO }]);
+    const k = logRankK([{ groups: [SIXMP, PLACEBO] }]);
+    assert.equal(k.df, 1);
+    assert.equal(k.groups, 2);
+    assert.ok(Math.abs(k.chi2 - two.chi2) < 1e-6, "chi2 must match logRank() exactly: " + k.chi2 + " vs " + two.chi2);
+    assert.ok(Math.abs(k.p - two.p) < 1e-9, "p must match logRank() exactly: " + k.p + " vs " + two.p);
+    assert.deepEqual(k.observed, two.observed);
+  });
+
+  test("the chi2 does not depend on which group is dropped to form the reduced system", () => {
+    const orders = [
+      [SIXMP, PLACEBO, MID],
+      [PLACEBO, MID, SIXMP],
+      [MID, SIXMP, PLACEBO],
+      [SIXMP, MID, PLACEBO],
+    ];
+    const chi2s = orders.map((groups) => logRankK([{ groups }]).chi2);
+    for (const c of chi2s) assert.ok(Math.abs(c - chi2s[0]) < 1e-6, "chi2 must be order-independent: " + chi2s.join(", "));
+  });
+
+  test("observed always sums to expected — a structural identity, whatever the data", () => {
+    const r = logRankK([{ groups: [SIXMP, PLACEBO, MID] }]);
+    const sumO = r.observed.reduce((a, b) => a + b, 0);
+    const sumE = r.expected.reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(sumO - sumE) < 0.05, "sum(observed) must equal sum(expected): " + sumO + " vs " + sumE);
+    assert.equal(r.df, 2);
+    assert.equal(r.groups, 3);
+  });
+
+  test("an entirely empty group is dropped, not left in as a singular row", () => {
+    const withEmpty = logRankK([{ groups: [SIXMP, PLACEBO, []] }]);
+    const without = logRankK([{ groups: [SIXMP, PLACEBO] }]);
+    assert.equal(withEmpty.groups, 2, "the empty 3rd group must not count");
+    assert.equal(withEmpty.df, 1);
+    assert.ok(Math.abs(withEmpty.chi2 - without.chi2) < 1e-6);
+  });
+
+  test("three identical curves: no real difference, chi2 near 0 and p near 1", () => {
+    const r = logRankK([{ groups: [SIXMP, SIXMP, SIXMP] }]);
+    assert.ok(r.chi2 < 0.01, "identical arms should show essentially no deviation: chi2=" + r.chi2);
+    assert.ok(r.p > 0.98);
+  });
+
+  test("stratified: contributions across strata add, same as the 2-group version", () => {
+    const one = logRankK([{ groups: [SIXMP, PLACEBO, MID] }]);
+    const two = logRankK([{ groups: [SIXMP, PLACEBO, MID] }, { groups: [SIXMP, PLACEBO, MID] }]);
+    assert.equal(two.strata, 2);
+    assert.ok(Math.abs(two.chi2 - 2 * one.chi2) < 0.02, "doubling the strata should double chi2");
+  });
+
+  test("mismatched group counts across strata are refused, not silently misaligned", () => {
+    assert.throws(() => logRankK([{ groups: [SIXMP, PLACEBO] }, { groups: [SIXMP, PLACEBO, MID] }]),
+      /every stratum must name the same number of groups/);
+  });
+
+  test("fewer than 2 non-empty groups says nothing, rather than throwing", () => {
+    const r = logRankK([{ groups: [SIXMP, [], []] }]);
+    assert.equal(r.chi2, 0);
+    assert.equal(r.p, 1);
+    assert.equal(r.df, 0);
   });
 });
 
@@ -482,5 +558,60 @@ describe("left truncation (delayed entry)", () => {
     const t = kaplanMeier([...A, ...B]);
     assert.equal(t.n, 10);
     assert.equal(t.events, 10);
+  });
+});
+
+describe("quantilesFromHistogram", () => {
+  const h = (vs: number[]): Histogram[] => vs.map((v) => ({ v, n: 1 }));
+
+  test("odd N: the middle order statistic, no interpolation needed", () => {
+    assert.deepEqual(quantilesFromHistogram(h([1, 2, 3, 4, 5]), [0.25, 0.5, 0.75]), [2, 3, 4]);
+  });
+
+  test("even N: the median interpolates between the two middle values", () => {
+    assert.deepEqual(quantilesFromHistogram(h([1, 2, 3, 4]), [0.5]), [2.5]);
+  });
+
+  test("a repeated value (count > 1) is weighted correctly, without expanding it", () => {
+    // {1,1,1,2,3} written as a histogram: median is the 3rd of 5 order statistics = 1
+    assert.deepEqual(quantilesFromHistogram([{ v: 1, n: 3 }, { v: 2, n: 1 }, { v: 3, n: 1 }], [0.5]), [1]);
+  });
+
+  test("an empty histogram reports null rather than NaN", () => {
+    assert.deepEqual(quantilesFromHistogram([], [0.5]), [null]);
+  });
+});
+
+describe("mannWhitneyU: Wilcoxon rank-sum from complete histograms", () => {
+  test("two completely separated groups, no ties — hand-verified against the U statistic and z formula", () => {
+    // A={1,2,3}, B={4,5,6}: ranks 1..6, R1=1+2+3=6, U1=R1-n1(n1+1)/2=6-6=0, meanU=4.5,
+    // varU (no ties) = n1*n2/12*(N+1) = 9/12*7 = 5.25, z (continuity-corrected) = (0-4.5+0.5)/sqrt(5.25)
+    const r = mannWhitneyU([{ v: 1, n: 1 }, { v: 2, n: 1 }, { v: 3, n: 1 }], [{ v: 4, n: 1 }, { v: 5, n: 1 }, { v: 6, n: 1 }]);
+    assert.equal(r.u, 0);
+    assert.ok(Math.abs(r.z - -1.7457) < 1e-3, "z=" + r.z);
+    assert.ok(Math.abs(r.p - 0.08086) < 1e-4, "p=" + r.p);
+  });
+
+  test("two identical distributions: U sits exactly at its null mean, z=0, p=1", () => {
+    const same = [{ v: 1, n: 1 }, { v: 2, n: 1 }, { v: 3, n: 1 }, { v: 4, n: 1 }, { v: 5, n: 1 }];
+    const r = mannWhitneyU(same, same);
+    assert.equal(r.u, 12.5); // = n1*n2/2 = meanU exactly
+    assert.equal(r.z, 0);
+    assert.equal(r.p, 1);
+  });
+
+  test("tied values: the tie-corrected variance, hand-verified", () => {
+    // A: {1,1,2,3,3} (n1=5), B: {2,3,4,4} (n2=4) — hand-derived R1=18.5, U1=3.5, tieSum=42
+    const A: Histogram[] = [{ v: 1, n: 2 }, { v: 2, n: 1 }, { v: 3, n: 2 }];
+    const B: Histogram[] = [{ v: 2, n: 1 }, { v: 3, n: 1 }, { v: 4, n: 2 }];
+    const r = mannWhitneyU(A, B);
+    assert.equal(r.u, 3.5);
+    assert.ok(Math.abs(r.z - -1.5145) < 1e-3, "z=" + r.z);
+  });
+
+  test("an empty group refuses rather than dividing by zero", () => {
+    const r = mannWhitneyU([], [{ v: 1, n: 1 }]);
+    assert.equal(r.p, 1);
+    assert.equal(r.n1, 0);
   });
 });

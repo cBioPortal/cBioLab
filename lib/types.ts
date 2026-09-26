@@ -175,6 +175,15 @@ export function isClinicalLeaf(c: Clause | null | undefined): c is ClinicalLeaf 
 
 export interface CohortDef {
   all?: Clause[];
+  /**
+   * Name of another cohort in the same document whose `all` clauses this one inherits — spliced
+   * in ahead of this cohort's own, so editing the parent updates every child instead of relying
+   * on copy-pasted clauses staying in sync by hand. Resolved (and cycles rejected) before
+   * anything is compiled — by the time a compiler or the readback sees this def, `extends` is
+   * gone and `all` already holds the full, flattened list. Only combines `all`; other fields
+   * (study, studies, lineGap, notes) are always the child's own, never inherited.
+   */
+  extends?: string;
   /** evaluate in another study */
   study?: string;
   /** union across studies (federated; members stay study-qualified) */
@@ -549,11 +558,28 @@ export interface ClinicalCell {
   top?: { v: string; n: number }[];
   /** numeric: computed from additive moments, never from transmitted values */
   mean?: number | null; sd?: number; min?: number | null; max?: number | null;
+  /**
+   * numeric, single-study views only: exact median/quartiles from the cohort's complete value
+   * histogram. Absent (not approximated) when the view spans more than one study, or when the
+   * attribute had more distinct values than the histogram cap allows.
+   */
+  median?: number | null; q1?: number | null; q3?: number | null;
+  /** true when the attribute had more distinct values than the histogram cap allows, so median/
+   *  IQR (and the rank test, if this cell is one of exactly 2) were refused rather than computed
+   *  from a partial distribution — stated, not silently absent */
+  histogramTruncated?: boolean;
 }
 export interface ClinicalRow {
   attribute: string; per: "patient" | "sample"; kind: "cat" | "num";
   cells: ClinicalCell[];
   test?: string; statistic?: number; df?: number; p?: number; q?: number;
+  /**
+   * numeric, single-study, exactly 2 cohorts: Mann-Whitney U alongside Welch's t (never in place
+   * of it) — a check worth having when the attribute is skewed or has outliers the mean can
+   * mislead on. Deliberately not itself part of the q-value correction above, which stays
+   * Welch's t only.
+   */
+  rankStatistic?: number; rankP?: number;
   /** categorical only: vocabulary size, and the smallest expected cell */
   distinct?: number; minExpected?: number;
   /** why this attribute was not tested — stated, never silently omitted */
@@ -577,6 +603,17 @@ export interface LogRank {
   observed: number[]; expected: number[];
   variance: number;
   /** how many strata contributed events — >1 means the test is site-stratified */
+  strata: number;
+}
+/**
+ * The k-group generalization (k>2): a (k-1)-df chi-squared from the full covariance matrix,
+ * not the single scalar variance the 2-group LogRank carries. df reflects however many groups
+ * actually had data — an entirely empty group doesn't inflate it.
+ */
+export interface LogRankK {
+  chi2: number; p: number; df: number;
+  observed: number[]; expected: number[];
+  groups: number;
   strata: number;
 }
 export interface ViewResult {
@@ -607,6 +644,8 @@ export interface ViewResult {
   tickMonths?: number;                      // survival: requested x-axis tick spacing, echoed for the renderers
   display?: "survival" | "incidence";       // survival: which curve was drawn
   logrank?: LogRank; logrankPooled?: LogRank;
+  /** survival, 3+ cohorts: the k-group generalization (tests whether the groups differ AT ALL) */
+  logrankK?: LogRankK; logrankKPooled?: LogRankK;
   pairs?: CooccurRow[];                     // cooccurrence
   clinical?: ClinicalRow[];                 // clinical comparison
   coexpression?: CoexprRow[];

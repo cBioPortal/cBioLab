@@ -13,13 +13,13 @@ import { genomicEventsSql, coverageSql, buildContract, PIDS_SQL } from "./oncopr
 import { geneSymbols } from "./gene-tracks.ts";
 import type { PlotView } from "./types.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
-import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
+import { fisherExact, kaplanMeier, logRank, logRankK, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, regressionFromMoments, fisherZMeta,
-  applyCutoff, toIncidence, coxRegression, type Moments, type CoxRow } from "./stats.ts";
+  applyCutoff, toIncidence, coxRegression, mannWhitneyU, quantilesFromHistogram, type Moments, type CoxRow } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
 import { viewToSvg } from "./view-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, LogRankK, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
@@ -28,6 +28,7 @@ import {
 import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis, coverageNote, type PlotData, type PlotGroup, type AxisKind } from "./plot.ts";
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
+import { resolveExtends } from "./cohort-extends.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -137,8 +138,11 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   const t0 = Date.now();
   // Parameters are resolved FIRST, so everything downstream — compilers,
   // validators, provenance — sees an ordinary document and cannot tell a
-  // template from one written out by hand.
-  const { doc, params: usedParams, unused: unusedParams } = resolveParams(template);
+  // template from one written out by hand. `extends` is resolved right after,
+  // for the same reason: by the time anything else looks at doc.cohorts, every
+  // cohort's `all` is already the full, flattened list.
+  const { doc: paramsDoc, params: usedParams, unused: unusedParams } = resolveParams(template);
+  const doc = resolveExtends(paramsDoc);
   const docStudy = await resolveStudy(doc.study);
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
   const names = Object.keys(doc.cohorts || {});
@@ -388,9 +392,13 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         return { cohort: n, ...kaplanMeier(data), missing: cohorts[n].count - data.length };
       });
       const curves = display === "incidence" ? curvesRaw.map((c) => toIncidence(c)) : curvesRaw;
-      // Two cohorts is the case the log-rank test is defined for, matching the
-      // compare view's Fisher p.
+      // Two cohorts is the case the 2-arm log-rank test is defined for, matching the compare
+      // view's Fisher p; 3+ uses the k-group generalization (a (k-1)-df chi-squared from the
+      // full covariance matrix) instead of running the 2-arm test pairwise, which would need
+      // its own multiple-testing correction and answers a different question ("which PAIRS
+      // differ") than "do these groups differ at all".
       let logrank: LogRank | undefined, logrankPooled: LogRank | undefined;
+      let logrankK: LogRankK | undefined, logrankKPooled: LogRankK | undefined;
       let sites: string[] = [];
       if (vNames.length === 2) {
         const [A, B] = vNames;
@@ -401,6 +409,15 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           logrankPooled = pooledTest;   // shown for contrast: the two can disagree
         } else {
           logrank = pooledTest;
+        }
+      } else if (vNames.length >= 3) {
+        sites = [...new Set(vNames.flatMap((n) => [...perSite.get(n)!.keys()]))];
+        const pooledTest = logRankK([{ groups: vNames.map((n) => pointsFor(n)) }]);
+        if (sites.length > 1) {
+          logrankK = logRankK(sites.map((st) => ({ groups: vNames.map((n) => pointsFor(n, st)) })));
+          logrankKPooled = pooledTest;
+        } else {
+          logrankK = pooledTest;
         }
       }
       // How long after the anchor patients actually became observable. A long
@@ -429,6 +446,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         ...(display === "incidence" ? { display } : {}),
         participation: participationFor(vStudies, false),
         ...(logrank ? { logrank } : {}), ...(logrankPooled ? { logrankPooled } : {}),
+        ...(logrankK ? { logrankK } : {}), ...(logrankKPooled ? { logrankKPooled } : {}),
         caveat: (display === "incidence"
           ? "Cumulative incidence (1 - survival) shown, not survival. "
           : "") +
@@ -460,7 +478,15 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               " Every site contributes only (months, event, n) counts; no patient-level survival time crosses an instance boundary."
             : logrank
               ? " Log-rank on a single study, so no stratification applies."
-              : " Log-rank needs exactly two cohorts.") });
+            : logrankKPooled
+              ? " The k-group log-rank test (" + logrankK!.groups + " groups, " + logrankK!.df + " df) is STRATIFIED by study (" +
+                logrankK!.strata + " strata contributed events): each study is compared only against itself. The pooled p is" +
+                " shown alongside — where the two disagree, the stratified one is the honest answer. This tests whether the" +
+                " groups differ AT ALL, not which pair does; every site contributes only (months, event, n) counts."
+              : logrankK
+                ? " " + logrankK.groups + "-group log-rank (" + logrankK.df + " df) on a single study — tests whether the" +
+                  " groups differ at all, not which pair does. No stratification applies."
+                : " Log-rank needs at least two cohorts.") });
 
     } else if (view.kind === "cox") {
       // Multivariate Cox: unlike survival/compare, this is fit from real per-patient rows
@@ -1137,10 +1163,15 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       { const e = overLimit("a clinical view", 20, attrs.length); if (e) { views.push({ kind: "clinical", error: e.replace("at most 20", "at most 20 attributes") }); continue; } }
       if (vNames.length < 2) { views.push({ kind: "clinical", error: "clinical comparison needs at least 2 cohorts" }); continue; }
       // cohort -> study -> that site's description of each attribute
+      // A median or a rank sum is not additive the way (n, sum, sumsq) is — there is no honest
+      // way to combine two sites' histograms into one — so the complete per-value histogram is
+      // only ever requested when the whole view is confined to a single study, where "this
+      // cohort's histogram" and "the view's histogram" are the same thing.
+      const singleStudy = vStudies.length === 1;
       const stats = new Map<string, AttrStats[]>();  // "cohort|study"
       await Promise.all(vNames.flatMap((n) =>
         cohorts[n].studies.map(async (st) => {
-          stats.set(n + "|" + st, await resolvers[st].attributeStats(doc.cohorts[n], attrs));
+          stats.set(n + "|" + st, await resolvers[st].attributeStats(doc.cohorts[n], attrs, { histograms: singleStudy }));
         })));
       const rows: ClinicalRow[] = [];
       for (const attribute of attrs) {
@@ -1176,22 +1207,32 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         } else {
           const cells = vNames.map((n) => {
             let n0 = 0, sum = 0, sumsq = 0, mn = Infinity, mx = -Infinity;
+            let valueCounts: { v: number; n: number }[] | null = null;
+            let histogramTruncated = false;
             for (const st of cohorts[n].studies) {
               const s = pick(n, st); if (!s || !s.n) continue;
               n0 += s.n!; sum += s.sum!; sumsq += s.sumsq!;
               mn = Math.min(mn, s.min!); mx = Math.max(mx, s.max!);
+              if (singleStudy && s.valueCounts) valueCounts = s.valueCounts;
+              if (singleStudy && s.histogramTruncated) histogramTruncated = true;
             }
             const variance = varianceFromMoments(n0, sum, sumsq);
+            const [median, q1, q3] = valueCounts ? quantilesFromHistogram(valueCounts, [0.5, 0.25, 0.75]) : [null, null, null];
             return { cohort: n, n: n0, mean: n0 ? Math.round((sum / n0) * 1e3) / 1e3 : null,
               sd: Math.round(Math.sqrt(variance) * 1e3) / 1e3,
-              min: Number.isFinite(mn) ? mn : null, max: Number.isFinite(mx) ? mx : null, variance };
+              min: Number.isFinite(mn) ? mn : null, max: Number.isFinite(mx) ? mx : null, variance,
+              median, q1, q3, histogramTruncated, valueCounts };
           });
           const row: ClinicalRow = { attribute, per, kind, q: 1,
-            cells: cells.map(({ variance, ...c }) => c) };
+            cells: cells.map(({ variance, valueCounts, ...c }) => c) };
           if (vNames.length === 2) {
             const [x, y] = cells;
             const w = welchT(x.n, x.mean ?? 0, x.variance, y.n, y.mean ?? 0, y.variance);
             row.test = "Welch t"; row.statistic = w.t; row.df = w.df; row.p = w.p;
+            if (x.valueCounts && y.valueCounts) {
+              const rk = mannWhitneyU(x.valueCounts, y.valueCounts);
+              row.rankStatistic = rk.u; row.rankP = rk.p;
+            }
           } else {
             row.skipped = "a numeric attribute is tested only for exactly 2 cohorts";
           }
@@ -1208,7 +1249,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           " ADDITIVE across sites, so the pooled mean and variance are exact from per-site aggregates and no" +
           " individual value is ever transmitted. Counting unit follows the attribute: patients for patient-level," +
           " samples for sample-level. q-values are Benjamini–Hochberg across the " + tested.length + " tested attributes." +
-          (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged." : "") });
+          (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged." :
+            " Numeric attributes also show median/IQR and, for exactly 2 cohorts, a Mann-Whitney U alongside Welch's t (not itself part of the q-value correction) — computed from the attribute's complete value distribution, which is only exact and only requested because this view is confined to a single study.") });
 
     } else if (view.kind === "cooccurrence") {
       // Co-occurrence is a property of ONE cohort, not a comparison between two,

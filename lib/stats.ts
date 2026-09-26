@@ -1,5 +1,5 @@
 // Small, dependency-free stats for comparison views.
-import type { KmCurve, KmPoint, LogRank, Cmh } from "./types.ts";
+import type { KmCurve, KmPoint, LogRank, LogRankK, Cmh } from "./types.ts";
 
 // log(n!) via Lanczos-free cumulative sum with memo
 const LF: number[] = [0, 0];
@@ -354,6 +354,94 @@ export function logRank(strata: { a: SurvPoint[]; b: SurvPoint[] }[]): LogRank {
   };
 }
 
+/**
+ * One stratum's contribution for k groups at once: observed/expected events per group, and the
+ * k×k covariance matrix of the deviations — the direct generalization of stratumTerms's single
+ * (o1, e1, v) triple. At i=l this reduces to exactly stratumTerms's scalar variance formula
+ * (verified algebraically and by test below); off-diagonal terms are the covariance between two
+ * groups' deviations, needed because they are not independent (one more event in group A is one
+ * fewer possible in the others at that same risk set).
+ */
+function stratumTermsK(groups: SurvPoint[][]): { o: number[]; e: number[]; v: number[][]; events: number } {
+  const ok = (d: SurvPoint) => Number.isFinite(d.t) && d.t >= 0;
+  const k = groups.length;
+  const G = groups.map((g) => g.filter(ok).slice().sort((x, y) => x.t - y.t));
+  const risk = G.map((g) => riskSweep(g));
+  const idx = zeros(k);
+  const o = zeros(k), e = zeros(k), v = zerosMat(k);
+  let events = 0;
+  const allTimes = [...new Set(G.flatMap((g) => g.map((d) => d.t)))].sort((a, b) => a - b);
+  for (const t of allTimes) {
+    const d = zeros(k);
+    for (let i = 0; i < k; i++)
+      while (idx[i] < G[i].length && G[i][idx[i]].t === t) { if (G[i][idx[i]].event) d[i]++; idx[i]++; }
+    const n = G.map((_, i) => risk[i](t));
+    const dTotal = d.reduce((a, b) => a + b, 0), nTotal = n.reduce((a, b) => a + b, 0);
+    if (dTotal > 0 && nTotal > 1) {
+      events += dTotal;
+      const w = (dTotal * (nTotal - dTotal)) / (nTotal - 1); // hypergeometric weight, this time
+      const p = n.map((ni) => ni / nTotal);
+      for (let i = 0; i < k; i++) {
+        o[i] += d[i];
+        e[i] += (dTotal * n[i]) / nTotal;
+        for (let l = 0; l < k; l++) v[i][l] += w * ((i === l ? p[i] : 0) - p[i] * p[l]);
+      }
+    }
+  }
+  return { o, e, v, events };
+}
+
+/**
+ * K-group log-rank (the Peto & Peto / Mantel-Cox generalization — the same statistic R's
+ * survdiff() reports for 3+ groups): at each distinct event time, compares every group's observed
+ * events against what its share of the risk set predicts, then tests the whole deviation vector
+ * against its covariance with a chi-squared on (groups with data − 1) degrees of freedom, rather
+ * than the single scalar variance the 2-group logRank() uses. Pass one stratum for the pooled
+ * test, one per site for the stratified test — same shape as logRank(), same reason (a federated
+ * caller computes it from per-site aggregates, never a pooled risk set).
+ *
+ * A group with no records in ANY stratum is dropped before the test rather than left in as an
+ * all-zero row — it would make the covariance matrix singular and says nothing anyway.
+ */
+export function logRankK(strata: { groups: SurvPoint[][] }[]): LogRankK {
+  const k0 = strata[0]?.groups.length || 0;
+  if (strata.some((s) => s.groups.length !== k0))
+    throw new Error("logRankK: every stratum must name the same number of groups");
+  const present = Array.from({ length: k0 }, (_, i) => strata.some((s) => s.groups[i].length > 0));
+  const keep = present.map((p, i) => p ? i : -1).filter((i) => i >= 0);
+  const k = keep.length;
+  if (k < 2) return { chi2: 0, p: 1, df: 0, observed: [], expected: [], groups: k, strata: 0 };
+
+  const O = zeros(k), E = zeros(k), V = zerosMat(k);
+  let used = 0;
+  for (const s of strata) {
+    const g = keep.map((i) => s.groups[i]);
+    const { o, e, v, events } = stratumTermsK(g);
+    if (!events) continue;
+    for (let i = 0; i < k; i++) E[i] += e[i], O[i] += o[i];
+    for (let i = 0; i < k; i++) for (let l = 0; l < k; l++) V[i][l] += v[i][l];
+    used++;
+  }
+
+  // The full (O-E) vector and V are singular by construction (both sum to zero across every
+  // group) — drop the last group's row/column and solve the (k-1)-dimensional system, the
+  // standard reduction. Which group is dropped does not change the resulting chi2 (tested below).
+  const d = O.map((o, i) => o - E[i]).slice(0, k - 1);
+  const Vsub = V.slice(0, k - 1).map((row) => row.slice(0, k - 1));
+  let chi2 = 0;
+  if (used > 0 && d.some((x) => x !== 0)) {
+    try { chi2 = Math.max(0, dot(d, solveLinear(Vsub, d))); }
+    catch { chi2 = 0; } // a degenerate covariance (e.g. one group with data but zero variation) says nothing, not an error
+  }
+  return {
+    chi2: Math.round(chi2 * 1e4) / 1e4,
+    p: chiSquareP(chi2, k - 1),
+    df: k - 1,
+    observed: O, expected: E.map((x) => Math.round(x * 10) / 10),
+    groups: k, strata: used
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Multiple testing and stratified 2x2 inference.
 // ---------------------------------------------------------------------------
@@ -652,4 +740,76 @@ export function fisherZMeta(parts: { r: number | null; n: number }[]): Correlati
     p: normalP(z / se),
     sites
   };
+}
+
+// ---------------------------------------------------------------------------
+// Median/IQR and a rank-based test, from a value HISTOGRAM alone — (value, count)
+// pairs are the complete, lossless distribution for a single-study cohort (nothing was
+// sampled or capped), so quantiles and ranks computed from them are exact, not approximated.
+// This is deliberately single-study only: unlike (n, sum, sumsq), a median or a rank is not
+// additive across sites, so there is no honest way to combine two sites' histograms into one
+// without merging raw values across a boundary that must not be crossed.
+// ---------------------------------------------------------------------------
+
+export interface Histogram { v: number; n: number }
+
+/**
+ * Quantiles by linear interpolation between order statistics (the "R-7"/numpy-default method),
+ * from a histogram instead of an expanded array — same result, without materializing N values.
+ */
+export function quantilesFromHistogram(hist: Histogram[], qs: number[]): (number | null)[] {
+  const N = hist.reduce((s, h) => s + h.n, 0);
+  if (!N) return qs.map(() => null);
+  const sorted = [...hist].sort((a, b) => a.v - b.v);
+  const at = (rank0: number): number => {
+    let cum = 0;
+    for (const h of sorted) { cum += h.n; if (rank0 < cum) return h.v; }
+    return sorted[sorted.length - 1].v;
+  };
+  return qs.map((q) => {
+    const idx = q * (N - 1);
+    const lo = Math.floor(idx), hi = Math.ceil(idx), frac = idx - lo;
+    const vlo = at(lo), vhi = at(hi);
+    return Math.round((vlo + frac * (vhi - vlo)) * 1e3) / 1e3;
+  });
+}
+
+export interface RankSumTest { u: number; z: number; p: number; n1: number; n2: number }
+
+/**
+ * Wilcoxon rank-sum / Mann-Whitney U between two cohorts' complete value histograms. Ranks are
+ * averaged within a tied value (the standard treatment), and the variance carries the usual tie
+ * correction. This is the large-sample NORMAL APPROXIMATION every stats package falls back to
+ * once there are ties or the sample isn't tiny — not the exact permutation p a small, tie-free
+ * sample gets from e.g. R's wilcox.test by default.
+ */
+export function mannWhitneyU(histA: Histogram[], histB: Histogram[]): RankSumTest {
+  const n1 = histA.reduce((s, h) => s + h.n, 0);
+  const n2 = histB.reduce((s, h) => s + h.n, 0);
+  if (!n1 || !n2) return { u: 0, z: 0, p: 1, n1, n2 };
+  const merged = new Map<number, { a: number; b: number }>();
+  for (const h of histA) merged.set(h.v, { a: (merged.get(h.v)?.a || 0) + h.n, b: merged.get(h.v)?.b || 0 });
+  for (const h of histB) merged.set(h.v, { a: merged.get(h.v)?.a || 0, b: (merged.get(h.v)?.b || 0) + h.n });
+  const values = [...merged.keys()].sort((x, y) => x - y);
+  let cum = 0, r1 = 0, tieSum = 0;
+  for (const v of values) {
+    const { a, b } = merged.get(v)!;
+    const t = a + b;
+    const avgRank = cum + (t + 1) / 2; // average of ranks cum+1 .. cum+t
+    r1 += avgRank * a;
+    tieSum += t * t * t - t;
+    cum += t;
+  }
+  const N = n1 + n2;
+  const u1 = r1 - (n1 * (n1 + 1)) / 2;
+  const u2 = n1 * n2 - u1;
+  const u = Math.min(u1, u2);
+  const meanU = (n1 * n2) / 2;
+  const varU = (n1 * n2 / 12) * ((N + 1) - tieSum / (N * (N - 1)));
+  if (varU <= 0) return { u, z: 0, p: 1, n1, n2 };
+  const sd = Math.sqrt(varU);
+  const diff = u1 - meanU;
+  const cc = diff > 0 ? -0.5 : diff < 0 ? 0.5 : 0; // continuity correction, toward the mean
+  const z = (diff + cc) / sd;
+  return { u: Math.round(u * 1e3) / 1e3, z: Math.round(z * 1e4) / 1e4, p: normalP(z), n1, n2 };
 }

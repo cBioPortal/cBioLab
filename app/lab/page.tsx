@@ -1688,8 +1688,18 @@ function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChange, allo
         <GeneInput gene={a.gene || ""} busy={busy} onCommit={(gene) => set({ ...a, gene })} />
       </>}
       {src === "alteration" && <>
-        <GeneInput gene={a.gene || ""} busy={busy} onCommit={(gene) => set({ ...a, gene })} />
-        <select value={a.by || "mutationType"} disabled={busy} title="how the gene's alterations are grouped"
+        <GeneSetInput genes={a.genes && a.genes.length ? a.genes : a.gene ? [a.gene] : []} busy={busy}
+          onCommit={(genes) => {
+            // A gene SET (2+) only supports "mutated vs not" — combining several genes'
+            // mutation types or copy-number states into one category has no honest reading,
+            // so switching to a set falls back to that rather than leaving an axis the
+            // engine would refuse.
+            const by = genes.length > 1 && a.by && a.by !== "mutated" ? "mutated" : a.by;
+            set(genes.length > 1 ? { ...a, gene: undefined, genes, by }
+              : { ...a, genes: undefined, gene: genes[0] || "", by });
+          }} />
+        <select value={a.by || (a.genes && a.genes.length > 1 ? "mutated" : "mutationType")} disabled={busy || (a.genes && a.genes.length > 1)}
+          title={a.genes && a.genes.length > 1 ? "a gene set only supports \"mutated vs not\"" : "how the gene's alterations are grouped"}
           onChange={(e) => set({ ...a, by: e.target.value })}>
           <option value="mutationType">mutation type</option>
           <option value="mutated">mutated vs not</option>
@@ -1719,6 +1729,32 @@ function GeneInput({ gene, busy, onCommit }: { gene: string; busy?: boolean; onC
         setDraft(v);
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => onCommit(v), 500);
+      }}
+      onBlur={() => commit(draft)} />
+  );
+}
+
+/**
+ * One gene, or a gene SET typed as a comma-separated list ("TP53,KRAS,PIK3CA") — an alteration
+ * axis's "is ANY of these altered" covariate. Same debounce-before-commit shape as GeneInput, for
+ * the same reason: committing every keystroke would briefly make an empty or half-typed gene
+ * list the shareable link, which the compiler then rejects.
+ */
+function GeneSetInput({ genes, busy, onCommit }: { genes: string[]; busy?: boolean; onCommit: (genes: string[]) => void }) {
+  const joined = genes.join(",");
+  const [draft, setDraft] = useState(joined);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => setDraft(joined), [joined]);
+  const parse = (v: string) => v.split(",").map((g) => g.trim().toUpperCase()).filter(Boolean);
+  const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); onCommit(parse(v)); };
+  return (
+    <input className="axisgene geneset" value={draft} disabled={busy} placeholder="gene, or gene,gene,... for a set" size={Math.max(8, Math.min(30, draft.length + 2))}
+      title={'one gene, or a comma-separated gene set ("is any of these altered")'}
+      onChange={(e) => {
+        const v = e.target.value.toUpperCase();
+        setDraft(v);
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => onCommit(parse(v)), 500);
       }}
       onBlur={() => commit(draft)} />
   );
@@ -3772,13 +3808,15 @@ function Latency({ v }: { v: any }) {
                               {r.cells.map(c => (
                                 <td key={c.cohort} style={{ padding: "0.3rem 0.6rem", verticalAlign: "top" }}>
                                   {r.kind === "num"
-                                    ? <span style={{ fontVariantNumeric: "tabular-nums" }}>{c.mean} <span className="meta">± {c.sd} (n={c.n.toLocaleString()})</span></span>
+                                    ? <span style={{ fontVariantNumeric: "tabular-nums" }}>{c.mean} <span className="meta">± {c.sd} (n={c.n.toLocaleString()})</span>
+                                        {c.median != null && <><br /><span className="meta">median {c.median} ({c.q1}–{c.q3})</span></>}</span>
                                     : <span className="meta">{(c.top || []).slice(0, 3).map(t2 => t2.v + " " + Math.round(1000 * t2.n / (c.n || 1)) / 10 + "%").join(" · ")}</span>}
                                 </td>
                               ))}
                               <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", whiteSpace: "nowrap" }}
-                                title={r.statistic != null ? r.test + " = " + r.statistic + ", df = " + r.df + (r.minExpected != null ? ", smallest expected cell = " + r.minExpected : "") : undefined}>
-                                <span className="meta">{r.test}</span>
+                                title={r.statistic != null ? r.test + " = " + r.statistic + ", df = " + r.df + (r.minExpected != null ? ", smallest expected cell = " + r.minExpected : "") +
+                                  (r.rankP != null ? "; Mann-Whitney U = " + r.rankStatistic + ", p = " + r.rankP + " (single-study only, not part of the q-value correction)" : "") : undefined}>
+                                <span className="meta">{r.test}{r.rankP != null && "*"}</span>
                               </td>
                               <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: (r.p ?? 1) < 0.001 ? 600 : 400 }}>{r.p != null ? pCell(r.p) : "—"}</td>
                               <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{r.q != null ? pCell(r.q) : "—"}</td>
@@ -3917,6 +3955,19 @@ function Latency({ v }: { v: any }) {
                         <span className="meta" title="the unstratified test, which pools risk sets across studies and assumes a common baseline hazard">
                           {"  ·  pooled " + fmtP(v.logrankPooled.p)}
                           {crossesThreshold(v.logrank.p, v.logrankPooled.p) && <strong style={{ color: "var(--warn, #b45309)" }}> — the two disagree at p=0.05</strong>}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {v.logrankK && (
+                    <div className="logrank" title={"observed " + v.logrankK.observed.join(" / ") + " events vs expected " + v.logrankK.expected.join(" / ") + " under the null, across " + v.logrankK.groups + " groups"}>
+                      <strong>{v.logrankK.groups}-group log-rank</strong> χ²={v.logrankK.chi2.toFixed(2)} ({v.logrankK.df} df) · <strong>{fmtP(v.logrankK.p)}</strong>
+                      <span className="meta"> — tests whether the groups differ at all, not which pair does</span>
+                      {v.logrankK.strata > 1 && <span className="meta"> · stratified by study, {v.logrankK.strata} strata</span>}
+                      {v.logrankKPooled && (
+                        <span className="meta" title="the unstratified test, which pools risk sets across studies and assumes a common baseline hazard">
+                          {"  ·  pooled " + fmtP(v.logrankKPooled.p)}
+                          {crossesThreshold(v.logrankK.p, v.logrankKPooled.p) && <strong style={{ color: "var(--warn, #b45309)" }}> — the two disagree at p=0.05</strong>}
                         </span>
                       )}
                     </div>
