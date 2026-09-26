@@ -294,6 +294,12 @@ export interface CoxCoefficient {
   label: string;
   /** the baseline level this coefficient is measured against, for a categorical covariate */
   reference?: string;
+  /** this coefficient's own level (the non-reference side), for a categorical covariate */
+  level?: string;
+  /** which entry of the view's `covariates` array this came from — lets the UI group a
+   *  categorical covariate's coefficients back together to offer its observed levels as a
+   *  reference-level picker, without re-deriving them from raw rows */
+  axisIndex?: number;
   beta: number; se: number; hr: number; ciLow: number; ciHigh: number; p: number;
 }
 export interface CoxResult {

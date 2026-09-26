@@ -95,8 +95,15 @@ export function buildCoxColumns(covariates: CoxCovariate[], kindsFinal: AxisKind
       const byFreq = [...counts.keys()].sort((a, b) => (counts.get(b)! - counts.get(a)!) || (a < b ? -1 : 1));
       // A declared reference (must be an observed level, or it's ignored rather than
       // silently matching nothing) goes first; everything else keeps its frequency order.
-      const declared = cov.reference;
-      const levels = declared && counts.has(declared) ? [declared, ...byFreq.filter((l) => l !== declared)] : byFreq;
+      // An alteration mutated-vs-not covariate defaults to "Not mutated" as the reference
+      // regardless of which side is more frequent: without this, a gene altered in a minority
+      // of patients reports "wild-type vs mutated" while one altered in a majority reports the
+      // opposite, purely from how common each gene's alteration happens to be, not from any
+      // real change in convention — the exact TP53-vs-APC inconsistency this fixes.
+      const isMutatedAxis = cov.source === "alteration" && (cov.by === "mutated" || cov.by === undefined);
+      const implicitDefault = isMutatedAxis && counts.has("Not mutated") ? "Not mutated" : undefined;
+      const declared = cov.reference && counts.has(cov.reference) ? cov.reference : implicitDefault;
+      const levels = declared ? [declared, ...byFreq.filter((l) => l !== declared)] : byFreq;
       const reference = levels[0];
       for (const level of levels.slice(1)) columns.push({ axisIndex: ci, label: axisLabel(cov) + ": " + level, reference, level });
     }
@@ -680,7 +687,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
 
       const missing = patientLevelTotal - fit.n;
       const coefficients: CoxCoefficient[] = columns.map((col, i) => ({
-        label: col.label, ...(col.reference ? { reference: col.reference } : {}),
+        label: col.label, ...(col.reference ? { reference: col.reference } : {}), ...(col.level ? { level: col.level } : {}),
+        axisIndex: col.axisIndex,
         beta: fit.beta[i], se: fit.se[i], hr: fit.hr[i], ciLow: fit.ciLow[i], ciHigh: fit.ciHigh[i], p: fit.p[i]
       }));
       const coxResult: ViewResult = { kind: "cox", cohorts: vNames, endpoint,

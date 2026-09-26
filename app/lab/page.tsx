@@ -4001,6 +4001,18 @@ function Latency({ v }: { v: any }) {
                     };
                     const removeCovariate = (ci: number) => patchView(vi, { covariates: covariates.filter((_, j) => j !== ci) });
                     const addCovariate = () => patchView(vi, { covariates: [...covariates, { source: "clinical", attribute: (trackAttrs.attrs[0] || {}).attribute || "" }] });
+                    // The reference level for a categorical covariate is picked from the levels
+                    // this run actually observed (v.cox.coefficients), not re-derived client-side —
+                    // a covariate the fit dropped (only one level, or no result yet) simply gets no
+                    // picker rather than a guess at what the data might contain.
+                    const observedLevels = (ci: number): string[] => {
+                      const coefs = (v.cox && v.cox.coefficients) || [];
+                      const mine = coefs.filter((c: any) => c.axisIndex === ci);
+                      if (!mine.length) return [];
+                      const levels = new Set<string>();
+                      for (const c of mine) { if (c.reference) levels.add(c.reference); if (c.level) levels.add(c.level); }
+                      return [...levels];
+                    };
                     return (
                       <div className="basis" style={{ flexWrap: "wrap" }}>
                         <span className="meta">endpoint</span>
@@ -4021,15 +4033,25 @@ function Latency({ v }: { v: any }) {
                           stratify by study
                         </label>
                         <div style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "0.3rem", marginTop: "0.3rem" }}>
-                          {covariates.map((c, ci) => (
+                          {covariates.map((c, ci) => {
+                            const levels = observedLevels(ci);
+                            return (
                             <span key={ci} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
                               <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={catalogAttrs()}
                                 profiles={profileOptions()} loading={attrsLoading()} busy={busy}
                                 onChange={(next) => setCovariate(ci, next)} />
+                              {levels.length > 1 && <label className="tbfield" title="the level a hazard ratio is measured against; unset uses this covariate's default (mutated/not always compares against 'Not mutated', other categoricals use whichever level is most frequent)">
+                                ref <select value={c.reference && levels.includes(c.reference) ? c.reference : ""} disabled={busy}
+                                  onChange={e => setCovariate(ci, { ...c, reference: e.target.value || undefined })}>
+                                  <option value="">(default)</option>
+                                  {levels.map(l => <option key={l} value={l}>{l}</option>)}
+                                </select>
+                              </label>}
                               <button type="button" className="tbbtn" disabled={busy} title="remove this covariate"
                                 onClick={() => removeCovariate(ci)}>remove</button>
                             </span>
-                          ))}
+                            );
+                          })}
                           <button type="button" className="tbbtn" disabled={busy} style={{ alignSelf: "flex-start" }}
                             onClick={addCovariate}>+ add covariate</button>
                         </div>
