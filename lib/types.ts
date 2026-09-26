@@ -175,6 +175,15 @@ export function isClinicalLeaf(c: Clause | null | undefined): c is ClinicalLeaf 
 
 export interface CohortDef {
   all?: Clause[];
+  /**
+   * Name of another cohort in the same document whose `all` clauses this one inherits — spliced
+   * in ahead of this cohort's own, so editing the parent updates every child instead of relying
+   * on copy-pasted clauses staying in sync by hand. Resolved (and cycles rejected) before
+   * anything is compiled — by the time a compiler or the readback sees this def, `extends` is
+   * gone and `all` already holds the full, flattened list. Only combines `all`; other fields
+   * (study, studies, lineGap, notes) are always the child's own, never inherited.
+   */
+  extends?: string;
   /** evaluate in another study */
   study?: string;
   /** union across studies (federated; members stay study-qualified) */

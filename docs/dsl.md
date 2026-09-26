@@ -23,6 +23,7 @@ Sent to `POST /api/analysis`, edited by the in-app chat, and encoded in shareabl
 
 ```
 cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient in the study
+               "extends"?: "<cohort name>",   // splice that cohort's own "all" in AHEAD of this one's, resolved before anything is compiled
                "study"?:   "<id>",            // evaluate in another study
                "studies"?: ["<id>", ...],     // union across studies (federated, no count limit)
                "lineGap"?: 90,                // derived-treatment-line gap, days
@@ -35,6 +36,14 @@ clause    := leaf | { "any": [leaf × 1-8] }   // OR (UNION DISTINCT)
 single-study by design); members are study-qualified patient ids. Patient overlap across studies
 is deliberately **not** deduplicated, and clinical vocabularies are **not** harmonized — views
 say so in their captions.
+
+**`extends`.** A cohort naming another cohort in `extends` inherits that cohort's `all`
+clauses, spliced in ahead of its own — so a family of nested cohorts (e.g. "APC-mutated", then
+"APC-mutated AND liver mets") can share one definition instead of two copies of the same clause
+drifting apart when one gets edited. Only `all` is inherited — `study`/`studies`/`lineGap`/
+`notes` are always the child's own. Resolved (and a cycle, direct or through a chain, rejected by
+name) before compilation, so every downstream reader — compiled SQL, the plain-language readback,
+provenance — sees the fully flattened `all` list, exactly as if it had been written out by hand.
 
 ### Leaf kinds
 
@@ -1819,6 +1828,48 @@ TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers w
   "views": [
     {
       "kind": "survival"
+    }
+  ]
+}
+```
+
+### Example 27: extends: a nested cohort without repeating its parent's filter
+
+APC-mutant colorectal cancer, then the same population restricted to liver metastasis — without re-stating the APC clause. `compare` shows both share the same APC-mutant base, so a difference between them is attributable to the liver-mets split, not to two independently-typed cohort definitions quietly drifting apart.
+
+```json
+{
+  "study": "crc_apc_impact_2020",
+  "cohorts": {
+    "APC-mutant": {
+      "all": [
+        {
+          "kind": "oql",
+          "q": "APC: MUT"
+        }
+      ]
+    },
+    "APC-mutant, liver mets": {
+      "extends": "APC-mutant",
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "METASTASIS_LIVER",
+          "values": [
+            "Yes"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "genes": [
+        "TP53",
+        "KRAS",
+        "PIK3CA"
+      ]
     }
   ]
 }

@@ -507,6 +507,21 @@ export const EXAMPLES: DslExample[] = [
       },
       views: [{ kind: "survival" }]
     }
+  },
+  {
+    title: "extends: a nested cohort without repeating its parent's filter",
+    demonstrates: "A cohort inheriting another's `all` clauses instead of copy-pasting them, so editing the base cohort updates every cohort built on it. `extends` is resolved before compilation, so the compiled SQL and this comparison's counts are identical to writing the APC clause out twice by hand.",
+    tags: ["cohort-structure", "extends"],
+    note: "APC-mutant colorectal cancer, then the same population restricted to liver metastasis — without re-stating the APC clause. `compare` shows both share the same APC-mutant base, so a difference between them is attributable to the liver-mets split, not to two independently-typed cohort definitions quietly drifting apart.",
+    doc: {
+      study: "crc_apc_impact_2020",
+      cohorts: {
+        "APC-mutant": { all: [{ kind: "oql", q: "APC: MUT" }] },
+        "APC-mutant, liver mets": { extends: "APC-mutant",
+          all: [{ kind: "clinical", attribute: "METASTASIS_LIVER", values: ["Yes"] }] }
+      },
+      views: [{ kind: "compare", genes: ["TP53", "KRAS", "PIK3CA"] }]
+    }
   }
 ];
 
@@ -540,6 +555,7 @@ Sent to \`POST /api/analysis\`, edited by the in-app chat, and encoded in sharea
 
 \`\`\`
 cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient in the study
+               "extends"?: "<cohort name>",   // splice that cohort's own "all" in AHEAD of this one's, resolved before anything is compiled
                "study"?:   "<id>",            // evaluate in another study
                "studies"?: ["<id>", ...],     // union across studies (federated, no count limit)
                "lineGap"?: 90,                // derived-treatment-line gap, days
@@ -552,6 +568,14 @@ clause    := leaf | { "any": [leaf × 1-8] }   // OR (UNION DISTINCT)
 single-study by design); members are study-qualified patient ids. Patient overlap across studies
 is deliberately **not** deduplicated, and clinical vocabularies are **not** harmonized — views
 say so in their captions.
+
+**\`extends\`.** A cohort naming another cohort in \`extends\` inherits that cohort's \`all\`
+clauses, spliced in ahead of its own — so a family of nested cohorts (e.g. "APC-mutated", then
+"APC-mutated AND liver mets") can share one definition instead of two copies of the same clause
+drifting apart when one gets edited. Only \`all\` is inherited — \`study\`/\`studies\`/\`lineGap\`/
+\`notes\` are always the child's own. Resolved (and a cycle, direct or through a chain, rejected by
+name) before compilation, so every downstream reader — compiled SQL, the plain-language readback,
+provenance — sees the fully flattened \`all\` list, exactly as if it had been written out by hand.
 
 ### Leaf kinds
 
@@ -896,7 +920,8 @@ Oncoprint sort: ordered track keys — "genomic" (default staircase), a clinical
 be in clinical), or "-label" descending; missing values sort last; staircase + patient id are the
 final tiebreakers. Example: "sort":["CANCER_TYPE","-CURRENT_AGE_DEID"].
 
-cohortDef: { "all": [clause, ...(max 8)], "study"?: "<id>", "studies"?: ["<id>", ...] } — clauses ANDed; an empty all[] is every patient in the study;
+cohortDef: { "all": [clause, ...(max 8)], "extends"?: "<cohort name>", "study"?: "<id>", "studies"?: ["<id>", ...] } — clauses ANDed; an empty all[] is every patient in the study;
+"extends" splices that cohort's own "all" in ahead of this one's (only "all" is inherited; a cycle is rejected by name) — e.g. define "apcMutated" once, then "apcMutatedLiverMets": {"extends":"apcMutated","all":[...]} instead of repeating the APC clause.
 a cohort may target another study or union across several (members are study-qualified; overlap
 across studies is NOT deduplicated — say so when comparing). Oncoprint views federate too: cross-study
 columns are qualified per study (duplicates appear twice) and a Study track shows each column's origin.

@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-09-24",
+  "generated": "2026-09-26",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -94,6 +94,10 @@
     "Study-stratified survival across two studies": {
       "TP53 mut": 25555,
       "TP53 wt": 24627
+    },
+    "extends: a nested cohort without repeating its parent's filter": {
+      "APC-mutant": 325,
+      "APC-mutant, liver mets": 227
     }
   }
 }

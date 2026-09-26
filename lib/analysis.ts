@@ -28,6 +28,7 @@ import {
 import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis, coverageNote, type PlotData, type PlotGroup, type AxisKind } from "./plot.ts";
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
+import { resolveExtends } from "./cohort-extends.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -137,8 +138,11 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   const t0 = Date.now();
   // Parameters are resolved FIRST, so everything downstream — compilers,
   // validators, provenance — sees an ordinary document and cannot tell a
-  // template from one written out by hand.
-  const { doc, params: usedParams, unused: unusedParams } = resolveParams(template);
+  // template from one written out by hand. `extends` is resolved right after,
+  // for the same reason: by the time anything else looks at doc.cohorts, every
+  // cohort's `all` is already the full, flattened list.
+  const { doc: paramsDoc, params: usedParams, unused: unusedParams } = resolveParams(template);
+  const doc = resolveExtends(paramsDoc);
   const docStudy = await resolveStudy(doc.study);
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
   const names = Object.keys(doc.cohorts || {});
