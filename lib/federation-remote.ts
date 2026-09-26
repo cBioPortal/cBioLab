@@ -12,7 +12,7 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, ExploreResult } from "./types.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest } from "./federation.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest } from "./federation.ts";
 import { carriesPatientIds } from "./federation.ts";
 
 interface RemoteAggregates {
@@ -151,10 +151,10 @@ export class RemoteAggregateResolver implements AggregateCapable {
     this.remember(r);
     return r.geneCounts;
   }
-  async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS", anchor?: SurvivalAnchor | null): Promise<SurvivalCount[]> {
+  async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS", anchor?: SurvivalAnchor | null, columns?: EndpointColumns): Promise<SurvivalCount[]> {
     this.guard(def);
     const r = await mcpCall(this.url, "federated_aggregates",
-      { study: this.study, cohort: def || {}, survival: true, endpoint, ...(anchor ? { anchor } : {}) });
+      { study: this.study, cohort: def || {}, survival: true, endpoint, ...(anchor ? { anchor } : {}), ...(columns ? { endpointColumns: columns } : {}) });
     this.remember(r);
     return r.survivalCounts;
   }
@@ -201,6 +201,12 @@ export class RemoteAggregateResolver implements AggregateCapable {
     this.guard(def);
     throw new Error("the peer serving " + this.study + " does not answer plots yet: bins from two sites are counted " +
       "on two scales, and pooling them needs a shared one");
+  }
+
+  async attributeQuantile(def: CohortDef | null | undefined, _attribute: string, _per: "patient" | "sample", _p: number): Promise<number | null> {
+    this.guard(def);
+    throw new Error("a percentile-based cutoff is not supported against " + this.study + " yet: it is served by a remote peer, " +
+      "and this needs its own MCP method rather than guessing at one");
   }
 
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {

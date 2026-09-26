@@ -30,6 +30,21 @@ export interface ClinicalLeaf {
   range?: ClinicalRange;
   op?: ClinicalOp;
   value?: string | number;
+  /**
+   * Resolve `value` from a live percentile of this attribute's distribution instead of a literal
+   * number — e.g. `{op:">=", percentile:0.8}` = "at or above the 80th percentile" ("top 20%").
+   * Requires `op` (not `values`/`range`) and must not be combined with an explicit `value`.
+   * Resolved once per document, before compilation (lib/analysis.ts's resolveCohortPercentiles),
+   * so cohort2.ts's compiler always sees an ordinary, already-numeric op+value leaf — `percentile`
+   * is gone by the time it gets there, exactly like a `$param` is gone after lib/params.ts.
+   */
+  percentile?: number;
+  /**
+   * The reference population the percentile is computed against: another cohort's name in this
+   * same document. Omit for the whole study. That cohort must not itself use `percentile` — no
+   * chaining — and must resolve to a single study, same as the cohort this leaf lives in.
+   */
+  percentileOf?: string;
 }
 /**
  * An explicit, cross-study list of ids. Each id is "<study>:<bare-id>" — the
@@ -222,6 +237,13 @@ export interface SurvivalView {
   /** endpoint prefix: OS (default), PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS */
   endpoint?: string;
   /**
+   * Override the <endpoint>_MONTHS/<endpoint>_STATUS naming convention with the exact clinical
+   * attribute names, for a study whose outcome columns don't follow it (some do not — e.g.
+   * PFS_MONTHS_FIRST_LINE_TX/PROGRESSION_STATUS). Both must be given together; `endpoint`, if
+   * also given, is then just a display label, not something column names are derived from.
+   */
+  monthsAttribute?: string; statusAttribute?: string;
+  /**
    * Re-anchor the clock to a timeline event instead of the study's day 0.
    * Delayed entry is applied automatically — without it, anchoring earlier than
    * day 0 manufactures immortal time.
@@ -258,6 +280,8 @@ export interface CoxView {
   kind: "cox"; cohorts?: string[];
   /** endpoint prefix: OS (default), PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS */
   endpoint?: string;
+  /** same escape hatch as SurvivalView.monthsAttribute/statusAttribute, for the same reason */
+  monthsAttribute?: string; statusAttribute?: string;
   /** one or more covariates to fit simultaneously; each becomes one or more forest-plot rows */
   covariates: CoxCovariate[];
   /** fit separate baseline hazards per study rather than pooling them (default false) */
@@ -471,6 +495,15 @@ export interface CohortResult {
 export interface CompareCell {
   cohort: string; profiled: number; any: number; driver: number;
   anyPct: number | null; driverPct: number | null;
+  /**
+   * profiled/altered split by alteration type (mutation/cna/structuralVariant) — lets a reader
+   * (or the UI) tell "0% altered, fully assayed" apart from "0% altered because this whole type
+   * was never assayed for this cohort's study". `any`/`anyPct` above combine all three, matching
+   * the oncoprint's "any alteration" convention, and can look like a real negative result even
+   * when a whole type contributed zero because it was never checked.
+   */
+  byType: { mutation: { profiled: number; altered: number }; cna: { profiled: number; altered: number };
+    structuralVariant: { profiled: number; altered: number } };
 }
 export interface CompareRow {
   gene: string; cells: CompareCell[]; pAny?: number; pDriver?: number;
@@ -573,11 +606,14 @@ export interface ClinicalRow {
   attribute: string; per: "patient" | "sample"; kind: "cat" | "num";
   cells: ClinicalCell[];
   test?: string; statistic?: number; df?: number; p?: number; q?: number;
+  /** Welch's ANOVA (3+ numeric cohorts) only: the denominator degrees of freedom — `df` above
+   *  holds df1 (groups − 1), an F-test's other, non-integer, Welch-Satterthwaite-style df */
+  df2?: number;
   /**
-   * numeric, single-study, exactly 2 cohorts: Mann-Whitney U alongside Welch's t (never in place
-   * of it) — a check worth having when the attribute is skewed or has outliers the mean can
-   * mislead on. Deliberately not itself part of the q-value correction above, which stays
-   * Welch's t only.
+   * numeric, single-study: a rank-based test alongside the moment-based one (never in place of
+   * it) — Mann-Whitney U for exactly 2 cohorts, Kruskal-Wallis for 3+ — a check worth having when
+   * the attribute is skewed or has outliers the mean can mislead on. Deliberately not itself part
+   * of the q-value correction above, which stays Welch's t/ANOVA only.
    */
   rankStatistic?: number; rankP?: number;
   /** categorical only: vocabulary size, and the smallest expected cell */

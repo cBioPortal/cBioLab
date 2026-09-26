@@ -14,8 +14,8 @@ import { geneSymbols } from "./gene-tracks.ts";
 import type { PlotView } from "./types.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, logRankK, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
-  chiSquareTest, welchT, varianceFromMoments, pearsonFromMoments, regressionFromMoments, fisherZMeta,
-  applyCutoff, toIncidence, coxRegression, mannWhitneyU, quantilesFromHistogram, type Moments, type CoxRow } from "./stats.ts";
+  chiSquareTest, welchT, welchAnovaTest, varianceFromMoments, pearsonFromMoments, regressionFromMoments, fisherZMeta,
+  applyCutoff, toIncidence, coxRegression, mannWhitneyU, kruskalWallis, quantilesFromHistogram, type Moments, type CoxRow } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
 import { viewToSvg } from "./view-svg.ts";
@@ -23,12 +23,13 @@ import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, Co
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
-  type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments,
+  type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments, type EndpointColumns,
   type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, type FederatedPlotCapable, legendFor } from "./federation.ts";
 import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis, coverageNote, type PlotData, type PlotGroup, type AxisKind } from "./plot.ts";
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
+import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -50,6 +51,28 @@ const COOCCUR_GENE_LIMIT = 12;
 function overLimit(what: string, max: number, given: number): string | null {
   return given > max ? what + " takes at most " + max + "; this asks for " + given + " — remove " + (given - max) +
     " rather than have the rest silently ignored" : null;
+}
+
+/** the three alteration types a compare-view gene's "any alteration" figure combines */
+export const ALTERATION_TYPES = ["mutation", "cna", "structuralVariant"] as const;
+export type AlterationType = typeof ALTERATION_TYPES[number];
+
+/**
+ * Which alteration types were actually assayed anywhere in a compare view's rows, and which
+ * contributed zero profiled patients everywhere despite at least one OTHER type being assayed —
+ * the signal that a whole type (e.g. copy-number) was never checked in this study, not "checked,
+ * found none". A gene's own byType.cna.profiled being 0 could just mean this one gene isn't on
+ * the CNA panel; it is only a study-wide gap when EVERY gene in the view agrees. Pulled out of
+ * the compare branch below so it's a pure function testable without a database.
+ */
+export function missingAlterationTypes(rows: { cells: { byType: Record<AlterationType, { profiled: number; altered: number }> }[] }[]):
+  { assayed: AlterationType[]; missing: AlterationType[] } {
+  const total: Record<AlterationType, number> = { mutation: 0, cna: 0, structuralVariant: 0 };
+  for (const r of rows) for (const c of r.cells) for (const t of ALTERATION_TYPES) total[t] += c.byType[t].profiled;
+  return {
+    assayed: ALTERATION_TYPES.filter((t) => total[t] > 0),
+    missing: ALTERATION_TYPES.filter((t) => total[t] === 0)
+  };
 }
 
 export interface CoxColumn { axisIndex: number; label: string; reference?: string; level?: string }
@@ -142,8 +165,16 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   // for the same reason: by the time anything else looks at doc.cohorts, every
   // cohort's `all` is already the full, flattened list.
   const { doc: paramsDoc, params: usedParams, unused: unusedParams } = resolveParams(template);
-  const doc = resolveExtends(paramsDoc);
-  const docStudy = await resolveStudy(doc.study);
+  const extendsDoc = resolveExtends(paramsDoc);
+  const docStudy = await resolveStudy(extendsDoc.study);
+  // A percentile leaf needs a real query (a percentile is a fact about the data, not the
+  // document's own JSON), so this runs after extends/params but before anything compiles a
+  // cohort — by the time compileCohortDef sees a leaf, `percentile` has already become an
+  // ordinary `value`.
+  const doc = await resolveCohortPercentiles(extendsDoc, docStudy, async (study, refDef, attribute, per, p) => {
+    const res = await resolverFor(study, {});
+    return res.attributeQuantile(refDef, attribute, per, p);
+  });
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
   const names = Object.keys(doc.cohorts || {});
   if (!names.length) throw new Error("document has no cohorts");
@@ -233,6 +264,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       // database; the analysis layer only sums. Identical arithmetic whether the
       // instance is patient-level or aggregate-only — which is what makes mixed
       // federation possible at all.
+      const zeroByType = () => ({ mutation: { profiled: 0, altered: 0 }, cna: { profiled: 0, altered: 0 }, structuralVariant: { profiled: 0, altered: 0 } });
+      const zeroCounts = (gene: string): GeneCounts => ({ gene, profiled: 0, altered: 0, driver: 0, byType: zeroByType() });
       const tally = new Map<string, GeneCounts>(); // "cohort|gene" -> summed counts
       const perSite: { cohort: string; study: string; counts: GeneCounts[] }[] = [];
       await Promise.all(vNames.flatMap((n) =>
@@ -241,8 +274,13 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           perSite.push({ cohort: n, study: st, counts });
           for (const c of counts) {
             const k = n + "|" + c.gene;
-            const cur = tally.get(k) || { gene: c.gene, profiled: 0, altered: 0, driver: 0 };
+            const cur = tally.get(k) || zeroCounts(c.gene);
             cur.profiled += c.profiled; cur.altered += c.altered; cur.driver += c.driver;
+            // an older MCP peer may not send byType yet — treat it as absent, not a crash
+            for (const t of ALTERATION_TYPES) {
+              cur.byType[t].profiled += c.byType?.[t]?.profiled ?? 0;
+              cur.byType[t].altered += c.byType?.[t]?.altered ?? 0;
+            }
             tally.set(k, cur);
           }
         })));
@@ -250,11 +288,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       const annSource = (await buildAnnotationIndex([], genes, vStudies.length === 1 ? vStudies[0] : vStudies)).source;
       const rows: CompareRow[] = genes.map((g) => {
         const cells: CompareCell[] = vNames.map((n) => {
-          const t = tally.get(n + "|" + g) || { gene: g, profiled: 0, altered: 0, driver: 0 };
+          const t = tally.get(n + "|" + g) || zeroCounts(g);
           const profiled = t.profiled, any = t.altered, driver = t.driver;
           return { cohort: n, profiled, any, driver,
             anyPct: profiled ? Math.round(1000 * any / profiled) / 10 : null,
-            driverPct: profiled ? Math.round(1000 * driver / profiled) / 10 : null };
+            driverPct: profiled ? Math.round(1000 * driver / profiled) / 10 : null,
+            byType: t.byType };
         });
         const row: CompareRow = { gene: g, cells };
         if (vNames.length === 2) {
@@ -283,15 +322,35 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         benjaminiHochberg(testedDriver.map((r) => r.pDriver!)).forEach((q, i) => { testedDriver[i].qDriver = q; });
       }
       const noteParts: string[] = [];
+      {
+        // Disclosed once per view rather than per cell, since a whole missing alteration type is
+        // a property of the participating studies' data, not of any one gene.
+        const { assayed, missing } = missingAlterationTypes(rows);
+        if (assayed.length && missing.length) {
+          const label = { mutation: "mutation", cna: "copy-number", structuralVariant: "structural-variant" };
+          noteParts.push("no " + missing.map((t) => label[t]).join("/") + " data exists for " +
+            (vStudies.length === 1 ? vStudies[0] : "the participating studies") +
+            " — altered% reflects only " + assayed.map((t) => label[t]).join("/") + " status, not a real negative for the missing type(s)");
+        }
+      }
       if (vNames.length > 2) {
         noteParts.push(vNames.length + " cohorts compared per gene with a Pearson chi-squared (2×" + vNames.length +
           " table: altered vs not, one column per cohort) — a two-cohort compare uses an exact Fisher test instead." +
           " q-values are Benjamini–Hochberg across the " + genes.length + " genes tested here, separately for any-alteration and driver-only");
       }
       if (vStudies.length > 1) {
+        // "A stratified test would be more principled" only means something when a single
+        // COHORT mixes patients from several studies — that is the situation a differing case
+        // mix WITHIN one arm can confound. When every cohort is confined to its own one study
+        // (a cross-study compare where each arm IS a study, e.g. UTUC vs a bladder TCGA study),
+        // there is no within-arm mixing to stratify away: study already IS the grouping variable,
+        // and the pooled test already only compares whole, homogeneous studies against each other.
+        const eachCohortOneStudy = vNames.every((n) => cohorts[n].studies.length === 1);
         noteParts.push("cross-study comparison" + (vStudies.length <= 2 ? " (" + vStudies.join(", ") + ")" : " across " + vStudies.length + " studies") +
           ": denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated" +
-          "; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic" +
+          (eachCohortOneStudy
+            ? "; each cohort is confined to a single study, so there is no within-cohort study mixing for a stratified test to correct — this compares whole studies against each other, not a pooled-vs-stratified question"
+            : "; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic") +
           (aggOnly.length ? "; " + aggOnly.join(", ") + " contributed aggregate counts only (no patient-level access)" : ""));
       }
       views.push({ kind: "compare", cohorts: vNames, annotation: annSource, rows,
@@ -309,6 +368,23 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) {
         views.push({ kind: "survival", error: "bad survival endpoint '" + endpoint.slice(0, 40) + "'" }); continue;
       }
+      // Escape hatch for a study whose outcome columns don't follow the <endpoint>_MONTHS/
+      // <endpoint>_STATUS convention (a real gap, not hypothetical — several MSK papers store
+      // e.g. PFS_MONTHS_FIRST_LINE_TX/PROGRESSION_STATUS). Both must be given together; endpoint
+      // becomes purely a display label rather than something column names are derived from.
+      const rawMonthsAttr = (view as SurvivalView).monthsAttribute, rawStatusAttr = (view as SurvivalView).statusAttribute;
+      let columns: EndpointColumns | undefined;
+      if (rawMonthsAttr != null || rawStatusAttr != null) {
+        const monthsAttr = String(rawMonthsAttr || "").trim(), statusAttr = String(rawStatusAttr || "").trim();
+        if (!/^[A-Za-z0-9_]{1,64}$/.test(monthsAttr) || !/^[A-Za-z0-9_]{1,64}$/.test(statusAttr)) {
+          views.push({ kind: "survival", endpoint,
+            error: "monthsAttribute and statusAttribute must both be given as valid attribute names (letters, digits, underscore, ≤64 chars): got '" +
+              monthsAttr.slice(0, 40) + "'/'" + statusAttr.slice(0, 40) + "'" });
+          continue;
+        }
+        columns = { months: monthsAttr, status: statusAttr };
+      }
+      const columnsLabel = columns ? columns.months + "/" + columns.status : endpoint + "_MONTHS/" + endpoint + "_STATUS";
       const rawCutoff = (view as SurvivalView).cutoffMonths;
       let cutoffMonths: number | undefined;
       if (rawCutoff != null) {
@@ -340,7 +416,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       for (const n of vNames) perSite.set(n, new Map());
       await Promise.all(vNames.flatMap((n) =>
         cohorts[n].studies.map(async (st) => {
-          perSite.get(n)!.set(st, await resolvers[st].survivalCounts(doc.cohorts[n], endpoint, anchor));
+          perSite.get(n)!.set(st, await resolvers[st].survivalCounts(doc.cohorts[n], endpoint, anchor, columns));
         })));
       // An EMPTY COHORT also yields no rows, and must not be reported as a
       // missing endpoint — that sends the reader (or a model) off to conclude the
@@ -367,18 +443,21 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         if (vStudies.length === 1) {
           const { st, eps } = declared[0];
           views.push({ kind: "survival", endpoint,
-            error: eps.length
-              ? st + " has no " + endpoint + " data (no " + endpoint + "_MONTHS/" + endpoint + "_STATUS). It does declare " +
-                eps.join(", ") + " — pick one of those as the endpoint."
-              : st + " has no survival data: it declares no <X>_MONTHS/<X>_STATUS pair, so there is no endpoint to plot." });
+            error: columns
+              ? st + " has no data in " + columnsLabel + " (checked because monthsAttribute/statusAttribute were given explicitly)." +
+                (eps.length ? " It does declare " + eps.join(", ") + " under the standard naming convention, if that's what was meant instead." : "")
+              : eps.length
+                ? st + " has no " + endpoint + " data (no " + columnsLabel + "). It does declare " +
+                  eps.join(", ") + " — pick one of those as the endpoint."
+                : st + " has no survival data: it declares no <X>_MONTHS/<X>_STATUS pair, so there is no endpoint to plot." });
           continue;
         }
         const avail = declared.map(({ st, eps }) => st + ": " + (eps.join(", ") || "none declared"));
         endpointHelp = " " + silent.length + " of " + vStudies.length + " stud" + (silent.length === 1 ? "y has" : "ies have") +
-          " no " + endpoint + " data and contribute" + (silent.length === 1 ? "s" : "") + " no patients here (" + avail.join("; ") + ").";
+          " no " + (columns ? columnsLabel : endpoint) + " data and contribute" + (silent.length === 1 ? "s" : "") + " no patients here (" + avail.join("; ") + ").";
         if (silent.length === vStudies.length) {
           views.push({ kind: "survival", endpoint,
-            error: "no participating study defines " + endpoint + "_MONTHS/" + endpoint + "_STATUS." + endpointHelp });
+            error: "no participating study has data in " + columnsLabel + "." + endpointHelp });
           continue;
         }
       }
@@ -397,10 +476,18 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       // full covariance matrix) instead of running the 2-arm test pairwise, which would need
       // its own multiple-testing correction and answers a different question ("which PAIRS
       // differ") than "do these groups differ at all".
+      //
+      // A log-rank test from a handful of patients is not wrong, exactly, but a chi2/p computed
+      // from (say) 1 vs 2 patients is statistically vacuous and a fully-formatted number reads
+      // as a real result regardless — the same "loud refusal, not a silently thin answer" this
+      // codebase applies everywhere else. MIN_ARM_N is a floor below which the test is refused
+      // outright; the KM curves themselves still draw (they are descriptive, not a test).
+      const MIN_ARM_N = 10;
+      const thinArms = curves.filter((c) => c.n < MIN_ARM_N).map((c) => c.cohort + " (n=" + c.n + ")");
       let logrank: LogRank | undefined, logrankPooled: LogRank | undefined;
       let logrankK: LogRankK | undefined, logrankKPooled: LogRankK | undefined;
       let sites: string[] = [];
-      if (vNames.length === 2) {
+      if (thinArms.length === 0 && vNames.length === 2) {
         const [A, B] = vNames;
         sites = [...new Set([...perSite.get(A)!.keys(), ...perSite.get(B)!.keys()])];
         const pooledTest = logRank([{ a: pointsFor(A), b: pointsFor(B) }]);
@@ -410,7 +497,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         } else {
           logrank = pooledTest;
         }
-      } else if (vNames.length >= 3) {
+      } else if (thinArms.length === 0 && vNames.length >= 3) {
         sites = [...new Set(vNames.flatMap((n) => [...perSite.get(n)!.keys()]))];
         const pooledTest = logRankK([{ groups: vNames.map((n) => pointsFor(n)) }]);
         if (sites.length > 1) {
@@ -486,7 +573,11 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               : logrankK
                 ? " " + logrankK.groups + "-group log-rank (" + logrankK.df + " df) on a single study — tests whether the" +
                   " groups differ at all, not which pair does. No stratification applies."
-                : " Log-rank needs at least two cohorts.") });
+                : thinArms.length
+                  ? " Log-rank not computed: " + thinArms.join(", ") + (thinArms.length === 1 ? " has" : " have") +
+                    " fewer than " + MIN_ARM_N + " patients — a chi-squared from this few is not a meaningful test, only a" +
+                    " number shaped like one. The curves above are still drawn; they are descriptive, not a test."
+                  : " Log-rank needs at least two cohorts.") });
 
     } else if (view.kind === "cox") {
       // Multivariate Cox: unlike survival/compare, this is fit from real per-patient rows
@@ -498,6 +589,19 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) {
         views.push({ kind: "cox", error: "bad survival endpoint '" + endpoint.slice(0, 40) + "'" }); continue;
       }
+      // Same escape hatch as SurvivalView, for the same reason — see the survival branch above.
+      let endpointColumns: EndpointColumns | undefined;
+      if (cx.monthsAttribute != null || cx.statusAttribute != null) {
+        const monthsAttr = String(cx.monthsAttribute || "").trim(), statusAttr = String(cx.statusAttribute || "").trim();
+        if (!/^[A-Za-z0-9_]{1,64}$/.test(monthsAttr) || !/^[A-Za-z0-9_]{1,64}$/.test(statusAttr)) {
+          views.push({ kind: "cox", endpoint,
+            error: "monthsAttribute and statusAttribute must both be given as valid attribute names (letters, digits, underscore, ≤64 chars): got '" +
+              monthsAttr.slice(0, 40) + "'/'" + statusAttr.slice(0, 40) + "'" });
+          continue;
+        }
+        endpointColumns = { months: monthsAttr, status: statusAttr };
+      }
+      const endpointLabel = endpointColumns ? endpointColumns.months + "/" + endpointColumns.status : endpoint;
       const covariates = Array.isArray(cx.covariates) ? cx.covariates : [];
       if (!covariates.length) { views.push({ kind: "cox", endpoint, error: "a cox view needs at least one covariate" }); continue; }
       { const e = overLimit("a cox view", 8, covariates.length); if (e) { views.push({ kind: "cox", endpoint, error: e.replace("at most 8", "at most 8 covariates") }); continue; } }
@@ -533,7 +637,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             continue;
           }
           patientLevelTotal += cohorts[n].perStudy[st]?.count || 0;
-          const { rows, kinds: k } = await res.coxRows(doc.cohorts[n], endpoint, covariates);
+          const { rows, kinds: k } = await res.coxRows(doc.cohorts[n], endpoint, covariates, endpointColumns);
           if (!kinds) kinds = k;
           for (const r of rows) rawRows.push({ ...r, study: st });
         }
@@ -543,7 +647,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           error: excludedRemote.length && patientLevelTotal === 0
             ? "no patient-level participant could answer this — " + excludedRemote.map((e) => e.study).join(", ") +
               (excludedRemote.length === 1 ? " is" : " are") + " aggregate-only, and multivariate Cox needs patient-level covariates"
-            : "no patient had both a " + endpoint + " measurement and every requested covariate defined" });
+            : "no patient had both a " + endpointLabel + " measurement and every requested covariate defined" });
         continue;
       }
       const kindsFinal = kinds!;
@@ -1234,7 +1338,15 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               row.rankStatistic = rk.u; row.rankP = rk.p;
             }
           } else {
-            row.skipped = "a numeric attribute is tested only for exactly 2 cohorts";
+            // Welch's ANOVA needs nothing beyond the same (n, mean, variance) moments Welch's t
+            // already uses, so — unlike the median/rank tests below — it works at any study
+            // count, the same reason chi-squared and the survival view's k-group log-rank do.
+            const a = welchAnovaTest(cells.map((c) => ({ n: c.n, mean: c.mean ?? 0, variance: c.variance })));
+            row.test = "Welch ANOVA"; row.statistic = a.f; row.df = a.df1; row.df2 = a.df2; row.p = a.p;
+            if (singleStudy && cells.every((c) => c.valueCounts)) {
+              const kw = kruskalWallis(cells.map((c) => c.valueCounts!));
+              row.rankStatistic = kw.h; row.rankP = kw.p;
+            }
           }
           rows.push(row);
         }
@@ -1245,12 +1357,16 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       views.push({ kind: "clinical", cohorts: vNames, clinical: rows, studies: vStudies,
         participation: participationFor(vStudies, false),
         note: "Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary;" +
-          " numeric ones with Welch's unequal-variance t-test computed from (n, Σx, Σx²) — those three totals are" +
-          " ADDITIVE across sites, so the pooled mean and variance are exact from per-site aggregates and no" +
-          " individual value is ever transmitted. Counting unit follows the attribute: patients for patient-level," +
-          " samples for sample-level. q-values are Benjamini–Hochberg across the " + tested.length + " tested attributes." +
+          " numeric ones with Welch's unequal-variance t-test (2 cohorts) or Welch's ANOVA (3+) computed from" +
+          " (n, Σx, Σx²) per cohort — those totals are ADDITIVE across sites, so the pooled mean and variance are" +
+          " exact from per-site aggregates and no individual value is ever transmitted. Counting unit follows the" +
+          " attribute: patients for patient-level, samples for sample-level. q-values are Benjamini–Hochberg across" +
+          " the " + tested.length + " tested attributes." +
           (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged." :
-            " Numeric attributes also show median/IQR and, for exactly 2 cohorts, a Mann-Whitney U alongside Welch's t (not itself part of the q-value correction) — computed from the attribute's complete value distribution, which is only exact and only requested because this view is confined to a single study.") });
+            " Numeric attributes also show median/IQR and a rank-based test alongside the moment-based one — a" +
+            " Mann-Whitney U for 2 cohorts, Kruskal-Wallis for 3+ (neither itself part of the q-value correction) —" +
+            " computed from the attribute's complete value distribution, which is only exact and only requested" +
+            " because this view is confined to a single study.") });
 
     } else if (view.kind === "cooccurrence") {
       // Co-occurrence is a property of ONE cohort, not a comparison between two,

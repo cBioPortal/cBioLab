@@ -110,6 +110,24 @@
       "stable": 428,
       "instable": 27,
       "indeterminate": 15
+    },
+    "A missing alteration type is disclosed, never a false negative": {
+      "Well-diff liposarcoma": 444
+    },
+    "Four receptor subtypes, one real test: Welch's ANOVA": {
+      "HR+/HER2-": 1291,
+      "TNBC": 167,
+      "HR+/HER2+": 132,
+      "HR-/HER2+": 61
+    },
+    "A non-standard survival endpoint, named directly": {
+      "MSI-H": 28,
+      "MSS": 148
+    },
+    "Top 20% TMB, within one cancer type: a percentile cutoff": {
+      "NSCLC": 350,
+      "NSCLC high-TMB": 69,
+      "NSCLC low-TMB": 281
     }
   }
 }

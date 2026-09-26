@@ -55,8 +55,20 @@ export interface Instance {
   conn: ChConn;
 }
 
-/** per (cohort, gene) alteration tallies — the compare view's atom */
-export interface GeneCounts { gene: string; profiled: number; altered: number; driver: number }
+/** profiled/altered for one alteration type alone */
+export interface TypeCounts { profiled: number; altered: number }
+/**
+ * per (cohort, gene) alteration tallies — the compare view's atom. `profiled`/`altered`/`driver`
+ * combine mutation+CNA+structural-variant, matching the oncoprint's "any alteration" convention;
+ * `byType` carries the same profiled/altered split PER type, so a caller can tell "0% altered,
+ * fully assayed" apart from "0% altered because this whole type was never assayed here" — a study
+ * with zero CNA data (no COPY_NUMBER_ALTERATION panel entries at all) would otherwise report a
+ * CNA-only gene as a false 0%, indistinguishable from a real negative result.
+ */
+export interface GeneCounts {
+  gene: string; profiled: number; altered: number; driver: number;
+  byType: { mutation: TypeCounts; cna: TypeCounts; structuralVariant: TypeCounts };
+}
 /** (months, event) multiset — pools exactly across instances, carries no ids */
 export interface SurvivalCount {
   months: number; event: number; n: number;
@@ -67,6 +79,14 @@ export interface SurvivalCount {
 export interface SurvivalAnchor {
   eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST";
 }
+/**
+ * Explicit (months, status) column names, overriding the `<endpoint>_MONTHS`/`<endpoint>_STATUS`
+ * naming convention — for a study whose outcome columns don't follow it (a real, not hypothetical,
+ * gap: several MSK papers store e.g. `PFS_MONTHS_FIRST_LINE_TX`/`PROGRESSION_STATUS`, which the
+ * convention-based endpoint discovery has no way to find). `endpoint` is then purely a display
+ * label, not something the engine derives column names from.
+ */
+export interface EndpointColumns { months: string; status: string }
 /** Additive moments for one gene on a continuous profile. */
 export interface ProfileMoments { gene: string; n: number; sum: number; sumsq: number }
 /** One protein change and how many patients carry it. */
@@ -217,8 +237,16 @@ function driverJoin(pin: string): string {
 }
 
 /**
- * Per-gene (profiled, altered, driver) counts for one cohort in one study,
- * computed entirely in the database. Returns counts only — no ids.
+ * Per-gene (profiled, altered, driver) counts for one cohort in one study, BOTH combined (vtype
+ * = 'any', matching the oncoprint's "any alteration" convention) and split per alteration type
+ * (vtype = 'mutation' | 'cna' | 'structural_variant') — computed entirely in the database,
+ * counts only, no ids.
+ *
+ * The per-type split exists so a caller can tell "0% altered, fully assayed" apart from "0%
+ * altered because this whole type was never assayed here": a study with zero CNA data has no
+ * COPY_NUMBER_ALTERATION rows in sample_to_gene_panel_derived, so a CNA-only gene's 'cna' row
+ * naturally comes back with profiled=0 — a signal the combined 'any' row alone cannot carry,
+ * since it can only ever say "altered" or "not altered", never "never checked".
  */
 export function geneCountsSql(cohortSql: string, genes: string[], study: string, pin: string | null, db: string = DB): string {
   const pid = "replaceOne(g.patient_unique_id, " + sq(study + "_") + ", '')";
@@ -227,33 +255,46 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
     "altered AS (\n" +
-    "  SELECT g.hugo_gene_symbol AS gene, " + pid + " AS pid,\n" +
+    "  SELECT g.hugo_gene_symbol AS gene, " + pid + " AS pid, g.variant_type AS vtype,\n" +
     (pin ? "         max(ann.is_driver) AS is_driver\n" : "         0 AS is_driver\n") +
     "  FROM " + db + ".genomic_event_derived g\n" +
     (pin ? driverJoin(pin) : "") +
     "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
     "    AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
-    "  GROUP BY gene, pid\n" +
+    "  GROUP BY gene, pid, vtype\n" +
     "),\n" +
     "covered AS (\n" +
-    "  SELECT DISTINCT pg.gene AS gene, " + covPid + " AS pid\n" +
+    "  SELECT DISTINCT pg.gene AS gene, " + covPid + " AS pid,\n" +
+    "         multiIf(sp.alteration_type = 'MUTATION_EXTENDED', 'mutation',\n" +
+    "                 sp.alteration_type = 'COPY_NUMBER_ALTERATION', 'cna', 'structural_variant') AS vtype\n" +
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + geneList + ")\n" +
     "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
-    "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
+    "  WHERE sp.cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')\n" +
     "    AND " + covPid + " IN (SELECT pid FROM cohort)\n" +
+    "),\n" +
+    "raw AS (\n" +
+    "  SELECT gene, pid, vtype, max(is_alt) AS is_alt, max(is_drv) AS is_drv\n" +
+    "  FROM (\n" +
+    "    SELECT gene, pid, vtype, 1 AS is_alt, is_driver > 0 AS is_drv FROM altered\n" +
+    "    UNION ALL\n" +
+    "    SELECT gene, pid, vtype, 0 AS is_alt, 0 AS is_drv FROM covered\n" +
+    "  )\n" +
+    "  GROUP BY gene, pid, vtype\n" +
+    "),\n" +
+    "perPatient AS (\n" +
+    "  SELECT gene, pid, max(is_alt) AS is_alt, max(is_drv) AS is_drv\n" +
+    "  FROM raw GROUP BY gene, pid\n" +
     ")\n" +
-    "SELECT gene,\n" +
-    "       uniqExact(pid) AS profiled,\n" +
-    "       uniqExactIf(pid, is_alt) AS altered,\n" +
-    "       uniqExactIf(pid, is_drv) AS driver\n" +
-    "FROM (\n" +
-    "  SELECT gene, pid, 1 AS is_alt, is_driver > 0 AS is_drv FROM altered\n" +
-    "  UNION ALL\n" +
-    "  SELECT gene, pid, 0 AS is_alt, 0 AS is_drv FROM covered\n" +
-    ")\n" +
-    "GROUP BY gene"
+    "SELECT gene, vtype,\n" +
+    "       uniqExact(pid) AS profiled, uniqExactIf(pid, is_alt = 1) AS altered, uniqExactIf(pid, is_drv = 1) AS driver\n" +
+    "FROM raw GROUP BY gene, vtype\n" +
+    "UNION ALL\n" +
+    "SELECT gene, 'any' AS vtype,\n" +
+    "       uniqExact(pid) AS profiled, uniqExactIf(pid, is_alt = 1) AS altered, uniqExactIf(pid, is_drv = 1) AS driver\n" +
+    "FROM perPatient GROUP BY gene"
   );
 }
 
@@ -583,6 +624,26 @@ export function clinicalHistogramSql(cohortSql: string, attrs: string[], study: 
 }
 
 /**
+ * One number: the exact p-th quantile of a numeric clinical attribute within one cohort, in one
+ * study — the reference population for a percentile-based cohort cutoff (item 4 of the CRC/APC
+ * roadmap's "features that would have helped", e.g. Samstein's "top 20% TMB per cancer type").
+ * A single ClickHouse aggregate; no individual value leaves the database, only the resolved
+ * threshold — same shape as every other aggregate here.
+ */
+export function attributeQuantileSql(cohortSql: string, attribute: string, per: "patient" | "sample", p: number, study: string, db: string = DB): string {
+  if (!(p > 0 && p < 1)) throw new Error("attributeQuantileSql: p must be between 0 and 1 (exclusive), got " + p);
+  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  return (
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT quantileExact(" + p + ")(toFloat64OrNull(attribute_value)) AS q\n" +
+    "FROM " + db + ".clinical_data_derived\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attribute) + "\n" +
+    "  AND type = " + sq(per) + " AND attribute_value != ''\n" +
+    "  AND " + pid + " IN (SELECT pid FROM cohort)"
+  );
+}
+
+/**
  * (months, event, n) triples for one cohort in one study. Aggregate — pools
  * exactly with other instances' triples to give a correct pooled KM curve.
  */
@@ -599,10 +660,10 @@ export const ENDPOINT_RE = /^[A-Z][A-Z0-9_]{0,39}$/;
  * told when a study has nothing for the endpoint asked for rather than seeing
  * its patients quietly vanish from a curve.
  */
-export function survivalCountsSql(cohortSql: string, study: string, db: string = DB, endpoint = "OS"): string {
+export function survivalCountsSql(cohortSql: string, study: string, db: string = DB, endpoint = "OS", columns?: EndpointColumns): string {
   if (!ENDPOINT_RE.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
-  const months = endpoint + "_MONTHS", status = endpoint + "_STATUS";
+  const months = columns?.months || (endpoint + "_MONTHS"), status = columns?.status || (endpoint + "_STATUS");
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
@@ -637,11 +698,12 @@ export function survivalCountsSql(cohortSql: string, study: string, db: string =
  */
 export function anchoredSurvivalSql(
   cohortSql: string, study: string, db: string, endpoint: string,
-  anchor: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" }
+  anchor: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" },
+  columns?: EndpointColumns
 ): string {
   if (!ENDPOINT_RE.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
-  const months = endpoint + "_MONTHS", status = endpoint + "_STATUS";
+  const months = columns?.months || (endpoint + "_MONTHS"), status = columns?.status || (endpoint + "_STATUS");
   const pick = anchor.occurrence === "LAST" ? "max" : "min";
   const attrCond = anchor.key
     ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data\n" +
@@ -690,11 +752,12 @@ export function anchoredSurvivalSql(
  * participant can answer.
  */
 export function coxRowsSql(
-  cohortSql: string, study: string, db: string, endpoint: string, covariates: { label: string; sel: string }[]
+  cohortSql: string, study: string, db: string, endpoint: string, covariates: { label: string; sel: string }[],
+  columns?: EndpointColumns
 ): string {
   if (!ENDPOINT_RE.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
-  const months = endpoint + "_MONTHS", status = endpoint + "_STATUS";
+  const months = columns?.months || (endpoint + "_MONTHS"), status = columns?.status || (endpoint + "_STATUS");
   const covCtes = covariates.map((c) => c.label + " AS (\n" + c.sel + "\n)").join(",\n");
   const joins = covariates.map((c) => "INNER JOIN " + c.label + " ON " + c.label + ".id = os.pid").join("\n  ");
   const select = covariates.map((c) => c.label + ".v AS " + c.label).join(", ");
@@ -1089,7 +1152,7 @@ export interface AggregateCapable {
   /** cohort size — a count, not a roster */
   count(def: CohortDef | null | undefined): Promise<number>;
   geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]>;
-  survivalCounts(def: CohortDef | null | undefined, endpoint?: string, anchor?: SurvivalAnchor | null): Promise<SurvivalCount[]>;
+  survivalCounts(def: CohortDef | null | undefined, endpoint?: string, anchor?: SurvivalAnchor | null, columns?: EndpointColumns): Promise<SurvivalCount[]>;
   /** endpoints this participant can answer for; [] when it cannot say */
   survivalEndpoints(): Promise<string[]>;
   /** structural shape of this cohort's timeline, per event type */
@@ -1104,6 +1167,9 @@ export interface AggregateCapable {
   /** a plot's aggregated contract: bins, groups or cells — never points */
   plot(def: CohortDef | null | undefined, spec: PlotRequest): Promise<PlotData>;
   attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean }): Promise<AttrStats[]>;
+  /** the p-th quantile of a numeric clinical attribute in this cohort — the reference population
+   *  for a percentile-based cohort cutoff. null when the attribute has no values here. */
+  attributeQuantile(def: CohortDef | null | undefined, attribute: string, per: "patient" | "sample", p: number): Promise<number | null>;
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
   variantCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<VariantReport>;
   /** per-codon counts for the lollipop (see lollipopCte) — aggregates only */
@@ -1129,7 +1195,7 @@ export interface PatientLevelCapable extends AggregateCapable {
   readonly instance: Instance & { mode: "patient-level" };
   members(def: CohortDef | null | undefined): Promise<string[]>;
   /** per-patient rows for a Cox fit — see PatientLevelResolver.coxRows for why this is here and not on AggregateCapable */
-  coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[]):
+  coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[], columns?: EndpointColumns):
     Promise<{ rows: { t: number; event: number; values: (number | string)[] }[]; kinds: AxisKind[] }>;
 }
 
@@ -1201,14 +1267,25 @@ abstract class BaseResolver implements AggregateCapable {
     if (!genes.length) return [];
     const r = await this.runLogged<ChRow>("geneCounts",
       geneCountsSql(this.cohortSql(def), genes, this.study, this.ctx.oncokbPin ?? null, this.instance.conn.db), this.instance.conn);
-    return r.data.map((x) => ({
-      gene: x.gene, profiled: Number(x.profiled), altered: Number(x.altered), driver: Number(x.driver)
-    }));
+    const zeroType = (): TypeCounts => ({ profiled: 0, altered: 0 });
+    const byGene = new Map<string, GeneCounts>();
+    for (const g of genes) byGene.set(g, { gene: g, profiled: 0, altered: 0, driver: 0,
+      byType: { mutation: zeroType(), cna: zeroType(), structuralVariant: zeroType() } });
+    for (const x of r.data) {
+      const g = byGene.get(x.gene as string);
+      if (!g) continue; // defensive: a row for a gene we didn't ask about
+      const profiled = Number(x.profiled), altered = Number(x.altered), driver = Number(x.driver);
+      if (x.vtype === "any") { g.profiled = profiled; g.altered = altered; g.driver = driver; }
+      else if (x.vtype === "mutation") g.byType.mutation = { profiled, altered };
+      else if (x.vtype === "cna") g.byType.cna = { profiled, altered };
+      else if (x.vtype === "structural_variant") g.byType.structuralVariant = { profiled, altered };
+    }
+    return genes.map((g) => byGene.get(g)!);
   }
-  async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS", anchor?: SurvivalAnchor | null): Promise<SurvivalCount[]> {
+  async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS", anchor?: SurvivalAnchor | null, columns?: EndpointColumns): Promise<SurvivalCount[]> {
     const sql = anchor
-      ? anchoredSurvivalSql(this.cohortSql(def), this.study, this.instance.conn.db, endpoint, anchor)
-      : survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db, endpoint);
+      ? anchoredSurvivalSql(this.cohortSql(def), this.study, this.instance.conn.db, endpoint, anchor, columns)
+      : survivalCountsSql(this.cohortSql(def), this.study, this.instance.conn.db, endpoint, columns);
     const r = await this.runLogged<ChRow>("survivalCounts:" + endpoint + (anchor ? "@" + anchor.eventType : ""), sql, this.instance.conn);
     return r.data.map((x) => ({
       months: Number(x.m), event: Number(x.ev), n: Number(x.n),
@@ -1367,6 +1444,12 @@ abstract class BaseResolver implements AggregateCapable {
     return out;
   }
 
+  async attributeQuantile(def: CohortDef | null | undefined, attribute: string, per: "patient" | "sample", p: number): Promise<number | null> {
+    const r = await this.runLogged<ChRow>("attributeQuantile",
+      attributeQuantileSql(this.cohortSql(def), attribute, per, p, this.study, this.instance.conn.db), this.instance.conn);
+    const v = r.data[0]?.q;
+    return v == null || v === "" ? null : Number(v);
+  }
 
   /**
    * Which of these axes' clinical attributes the STUDY declares as numbers. Only it knows: it
@@ -1635,7 +1718,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * single row carries an identifier. `kinds` says which covariates came back numeric so the
    * caller (which dummy-codes categoricals) doesn't have to re-derive it.
    */
-  async coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[]):
+  async coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[], columns?: EndpointColumns):
     Promise<{ rows: { t: number; event: number; values: (number | string)[] }[]; kinds: AxisKind[] }> {
     covariates.forEach((c, i) => validateAxis(c, "covariate " + (i + 1)));
     const db = this.instance.conn.db, conn = this.instance.conn;
@@ -1643,7 +1726,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
     const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def) };
     const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
-    const sql = coxRowsSql(ctx.cohortSql, this.study, db, endpoint, sels);
+    const sql = coxRowsSql(ctx.cohortSql, this.study, db, endpoint, sels, columns);
     const r = await this.runLogged<ChRow>("coxRows:" + endpoint, sql, conn);
     const rows = r.data.map((row) => ({
       t: Number(row.m), event: Number(row.ev),

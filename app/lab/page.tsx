@@ -3719,7 +3719,21 @@ function Latency({ v }: { v: any }) {
                       <tbody>{v.rows.map(r => (
                         <tr key={r.gene} style={{ borderTop: "1px solid var(--line)" }}>
                           <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600 }}>{r.gene}</td>
-                          {r.cells.map(c => <td key={c.cohort} style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{c.driverPct}% / {c.anyPct}%</td>)}
+                          {r.cells.map(c => {
+                            const bt = c.byType;
+                            const missing = bt && (["mutation", "cna", "structuralVariant"] as const)
+                              .filter(t => bt[t].profiled === 0 && (bt.mutation.profiled > 0 || bt.cna.profiled > 0 || bt.structuralVariant.profiled > 0));
+                            const label = { mutation: "mutation", cna: "copy-number", structuralVariant: "structural-variant" };
+                            const title = bt ? "mutation " + bt.mutation.altered + "/" + bt.mutation.profiled +
+                              " · copy-number " + bt.cna.altered + "/" + bt.cna.profiled +
+                              " · structural-variant " + bt.structuralVariant.altered + "/" + bt.structuralVariant.profiled +
+                              (missing && missing.length ? " — no " + missing.map(t => label[t]).join("/") + " data for this cohort's study" : "") : undefined;
+                            return (
+                              <td key={c.cohort} style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }} title={title}>
+                                {c.driverPct}% / {c.anyPct}%{missing && missing.length ? <sup style={{ color: "var(--warn, #b45309)" }}>*</sup> : null}
+                              </td>
+                            );
+                          })}
                           {r.pAny != null && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: r.pAny < 0.001 ? 600 : 400 }}>{r.pAny < 1e-4 ? r.pAny.toExponential(1) : r.pAny.toFixed(3)}</td>}
                           {r.qAny != null && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: r.qAny < 0.05 ? 600 : 400 }}>{r.qAny < 1e-4 ? r.qAny.toExponential(1) : r.qAny.toFixed(3)}</td>}
                         </tr>))}
@@ -3814,8 +3828,8 @@ function Latency({ v }: { v: any }) {
                                 </td>
                               ))}
                               <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", whiteSpace: "nowrap" }}
-                                title={r.statistic != null ? r.test + " = " + r.statistic + ", df = " + r.df + (r.minExpected != null ? ", smallest expected cell = " + r.minExpected : "") +
-                                  (r.rankP != null ? "; Mann-Whitney U = " + r.rankStatistic + ", p = " + r.rankP + " (single-study only, not part of the q-value correction)" : "") : undefined}>
+                                title={r.statistic != null ? r.test + " = " + r.statistic + ", df = " + r.df + (r.df2 != null ? ", " + r.df2 : "") + (r.minExpected != null ? ", smallest expected cell = " + r.minExpected : "") +
+                                  (r.rankP != null ? "; " + (r.test === "Welch ANOVA" ? "Kruskal-Wallis H = " : "Mann-Whitney U = ") + r.rankStatistic + ", p = " + r.rankP + " (single-study only, not part of the q-value correction)" : "") : undefined}>
                                 <span className="meta">{r.test}{r.rankP != null && "*"}</span>
                               </td>
                               <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: (r.p ?? 1) < 0.001 ? 600 : 400 }}>{r.p != null ? pCell(r.p) : "—"}</td>
