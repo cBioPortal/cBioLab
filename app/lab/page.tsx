@@ -4006,7 +4006,10 @@ function Latency({ v }: { v: any }) {
                     // a covariate the fit dropped (only one level, or no result yet) simply gets no
                     // picker rather than a guess at what the data might contain.
                     const observedLevels = (ci: number): string[] => {
-                      const coefs = (v.cox && v.cox.coefficients) || [];
+                      // when stratified by cohort there's no single pooled coefficients array —
+                      // union the levels each cohort's own fit happened to observe instead
+                      const coefs = (v.cox && v.cox.coefficients.length) ? v.cox.coefficients
+                        : (v.cox?.byCohort || []).flatMap((c: any) => c.coefficients);
                       const mine = coefs.filter((c: any) => c.axisIndex === ci);
                       if (!mine.length) return [];
                       const levels = new Set<string>();
@@ -4031,6 +4034,11 @@ function Latency({ v }: { v: any }) {
                           <input type="checkbox" checked={!!sv.stratifyByStudy} disabled={busy}
                             onChange={e => patchView(vi, { stratifyByStudy: e.target.checked || undefined })} />
                           stratify by study
+                        </label>
+                        <label className="chk" title="fit each cohort as its own separate model — own coefficients, own reference levels — instead of pooling them into one fit; a no-op with only one cohort">
+                          <input type="checkbox" checked={!!sv.stratifyByCohort} disabled={busy}
+                            onChange={e => patchView(vi, { stratifyByCohort: e.target.checked || undefined })} />
+                          stratify by cohort
                         </label>
                         <div style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "0.3rem", marginTop: "0.3rem" }}>
                           {covariates.map((c, ci) => {

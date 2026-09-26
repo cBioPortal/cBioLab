@@ -771,28 +771,43 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
 /** A forest plot: one row per covariate/level, its hazard ratio and Wald CI on a log axis. */
 function coxSvg(v: ViewResult, o: SvgOpts): string {
   const p = palette(o.theme), W = o.width || 760;
-  const coefs = v.cox?.coefficients || [];
-  const L = 175, R = 215, T = 30, rowH = 22;
-  const plotH = rowH * coefs.length;
-  const cap = caption(v.caveat || "", W, T + plotH + 20, p.muted);
-  const H = T + plotH + 20 + cap.height + 16;
-  const allHr = coefs.flatMap((c) => [c.ciLow, c.ciHigh, c.hr, 1]).filter((n) => Number.isFinite(n) && n > 0);
+  const L = 175, R = 215, rowH = 22, panelGap = 26;
+  const byCohort = v.cox?.byCohort;
+  // stratifyByCohort: one panel per cohort that fit, all sharing ONE hazard-ratio scale
+  // (computed across every panel) so hazard ratios are directly comparable at a glance —
+  // the whole point of stratifying is seeing where cohorts agree or disagree.
+  const panels = byCohort
+    ? byCohort.filter((c) => c.coefficients.length).map((c) => ({ heading: c.cohort + " (n=" + c.n + ", " + c.events + " events)", coefs: c.coefficients }))
+    : [{ heading: null as string | null, coefs: v.cox?.coefficients || [] }];
+  const allHr = panels.flatMap((pn) => pn.coefs).flatMap((c) => [c.ciLow, c.ciHigh, c.hr, 1]).filter((n) => Number.isFinite(n) && n > 0);
   const lo = Math.max(1e-3, Math.min(...allHr) * 0.85), hi = Math.max(...allHr) * 1.15;
   const lLo = Math.log(lo), lHi = Math.log(Math.max(hi, lo * 1.01));
   const x = (hr: number) => L + (W - L - R) * (Math.log(Math.max(hr, 1e-6)) - lLo) / (lHi - lLo);
   const out: string[] = [];
-  out.push(`<line x1="${num(x(1))}" y1="${T - 10}" x2="${num(x(1))}" y2="${num(T + plotH)}" stroke="${p.line}" stroke-width="1" stroke-dasharray="3,3"/>`);
-  out.push(`<text x="${num(x(1))}" y="${T - 14}" font-size="10" fill="${p.muted}" text-anchor="middle">HR=1</text>`);
-  coefs.forEach((c, i) => {
-    const cy = T + rowH * i + rowH / 2;
-    const label = c.label + (c.reference ? " vs " + c.reference : "");
-    out.push(`<text x="${L - 10}" y="${num(cy + 3)}" font-size="11" fill="${p.ink}" text-anchor="end">` +
-      `${esc(label.length > 26 ? label.slice(0, 25) + "…" : label)}</text>`);
-    out.push(`<line x1="${num(x(c.ciLow))}" y1="${num(cy)}" x2="${num(x(c.ciHigh))}" y2="${num(cy)}" stroke="${SERIES[0]}" stroke-width="2"/>`);
-    out.push(`<circle cx="${num(x(c.hr))}" cy="${num(cy)}" r="4" fill="${SERIES[0]}"/>`);
-    out.push(`<text x="${num(W - R + 10)}" y="${num(cy + 3)}" font-size="10" fill="${p.muted}">` +
-      `${num(c.hr)} (${num(c.ciLow)}–${num(c.ciHigh)}), ${pFmt(c.p)}</text>`);
+  let y = 30;
+  panels.forEach((pn) => {
+    const panelTop = y;
+    if (pn.heading) {
+      out.push(`<text x="${L - 10}" y="${num(y - 6)}" font-size="11" fill="${p.ink}" text-anchor="end" font-weight="600">${esc(pn.heading)}</text>`);
+    }
+    const plotH = rowH * pn.coefs.length;
+    out.push(`<line x1="${num(x(1))}" y1="${panelTop - 10}" x2="${num(x(1))}" y2="${num(panelTop + plotH)}" stroke="${p.line}" stroke-width="1" stroke-dasharray="3,3"/>`);
+    if (panelTop === 30) out.push(`<text x="${num(x(1))}" y="${panelTop - 14}" font-size="10" fill="${p.muted}" text-anchor="middle">HR=1</text>`);
+    pn.coefs.forEach((c, i) => {
+      const cy = panelTop + rowH * i + rowH / 2;
+      const label = c.label + (c.reference ? " vs " + c.reference : "");
+      out.push(`<text x="${L - 10}" y="${num(cy + 3)}" font-size="11" fill="${p.ink}" text-anchor="end">` +
+        `${esc(label.length > 26 ? label.slice(0, 25) + "…" : label)}</text>`);
+      out.push(`<line x1="${num(x(c.ciLow))}" y1="${num(cy)}" x2="${num(x(c.ciHigh))}" y2="${num(cy)}" stroke="${SERIES[0]}" stroke-width="2"/>`);
+      out.push(`<circle cx="${num(x(c.hr))}" cy="${num(cy)}" r="4" fill="${SERIES[0]}"/>`);
+      out.push(`<text x="${num(W - R + 10)}" y="${num(cy + 3)}" font-size="10" fill="${p.muted}">` +
+        `${num(c.hr)} (${num(c.ciLow)}–${num(c.ciHigh)}), ${pFmt(c.p)}</text>`);
+    });
+    y = panelTop + plotH + panelGap;
   });
+  const plotBottom = y - panelGap;
+  const cap = caption(v.caveat || "", W, plotBottom + 20, p.muted);
+  const H = plotBottom + 20 + cap.height + 16;
   out.push(cap.svg);
   return frame(W, H, out.join(""), p.bg);
 }
@@ -804,7 +819,7 @@ export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {
   if (v.kind === "course" && v.course && v.course.length) return courseSvg(v, o);
   if (v.kind === "sequence" && v.sequence && v.sequence.panels.some((z) => z.flows.length)) return sequenceSvg(v, o);
   if (v.kind === "survival" && v.curves && v.curves.length) return survivalSvg(v, o);
-  if (v.kind === "cox" && v.cox && v.cox.coefficients.length) return coxSvg(v, o);
+  if (v.kind === "cox" && v.cox && (v.cox.coefficients.length || (v.cox.byCohort || []).some((c) => c.coefficients.length))) return coxSvg(v, o);
   if (v.kind === "hotspots" && v.hotspots && v.hotspots.length) return hotspotsSvg(v, o);
   if (v.kind === "cooccurrence" && v.pairs && v.pairs.length) return cooccurrenceSvg(v, o);
   if (v.kind === "compare" && v.rows && v.rows.length) return compareSvg(v, o);

@@ -121,7 +121,7 @@ rel      := { "type": "NONE" }                                                 /
 | `hotspots` | `genes:[≤12], cohorts?:[names], minCount?` | the lollipop, as cBioPortal's results-page mutation tab draws it: one stem per codon (the stored protein start position) whose height is the distinct patient + protein change pairs there, coloured by the codon's dominant mutation type (putative drivers first), on the canonical transcript with its Pfam domains (Genome Nexus); mutations with no protein position are counted and disclosed, not drawn. `minCount` is a suppression floor each site applies **before returning anything** — a change carried by one patient is the most disclosive aggregate here |
 | `coexpression` | `genes:[2-12], profileType, cohorts?:[names]` | Pearson correlation between gene pairs on a continuous molecular profile, **within one cohort** (the first named). Each site reports only six sums (n, Σx, Σy, Σxy, Σx², Σy²), which are additive — so the federated correlation is exact, not approximate. Across studies a Fisher-z meta-analysis of per-study correlations is reported alongside the pooled one |
 | `survival` | `endpoint?:"OS"|"PFS"|…, monthsAttribute?/statusAttribute?, anchor?:{eventType,key?,value?,occurrence?}, cohorts?:[names]` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts, or the **k-group generalization** (a (k-1)-df chi-squared from the full covariance matrix, not a scalar variance — the same statistic R's `survdiff()` reports) when 3+, testing whether the groups differ AT ALL rather than which pair does. Across studies either test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. `anchor` resets the clock to a timeline event (first chemotherapy, initial diagnosis) instead of the study's day 0, and **applies left truncation automatically**: a patient joins the risk set when the study could first observe them, never at the anchor — otherwise everyone appears to survive from the anchor to their own entry, which is exactly what put them in the study. The reported entry distribution warns when an anchor is matching earlier events than intended. Cross-study baselines are not harmonized. **The test is refused, not computed, when any arm has fewer than 10 patients** — the KM curves still draw (they are descriptive), but a chi-squared from a handful of patients reads as a real result whatever its p-value says, so it is named as refused rather than reported. `monthsAttribute`/`statusAttribute` override the `<endpoint>_MONTHS`/`<endpoint>_STATUS` naming convention with exact column names, for a study whose outcome columns don't follow it (some do not — e.g. `PFS_MONTHS_FIRST_LINE_TX`/`PROGRESSION_STATUS`); both must be given together, and `endpoint` becomes purely a display label rather than something column names are derived from |
-| `cox` | `endpoint?:"OS"|"PFS"|..., monthsAttribute?/statusAttribute?, covariates:[axis, ...(max 8)], stratifyByStudy?, cutoffMonths?, cohorts?:[names]` | multivariate Cox proportional-hazards regression: several covariates fit simultaneously, reported as hazard ratios with Wald confidence intervals, drawn as a forest plot. Each `covariate` is a plot axis (clinical, molecular, or a gene's — or a gene SET's — alteration status; see Plot axes below). Unlike every other view, this is fit from real per-patient rows within each LOCAL study, not pooled aggregate counts, so a remote or aggregate-only participant cannot contribute to it and is named as excluded rather than silently dropped. `stratifyByStudy` fits a separate baseline hazard per study instead of pooling them. A categorical covariate is dummy-coded against a reference level: a mutated-vs-not alteration axis (`by:"mutated"`, the default) always defaults to `"Not mutated"` regardless of which side is more frequent — a gene altered in a minority of patients and one altered in a majority would otherwise silently end up measured in opposite directions, purely from how common each gene's alteration happens to be; every other categorical (a mutation-type/CNA axis, a clinical attribute) defaults to its most-frequently-observed level. Either way, a covariate axis may add `"reference":"<level>"` to declare the level explicitly instead — a `reference` naming a level the data doesn't have is ignored (falls back to the same default as if none were declared) rather than silently matching nothing. `monthsAttribute`/`statusAttribute` are the same naming-convention override as `survival`, for a study whose outcome columns don't follow `<endpoint>_MONTHS`/`<endpoint>_STATUS` |
+| `cox` | `endpoint?:"OS"|"PFS"|..., monthsAttribute?/statusAttribute?, covariates:[axis, ...(max 8)], stratifyByStudy?, stratifyByCohort?, cutoffMonths?, cohorts?:[names]` | multivariate Cox proportional-hazards regression: several covariates fit simultaneously, reported as hazard ratios with Wald confidence intervals, drawn as a forest plot. Each `covariate` is a plot axis (clinical, molecular, or a gene's — or a gene SET's — alteration status; see Plot axes below). Unlike every other view, this is fit from real per-patient rows within each LOCAL study, not pooled aggregate counts, so a remote or aggregate-only participant cannot contribute to it and is named as excluded rather than silently dropped. `stratifyByStudy` fits a separate baseline hazard per study instead of pooling them (one model, per-study risk sets). `stratifyByCohort` goes further: with 2+ named cohorts, it fits each cohort as its own INDEPENDENT model — own coefficients, own reference-level choice — instead of one pooled fit, drawn as one forest-plot panel per cohort sharing a single hazard-ratio scale so the effects are directly comparable; the right tool when a covariate's EFFECT, not just the cohorts' case mix, might genuinely differ between them (pooling would average that difference away). A cohort that can't be fit (too few patients, no variation) is named and skipped rather than blocking the rest; a no-op with only one cohort. A categorical covariate is dummy-coded against a reference level: a mutated-vs-not alteration axis (`by:"mutated"`, the default) always defaults to `"Not mutated"` regardless of which side is more frequent — a gene altered in a minority of patients and one altered in a majority would otherwise silently end up measured in opposite directions, purely from how common each gene's alteration happens to be; every other categorical (a mutation-type/CNA axis, a clinical attribute) defaults to its most-frequently-observed level. Either way, a covariate axis may add `"reference":"<level>"` to declare the level explicitly instead — a `reference` naming a level the data doesn't have is ignored (falls back to the same default as if none were declared) rather than silently matching nothing. `monthsAttribute`/`statusAttribute` are the same naming-convention override as `survival`, for a study whose outcome columns don't follow `<endpoint>_MONTHS`/`<endpoint>_STATUS` |
 | `course` | `eventTypes:[≤6], anchor?:{eventType,key?,value?,occurrence?}, binMonths?:3, fromMonths?:-12, toMonths?:60, cohorts?:[names]` | the **clinical course**: per time bin, the share of the cohort in each event state. Two things it refuses to fake. (1) The denominator is the patients still under observation in that bin — first recorded event to last contact (the later of their last event and their OS follow-up) — never the whole cohort, which would make a curve fall merely because follow-up ran out. (2) `anchor` is optional for one study but **required across studies**: day 0 is birth in some studies and first sequencing in others, and nothing in the schema records which, so raw day 0 compares incomparable clocks. Event types that carry real durations are drawn as a state the patient is IN; the rest as an event that HAPPENED — read from the data, not from the name. Bins are half-open [t, t+w). Event-name spellings differing only in case are folded (`Treatment`/`TREATMENT`) and the fold is named in the caveat; nothing else is merged |
 | `sequence` | `labelKey?:"SUBTYPE", eventType?:"treatment", exclude?:[values], lineGap?:90, maxSteps?:3, topN?:8, cohorts?:[names]` | **what follows what**: therapy transitions as lines, drawn as a Sankey. Records are first grouped into LINES — therapies less than `lineGap` days apart are one line, labelled by their whole combination (sorted, so `A + B` and `B + A` are one regimen). That grouping is the point: a patient has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision. Paths that end flow into TWO explicit terminals, never one: **no further line** (the study watched for at least one `lineGap` and saw no further therapy) and **record ends here** (it did not, so nothing can be concluded). Measured on MSK-CHORD, 68% of patients have under three months of observation after their last therapy and the median is 15 days — so collapsing the two would turn record-keeping into an apparent clinical decision. Flows out of a node sum to it, so nobody vanishes. Up to two cohorts are drawn as panels sharing one scale and one colour per regimen. `exclude` drops label values that are not therapies; it is a parameter and not an engine rule because such markers are **not structurally distinguishable** (MSK’s `Prior Medications to MSK` carries no duration, but neither do `Radiation Therapy` or `Investigational`), so the choice belongs in the document where a reader can see it. One cohort only |
 | `plot` | `x:axis, y:axis, unit?:"patient"\|"sample", bins?:[240,160], points?:true, colorBy?:axis, ringBy?:axis, cohorts?:[names]` | two axes over the same cases, aggregated **inside the database**: a scatter comes back as counts per grid cell, a box as quartiles per group, two categoricals as a contingency table. The payload is a few kilobytes whatever the cohort's size |
@@ -1964,7 +1964,54 @@ Every patient in the study, one term: mutated in any of TP53/KRAS/PIK3CA versus 
 }
 ```
 
-### Example 30: Survival split three ways: the k-group log-rank
+### Example 30: Cox stratified by cohort: does a gene's hazard ratio hold up in both arms?
+
+APC mutation status regressed on overall survival, separately in the MSI-high and MSS arms of the same study. Pooled, APC reads HR=0.61 (95% CI 0.48-0.78) — a real effect, but stratifying shows it is almost entirely a microsatellite-stable-population effect (MSS: HR=0.54, p<0.0001) that does not reach significance in the small MSI-high arm (HR=0.87, 95% CI 0.31-2.44, n=27) — a pooled fit alone would not have shown that the effect is concentrated in one subgroup.
+
+```json
+{
+  "study": "crc_apc_impact_2020",
+  "cohorts": {
+    "MSI-high": {
+      "all": [
+        {
+          "kind": "clinical",
+          "per": "sample",
+          "attribute": "MSI_TYPE",
+          "op": "=",
+          "value": "Instable"
+        }
+      ]
+    },
+    "MSS": {
+      "all": [
+        {
+          "kind": "clinical",
+          "per": "sample",
+          "attribute": "MSI_TYPE",
+          "op": "=",
+          "value": "Stable"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "cox",
+      "covariates": [
+        {
+          "source": "alteration",
+          "gene": "APC",
+          "by": "mutated"
+        }
+      ],
+      "stratifyByCohort": true
+    }
+  ]
+}
+```
+
+### Example 31: Survival split three ways: the k-group log-rank
 
 MSI status in three groups (stable / instable / indeterminate) instead of the usual two-arm split. The test asks whether the three curves differ AT ALL, not which pair does — a different question from running the 2-arm test three times pairwise, which would need its own multiple-testing correction.
 
@@ -2018,7 +2065,7 @@ MSI status in three groups (stable / instable / indeterminate) instead of the us
 }
 ```
 
-### Example 31: A missing alteration type is disclosed, never a false negative
+### Example 32: A missing alteration type is disclosed, never a false negative
 
 TP53 (a real mutation hotspot here) and MDM2 (never assayed for copy-number in this study) side by side. Both show 0%-or-real altered figures, but only the view's note — and each cell's per-type breakdown (mutation/CNA/structural-variant counts, visible on hover in the app) — reveals that MDM2's 0% means "never checked" while TP53's is a real, profiled result.
 
@@ -2051,7 +2098,7 @@ TP53 (a real mutation hotspot here) and MDM2 (never assayed for copy-number in t
 }
 ```
 
-### Example 32: Four receptor subtypes, one real test: Welch's ANOVA
+### Example 33: Four receptor subtypes, one real test: Welch's ANOVA
 
 Breast cancer's four receptor subtypes, compared on genomic instability (FRACTION_GENOME_ALTERED) and mutation burden (TMB_NONSYNONYMOUS). Triple-negative's markedly higher genomic instability is exactly the known biology, and both the parametric (ANOVA) and rank-based (Kruskal-Wallis) tests agree emphatically; TMB does not differ significantly by subtype here, and again both tests agree.
 
@@ -2120,7 +2167,7 @@ Breast cancer's four receptor subtypes, compared on genomic instability (FRACTIO
 }
 ```
 
-### Example 33: A non-standard survival endpoint, named directly
+### Example 34: A non-standard survival endpoint, named directly
 
 MSI-H vs MSS endometrial cancer, progression-free survival from first-line treatment — the study's actual recorded outcome, reachable only because the exact column names are given rather than assumed from an OS/PFS/DFS-style prefix.
 
@@ -2164,7 +2211,7 @@ MSI-H vs MSS endometrial cancer, progression-free survival from first-line treat
 }
 ```
 
-### Example 34: Top 20% TMB, within one cancer type: a percentile cutoff
+### Example 35: Top 20% TMB, within one cancer type: a percentile cutoff
 
 tmb_mskcc_2018 is pan-cancer, so a plain percentile would mix histologies with very different baseline TMB. "NSCLC high-TMB"/"NSCLC low-TMB" both restrict to NSCLC first, then split on whether TMB is at or above the 80th percentile COMPUTED WITHIN THAT NSCLC POPULATION (percentileOf:"NSCLC") — the readback shows the resolved number and what it was a percentile of, not just a bare threshold.
 

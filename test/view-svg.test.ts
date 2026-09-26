@@ -46,6 +46,43 @@ describe("renderers refuse rather than draw an empty frame", () => {
   });
 });
 
+describe("cox: pooled vs stratified-by-cohort forest plots", () => {
+  const coef = (label: string, hr: number) => ({ label, reference: "Not mutated", level: "Mutated", axisIndex: 0, beta: Math.log(hr), se: 0.1, hr, ciLow: hr * 0.7, ciHigh: hr * 1.3, p: 0.02 });
+  test("a pooled fit draws one panel, one HR=1 reference line", () => {
+    const v: ViewResult = { kind: "cox", cohorts: ["all"], cox: { coefficients: [coef("TP53", 1.2)], n: 100, events: 40 }, caveat: "pooled" };
+    const svg = viewToSvg(v)!;
+    assert.equal((svg.match(/HR=1/g) || []).length, 1);
+    assert.ok(svg.includes("TP53"));
+  });
+  test("stratifyByCohort draws one panel per cohort that fit, each headed by its own name and n", () => {
+    const v: ViewResult = { kind: "cox", cohorts: ["NSCLC", "CRC"],
+      cox: { coefficients: [], n: 150, events: 55, byCohort: [
+        { cohort: "NSCLC", coefficients: [coef("TP53", 1.5)], n: 100, events: 40 },
+        { cohort: "CRC", coefficients: [coef("TP53", 0.6)], n: 50, events: 15 },
+      ] },
+      caveat: "stratified" };
+    const svg = viewToSvg(v)!;
+    assert.ok(svg.includes("NSCLC (n=100, 40 events)"));
+    assert.ok(svg.includes("CRC (n=50, 15 events)"));
+    // one shared HR=1 axis label, not one per panel — the scale is shared across panels
+    assert.equal((svg.match(/HR=1/g) || []).length, 1);
+  });
+  test("a cohort that failed to fit is simply not drawn, not a blank panel", () => {
+    const v: ViewResult = { kind: "cox", cohorts: ["NSCLC", "Empty"],
+      cox: { coefficients: [], n: 100, events: 40, byCohort: [
+        { cohort: "NSCLC", coefficients: [coef("TP53", 1.5)], n: 100, events: 40 },
+        { cohort: "Empty", coefficients: [], n: 0, events: 0, error: "nothing to fit: cohort “Empty” is empty." },
+      ] },
+      caveat: "stratified, one failed" };
+    const svg = viewToSvg(v)!;
+    assert.ok(svg.includes("NSCLC"));
+    assert.equal(svg.includes("Empty ("), false);
+  });
+  test("a view with every cohort's fit empty yields no figure, same as any other empty payload", () => {
+    assert.equal(viewToSvg({ kind: "cox", cox: { coefficients: [], n: 0, events: 0, byCohort: [] } }), null);
+  });
+});
+
 describe("figures scale uniformly", () => {
   // preserveAspectRatio="none" shears circles and slants text; it forced the
   // lollipop out of SVG once already and must not come back.

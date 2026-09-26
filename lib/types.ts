@@ -286,6 +286,15 @@ export interface CoxView {
   covariates: CoxCovariate[];
   /** fit separate baseline hazards per study rather than pooling them (default false) */
   stratifyByStudy?: boolean;
+  /**
+   * Fit each named cohort as its own separate Cox model — its own coefficients, its own chosen
+   * reference levels, its own N/events — instead of pooling every cohort's patients into one
+   * fit (default false). Unlike `stratifyByStudy` (one shared model, a per-study baseline
+   * hazard via Cox's `stratum`), this produces N independent models: the right tool when the
+   * covariate EFFECT itself, not just the baseline hazard, might differ between cohorts (e.g.
+   * a gene's hazard ratio in NSCLC vs in CRC). A no-op when only one cohort is named.
+   */
+  stratifyByCohort?: boolean;
   /** administratively censor everyone still at risk past this month, same semantics as SurvivalView */
   cutoffMonths?: number;
 }
@@ -307,6 +316,16 @@ export interface CoxResult {
   n: number; events: number;
   /** studies whose patients were left out of the fit for lacking patient-level access */
   excludedRemote?: { study: string; patients: number }[];
+  /**
+   * Present only when the view asked for `stratifyByCohort` (and named 2+ cohorts): one
+   * independent Cox fit per cohort, in place of the single pooled fit above (`coefficients`
+   * here is then empty; `n`/`events` are the sum across cohorts, for the header only). Each
+   * cohort's `coefficients` chose its OWN reference levels from what IT observed, so the same
+   * covariate can read against a different reference in different cohorts — real information,
+   * not an inconsistency to paper over.
+   */
+  byCohort?: { cohort: string; coefficients: CoxCoefficient[]; n: number; events: number;
+    excludedRemote?: { study: string; patients: number }[]; error?: string }[];
 }
 /**
  * A plot: two axes over the same cases. The shape — scatter, box, contingency — follows from
