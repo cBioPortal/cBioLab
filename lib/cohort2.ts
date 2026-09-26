@@ -20,7 +20,7 @@ import { clinicalValueFoldSql, canonicalEventName } from "./event-names.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
-  SampleListLeaf, PatientListLeaf, AlterationLeaf, EventLeafFields
+  SampleListLeaf, PatientListLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
 } from "./types.ts";
 
 /** Every leaf compiler receives a fully-resolved context. */
@@ -313,6 +313,21 @@ function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): string {
     "    AND " + conds.join(" AND ");
 }
 
+// mutation_derived, not genetic_alteration_derived: the same table the lollipop reads
+// proteinPosStart from (never parsed from the change string), and its patientId is
+// already bare — no PID() stripping, unlike every table above keyed by patient_unique_id.
+function proteinPositionLeafSql(leaf: ProteinPositionLeaf, ctx: Ctx): string {
+  const gene = String(leaf.gene || "").toUpperCase().trim();
+  if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(gene)) throw new Error("proteinPosition clause: bad gene");
+  const conds = numRangeConds(leaf.range, "proteinPosStart");
+  if (!conds.length) throw new Error("proteinPosition clause needs range{gt,gte,lt,lte}");
+  return "SELECT DISTINCT patientId AS pid\n" +
+    "  FROM " + dbOf(ctx) + ".mutation_derived\n" +
+    "  WHERE studyId = " + sq(ctx.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
+    "    AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''\n" +
+    "    AND " + conds.join(" AND ");
+}
+
 function eventLeafSql(leaf: EventLeafFields, ctx: Ctx): string {
   const { patientsSql } = compileCohort({
     db: dbOf(ctx), study: ctx.study, a: leaf.a, b: leaf.b, rel: leaf.rel,
@@ -371,6 +386,7 @@ function leafSql(leaf: any, ctx: Ctx): string {
   if (leaf.kind === "caseList") return caseListLeafSql(leaf, ctx);
   if (leaf.kind === "genomicData") return genomicDataLeafSql(leaf, ctx);
   if (leaf.kind === "genericAssay") return genericAssayLeafSql(leaf, ctx);
+  if (leaf.kind === "proteinPosition") return proteinPositionLeafSql(leaf, ctx);
   if (leaf.kind === "event") return eventLeafSql(leaf, ctx);
   if (leaf.kind === "derived") return derivedLeafSql(leaf, ctx);
   if (leaf.kind === "sampleList") return sampleListLeafSql(leaf, ctx);
@@ -394,7 +410,10 @@ function clauseSql(clause: any, ctx: Ctx): string {
     return clause.any.map((l: any) => "(" + leafSql(l, ctx) + ")").join("\nUNION DISTINCT\n");
   }
   if (clause.not) {
-    return "(" + basePatientsSql(ctx.study, dbOf(ctx)) + ")\nEXCEPT DISTINCT\n(" + leafSql(clause.not, ctx) + ")";
+    // clauseSql, not leafSql: {not: {any: [...]}} needs the same any/leaf dispatch a bare
+    // clause gets, not just a single leaf — De Morgan's otherwise forces two separate `not`s
+    // to express "none of these" (e.g. "DDR intact" needed !A and !B and !C by hand).
+    return "(" + basePatientsSql(ctx.study, dbOf(ctx)) + ")\nEXCEPT DISTINCT\n(" + clauseSql(clause.not, ctx) + ")";
   }
   return leafSql(clause, ctx);
 }
@@ -450,6 +469,7 @@ function leafText(leaf: any): string {
   if (leaf.kind === "caseList") return "in case list " + leaf.id;
   if (leaf.kind === "genomicData") return leaf.gene + " " + leaf.profileType + " " + JSON.stringify(leaf.range || leaf.values);
   if (leaf.kind === "genericAssay") return leaf.entity + " " + JSON.stringify(leaf.range || leaf.values);
+  if (leaf.kind === "proteinPosition") return leaf.gene + " protein position " + JSON.stringify(leaf.range || {});
   if (leaf.kind === "sampleList" || leaf.kind === "patientList") {
     const ids: string[] = leaf.ids || [];
     const noun = leaf.kind === "sampleList" ? "sample" : "patient";
@@ -489,7 +509,9 @@ export function describeCohortDef(def: CohortDef | null | undefined): string {
   if (Array.isArray(d.all) && d.all.length === 0) return "all patients in the study";
   return (d.all || []).map((c: any) => {
     if (c.any) return "(" + c.any.map(leafText).join(" OR ") + ")";
-    if (c.not) return "NOT " + leafText(c.not);
+    if (c.not) return c.not.any
+      ? "NOT (" + c.not.any.map(leafText).join(" OR ") + ")"
+      : "NOT " + leafText(c.not);
     return leafText(c);
   }).join(" AND ");
 }

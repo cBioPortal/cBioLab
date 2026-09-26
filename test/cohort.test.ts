@@ -35,6 +35,45 @@ describe("clause-count bounds are still enforced", () => {
   });
 });
 
+describe("not: over an any: group (De Morgan's in one clause)", () => {
+  const group = { any: [{ kind: "oql" as const, q: "MLH1: MUT" }, { kind: "oql" as const, q: "MSH2: MUT" }] };
+
+  test("compiles as the study base EXCEPT the union of the group's leaves", () => {
+    const sql = compileCohortDef({ all: [{ not: group }] }, ctx);
+    assert.match(sql, /EXCEPT DISTINCT/);
+    assert.match(sql, /MLH1/);
+    assert.match(sql, /MSH2/);
+    assert.match(sql, /UNION DISTINCT/); // the group itself still unions its own leaves
+  });
+  test("is exactly the same population as negating each leaf and ANDing them (De Morgan's)", () => {
+    const oneClause = compileCohortDef({ all: [{ not: group }] }, ctx);
+    const twoClauses = compileCohortDef({
+      all: [{ not: { kind: "oql", q: "MLH1: MUT" } }, { not: { kind: "oql", q: "MSH2: MUT" } }]
+    }, ctx);
+    // not the same SQL text (a real difference: one EXCEPT vs two), but describeCohortDef's
+    // readback is how an analyst actually checks this, and it should read as equivalent logic
+    assert.equal(describeCohortDef({ all: [{ not: group }] }), "NOT (OQL[MLH1: MUT] OR OQL[MSH2: MUT])");
+    assert.equal(describeCohortDef({
+      all: [{ not: { kind: "oql", q: "MLH1: MUT" } }, { not: { kind: "oql", q: "MSH2: MUT" } }]
+    }), "NOT OQL[MLH1: MUT] AND NOT OQL[MSH2: MUT]");
+    assert.ok(oneClause && twoClauses); // both compile without throwing
+  });
+  test("a bare leaf under not still describes as before (no regression)", () => {
+    assert.equal(describeCohortDef({ all: [{ not: { kind: "oql", q: "TP53: MUT" } }] }), "NOT OQL[TP53: MUT]");
+  });
+});
+
+describe("OQL entry limit", () => {
+  test("up to 30 gene entries are accepted (was 10)", () => {
+    const genes = Array.from({ length: 30 }, (_, i) => "GENE" + i);
+    assert.doesNotThrow(() => compileCohortDef({ all: [{ kind: "oql", q: genes.join(";") }] }, ctx));
+  });
+  test("more than 30 is still refused, loudly", () => {
+    const genes = Array.from({ length: 31 }, (_, i) => "GENE" + i);
+    assert.throws(() => compileCohortDef({ all: [{ kind: "oql", q: genes.join(";") }] }, ctx), /1-30 gene entries/);
+  });
+});
+
 describe("derived buckets OR into one scan", () => {
   const ctx = { study: "x", db: "db" };
   const leaf = (range: Record<string, number>) => ({ kind: "derived" as const, metric: "followupMonths" as const, range });
@@ -72,5 +111,39 @@ describe("derived buckets OR into one scan", () => {
       /metric must be one of/);
     assert.throws(() => compileCohortDef({ all: [{ any: [leaf({ gte: 1 }), { kind: "derived", metric: "followupMonths" }] }] } as any, ctx),
       /needs a range/);
+  });
+});
+
+describe("proteinPosition: an N-/C-terminal split without a clinical attribute for it", () => {
+  test("compiles against mutation_derived's proteinPosStart, keyed by bare patientId", () => {
+    const sql = compileCohortDef({ all: [{ kind: "proteinPosition", gene: "APC", range: { lt: 1400 } }] }, ctx);
+    assert.match(sql, /FROM db\.mutation_derived/);
+    assert.match(sql, /`GENE\.hugoGeneSymbol` = 'APC'/);
+    assert.match(sql, /proteinPosStart < 1400/);
+    assert.match(sql, /SELECT DISTINCT patientId AS pid/); // bare — no PID()/study-prefix stripping, unlike patient_unique_id tables
+  });
+  test("range can combine both ends", () => {
+    const sql = compileCohortDef({ all: [{ kind: "proteinPosition", gene: "APC", range: { gte: 1400, lt: 1600 } }] }, ctx);
+    assert.match(sql, /proteinPosStart >= 1400/);
+    assert.match(sql, /proteinPosStart < 1600/);
+  });
+  test("a bad gene symbol is refused", () => {
+    assert.throws(() => compileCohortDef({ all: [{ kind: "proteinPosition", gene: "not a gene!", range: { lt: 1400 } }] }, ctx),
+      /bad gene/);
+  });
+  test("an empty range is refused rather than matching everyone", () => {
+    assert.throws(() => compileCohortDef({ all: [{ kind: "proteinPosition", gene: "APC", range: {} }] }, ctx),
+      /needs range/);
+  });
+  test("composes with an oql leaf to also require a mutation type (AND, not a new taxonomy)", () => {
+    const sql = compileCohortDef({ all: [
+      { kind: "oql", q: "APC: TRUNC" },
+      { kind: "proteinPosition", gene: "APC", range: { lt: 1400 } }
+    ] }, ctx);
+    assert.match(sql, /INTERSECT DISTINCT/); // how `all` ANDs its clauses together
+  });
+  test("reads back in plain language", () => {
+    assert.equal(describeCohortDef({ all: [{ kind: "proteinPosition", gene: "APC", range: { lt: 1400 } }] }),
+      'APC protein position {"lt":1400}');
   });
 });

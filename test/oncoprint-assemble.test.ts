@@ -52,6 +52,38 @@ test("frequencies use profiled columns as the denominator", () => {
   assert.equal(kras.profiled, 3); assert.equal(kras.freqPct, 33.3);
 });
 
+test("byGroup: the same pooled formula, sliced to each group's own columns", () => {
+  const c = assembleContract(input());
+  const tp53 = c.tracks.find((t) => t.label === "TP53")!;
+  // group A = P1 (altered), P2 (altered), P3 (profiled, not altered) -> 2 of 3
+  // group B = P4 (profiled, not altered), P5 (altered via an event on an uncovered
+  // patient) -> 1 of 2 -- and 2+1 = 3, 3+2 = 5, matching the pooled numbers above exactly
+  assert.deepEqual(tp53.byGroup, [
+    { group: "A", altered: 2, profiled: 3, freqPct: 66.7, driverPct: 33.3 },
+    { group: "B", altered: 1, profiled: 2, freqPct: 50, driverPct: 50 }
+  ]);
+  const kras = c.tracks.find((t) => t.label === "KRAS")!;
+  // group B is NOT_PROFILED for KRAS entirely (P4's panel omits it, P5 has no KRAS
+  // event) -- 0 profiled, so freqPct/driverPct are null rather than a division by zero
+  assert.deepEqual(kras.byGroup, [
+    { group: "A", altered: 1, profiled: 3, freqPct: 33.3, driverPct: 33.3 },
+    { group: "B", altered: 0, profiled: 0, freqPct: null, driverPct: null }
+  ]);
+});
+
+test("byGroup is absent (not an empty array) for a single-group oncoprint", () => {
+  const c = assembleContract({ ...input(), groups: [{ name: "everyone", pids: ["P1", "P2", "P3", "P4", "P5"] }] });
+  const tp53 = c.tracks.find((t) => t.label === "TP53")!;
+  assert.equal(tp53.byGroup, undefined, "one group pooled == the whole thing; a breakdown would just repeat it");
+});
+
+test("byGroup is only on gene tracks, not clinical/derived/heatmap rows", () => {
+  const c = assembleContract(input());
+  const nonGene = c.tracks.filter((t) => t.kind !== "gene");
+  assert.ok(nonGene.length > 0, "fixture actually has non-gene tracks to check");
+  for (const t of nonGene) assert.equal((t as { byGroup?: unknown }).byGroup, undefined);
+});
+
 test("clinical typing: categorical with Other, numeric only past 10 distinct values, absent attribute labelled", () => {
   const c = assembleContract(input());
   const type = c.tracks.find((t) => t.label === "TYPE")!;

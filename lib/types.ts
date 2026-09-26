@@ -93,6 +93,26 @@ export interface GenericAssayLeaf {
   kind: "genericAssay"; profileType: string; entity: string;
   range?: ClinicalRange; values?: (string | number)[];
 }
+/**
+ * A patient carries a mutation in `gene` whose protein position falls in
+ * `range` — the stored proteinPosStart, same column the lollipop draws from,
+ * never parsed from the change string. For splitting a cohort by where along
+ * a protein a mutation falls (e.g. an N-terminal/C-terminal truncating-domain
+ * split) when a study doesn't deposit that split as its own clinical
+ * attribute. Position-only by design: AND it with an `oql` leaf
+ * (`{"kind":"oql","q":"APC: TRUNC"}`) to also restrict by mutation type,
+ * rather than this leaf growing a second, parallel type taxonomy.
+ *
+ * Not a partition: a patient with two separate qualifying mutations on
+ * either side of a cutoff matches BOTH an N-terminal and a C-terminal
+ * leaf, the same way the CNA amp/del "overlap" is a real, disclosed
+ * count rather than an error (see GeneStateFacet.overlap). Two
+ * "disjoint" cohorts built from complementary ranges can both count
+ * such a patient, so their sizes may not add up to the ungrouped total.
+ */
+export interface ProteinPositionLeaf {
+  kind: "proteinPosition"; gene: string; range: ClinicalRange;
+}
 /** deprecated alias, translated to OQL internally */
 export interface AlterationLeaf {
   kind: "alteration"; gene: string;
@@ -142,10 +162,11 @@ export interface DerivedLeaf {
 export type Leaf =
   | OqlLeaf | ClinicalLeaf | EventLeaf | SampleListLeaf | PatientListLeaf | ProfiledLeaf
   | CaseListLeaf | GenomicDataLeaf | GenericAssayLeaf | AlterationLeaf | DerivedLeaf
+  | ProteinPositionLeaf
   /** back-compat: the flat v1 event shape, accepted without a `kind` */
   | EventLeafFields;
 
-export type Clause = Leaf | { any: Leaf[] } | { not: Leaf };
+export type Clause = Leaf | { any: Leaf[] } | { not: Leaf | { any: Leaf[] } };
 
 /** Narrow a clause to a clinical leaf (clauses may also be any/not groups). */
 export function isClinicalLeaf(c: Clause | null | undefined): c is ClinicalLeaf {
@@ -204,8 +225,17 @@ export interface SurvivalView {
   /** draw 1 - S(t), cumulative incidence, instead of survival (default "survival") */
   display?: "survival" | "incidence";
 }
-/** A Cox covariate is exactly a plot axis: clinical, molecular, or a gene's alteration status. */
-export type CoxCovariate = PlotAxis;
+/**
+ * A Cox covariate is exactly a plot axis: clinical, molecular, or a gene's alteration
+ * status — plus, only here, an optional declared reference level for a categorical
+ * covariate. Without it the most-frequent observed level becomes the reference (see
+ * runAnalysis's Cox branch), which silently decided which direction a hazard ratio points;
+ * a mutated/wild-type covariate came out "not-mutated vs mutated" whenever mutants were the
+ * majority, backwards from how a paper usually reports it. `reference` must name a level the
+ * data actually has — an unobserved value falls back to the frequency default rather than
+ * silently doing nothing.
+ */
+export type CoxCovariate = PlotAxis & { reference?: string };
 /**
  * Multivariate Cox proportional-hazards regression: several covariates at once, each
  * reported as a hazard ratio with a confidence interval (drawn as a forest plot), rather than
@@ -435,6 +465,9 @@ export interface CompareCell {
 }
 export interface CompareRow {
   gene: string; cells: CompareCell[]; pAny?: number; pDriver?: number;
+  /** Benjamini–Hochberg across the genes tested in this view, computed separately for
+   *  each of pAny/pDriver — only present once 2+ cohorts produce a p-value to correct. */
+  qAny?: number; qDriver?: number;
 }
 export interface KmPoint { t: number; s: number }
 export interface KmCurve {
@@ -665,6 +698,14 @@ export interface Track {
   /** a merged gene row: the symbols it pools, in order. Absent on a single-gene row. */
   members?: string[];
   freqPct?: number | null; driverPct?: number | null;
+  /**
+   * The same altered/profiled/freqPct/driverPct, but sliced to one column group
+   * (see Contract.groups) instead of pooled across all of them — the text/provenance
+   * side of what the figure already draws with a group boundary. Present only on gene
+   * tracks when the oncoprint has more than one group; absent (not zero-length) for a
+   * single-group oncoprint, where a per-group breakdown would just repeat the pooled row.
+   */
+  byGroup?: { group: string; altered: number; profiled: number; freqPct: number | null; driverPct: number | null }[];
   /** categorical clinical tracks */
   categories?: string[];
   /** numeric clinical + heatmap tracks (cells scaled 0..255; -1 = no data) */

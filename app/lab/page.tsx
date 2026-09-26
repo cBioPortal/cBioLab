@@ -2180,10 +2180,10 @@ function Latency({ v }: { v: any }) {
       if (def) chosen.push([name, def]);
     }
     if (!chosen.length) return;
-    // refused rather than cut to the first six: the reader ticked these, so analysing some of
-    // them without saying which would answer a different question than the one asked
-    if (chosen.length > 6) {
-      setError("an analysis takes at most 6 cohorts; " + chosen.length + " are ticked — untick " + (chosen.length - 6) + " and analyse again");
+    // refused rather than cut to the first sixteen: the reader ticked these, so analysing some
+    // of them without saying which would answer a different question than the one asked
+    if (chosen.length > 16) {
+      setError("an analysis takes at most 16 cohorts; " + chosen.length + " are ticked — untick " + (chosen.length - 16) + " and analyse again");
       return;
     }
     const nd: AnalysisDoc = { study, cohorts: Object.fromEntries(chosen), views: DEFAULT_VIEWS };
@@ -3344,7 +3344,7 @@ function Latency({ v }: { v: any }) {
               <span className="spacer" />
               <span className="meta">
                 {picked.length === 0 ? "none selected"
-                  : picked.length + " selected" + (picked.length > 6 ? " — only the first 6 are analysed" : "")}
+                  : picked.length + " selected" + (picked.length > 16 ? " — untick some first, an analysis takes at most 16" : "")}
               </span>
               <button className="primary" disabled={!picked.length} onClick={analyzePicked}
                 title={picked.length ? "analyse the ticked cohorts together (replaces the current document)" : "tick at least one cohort"}>
@@ -3678,12 +3678,14 @@ function Latency({ v }: { v: any }) {
                         <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>gene</th>
                         {v.cohorts!.map((n, i: number) => <th key={n} style={{ textAlign: "right", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}<br /><span style={{ fontWeight: 400, color: "var(--muted)" }}>driver / any</span></th>)}
                         {v.rows![0] && v.rows![0].pAny != null && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p (any)</th>}
+                        {v.rows![0] && v.rows![0].qAny != null && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q (any)</th>}
                       </tr></thead>
                       <tbody>{v.rows.map(r => (
                         <tr key={r.gene} style={{ borderTop: "1px solid var(--line)" }}>
                           <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600 }}>{r.gene}</td>
                           {r.cells.map(c => <td key={c.cohort} style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{c.driverPct}% / {c.anyPct}%</td>)}
                           {r.pAny != null && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: r.pAny < 0.001 ? 600 : 400 }}>{r.pAny < 1e-4 ? r.pAny.toExponential(1) : r.pAny.toFixed(3)}</td>}
+                          {r.qAny != null && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: r.qAny < 0.05 ? 600 : 400 }}>{r.qAny < 1e-4 ? r.qAny.toExponential(1) : r.qAny.toFixed(3)}</td>}
                         </tr>))}
                       </tbody>
                     </table>

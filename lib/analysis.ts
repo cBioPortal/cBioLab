@@ -19,7 +19,7 @@ import { fisherExact, kaplanMeier, logRank, benjaminiHochberg, cochranMantelHaen
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
 import { viewToSvg } from "./view-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
@@ -49,6 +49,35 @@ const COOCCUR_GENE_LIMIT = 12;
 function overLimit(what: string, max: number, given: number): string | null {
   return given > max ? what + " takes at most " + max + "; this asks for " + given + " — remove " + (given - max) +
     " rather than have the rest silently ignored" : null;
+}
+
+export interface CoxColumn { axisIndex: number; label: string; reference?: string; level?: string }
+/**
+ * Dummy-codes Cox covariates into fit columns: a numeric covariate (clinical number, or a
+ * molecular value) is a single column as-is. A categorical one becomes one column per
+ * non-reference level, where the reference is the covariate's declared `reference` (see
+ * CoxCovariate) if it names an observed level, else the most-frequent one — same rule either
+ * way, just which level goes first. Pulled out of the Cox branch below so it's a pure
+ * function testable without a database.
+ */
+export function buildCoxColumns(covariates: CoxCovariate[], kindsFinal: AxisKind[], rows: { values: (number | string)[] }[]): CoxColumn[] {
+  const columns: CoxColumn[] = [];
+  covariates.forEach((cov, ci) => {
+    if (kindsFinal[ci] === "num") {
+      columns.push({ axisIndex: ci, label: axisLabel(cov) });
+    } else {
+      const counts = new Map<string, number>();
+      for (const r of rows) { const v = String(r.values[ci]); counts.set(v, (counts.get(v) || 0) + 1); }
+      const byFreq = [...counts.keys()].sort((a, b) => (counts.get(b)! - counts.get(a)!) || (a < b ? -1 : 1));
+      // A declared reference (must be an observed level, or it's ignored rather than
+      // silently matching nothing) goes first; everything else keeps its frequency order.
+      const declared = cov.reference;
+      const levels = declared && counts.has(declared) ? [declared, ...byFreq.filter((l) => l !== declared)] : byFreq;
+      const reference = levels[0];
+      for (const level of levels.slice(1)) columns.push({ axisIndex: ci, label: axisLabel(cov) + ": " + level, reference, level });
+    }
+  });
+  return columns;
 }
 
 const _profileCache = new Map<string, { profiles: string[]; gaProfiles: string[] }>(); // per-study
@@ -114,7 +143,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
   const names = Object.keys(doc.cohorts || {});
   if (!names.length) throw new Error("document has no cohorts");
-  { const e = overLimit("an analysis document", 6, names.length); if (e) throw new Error(e.replace("at most 6", "at most 6 cohorts")); }
+  // 16, not 6: a real multi-arm workup (e.g. splitting one population by a categorical
+  // attribute with several levels, crossed with a base filter) routinely needs a dozen-plus
+  // named cohorts, and 6 forced one such analysis into four separate documents. Views stay
+  // at 6 — each one issues its own set of queries per cohort, so raising cohorts already
+  // multiplies real query cost without also multiplying the view count.
+  { const e = overLimit("an analysis document", 16, names.length); if (e) throw new Error(e.replace("at most 16", "at most 16 cohorts")); }
   { const e = overLimit("an analysis document", 6, (doc.views || []).length); if (e) throw new Error(e.replace("at most 6", "at most 6 views")); }
 
   // ---- evaluate cohorts: per study, sum the counts ------------------------
@@ -223,17 +257,43 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           const [x, y] = cells;
           row.pAny = fisherExact(x.any, x.profiled - x.any, y.any, y.profiled - y.any);
           row.pDriver = fisherExact(x.driver, x.profiled - x.driver, y.driver, y.profiled - y.driver);
+        } else if (vNames.length > 2) {
+          // Fisher exact is 2x2-only; an N>2-cohort comparison is a 2xN contingency
+          // table (altered vs not, one column per cohort), so it gets a chi-squared
+          // instead. minExpected — the classic "each cell should expect >=5" rule of
+          // thumb — is disclosed via the note below rather than silently trusted.
+          row.pAny = chiSquareTest(cells.map((c) => [c.any, c.profiled - c.any])).p;
+          row.pDriver = chiSquareTest(cells.map((c) => [c.driver, c.profiled - c.driver])).p;
         }
         return row;
       });
-      if (vNames.length === 2) rows.sort((a, b) => (a.pAny ?? 1) - (b.pAny ?? 1));
+      if (vNames.length >= 2) {
+        rows.sort((a, b) => (a.pAny ?? 1) - (b.pAny ?? 1));
+        // Two separate hypothesis families (any-alteration, driver-only) each get their
+        // own Benjamini–Hochberg pass across the genes tested here — mixing the two
+        // into one correction would understate significance for whichever family has
+        // fewer real signals.
+        const testedAny = rows.filter((r) => r.pAny != null);
+        benjaminiHochberg(testedAny.map((r) => r.pAny!)).forEach((q, i) => { testedAny[i].qAny = q; });
+        const testedDriver = rows.filter((r) => r.pDriver != null);
+        benjaminiHochberg(testedDriver.map((r) => r.pDriver!)).forEach((q, i) => { testedDriver[i].qDriver = q; });
+      }
+      const noteParts: string[] = [];
+      if (vNames.length > 2) {
+        noteParts.push(vNames.length + " cohorts compared per gene with a Pearson chi-squared (2×" + vNames.length +
+          " table: altered vs not, one column per cohort) — a two-cohort compare uses an exact Fisher test instead." +
+          " q-values are Benjamini–Hochberg across the " + genes.length + " genes tested here, separately for any-alteration and driver-only");
+      }
+      if (vStudies.length > 1) {
+        noteParts.push("cross-study comparison" + (vStudies.length <= 2 ? " (" + vStudies.join(", ") + ")" : " across " + vStudies.length + " studies") +
+          ": denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated" +
+          "; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic" +
+          (aggOnly.length ? "; " + aggOnly.join(", ") + " contributed aggregate counts only (no patient-level access)" : ""));
+      }
       views.push({ kind: "compare", cohorts: vNames, annotation: annSource, rows,
         participation: participationFor(vStudies, false),
-        ...(vStudies.length > 1 ? { studies: vStudies,
-          note: "cross-study comparison" + (vStudies.length <= 2 ? " (" + vStudies.join(", ") + ")" : " across " + vStudies.length + " studies") +
-            ": denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated" +
-            "; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic" +
-            (aggOnly.length ? "; " + aggOnly.join(", ") + " contributed aggregate counts only (no patient-level access)" : "") } : {}) });
+        ...(vStudies.length > 1 ? { studies: vStudies } : {}),
+        ...(noteParts.length ? { note: noteParts.join(". ") } : {}) });
 
     } else if (view.kind === "survival") {
       // Each participant returns (months, event, n) triples for its own patients:
@@ -467,21 +527,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         ? rawRows.map((r) => r.t > cutoffMonths! ? { ...r, t: cutoffMonths!, event: 0 } : r)
         : rawRows;
 
-      // Dummy-code categorical covariates (reference = the most common level); a numeric
-      // covariate (clinical number, or a molecular value) is a single column as-is.
-      interface Column { axisIndex: number; label: string; reference?: string; level?: string }
-      const columns: Column[] = [];
-      covariates.forEach((cov, ci) => {
-        if (kindsFinal[ci] === "num") {
-          columns.push({ axisIndex: ci, label: axisLabel(cov) });
-        } else {
-          const counts = new Map<string, number>();
-          for (const r of rowsCut) { const v = String(r.values[ci]); counts.set(v, (counts.get(v) || 0) + 1); }
-          const levels = [...counts.keys()].sort((a, b) => (counts.get(b)! - counts.get(a)!) || (a < b ? -1 : 1));
-          const reference = levels[0];
-          for (const level of levels.slice(1)) columns.push({ axisIndex: ci, label: axisLabel(cov) + ": " + level, reference, level });
-        }
-      });
+      const columns = buildCoxColumns(covariates, kindsFinal, rowsCut);
       if (!columns.length) {
         views.push({ kind: "cox", endpoint, cohorts: vNames,
           error: "every covariate had only one observed level across these patients — there is nothing to estimate a hazard ratio against" });

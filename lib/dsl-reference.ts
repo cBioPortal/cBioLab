@@ -529,7 +529,7 @@ SQL each cohort compiled to.
 
 \`\`\`
 { "study":   "<default study id>",            // validated against cancer_study
-  "cohorts": { "<name>": cohortDef, ... },    // max 6
+  "cohorts": { "<name>": cohortDef, ... },    // max 16
   "views":   [ view, ... ] }                  // max 6
 \`\`\`
 
@@ -545,7 +545,7 @@ cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient 
                "lineGap"?: 90,                // derived-treatment-line gap, days
                "notes"?:   "<prose>" }        // the analyst's own note on this cohort; never compiled
 clause    := leaf | { "any": [leaf × 1-8] }   // OR (UNION DISTINCT)
-                  | { "not": leaf }           // study base EXCEPT leaf
+                  | { "not": leaf | { "any": [leaf × 1-8] } }  // study base EXCEPT leaf, or EXCEPT the OR of several (De Morgan's, in one clause instead of one "not" per leaf)
 \`\`\`
 
 **Cross-study semantics.** A cohort with \`studies\` is compiled per study (compilers are
@@ -567,6 +567,7 @@ say so in their captions.
 | \`caseList\` | \`{"kind":"caseList","id":"sequenced"}\` | portal sample list; bare ids get the study prefix |
 | \`genomicData\` | \`{"kind":"genomicData","gene":G,"profileType":P,"range"\\|"values"}\` | continuous per-gene values (cna, mrna z-scores, …); unknown profiles error listing what the study has |
 | \`genericAssay\` | \`{"kind":"genericAssay","profileType":P,"entity":E,"range"\\|"values"}\` | generic assay values (mutational signatures, …) |
+| \`proteinPosition\` | \`{"kind":"proteinPosition","gene":G,"range":{gt,gte,lt,lte}}\` | patient carries a mutation in \`gene\` whose protein position (the stored proteinPosStart, same column the lollipop draws from) falls in \`range\` — for an N-/C-terminal split when a study doesn't deposit one as a clinical attribute. Position-only: AND with an \`oql\` leaf (e.g. \`{"kind":"oql","q":"APC: TRUNC"}\`) to also restrict by mutation type |
 | \`alteration\` | *(deprecated)* | translated to OQL internally; do not write new ones |
 
 **\`sampleList\`/\`patientList\` ids.** Each id is \`"<study>:<bare-id>"\` — a colon, not the
@@ -581,7 +582,7 @@ describes for every other identifier-bearing path.
 
 ### OQL subset
 
-\`q\` is 1–10 entries separated by \`;\`, each \`GENE\` (any alteration) or \`GENE: spec spec ...\`.
+\`q\` is 1–30 entries separated by \`;\`, each \`GENE\` (any alteration) or \`GENE: spec spec ...\`.
 A patient matches if **any** entry matches (portal "altered in query" semantics).
 
 - Mutations: \`MUT\`, \`MUT=<protein change>\` (e.g. \`MUT=G12C\`), classes \`MISSENSE NONSENSE TRUNC INFRAME SPLICE\`; bare \`G12C\` is protein-change shorthand.
@@ -622,13 +623,13 @@ rel      := { "type": "NONE" }                                                 /
 
 | kind | fields | semantics |
 |---|---|---|
-| \`compare\` | \`genes:[≤20], cohorts?:[names]\` | per-gene driver% / altered% per cohort with **panel-aware denominators** (profiled patients only); two-sided Fisher p when exactly 2 cohorts |
+| \`compare\` | \`genes:[≤20], cohorts?:[names]\` | per-gene driver% / altered% per cohort with **panel-aware denominators** (profiled patients only); two-sided Fisher p for exactly 2 cohorts, a Pearson chi-squared (2×N table, altered vs not) for 3+; either way, q-values are Benjamini–Hochberg across the genes tested, separately for any-alteration and driver-only |
 | \`clinical\` | \`attributes:[\u22641-20], cohorts?:[names]\` | compares clinical attribute distributions across cohorts. Categorical: Pearson chi-squared over the **full** value vocabulary. Numeric: Welch's t from (n, \u03a3x, \u03a3x\u00b2) \u2014 additive across sites, so pooled mean/variance are exact and no individual value is transmitted. BH q across attributes. Each site types its own attributes from \`clinical_attribute_meta\`; disagreements are refused, not merged |
 | \`cooccurrence\` | \`genes:[2-12], cohorts?:[names]\` | pairwise co-occurrence / mutual exclusivity **within one cohort** (the first named). Each pair's 2×2 is counted among patients profiled for **both** genes, per study against that study's own panels; log₂ odds ratio, two-sided Fisher, Benjamini–Hochberg q across pairs. Across studies the test is **stratified by study** (Cochran–Mantel–Haenszel). Pairs no panel covers are reported as not assessable, never as a null result |
 | \`hotspots\` | \`genes:[\u226412], cohorts?:[names], minCount?\` | the lollipop, as cBioPortal's results-page mutation tab draws it: one stem per codon (the stored protein start position) whose height is the distinct patient + protein change pairs there, coloured by the codon's dominant mutation type (putative drivers first), on the canonical transcript with its Pfam domains (Genome Nexus); mutations with no protein position are counted and disclosed, not drawn. \`minCount\` is a suppression floor each site applies **before returning anything** \u2014 a change carried by one patient is the most disclosive aggregate here |
 | \`coexpression\` | \`genes:[2-12], profileType, cohorts?:[names]\` | Pearson correlation between gene pairs on a continuous molecular profile, **within one cohort** (the first named). Each site reports only six sums (n, \u03a3x, \u03a3y, \u03a3xy, \u03a3x\u00b2, \u03a3y\u00b2), which are additive \u2014 so the federated correlation is exact, not approximate. Across studies a Fisher-z meta-analysis of per-study correlations is reported alongside the pooled one |
 | \`survival\` | \`endpoint?:"OS"|"PFS"|…, anchor?:{eventType,key?,value?,occurrence?}, cohorts?:[names]\` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts. Across studies the test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. \`anchor\` resets the clock to a timeline event (first chemotherapy, initial diagnosis) instead of the study's day 0, and **applies left truncation automatically**: a patient joins the risk set when the study could first observe them, never at the anchor \u2014 otherwise everyone appears to survive from the anchor to their own entry, which is exactly what put them in the study. The reported entry distribution warns when an anchor is matching earlier events than intended. Cross-study baselines are not harmonized |
-| \`cox\` | \`endpoint?:"OS"|"PFS"|..., covariates:[axis, ...(max 8)], stratifyByStudy?, cutoffMonths?, cohorts?:[names]\` | multivariate Cox proportional-hazards regression: several covariates fit simultaneously (a categorical covariate is dummy-coded against its most common level), reported as hazard ratios with Wald confidence intervals, drawn as a forest plot. Each \`covariate\` is a plot axis (clinical, molecular, or a gene's alteration status -- see Plot axes below). Unlike every other view, this is fit from real per-patient rows within each LOCAL study, not pooled aggregate counts, so a remote or aggregate-only participant cannot contribute to it and is named as excluded rather than silently dropped. \`stratifyByStudy\` fits a separate baseline hazard per study instead of pooling them |
+| \`cox\` | \`endpoint?:"OS"|"PFS"|..., covariates:[axis, ...(max 8)], stratifyByStudy?, cutoffMonths?, cohorts?:[names]\` | multivariate Cox proportional-hazards regression: several covariates fit simultaneously (a categorical covariate is dummy-coded against its most common level, unless a covariate names its own \`reference\`, see below), reported as hazard ratios with Wald confidence intervals, drawn as a forest plot. Each \`covariate\` is a plot axis (clinical, molecular, or a gene's alteration status -- see Plot axes below). Unlike every other view, this is fit from real per-patient rows within each LOCAL study, not pooled aggregate counts, so a remote or aggregate-only participant cannot contribute to it and is named as excluded rather than silently dropped. \`stratifyByStudy\` fits a separate baseline hazard per study instead of pooling them. A categorical covariate axis may add \`"reference":"<level>"\` to declare which level the hazard ratio is measured against, instead of always the most-frequently-observed one — without it, a mutated/wild-type covariate reports "wild-type vs mutated" whenever wild-type is the majority, which is backwards from how most papers report it; a \`reference\` naming a level the data doesn't have is ignored (falls back to the frequency default) rather than silently matching nothing |
 | \`course\` | \`eventTypes:[\u22646], anchor?:{eventType,key?,value?,occurrence?}, binMonths?:3, fromMonths?:-12, toMonths?:60, cohorts?:[names]\` | the **clinical course**: per time bin, the share of the cohort in each event state. Two things it refuses to fake. (1) The denominator is the patients still under observation in that bin \u2014 first recorded event to last contact (the later of their last event and their OS follow-up) \u2014 never the whole cohort, which would make a curve fall merely because follow-up ran out. (2) \`anchor\` is optional for one study but **required across studies**: day 0 is birth in some studies and first sequencing in others, and nothing in the schema records which, so raw day 0 compares incomparable clocks. Event types that carry real durations are drawn as a state the patient is IN; the rest as an event that HAPPENED \u2014 read from the data, not from the name. Bins are half-open [t, t+w). Event-name spellings differing only in case are folded (\`Treatment\`/\`TREATMENT\`) and the fold is named in the caveat; nothing else is merged |
 | \`sequence\` | \`labelKey?:"SUBTYPE", eventType?:"treatment", exclude?:[values], lineGap?:90, maxSteps?:3, topN?:8, cohorts?:[names]\` | **what follows what**: therapy transitions as lines, drawn as a Sankey. Records are first grouped into LINES \u2014 therapies less than \`lineGap\` days apart are one line, labelled by their whole combination (sorted, so \`A + B\` and \`B + A\` are one regimen). That grouping is the point: a patient has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision. Paths that end flow into TWO explicit terminals, never one: **no further line** (the study watched for at least one \`lineGap\` and saw no further therapy) and **record ends here** (it did not, so nothing can be concluded). Measured on MSK-CHORD, 68% of patients have under three months of observation after their last therapy and the median is 15 days \u2014 so collapsing the two would turn record-keeping into an apparent clinical decision. Flows out of a node sum to it, so nobody vanishes. Up to two cohorts are drawn as panels sharing one scale and one colour per regimen. \`exclude\` drops label values that are not therapies; it is a parameter and not an engine rule because such markers are **not structurally distinguishable** (MSK\u2019s \`Prior Medications to MSK\` carries no duration, but neither do \`Radiation Therapy\` or \`Investigational\`), so the choice belongs in the document where a reader can see it. One cohort only |
 | \`plot\` | \`x:axis, y:axis, unit?:"patient"\\|"sample", bins?:[240,160], points?:true, colorBy?:axis, ringBy?:axis, cohorts?:[names]\` | two axes over the same cases, aggregated **inside the database**: a scatter comes back as counts per grid cell, a box as quartiles per group, two categoricals as a contingency table. The payload is a few kilobytes whatever the cohort's size |
@@ -860,7 +861,7 @@ export const CHAT_GRAMMAR = `Document shape:
   "params"?: { "<name>": <any JSON> },   // optional; a value that is EXACTLY "$name" is replaced by it
   "notes"?: "<the analyst's own prose about this workspace>",
   "title"?: "<name, when saved as a workspace>",
-  "cohorts": { "<name>": <cohortDef>, ... (max 6) },
+  "cohorts": { "<name>": <cohortDef>, ... (max 16) },
   "views": [ {"kind":"compare","genes":[...(max 20)],"cohorts":[names?]},
              {"kind":"survival","endpoint":"OS|PFS|DFS|…","anchor":{"eventType":"Treatment","key":"SUBTYPE","value":"Chemo","occurrence":"FIRST"},"cohorts":[names?]},
              {"kind":"cox","endpoint":"OS|PFS|DFS|...","covariates":[axis, ...(max 8)],"stratifyByStudy":true?,"cutoffMonths":number?,"cohorts":[names?]},
@@ -899,7 +900,7 @@ cohortDef: { "all": [clause, ...(max 8)], "study"?: "<id>", "studies"?: ["<id>",
 a cohort may target another study or union across several (members are study-qualified; overlap
 across studies is NOT deduplicated — say so when comparing). Oncoprint views federate too: cross-study
 columns are qualified per study (duplicates appear twice) and a Study track shows each column's origin.
-clause = leaf | {"any":[leaf,...]} | {"not":leaf}.
+clause = leaf | {"any":[leaf,...]} | {"not":leaf} | {"not":{"any":[leaf,...]}} (De Morgan's — "none of these" in one clause).
 Leaf kinds:
 - {"kind":"oql","q":"STK11: DRIVER"} — genomic status in cBioPortal OQL (preferred; full notes below).
 - {"kind":"derived","metric":"followupMonths","range":{"gte":24}} (also historyMonths, alteredGenes \u2014 computed from data shape, not study vocabulary; also "lines"/"treatmentSpan", which need an explicit "eventType" since they read the study's own therapy-event vocabulary on purpose)
@@ -925,6 +926,9 @@ Leaf kinds:
 - {"kind":"caseList","id":"sequenced"|"cna"|full stable id} — portal case lists.
 - {"kind":"genomicData","gene":"CDKN2A","profileType":"cna","range":{"lte":-2}} — continuous
   per-gene values; profile must exist in the study or it errors listing what does.
+- {"kind":"proteinPosition","gene":"APC","range":{"lt":1400}} — mutated in gene with protein
+  position (proteinPosStart) in range, for an N-/C-terminal split; AND with an oql leaf
+  ({"kind":"oql","q":"APC: TRUNC"}) to also require a mutation type.
 - OQL EXP>z / PROT>z work only if the study has mRNA/protein profiles (msk_chord does not).
 - OQL details for {"kind":"oql"}: per gene MUT,
   MUT=<pchange>, MISSENSE/NONSENSE/TRUNC/INFRAME/SPLICE, AMP, HOMDEL, FUSION, DRIVER and _DRIVER

@@ -164,6 +164,8 @@ export interface TrackSummary {
   label: string; members?: string[]; kind?: string; numeric?: boolean; categories?: string[];
   altered?: number; profiled?: number; driverAltered?: number;
   freqPct?: number | null; driverPct?: number | null;
+  /** same shape, sliced to one column group — see Track.byGroup */
+  byGroup?: { group: string; altered: number; profiled: number; freqPct: number | null; driverPct: number | null }[];
   min?: number; max?: number; profileType?: string; note?: string;
 }
 export function trackTooltipLines(t: TrackSummary, columns: number, unit = "patient"): string[] {
@@ -173,6 +175,10 @@ export function trackTooltipLines(t: TrackSummary, columns: number, unit = "pati
   if (t.freqPct != null && t.profiled != null && t.altered != null) {
     lines.push(n(t.altered) + " of " + n(t.profiled) + " profiled " + unit + "s altered (" + t.freqPct + "%)");
     if (t.driverPct != null && t.driverAltered != null) lines.push(n(t.driverAltered) + " putative driver (" + t.driverPct + "%)");
+    // Pooled above, one group per line here — the same split the figure already draws
+    // with a group boundary, not just a number pooled across all of them.
+    if (t.byGroup) for (const g of t.byGroup)
+      lines.push("  " + g.group + ": " + n(g.altered) + " of " + n(g.profiled) + " altered" + (g.freqPct != null ? " (" + g.freqPct + "%)" : ""));
     if (t.profiled < columns) lines.push("not profiled in " + n(columns - t.profiled) + " of " + n(columns) + " columns");
   } else if (t.numeric && t.min != null && t.max != null) {
     lines.push((t.profileType ? t.profileType + ", " : "") + t.min + " → " + t.max);
