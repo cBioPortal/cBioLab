@@ -110,6 +110,9 @@
       "stable": 428,
       "instable": 27,
       "indeterminate": 15
+    },
+    "A missing alteration type is disclosed, never a false negative": {
+      "Well-diff liposarcoma": 444
     }
   }
 }

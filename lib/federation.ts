@@ -55,8 +55,20 @@ export interface Instance {
   conn: ChConn;
 }
 
-/** per (cohort, gene) alteration tallies — the compare view's atom */
-export interface GeneCounts { gene: string; profiled: number; altered: number; driver: number }
+/** profiled/altered for one alteration type alone */
+export interface TypeCounts { profiled: number; altered: number }
+/**
+ * per (cohort, gene) alteration tallies — the compare view's atom. `profiled`/`altered`/`driver`
+ * combine mutation+CNA+structural-variant, matching the oncoprint's "any alteration" convention;
+ * `byType` carries the same profiled/altered split PER type, so a caller can tell "0% altered,
+ * fully assayed" apart from "0% altered because this whole type was never assayed here" — a study
+ * with zero CNA data (no COPY_NUMBER_ALTERATION panel entries at all) would otherwise report a
+ * CNA-only gene as a false 0%, indistinguishable from a real negative result.
+ */
+export interface GeneCounts {
+  gene: string; profiled: number; altered: number; driver: number;
+  byType: { mutation: TypeCounts; cna: TypeCounts; structuralVariant: TypeCounts };
+}
 /** (months, event) multiset — pools exactly across instances, carries no ids */
 export interface SurvivalCount {
   months: number; event: number; n: number;
@@ -217,8 +229,16 @@ function driverJoin(pin: string): string {
 }
 
 /**
- * Per-gene (profiled, altered, driver) counts for one cohort in one study,
- * computed entirely in the database. Returns counts only — no ids.
+ * Per-gene (profiled, altered, driver) counts for one cohort in one study, BOTH combined (vtype
+ * = 'any', matching the oncoprint's "any alteration" convention) and split per alteration type
+ * (vtype = 'mutation' | 'cna' | 'structural_variant') — computed entirely in the database,
+ * counts only, no ids.
+ *
+ * The per-type split exists so a caller can tell "0% altered, fully assayed" apart from "0%
+ * altered because this whole type was never assayed here": a study with zero CNA data has no
+ * COPY_NUMBER_ALTERATION rows in sample_to_gene_panel_derived, so a CNA-only gene's 'cna' row
+ * naturally comes back with profiled=0 — a signal the combined 'any' row alone cannot carry,
+ * since it can only ever say "altered" or "not altered", never "never checked".
  */
 export function geneCountsSql(cohortSql: string, genes: string[], study: string, pin: string | null, db: string = DB): string {
   const pid = "replaceOne(g.patient_unique_id, " + sq(study + "_") + ", '')";
@@ -227,33 +247,46 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
     "altered AS (\n" +
-    "  SELECT g.hugo_gene_symbol AS gene, " + pid + " AS pid,\n" +
+    "  SELECT g.hugo_gene_symbol AS gene, " + pid + " AS pid, g.variant_type AS vtype,\n" +
     (pin ? "         max(ann.is_driver) AS is_driver\n" : "         0 AS is_driver\n") +
     "  FROM " + db + ".genomic_event_derived g\n" +
     (pin ? driverJoin(pin) : "") +
     "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
     "    AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
-    "  GROUP BY gene, pid\n" +
+    "  GROUP BY gene, pid, vtype\n" +
     "),\n" +
     "covered AS (\n" +
-    "  SELECT DISTINCT pg.gene AS gene, " + covPid + " AS pid\n" +
+    "  SELECT DISTINCT pg.gene AS gene, " + covPid + " AS pid,\n" +
+    "         multiIf(sp.alteration_type = 'MUTATION_EXTENDED', 'mutation',\n" +
+    "                 sp.alteration_type = 'COPY_NUMBER_ALTERATION', 'cna', 'structural_variant') AS vtype\n" +
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + geneList + ")\n" +
     "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
-    "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
+    "  WHERE sp.cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')\n" +
     "    AND " + covPid + " IN (SELECT pid FROM cohort)\n" +
+    "),\n" +
+    "raw AS (\n" +
+    "  SELECT gene, pid, vtype, max(is_alt) AS is_alt, max(is_drv) AS is_drv\n" +
+    "  FROM (\n" +
+    "    SELECT gene, pid, vtype, 1 AS is_alt, is_driver > 0 AS is_drv FROM altered\n" +
+    "    UNION ALL\n" +
+    "    SELECT gene, pid, vtype, 0 AS is_alt, 0 AS is_drv FROM covered\n" +
+    "  )\n" +
+    "  GROUP BY gene, pid, vtype\n" +
+    "),\n" +
+    "perPatient AS (\n" +
+    "  SELECT gene, pid, max(is_alt) AS is_alt, max(is_drv) AS is_drv\n" +
+    "  FROM raw GROUP BY gene, pid\n" +
     ")\n" +
-    "SELECT gene,\n" +
-    "       uniqExact(pid) AS profiled,\n" +
-    "       uniqExactIf(pid, is_alt) AS altered,\n" +
-    "       uniqExactIf(pid, is_drv) AS driver\n" +
-    "FROM (\n" +
-    "  SELECT gene, pid, 1 AS is_alt, is_driver > 0 AS is_drv FROM altered\n" +
-    "  UNION ALL\n" +
-    "  SELECT gene, pid, 0 AS is_alt, 0 AS is_drv FROM covered\n" +
-    ")\n" +
-    "GROUP BY gene"
+    "SELECT gene, vtype,\n" +
+    "       uniqExact(pid) AS profiled, uniqExactIf(pid, is_alt = 1) AS altered, uniqExactIf(pid, is_drv = 1) AS driver\n" +
+    "FROM raw GROUP BY gene, vtype\n" +
+    "UNION ALL\n" +
+    "SELECT gene, 'any' AS vtype,\n" +
+    "       uniqExact(pid) AS profiled, uniqExactIf(pid, is_alt = 1) AS altered, uniqExactIf(pid, is_drv = 1) AS driver\n" +
+    "FROM perPatient GROUP BY gene"
   );
 }
 
@@ -1201,9 +1234,20 @@ abstract class BaseResolver implements AggregateCapable {
     if (!genes.length) return [];
     const r = await this.runLogged<ChRow>("geneCounts",
       geneCountsSql(this.cohortSql(def), genes, this.study, this.ctx.oncokbPin ?? null, this.instance.conn.db), this.instance.conn);
-    return r.data.map((x) => ({
-      gene: x.gene, profiled: Number(x.profiled), altered: Number(x.altered), driver: Number(x.driver)
-    }));
+    const zeroType = (): TypeCounts => ({ profiled: 0, altered: 0 });
+    const byGene = new Map<string, GeneCounts>();
+    for (const g of genes) byGene.set(g, { gene: g, profiled: 0, altered: 0, driver: 0,
+      byType: { mutation: zeroType(), cna: zeroType(), structuralVariant: zeroType() } });
+    for (const x of r.data) {
+      const g = byGene.get(x.gene as string);
+      if (!g) continue; // defensive: a row for a gene we didn't ask about
+      const profiled = Number(x.profiled), altered = Number(x.altered), driver = Number(x.driver);
+      if (x.vtype === "any") { g.profiled = profiled; g.altered = altered; g.driver = driver; }
+      else if (x.vtype === "mutation") g.byType.mutation = { profiled, altered };
+      else if (x.vtype === "cna") g.byType.cna = { profiled, altered };
+      else if (x.vtype === "structural_variant") g.byType.structuralVariant = { profiled, altered };
+    }
+    return genes.map((g) => byGene.get(g)!);
   }
   async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS", anchor?: SurvivalAnchor | null): Promise<SurvivalCount[]> {
     const sql = anchor

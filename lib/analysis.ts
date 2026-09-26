@@ -52,6 +52,28 @@ function overLimit(what: string, max: number, given: number): string | null {
     " rather than have the rest silently ignored" : null;
 }
 
+/** the three alteration types a compare-view gene's "any alteration" figure combines */
+export const ALTERATION_TYPES = ["mutation", "cna", "structuralVariant"] as const;
+export type AlterationType = typeof ALTERATION_TYPES[number];
+
+/**
+ * Which alteration types were actually assayed anywhere in a compare view's rows, and which
+ * contributed zero profiled patients everywhere despite at least one OTHER type being assayed —
+ * the signal that a whole type (e.g. copy-number) was never checked in this study, not "checked,
+ * found none". A gene's own byType.cna.profiled being 0 could just mean this one gene isn't on
+ * the CNA panel; it is only a study-wide gap when EVERY gene in the view agrees. Pulled out of
+ * the compare branch below so it's a pure function testable without a database.
+ */
+export function missingAlterationTypes(rows: { cells: { byType: Record<AlterationType, { profiled: number; altered: number }> }[] }[]):
+  { assayed: AlterationType[]; missing: AlterationType[] } {
+  const total: Record<AlterationType, number> = { mutation: 0, cna: 0, structuralVariant: 0 };
+  for (const r of rows) for (const c of r.cells) for (const t of ALTERATION_TYPES) total[t] += c.byType[t].profiled;
+  return {
+    assayed: ALTERATION_TYPES.filter((t) => total[t] > 0),
+    missing: ALTERATION_TYPES.filter((t) => total[t] === 0)
+  };
+}
+
 export interface CoxColumn { axisIndex: number; label: string; reference?: string; level?: string }
 /**
  * Dummy-codes Cox covariates into fit columns: a numeric covariate (clinical number, or a
@@ -233,6 +255,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       // database; the analysis layer only sums. Identical arithmetic whether the
       // instance is patient-level or aggregate-only — which is what makes mixed
       // federation possible at all.
+      const zeroByType = () => ({ mutation: { profiled: 0, altered: 0 }, cna: { profiled: 0, altered: 0 }, structuralVariant: { profiled: 0, altered: 0 } });
+      const zeroCounts = (gene: string): GeneCounts => ({ gene, profiled: 0, altered: 0, driver: 0, byType: zeroByType() });
       const tally = new Map<string, GeneCounts>(); // "cohort|gene" -> summed counts
       const perSite: { cohort: string; study: string; counts: GeneCounts[] }[] = [];
       await Promise.all(vNames.flatMap((n) =>
@@ -241,8 +265,13 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           perSite.push({ cohort: n, study: st, counts });
           for (const c of counts) {
             const k = n + "|" + c.gene;
-            const cur = tally.get(k) || { gene: c.gene, profiled: 0, altered: 0, driver: 0 };
+            const cur = tally.get(k) || zeroCounts(c.gene);
             cur.profiled += c.profiled; cur.altered += c.altered; cur.driver += c.driver;
+            // an older MCP peer may not send byType yet — treat it as absent, not a crash
+            for (const t of ALTERATION_TYPES) {
+              cur.byType[t].profiled += c.byType?.[t]?.profiled ?? 0;
+              cur.byType[t].altered += c.byType?.[t]?.altered ?? 0;
+            }
             tally.set(k, cur);
           }
         })));
@@ -250,11 +279,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       const annSource = (await buildAnnotationIndex([], genes, vStudies.length === 1 ? vStudies[0] : vStudies)).source;
       const rows: CompareRow[] = genes.map((g) => {
         const cells: CompareCell[] = vNames.map((n) => {
-          const t = tally.get(n + "|" + g) || { gene: g, profiled: 0, altered: 0, driver: 0 };
+          const t = tally.get(n + "|" + g) || zeroCounts(g);
           const profiled = t.profiled, any = t.altered, driver = t.driver;
           return { cohort: n, profiled, any, driver,
             anyPct: profiled ? Math.round(1000 * any / profiled) / 10 : null,
-            driverPct: profiled ? Math.round(1000 * driver / profiled) / 10 : null };
+            driverPct: profiled ? Math.round(1000 * driver / profiled) / 10 : null,
+            byType: t.byType };
         });
         const row: CompareRow = { gene: g, cells };
         if (vNames.length === 2) {
@@ -283,6 +313,17 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         benjaminiHochberg(testedDriver.map((r) => r.pDriver!)).forEach((q, i) => { testedDriver[i].qDriver = q; });
       }
       const noteParts: string[] = [];
+      {
+        // Disclosed once per view rather than per cell, since a whole missing alteration type is
+        // a property of the participating studies' data, not of any one gene.
+        const { assayed, missing } = missingAlterationTypes(rows);
+        if (assayed.length && missing.length) {
+          const label = { mutation: "mutation", cna: "copy-number", structuralVariant: "structural-variant" };
+          noteParts.push("no " + missing.map((t) => label[t]).join("/") + " data exists for " +
+            (vStudies.length === 1 ? vStudies[0] : "the participating studies") +
+            " — altered% reflects only " + assayed.map((t) => label[t]).join("/") + " status, not a real negative for the missing type(s)");
+        }
+      }
       if (vNames.length > 2) {
         noteParts.push(vNames.length + " cohorts compared per gene with a Pearson chi-squared (2×" + vNames.length +
           " table: altered vs not, one column per cohort) — a two-cohort compare uses an exact Fisher test instead." +

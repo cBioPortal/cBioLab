@@ -471,6 +471,15 @@ export interface CohortResult {
 export interface CompareCell {
   cohort: string; profiled: number; any: number; driver: number;
   anyPct: number | null; driverPct: number | null;
+  /**
+   * profiled/altered split by alteration type (mutation/cna/structuralVariant) — lets a reader
+   * (or the UI) tell "0% altered, fully assayed" apart from "0% altered because this whole type
+   * was never assayed for this cohort's study". `any`/`anyPct` above combine all three, matching
+   * the oncoprint's "any alteration" convention, and can look like a real negative result even
+   * when a whole type contributed zero because it was never checked.
+   */
+  byType: { mutation: { profiled: number; altered: number }; cna: { profiled: number; altered: number };
+    structuralVariant: { profiled: number; altered: number } };
 }
 export interface CompareRow {
   gene: string; cells: CompareCell[]; pAny?: number; pDriver?: number;
