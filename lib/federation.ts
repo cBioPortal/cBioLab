@@ -779,6 +779,27 @@ export function coxRowsSql(
   );
 }
 
+/**
+ * Per-patient (outcome, covariate values) rows for a logistic fit — patient-level only, same
+ * boundary reason as coxRowsSql (see its comment). Unlike Cox/survival, there is no special
+ * `<endpoint>_MONTHS`/`<endpoint>_STATUS` convention here: the outcome is just another
+ * axis-selected CTE like any covariate, joined the same way. The caller turns its raw value
+ * into 0/1 (an observed level for a categorical outcome, already-validated 0/1 for a numeric
+ * one) — this SQL only assembles the rows, one per patient with a value on every axis.
+ */
+export function logisticRowsSql(
+  cohortSql: string, outcome: { label: string; sel: string }, covariates: { label: string; sel: string }[]
+): string {
+  const ctes = [outcome, ...covariates].map((c) => c.label + " AS (\n" + c.sel + "\n)").join(",\n");
+  const joins = covariates.map((c) => "INNER JOIN " + c.label + " ON " + c.label + ".id = " + outcome.label + ".id").join("\n  ");
+  const select = covariates.map((c) => c.label + ".v AS " + c.label).join(", ");
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" + ctes + "\n" +
+    "SELECT " + outcome.label + ".v AS y" + (select ? ", " + select : "") + "\n" +
+    "FROM " + outcome.label + (joins ? "\n  " + joins : "")
+  );
+}
+
 /** Which (<X>_MONTHS, <X>_STATUS) pairs a study actually declares. Metadata only. */
 export function survivalEndpointsSql(study: string, db: string = DB): string {
   return (
@@ -1197,6 +1218,9 @@ export interface PatientLevelCapable extends AggregateCapable {
   /** per-patient rows for a Cox fit — see PatientLevelResolver.coxRows for why this is here and not on AggregateCapable */
   coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[], columns?: EndpointColumns):
     Promise<{ rows: { t: number; event: number; values: (number | string)[] }[]; kinds: AxisKind[] }>;
+  /** per-patient rows for a logistic fit — same reason as coxRows */
+  logisticRows(def: CohortDef | null | undefined, outcome: PlotAxis, covariates: PlotAxis[]):
+    Promise<{ rows: { y: number | string; values: (number | string)[] }[]; outcomeKind: AxisKind; kinds: AxisKind[] }>;
 }
 
 export type Resolver = AggregateCapable | PatientLevelCapable;
@@ -1733,6 +1757,32 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
       values: covariates.map((_, i) => kinds[i] === "num" ? Number(row["c" + i]) : String(row["c" + i]))
     }));
     return { rows, kinds };
+  }
+
+  /**
+   * Per-patient (outcome, covariate values) rows for a logistic fit — patient-level only, for
+   * the same reason coxRows is. The outcome is validated and axis-selected exactly like a
+   * covariate; the caller (runAnalysis's logistic branch) is the one that knows which observed
+   * level, or which already-0/1 numeric value, counts as the event.
+   */
+  async logisticRows(def: CohortDef | null | undefined, outcome: PlotAxis, covariates: PlotAxis[]):
+    Promise<{ rows: { y: number | string; values: (number | string)[] }[]; outcomeKind: AxisKind; kinds: AxisKind[] }> {
+    validateAxis(outcome, "outcome");
+    covariates.forEach((c, i) => validateAxis(c, "covariate " + (i + 1)));
+    const db = this.instance.conn.db, conn = this.instance.conn;
+    const kindsMap = await this.clinicalKinds([outcome, ...covariates]);
+    const outcomeKind = axisKind(outcome, (a) => kindsMap.get(a));
+    const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
+    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def) };
+    const outcomeSel = { label: "y0", sel: axisSelect(outcome, ctx, outcomeKind) };
+    const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
+    const sql = logisticRowsSql(ctx.cohortSql, outcomeSel, sels);
+    const r = await this.runLogged<ChRow>("logisticRows", sql, conn);
+    const rows = r.data.map((row) => ({
+      y: outcomeKind === "num" ? Number(row.y) : String(row.y),
+      values: covariates.map((_, i) => kinds[i] === "num" ? Number(row["c" + i]) : String(row["c" + i]))
+    }));
+    return { rows, outcomeKind, kinds };
   }
 }
 

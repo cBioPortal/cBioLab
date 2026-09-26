@@ -83,6 +83,21 @@ describe("cox: pooled vs stratified-by-cohort forest plots", () => {
   });
 });
 
+describe("logistic: forest plot of odds ratios", () => {
+  const coef = (label: string, or: number) => ({ label, reference: "Not mutated", level: "Mutated", axisIndex: 0, beta: Math.log(or), se: 0.1, or, ciLow: or * 0.7, ciHigh: or * 1.3, p: 0.02 });
+  test("draws one panel, one OR=1 reference line — same shape as cox's forest plot, an odds ratio instead of a hazard ratio", () => {
+    const v: ViewResult = { kind: "logistic", cohorts: ["all"], logistic: { coefficients: [coef("APC", 0.3)], n: 471, events: 27 }, caveat: "logistic" };
+    const svg = viewToSvg(v)!;
+    assert.equal((svg.match(/OR=1/g) || []).length, 1);
+    assert.equal((svg.match(/HR=1/g) || []).length, 0);
+    assert.ok(svg.includes("APC"));
+    assert.ok(svg.includes("0.3"));
+  });
+  test("a view with no coefficients yields no figure, same as any other empty payload", () => {
+    assert.equal(viewToSvg({ kind: "logistic", logistic: { coefficients: [], n: 0, events: 0 } }), null);
+  });
+});
+
 describe("figures scale uniformly", () => {
   // preserveAspectRatio="none" shears circles and slants text; it forced the
   // lollipop out of SVG once already and must not come back.

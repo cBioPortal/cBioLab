@@ -139,7 +139,7 @@ function solveLinear(H: number[][], U: number[]): number[] {
   for (let col = 0; col < n; col++) {
     let piv = col;
     for (let r = col + 1; r < n; r++) if (Math.abs(A[r][col]) > Math.abs(A[piv][col])) piv = r;
-    if (Math.abs(A[piv][col]) < 1e-12) throw new Error("Cox model is not identifiable: covariates are collinear or a category has no variation");
+    if (Math.abs(A[piv][col]) < 1e-12) throw new Error("this model is not identifiable: covariates are collinear or a category has no variation");
     [A[col], A[piv]] = [A[piv], A[col]];
     const pv = A[col][col];
     for (let c = col; c <= n; c++) A[col][c] /= pv;
@@ -261,6 +261,91 @@ export function coxRegression(rows: CoxRow[]): CoxFit {
   const ciHigh = beta.map((b, a) => Math.exp(b + 1.96 * se[a]));
   const pvals = beta.map((b, a) => se[a] > 0 ? chiSquareP1df((b / se[a]) * (b / se[a])) : 1);
   return { beta, se, hr, ciLow, ciHigh, p: pvals, loglik: ll, n: rows.length, events, iterations };
+}
+
+// ---------------------------------------------------------------------------
+// Logistic regression (binomial GLM, Newton-Raphson / IRLS on the log-likelihood).
+//
+// Unlike Cox's partial likelihood, this is a fully parametric model — P(y=1|x) is estimated
+// directly, not just a hazard ratio relative to an unspecified baseline — so it needs an
+// intercept the way Cox does not: with every covariate at its reference/zero, Cox's baseline
+// hazard absorbs that case, but logistic has nothing analogous, and without an intercept term
+// the fit is forced through log-odds=0 at that point regardless of the true baseline rate. The
+// intercept is fit like any other coefficient (x augmented with a leading 1) and simply not
+// reported as one of the covariate coefficients — the same convention a forest plot follows.
+// ---------------------------------------------------------------------------
+
+export interface LogisticRow { y: 0 | 1; x: number[] }
+export interface LogisticFit {
+  /** the fitted intercept — not reported as a covariate coefficient, but real fitted state */
+  intercept: number;
+  /** beta/se/or/ciLow/ciHigh/p line up with each row's x[0..], the intercept excluded from all of them */
+  beta: number[]; se: number[]; or: number[]; ciLow: number[]; ciHigh: number[]; p: number[];
+  loglik: number; n: number; events: number; iterations: number;
+}
+
+/** The binomial log-likelihood at (intercept, beta) — exposed for tests, mirroring coxPartialLogLik. */
+export function logisticLogLik(rows: LogisticRow[], intercept: number, beta: number[]): number {
+  return logisticScore(rows.map((r) => ({ y: r.y, x: [1, ...r.x] })), [intercept, ...beta]).ll;
+}
+
+/** Log-likelihood, score and Fisher information for the binomial GLM at `beta` (x already has its leading 1). */
+function logisticScore(rows: { y: 0 | 1; x: number[] }[], beta: number[]): { ll: number; grad: number[]; info: number[][] } {
+  const p = beta.length;
+  let ll = 0;
+  const grad = zeros(p), info = zerosMat(p);
+  for (const r of rows) {
+    const eta = dot(beta, r.x);
+    // numerically stable sigmoid and log(1+exp(eta)), whichever sign of eta avoids overflow
+    const prob = eta >= 0 ? 1 / (1 + Math.exp(-eta)) : Math.exp(eta) / (1 + Math.exp(eta));
+    const logDenom = eta >= 0 ? eta + Math.log1p(Math.exp(-eta)) : Math.log1p(Math.exp(eta));
+    ll += r.y ? eta - logDenom : -logDenom;
+    const resid = r.y - prob, w = prob * (1 - prob);
+    for (let a = 0; a < p; a++) {
+      grad[a] += resid * r.x[a];
+      for (let b = 0; b < p; b++) info[a][b] += w * r.x[a] * r.x[b];
+    }
+  }
+  return { ll, grad, info };
+}
+
+/**
+ * Fit a logistic regression by Newton-Raphson (equivalently IRLS) on the binomial
+ * log-likelihood. Every `x` must be the same length (dummy-code categoricals before calling
+ * this, via buildCoxColumns — the same columns a Cox fit would use); an intercept is added
+ * internally. `y` must already be 0/1.
+ */
+export function logisticRegression(rows: LogisticRow[]): LogisticFit {
+  const p0 = rows[0]?.x.length ?? 0;
+  const events = rows.reduce((n, r) => n + (r.y ? 1 : 0), 0);
+  if (!rows.length || p0 === 0) return { intercept: 0, beta: [], se: [], or: [], ciLow: [], ciHigh: [], p: [], loglik: 0, n: rows.length, events, iterations: 0 };
+  const aug = rows.map((r) => ({ y: r.y, x: [1, ...r.x] }));
+  const p = p0 + 1;
+  let beta = zeros(p), iterations = 0;
+  for (; iterations < 50; iterations++) {
+    const s = logisticScore(aug, beta);
+    const delta = solveLinear(s.info.map((r) => [...r]), s.grad);
+    let step = 1, next = beta.map((b, a) => b + delta[a]);
+    for (let tries = 0; tries < 10; tries++) {
+      const llNext = logisticScore(aug, next).ll;
+      if (llNext >= s.ll || tries === 9) break;
+      step /= 2; next = beta.map((b, a) => b + step * delta[a]);
+    }
+    const converged = Math.max(...delta.map((d) => Math.abs(d) * step)) < 1e-7;
+    beta = next;
+    if (converged) { iterations++; break; }
+  }
+  const finalLl = logisticScore(aug, beta).ll;
+  const finalInfo = logisticScore(aug, beta).info;
+  const variances = inverseDiagonal(finalInfo);
+  const se = variances.map((v) => Math.sqrt(Math.max(0, v)));
+  // drop the intercept (index 0) from what's reported — a forest plot has no row for it
+  const betaCov = beta.slice(1), seCov = se.slice(1);
+  const or = betaCov.map((b) => Math.exp(b));
+  const ciLow = betaCov.map((b, a) => Math.exp(b - 1.96 * seCov[a]));
+  const ciHigh = betaCov.map((b, a) => Math.exp(b + 1.96 * seCov[a]));
+  const pvals = betaCov.map((b, a) => seCov[a] > 0 ? chiSquareP1df((b / seCov[a]) * (b / seCov[a])) : 1);
+  return { intercept: beta[0], beta: betaCov, se: seCov, or, ciLow, ciHigh, p: pvals, loglik: finalLl, n: rows.length, events, iterations };
 }
 
 // ---------------------------------------------------------------------------

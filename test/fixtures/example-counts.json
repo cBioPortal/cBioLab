@@ -110,6 +110,9 @@
       "MSI-high": 27,
       "MSS": 428
     },
+    "Logistic regression: does APC status predict MSI-high status?": {
+      "all patients": 471
+    },
     "Survival split three ways: the k-group log-rank": {
       "stable": 428,
       "instable": 27,

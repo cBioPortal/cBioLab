@@ -768,21 +768,21 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
   return "";
 }
 
-/** A forest plot: one row per covariate/level, its hazard ratio and Wald CI on a log axis. */
-function coxSvg(v: ViewResult, o: SvgOpts): string {
-  const p = palette(o.theme), W = o.width || 760;
+/**
+ * A forest plot's shared body: N panels (one per cohort, when stratified — otherwise just one),
+ * all sharing ONE ratio scale computed across every panel together, so effect sizes are directly
+ * comparable at a glance. `refLabel` names what ratio=1 means ("HR=1" for Cox, "OR=1" for
+ * logistic) — everything else about a hazard ratio and an odds ratio's forest plot is identical.
+ */
+function forestBody(
+  panels: { heading: string | null; coefs: { label: string; reference?: string; ciLow: number; ciHigh: number; ratio: number; p: number }[] }[],
+  W: number, p: ReturnType<typeof palette>, refLabel: string
+): { svg: string; bottom: number } {
   const L = 175, R = 215, rowH = 22, panelGap = 26;
-  const byCohort = v.cox?.byCohort;
-  // stratifyByCohort: one panel per cohort that fit, all sharing ONE hazard-ratio scale
-  // (computed across every panel) so hazard ratios are directly comparable at a glance —
-  // the whole point of stratifying is seeing where cohorts agree or disagree.
-  const panels = byCohort
-    ? byCohort.filter((c) => c.coefficients.length).map((c) => ({ heading: c.cohort + " (n=" + c.n + ", " + c.events + " events)", coefs: c.coefficients }))
-    : [{ heading: null as string | null, coefs: v.cox?.coefficients || [] }];
-  const allHr = panels.flatMap((pn) => pn.coefs).flatMap((c) => [c.ciLow, c.ciHigh, c.hr, 1]).filter((n) => Number.isFinite(n) && n > 0);
-  const lo = Math.max(1e-3, Math.min(...allHr) * 0.85), hi = Math.max(...allHr) * 1.15;
+  const allRatio = panels.flatMap((pn) => pn.coefs).flatMap((c) => [c.ciLow, c.ciHigh, c.ratio, 1]).filter((n) => Number.isFinite(n) && n > 0);
+  const lo = Math.max(1e-3, Math.min(...allRatio) * 0.85), hi = Math.max(...allRatio) * 1.15;
   const lLo = Math.log(lo), lHi = Math.log(Math.max(hi, lo * 1.01));
-  const x = (hr: number) => L + (W - L - R) * (Math.log(Math.max(hr, 1e-6)) - lLo) / (lHi - lLo);
+  const x = (r: number) => L + (W - L - R) * (Math.log(Math.max(r, 1e-6)) - lLo) / (lHi - lLo);
   const out: string[] = [];
   let y = 30;
   panels.forEach((pn) => {
@@ -792,24 +792,45 @@ function coxSvg(v: ViewResult, o: SvgOpts): string {
     }
     const plotH = rowH * pn.coefs.length;
     out.push(`<line x1="${num(x(1))}" y1="${panelTop - 10}" x2="${num(x(1))}" y2="${num(panelTop + plotH)}" stroke="${p.line}" stroke-width="1" stroke-dasharray="3,3"/>`);
-    if (panelTop === 30) out.push(`<text x="${num(x(1))}" y="${panelTop - 14}" font-size="10" fill="${p.muted}" text-anchor="middle">HR=1</text>`);
+    if (panelTop === 30) out.push(`<text x="${num(x(1))}" y="${panelTop - 14}" font-size="10" fill="${p.muted}" text-anchor="middle">${esc(refLabel)}</text>`);
     pn.coefs.forEach((c, i) => {
       const cy = panelTop + rowH * i + rowH / 2;
       const label = c.label + (c.reference ? " vs " + c.reference : "");
       out.push(`<text x="${L - 10}" y="${num(cy + 3)}" font-size="11" fill="${p.ink}" text-anchor="end">` +
         `${esc(label.length > 26 ? label.slice(0, 25) + "…" : label)}</text>`);
       out.push(`<line x1="${num(x(c.ciLow))}" y1="${num(cy)}" x2="${num(x(c.ciHigh))}" y2="${num(cy)}" stroke="${SERIES[0]}" stroke-width="2"/>`);
-      out.push(`<circle cx="${num(x(c.hr))}" cy="${num(cy)}" r="4" fill="${SERIES[0]}"/>`);
+      out.push(`<circle cx="${num(x(c.ratio))}" cy="${num(cy)}" r="4" fill="${SERIES[0]}"/>`);
       out.push(`<text x="${num(W - R + 10)}" y="${num(cy + 3)}" font-size="10" fill="${p.muted}">` +
-        `${num(c.hr)} (${num(c.ciLow)}–${num(c.ciHigh)}), ${pFmt(c.p)}</text>`);
+        `${num(c.ratio)} (${num(c.ciLow)}–${num(c.ciHigh)}), ${pFmt(c.p)}</text>`);
     });
     y = panelTop + plotH + panelGap;
   });
-  const plotBottom = y - panelGap;
-  const cap = caption(v.caveat || "", W, plotBottom + 20, p.muted);
-  const H = plotBottom + 20 + cap.height + 16;
-  out.push(cap.svg);
-  return frame(W, H, out.join(""), p.bg);
+  return { svg: out.join(""), bottom: y - panelGap };
+}
+
+/** A forest plot: one row per covariate/level, its hazard ratio and Wald CI on a log axis. */
+function coxSvg(v: ViewResult, o: SvgOpts): string {
+  const p = palette(o.theme), W = o.width || 760;
+  const byCohort = v.cox?.byCohort;
+  // stratifyByCohort: one panel per cohort that fit, sharing forestBody's one scale — the
+  // whole point of stratifying is seeing where cohorts agree or disagree at a glance.
+  const panels = byCohort
+    ? byCohort.filter((c) => c.coefficients.length).map((c) => ({ heading: c.cohort + " (n=" + c.n + ", " + c.events + " events)", coefs: c.coefficients.map((cf) => ({ ...cf, ratio: cf.hr })) }))
+    : [{ heading: null as string | null, coefs: (v.cox?.coefficients || []).map((cf) => ({ ...cf, ratio: cf.hr })) }];
+  const body = forestBody(panels, W, p, "HR=1");
+  const cap = caption(v.caveat || "", W, body.bottom + 20, p.muted);
+  const H = body.bottom + 20 + cap.height + 16;
+  return frame(W, H, body.svg + cap.svg, p.bg);
+}
+
+/** Same forest-plot shape as coxSvg, but for an odds ratio: one panel, no stratifyByCohort yet. */
+function logisticSvg(v: ViewResult, o: SvgOpts): string {
+  const p = palette(o.theme), W = o.width || 760;
+  const panels = [{ heading: null as string | null, coefs: (v.logistic?.coefficients || []).map((cf) => ({ ...cf, ratio: cf.or })) }];
+  const body = forestBody(panels, W, p, "OR=1");
+  const cap = caption(v.caveat || "", W, body.bottom + 20, p.muted);
+  const H = body.bottom + 20 + cap.height + 16;
+  return frame(W, H, body.svg + cap.svg, p.bg);
 }
 
 export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {
@@ -820,6 +841,7 @@ export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {
   if (v.kind === "sequence" && v.sequence && v.sequence.panels.some((z) => z.flows.length)) return sequenceSvg(v, o);
   if (v.kind === "survival" && v.curves && v.curves.length) return survivalSvg(v, o);
   if (v.kind === "cox" && v.cox && (v.cox.coefficients.length || (v.cox.byCohort || []).some((c) => c.coefficients.length))) return coxSvg(v, o);
+  if (v.kind === "logistic" && v.logistic && v.logistic.coefficients.length) return logisticSvg(v, o);
   if (v.kind === "hotspots" && v.hotspots && v.hotspots.length) return hotspotsSvg(v, o);
   if (v.kind === "cooccurrence" && v.pairs && v.pairs.length) return cooccurrenceSvg(v, o);
   if (v.kind === "compare" && v.rows && v.rows.length) return compareSvg(v, o);
@@ -833,6 +855,7 @@ export function viewTitle(v: ViewResult): string {
   const c = (v.cohorts || []).join(" vs ");
   const base = v.kind === "survival" ? (v.endpoint || "OS") + " survival" + (v.anchoredTo ? " from " + v.anchoredTo : "")
     : v.kind === "cox" ? "Cox regression — " + (v.endpoint || "OS")
+    : v.kind === "logistic" ? "Logistic regression"
     : v.kind === "hotspots" ? "Recurrent protein changes"
     : v.kind === "cooccurrence" ? "Co-occurrence and mutual exclusivity"
     : v.kind === "coexpression" ? "Co-expression"
