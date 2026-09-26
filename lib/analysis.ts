@@ -330,9 +330,18 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           " q-values are Benjamini–Hochberg across the " + genes.length + " genes tested here, separately for any-alteration and driver-only");
       }
       if (vStudies.length > 1) {
+        // "A stratified test would be more principled" only means something when a single
+        // COHORT mixes patients from several studies — that is the situation a differing case
+        // mix WITHIN one arm can confound. When every cohort is confined to its own one study
+        // (a cross-study compare where each arm IS a study, e.g. UTUC vs a bladder TCGA study),
+        // there is no within-arm mixing to stratify away: study already IS the grouping variable,
+        // and the pooled test already only compares whole, homogeneous studies against each other.
+        const eachCohortOneStudy = vNames.every((n) => cohorts[n].studies.length === 1);
         noteParts.push("cross-study comparison" + (vStudies.length <= 2 ? " (" + vStudies.join(", ") + ")" : " across " + vStudies.length + " studies") +
           ": denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated" +
-          "; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic" +
+          (eachCohortOneStudy
+            ? "; each cohort is confined to a single study, so there is no within-cohort study mixing for a stratified test to correct — this compares whole studies against each other, not a pooled-vs-stratified question"
+            : "; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic") +
           (aggOnly.length ? "; " + aggOnly.join(", ") + " contributed aggregate counts only (no patient-level access)" : ""));
       }
       views.push({ kind: "compare", cohorts: vNames, annotation: annSource, rows,
