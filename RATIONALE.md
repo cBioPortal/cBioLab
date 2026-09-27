@@ -201,6 +201,19 @@ a "corrected" count resting on a linkage the data can't support.
 is documented in the generated DSL reference (`docs/dsl.md`) whose examples are executed
 against the live compiler on every test run.*
 
+## Proof against real papers
+
+The claims above are about the engine's own honesty. A separate, harder question is whether the
+tool actually reproduces real published findings — not a synthetic benchmark, an actual paper's
+actual numbers. **[/reproductions](/reproductions)** is eleven published cancer-genomics papers,
+re-derived against the live warehouse with today's DSL: TMB and immunotherapy survival, sidedness
+genomics in colorectal cancer, IDH-mutant glioma survival, receptor-subtype comparisons in breast
+cancer, and more — most reproduce cleanly, one surfaced a real correctness bug (a study with zero
+copy-number data silently reporting a false 0%, since fixed), and every gap the DSL couldn't close
+is named rather than papered over. Each reproduction is a real, runnable analysis document — its
+own notes explain how each figure maps back to the paper's own claim, not just a summary on the
+listing page.
+
 ## User state: from frozen ID lists to living definitions
 
 *(Proposed direction — not yet built. This may be the strongest justification of all.)*
