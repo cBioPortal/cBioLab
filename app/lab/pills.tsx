@@ -58,7 +58,13 @@ function leafText(leaf: any) {
     const bits = [];
     if (leaf.values && leaf.values.length) bits.push("∈ {" + leaf.values.join(", ") + "}");
     if (leaf.range) bits.push(Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" "));
-    if (leaf.op != null) bits.push(`${leaf.op} ${leaf.value}`);
+    if (leaf.op != null) bits.push(leaf.percentile != null
+      // A percentile leaf's `value` is resolved server-side only (see resolveCohortPercentiles
+      // in lib/cohort-percentile.ts) — the authored document never has one, so reading
+      // `leaf.value` here printed the literal string "undefined" instead of describing the
+      // percentile request itself.
+      ? `${leaf.op} ${Math.round(leaf.percentile * 100)}th percentile${leaf.percentileOf ? " of " + leaf.percentileOf : ""}`
+      : `${leaf.op} ${leaf.value}`);
     return `${leaf.attribute} ${bits.join(" ")}` + (leaf.per === "sample" ? " ·any sample" : "");
   }
   if (k === "derived") {
