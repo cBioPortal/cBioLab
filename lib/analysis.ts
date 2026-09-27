@@ -309,14 +309,36 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         // resolveCohortPercentiles above), makes every branch see it for free with no changes to
         // any of them, while `names`/`result.cohorts` (captured before this point) still don't.
         for (const arm of resolved.arms) { doc.cohorts[arm.name] = arm.def; cohorts[arm.name] = await evalCohortDef(arm.def); }
-        vNames = resolved.arms.map((a) => a.name);
+        // oql mode always includes an "Other" arm (unlike attribute mode, whether it's needed
+        // can't be known ahead of a live count) — drop it here if it turns out empty, rather
+        // than showing an always-empty bucket.
+        let keptArms = resolved.arms;
+        if (resolved.otherArmName && cohorts[resolved.otherArmName].count === 0) {
+          keptArms = resolved.arms.filter((a) => a.name !== resolved.otherArmName);
+          delete cohorts[resolved.otherArmName];
+          delete doc.cohorts[resolved.otherArmName];
+        }
+        vNames = keptArms.map((a) => a.name);
+        // Arms are not forced into a partition (a patient can match more than one), so disclose
+        // by how much they overlap rather than leaving a reader to notice the arm counts don't
+        // sum to the base cohort on their own. Never counts "Other" itself, which is disjoint
+        // from the named arms by construction.
+        let overlapCount: number | undefined;
+        if (resolved.overlapCheckDef) {
+          const namedArms = keptArms.filter((a) => a.name !== resolved.otherArmName);
+          const sumCount = namedArms.reduce((n, a) => n + cohorts[a.name].count, 0);
+          const overlapEval = await evalCohortDef(resolved.overlapCheckDef);
+          overlapCount = sumCount - overlapEval.count;
+        }
         splitByForView[vi] = {
-          ...(resolved.gene ? { gene: resolved.gene } : { attribute: resolved.attribute }), cohort: baseName,
-          arms: resolved.arms.map((a) => ({
+          ...(resolved.gene ? { gene: resolved.gene } : resolved.oql ? { oql: resolved.oql } : { attribute: resolved.attribute }),
+          cohort: baseName,
+          arms: keptArms.map((a) => ({
             name: a.name, count: cohorts[a.name].count, text: cohorts[a.name].text,
             sql: Object.entries(cohorts[a.name].perStudy).map(([s, x]) => "-- " + s + "\n" + x.sql).join("\n\n")
           })),
-          ...(resolved.otherValues.length ? { otherValues: resolved.otherValues } : {})
+          ...(resolved.otherValues.length ? { otherValues: resolved.otherValues } : {}),
+          ...(overlapCount ? { overlapCount } : {})
         };
       } catch (e) {
         views.push({ kind: view.kind, error: (e as Error).message });

@@ -11,12 +11,17 @@
 // extends/percentile; the per-view cohort loop, for this — already has an ordinary structure to
 // work with, with nothing left to resolve.
 import type { CohortDef, ClinicalLeaf, OqlLeaf, SplitBy } from "./types.ts";
+import { parseOql } from "./oql.ts";
 
 export const SPLIT_BY_DEFAULT_MAX_ARMS = 8;
 export const SPLIT_BY_DEFAULT_MIN_COUNT = 10;
-/** hard ceiling on `maxArms` itself — well under the document's own 16-cohort cap, since a
- *  split's arms are only ever ONE view's worth of cohorts, not the whole document's budget */
-export const SPLIT_BY_MAX_ARMS_CEILING = 12;
+/** hard ceiling on `maxArms` (attribute mode) and on how many queries `oql` mode takes. Set to
+ *  the compiler's own `{any:[...]}` leaf cap (lib/cohort2.ts) rather than the document's looser
+ *  16-cohort budget: the Other arm's def negates "any of" every named arm/query in ONE clause,
+ *  and so does the overlap-check def that discloses how many patients landed in more than one
+ *  arm — both need every named leaf to fit inside a single `any`, which the compiler refuses
+ *  outright past 8. A higher ceiling here would build a def the compiler then rejects. */
+export const SPLIT_BY_MAX_ARMS_CEILING = 8;
 
 export interface SplitByValue { v: string; n: number }
 /** what the caller's live lookup reports back for one attribute within the base cohort */
@@ -33,11 +38,24 @@ export interface SplitByArm { name: string; def: CohortDef }
 export interface SplitByResolved {
   arms: SplitByArm[];
   /** raw attribute values this split saw but pooled into "Other" rather than giving their own
-   *  arm — either there were more than `maxArms` distinct values, or too few patients had them */
+   *  arm — either there were more than `maxArms` distinct values, or too few patients had them.
+   *  Attribute mode only. */
   otherValues: string[];
-  /** the attribute/gene actually used, normalized (trimmed, gene uppercased) — echo this back
-   *  rather than the caller's own raw splitBy.attribute/gene, which may differ in case/whitespace */
-  attribute?: string; gene?: string;
+  /** the attribute/gene/oql list actually used, normalized (trimmed, gene uppercased) — echo
+   *  this back rather than the caller's own raw splitBy fields, which may differ in whitespace */
+  attribute?: string; gene?: string; oql?: string[];
+  /** which arm in `arms` (if any) is the "Other" bucket — leftover attribute values, or oql's
+   *  "matched none of the given queries" — so the caller can exclude it from the overlap sum and
+   *  (oql mode only, where unlike attribute mode there's no pre-fetched distribution to check
+   *  against before committing to include it) drop it from the result if its live count comes
+   *  back 0 rather than showing an always-empty "Other". */
+  otherArmName?: string;
+  /** when 2+ NAMED (non-"Other") arms exist, a cohort def matching "any of them" — the caller
+   *  evaluates it and compares to the sum of individual arm counts to disclose how many patients
+   *  landed in more than one arm (arms are not forced into a partition; see SplitBy's own gene
+   *  vs attribute/oql comment). Omitted when overlap is impossible by construction (gene mode's
+   *  two arms) or moot (fewer than 2 named arms). */
+  overlapCheckDef?: CohortDef;
 }
 
 const ATTR_RE = /^[A-Za-z0-9_]{1,64}$/;
@@ -71,6 +89,35 @@ function resolveSplitByGene(splitBy: SplitBy, existingCohortNames: string[], bas
 }
 
 /**
+ * OQL mode: one arm per query, named from the query text itself — reaches anything OQL can
+ * express (mutation type, driver-only, copy number, multi-gene co-alteration), not just plain
+ * mutation status. Unlike attribute mode, whether patients overlap between arms, or whether
+ * anyone matches none of them, can't be decided here — there's no live count yet, only defs —
+ * so the caller evaluates every arm (Other included) and drops Other if it comes back empty.
+ */
+function resolveSplitByOql(splitBy: SplitBy, existingCohortNames: string[], baseDef: CohortDef): SplitByResolved {
+  if (splitBy.maxArms != null || splitBy.minCount != null)
+    throw new Error("splitBy: maxArms/minCount only apply when splitting by attribute — oql mode uses exactly the queries you give it, nothing to pool");
+  const queries = (splitBy.oql || []).map((q) => String(q).trim()).filter(Boolean);
+  if (!queries.length) throw new Error("splitBy: oql needs at least 1 query");
+  if (queries.length > SPLIT_BY_MAX_ARMS_CEILING)
+    throw new Error("splitBy: oql takes at most " + SPLIT_BY_MAX_ARMS_CEILING + " queries; got " + queries.length);
+  for (const q of queries) {
+    try { parseOql(q); } catch (e) { throw new Error("splitBy: '" + q + "' is not valid OQL — " + (e as Error).message); }
+  }
+  const baseAll = baseDef.all || [];
+  const leaves: OqlLeaf[] = queries.map((q) => ({ kind: "oql", q }));
+  const nameFor = (label: string) => splitBy.cohort + " — " + label;
+  const arms: SplitByArm[] = leaves.map((leaf) => ({ name: nameFor(leaf.q), def: { ...baseDef, all: [...baseAll, leaf] } }));
+  const otherArmName = nameFor("Other");
+  arms.push({ name: otherArmName, def: { ...baseDef, all: [...baseAll, { not: { any: leaves } }] } });
+  checkCollision(splitBy, existingCohortNames, arms);
+  const overlapCheckDef: CohortDef | undefined = leaves.length > 1
+    ? { ...baseDef, all: [...baseAll, { any: leaves }] } : undefined;
+  return { arms, otherValues: [], oql: queries, otherArmName, overlapCheckDef };
+}
+
+/**
  * Decide which values become their own arm and which pool into "Other", or refuse outright.
  * Pure apart from `distributionFor` — inject a fake for tests; lib/analysis.ts injects the real
  * attributeStats-backed lookup, merged across every study the base cohort spans.
@@ -81,9 +128,12 @@ export async function resolveSplitBy(
 ): Promise<SplitByResolved> {
   const hasAttribute = splitBy.attribute != null && String(splitBy.attribute).trim() !== "";
   const hasGene = splitBy.gene != null && String(splitBy.gene).trim() !== "";
-  if (hasAttribute === hasGene)
-    throw new Error("splitBy: name exactly one of attribute or gene" + (hasAttribute ? " — both were given" : ""));
+  const hasOql = splitBy.oql != null;
+  const modeCount = (hasAttribute ? 1 : 0) + (hasGene ? 1 : 0) + (hasOql ? 1 : 0);
+  if (modeCount !== 1)
+    throw new Error("splitBy: name exactly one of attribute, gene, or oql" + (modeCount > 1 ? " — more than one was given" : ""));
   if (hasGene) return resolveSplitByGene(splitBy, existingCohortNames, baseDef);
+  if (hasOql) return resolveSplitByOql(splitBy, existingCohortNames, baseDef);
 
   const attribute = String(splitBy.attribute || "").trim();
   if (!ATTR_RE.test(attribute)) throw new Error("splitBy: '" + attribute + "' is not a valid attribute name");
@@ -140,5 +190,7 @@ export async function resolveSplitBy(
     });
   }
   checkCollision(splitBy, existingCohortNames, arms);
-  return { arms, otherValues, attribute };
+  const overlapCheckDef: CohortDef | undefined = ownValues.length > 1
+    ? { ...baseDef, all: [...baseAll, { any: ownValues.map((x) => clause(x.v)) }] } : undefined;
+  return { arms, otherValues, attribute, overlapCheckDef, ...(otherValues.length ? { otherArmName: nameFor("Other") } : {}) };
 }

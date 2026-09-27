@@ -1826,18 +1826,23 @@ function SplitByControl({ current, cohortNames, attrs, busy, menuId, menuStore, 
 }) {
   const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   const catAttrs = attrs.filter((a) => a.kind !== "num");
-  const [mode, setMode] = useState<"attribute" | "gene">(current?.gene ? "gene" : "attribute");
+  const [mode, setMode] = useState<"attribute" | "gene" | "oql">(current?.gene ? "gene" : current?.oql ? "oql" : "attribute");
   const [geneDraft, setGeneDraft] = useState(current?.gene || "");
+  const [oqlDraft, setOqlDraft] = useState((current?.oql || []).join("\n"));
   if (!cohortNames.length) return null;
   const cohort = current?.cohort ?? cohortNames[0];
   const applyGene = () => {
     const g = geneDraft.trim().toUpperCase();
     if (g) onChange({ cohort, gene: g });
   };
+  const applyOql = () => {
+    const qs = oqlDraft.split("\n").map((q) => q.trim()).filter(Boolean);
+    if (qs.length) onChange({ cohort, oql: qs });
+  };
   return (
     <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title="auto-split one cohort into an arm per value of an attribute, or per a gene's mutation status, live from the data">
-        {current ? "split: " + (current.gene || current.attribute) : "+ split by"}
+      <summary className="tbbtn" title="auto-split one cohort into an arm per value of an attribute, per a gene's mutation status, or per a list of OQL queries — live from the data">
+        {current ? "split: " + (current.gene || current.attribute || (current.oql && current.oql.length + " OQL quer" + (current.oql.length === 1 ? "y" : "ies"))) : "+ split by"}
       </summary>
       <div className="gearmenu-items">
         <div className="setrow">
@@ -1849,9 +1854,10 @@ function SplitByControl({ current, cohortNames, attrs, busy, menuId, menuStore, 
         </div>
         <div className="setrow">
           <span className="meta">split on</span>
-          <select value={mode} disabled={busy} onChange={(e) => setMode(e.target.value as "attribute" | "gene")}>
+          <select value={mode} disabled={busy} onChange={(e) => setMode(e.target.value as "attribute" | "gene" | "oql")}>
             <option value="attribute">clinical attribute</option>
             <option value="gene">gene mutation status</option>
+            <option value="oql">OQL queries</option>
           </select>
         </div>
         {mode === "gene" ? (
@@ -1861,6 +1867,25 @@ function SplitByControl({ current, cohortNames, attrs, busy, menuId, menuStore, 
               onChange={(e) => setGeneDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") applyGene(); }} />
             <button type="button" className="tbbtn" disabled={busy || !geneDraft.trim()} onClick={applyGene}>split</button>
+          </div>
+        ) : mode === "oql" ? (
+          <div className="setrow" style={{ alignItems: "flex-start" }}>
+            <span className="meta">queries</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+              <textarea value={oqlDraft} disabled={busy} rows={3} style={{ width: "16rem", fontFamily: "monospace", fontSize: "0.85em" }}
+                placeholder={"one query per line, e.g.\nTP53: MUT\nKRAS: MUT\nCDKN2A: HOMDEL"}
+                onChange={(e) => setOqlDraft(e.target.value)} />
+              <span className="note">
+                One arm per line (up to 8), same OQL a cohort query uses — mutation type
+                (<code>TP53: MUT</code>), a driver-only call (<code>TP53: DRIVER</code>), copy number
+                (<code>CDKN2A: HOMDEL</code>), or a multi-gene combination (<code>TP53: MUT; KRAS: MUT</code>). Named
+                from the query text itself. A patient matching more than one query counts toward each — arms
+                aren't forced into a partition, and the overlap is disclosed once results are in. Anyone matching
+                none of them gets a shared "Other" arm.
+              </span>
+              <button type="button" className="tbbtn" style={{ alignSelf: "flex-start" }}
+                disabled={busy || !oqlDraft.trim()} onClick={applyOql}>split</button>
+            </div>
           </div>
         ) : catAttrs.length ? (
           <div className="setrow">
@@ -1876,7 +1901,7 @@ function SplitByControl({ current, cohortNames, attrs, busy, menuId, menuStore, 
         ) : <p className="note">this study declares no clinical attributes to split by</p>}
         {mode === "attribute" && current?.attribute && <div className="setrow">
           <span className="meta">max arms</span>
-          <input type="number" min={2} max={12} disabled={busy} style={{ width: "4rem" }}
+          <input type="number" min={2} max={8} disabled={busy} style={{ width: "4rem" }}
             value={current.maxArms ?? 8}
             onChange={(e) => onChange({ ...current, maxArms: e.target.value ? Number(e.target.value) : undefined })}
             title="at most this many arms, including a pooled &quot;Other&quot; for whatever doesn't fit" />
@@ -1885,6 +1910,30 @@ function SplitByControl({ current, cohortNames, attrs, busy, menuId, menuStore, 
       </div>
     </details>
   );
+}
+
+/**
+ * What a split actually did, once results are in — not how to set it up (that's
+ * SplitByControl), but what to understand about the numbers: which raw values got pooled into
+ * "Other" rather than getting their own arm, and how many patients landed in more than one arm.
+ * Arms are never forced into a strict partition (a patient can match 2+ oql queries, or already
+ * hold 2+ values of a sample-level attribute), so this is the one place that says by how much —
+ * silence here would read as "these arms are disjoint," which isn't always true. Renders nothing
+ * when there's nothing to disclose (a clean split with no pooling and no overlap).
+ */
+function SplitByNote({ v }: { v: any }) {
+  const sb = v.splitBy;
+  if (!sb) return null;
+  const label = sb.gene ? "gene " + sb.gene : sb.oql ? "oql (" + sb.oql.length + " quer" + (sb.oql.length === 1 ? "y" : "ies") + ")" : sb.attribute;
+  const bits: string[] = [];
+  if (sb.otherValues && sb.otherValues.length)
+    bits.push("“Other” pools " + sb.otherValues.length + " value" + (sb.otherValues.length === 1 ? "" : "s") +
+      " not shown as its own arm: " + sb.otherValues.join(", "));
+  if (sb.overlapCount)
+    bits.push(sb.overlapCount.toLocaleString() + " patient" + (sb.overlapCount === 1 ? "" : "s") +
+      " counted toward more than one arm — split arms aren't a strict partition, so this can happen even outside “Other”");
+  if (!bits.length) return null;
+  return <p className="viewnote" title={"split “" + sb.cohort + "” by " + label}>{bits.join(" · ")}</p>;
 }
 
 /**
@@ -1970,6 +2019,7 @@ function ViewHead({ v, title, sub, actions, chips, cohorts, splitBy, onMoveUp, o
           that competes with the title for the first thing read. Plain text
           by design, see .viewnote in globals.css for why it's never markdown. */}
       {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
+      <SplitByNote v={v} />
     </>
   );
 }
@@ -4347,6 +4397,7 @@ function Latency({ v }: { v: any }) {
                     </div>
                   </div>
                   {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
+      <SplitByNote v={v} />
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}
                 {v.kind === "course" && v.svg && <>
@@ -4437,6 +4488,7 @@ function Latency({ v }: { v: any }) {
                     </div>
                     </div>
                   {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
+      <SplitByNote v={v} />
                   {/* The same SVG the chat and MCP clients receive \u2014 one renderer,
                       so the figure cannot differ between surfaces. */}
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />

@@ -224,8 +224,8 @@ export interface SplitBy {
   /** which existing named cohort to split */
   cohort: string;
   /**
-   * Exactly one of `attribute`/`gene` must be given — two different sources of grouping, both
-   * producing the same kind of ephemeral, view-scoped arms.
+   * Exactly one of `attribute`/`gene`/`oql` must be given — three different sources of grouping,
+   * all producing the same kind of ephemeral, view-scoped arms.
    */
   /** a categorical clinical attribute; a numeric one is refused (use a percentile cutoff on a
    *  cohort instead — this splits into groups, it doesn't threshold a continuous value) */
@@ -233,10 +233,27 @@ export interface SplitBy {
   /**
    * A gene symbol: splits into exactly two arms (mutated / not mutated via OQL) rather than a
    * live-discovered value distribution — no query needed to know the group names in advance,
-   * unlike `attribute`. `maxArms`/`minCount` don't apply here (always exactly 2) and are refused
-   * if given alongside `gene`, to avoid silently implying a knob that does nothing.
+   * unlike `attribute`. Sugar for the single-gene case of `oql` below, with its complement
+   * ("Not mutated") auto-generated — `oql` itself never auto-generates a complement, since with
+   * an arbitrary list of queries there's no single obvious "everything else" to name that way.
+   * `maxArms`/`minCount` don't apply here (always exactly 2) and are refused if given alongside
+   * `gene`, to avoid silently implying a knob that does nothing.
    */
   gene?: string;
+  /**
+   * One or more portal-OQL queries (1-8 — the same limit the compiler's own `{any:[...]}` clause
+   * enforces everywhere else, since the Other arm and the overlap check both need every query to
+   * fit inside one such clause; the same subset lib/oql.ts compiles for a cohort's own
+   * `{kind:"oql"}` leaf) — one arm per query, named from the query text itself, so this reaches
+   * anything OQL can express: a specific mutation type, a driver-only call, a multi-gene
+   * co-alteration ("TP53: MUT; KRAS: MUT"), copy number, and so on — not just plain mutation
+   * status. A patient matching more than one query appears in EVERY arm it matches — arms are
+   * NOT forced into a partition — and the total overlap is disclosed, not hidden; a patient
+   * matching none of them falls into a disclosed "Other" arm, same as attribute mode's leftover
+   * values. `maxArms`/`minCount` don't apply (you named the arms yourself; there's no
+   * data-discovered long tail to cap or pool) and are refused if given alongside `oql`.
+   */
+  oql?: string[];
   /** at most this many arms, INCLUDING a pooled "Other" if the attribute has more distinct
    *  values than this (default 8) — never silently drops a value, always discloses what got
    *  pooled and why, the same "+N more" idiom the oncoprint legend and sequence view use.
@@ -786,13 +803,19 @@ export interface ViewResult {
    * as this view's drawn cohorts; this is where a reader finds out what each one actually means.
    */
   splitBy?: {
-    /** echoes exactly one of the view's own splitBy.attribute/gene */
-    attribute?: string; gene?: string; cohort: string;
+    /** echoes exactly one of the view's own splitBy.attribute/gene/oql */
+    attribute?: string; gene?: string; oql?: string[]; cohort: string;
     arms: { name: string; count: number; text: string; sql: string }[];
     /** raw values this split saw but pooled into "Other" rather than giving their own arm —
-     *  because there were too many to fit `maxArms`, or too few patients to clear `minCount`.
-     *  Attribute mode only — gene mode always produces exactly 2 arms, never an "Other". */
+     *  because there were too many to fit `maxArms`, or too few patients to clear `minCount`
+     *  (attribute mode), or matched none of the given queries (oql mode). Never set for gene
+     *  mode — its two arms (mutated / not) are already a complete partition by construction. */
     otherValues?: string[];
+    /** patients counted toward more than one of the NAMED arms above (never "Other", which is
+     *  disjoint from them by construction) — arms are not forced into a partition, so this
+     *  discloses by how much they overlap rather than leaving it to be discovered by the arm
+     *  counts not summing to the base cohort. 0/undefined when there's no overlap to report. */
+    overlapCount?: number;
   };
   rows?: CompareRow[];                      // compare
   curves?: KmCurve[]; caveat?: string;      // survival

@@ -128,17 +128,129 @@ describe("resolveSplitBy", () => {
       /same name as an existing cohort/);
   });
 
-  test("naming neither attribute nor gene is refused", async () => {
+  test("naming none of attribute/gene/oql is refused", async () => {
     await assert.rejects(
       () => resolveSplitBy({ cohort: "base" }, [], BASE, async () => { throw new Error("should not be called"); }),
-      /name exactly one of attribute or gene/);
+      /name exactly one of attribute, gene, or oql/);
   });
 
   test("naming both attribute and gene is refused", async () => {
     await assert.rejects(
       () => resolveSplitBy({ cohort: "base", attribute: "SUBTYPE", gene: "TP53" }, [], BASE,
         async () => { throw new Error("should not be called"); }),
-      /name exactly one of attribute or gene/);
+      /name exactly one of attribute, gene, or oql/);
+  });
+
+  test("naming attribute alongside oql is refused too", async () => {
+    await assert.rejects(
+      () => resolveSplitBy({ cohort: "base", attribute: "SUBTYPE", oql: ["TP53: MUT"] }, [], BASE,
+        async () => { throw new Error("should not be called"); }),
+      /name exactly one of attribute, gene, or oql/);
+  });
+
+  test("otherArmName is set only when an Other arm actually exists", async () => {
+    const withOther = await resolveSplitBy(sb({ maxArms: 3, minCount: 10 }),
+      [], BASE, async () => cat([{ v: "A", n: 100 }, { v: "B", n: 90 }, { v: "C", n: 5 }]));
+    assert.equal(withOther.otherArmName, "base — SUBTYPE: Other");
+    const noOther = await resolveSplitBy(sb(), [], BASE, async () => cat([{ v: "A", n: 50 }, { v: "B", n: 50 }]));
+    assert.equal(noOther.otherArmName, undefined);
+  });
+
+  test("overlapCheckDef is set once 2+ named arms exist, matching any of their own equality leaves", async () => {
+    const dist = cat([{ v: "A", n: 50 }, { v: "B", n: 30 }, { v: "C", n: 20 }]);
+    const r = await resolveSplitBy(sb(), [], BASE, async () => dist);
+    assert.deepEqual(r.overlapCheckDef!.all, [
+      { kind: "oql", q: "TP53: MUT" },
+      { any: [
+        { kind: "clinical", attribute: "SUBTYPE", per: "patient", op: "=", value: "A" },
+        { kind: "clinical", attribute: "SUBTYPE", per: "patient", op: "=", value: "B" },
+        { kind: "clinical", attribute: "SUBTYPE", per: "patient", op: "=", value: "C" },
+      ] },
+    ]);
+  });
+
+  test("overlapCheckDef is omitted with only 1 named arm — nothing to overlap with", async () => {
+    const dist = cat([{ v: "A", n: 100 }, { v: "B", n: 90 }, { v: "C", n: 5 }]);
+    const r = await resolveSplitBy(sb({ maxArms: 2, minCount: 10 }), [], BASE, async () => dist);
+    assert.equal(r.arms.map((a) => a.name.split(": ")[1]).filter((n) => n !== "Other").length, 1);
+    assert.equal(r.overlapCheckDef, undefined);
+  });
+});
+
+describe("resolveSplitBy: oql mode", () => {
+  const sbOql = (over: Partial<SplitBy> = {}): SplitBy => ({ cohort: "base", oql: ["TP53: MUT", "KRAS: MUT"], ...over });
+  const noDistribution = async (): Promise<AttributeDistribution> => { throw new Error("should not be called"); };
+
+  test("produces one arm per query, plus a trailing Other arm for whoever matches none", async () => {
+    const r = await resolveSplitBy(sbOql(), [], BASE, noDistribution);
+    assert.deepEqual(r.arms.map((a) => a.name), [
+      "base — TP53: MUT", "base — KRAS: MUT", "base — Other"
+    ]);
+    assert.equal(r.otherArmName, "base — Other");
+    assert.deepEqual(r.oql, ["TP53: MUT", "KRAS: MUT"]);
+  });
+
+  test("each named arm's def splices in the base cohort's own clauses plus that one query as an OQL leaf", async () => {
+    const r = await resolveSplitBy(sbOql(), [], BASE, noDistribution);
+    assert.deepEqual(r.arms[0].def.all, [{ kind: "oql", q: "TP53: MUT" }, { kind: "oql", q: "TP53: MUT" }]);
+    assert.deepEqual(r.arms[1].def.all, [{ kind: "oql", q: "TP53: MUT" }, { kind: "oql", q: "KRAS: MUT" }]);
+  });
+
+  test("the Other arm's def negates \"any of\" every query given", async () => {
+    const r = await resolveSplitBy(sbOql(), [], BASE, noDistribution);
+    const other = r.arms.find((a) => a.name === "base — Other")!;
+    assert.deepEqual(other.def.all, [
+      { kind: "oql", q: "TP53: MUT" },
+      { not: { any: [{ kind: "oql", q: "TP53: MUT" }, { kind: "oql", q: "KRAS: MUT" }] } },
+    ]);
+  });
+
+  test("overlapCheckDef matches any of the named queries — never Other", async () => {
+    const r = await resolveSplitBy(sbOql(), [], BASE, noDistribution);
+    assert.deepEqual(r.overlapCheckDef!.all, [
+      { kind: "oql", q: "TP53: MUT" },
+      { any: [{ kind: "oql", q: "TP53: MUT" }, { kind: "oql", q: "KRAS: MUT" }] },
+    ]);
+  });
+
+  test("a single query still works — no overlap possible, so overlapCheckDef is omitted", async () => {
+    const r = await resolveSplitBy(sbOql({ oql: ["TP53: MUT"] }), [], BASE, noDistribution);
+    assert.equal(r.arms.length, 2); // the query's arm + Other
+    assert.equal(r.overlapCheckDef, undefined);
+  });
+
+  test("whitespace-only and duplicate-after-trim entries are dropped before counting", async () => {
+    const r = await resolveSplitBy(sbOql({ oql: [" TP53: MUT ", "  ", "KRAS: MUT"] }), [], BASE, noDistribution);
+    assert.deepEqual(r.arms.map((a) => a.name), ["base — TP53: MUT", "base — KRAS: MUT", "base — Other"]);
+  });
+
+  test("an empty oql list is refused", async () => {
+    await assert.rejects(() => resolveSplitBy(sbOql({ oql: [] }), [], BASE, noDistribution), /needs at least 1 query/);
+  });
+
+  test("more queries than the arm ceiling is refused", async () => {
+    const many = Array.from({ length: SPLIT_BY_MAX_ARMS_CEILING + 1 }, (_, i) => "GENE" + i + ": MUT");
+    await assert.rejects(() => resolveSplitBy(sbOql({ oql: many }), [], BASE, noDistribution), /takes at most/);
+  });
+
+  test("invalid OQL syntax is refused with the offending query named", async () => {
+    await assert.rejects(
+      () => resolveSplitBy(sbOql({ oql: ["not valid oql {{{"] }), [], BASE, noDistribution),
+      /not valid OQL/);
+  });
+
+  test("maxArms alongside oql is refused, not silently ignored", async () => {
+    await assert.rejects(() => resolveSplitBy(sbOql({ maxArms: 4 }), [], BASE, noDistribution), /maxArms.*only apply.*attribute/);
+  });
+
+  test("minCount alongside oql is refused, not silently ignored", async () => {
+    await assert.rejects(() => resolveSplitBy(sbOql({ minCount: 5 }), [], BASE, noDistribution), /minCount.*only apply.*attribute/);
+  });
+
+  test("an arm name colliding with an existing document cohort is refused", async () => {
+    await assert.rejects(
+      () => resolveSplitBy(sbOql(), ["base — TP53: MUT"], BASE, noDistribution),
+      /same name as an existing cohort/);
   });
 });
 

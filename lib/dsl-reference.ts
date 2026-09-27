@@ -597,6 +597,17 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "splitBy: a list of OQL queries, arms that overlap and a disclosed \"Other\"",
+    demonstrates: "splitBy's third shape — `{cohort, oql}` — reaches anything OQL can express, not just one gene's plain mutation status: each query becomes its own arm, named from the query text. Arms are not forced into a partition — a patient matching more than one query counts toward each — so the result discloses `overlapCount`; anyone matching none of the queries falls into an \"Other\" arm alongside the named ones.",
+    tags: ["splitBy", "compare", "oql"],
+    note: "\"all patients\" split by [\"TP53: MUT\", \"KRAS: MUT\"] gives 13,105 TP53-mutant, 7,115 KRAS-mutant, and 9,019 in neither (\"Other\") — summing to more than the 24,950-patient base cohort because 4,289 patients carry both mutations, which the result discloses as `splitBy.overlapCount` rather than leaving the arm counts to look inconsistent on their own (13,105 + 7,115 − 4,289 + 9,019 = 24,950, exactly the base count).",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: { "all patients": { all: [] } },
+      views: [{ kind: "compare", genes: ["TP53", "KRAS"], splitBy: { cohort: "all patients", oql: ["TP53: MUT", "KRAS: MUT"] } }]
+    }
+  },
+  {
     title: "Survival split three ways: the k-group log-rank",
     demonstrates: "3+ cohorts in a survival view now get a real test — the k-group log-rank generalization (a (k-1)-df chi-squared from the full covariance matrix, the same statistic R's survdiff() reports) — instead of only a picture with no way to say whether the split is real.",
     tags: ["survival", "log-rank", "k-group"],
@@ -811,10 +822,10 @@ document's own cohort list (they don't count against the 16-cohort cap or appear
 tab — only in this one view's own result, with full provenance: each arm's own compiled SQL and
 count), and this view alone draws them instead of whatever \`cohorts\` would otherwise resolve to.
 
-Exactly one of two mutually exclusive shapes:
+Exactly one of three mutually exclusive shapes:
 
 - \`splitBy: {cohort, attribute, maxArms?, minCount?}\` — one arm per distinct value of a
-  categorical clinical attribute. Top \`maxArms - 1\` values by patient count (default 8, max 12)
+  categorical clinical attribute. Top \`maxArms - 1\` values by patient count (default and max 8)
   get their own arm; everything else — both values beyond that cutoff and any value with fewer
   than \`minCount\` patients (default 10) — pools into one disclosed \`"Other"\` arm rather than
   being dropped or given a needlessly small, statistically unstable arm of its own. A numeric
@@ -823,16 +834,25 @@ Exactly one of two mutually exclusive shapes:
   a study that itself declines to answer (e.g. over its own 200-distinct-value cap). Arms are
   named \`"<cohort> — <attribute>: <value>"\`.
 - \`splitBy: {cohort, gene}\` — exactly two arms, mutated vs. not, via OQL (\`<gene>: MUT\`) —
-  no live query needed to know the two group names in advance, unlike \`attribute\`. \`maxArms\`/
+  no live query needed to know the two group names in advance, unlike \`attribute\`. Sugar for the
+  single-query case of \`oql\` below, with its complement (not mutated) auto-generated. \`maxArms\`/
   \`minCount\` don't apply and are refused if given alongside \`gene\`, rather than silently
   ignored. Arms are named \`"<cohort> — <gene>: Mutated"\` / \`"<cohort> — <gene>: Not mutated"\`.
-\`maxArms\` (default 8, max 12) caps how many arms are ever drawn: the top \`maxArms - 1\` values by
-patient count get their own arm, and everything else — both values beyond that cutoff and any
-value with fewer than \`minCount\` patients (default 10) — pools into one disclosed \`"Other"\` arm
-rather than being dropped or given a needlessly small, statistically unstable arm of its own. A
-numeric attribute is refused (split needs a categorical; threshold a continuous one with a
-cohort's own \`percentile\` instead), as is an attribute with fewer than 2 values clearing
-\`minCount\`, or a study that itself declines to answer (e.g. over its own 200-distinct-value cap).
+- \`splitBy: {cohort, oql: [q, ...]}\` — one arm per portal-OQL query (1-8, the same subset a
+  cohort's own \`{"kind":"oql"}\` leaf compiles), named from the query text itself — reaching
+  anything OQL can express (a driver-only call, copy number, a multi-gene co-alteration like
+  \`"TP53: MUT; KRAS: MUT"\`), not just plain mutation status as \`gene\` does. Arms are **not**
+  forced into a partition: a patient matching more than one query counts toward each, and the
+  total overlap is disclosed (\`overlapCount\` in the result), not hidden; anyone matching none of
+  them falls into a disclosed \`"<cohort> — Other"\` arm (omitted entirely if it would be empty).
+  \`maxArms\`/\`minCount\` don't apply here either — you named the arms yourself, so there's no
+  data-discovered long tail to cap or pool — and are refused if given alongside \`oql\`.
+
+Arms are only a strict partition for \`gene\` (mutated/not always sums to the whole). For
+\`attribute\` and \`oql\`, the result's \`splitBy.overlapCount\` discloses how many patients counted
+toward more than one named arm — attribute mode can still overlap on a sample-level attribute
+when one patient's samples disagree, and oql mode whenever two queries both match the same
+patient — so the arm counts summing to more than the base cohort is expected, not a bug.
 
 | kind | fields | semantics |
 |---|---|---|
@@ -1085,13 +1105,17 @@ export const CHAT_GRAMMAR = `Document shape:
   "cohorts": { "<name>": <cohortDef>, ... (max 16) },
   // compare/survival/cox/logistic/clinical/course/oncoprint (only) may carry "splitBy" instead of (or with)
   // "cohorts" — auto-splits one named cohort into several arms, scoped to THIS view only, never added to the
-  // document's own cohort list. Exactly one of two shapes:
+  // document's own cohort list. Exactly one of three shapes:
   //   {"cohort":"<name>","attribute":"<categorical clinical attr>","maxArms"?:8,"minCount"?:10} — one arm per
   //     distinct value, live from the data; top (maxArms-1) by count each get an arm, the rest (plus anything
   //     under minCount patients) pool into one disclosed "Other" arm. Refused for a numeric attribute, or
   //     fewer than 2 values clearing minCount.
   //   {"cohort":"<name>","gene":"<symbol>"} — exactly 2 arms (mutated / not, via OQL), no live query needed;
   //     maxArms/minCount are refused here, not silently ignored.
+  //   {"cohort":"<name>","oql":["<query>", ...(max 8)]} — one arm per portal-OQL query, named from the query
+  //     text — reaches driver calls, CNA, multi-gene co-alteration, not just plain mutation. Arms aren't a
+  //     partition (a patient matching 2+ queries counts toward each; the result's splitBy.overlapCount says by
+  //     how much); anyone matching none of them gets a disclosed "Other" arm. maxArms/minCount refused here too.
   "views": [ {"kind":"compare","genes":[...(max 20)],"cohorts":[names?]},
              {"kind":"survival","endpoint":"OS|PFS|DFS|…","anchor":{"eventType":"Treatment","key":"SUBTYPE","value":"Chemo","occurrence":"FIRST"},"cohorts":[names?]},
              {"kind":"cox","endpoint":"OS|PFS|DFS|...","covariates":[axis, ...(max 8)],"stratifyByStudy":true?,"stratifyByCohort":true?,"cutoffMonths":number?,"cohorts":[names?]},

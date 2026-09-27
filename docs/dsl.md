@@ -127,10 +127,10 @@ document's own cohort list (they don't count against the 16-cohort cap or appear
 tab — only in this one view's own result, with full provenance: each arm's own compiled SQL and
 count), and this view alone draws them instead of whatever `cohorts` would otherwise resolve to.
 
-Exactly one of two mutually exclusive shapes:
+Exactly one of three mutually exclusive shapes:
 
 - `splitBy: {cohort, attribute, maxArms?, minCount?}` — one arm per distinct value of a
-  categorical clinical attribute. Top `maxArms - 1` values by patient count (default 8, max 12)
+  categorical clinical attribute. Top `maxArms - 1` values by patient count (default and max 8)
   get their own arm; everything else — both values beyond that cutoff and any value with fewer
   than `minCount` patients (default 10) — pools into one disclosed `"Other"` arm rather than
   being dropped or given a needlessly small, statistically unstable arm of its own. A numeric
@@ -139,16 +139,25 @@ Exactly one of two mutually exclusive shapes:
   a study that itself declines to answer (e.g. over its own 200-distinct-value cap). Arms are
   named `"<cohort> — <attribute>: <value>"`.
 - `splitBy: {cohort, gene}` — exactly two arms, mutated vs. not, via OQL (`<gene>: MUT`) —
-  no live query needed to know the two group names in advance, unlike `attribute`. `maxArms`/
+  no live query needed to know the two group names in advance, unlike `attribute`. Sugar for the
+  single-query case of `oql` below, with its complement (not mutated) auto-generated. `maxArms`/
   `minCount` don't apply and are refused if given alongside `gene`, rather than silently
   ignored. Arms are named `"<cohort> — <gene>: Mutated"` / `"<cohort> — <gene>: Not mutated"`.
-`maxArms` (default 8, max 12) caps how many arms are ever drawn: the top `maxArms - 1` values by
-patient count get their own arm, and everything else — both values beyond that cutoff and any
-value with fewer than `minCount` patients (default 10) — pools into one disclosed `"Other"` arm
-rather than being dropped or given a needlessly small, statistically unstable arm of its own. A
-numeric attribute is refused (split needs a categorical; threshold a continuous one with a
-cohort's own `percentile` instead), as is an attribute with fewer than 2 values clearing
-`minCount`, or a study that itself declines to answer (e.g. over its own 200-distinct-value cap).
+- `splitBy: {cohort, oql: [q, ...]}` — one arm per portal-OQL query (1-8, the same subset a
+  cohort's own `{"kind":"oql"}` leaf compiles), named from the query text itself — reaching
+  anything OQL can express (a driver-only call, copy number, a multi-gene co-alteration like
+  `"TP53: MUT; KRAS: MUT"`), not just plain mutation status as `gene` does. Arms are **not**
+  forced into a partition: a patient matching more than one query counts toward each, and the
+  total overlap is disclosed (`overlapCount` in the result), not hidden; anyone matching none of
+  them falls into a disclosed `"<cohort> — Other"` arm (omitted entirely if it would be empty).
+  `maxArms`/`minCount` don't apply here either — you named the arms yourself, so there's no
+  data-discovered long tail to cap or pool — and are refused if given alongside `oql`.
+
+Arms are only a strict partition for `gene` (mutated/not always sums to the whole). For
+`attribute` and `oql`, the result's `splitBy.overlapCount` discloses how many patients counted
+toward more than one named arm — attribute mode can still overlap on a sample-level attribute
+when one patient's samples disagree, and oql mode whenever two queries both match the same
+patient — so the arm counts summing to more than the base cohort is expected, not a bug.
 
 | kind | fields | semantics |
 |---|---|---|
@@ -2133,7 +2142,38 @@ MSI_TYPE = Instable (vs every other observed value: Stable, Indeterminate, Do no
 }
 ```
 
-### Example 34: Survival split three ways: the k-group log-rank
+### Example 34: splitBy: a list of OQL queries, arms that overlap and a disclosed "Other"
+
+"all patients" split by ["TP53: MUT", "KRAS: MUT"] gives 13,105 TP53-mutant, 7,115 KRAS-mutant, and 9,019 in neither ("Other") — summing to more than the 24,950-patient base cohort because 4,289 patients carry both mutations, which the result discloses as `splitBy.overlapCount` rather than leaving the arm counts to look inconsistent on their own (13,105 + 7,115 − 4,289 + 9,019 = 24,950, exactly the base count).
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "genes": [
+        "TP53",
+        "KRAS"
+      ],
+      "splitBy": {
+        "cohort": "all patients",
+        "oql": [
+          "TP53: MUT",
+          "KRAS: MUT"
+        ]
+      }
+    }
+  ]
+}
+```
+
+### Example 35: Survival split three ways: the k-group log-rank
 
 MSI status in three groups (stable / instable / indeterminate) instead of the usual two-arm split. The test asks whether the three curves differ AT ALL, not which pair does — a different question from running the 2-arm test three times pairwise, which would need its own multiple-testing correction.
 
@@ -2187,7 +2227,7 @@ MSI status in three groups (stable / instable / indeterminate) instead of the us
 }
 ```
 
-### Example 35: A missing alteration type is disclosed, never a false negative
+### Example 36: A missing alteration type is disclosed, never a false negative
 
 TP53 (a real mutation hotspot here) and MDM2 (never assayed for copy-number in this study) side by side. Both show 0%-or-real altered figures, but only the view's note — and each cell's per-type breakdown (mutation/CNA/structural-variant counts, visible on hover in the app) — reveals that MDM2's 0% means "never checked" while TP53's is a real, profiled result.
 
@@ -2220,7 +2260,7 @@ TP53 (a real mutation hotspot here) and MDM2 (never assayed for copy-number in t
 }
 ```
 
-### Example 36: Four receptor subtypes, one real test: Welch's ANOVA
+### Example 37: Four receptor subtypes, one real test: Welch's ANOVA
 
 Breast cancer's four receptor subtypes, compared on genomic instability (FRACTION_GENOME_ALTERED) and mutation burden (TMB_NONSYNONYMOUS). Triple-negative's markedly higher genomic instability is exactly the known biology, and both the parametric (ANOVA) and rank-based (Kruskal-Wallis) tests agree emphatically; TMB does not differ significantly by subtype here, and again both tests agree.
 
@@ -2289,7 +2329,7 @@ Breast cancer's four receptor subtypes, compared on genomic instability (FRACTIO
 }
 ```
 
-### Example 37: A non-standard survival endpoint, named directly
+### Example 38: A non-standard survival endpoint, named directly
 
 MSI-H vs MSS endometrial cancer, progression-free survival from first-line treatment — the study's actual recorded outcome, reachable only because the exact column names are given rather than assumed from an OS/PFS/DFS-style prefix.
 
@@ -2333,7 +2373,7 @@ MSI-H vs MSS endometrial cancer, progression-free survival from first-line treat
 }
 ```
 
-### Example 38: Top 20% TMB, within one cancer type: a percentile cutoff
+### Example 39: Top 20% TMB, within one cancer type: a percentile cutoff
 
 tmb_mskcc_2018 is pan-cancer, so a plain percentile would mix histologies with very different baseline TMB. "NSCLC high-TMB"/"NSCLC low-TMB" both restrict to NSCLC first, then split on whether TMB is at or above the 80th percentile COMPUTED WITHIN THAT NSCLC POPULATION (percentileOf:"NSCLC") — the readback shows the resolved number and what it was a percentile of, not just a bare threshold.
 
