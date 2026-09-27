@@ -6,7 +6,7 @@ import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type G
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 import { parameterize } from "../../lib/params.ts";
-import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
+import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve, SplitBy } from "../../lib/types.ts";
 import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
 import type { ViewParticipation } from "../../lib/types.ts";
 import { survivalAxis } from "../../lib/stats.ts";
@@ -1816,6 +1816,57 @@ function ViewHelpButton({ kind, menuId, menuStore }: { kind: string; menuId: str
 }
 
 /**
+ * "split by" in a view's header: auto-split one named cohort into an arm per value of a
+ * categorical attribute, instead of hand-writing one cohort per value. The arms are computed
+ * server-side (lib/cohort-splitby.ts) and never added to the document's own cohort list — this
+ * control only ever patches the view's own `splitBy` field. `cohortNames` reuses whatever the
+ * header's own cohort picker already has on hand, so this needs no new per-call-site data beyond
+ * the attribute catalog every view already fetches for its own axis pickers.
+ */
+function SplitByControl({ current, cohortNames, attrs, busy, menuId, menuStore, onChange }: {
+  current?: SplitBy; cohortNames: string[]; attrs: { attribute: string; kind: string }[]; busy?: boolean;
+  menuId: string; menuStore: Map<string, boolean>; onChange: (next: SplitBy | undefined) => void;
+}) {
+  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
+  const catAttrs = attrs.filter((a) => a.kind !== "num");
+  if (!cohortNames.length || !catAttrs.length) return null;
+  return (
+    <details className="gearmenu" ref={ref} onToggle={onToggle}>
+      <summary className="tbbtn" title="auto-split one cohort into an arm per value of an attribute, live from the data">
+        {current ? "split: " + current.attribute : "+ split by"}
+      </summary>
+      <div className="gearmenu-items">
+        <div className="setrow">
+          <span className="meta">cohort</span>
+          <select value={current?.cohort ?? cohortNames[0]} disabled={busy}
+            onChange={(e) => onChange(current ? { ...current, cohort: e.target.value } : undefined)}>
+            {cohortNames.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div className="setrow">
+          <span className="meta">attribute</span>
+          <select value={current?.attribute ?? ""} disabled={busy}
+            onChange={(e) => e.target.value
+              ? onChange({ maxArms: current?.maxArms, minCount: current?.minCount, ...current, cohort: current?.cohort ?? cohortNames[0], attribute: e.target.value })
+              : onChange(undefined)}>
+            <option value="">(none — not split)</option>
+            {catAttrs.map((a) => <option key={a.attribute} value={a.attribute}>{a.attribute}</option>)}
+          </select>
+        </div>
+        {current && <div className="setrow">
+          <span className="meta">max arms</span>
+          <input type="number" min={2} max={12} disabled={busy} style={{ width: "4rem" }}
+            value={current.maxArms ?? 8}
+            onChange={(e) => onChange({ ...current, maxArms: e.target.value ? Number(e.target.value) : undefined })}
+            title="at most this many arms, including a pooled &quot;Other&quot; for whatever doesn't fit" />
+        </div>}
+        {current && <button type="button" className="linklike" onClick={() => onChange(undefined)}>remove split</button>}
+      </div>
+    </details>
+  );
+}
+
+/**
  * A checkbox menu in a view's header: which cohorts it uses, which attributes it compares.
  * One component, because these were the settings you could only reach by editing the JSON.
  */
@@ -1858,11 +1909,13 @@ function PickMenu({ label, title, options, chosen, onChange, min, max, busy, loa
  * Before this each view kind built its own, so the timing chip landed in a different place
  * in each card.
  */
-function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown, onRemove, onEditNote, menuStore }: {
+function ViewHead({ v, title, sub, actions, chips, cohorts, splitBy, onMoveUp, onMoveDown, onRemove, onEditNote, menuStore }: {
   v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode;
   onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void; onEditNote?: () => void; menuStore: Map<string, boolean>;
   /** which cohorts this view draws; absent when the document has only one */
   cohorts?: { chosen: string[]; all: string[]; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void };
+  /** auto-split one cohort into an arm per attribute value; reuses `cohorts.all`/`.busy` above */
+  splitBy?: { current?: SplitBy; attrs: { attribute: string; kind: string }[]; onChange: (next: SplitBy | undefined) => void };
 }) {
   const menuKey = cohorts?.viewKey ?? "vh";
   return (
@@ -1875,6 +1928,10 @@ function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown
             <PickMenu label="cohorts" title="which cohorts this view draws; all of them unless you say otherwise"
               options={cohorts.all.map((n) => ({ value: n, label: n }))} chosen={cohorts.chosen}
               onChange={cohorts.onChange} min={1} max={cohorts.max} busy={cohorts.busy} menuId={"pick:" + menuKey} menuStore={menuStore} />
+          )}
+          {splitBy && cohorts && (
+            <SplitByControl current={splitBy.current} cohortNames={cohorts.all} attrs={splitBy.attrs} busy={cohorts.busy}
+              menuId={"split:" + menuKey} menuStore={menuStore} onChange={splitBy.onChange} />
           )}
           {actions}
           {chips}
@@ -1978,6 +2035,11 @@ function Latency({ v }: { v: any }) {
     const chosen: string[] = Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts.filter((n: string) => all.includes(n)) : all;
     return { chosen, all, max, busy, viewKey: resultViewKeys.current[vi] ?? vi, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
   };
+
+  /** "split by" for a view's own ViewHead — reuses the same attribute catalog every axis
+   *  picker already fetches, patches just this one view's `splitBy` field. */
+  const splitByChoice = (vi: number, v: any) =>
+    ({ current: v.splitBy as SplitBy | undefined, attrs: catalogAttrs(), onChange: (next: SplitBy | undefined) => patchView(vi, { splitBy: next }) });
 
   /** the view at index vi, read as an oncoprint view (its editor only renders there) */
   const ocView = (vi: number): OncoprintView => ((doc.views || [])[vi] || {}) as OncoprintView;
@@ -3731,7 +3793,7 @@ function Latency({ v }: { v: any }) {
                     this is the only thing that needs to render for it. */}
                 {(v as any).pending && <div className="skeleton skeleton-view" />}
                 {v.kind === "compare" && v.rows && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} splitBy={splitByChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                     style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
@@ -3769,7 +3831,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi))} sub="lollipop by protein position, as the portal's mutation tab draws it" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi))} splitBy={splitByChoice(vi, docView(vi))} sub="lollipop by protein position, as the portal's mutation tab draws it" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {/* one renderer (lib/view-svg.ts) for this figure everywhere: the app, chat and MCP;
                       the caption under it carries the note, so it isn't repeated above */}
@@ -3778,7 +3840,7 @@ function Latency({ v }: { v: any }) {
                     : <p className="note">{v.note || "no mutations in these genes for this cohort"}</p>}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} splitBy={splitByChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<>
                       <label className="tbfield" title="the molecular profile the correlation is computed over">profile <select
                         value={docView(vi).profileType || ""} disabled={busy}
@@ -3822,7 +3884,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "clinical" && v.clinical && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} splitBy={splitByChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<PickMenu label="attributes" title="which clinical attributes this view compares" busy={busy}
                       menuId={"attrs:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} loading={attrsLoading()}
                       options={catalogAttrs().map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind }))}
@@ -3868,7 +3930,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} splitBy={splitByChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
@@ -3908,7 +3970,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "survival" && v.curves && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} splitBy={splitByChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     sub={<>Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}{v.anchoredTo && <> — from {v.anchoredTo}</>}</>}
                     chips={v.truncated ? <span className="trunc" title={
                       "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
@@ -4016,7 +4078,7 @@ function Latency({ v }: { v: any }) {
                   <p className="note">{v.caveat}</p>
                 </>}
                 {v.kind === "cox" && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Cox regression" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Cox regression" cohorts={cohortChoice(vi, docView(vi))} splitBy={splitByChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     sub={<>Multivariate Cox, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}</>} />
                   {(() => {
                     const sv: any = (doc.views || [])[vi] || {};
@@ -4098,7 +4160,7 @@ function Latency({ v }: { v: any }) {
                     : !v.error && <p className="note">nothing to draw</p>}
                 </>}
                 {v.kind === "logistic" && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Logistic regression" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Logistic regression" cohorts={cohortChoice(vi, docView(vi))} splitBy={splitByChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     sub={<>Multivariate logistic, odds ratios</>} />
                   {(() => {
                     const sv: any = (doc.views || [])[vi] || {};
@@ -4183,7 +4245,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 )}
                 {v.kind === "plot" && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} splitBy={splitByChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
                   {/* Every control here changes what is DRAWN and costs a query, so there is one
                       zone and it says so — the same toolbar the oncoprint uses. */}
@@ -4241,6 +4303,8 @@ function Latency({ v }: { v: any }) {
                         options={Object.keys((result && result.cohorts) || {}).map((n) => ({ value: n, label: n }))}
                         chosen={cohortChoice(vi, docView(vi)).chosen} min={1} max={1}
                         onChange={(next) => setViewCohorts(vi, next, Object.keys((result && result.cohorts) || {}))} />
+                      <SplitByControl {...splitByChoice(vi, docView(vi))} cohortNames={Object.keys((result && result.cohorts) || {})} busy={busy}
+                        menuId={"split:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} />
                     {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
                       <details className="gearmenu inline">
                         <summary title="treatment sequence options">settings</summary>
@@ -4298,6 +4362,8 @@ function Latency({ v }: { v: any }) {
                         options={Object.keys((result && result.cohorts) || {}).map((n) => ({ value: n, label: n }))}
                         chosen={cohortChoice(vi, docView(vi)).chosen} min={1}
                         onChange={(next) => setViewCohorts(vi, next, Object.keys((result && result.cohorts) || {}))} />
+                      <SplitByControl {...splitByChoice(vi, docView(vi))} cohortNames={Object.keys((result && result.cohorts) || {})} busy={busy}
+                        menuId={"split:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} />
                     <details className="gearmenu inline">
                       <summary title="clinical course options">settings</summary>
                       {/* Every parameter of this chart is a choice, and the defaults are only a

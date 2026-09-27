@@ -15,7 +15,8 @@
     "check:genefacets": "node --env-file=.env.local scripts/check-gene-facets.ts",
     "check:values": "node --env-file=.env.local scripts/check-value-folding.ts",
     "check:denominators": "node --env-file=.env.local scripts/check-denominators.ts",
-    "denominators:pin": "UPDATE_DENOM=1 node --env-file=.env.local scripts/check-denominators.ts"
+    "denominators:pin": "UPDATE_DENOM=1 node --env-file=.env.local scripts/check-denominators.ts",
+    "check:splitby-perf": "node --env-file=.env.local scripts/check-splitby-perf.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",

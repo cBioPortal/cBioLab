@@ -575,6 +575,17 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "splitBy: one cohort, auto-split into an arm per receptor subtype",
+    demonstrates: "`splitBy` turns one named cohort into an arm per distinct value of a categorical attribute, live from the data, instead of hand-writing one cohort per value. The arms are scoped to this one view — they never touch the document's own cohort list — but still carry full provenance (each arm's own compiled count/SQL) in the result.",
+    tags: ["splitBy", "compare", "cohorts"],
+    note: "\"all patients\" split by RECEPTOR_STATUS_PRIMARY gives the same 4 clinically standard subtypes a hand-written 4-cohort document would (HR+/HER2-, Triple Negative, HR+/HER2+, HR-/HER2+), plus a few small ones this study also records (HR+/HER2_Unknown, Unk/ND, HR+/HER2_Equivocal) — all within the default 8-arm cap, so nothing here needs pooling into \"Other\". TP53 reads 26.8%/90.4%/49.2%/77% across the four main subtypes, matching the published literature on triple-negative breast cancer's markedly higher TP53 mutation rate.",
+    doc: {
+      study: "breast_msk_2018",
+      cohorts: { "all patients": { all: [] } },
+      views: [{ kind: "compare", genes: ["TP53", "PIK3CA"], splitBy: { cohort: "all patients", attribute: "RECEPTOR_STATUS_PRIMARY" } }]
+    }
+  },
+  {
     title: "Survival split three ways: the k-group log-rank",
     demonstrates: "3+ cohorts in a survival view now get a real test — the k-group log-rank generalization (a (k-1)-df chi-squared from the full covariance matrix, the same statistic R's survdiff() reports) — instead of only a picture with no way to say whether the split is real.",
     tags: ["survival", "log-rank", "k-group"],
@@ -774,6 +785,22 @@ rel      := { "type": "NONE" }                                                 /
   default 90 days) and supports attrs \`LINE_NO\`, \`COMPOSITION\`, \`GAP\`.
 
 ## Views
+
+Any view below (**oncoprint excepted** — no UI control for it yet, though the field is honored if
+written by hand) may carry \`splitBy: {cohort, attribute, maxArms?, minCount?}\` instead of, or
+alongside, its own \`cohorts\`: auto-split one named cohort into an arm per distinct value of a
+categorical clinical attribute, live from the data, rather than hand-writing one cohort per
+value. The synthetic arms are named \`"<cohort> — <attribute>: <value>"\`, are **not** added to the
+document's own cohort list (they don't count against the 16-cohort cap or appear in the Cohorts
+tab — only in this one view's own result, with full provenance: each arm's own compiled SQL and
+count), and this view alone draws them instead of whatever \`cohorts\` would otherwise resolve to.
+\`maxArms\` (default 8, max 12) caps how many arms are ever drawn: the top \`maxArms - 1\` values by
+patient count get their own arm, and everything else — both values beyond that cutoff and any
+value with fewer than \`minCount\` patients (default 10) — pools into one disclosed \`"Other"\` arm
+rather than being dropped or given a needlessly small, statistically unstable arm of its own. A
+numeric attribute is refused (split needs a categorical; threshold a continuous one with a
+cohort's own \`percentile\` instead), as is an attribute with fewer than 2 values clearing
+\`minCount\`, or a study that itself declines to answer (e.g. over its own 200-distinct-value cap).
 
 | kind | fields | semantics |
 |---|---|---|
@@ -1024,6 +1051,11 @@ export const CHAT_GRAMMAR = `Document shape:
   "notes"?: "<the analyst's own prose about this workspace>",
   "title"?: "<name, when saved as a workspace>",
   "cohorts": { "<name>": <cohortDef>, ... (max 16) },
+  // Any view except oncoprint may also carry "splitBy":{"cohort":"<name>","attribute":"<categorical clinical attr>","maxArms"?:8,"minCount"?:10}
+  // instead of (or with) "cohorts": auto-splits that one cohort into an arm per distinct value, live from the
+  // data — top (maxArms-1) values by count each get an arm, the rest (plus anything under minCount patients)
+  // pool into one disclosed "Other" arm. Arms are scoped to THIS view only, never added to the document's own
+  // cohort list. Refused (not guessed) for a numeric attribute, or fewer than 2 values clearing minCount.
   "views": [ {"kind":"compare","genes":[...(max 20)],"cohorts":[names?]},
              {"kind":"survival","endpoint":"OS|PFS|DFS|…","anchor":{"eventType":"Treatment","key":"SUBTYPE","value":"Chemo","occurrence":"FIRST"},"cohorts":[names?]},
              {"kind":"cox","endpoint":"OS|PFS|DFS|...","covariates":[axis, ...(max 8)],"stratifyByStudy":true?,"stratifyByCohort":true?,"cutoffMonths":number?,"cohorts":[names?]},

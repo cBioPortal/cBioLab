@@ -210,6 +210,32 @@ export interface CohortDef {
   notes?: string;
 }
 
+/**
+ * Auto-split ONE existing named cohort into an arm per distinct value of a categorical clinical
+ * attribute, live from the data — instead of hand-writing one cohort per value. Lives on a VIEW,
+ * not a cohort: the synthetic arms it produces are not added to the document's own named-cohort
+ * map (so they don't compete for the 16-cohort cap or clutter the Cohorts tab), but each arm
+ * still carries full provenance — its own compiled SQL and count — attached to that view's own
+ * result (ViewResult.splitBy). Resolved once per view, live, before that view's own queries run
+ * (lib/cohort-splitby.ts), the same "resolve once before compilation" shape as `extends` and a
+ * clinical leaf's `percentile`.
+ */
+export interface SplitBy {
+  /** which existing named cohort to split */
+  cohort: string;
+  /** a categorical clinical attribute; a numeric one is refused (use a percentile cutoff on a
+   *  cohort instead — this splits into groups, it doesn't threshold a continuous value) */
+  attribute: string;
+  /** at most this many arms, INCLUDING a pooled "Other" if the attribute has more distinct
+   *  values than this (default 8) — never silently drops a value, always discloses what got
+   *  pooled and why, the same "+N more" idiom the oncoprint legend and sequence view use */
+  maxArms?: number;
+  /** an arm with fewer than this many matching patients pools into "Other" instead of standing
+   *  alone (default 10 — the same floor the survival view's log-rank guard uses: below it, a
+   *  group's own statistics are too unstable to read as a real arm) */
+  minCount?: number;
+}
+
 /** Context threaded into every leaf compiler. */
 export interface CompileCtx {
   study: string;
@@ -228,12 +254,12 @@ export type { GeneTrackSpec };
 export interface CompareView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "compare"; genes: string[]; cohorts?: string[];
+  kind: "compare"; genes: string[]; cohorts?: string[]; splitBy?: SplitBy;
 }
 export interface SurvivalView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "survival"; cohorts?: string[];
+  kind: "survival"; cohorts?: string[]; splitBy?: SplitBy;
   /** endpoint prefix: OS (default), PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS */
   endpoint?: string;
   /**
@@ -277,7 +303,7 @@ export type CoxCovariate = PlotAxis & { reference?: string };
 export interface CoxView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "cox"; cohorts?: string[];
+  kind: "cox"; cohorts?: string[]; splitBy?: SplitBy;
   /** endpoint prefix: OS (default), PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS */
   endpoint?: string;
   /** same escape hatch as SurvivalView.monthsAttribute/statusAttribute, for the same reason */
@@ -339,7 +365,7 @@ export interface CoxResult {
 export interface LogisticView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "logistic"; cohorts?: string[];
+  kind: "logistic"; cohorts?: string[]; splitBy?: SplitBy;
   /** the binary outcome, as a plot axis (clinical, molecular, or alteration status) */
   outcome: PlotAxis;
   /**
@@ -381,7 +407,7 @@ export interface LogisticResult {
 export interface PlotView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "plot"; x: PlotAxis; y: PlotAxis; cohorts?: string[];
+  kind: "plot"; x: PlotAxis; y: PlotAxis; cohorts?: string[]; splitBy?: SplitBy;
   /** what a point is (default "sample"); patient mode averages a patient's samples */
   unit?: "patient" | "sample";
   /** the grid a scatter is binned onto (default 240 x 160) */
@@ -402,16 +428,16 @@ export interface PlotView {
 }
 export interface CooccurrenceView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
-  note?: string; kind: "cooccurrence"; genes: string[]; cohorts?: string[] }
+  note?: string; kind: "cooccurrence"; genes: string[]; cohorts?: string[]; splitBy?: SplitBy }
 export interface ClinicalView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
-  note?: string; kind: "clinical"; attributes: string[]; cohorts?: string[] }
+  note?: string; kind: "clinical"; attributes: string[]; cohorts?: string[]; splitBy?: SplitBy }
 export interface CoexpressionView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
-  note?: string; kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[] }
+  note?: string; kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[]; splitBy?: SplitBy }
 export interface HotspotsView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
-  note?: string; kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number }
+  note?: string; kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number; splitBy?: SplitBy }
 /**
  * The clinical course: what fraction of the still-observable cohort is in each
  * event state, over time relative to an anchor.
@@ -425,7 +451,7 @@ export interface HotspotsView {
 export interface CourseView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "course"; cohorts?: string[];
+  kind: "course"; cohorts?: string[]; splitBy?: SplitBy;
   /** canonical event names to measure; case is folded (lib/event-names.ts) */
   eventTypes: string[];
   anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
@@ -488,7 +514,7 @@ export interface OncoprintView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
   /** rows: a gene symbol, or {label?, genes} for one merged row over several genes */
-  kind: "oncoprint"; genes: GeneTrackSpec[]; cohorts?: string[];
+  kind: "oncoprint"; genes: GeneTrackSpec[]; cohorts?: string[]; splitBy?: SplitBy;
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
   /** what a column is (default "patient"); "sample" draws every sample of the cohort's patients */
   unit?: "patient" | "sample";
@@ -513,7 +539,7 @@ export interface OncoprintView {
 export interface SequenceView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "sequence"; cohorts?: string[];
+  kind: "sequence"; cohorts?: string[]; splitBy?: SplitBy;
   /** event type carrying therapies (default: treatment) */
   eventType?: string;
   /** attribute key labelling each therapy (default: SUBTYPE) */
@@ -741,6 +767,19 @@ export interface ViewResult {
   /** the aggregate queries that produced THIS view's numbers, in order */
   queries?: { study: string; label: string; sql: string; ms?: number; remote?: boolean }[];
   cohorts?: string[]; annotation?: string;
+  /**
+   * Present only when the view asked for `splitBy`: the synthetic arms it produced, with full
+   * provenance (each arm's own compiled SQL and count) since they aren't in the document's own
+   * `cohorts` map (see SplitBy's own comment for why). `cohorts` above already lists their names
+   * as this view's drawn cohorts; this is where a reader finds out what each one actually means.
+   */
+  splitBy?: {
+    attribute: string; cohort: string;
+    arms: { name: string; count: number; text: string; sql: string }[];
+    /** raw values this split saw but pooled into "Other" rather than giving their own arm —
+     *  because there were too many to fit `maxArms`, or too few patients to clear `minCount` */
+    otherValues?: string[];
+  };
   rows?: CompareRow[];                      // compare
   curves?: KmCurve[]; caveat?: string;      // survival
   endpoint?: string;                        // survival: which endpoint was used

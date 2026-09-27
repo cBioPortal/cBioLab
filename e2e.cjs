@@ -835,6 +835,21 @@ async function main() {
     if (!/^FAIL /m.test(out)) results.push("FAIL check:values crashed: " + String(e.message).slice(0, 120));
   }
 
+  // splitBy performance gate — the first of its kind (see docs/PERFORMANCE.md: everything
+  // else there is a manual snapshot, not a gate). splitBy can turn one cohort into up to
+  // SPLIT_BY_MAX_ARMS_CEILING of them for a single view with one click; this asserts query
+  // count scales with arm count, not worse, and that a near-ceiling split stays well under a
+  // generous wall-clock budget.
+  try {
+    const { execSync } = require("child_process");
+    const out = execSync("npm run --silent check:splitby-perf", { cwd: __dirname, encoding: "utf8", timeout: 300000 });
+    for (const line of out.trim().split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
+  } catch (e) {
+    const out = String((e.stdout || "") + (e.stderr || "")).trim();
+    for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
+    if (!/^FAIL /m.test(out)) results.push("FAIL check:splitby-perf crashed: " + String(e.message).slice(0, 120));
+  }
+
   console.log(results.join("\n"));
   process.exit(results.some(r => r.startsWith("FAIL")) ? 1 : 0);
 }
