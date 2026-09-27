@@ -25,7 +25,7 @@ import {
   geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
   clinicalCountsSql, clinicalMomentsSql, clinicalHistogramSql, attributeQuantileSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
   lollipopChangesSql, lollipopTypesSql, lollipopTotalsSql, cohortSampleCountSql,
-  timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql, coxRowsSql,
+  timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql, coxRowsSql, logisticRowsSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
 import * as federation from "../lib/federation.ts";
@@ -260,7 +260,10 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // Cox rows are per-patient (unlike every other builder above), but still project no
     // identifier: `os.pid` only ever appears in a JOIN ON clause, never in the outer SELECT.
     "coxRowsSql": () => coxRowsSql(cohortSql, "x", "db", "OS", [{ label: "c0", sel: catAxis }, { label: "c1", sel: numAxis }]),
-    "coxRowsSql:customColumns": () => coxRowsSql(cohortSql, "x", "db", "CUSTOM", [{ label: "c0", sel: catAxis }], { months: "PFS_MONTHS_FIRST_LINE_TX", status: "PROGRESSION_STATUS" })
+    "coxRowsSql:customColumns": () => coxRowsSql(cohortSql, "x", "db", "CUSTOM", [{ label: "c0", sel: catAxis }], { months: "PFS_MONTHS_FIRST_LINE_TX", status: "PROGRESSION_STATUS" }),
+    // Same shape as coxRowsSql: the outcome is just another axis-selected CTE, joined the same
+    // way — no identifier ever reaches the outer SELECT here either.
+    "logisticRowsSql": () => logisticRowsSql(cohortSql, { label: "y0", sel: catAxis }, [{ label: "c0", sel: numAxis }])
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

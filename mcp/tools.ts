@@ -194,7 +194,7 @@ export function registerTools(server: any): void {
 
   server.tool(
     "run_analysis",
-    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes) and oncoprint. Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
+    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes) and oncoprint. Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
     {
       document: z.object({}).passthrough()
         .describe("The Analysis document: {study, cohorts: {name: def, ...}, views: [...]}. Grammar and examples: describe_dsl.")
@@ -250,9 +250,25 @@ export function registerTools(server: any): void {
             `  ${c.cohort}: median ${c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n=${c.n}, ${c.events} events${c.missing ? ", " + c.missing + " missing OS" : ""})`).join("\n") +
             "\nCAVEAT (tell the user): " + v.caveat);
         } else if (v.kind === "cox") {
-          out.push(`Cox regression (${v.endpoint || "OS"}, n=${v.cox!.n.toLocaleString()}, ${v.cox!.events.toLocaleString()} events):\n` +
-            v.cox!.coefficients.map((c) =>
-              `  ${c.label}${c.reference ? " vs " + c.reference : ""}: HR ${c.hr.toFixed(2)} ` +
+          // stratifyByCohort: no pooled coefficients — one independent fit per cohort instead.
+          out.push(v.cox!.byCohort
+            ? `Cox regression (${v.endpoint || "OS"}, stratified by cohort):\n` +
+              v.cox!.byCohort.map((c) => c.error
+                ? `  ${c.cohort}: ERROR — ${c.error}`
+                : `  ${c.cohort} (n=${c.n.toLocaleString()}, ${c.events.toLocaleString()} events):\n` +
+                  c.coefficients.map((cf) =>
+                    `    ${cf.label}${cf.reference ? " vs " + cf.reference : ""}: HR ${cf.hr.toFixed(2)} ` +
+                    `(95% CI ${cf.ciLow.toFixed(2)}-${cf.ciHigh.toFixed(2)}) p=${pFmt(cf.p)}`).join("\n")
+              ).join("\n") + caveatOf(v)
+            : `Cox regression (${v.endpoint || "OS"}, n=${v.cox!.n.toLocaleString()}, ${v.cox!.events.toLocaleString()} events):\n` +
+              v.cox!.coefficients.map((c) =>
+                `  ${c.label}${c.reference ? " vs " + c.reference : ""}: HR ${c.hr.toFixed(2)} ` +
+                `(95% CI ${c.ciLow.toFixed(2)}-${c.ciHigh.toFixed(2)}) p=${pFmt(c.p)}`).join("\n") +
+              caveatOf(v));
+        } else if (v.kind === "logistic") {
+          out.push(`Logistic regression (n=${v.logistic!.n.toLocaleString()}, ${v.logistic!.events.toLocaleString()} with the outcome):\n` +
+            v.logistic!.coefficients.map((c) =>
+              `  ${c.label}${c.reference ? " vs " + c.reference : ""}: OR ${c.or.toFixed(2)} ` +
               `(95% CI ${c.ciLow.toFixed(2)}-${c.ciHigh.toFixed(2)}) p=${pFmt(c.p)}`).join("\n") +
             caveatOf(v));
         } else if (v.kind === "cooccurrence") {

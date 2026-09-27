@@ -10,17 +10,32 @@ const mutatedCov: CoxCovariate = { source: "alteration", gene: "APC", by: "mutat
 const rows = (values: (number | string)[][]) => values.map((v) => ({ values: v }));
 
 describe("buildCoxColumns: reference level", () => {
-  test("with no declared reference, the most frequent level is the reference (existing behavior)", () => {
-    // 7 "Mutated", 3 "Not mutated" — Mutated is more frequent, so it's the reference by
-    // default, and the fit column is "Not mutated" vs it (HR reads mutated-relative-to-that).
+  test("with no declared reference, a mutated-vs-not covariate always defaults to 'Not mutated' — not frequency", () => {
+    // 7 "Mutated", 3 "Not mutated" — Mutated is more frequent, but the reference is still
+    // "Not mutated": for a mutated/not axis, frequency isn't a sound tie-breaker (a gene
+    // altered in most patients would otherwise silently flip which side of the HR is "risk"
+    // relative to a gene altered in few), so this one axis kind gets a fixed convention instead.
     const r = rows([
       ...Array.from({ length: 7 }, () => ["Mutated"]),
       ...Array.from({ length: 3 }, () => ["Not mutated"]),
     ]);
     const cols = buildCoxColumns([mutatedCov], ["cat"] as AxisKind[], r);
     assert.equal(cols.length, 1);
-    assert.equal(cols[0].reference, "Mutated");
-    assert.equal(cols[0].level, "Not mutated");
+    assert.equal(cols[0].reference, "Not mutated");
+    assert.equal(cols[0].level, "Mutated");
+  });
+
+  test("mutationType/cna axes are unaffected — only a plain mutated-vs-not axis gets the fixed default", () => {
+    // by:"mutationType" also produces a "Not mutated" level, but this covariate isn't asking
+    // a binary mutated/not question, so it stays on the frequency default like any other
+    // multi-level categorical.
+    const cov: CoxCovariate = { source: "alteration", gene: "APC", by: "mutationType" };
+    const r = rows([
+      ["Truncating"], ["Truncating"], ["Truncating"], ["Truncating"], ["Truncating"],
+      ["Not mutated"], ["Not mutated"], ["Not mutated"],
+    ]);
+    const cols = buildCoxColumns([cov], ["cat"] as AxisKind[], r);
+    assert.ok(cols.every((c) => c.reference === "Truncating"));
   });
 
   test("a declared reference overrides frequency — the paper's actual complaint", () => {
@@ -42,7 +57,14 @@ describe("buildCoxColumns: reference level", () => {
     const cov: CoxCovariate = { ...mutatedCov, reference: "Amplified" }; // not a level this covariate ever produces
     const r = rows([["Mutated"], ["Mutated"], ["Not mutated"]]);
     const cols = buildCoxColumns([cov], ["cat"] as AxisKind[], r);
-    assert.equal(cols[0].reference, "Mutated"); // falls back to frequency, same as no declaration at all
+    assert.equal(cols[0].reference, "Not mutated"); // falls back to the same default as no declaration at all
+  });
+
+  test("a declared reference that was never observed, on a non-mutated-axis covariate, falls back to frequency", () => {
+    const cov: CoxCovariate = { source: "clinical", attribute: "APC_GROUPS", reference: "Not a real level" };
+    const r = rows([["N-terminal"], ["N-terminal"], ["C-terminal"]]);
+    const cols = buildCoxColumns([cov], ["cat"] as AxisKind[], r);
+    assert.equal(cols[0].reference, "N-terminal"); // no implicit default applies here — frequency wins
   });
 
   test("a numeric covariate is untouched by any of this — one column, no reference", () => {

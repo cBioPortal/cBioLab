@@ -12,7 +12,7 @@ import { logRank, logRankK, chiSquareP1df, fisherExact, kaplanMeier,
   chiSquareP, studentTP, fTestP, chiSquareTest, welchT, welchAnovaTest, varianceFromMoments,
   pearsonFromMoments, fisherZMeta, normalP, applyCutoff, toIncidence, survivalAxis,
   coxRegression, coxPartialLogLik, mannWhitneyU, kruskalWallis, quantilesFromHistogram,
-  type CoxRow, type Histogram } from "../lib/stats.ts";
+  logisticRegression, logisticLogLik, type CoxRow, type Histogram, type LogisticRow } from "../lib/stats.ts";
 
 /** Freireich et al. (1963), 6-MP vs placebo in acute leukaemia. `+` = censored. */
 const SIXMP = [
@@ -278,6 +278,77 @@ describe("coxRegression (multivariate Cox, Efron partial likelihood)", () => {
       { t: 3, event: 1, x: [1, 1] }, { t: 4, event: 1, x: [0, 0] },
     ];
     assert.throws(() => coxRegression(rows), /collinear|not identifiable/);
+  });
+});
+
+describe("logisticRegression (binomial GLM, Newton-Raphson)", () => {
+  test("a single binary covariate exactly reproduces the log odds ratio between the two groups", () => {
+    // A saturated model (one binary covariate, two free parameters: intercept + slope) always
+    // fits the two groups' empirical proportions EXACTLY — a closed-form identity, independent
+    // of this code, that any correct implementation must satisfy:
+    //   beta1 = logit(p1) - logit(p0), so OR = odds1 / odds0
+    // Group x=0: 30 patients, 10 events -> p0 = 1/3, odds0 = 0.5
+    // Group x=1: 20 patients, 15 events -> p1 = 3/4, odds1 = 3
+    // OR = 3 / 0.5 = 6 exactly.
+    const rows: LogisticRow[] = [
+      ...Array.from({ length: 10 }, () => ({ y: 1 as const, x: [0] })),
+      ...Array.from({ length: 20 }, () => ({ y: 0 as const, x: [0] })),
+      ...Array.from({ length: 15 }, () => ({ y: 1 as const, x: [1] })),
+      ...Array.from({ length: 5 }, () => ({ y: 0 as const, x: [1] })),
+    ];
+    const fit = logisticRegression(rows);
+    assert.ok(Math.abs(fit.or[0] - 6) < 1e-5, "odds ratio should be exactly 6: got " + fit.or[0]);
+    assert.equal(fit.n, 50);
+    assert.equal(fit.events, 25);
+  });
+
+  test("the fitted (intercept, beta) is a local maximum of its own log-likelihood", () => {
+    // A generic property any correct optimizer must satisfy, checked without assuming anything
+    // about the specific numbers — same idea as coxRegression's own such test, using the
+    // exposed logisticLogLik to include the fitted intercept in the perturbation.
+    const rows: LogisticRow[] = [
+      { y: 1, x: [1, 30] }, { y: 0, x: [0, 45] }, { y: 1, x: [1, 62] }, { y: 0, x: [1, 71] },
+      { y: 0, x: [0, 38] }, { y: 1, x: [1, 55] }, { y: 1, x: [0, 66] }, { y: 0, x: [0, 29] },
+      { y: 1, x: [1, 48] }, { y: 0, x: [1, 80] }, { y: 1, x: [0, 52] }, { y: 0, x: [0, 41] },
+    ];
+    const fit = logisticRegression(rows);
+    const atFit = logisticLogLik(rows, fit.intercept, fit.beta);
+    const eps = 1e-4;
+    const coords: ("intercept" | number)[] = ["intercept", 0, 1];
+    for (const which of coords) {
+      for (const d of [-eps, eps]) {
+        const intercept = which === "intercept" ? fit.intercept + d : fit.intercept;
+        const beta = fit.beta.map((b, i) => i === which ? b + d : b);
+        assert.ok(logisticLogLik(rows, intercept, beta) <= atFit + 1e-9,
+          "perturbing " + which + " by " + d + " must not increase the likelihood");
+      }
+    }
+  });
+
+  test("an intercept is fit implicitly: an unbalanced baseline rate does not bias the covariate's OR", () => {
+    // Same 6x odds ratio as above, but now the baseline (x=0) event rate is rare (5%) rather
+    // than the earlier 33% — without an intercept term the fit would be forced through
+    // log-odds=0 at x=0 and distort the slope; with one, the OR should still land at 6.
+    const p0 = 0.05, p1 = 6 * p0 / (1 - p0 + 6 * p0); // odds1 = 6*odds0 solved back to a probability
+    const n = 5000;
+    const rows: LogisticRow[] = [];
+    for (let i = 0; i < n; i++) rows.push({ y: i < n * p0 ? 1 : 0, x: [0] });
+    for (let i = 0; i < n; i++) rows.push({ y: i < n * p1 ? 1 : 0, x: [1] });
+    const fit = logisticRegression(rows);
+    assert.ok(Math.abs(fit.or[0] - 6) < 0.1, "OR should still recover ~6 despite a rare baseline: got " + fit.or[0]);
+  });
+
+  test("a collinear covariate is refused, same guard coxRegression uses", () => {
+    const rows: LogisticRow[] = [
+      { y: 1, x: [1, 1] }, { y: 0, x: [0, 0] }, { y: 1, x: [1, 1] }, { y: 0, x: [0, 0] },
+    ];
+    assert.throws(() => logisticRegression(rows), /collinear|not identifiable/);
+  });
+
+  test("an empty input yields an empty fit, not a crash", () => {
+    const fit = logisticRegression([]);
+    assert.deepEqual(fit.beta, []);
+    assert.equal(fit.n, 0);
   });
 });
 

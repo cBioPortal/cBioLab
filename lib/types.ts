@@ -286,6 +286,15 @@ export interface CoxView {
   covariates: CoxCovariate[];
   /** fit separate baseline hazards per study rather than pooling them (default false) */
   stratifyByStudy?: boolean;
+  /**
+   * Fit each named cohort as its own separate Cox model — its own coefficients, its own chosen
+   * reference levels, its own N/events — instead of pooling every cohort's patients into one
+   * fit (default false). Unlike `stratifyByStudy` (one shared model, a per-study baseline
+   * hazard via Cox's `stratum`), this produces N independent models: the right tool when the
+   * covariate EFFECT itself, not just the baseline hazard, might differ between cohorts (e.g.
+   * a gene's hazard ratio in NSCLC vs in CRC). A no-op when only one cohort is named.
+   */
+  stratifyByCohort?: boolean;
   /** administratively censor everyone still at risk past this month, same semantics as SurvivalView */
   cutoffMonths?: number;
 }
@@ -294,11 +303,74 @@ export interface CoxCoefficient {
   label: string;
   /** the baseline level this coefficient is measured against, for a categorical covariate */
   reference?: string;
+  /** this coefficient's own level (the non-reference side), for a categorical covariate */
+  level?: string;
+  /** which entry of the view's `covariates` array this came from — lets the UI group a
+   *  categorical covariate's coefficients back together to offer its observed levels as a
+   *  reference-level picker, without re-deriving them from raw rows */
+  axisIndex?: number;
   beta: number; se: number; hr: number; ciLow: number; ciHigh: number; p: number;
 }
 export interface CoxResult {
   coefficients: CoxCoefficient[];
   n: number; events: number;
+  /** studies whose patients were left out of the fit for lacking patient-level access */
+  excludedRemote?: { study: string; patients: number }[];
+  /**
+   * Present only when the view asked for `stratifyByCohort` (and named 2+ cohorts): one
+   * independent Cox fit per cohort, in place of the single pooled fit above (`coefficients`
+   * here is then empty; `n`/`events` are the sum across cohorts, for the header only). Each
+   * cohort's `coefficients` chose its OWN reference levels from what IT observed, so the same
+   * covariate can read against a different reference in different cohorts — real information,
+   * not an inconsistency to paper over.
+   */
+  byCohort?: { cohort: string; coefficients: CoxCoefficient[]; n: number; events: number;
+    excludedRemote?: { study: string; patients: number }[]; error?: string }[];
+}
+/**
+ * Multivariate logistic regression: a BINARY outcome (not time-to-event) regressed on several
+ * covariates at once, reported as odds ratios with a forest plot — the same shape as `cox`, but
+ * for "did X happen" rather than "when did X happen". Reuses the exact same covariate/dummy-
+ * coding machinery as `cox` (buildCoxColumns): a categorical covariate is dummy-coded the same
+ * way, with the same reference-level rules (a mutated-vs-not axis defaults to "Not mutated";
+ * others default to the most frequent level; `reference` overrides either). Fit from real
+ * per-patient rows within each LOCAL study, same boundary as `cox`.
+ */
+export interface LogisticView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string;
+  kind: "logistic"; cohorts?: string[];
+  /** the binary outcome, as a plot axis (clinical, molecular, or alteration status) */
+  outcome: PlotAxis;
+  /**
+   * Which observed value of a CATEGORICAL outcome counts as the event (1) — every other observed
+   * value is collapsed into "not event" (0), and which values got collapsed is disclosed in the
+   * caveat rather than left implicit. Required for a categorical outcome; refused (not guessed)
+   * if omitted, or if it names a value the outcome never actually takes. Not used, and must be
+   * omitted, for a NUMERIC outcome — that one must already be coded exactly 0/1, refused
+   * otherwise (a continuous number silently coerced to 0/1 would be a guess about a threshold
+   * nobody asked for).
+   */
+  outcomeEvent?: string;
+  /** one or more covariates to fit simultaneously; each becomes one or more forest-plot rows */
+  covariates: CoxCovariate[];
+}
+export interface LogisticCoefficient {
+  /** covariate name, or "<covariate>: <level>" for a categorical level */
+  label: string;
+  /** the baseline level this coefficient is measured against, for a categorical covariate */
+  reference?: string;
+  /** this coefficient's own level (the non-reference side), for a categorical covariate */
+  level?: string;
+  axisIndex?: number;
+  beta: number; se: number; or: number; ciLow: number; ciHigh: number; p: number;
+}
+export interface LogisticResult {
+  coefficients: LogisticCoefficient[];
+  n: number; events: number;
+  /** a categorical outcome's other observed values, collapsed into "not event" — named so that
+   *  is a disclosed choice, not a silent one */
+  outcomeOther?: string[];
   /** studies whose patients were left out of the fit for lacking patient-level access */
   excludedRemote?: { study: string; patients: number }[];
 }
@@ -456,7 +528,7 @@ export interface SequenceView {
 }
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView;
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -703,6 +775,7 @@ export interface ViewResult {
   svg?: string; nColumns?: number;          // oncoprint
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
   cox?: CoxResult;                          // multivariate Cox
+  logistic?: LogisticResult;                // multivariate logistic regression
 }
 /**
  * Therapy transitions, ready to draw: nodes in columns, flows between them.

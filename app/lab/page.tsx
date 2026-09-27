@@ -882,6 +882,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     { kind: "compare", label: "Compare genes" },
     { kind: "survival", label: "Survival", why: noSurvivalWhy, loading: () => catLoading },
     { kind: "cox", label: "Cox regression (forest plot)", why: noSurvivalWhy, loading: () => catLoading },
+    { kind: "logistic", label: "Logistic regression (odds ratios)" },
     { kind: "oncoprint", label: "Oncoprint" },
     { kind: "hotspots", label: "Lollipop (hotspots)" },
     { kind: "plot", label: "Plot", loading: attrsLoading,
@@ -905,7 +906,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
    * would otherwise be a bare red box the reader can't remove without editing the JSON.
    */
   const drawsOwnHead = (v: any): boolean =>
-    v.kind === "cox" || v.kind === "plot" ||
+    v.kind === "cox" || v.kind === "logistic" || v.kind === "plot" ||
     (v.kind === "compare" && !!v.rows) || (v.kind === "hotspots" && !!v.hotspots) ||
     (v.kind === "coexpression" && !!v.coexpression) || (v.kind === "clinical" && !!v.clinical) ||
     (v.kind === "cooccurrence" && !!v.pairs) || (v.kind === "survival" && !!v.curves) ||
@@ -991,6 +992,9 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
       : kind === "cooccurrence" ? { kind, genes: genes.slice(0, 6) }
       : kind === "oncoprint" ? { kind, genes: genes.slice(0, 5) }
       : kind === "cox" ? { kind, covariates: [{ source: "alteration", gene: genes[0] || "TP53", by: "mutated" }] }
+      : kind === "logistic" ? { kind,
+          outcome: { source: "alteration", gene: genes[0] || "TP53", by: "mutated" }, outcomeEvent: "Mutated",
+          covariates: [{ source: "clinical", attribute: viewAttrs()[0] || "SEX" }] }
       : { kind, genes };
     const d = { ...doc, views: [v, ...(doc.views || [])] };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
@@ -4001,6 +4005,21 @@ function Latency({ v }: { v: any }) {
                     };
                     const removeCovariate = (ci: number) => patchView(vi, { covariates: covariates.filter((_, j) => j !== ci) });
                     const addCovariate = () => patchView(vi, { covariates: [...covariates, { source: "clinical", attribute: (trackAttrs.attrs[0] || {}).attribute || "" }] });
+                    // The reference level for a categorical covariate is picked from the levels
+                    // this run actually observed (v.cox.coefficients), not re-derived client-side —
+                    // a covariate the fit dropped (only one level, or no result yet) simply gets no
+                    // picker rather than a guess at what the data might contain.
+                    const observedLevels = (ci: number): string[] => {
+                      // when stratified by cohort there's no single pooled coefficients array —
+                      // union the levels each cohort's own fit happened to observe instead
+                      const coefs = (v.cox && v.cox.coefficients.length) ? v.cox.coefficients
+                        : (v.cox?.byCohort || []).flatMap((c: any) => c.coefficients);
+                      const mine = coefs.filter((c: any) => c.axisIndex === ci);
+                      if (!mine.length) return [];
+                      const levels = new Set<string>();
+                      for (const c of mine) { if (c.reference) levels.add(c.reference); if (c.level) levels.add(c.level); }
+                      return [...levels];
+                    };
                     return (
                       <div className="basis" style={{ flexWrap: "wrap" }}>
                         <span className="meta">endpoint</span>
@@ -4020,16 +4039,105 @@ function Latency({ v }: { v: any }) {
                             onChange={e => patchView(vi, { stratifyByStudy: e.target.checked || undefined })} />
                           stratify by study
                         </label>
+                        <label className="chk" title="fit each cohort as its own separate model — own coefficients, own reference levels — instead of pooling them into one fit; a no-op with only one cohort">
+                          <input type="checkbox" checked={!!sv.stratifyByCohort} disabled={busy}
+                            onChange={e => patchView(vi, { stratifyByCohort: e.target.checked || undefined })} />
+                          stratify by cohort
+                        </label>
                         <div style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "0.3rem", marginTop: "0.3rem" }}>
-                          {covariates.map((c, ci) => (
+                          {covariates.map((c, ci) => {
+                            const levels = observedLevels(ci);
+                            return (
                             <span key={ci} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
                               <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={catalogAttrs()}
                                 profiles={profileOptions()} loading={attrsLoading()} busy={busy}
                                 onChange={(next) => setCovariate(ci, next)} />
+                              {levels.length > 1 && <label className="tbfield" title="the level a hazard ratio is measured against; unset uses this covariate's default (mutated/not always compares against 'Not mutated', other categoricals use whichever level is most frequent)">
+                                ref <select value={c.reference && levels.includes(c.reference) ? c.reference : ""} disabled={busy}
+                                  onChange={e => setCovariate(ci, { ...c, reference: e.target.value || undefined })}>
+                                  <option value="">(default)</option>
+                                  {levels.map(l => <option key={l} value={l}>{l}</option>)}
+                                </select>
+                              </label>}
                               <button type="button" className="tbbtn" disabled={busy} title="remove this covariate"
                                 onClick={() => removeCovariate(ci)}>remove</button>
                             </span>
-                          ))}
+                            );
+                          })}
+                          <button type="button" className="tbbtn" disabled={busy} style={{ alignSelf: "flex-start" }}
+                            onClick={addCovariate}>+ add covariate</button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {v.svg
+                    ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
+                    : !v.error && <p className="note">nothing to draw</p>}
+                </>}
+                {v.kind === "logistic" && <>
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Logistic regression" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                    sub={<>Multivariate logistic, odds ratios</>} />
+                  {(() => {
+                    const sv: any = (doc.views || [])[vi] || {};
+                    const covariates: any[] = Array.isArray(sv.covariates) ? sv.covariates : [];
+                    const setCovariate = (ci: number, next: any) => {
+                      const nc = covariates.map((c, j) => j === ci ? next : c);
+                      patchView(vi, { covariates: nc });
+                    };
+                    const removeCovariate = (ci: number) => patchView(vi, { covariates: covariates.filter((_, j) => j !== ci) });
+                    const addCovariate = () => patchView(vi, { covariates: [...covariates, { source: "clinical", attribute: (trackAttrs.attrs[0] || {}).attribute || "" }] });
+                    // Same idea as the Cox picker's observedLevels, but there's only ever one
+                    // pooled fit here (logistic has no stratifyByCohort yet).
+                    const observedLevels = (ci: number): string[] => {
+                      const coefs = (v.logistic && v.logistic.coefficients) || [];
+                      const mine = coefs.filter((c: any) => c.axisIndex === ci);
+                      if (!mine.length) return [];
+                      const levels = new Set<string>();
+                      for (const c of mine) { if (c.reference) levels.add(c.reference); if (c.level) levels.add(c.level); }
+                      return [...levels];
+                    };
+                    // The outcome's own observed levels, for the outcomeEvent picker: the
+                    // currently-chosen event (if the fit succeeded) plus whatever got collapsed
+                    // into "not event" (outcomeOther) — together, everything this run has seen.
+                    const outcomeLevels = [...new Set([
+                      ...(sv.outcomeEvent ? [String(sv.outcomeEvent)] : []),
+                      ...((v.logistic && v.logistic.outcomeOther) || [])
+                    ])];
+                    const outcomeIsAlteration = sv.outcome?.source === "alteration";
+                    return (
+                      <div className="basis" style={{ flexWrap: "wrap" }}>
+                        <span className="meta">outcome</span>
+                        <AxisPicker side="outcome" axis={sv.outcome || { source: "clinical", attribute: "" }} attrs={catalogAttrs()}
+                          profiles={profileOptions()} loading={attrsLoading()} busy={busy}
+                          onChange={(next) => patchView(vi, { outcome: next })} />
+                        {!outcomeIsAlteration && <label className="tbfield" title="which observed value of the outcome counts as the event (1); every other observed value is treated as 'not event' and disclosed in the caveat. Required for a categorical outcome; not used for a numeric one, which must already be coded 0/1">
+                          event <input type="text" list={"outcome-levels-" + vi} disabled={busy} style={{ width: "9rem" }}
+                            placeholder="e.g. Responder" value={sv.outcomeEvent || ""}
+                            onChange={e => patchView(vi, { outcomeEvent: e.target.value || undefined })} />
+                          <datalist id={"outcome-levels-" + vi}>
+                            {outcomeLevels.map(l => <option key={l} value={l} />)}
+                          </datalist>
+                        </label>}
+                        <div style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "0.3rem", marginTop: "0.3rem" }}>
+                          {covariates.map((c, ci) => {
+                            const levels = observedLevels(ci);
+                            return (
+                            <span key={ci} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                              <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={catalogAttrs()}
+                                profiles={profileOptions()} loading={attrsLoading()} busy={busy}
+                                onChange={(next) => setCovariate(ci, next)} />
+                              {levels.length > 1 && <label className="tbfield" title="the level an odds ratio is measured against; unset uses this covariate's default (mutated/not always compares against 'Not mutated', other categoricals use whichever level is most frequent)">
+                                ref <select value={c.reference && levels.includes(c.reference) ? c.reference : ""} disabled={busy}
+                                  onChange={e => setCovariate(ci, { ...c, reference: e.target.value || undefined })}>
+                                  <option value="">(default)</option>
+                                  {levels.map(l => <option key={l} value={l}>{l}</option>)}
+                                </select>
+                              </label>}
+                              <button type="button" className="tbbtn" disabled={busy} title="remove this covariate"
+                                onClick={() => removeCovariate(ci)}>remove</button>
+                            </span>
+                            );
+                          })}
                           <button type="button" className="tbbtn" disabled={busy} style={{ alignSelf: "flex-start" }}
                             onClick={addCovariate}>+ add covariate</button>
                         </div>

@@ -15,11 +15,12 @@ import type { PlotView } from "./types.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, logRankK, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
   chiSquareTest, welchT, welchAnovaTest, varianceFromMoments, pearsonFromMoments, regressionFromMoments, fisherZMeta,
-  applyCutoff, toIncidence, coxRegression, mannWhitneyU, kruskalWallis, quantilesFromHistogram, type Moments, type CoxRow } from "./stats.ts";
+  applyCutoff, toIncidence, coxRegression, logisticRegression, mannWhitneyU, kruskalWallis, quantilesFromHistogram,
+  type Moments, type CoxRow, type LogisticRow } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
 import { viewToSvg } from "./view-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, LogRankK, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, LogRankK, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate, LogisticView, LogisticCoefficient } from "./types.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
@@ -95,8 +96,15 @@ export function buildCoxColumns(covariates: CoxCovariate[], kindsFinal: AxisKind
       const byFreq = [...counts.keys()].sort((a, b) => (counts.get(b)! - counts.get(a)!) || (a < b ? -1 : 1));
       // A declared reference (must be an observed level, or it's ignored rather than
       // silently matching nothing) goes first; everything else keeps its frequency order.
-      const declared = cov.reference;
-      const levels = declared && counts.has(declared) ? [declared, ...byFreq.filter((l) => l !== declared)] : byFreq;
+      // An alteration mutated-vs-not covariate defaults to "Not mutated" as the reference
+      // regardless of which side is more frequent: without this, a gene altered in a minority
+      // of patients reports "wild-type vs mutated" while one altered in a majority reports the
+      // opposite, purely from how common each gene's alteration happens to be, not from any
+      // real change in convention — the exact TP53-vs-APC inconsistency this fixes.
+      const isMutatedAxis = cov.source === "alteration" && (cov.by === "mutated" || cov.by === undefined);
+      const implicitDefault = isMutatedAxis && counts.has("Not mutated") ? "Not mutated" : undefined;
+      const declared = cov.reference && counts.has(cov.reference) ? cov.reference : implicitDefault;
+      const levels = declared ? [declared, ...byFreq.filter((l) => l !== declared)] : byFreq;
       const reference = levels[0];
       for (const level of levels.slice(1)) columns.push({ axisIndex: ci, label: axisLabel(cov) + ": " + level, reference, level });
     }
@@ -617,86 +625,121 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         }
         cutoffMonths = c;
       }
-      const cohortTotal = vNames.reduce((n, cn) => n + cohorts[cn].count, 0);
-      if (cohortTotal === 0) {
-        views.push({ kind: "cox", endpoint, cohorts: vNames,
-          error: "nothing to fit: " + (vNames.length === 1 ? "cohort “" + vNames[0] + "” is" : "all cohorts are") + " empty." });
-        continue;
-      }
-
-      const excludedRemote: { study: string; patients: number }[] = [];
+      // One fit, over exactly the named cohorts pooled together — shared by the default
+      // (pool everything) path and by stratifyByCohort (called once per cohort, alone).
       type RawCoxRow = { t: number; event: number; values: (number | string)[]; study: string };
-      const rawRows: RawCoxRow[] = [];
-      let kinds: AxisKind[] | null = null;
-      let patientLevelTotal = 0;
-      for (const n of vNames) {
-        for (const st of cohorts[n].studies) {
-          const res = resolvers[st];
-          if (!isPatientLevel(res)) {
-            excludedRemote.push({ study: st, patients: cohorts[n].perStudy[st]?.count || 0 });
-            continue;
-          }
-          patientLevelTotal += cohorts[n].perStudy[st]?.count || 0;
-          const { rows, kinds: k } = await res.coxRows(doc.cohorts[n], endpoint, covariates, endpointColumns);
-          if (!kinds) kinds = k;
-          for (const r of rows) rawRows.push({ ...r, study: st });
+      type CoxFit = { error: string } | {
+        coefficients: CoxCoefficient[]; n: number; events: number; termCount: number;
+        excludedRemote: { study: string; patients: number }[]; patientLevelTotal: number;
+      };
+      const fitCoxFor = async (names: string[]): Promise<CoxFit> => {
+        const cohortTotal = names.reduce((n, cn) => n + cohorts[cn].count, 0);
+        if (cohortTotal === 0) {
+          return { error: "nothing to fit: " + (names.length === 1 ? "cohort “" + names[0] + "” is" : "all cohorts are") + " empty." };
         }
-      }
-      if (!rawRows.length) {
-        views.push({ kind: "cox", endpoint, cohorts: vNames,
-          error: excludedRemote.length && patientLevelTotal === 0
+        const excludedRemote: { study: string; patients: number }[] = [];
+        const rawRows: RawCoxRow[] = [];
+        let kinds: AxisKind[] | null = null;
+        let patientLevelTotal = 0;
+        for (const n of names) {
+          for (const st of cohorts[n].studies) {
+            const res = resolvers[st];
+            if (!isPatientLevel(res)) {
+              excludedRemote.push({ study: st, patients: cohorts[n].perStudy[st]?.count || 0 });
+              continue;
+            }
+            patientLevelTotal += cohorts[n].perStudy[st]?.count || 0;
+            const { rows, kinds: k } = await res.coxRows(doc.cohorts[n], endpoint, covariates, endpointColumns);
+            if (!kinds) kinds = k;
+            for (const r of rows) rawRows.push({ ...r, study: st });
+          }
+        }
+        if (!rawRows.length) {
+          return { error: excludedRemote.length && patientLevelTotal === 0
             ? "no patient-level participant could answer this — " + excludedRemote.map((e) => e.study).join(", ") +
               (excludedRemote.length === 1 ? " is" : " are") + " aggregate-only, and multivariate Cox needs patient-level covariates"
-            : "no patient had both a " + endpointLabel + " measurement and every requested covariate defined" });
+            : "no patient had both a " + endpointLabel + " measurement and every requested covariate defined" };
+        }
+        const kindsFinal = kinds!;
+
+        // administrative censoring, same semantics as the KM view
+        const rowsCut = cutoffMonths != null
+          ? rawRows.map((r) => r.t > cutoffMonths! ? { ...r, t: cutoffMonths!, event: 0 } : r)
+          : rawRows;
+
+        const columns = buildCoxColumns(covariates, kindsFinal, rowsCut);
+        if (!columns.length) {
+          return { error: "every covariate had only one observed level across these patients — there is nothing to estimate a hazard ratio against" };
+        }
+        if (columns.length > 20) {
+          return { error: "these covariates expand to " + columns.length + " terms (capped at 20) — narrow a high-cardinality categorical covariate first" };
+        }
+        const toX = (r: RawCoxRow): number[] => columns.map((col) =>
+          kindsFinal[col.axisIndex] === "num" ? Number(r.values[col.axisIndex]) : (String(r.values[col.axisIndex]) === col.level ? 1 : 0));
+        const coxInput: CoxRow[] = rowsCut
+          .filter((r) => Number.isFinite(r.t) && r.t >= 0)
+          .map((r) => ({ t: r.t, event: r.event, x: toX(r), ...(cx.stratifyByStudy ? { stratum: r.study } : {}) }));
+
+        let fit;
+        try { fit = coxRegression(coxInput); }
+        catch (e) { return { error: (e as Error).message }; }
+
+        const coefficients: CoxCoefficient[] = columns.map((col, i) => ({
+          label: col.label, ...(col.reference ? { reference: col.reference } : {}), ...(col.level ? { level: col.level } : {}),
+          axisIndex: col.axisIndex,
+          beta: fit.beta[i], se: fit.se[i], hr: fit.hr[i], ciLow: fit.ciLow[i], ciHigh: fit.ciHigh[i], p: fit.p[i]
+        }));
+        return { coefficients, n: fit.n, events: fit.events, termCount: columns.length, excludedRemote, patientLevelTotal };
+      };
+
+      // stratifyByCohort: N independent fits (own baseline hazard, own coefficients, own
+      // choice of reference level per cohort) instead of one pooled fit — a no-op with only
+      // one cohort named, since that's already exactly what the pooled path below would do.
+      if (cx.stratifyByCohort && vNames.length > 1) {
+        const perCohort: { cohort: string; fit: CoxFit }[] = [];
+        for (const cohort of vNames) perCohort.push({ cohort, fit: await fitCoxFor([cohort]) });
+        const okCount = perCohort.filter((c) => !("error" in c.fit)).length;
+        if (!okCount) {
+          views.push({ kind: "cox", endpoint, cohorts: vNames,
+            error: "no cohort could be fit: " + perCohort.map((c) => c.cohort + " (" + (c.fit as { error: string }).error + ")").join("; ") });
+          continue;
+        }
+        const byCohort = perCohort.map(({ cohort, fit }) => "error" in fit
+          ? { cohort, coefficients: [] as CoxCoefficient[], n: 0, events: 0, error: fit.error }
+          : { cohort, coefficients: fit.coefficients, n: fit.n, events: fit.events, ...(fit.excludedRemote.length ? { excludedRemote: fit.excludedRemote } : {}) });
+        const failedNotes = perCohort.filter((c) => "error" in c.fit)
+          .map((c) => "“" + c.cohort + "” could not be fit: " + (c.fit as { error: string }).error);
+        const coxResult: ViewResult = { kind: "cox", cohorts: vNames, endpoint,
+          ...(cutoffMonths != null ? { cutoffMonths } : {}),
+          cox: { coefficients: [], n: byCohort.reduce((s, c) => s + c.n, 0), events: byCohort.reduce((s, c) => s + c.events, 0), byCohort },
+          participation: participationFor(vStudies, false),
+          caveat: "Stratified by cohort: " + okCount + " of " + vNames.length + " cohort" + (vNames.length === 1 ? "" : "s") +
+            " fit as its OWN separate Cox model — own baseline hazard, own coefficients, even its own choice of reference level — rather than pooled into one fit. A covariate's effect, not just the cohorts' case mix, may genuinely differ between them; pooling would have averaged that difference away instead of showing it." +
+            (failedNotes.length ? " " + failedNotes.join(" ") : "") +
+            (cutoffMonths != null ? " Administratively censored at " + cutoffMonths + " months." : "") +
+            " Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers, unlike KM/log-rank." };
+        coxResult.svg = viewToSvg(coxResult) || undefined;
+        views.push(coxResult);
         continue;
       }
-      const kindsFinal = kinds!;
 
-      // administrative censoring, same semantics as the KM view
-      const rowsCut = cutoffMonths != null
-        ? rawRows.map((r) => r.t > cutoffMonths! ? { ...r, t: cutoffMonths!, event: 0 } : r)
-        : rawRows;
-
-      const columns = buildCoxColumns(covariates, kindsFinal, rowsCut);
-      if (!columns.length) {
-        views.push({ kind: "cox", endpoint, cohorts: vNames,
-          error: "every covariate had only one observed level across these patients — there is nothing to estimate a hazard ratio against" });
-        continue;
-      }
-      if (columns.length > 20) {
-        views.push({ kind: "cox", endpoint, cohorts: vNames,
-          error: "these covariates expand to " + columns.length + " terms (capped at 20) — narrow a high-cardinality categorical covariate first" });
-        continue;
-      }
-      const toX = (r: RawCoxRow): number[] => columns.map((col) =>
-        kindsFinal[col.axisIndex] === "num" ? Number(r.values[col.axisIndex]) : (String(r.values[col.axisIndex]) === col.level ? 1 : 0));
-      const coxInput: CoxRow[] = rowsCut
-        .filter((r) => Number.isFinite(r.t) && r.t >= 0)
-        .map((r) => ({ t: r.t, event: r.event, x: toX(r), ...(cx.stratifyByStudy ? { stratum: r.study } : {}) }));
-
-      let fit;
-      try { fit = coxRegression(coxInput); }
-      catch (e) { views.push({ kind: "cox", endpoint, cohorts: vNames, error: (e as Error).message }); continue; }
-
-      const missing = patientLevelTotal - fit.n;
-      const coefficients: CoxCoefficient[] = columns.map((col, i) => ({
-        label: col.label, ...(col.reference ? { reference: col.reference } : {}),
-        beta: fit.beta[i], se: fit.se[i], hr: fit.hr[i], ciLow: fit.ciLow[i], ciHigh: fit.ciHigh[i], p: fit.p[i]
-      }));
+      const fit0 = await fitCoxFor(vNames);
+      if ("error" in fit0) { views.push({ kind: "cox", endpoint, cohorts: vNames, error: fit0.error }); continue; }
+      const missing = fit0.patientLevelTotal - fit0.n;
       const coxResult: ViewResult = { kind: "cox", cohorts: vNames, endpoint,
         ...(cutoffMonths != null ? { cutoffMonths } : {}),
-        cox: { coefficients, n: fit.n, events: fit.events, ...(excludedRemote.length ? { excludedRemote } : {}) },
+        cox: { coefficients: fit0.coefficients, n: fit0.n, events: fit0.events, ...(fit0.excludedRemote.length ? { excludedRemote: fit0.excludedRemote } : {}) },
         participation: participationFor(vStudies, false),
-        caveat: "Cox proportional-hazards regression (Efron ties) on " + fit.n + " patients, " + fit.events + " events, " +
-          columns.length + " term" + (columns.length === 1 ? "" : "s") + "." +
+        caveat: "Cox proportional-hazards regression (Efron ties) on " + fit0.n + " patients, " + fit0.events + " events, " +
+          fit0.termCount + " term" + (fit0.termCount === 1 ? "" : "s") + "." +
           (missing > 0 ? " " + missing + " patient" + (missing === 1 ? "" : "s") + " from patient-level participants lacked the endpoint or a covariate and were excluded." : "") +
           (cutoffMonths != null ? " Administratively censored at " + cutoffMonths + " months." : "") +
           (cx.stratifyByStudy
             ? " Stratified by study: each study fits its own baseline hazard, so a case-mix difference between studies cannot masquerade as a covariate effect."
             : vStudies.length > 1 ? " Pooled across studies WITHOUT stratifying — a case-mix difference between studies could be absorbed into a covariate's estimated effect; consider stratifyByStudy." : "") +
           (vStudies.length > 1 ? " Clinical-attribute vocabularies and declared types are NOT harmonized across studies." : "") +
-          (excludedRemote.length
-            ? " " + excludedRemote.map((e) => e.study + " (" + e.patients + " patients)").join(", ") +
+          (fit0.excludedRemote.length
+            ? " " + fit0.excludedRemote.map((e) => e.study + " (" + e.patients + " patients)").join(", ") +
               " could not contribute: aggregate-only participants have no patient-level covariates to fit on."
             : "") +
           " Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers, unlike KM/log-rank." };
@@ -705,6 +748,143 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       // the clinical course and treatment-sequence views already follow).
       coxResult.svg = viewToSvg(coxResult) || undefined;
       views.push(coxResult);
+
+    } else if (view.kind === "logistic") {
+      // Multivariate logistic regression: same covariate/dummy-coding machinery as Cox
+      // (buildCoxColumns, the same reference-level rules), same patient-level-only boundary —
+      // but a binary outcome rather than a time-to-event one, so there is no endpoint/months
+      // convention here: the outcome is just another axis, exactly like a covariate.
+      const lv = view as LogisticView;
+      try { validateAxis(lv.outcome, "outcome"); }
+      catch (e) { views.push({ kind: "logistic", error: (e as Error).message }); continue; }
+      const outcomeLabel = axisLabel(lv.outcome);
+      // alteration/molecular axes are deterministically categorical/numeric without a DB round
+      // trip; a clinical attribute's kind is only known once its study's metadata is fetched
+      // below, so that half of the check waits until outcomeKindFinal is known.
+      if (lv.outcome.source === "alteration" && !lv.outcomeEvent) {
+        views.push({ kind: "logistic", error: "a categorical outcome needs outcomeEvent, naming which observed value of " + outcomeLabel + " counts as the event" });
+        continue;
+      }
+      if (lv.outcome.source === "molecular" && lv.outcomeEvent) {
+        views.push({ kind: "logistic", error: outcomeLabel + " is numeric (a molecular axis) — outcomeEvent only applies to a categorical outcome" });
+        continue;
+      }
+      const lCovariates = Array.isArray(lv.covariates) ? lv.covariates : [];
+      if (!lCovariates.length) { views.push({ kind: "logistic", error: "a logistic view needs at least one covariate" }); continue; }
+      { const e = overLimit("a logistic view", 8, lCovariates.length); if (e) { views.push({ kind: "logistic", error: e.replace("at most 8", "at most 8 covariates") }); continue; } }
+      try { lCovariates.forEach((c, i) => validateAxis(c, "covariate " + (i + 1))); }
+      catch (e) { views.push({ kind: "logistic", error: (e as Error).message }); continue; }
+
+      const lCohortTotal = vNames.reduce((n, cn) => n + cohorts[cn].count, 0);
+      if (lCohortTotal === 0) {
+        views.push({ kind: "logistic", cohorts: vNames,
+          error: "nothing to fit: " + (vNames.length === 1 ? "cohort “" + vNames[0] + "” is" : "all cohorts are") + " empty." });
+        continue;
+      }
+
+      const lExcludedRemote: { study: string; patients: number }[] = [];
+      type RawLogisticRow = { y: number | string; values: (number | string)[]; study: string };
+      const lRawRows: RawLogisticRow[] = [];
+      let outcomeKind: AxisKind | null = null;
+      let lKinds: AxisKind[] | null = null;
+      let lPatientLevelTotal = 0;
+      for (const n of vNames) {
+        for (const st of cohorts[n].studies) {
+          const res = resolvers[st];
+          if (!isPatientLevel(res)) {
+            lExcludedRemote.push({ study: st, patients: cohorts[n].perStudy[st]?.count || 0 });
+            continue;
+          }
+          lPatientLevelTotal += cohorts[n].perStudy[st]?.count || 0;
+          const { rows, outcomeKind: ok, kinds: k } = await res.logisticRows(doc.cohorts[n], lv.outcome, lCovariates);
+          if (!outcomeKind) outcomeKind = ok;
+          if (!lKinds) lKinds = k;
+          for (const r of rows) lRawRows.push({ ...r, study: st });
+        }
+      }
+      if (!lRawRows.length) {
+        views.push({ kind: "logistic", cohorts: vNames,
+          error: lExcludedRemote.length && lPatientLevelTotal === 0
+            ? "no patient-level participant could answer this — " + lExcludedRemote.map((e) => e.study).join(", ") +
+              (lExcludedRemote.length === 1 ? " is" : " are") + " aggregate-only, and multivariate logistic regression needs patient-level covariates"
+            : "no patient had both a value for " + outcomeLabel + " and every requested covariate defined" });
+        continue;
+      }
+      const lKindsFinal = lKinds!, outcomeKindFinal = outcomeKind!;
+
+      let outcomeOther: string[] = [];
+      let yRows: { y: 0 | 1; values: (number | string)[] }[];
+      if (outcomeKindFinal === "num") {
+        if (lv.outcomeEvent) {
+          views.push({ kind: "logistic", cohorts: vNames,
+            error: outcomeLabel + " is numeric here — outcomeEvent only applies to a categorical outcome" });
+          continue;
+        }
+        const bad = lRawRows.find((r) => Number(r.y) !== 0 && Number(r.y) !== 1);
+        if (bad) {
+          views.push({ kind: "logistic", cohorts: vNames,
+            error: "a numeric logistic outcome must already be coded 0/1 — " + outcomeLabel + " has an observed value of " + bad.y + ". Use outcomeEvent on a categorical outcome instead of a threshold on a continuous one." });
+          continue;
+        }
+        yRows = lRawRows.map((r) => ({ y: Number(r.y) as 0 | 1, values: r.values }));
+      } else {
+        const observed = [...new Set(lRawRows.map((r) => String(r.y)))];
+        if (!lv.outcomeEvent) {
+          views.push({ kind: "logistic", cohorts: vNames,
+            error: "a categorical outcome needs outcomeEvent, naming which observed value of " + outcomeLabel + " counts as the event — observed values: " + observed.sort().join(", ") });
+          continue;
+        }
+        const event = String(lv.outcomeEvent);
+        if (!observed.includes(event)) {
+          views.push({ kind: "logistic", cohorts: vNames,
+            error: "outcomeEvent “" + event + "” was never observed for " + outcomeLabel + " here — observed values: " + observed.sort().join(", ") });
+          continue;
+        }
+        outcomeOther = observed.filter((v) => v !== event).sort();
+        yRows = lRawRows.map((r) => ({ y: (String(r.y) === event ? 1 : 0) as 0 | 1, values: r.values }));
+      }
+
+      const lColumns = buildCoxColumns(lCovariates, lKindsFinal, yRows);
+      if (!lColumns.length) {
+        views.push({ kind: "logistic", cohorts: vNames,
+          error: "every covariate had only one observed level across these patients — there is nothing to estimate an odds ratio against" });
+        continue;
+      }
+      if (lColumns.length > 20) {
+        views.push({ kind: "logistic", cohorts: vNames,
+          error: "these covariates expand to " + lColumns.length + " terms (capped at 20) — narrow a high-cardinality categorical covariate first" });
+        continue;
+      }
+      const toLx = (r: { values: (number | string)[] }): number[] => lColumns.map((col) =>
+        lKindsFinal[col.axisIndex] === "num" ? Number(r.values[col.axisIndex]) : (String(r.values[col.axisIndex]) === col.level ? 1 : 0));
+      const logisticInput: LogisticRow[] = yRows.map((r) => ({ y: r.y, x: toLx(r) }));
+
+      let lFit;
+      try { lFit = logisticRegression(logisticInput); }
+      catch (e) { views.push({ kind: "logistic", cohorts: vNames, error: (e as Error).message }); continue; }
+
+      const lMissing = lPatientLevelTotal - lFit.n;
+      const lCoefficients: LogisticCoefficient[] = lColumns.map((col, i) => ({
+        label: col.label, ...(col.reference ? { reference: col.reference } : {}), ...(col.level ? { level: col.level } : {}),
+        axisIndex: col.axisIndex,
+        beta: lFit.beta[i], se: lFit.se[i], or: lFit.or[i], ciLow: lFit.ciLow[i], ciHigh: lFit.ciHigh[i], p: lFit.p[i]
+      }));
+      const logisticResult: ViewResult = { kind: "logistic", cohorts: vNames,
+        logistic: { coefficients: lCoefficients, n: lFit.n, events: lFit.events,
+          ...(outcomeOther.length ? { outcomeOther } : {}), ...(lExcludedRemote.length ? { excludedRemote: lExcludedRemote } : {}) },
+        participation: participationFor(vStudies, false),
+        caveat: "Logistic regression on " + lFit.n + " patients, " + lFit.events + " with " + outcomeLabel +
+          (outcomeKindFinal === "cat" ? " = " + lv.outcomeEvent : "") + " (" + lColumns.length + " term" + (lColumns.length === 1 ? "" : "s") + ")." +
+          (outcomeOther.length ? " Every other observed value of " + outcomeLabel + " (" + outcomeOther.join(", ") + ") was treated as “not event.”" : "") +
+          (lMissing > 0 ? " " + lMissing + " patient" + (lMissing === 1 ? "" : "s") + " from patient-level participants lacked the outcome or a covariate and were excluded." : "") +
+          (vStudies.length > 1 ? " Clinical-attribute vocabularies and declared types are NOT harmonized across studies." : "") +
+          (lExcludedRemote.length
+            ? " " + lExcludedRemote.map((e) => e.study + " (" + e.patients + " patients)").join(", ") +
+              " could not contribute: aggregate-only participants have no patient-level covariates to fit on."
+            : "") +
+          " Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers." };
+      logisticResult.svg = viewToSvg(logisticResult) || undefined;
+      views.push(logisticResult);
 
     } else if (view.kind === "course") {
       const cv = view as CourseView;
