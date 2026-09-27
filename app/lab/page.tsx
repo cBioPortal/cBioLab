@@ -10,6 +10,7 @@ import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, View, Oncopri
 import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
 import type { ViewParticipation } from "../../lib/types.ts";
 import { survivalAxis } from "../../lib/stats.ts";
+import { VIEW_HELP } from "../../lib/view-help.ts";
 
 const TABS = ["explore", "cohorts", "saved", "analysis", "examples"] as const;
 
@@ -1795,6 +1796,26 @@ function useGearmenuOpen(id: string, store: Map<string, boolean>) {
 }
 
 /**
+ * The "?" in every view's header: a plain-language explanation of what this KIND of view is —
+ * for a reader who isn't a scientist, not the DSL's own precise documentation (lib/dsl-reference.ts
+ * is for someone writing a document; this is for someone reading the figure). One component in
+ * ViewHead means every view kind gets it for free, with nothing to add at each view's own JSX.
+ */
+function ViewHelpButton({ kind, menuId, menuStore }: { kind: string; menuId: string; menuStore: Map<string, boolean> }) {
+  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
+  const help = VIEW_HELP[kind];
+  if (!help) return null;
+  return (
+    <details className="gearmenu" ref={ref} onToggle={onToggle}>
+      <summary className="tbbtn" title="what this view is, in plain language" aria-label="what this view is, in plain language">?</summary>
+      <div className="gearmenu-items">
+        <p className="viewhelp-text">{help.text}</p>
+      </div>
+    </details>
+  );
+}
+
+/**
  * A checkbox menu in a view's header: which cohorts it uses, which attributes it compares.
  * One component, because these were the settings you could only reach by editing the JSON.
  */
@@ -1849,6 +1870,7 @@ function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown
       <div className="vhead">
         <h2 className="vtitle">{title}{sub != null && <span className="plain"> — {sub}</span>}</h2>
         <div className="vmeta">
+          <ViewHelpButton kind={v.kind} menuId={"help:" + menuKey} menuStore={menuStore} />
           {cohorts && cohorts.all.length > 1 && (
             <PickMenu label="cohorts" title="which cohorts this view draws; all of them unless you say otherwise"
               options={cohorts.all.map((n) => ({ value: n, label: n }))} chosen={cohorts.chosen}
@@ -4213,6 +4235,7 @@ function Latency({ v }: { v: any }) {
                       — lines of therapy by {v.sequence ? v.sequence.labelKey : ""}
                       {v.sequence ? " · " + v.sequence.lineGap + "-day line gap" : ""}</span></h2>
                     <div className="vmeta">
+                      <ViewHelpButton kind="sequence" menuId={"help:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} />
                       <PickMenu label="cohorts" title="which cohorts this view draws" busy={busy}
                         menuId={"pick:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current}
                         options={Object.keys((result && result.cohorts) || {}).map((n) => ({ value: n, label: n }))}
@@ -4269,6 +4292,7 @@ function Latency({ v }: { v: any }) {
                       — {[...new Set((v.course || []).map(c => c.eventType))].join(", ")}
                       {v.anchoredTo ? "" : ""} · {v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
                     <div className="vmeta">
+                      <ViewHelpButton kind="course" menuId={"help:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} />
                       <PickMenu label="cohorts" title="which cohorts this view draws" busy={busy}
                         menuId={"pick:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current}
                         options={Object.keys((result && result.cohorts) || {}).map((n) => ({ value: n, label: n }))}
