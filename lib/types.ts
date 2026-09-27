@@ -407,7 +407,7 @@ export interface LogisticResult {
 export interface PlotView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "plot"; x: PlotAxis; y: PlotAxis; cohorts?: string[]; splitBy?: SplitBy;
+  kind: "plot"; x: PlotAxis; y: PlotAxis; cohorts?: string[];
   /** what a point is (default "sample"); patient mode averages a patient's samples */
   unit?: "patient" | "sample";
   /** the grid a scatter is binned onto (default 240 x 160) */
@@ -428,16 +428,16 @@ export interface PlotView {
 }
 export interface CooccurrenceView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
-  note?: string; kind: "cooccurrence"; genes: string[]; cohorts?: string[]; splitBy?: SplitBy }
+  note?: string; kind: "cooccurrence"; genes: string[]; cohorts?: string[] }
 export interface ClinicalView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string; kind: "clinical"; attributes: string[]; cohorts?: string[]; splitBy?: SplitBy }
 export interface CoexpressionView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
-  note?: string; kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[]; splitBy?: SplitBy }
+  note?: string; kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[] }
 export interface HotspotsView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
-  note?: string; kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number; splitBy?: SplitBy }
+  note?: string; kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number }
 /**
  * The clinical course: what fraction of the still-observable cohort is in each
  * event state, over time relative to an anchor.
@@ -539,7 +539,7 @@ export interface OncoprintView {
 export interface SequenceView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "sequence"; cohorts?: string[]; splitBy?: SplitBy;
+  kind: "sequence"; cohorts?: string[];
   /** event type carrying therapies (default: treatment) */
   eventType?: string;
   /** attribute key labelling each therapy (default: SUBTYPE) */

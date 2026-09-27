@@ -786,14 +786,21 @@ rel      := { "type": "NONE" }                                                 /
 
 ## Views
 
-Any view below (**oncoprint excepted** — no UI control for it yet, though the field is honored if
-written by hand) may carry \`splitBy: {cohort, attribute, maxArms?, minCount?}\` instead of, or
-alongside, its own \`cohorts\`: auto-split one named cohort into an arm per distinct value of a
-categorical clinical attribute, live from the data, rather than hand-writing one cohort per
-value. The synthetic arms are named \`"<cohort> — <attribute>: <value>"\`, are **not** added to the
-document's own cohort list (they don't count against the 16-cohort cap or appear in the Cohorts
-tab — only in this one view's own result, with full provenance: each arm's own compiled SQL and
-count), and this view alone draws them instead of whatever \`cohorts\` would otherwise resolve to.
+\`compare\`, \`survival\`, \`cox\`, \`logistic\`, \`clinical\` and \`course\` (**genuinely multi-cohort
+views — every named or synthetic cohort they're given is drawn**), and \`oncoprint\` (one column-
+group per cohort; JSON only, no UI control for it yet) may carry
+\`splitBy: {cohort, attribute, maxArms?, minCount?}\` instead of, or alongside, their own
+\`cohorts\`: auto-split one named cohort into an arm per distinct value of a categorical clinical
+attribute, live from the data, rather than hand-writing one cohort per value. **Not offered** on
+\`hotspots\`, \`cooccurrence\`, \`coexpression\` or \`plot\` (each draws exactly one cohort, always the
+first named — documented behavior for the first three, an architectural property of the fourth,
+whose grouping comes from its own x-axis/colorBy attribute, not from multiple cohorts) or on
+\`sequence\` (draws at most 2, silently) — a facet split's whole value is drawing many arms at
+once, which none of those five would actually show. The synthetic arms are named
+\`"<cohort> — <attribute>: <value>"\`, are **not** added to the document's own cohort list (they
+don't count against the 16-cohort cap or appear in the Cohorts tab — only in this one view's own
+result, with full provenance: each arm's own compiled SQL and count), and this view alone draws
+them instead of whatever \`cohorts\` would otherwise resolve to.
 \`maxArms\` (default 8, max 12) caps how many arms are ever drawn: the top \`maxArms - 1\` values by
 patient count get their own arm, and everything else — both values beyond that cutoff and any
 value with fewer than \`minCount\` patients (default 10) — pools into one disclosed \`"Other"\` arm

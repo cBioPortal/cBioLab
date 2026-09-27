@@ -178,6 +178,10 @@ const crossesThreshold = (a: number, b: number): boolean => (a < 0.05) !== (b < 
 const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
 /** the synthetic eventType the server's derived treatment-line logic (lib/compiler.ts LINE_TYPE) recognizes */
 const LINE_TYPE = "Treatment line (derived)";
+/** view kinds splitBy actually helps: every one that draws EVERY cohort it's given, not just the
+ *  first (see lib/dsl-reference.ts's own list — hotspots/cooccurrence/coexpression/plot/sequence
+ *  draw at most one or two, so a facet split there would compute arms nothing ever shows) */
+const SPLIT_BY_KINDS = new Set(["compare", "survival", "cox", "logistic", "clinical", "course", "oncoprint"]);
 
 interface Example { name: string; desc: string; def: CohortDef }
 const EXAMPLES: Example[] = [
@@ -3831,7 +3835,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi))} splitBy={splitByChoice(vi, docView(vi))} sub="lollipop by protein position, as the portal's mutation tab draws it" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi))} sub="lollipop by protein position, as the portal's mutation tab draws it" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {/* one renderer (lib/view-svg.ts) for this figure everywhere: the app, chat and MCP;
                       the caption under it carries the note, so it isn't repeated above */}
@@ -3840,7 +3844,7 @@ function Latency({ v }: { v: any }) {
                     : <p className="note">{v.note || "no mutations in these genes for this cohort"}</p>}
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} splitBy={splitByChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<>
                       <label className="tbfield" title="the molecular profile the correlation is computed over">profile <select
                         value={docView(vi).profileType || ""} disabled={busy}
@@ -3930,7 +3934,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} splitBy={splitByChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
@@ -4245,7 +4249,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 )}
                 {v.kind === "plot" && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} splitBy={splitByChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
                   {/* Every control here changes what is DRAWN and costs a query, so there is one
                       zone and it says so — the same toolbar the oncoprint uses. */}
@@ -4303,8 +4307,6 @@ function Latency({ v }: { v: any }) {
                         options={Object.keys((result && result.cohorts) || {}).map((n) => ({ value: n, label: n }))}
                         chosen={cohortChoice(vi, docView(vi)).chosen} min={1} max={1}
                         onChange={(next) => setViewCohorts(vi, next, Object.keys((result && result.cohorts) || {}))} />
-                      <SplitByControl {...splitByChoice(vi, docView(vi))} cohortNames={Object.keys((result && result.cohorts) || {})} busy={busy}
-                        menuId={"split:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} />
                     {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
                       <details className="gearmenu inline">
                         <summary title="treatment sequence options">settings</summary>
@@ -4533,6 +4535,11 @@ function Latency({ v }: { v: any }) {
                 )}
                 {v.error && !drawsOwnHead(v) && <ViewHead menuStore={menuOpenRef.current} v={v}
                   title={(VIEW_KINDS.find((k) => k.kind === v.kind) || { label: v.kind }).label}
+                  cohorts={cohortChoice(vi, docView(vi))}
+                  // Only for the kinds splitBy actually helps (see lib/dsl-reference.ts's own
+                  // list) — an errored compare/clinical/etc. view is exactly where a reader
+                  // hitting e.g. "needs at least 2 cohorts" most needs to discover it.
+                  splitBy={SPLIT_BY_KINDS.has(v.kind) ? splitByChoice(vi, docView(vi)) : undefined}
                   onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined}
                   onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined}
                   onRemove={() => removeView(vi)} />}
