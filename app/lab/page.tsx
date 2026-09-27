@@ -239,24 +239,6 @@ function KMChart({ curves, cutoffMonths, tickMonths, incidence }:
   return <canvas ref={ref} style={{ width: "100%", display: "block" }} />;
 }
 
-/**
- * A gene symbol box + button: the fastest way to compare two survival curves by mutation
- * status without hand-editing cohort definitions. Submitting hands the gene up to the caller,
- * which builds the mutant/wildtype cohort pair and re-points the survival view at them.
- */
-function GeneSplitControl({ busy, onSplit }: { busy?: boolean; onSplit: (gene: string) => void }) {
-  const [gene, setGene] = useState("");
-  const submit = () => { const g = gene.trim().toUpperCase(); if (g) { onSplit(g); setGene(""); } };
-  return (
-    <span style={{ display: "inline-flex", gap: "0.3rem" }}>
-      <input value={gene} disabled={busy} placeholder="gene" style={{ width: "5.5rem" }}
-        onChange={e => setGene(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter") submit(); }} />
-      <button type="button" className="tbbtn" disabled={busy || !gene.trim()} onClick={submit}>split</button>
-    </span>
-  );
-}
-
 /** Explore opens on these: one deeply-annotated MSK study and one large
  *  consortium cohort on the peer instance, so federation is visible up front. */
 const DEFAULT_EXPLORE_STUDIES = ["msk_chord_2024", "genie_public"];
@@ -1827,37 +1809,72 @@ function ViewHelpButton({ kind, menuId, menuStore }: { kind: string; menuId: str
  * header's own cohort picker already has on hand, so this needs no new per-call-site data beyond
  * the attribute catalog every view already fetches for its own axis pickers.
  */
+/**
+ * "split by" in a view's header: auto-split one named cohort into an arm per value of a
+ * categorical attribute, OR per a gene's mutation status — two different data sources (a
+ * clinical attribute vs. an OQL mutation call) behind one control, since both answer the same
+ * felt need ("give me groups without hand-writing cohort JSON") and a reader has no reason to
+ * know in advance which mechanism a given split needs. The "split on" toggle is pure local UI
+ * state — it does NOT call `onChange` by itself (an earlier version did, which cleared the
+ * split and re-ran the query on every toggle click; re-running remounts this component, which
+ * reset the toggle right back — the mode selection could never stick). Only an actual
+ * selection (an attribute chosen, a gene submitted) replaces whatever split was there before.
+ */
 function SplitByControl({ current, cohortNames, attrs, busy, menuId, menuStore, onChange }: {
   current?: SplitBy; cohortNames: string[]; attrs: { attribute: string; kind: string }[]; busy?: boolean;
   menuId: string; menuStore: Map<string, boolean>; onChange: (next: SplitBy | undefined) => void;
 }) {
   const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   const catAttrs = attrs.filter((a) => a.kind !== "num");
-  if (!cohortNames.length || !catAttrs.length) return null;
+  const [mode, setMode] = useState<"attribute" | "gene">(current?.gene ? "gene" : "attribute");
+  const [geneDraft, setGeneDraft] = useState(current?.gene || "");
+  if (!cohortNames.length) return null;
+  const cohort = current?.cohort ?? cohortNames[0];
+  const applyGene = () => {
+    const g = geneDraft.trim().toUpperCase();
+    if (g) onChange({ cohort, gene: g });
+  };
   return (
     <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title="auto-split one cohort into an arm per value of an attribute, live from the data">
-        {current ? "split: " + current.attribute : "+ split by"}
+      <summary className="tbbtn" title="auto-split one cohort into an arm per value of an attribute, or per a gene's mutation status, live from the data">
+        {current ? "split: " + (current.gene || current.attribute) : "+ split by"}
       </summary>
       <div className="gearmenu-items">
         <div className="setrow">
           <span className="meta">cohort</span>
-          <select value={current?.cohort ?? cohortNames[0]} disabled={busy}
+          <select value={cohort} disabled={busy}
             onChange={(e) => onChange(current ? { ...current, cohort: e.target.value } : undefined)}>
             {cohortNames.map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
         <div className="setrow">
-          <span className="meta">attribute</span>
-          <select value={current?.attribute ?? ""} disabled={busy}
-            onChange={(e) => e.target.value
-              ? onChange({ maxArms: current?.maxArms, minCount: current?.minCount, ...current, cohort: current?.cohort ?? cohortNames[0], attribute: e.target.value })
-              : onChange(undefined)}>
-            <option value="">(none — not split)</option>
-            {catAttrs.map((a) => <option key={a.attribute} value={a.attribute}>{a.attribute}</option>)}
+          <span className="meta">split on</span>
+          <select value={mode} disabled={busy} onChange={(e) => setMode(e.target.value as "attribute" | "gene")}>
+            <option value="attribute">clinical attribute</option>
+            <option value="gene">gene mutation status</option>
           </select>
         </div>
-        {current && <div className="setrow">
+        {mode === "gene" ? (
+          <div className="setrow">
+            <span className="meta">gene</span>
+            <input value={geneDraft} disabled={busy} placeholder="gene" style={{ width: "6rem" }}
+              onChange={(e) => setGeneDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") applyGene(); }} />
+            <button type="button" className="tbbtn" disabled={busy || !geneDraft.trim()} onClick={applyGene}>split</button>
+          </div>
+        ) : catAttrs.length ? (
+          <div className="setrow">
+            <span className="meta">attribute</span>
+            <select value={current?.attribute ?? ""} disabled={busy}
+              onChange={(e) => e.target.value
+                ? onChange({ maxArms: current?.maxArms, minCount: current?.minCount, cohort, attribute: e.target.value })
+                : onChange(undefined)}>
+              <option value="">(none — not split)</option>
+              {catAttrs.map((a) => <option key={a.attribute} value={a.attribute}>{a.attribute}</option>)}
+            </select>
+          </div>
+        ) : <p className="note">this study declares no clinical attributes to split by</p>}
+        {mode === "attribute" && current?.attribute && <div className="setrow">
           <span className="meta">max arms</span>
           <input type="number" min={2} max={12} disabled={busy} style={{ width: "4rem" }}
             value={current.maxArms ?? 8}
@@ -2267,24 +2284,6 @@ function Latency({ v }: { v: any }) {
       rviews[vi] = { ...rviews[vi], annotationNote: trimmed || undefined };
       return { ...prev, views: rviews };
     });
-  };
-
-  /**
-   * The "split by gene" shortcut for cumulative-incidence/KM-by-genotype: define the two
-   * cohorts an analyst would otherwise hand-write (mutant, and its DSL complement) and point
-   * the given survival view at them, replacing whatever cohorts it named before.
-   */
-  const splitSurvivalByGene = (vi: number, gene: string) => {
-    const taken = new Set(Object.keys(doc.cohorts || {}));
-    const uniq = (base: string) => { let n = base, i = 2; while (taken.has(n)) n = base + " " + i++; taken.add(n); return n; };
-    const mutName = uniq(gene + "-mutant"), wtName = uniq(gene + "-wildtype");
-    const cohorts = { ...doc.cohorts,
-      [mutName]: { all: [{ kind: "oql", q: gene + ": MUT" } as const] },
-      [wtName]: { all: [{ not: { kind: "oql", q: gene + ": MUT" } } as const] } };
-    const views = (doc.views || []).map((v: any, j: number) => j === vi ? { ...v, cohorts: [mutName, wtName] } : v);
-    const d = { ...doc, cohorts, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    run(d);
   };
 
   const clearAnalysis = () => {
@@ -4045,8 +4044,6 @@ function Latency({ v }: { v: any }) {
                           value={sv.cutoffMonths ?? ""} style={{ width: "5rem" }}
                           onChange={e => patchView(vi, { cutoffMonths: e.target.value ? Number(e.target.value) : undefined })} />
                         <span className="meta">mo</span>
-                        <span className="meta">split by gene</span>
-                        <GeneSplitControl busy={busy} onSplit={(gene) => splitSurvivalByGene(vi, gene)} />
                       </div>
                     );
                   })()}

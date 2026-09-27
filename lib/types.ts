@@ -223,16 +223,28 @@ export interface CohortDef {
 export interface SplitBy {
   /** which existing named cohort to split */
   cohort: string;
+  /**
+   * Exactly one of `attribute`/`gene` must be given — two different sources of grouping, both
+   * producing the same kind of ephemeral, view-scoped arms.
+   */
   /** a categorical clinical attribute; a numeric one is refused (use a percentile cutoff on a
    *  cohort instead — this splits into groups, it doesn't threshold a continuous value) */
-  attribute: string;
+  attribute?: string;
+  /**
+   * A gene symbol: splits into exactly two arms (mutated / not mutated via OQL) rather than a
+   * live-discovered value distribution — no query needed to know the group names in advance,
+   * unlike `attribute`. `maxArms`/`minCount` don't apply here (always exactly 2) and are refused
+   * if given alongside `gene`, to avoid silently implying a knob that does nothing.
+   */
+  gene?: string;
   /** at most this many arms, INCLUDING a pooled "Other" if the attribute has more distinct
    *  values than this (default 8) — never silently drops a value, always discloses what got
-   *  pooled and why, the same "+N more" idiom the oncoprint legend and sequence view use */
+   *  pooled and why, the same "+N more" idiom the oncoprint legend and sequence view use.
+   *  `attribute` mode only. */
   maxArms?: number;
   /** an arm with fewer than this many matching patients pools into "Other" instead of standing
    *  alone (default 10 — the same floor the survival view's log-rank guard uses: below it, a
-   *  group's own statistics are too unstable to read as a real arm) */
+   *  group's own statistics are too unstable to read as a real arm). `attribute` mode only. */
   minCount?: number;
 }
 
@@ -774,10 +786,12 @@ export interface ViewResult {
    * as this view's drawn cohorts; this is where a reader finds out what each one actually means.
    */
   splitBy?: {
-    attribute: string; cohort: string;
+    /** echoes exactly one of the view's own splitBy.attribute/gene */
+    attribute?: string; gene?: string; cohort: string;
     arms: { name: string; count: number; text: string; sql: string }[];
     /** raw values this split saw but pooled into "Other" rather than giving their own arm —
-     *  because there were too many to fit `maxArms`, or too few patients to clear `minCount` */
+     *  because there were too many to fit `maxArms`, or too few patients to clear `minCount`.
+     *  Attribute mode only — gene mode always produces exactly 2 arms, never an "Other". */
     otherValues?: string[];
   };
   rows?: CompareRow[];                      // compare

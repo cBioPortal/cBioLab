@@ -586,6 +586,17 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "splitBy: gene mutation status, without hand-writing the mutant/wildtype pair",
+    demonstrates: "splitBy's second shape — `{cohort, gene}` — makes the same one-view, never-touches-the-document's-cohort-list arms as the attribute shape, but for a gene's mutation status: exactly two arms, no live query needed to know their names in advance (unlike an attribute's values, which must be discovered from the data).",
+    tags: ["splitBy", "survival", "gene"],
+    note: "\"all patients\" split by APC mutation status gives the same two arms a hand-written {\"kind\":\"oql\",\"q\":\"APC: MUT\"} cohort pair would (325 mutant, 146 wildtype) — APC-mutant patients have better overall survival (median 25.6mo vs 17.9mo, log-rank p=9.1e-5), matching this study's own headline finding (see the crc_apc_impact_2020 Cox example above) from a single view, no separate cohorts to define.",
+    doc: {
+      study: "crc_apc_impact_2020",
+      cohorts: { "all patients": { all: [] } },
+      views: [{ kind: "survival", splitBy: { cohort: "all patients", gene: "APC" } }]
+    }
+  },
+  {
     title: "Survival split three ways: the k-group log-rank",
     demonstrates: "3+ cohorts in a survival view now get a real test — the k-group log-rank generalization (a (k-1)-df chi-squared from the full covariance matrix, the same statistic R's survdiff() reports) — instead of only a picture with no way to say whether the split is real.",
     tags: ["survival", "log-rank", "k-group"],
@@ -788,19 +799,33 @@ rel      := { "type": "NONE" }                                                 /
 
 \`compare\`, \`survival\`, \`cox\`, \`logistic\`, \`clinical\` and \`course\` (**genuinely multi-cohort
 views — every named or synthetic cohort they're given is drawn**), and \`oncoprint\` (one column-
-group per cohort; JSON only, no UI control for it yet) may carry
-\`splitBy: {cohort, attribute, maxArms?, minCount?}\` instead of, or alongside, their own
-\`cohorts\`: auto-split one named cohort into an arm per distinct value of a categorical clinical
-attribute, live from the data, rather than hand-writing one cohort per value. **Not offered** on
-\`hotspots\`, \`cooccurrence\`, \`coexpression\` or \`plot\` (each draws exactly one cohort, always the
-first named — documented behavior for the first three, an architectural property of the fourth,
-whose grouping comes from its own x-axis/colorBy attribute, not from multiple cohorts) or on
+group per cohort; JSON only, no UI control for it yet) may carry \`splitBy\` instead of, or
+alongside, their own \`cohorts\`: auto-split one named cohort into several arms, live from the
+data, rather than hand-writing one cohort per arm. **Not offered** on \`hotspots\`,
+\`cooccurrence\`, \`coexpression\` or \`plot\` (each draws exactly one cohort, always the first named
+— documented behavior for the first three, an architectural property of the fourth, whose
+grouping comes from its own x-axis/colorBy attribute, not from multiple cohorts) or on
 \`sequence\` (draws at most 2, silently) — a facet split's whole value is drawing many arms at
-once, which none of those five would actually show. The synthetic arms are named
-\`"<cohort> — <attribute>: <value>"\`, are **not** added to the document's own cohort list (they
-don't count against the 16-cohort cap or appear in the Cohorts tab — only in this one view's own
-result, with full provenance: each arm's own compiled SQL and count), and this view alone draws
-them instead of whatever \`cohorts\` would otherwise resolve to.
+once, which none of those five would actually show. The synthetic arms are **not** added to the
+document's own cohort list (they don't count against the 16-cohort cap or appear in the Cohorts
+tab — only in this one view's own result, with full provenance: each arm's own compiled SQL and
+count), and this view alone draws them instead of whatever \`cohorts\` would otherwise resolve to.
+
+Exactly one of two mutually exclusive shapes:
+
+- \`splitBy: {cohort, attribute, maxArms?, minCount?}\` — one arm per distinct value of a
+  categorical clinical attribute. Top \`maxArms - 1\` values by patient count (default 8, max 12)
+  get their own arm; everything else — both values beyond that cutoff and any value with fewer
+  than \`minCount\` patients (default 10) — pools into one disclosed \`"Other"\` arm rather than
+  being dropped or given a needlessly small, statistically unstable arm of its own. A numeric
+  attribute is refused (split needs a categorical; threshold a continuous one with a cohort's
+  own \`percentile\` instead), as is an attribute with fewer than 2 values clearing \`minCount\`, or
+  a study that itself declines to answer (e.g. over its own 200-distinct-value cap). Arms are
+  named \`"<cohort> — <attribute>: <value>"\`.
+- \`splitBy: {cohort, gene}\` — exactly two arms, mutated vs. not, via OQL (\`<gene>: MUT\`) —
+  no live query needed to know the two group names in advance, unlike \`attribute\`. \`maxArms\`/
+  \`minCount\` don't apply and are refused if given alongside \`gene\`, rather than silently
+  ignored. Arms are named \`"<cohort> — <gene>: Mutated"\` / \`"<cohort> — <gene>: Not mutated"\`.
 \`maxArms\` (default 8, max 12) caps how many arms are ever drawn: the top \`maxArms - 1\` values by
 patient count get their own arm, and everything else — both values beyond that cutoff and any
 value with fewer than \`minCount\` patients (default 10) — pools into one disclosed \`"Other"\` arm
@@ -1058,11 +1083,15 @@ export const CHAT_GRAMMAR = `Document shape:
   "notes"?: "<the analyst's own prose about this workspace>",
   "title"?: "<name, when saved as a workspace>",
   "cohorts": { "<name>": <cohortDef>, ... (max 16) },
-  // Any view except oncoprint may also carry "splitBy":{"cohort":"<name>","attribute":"<categorical clinical attr>","maxArms"?:8,"minCount"?:10}
-  // instead of (or with) "cohorts": auto-splits that one cohort into an arm per distinct value, live from the
-  // data — top (maxArms-1) values by count each get an arm, the rest (plus anything under minCount patients)
-  // pool into one disclosed "Other" arm. Arms are scoped to THIS view only, never added to the document's own
-  // cohort list. Refused (not guessed) for a numeric attribute, or fewer than 2 values clearing minCount.
+  // compare/survival/cox/logistic/clinical/course/oncoprint (only) may carry "splitBy" instead of (or with)
+  // "cohorts" — auto-splits one named cohort into several arms, scoped to THIS view only, never added to the
+  // document's own cohort list. Exactly one of two shapes:
+  //   {"cohort":"<name>","attribute":"<categorical clinical attr>","maxArms"?:8,"minCount"?:10} — one arm per
+  //     distinct value, live from the data; top (maxArms-1) by count each get an arm, the rest (plus anything
+  //     under minCount patients) pool into one disclosed "Other" arm. Refused for a numeric attribute, or
+  //     fewer than 2 values clearing minCount.
+  //   {"cohort":"<name>","gene":"<symbol>"} — exactly 2 arms (mutated / not, via OQL), no live query needed;
+  //     maxArms/minCount are refused here, not silently ignored.
   "views": [ {"kind":"compare","genes":[...(max 20)],"cohorts":[names?]},
              {"kind":"survival","endpoint":"OS|PFS|DFS|…","anchor":{"eventType":"Treatment","key":"SUBTYPE","value":"Chemo","occurrence":"FIRST"},"cohorts":[names?]},
              {"kind":"cox","endpoint":"OS|PFS|DFS|...","covariates":[axis, ...(max 8)],"stratifyByStudy":true?,"stratifyByCohort":true?,"cutoffMonths":number?,"cohorts":[names?]},

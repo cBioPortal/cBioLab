@@ -311,7 +311,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         for (const arm of resolved.arms) { doc.cohorts[arm.name] = arm.def; cohorts[arm.name] = await evalCohortDef(arm.def); }
         vNames = resolved.arms.map((a) => a.name);
         splitByForView[vi] = {
-          attribute: sb.attribute, cohort: baseName,
+          ...(resolved.gene ? { gene: resolved.gene } : { attribute: resolved.attribute }), cohort: baseName,
           arms: resolved.arms.map((a) => ({
             name: a.name, count: cohorts[a.name].count, text: cohorts[a.name].text,
             sql: Object.entries(cohorts[a.name].perStudy).map(([s, x]) => "-- " + s + "\n" + x.sql).join("\n\n")

@@ -10,7 +10,7 @@
 // has). All three run as a pre-pass so whatever sees the document next — the compiler, for
 // extends/percentile; the per-view cohort loop, for this — already has an ordinary structure to
 // work with, with nothing left to resolve.
-import type { CohortDef, ClinicalLeaf, SplitBy } from "./types.ts";
+import type { CohortDef, ClinicalLeaf, OqlLeaf, SplitBy } from "./types.ts";
 
 export const SPLIT_BY_DEFAULT_MAX_ARMS = 8;
 export const SPLIT_BY_DEFAULT_MIN_COUNT = 10;
@@ -35,9 +35,40 @@ export interface SplitByResolved {
   /** raw attribute values this split saw but pooled into "Other" rather than giving their own
    *  arm — either there were more than `maxArms` distinct values, or too few patients had them */
   otherValues: string[];
+  /** the attribute/gene actually used, normalized (trimmed, gene uppercased) — echo this back
+   *  rather than the caller's own raw splitBy.attribute/gene, which may differ in case/whitespace */
+  attribute?: string; gene?: string;
 }
 
 const ATTR_RE = /^[A-Za-z0-9_]{1,64}$/;
+const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
+
+function checkCollision(splitBy: SplitBy, existingCohortNames: string[], arms: SplitByArm[]): void {
+  const collision = arms.find((a) => existingCohortNames.includes(a.name));
+  if (collision) throw new Error("splitBy: the arm “" + collision.name + "” it would create has the same name as an existing cohort — rename that cohort first");
+}
+
+/**
+ * Gene mode: exactly two arms (mutated / not, via OQL) — no live query needed, unlike attribute
+ * mode, since the two group names are fixed regardless of the data. `maxArms`/`minCount` don't
+ * mean anything here and are refused rather than silently ignored, so a document that sets them
+ * alongside `gene` doesn't quietly imply a knob that does nothing.
+ */
+function resolveSplitByGene(splitBy: SplitBy, existingCohortNames: string[], baseDef: CohortDef): SplitByResolved {
+  if (splitBy.maxArms != null || splitBy.minCount != null)
+    throw new Error("splitBy: maxArms/minCount only apply when splitting by attribute — gene mode always produces exactly 2 arms");
+  const gene = String(splitBy.gene).trim().toUpperCase();
+  if (!GENE_RE.test(gene)) throw new Error("splitBy: '" + gene + "' is not a valid gene symbol");
+  const baseAll = baseDef.all || [];
+  const nameFor = (label: string) => splitBy.cohort + " — " + gene + ": " + label;
+  const mutLeaf: OqlLeaf = { kind: "oql", q: gene + ": MUT" };
+  const arms: SplitByArm[] = [
+    { name: nameFor("Mutated"), def: { ...baseDef, all: [...baseAll, mutLeaf] } },
+    { name: nameFor("Not mutated"), def: { ...baseDef, all: [...baseAll, { not: mutLeaf }] } }
+  ];
+  checkCollision(splitBy, existingCohortNames, arms);
+  return { arms, otherValues: [], gene };
+}
 
 /**
  * Decide which values become their own arm and which pool into "Other", or refuse outright.
@@ -48,6 +79,12 @@ export async function resolveSplitBy(
   splitBy: SplitBy, existingCohortNames: string[], baseDef: CohortDef,
   distributionFor: (attribute: string) => Promise<AttributeDistribution>
 ): Promise<SplitByResolved> {
+  const hasAttribute = splitBy.attribute != null && String(splitBy.attribute).trim() !== "";
+  const hasGene = splitBy.gene != null && String(splitBy.gene).trim() !== "";
+  if (hasAttribute === hasGene)
+    throw new Error("splitBy: name exactly one of attribute or gene" + (hasAttribute ? " — both were given" : ""));
+  if (hasGene) return resolveSplitByGene(splitBy, existingCohortNames, baseDef);
+
   const attribute = String(splitBy.attribute || "").trim();
   if (!ATTR_RE.test(attribute)) throw new Error("splitBy: '" + attribute + "' is not a valid attribute name");
 
@@ -102,7 +139,6 @@ export async function resolveSplitBy(
       ] }
     });
   }
-  const collision = arms.find((a) => existingCohortNames.includes(a.name));
-  if (collision) throw new Error("splitBy: the arm “" + collision.name + "” it would create has the same name as an existing cohort — rename that cohort first");
-  return { arms, otherValues };
+  checkCollision(splitBy, existingCohortNames, arms);
+  return { arms, otherValues, attribute };
 }

@@ -127,4 +127,71 @@ describe("resolveSplitBy", () => {
       () => resolveSplitBy(sb(), ["base — SUBTYPE: A"], BASE, async () => dist),
       /same name as an existing cohort/);
   });
+
+  test("naming neither attribute nor gene is refused", async () => {
+    await assert.rejects(
+      () => resolveSplitBy({ cohort: "base" }, [], BASE, async () => { throw new Error("should not be called"); }),
+      /name exactly one of attribute or gene/);
+  });
+
+  test("naming both attribute and gene is refused", async () => {
+    await assert.rejects(
+      () => resolveSplitBy({ cohort: "base", attribute: "SUBTYPE", gene: "TP53" }, [], BASE,
+        async () => { throw new Error("should not be called"); }),
+      /name exactly one of attribute or gene/);
+  });
+});
+
+describe("resolveSplitBy: gene mode", () => {
+  const sbGene = (over: Partial<SplitBy> = {}): SplitBy => ({ cohort: "base", gene: "TP53", ...over });
+  // never called in gene mode — proves it, rather than merely not testing it
+  const noDistribution = async (): Promise<AttributeDistribution> => { throw new Error("should not be called"); };
+
+  test("produces exactly two arms — Mutated and Not mutated — via OQL, no distribution lookup", async () => {
+    const r = await resolveSplitBy(sbGene(), [], BASE, noDistribution);
+    assert.deepEqual(r.arms.map((a) => a.name), ["base — TP53: Mutated", "base — TP53: Not mutated"]);
+    assert.deepEqual(r.otherValues, []);
+  });
+
+  test("the Mutated arm's def splices in the base cohort's own clauses plus a plain OQL leaf", async () => {
+    const r = await resolveSplitBy(sbGene(), [], BASE, noDistribution);
+    assert.deepEqual(r.arms[0].def.all, [
+      { kind: "oql", q: "TP53: MUT" },
+      { kind: "oql", q: "TP53: MUT" },
+    ]);
+  });
+
+  test("the Not-mutated arm's def negates the same OQL leaf", async () => {
+    const r = await resolveSplitBy(sbGene(), [], BASE, noDistribution);
+    assert.deepEqual(r.arms[1].def.all, [
+      { kind: "oql", q: "TP53: MUT" },
+      { not: { kind: "oql", q: "TP53: MUT" } },
+    ]);
+  });
+
+  test("the gene symbol is trimmed and uppercased", async () => {
+    const r = await resolveSplitBy(sbGene({ gene: "  tp53  " }), [], BASE, noDistribution);
+    assert.equal(r.arms[0].name, "base — TP53: Mutated");
+  });
+
+  test("an invalid gene symbol is refused", async () => {
+    await assert.rejects(() => resolveSplitBy(sbGene({ gene: "not a gene!" }), [], BASE, noDistribution),
+      /not a valid gene symbol/);
+  });
+
+  test("maxArms alongside gene is refused, not silently ignored", async () => {
+    await assert.rejects(() => resolveSplitBy(sbGene({ maxArms: 8 }), [], BASE, noDistribution),
+      /maxArms\/minCount only apply when splitting by attribute/);
+  });
+
+  test("minCount alongside gene is refused, not silently ignored", async () => {
+    await assert.rejects(() => resolveSplitBy(sbGene({ minCount: 10 }), [], BASE, noDistribution),
+      /maxArms\/minCount only apply when splitting by attribute/);
+  });
+
+  test("an arm name colliding with an existing document cohort is refused", async () => {
+    await assert.rejects(
+      () => resolveSplitBy(sbGene(), ["base — TP53: Mutated"], BASE, noDistribution),
+      /same name as an existing cohort/);
+  });
 });

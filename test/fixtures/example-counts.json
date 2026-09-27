@@ -116,6 +116,9 @@
     "splitBy: one cohort, auto-split into an arm per receptor subtype": {
       "all patients": 1756
     },
+    "splitBy: gene mutation status, without hand-writing the mutant/wildtype pair": {
+      "all patients": 471
+    },
     "Survival split three ways: the k-group log-rank": {
       "stable": 428,
       "instable": 27,
