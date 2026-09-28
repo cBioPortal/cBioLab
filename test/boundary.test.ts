@@ -289,7 +289,10 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "clonalityGenesSql:any-noqc": () => federation.clonalityGenesSql(cohortSql, "x", "db", ["TP53", "KRAS"], null, "any", false),
     "facetsSummarySql": () => federation.facetsSummarySql(cohortSql, "x", "db", true),
     "facetsHistogramSql": () => federation.facetsHistogramSql(cohortSql, "x", "db", false),
-    "ascnStudiesSql": () => federation.ascnStudiesSql("x", "db")
+    "ascnStudiesSql": () => federation.ascnStudiesSql("x", "db"),
+    // incidence: `per`/`cls` are per patient; the outer SELECT groups them into (kind, entry, t, cause) tallies
+    "incidenceCountsSql": () => federation.incidenceCountsSql(cohortSql, "x", "db", { eventType: "Diagnosis", attrs: [{ key: "TUMOR_SITE", value: "CNS/Brain" }] }, null),
+    "incidenceCountsSql:anchored": () => federation.incidenceCountsSql(cohortSql, "x", "db", { eventType: "Status" }, { eventType: "Treatment", key: "SUBTYPE", value: "Chemo", occurrence: "FIRST" })
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

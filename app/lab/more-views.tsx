@@ -41,6 +41,8 @@ export const MORE_KINDS: Record<string, MoreKindUi> = {
   attrition: { label: "Cohort attrition (CONSORT)", title: "Cohort attrition", maxCohorts: 6 },
   genome: { label: "Genome-wide copy number", title: "Genome-wide copy number", maxCohorts: 4 },
   pathways: { label: "Oncogenic pathways", title: "Oncogenic signalling pathways", maxCohorts: 4 },
+  incidence: { label: "Cumulative incidence (competing risks)", title: "Cumulative incidence", maxCohorts: 6,
+    why: (k) => k.events.length ? null : "this study records no timeline events to estimate the incidence of" },
   clonality: { label: "Clonality (FACETS)", title: "Clonality", genes: true, maxCohorts: 3 },
   paired: { label: "Paired samples (primary vs metastasis)", title: "Paired samples", genes: true, maxCohorts: 3 },
   diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2,
@@ -67,6 +69,12 @@ export interface MoreCtx {
 /** A one-line subtitle for the card header. */
 export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "attrition") return "patients left after each clause, in order";
+  if (kind === "incidence") {
+    const e = spec.event || {};
+    const an = spec.anchor;
+    return (e.label || e.eventType || "no event chosen") +
+      (an && an.eventType ? " from first " + an.eventType + (an.key ? " [" + an.key + "=" + an.value + "]" : "") : " from day 0") + ", death competing";
+  }
   if (kind === "clonality") return "FACETS allele-specific copy number" + (spec.measure === "any" ? ", every mutation" : ", driver mutations") + (spec.qc === false ? ", all samples" : ", QC-passing samples");
   if (kind === "paired") {
     const pb = spec.pairBy || { attribute: "SAMPLE_TYPE", a: "Primary", b: "Metastasis" };
@@ -122,6 +130,42 @@ export function MoreControls({ c }: { c: MoreCtx }) {
       </div>
     </div>
   );
+  if (spec.kind === "incidence") {
+    const e = spec.event || { eventType: "" }, a0 = (e.attrs || [])[0] || { key: "", value: "" };
+    const an = spec.anchor || null;
+    const setEvent = (next: any) => patch({ event: next });
+    const types = c.events.map((x) => x.label);
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">event</span>
+          <label className="tbfield" title="the timeline event whose first occurrence after the anchor is counted">
+            type <select value={e.eventType || ""} disabled={busy} onChange={(ev) => setEvent({ ...e, eventType: ev.target.value })}>
+              {!types.includes(e.eventType) && <option value={e.eventType || ""}>{e.eventType || "choose…"}</option>}
+              {types.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+          <label className="tbfield" title="only events with this attribute (e.g. TUMOR_SITE); leave empty for any">
+            where <DraftInput value={a0.key || ""} disabled={busy} width="8rem" placeholder="attribute"
+              onCommit={(t) => setEvent({ ...e, attrs: t.trim() ? [{ key: t.trim(), value: a0.value || "" }] : undefined })} />
+          </label>
+          <label className="tbfield" title="the value that attribute must take">
+            = <DraftInput value={a0.value || ""} disabled={busy} width="8rem" placeholder="value"
+              onCommit={(t) => setEvent({ ...e, attrs: a0.key ? [{ key: a0.key, value: t }] : undefined })} />
+          </label>
+        </div>
+        <div className="tbz"><span className="tbl">clock</span>
+          <label className="tbfield" title="when the clock starts: the study's day 0, or the first event of a type (left truncation applies, as in survival)">
+            from <select value={an ? an.eventType : ""} disabled={busy}
+              onChange={(ev) => patch({ anchor: ev.target.value ? { eventType: ev.target.value, occurrence: "FIRST" } : undefined })}>
+              <option value="">day 0</option>
+              {types.map((t) => <option key={t} value={t}>first {t}</option>)}
+            </select>
+          </label>
+          {an && an.key && <span className="meta" title="set in the document; choosing another clock drops it">where {an.key} = {String(an.value ?? "")}</span>}
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "clonality") return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
@@ -183,6 +227,10 @@ export function MoreControls({ c }: { c: MoreCtx }) {
 
 /** The view a fresh "add view" click starts from, built from what the study is known to have. */
 export function defaultMoreView(kind: string, known: Known): Record<string, unknown> {
+  if (kind === "incidence") {
+    const ev = known.events.find((e) => /diagnos|progress|status/i.test(e.canonical)) || known.events[0];
+    return { kind, event: { eventType: ev ? ev.label : "" } };
+  }
   if (kind === "clonality") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "APC", "PIK3CA", "SMAD4", "CDH1"] };
   if (kind === "paired") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "PIK3CA", "ESR1", "AR", "CDKN2A", "MYC", "TERT"] };
   if (kind === "diffexpr") {

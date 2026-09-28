@@ -167,6 +167,11 @@
     "Clonality, LOH and genome doubling from FACETS": {
       "Colorectal": 4993,
       "Breast": 5803
+    },
+    "Brain metastasis, with death as a competing risk": {
+      "NSCLC": 7809,
+      "Breast": 5368,
+      "Colorectal": 5543
     }
   }
 }

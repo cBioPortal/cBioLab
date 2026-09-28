@@ -1117,3 +1117,133 @@ export function mcnemarExact(b: number, c: number): number {
   for (let i = 0; i <= k; i++) tail += Math.exp(logFact(n) - logFact(i) - logFact(n - i) - n * Math.LN2);
   return Math.min(1, 2 * tail);
 }
+
+// ---------------------------------------------------------------------------
+// Competing risks: cumulative incidence (Aalen–Johansen) and Gray's test
+
+/**
+ * One subject's competing-risks follow-up: leaves at `t` by `cause` 1 (the event of interest),
+ * 2 (the competing event) or 0 (censored), having become observable at `entry` (left truncation;
+ * omit for "observed from time zero").
+ */
+export interface CrRecord { t: number; cause: 0 | 1 | 2; entry?: number }
+
+export interface CifPoint { t: number; f1: number; f2: number; se1: number; atRisk: number }
+export interface CifCurve { n: number; events: number; competing: number; censored: number; points: CifPoint[] }
+
+/**
+ * Aalen–Johansen: at each distinct exit time, F1 rises by S(t−)·d1/R and F2 by S(t−)·d2/R,
+ * where S is the all-cause Kaplan–Meier survival and R the number at risk — entered strictly
+ * before t and not yet left, so delayed entry is honoured. 1 − KM of cause 1 alone overstates
+ * incidence whenever the competing event is common, because it treats the dead as still at risk.
+ * The standard error is the delta-method (Aalen 1978) estimator.
+ */
+export function aalenJohansen(recs: CrRecord[]): CifCurve {
+  const n = recs.length;
+  const byT = [...recs].sort((a, b) => a.t - b.t);
+  const entries = recs.map((r) => r.entry ?? -Infinity).sort((a, b) => a - b);
+  const times: { t: number; d1: number; d2: number; c: number; R: number }[] = [];
+  let ei = 0, left = 0, i = 0;
+  while (i < byT.length) {
+    const t = byT[i].t;
+    let d1 = 0, d2 = 0, c = 0;
+    while (i < byT.length && byT[i].t === t) { const x = byT[i++]; if (x.cause === 1) d1++; else if (x.cause === 2) d2++; else c++; }
+    while (ei < entries.length && entries[ei] < t) ei++;
+    const R = ei - left;
+    left += d1 + d2 + c;
+    times.push({ t, d1, d2, c, R });
+  }
+  // cumulative quantities, then the delta-method variance at each event time
+  const pts: CifPoint[] = [];
+  let S = 1, F1 = 0, F2 = 0;
+  const hist: { F1: number; Sprev: number; d: number; d1: number; R: number }[] = [];
+  for (const x of times) {
+    if (x.R <= 0) continue;
+    const Sprev = S, d = x.d1 + x.d2;
+    F1 += Sprev * x.d1 / x.R; F2 += Sprev * x.d2 / x.R;
+    S *= 1 - d / x.R;
+    hist.push({ F1, Sprev, d, d1: x.d1, R: x.R });
+    if (d > 0) {
+      let v = 0;
+      for (const h of hist) {
+        if (h.d === 0) continue;
+        const diff = F1 - h.F1;
+        v += (h.R - h.d > 0 ? diff * diff * h.d / (h.R * (h.R - h.d)) : 0) +
+          h.Sprev * h.Sprev * h.d1 * (h.R - h.d1) / (h.R * h.R * h.R) -
+          2 * diff * h.Sprev * h.d1 / (h.R * h.R);
+      }
+      pts.push({ t: x.t, f1: F1, f2: F2, se1: Math.sqrt(Math.max(0, v)), atRisk: x.R });
+    }
+  }
+  return { n, events: recs.filter((r) => r.cause === 1).length, competing: recs.filter((r) => r.cause === 2).length,
+    censored: recs.filter((r) => r.cause === 0).length, points: pts };
+}
+
+/** F1 at time t: the step function's value, 0 before the first event. */
+export function cifAt(c: CifCurve, t: number): { f1: number; se1: number } {
+  let f1 = 0, se1 = 0;
+  for (const p of c.points) { if (p.t > t) break; f1 = p.f1; se1 = p.se1; }
+  return { f1, se1 };
+}
+
+/**
+ * Gray's (1988) statistic for K groups, weight 1: per group, observed cause-1 events minus the
+ * number expected from the pooled subdistribution hazard, with each group's subdistribution risk
+ * set R_k = Y_k (1 − F1_k(t−)) / S_k(t−) (those still at risk, plus those who died of the
+ * competing cause, reweighted). Returned as Σ z_k² / E_k over groups, a chi-squared-shaped
+ * summary; its p-value comes from grayPermutationTest rather than an asymptotic variance.
+ */
+function grayStatistic(order: Int32Array, t: Float64Array, cause: Uint8Array, groupOf: Int32Array, entryOrder: Int32Array,
+  entry: Float64Array, K: number): number {
+  const Y = new Float64Array(K), S = new Float64Array(K).fill(1), F = new Float64Array(K);
+  const z = new Float64Array(K), E = new Float64Array(K);
+  const d1 = new Float64Array(K), d2 = new Float64Array(K), cc = new Float64Array(K), R = new Float64Array(K);
+  let i = 0, ei = 0;
+  const n = order.length;
+  while (i < n) {
+    const tj = t[order[i]];
+    while (ei < n && entry[entryOrder[ei]] < tj) { Y[groupOf[entryOrder[ei]]]++; ei++; }
+    d1.fill(0); d2.fill(0); cc.fill(0);
+    while (i < n && t[order[i]] === tj) {
+      const r = order[i++], g = groupOf[r];
+      if (cause[r] === 1) d1[g]++; else if (cause[r] === 2) d2[g]++; else cc[g]++;
+    }
+    let D1 = 0, Rtot = 0;
+    for (let k = 0; k < K; k++) { R[k] = Y[k] > 0 && S[k] > 0 ? Y[k] * (1 - F[k]) / S[k] : 0; D1 += d1[k]; Rtot += R[k]; }
+    if (D1 > 0 && Rtot > 0) for (let k = 0; k < K; k++) { const e = R[k] * D1 / Rtot; z[k] += d1[k] - e; E[k] += e; }
+    for (let k = 0; k < K; k++) {
+      if (Y[k] > 0) { F[k] += S[k] * d1[k] / Y[k]; S[k] *= 1 - (d1[k] + d2[k]) / Y[k]; }
+      Y[k] -= d1[k] + d2[k] + cc[k];
+    }
+  }
+  let stat = 0;
+  for (let k = 0; k < K; k++) if (E[k] > 0) stat += z[k] * z[k] / E[k];
+  return stat;
+}
+
+export interface GrayTest { statistic: number; p: number; permutations: number; groups: number }
+
+/**
+ * Gray's test by permutation: group labels are shuffled over the pooled records (a seeded
+ * shuffle, so the p-value is reproducible), which is exact under the null that every group's
+ * records come from one distribution — entry times included — and needs nothing but the records
+ * themselves. p = (b + 1) / (m + 1).
+ */
+export function grayPermutationTest(groups: CrRecord[][], permutations = 2000, seed = 1): GrayTest {
+  const K = groups.length;
+  const all = groups.flatMap((g, k) => g.map((r) => ({ ...r, k })));
+  const n = all.length;
+  const t = Float64Array.from(all, (r) => r.t), entry = Float64Array.from(all, (r) => r.entry ?? -Infinity);
+  const cause = Uint8Array.from(all, (r) => r.cause);
+  const labels = Int32Array.from(all, (r) => r.k);
+  const order = Int32Array.from({ length: n }, (_, i) => i).sort((a, b) => t[a] - t[b]);
+  const entryOrder = Int32Array.from({ length: n }, (_, i) => i).sort((a, b) => entry[a] - entry[b]);
+  const observed = grayStatistic(order, t, cause, labels, entryOrder, entry, K);
+  const rnd = seededRandom(seed), perm = Int32Array.from(labels);
+  let beyond = 0;
+  for (let b = 0; b < permutations; b++) {
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const x = perm[i]; perm[i] = perm[j]; perm[j] = x; }
+    if (grayStatistic(order, t, cause, perm, entryOrder, entry, K) >= observed - 1e-12) beyond++;
+  }
+  return { statistic: observed, p: (beyond + 1) / (permutations + 1), permutations, groups: K };
+}

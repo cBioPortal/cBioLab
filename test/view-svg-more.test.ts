@@ -153,3 +153,22 @@ describe("clonality", () => {
     assert.ok(!/%<tspan[^>]*>of /.test(svg) && !/clonal<tspan[^>]*>·/.test(svg));
   });
 });
+
+describe("incidence", () => {
+  const curve = (cohort: string) => ({ cohort, n: 100, events: 20, competing: 30, censored: 50,
+    points: [{ t: 3, f1: 0.1, f2: 0.05, se1: 0.02, atRisk: 90 }, { t: 12, f1: 0.2, f2: 0.3, se1: 0.03, atRisk: 50 }],
+    excluded: { prior: 7, unobserved: 0, noFollowup: 0, noAnchor: 0 }, late: 0 });
+  const v: ViewResult = { kind: "incidence", cohorts: ["A", "B"], caveat: "not 1-KM",
+    incidence: { eventLabel: "brain <met>", curves: [curve("A"), curve("B")],
+      horizons: [{ months: 12, cells: [{ cohort: "A", f1: 0.2, lo: 0.14, hi: 0.26, naive: 0.25, atRisk: 50 }, { cohort: "B", f1: 0.2, lo: 0.14, hi: 0.26, naive: 0.25, atRisk: 50 }] }],
+      gray: { statistic: 3.2, p: 1 / 2001, permutations: 2000, groups: 2 } } };
+  test("sets the estimate beside 1 − KM, and counts who could not be at risk", () => {
+    const svg = viewToSvg(v)!;
+    assert.ok(svg.includes("20.0%") && svg.includes("1−KM 25.0%"));
+    assert.ok(svg.includes("7 already had it"));
+    assert.ok(svg.includes("brain &lt;met&gt;") && !svg.includes("<met>"));
+  });
+  test("a permutation p at its floor says so instead of reading as exact", () => {
+    assert.ok(viewToSvg(v)!.includes("no shuffle of 2000 as extreme"));
+  });
+});

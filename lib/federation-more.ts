@@ -386,3 +386,95 @@ export function ascnStudiesSql(_study: string, db: string): string {
     "JOIN " + db + ".genetic_profile gp ON gp.genetic_profile_id = a.genetic_profile_id\n" +
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id ORDER BY study";
 }
+
+// ---------------------------------------------------------------------------
+// incidence: time to a timeline event, with death as the competing risk
+
+export interface EventSel { eventType: string; attrs?: { key: string; value: string }[] }
+export interface IncidenceAnchor { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" }
+
+/** Timeline events of a type (with every given attribute), per cohort patient: (pid, day). */
+function eventDaysSql(db: string, study: string, sel: EventSel, cohortRef: string): string {
+  const attrs = (sel.attrs || []).slice(0, 3);
+  return "SELECT p.stable_id AS pid, ce.start_date AS day\n" +
+    "  FROM " + db + ".clinical_event ce\n" +
+    "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND ce.event_type = " + sq(sel.eventType) + "\n" +
+    attrs.map((a) => "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE key = " +
+      sq(a.key) + " AND value = " + sq(a.value) + ")\n").join("") +
+    "    AND p.stable_id IN (SELECT pid FROM " + cohortRef + ")";
+}
+
+/**
+ * Per cohort, counts of (entry, t, cause) in months from the anchor (the study's day 0 when
+ * there is none): cause 1 the first qualifying event after the anchor, 2 death without it
+ * (OS_STATUS), 0 censored at last follow-up (OS_MONTHS). Entry is the delay from the anchor to
+ * day 0 when the anchor precedes it — the same left truncation the survival view applies, since
+ * a patient is only in the study because they were alive at day 0.
+ *
+ * Patients who cannot enter the risk set are counted under `kind`, never silently dropped:
+ * 'prior' already had the event at or before the anchor; 'unobserved' had it after the anchor
+ * but before observation began; 'nofollowup' has no OS follow-up (or none after the anchor);
+ * 'late' is a flag on records whose first event was recorded after their last follow-up (they
+ * are kept, as censored or dead at follow-up). A cohort patient with no anchor event appears in
+ * no row at all; the caller counts them as the cohort size less every row's n.
+ */
+export function incidenceCountsSql(cohortSql: string, study: string, db: string, event: EventSel, anchor: IncidenceAnchor | null): string {
+  const pid = pidOf("patient_unique_id", study);
+  const pick = anchor?.occurrence === "LAST" ? "max" : "min";
+  const anchCte = anchor
+    ? "anch AS (\n" +
+      "  SELECT p.stable_id AS pid, " + pick + "(ce.start_date) AS day\n" +
+      "  FROM " + db + ".clinical_event ce\n" +
+      "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+      "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+      "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND ce.event_type = " + sq(anchor.eventType) + "\n" +
+      (anchor.key ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE key = " +
+        sq(anchor.key) + " AND value = " + sq(String(anchor.value ?? "")) + ")\n" : "") +
+      "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+      "  GROUP BY pid\n" +
+      "),\n"
+    : "anch AS (SELECT pid, toInt64(0) AS day FROM cohort),\n";
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "os AS (\n" +
+    "  SELECT " + pid + " AS pid,\n" +
+    "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) AS months,\n" +
+    "         anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status\n" +
+    "  FROM " + db + ".clinical_data_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    "),\n" +
+    anchCte +
+    "ev AS (" + eventDaysSql(db, study, event, "cohort") + "),\n" +
+    "evs AS (\n" +
+    "  SELECT ev.pid AS pid, countIf(ev.day <= anch.day) AS n_prior, countIf(ev.day > anch.day) AS n_after,\n" +
+    "         minIf(ev.day, ev.day > anch.day) AS first_after\n" +
+    "  FROM ev INNER JOIN anch ON anch.pid = ev.pid GROUP BY ev.pid\n" +
+    "),\n" +
+    "per AS (\n" +
+    "  SELECT anch.pid AS pid, anch.day AS a, os.months AS months, os.status LIKE '1%' AS dead,\n" +
+    "         evs.pid != '' AS has_ev, evs.n_prior AS n_prior, evs.n_after AS n_after, evs.first_after AS first_after\n" +
+    "  FROM anch\n" +
+    "  LEFT JOIN os ON os.pid = anch.pid\n" +
+    "  LEFT JOIN evs ON evs.pid = anch.pid\n" +
+    "),\n" +
+    "cls AS (\n" +
+    "  SELECT greatest(0, -a) / 30.4375 AS entry, months - a / 30.4375 AS tend,\n" +
+    "         (first_after - a) / 30.4375 AS tev,\n" +
+    "         multiIf(months IS NULL OR months - a / 30.4375 <= 0, 'nofollowup',\n" +
+    "                 has_ev AND n_prior > 0, 'prior',\n" +
+    "                 has_ev AND n_after > 0 AND first_after < 0, 'unobserved',\n" +
+    "                 'record') AS kind,\n" +
+    "         has_ev AND n_after > 0 AND (first_after - a) / 30.4375 <= months - a / 30.4375 AS hit,\n" +
+    "         has_ev AND n_after > 0 AND (first_after - a) / 30.4375 > months - a / 30.4375 AS late,\n" +
+    "         dead\n" +
+    "  FROM per\n" +
+    ")\n" +
+    "SELECT kind, if(kind = 'record', round(entry, 4), 0) AS entry, if(kind = 'record', round(if(hit, tev, tend), 4), 0) AS t,\n" +
+    "       if(kind != 'record', -1, if(hit, 1, if(dead, 2, 0))) AS cause, late, count() AS n\n" +
+    "FROM cls GROUP BY kind, entry, t, cause, late ORDER BY t"
+  );
+}

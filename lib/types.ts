@@ -779,10 +779,42 @@ export interface ClonalityResult {
   wgdP?: number;
   excluded?: { study: string; reason: string }[];
 }
+/**
+ * Cumulative incidence of a timeline event with death as a competing risk (Aalen–Johansen, with
+ * the survival view's left truncation), Gray's test between cohorts, and — beside it — what
+ * 1 − Kaplan–Meier would have claimed, which treats the dead as still at risk and so overstates
+ * incidence whenever death is common. Counts only: (entry, time, cause) tallies per site.
+ */
+export interface IncidenceView {
+  note?: string;
+  kind: "incidence"; cohorts?: string[];
+  /** the event of interest: its first occurrence after the anchor */
+  event: { eventType: string; attrs?: { key: string; value: string }[]; label?: string };
+  /** the clock's start (default: the study's day 0), as in the survival view */
+  anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
+  /** months at which incidence is read off and compared (default [12, 24, 60]) */
+  horizons?: number[];
+}
+export interface IncidenceCurve {
+  cohort: string;
+  n: number; events: number; competing: number; censored: number;
+  points: { t: number; f1: number; f2: number; se1: number; atRisk: number }[];
+  /** patients who could not enter the risk set, by reason */
+  excluded: { prior: number; unobserved: number; noFollowup: number; noAnchor: number };
+  /** kept, but their first event was recorded after their last follow-up */
+  late: number;
+}
+export interface IncidenceResult {
+  eventLabel: string; anchoredTo?: string;
+  curves: IncidenceCurve[];
+  horizons: { months: number; cells: { cohort: string; f1: number; lo: number; hi: number; naive: number; atRisk: number }[] }[];
+  gray?: import("./stats.ts").GrayTest;
+  excludedStudies?: { study: string; reason: string }[];
+}
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
-  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView;
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -1057,6 +1089,7 @@ export interface ViewResult {
   diffexpr?: DiffexprResult;                // differential expression + GSEA
   paired?: PairedResult;                    // paired-sample concordance
   clonality?: ClonalityResult;              // FACETS clonality, WGD, purity/ploidy
+  incidence?: IncidenceResult;              // competing-risks cumulative incidence
 }
 /**
  * Therapy transitions, ready to draw: nodes in columns, flows between them.
