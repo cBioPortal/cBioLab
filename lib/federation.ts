@@ -1222,6 +1222,8 @@ export interface PatientLevelCapable extends AggregateCapable {
   /** per-patient rows for a logistic fit — same reason as coxRows */
   logisticRows(def: CohortDef | null | undefined, outcome: PlotAxis, covariates: PlotAxis[]):
     Promise<{ rows: { y: number | string; values: (number | string)[] }[]; outcomeKind: AxisKind; kinds: AxisKind[] }>;
+  /** one row per patient (never an identifier) for a lib/views-more.ts view — see PatientLevelResolver.moreRows */
+  moreRows(label: string, def: CohortDef | null | undefined, build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
 }
 
 export type Resolver = AggregateCapable | PatientLevelCapable;
@@ -1787,6 +1789,18 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
       values: covariates.map((_, i) => kinds[i] === "num" ? Number(row["c" + i]) : String(row["c" + i]))
     }));
     return { rows, kinds };
+  }
+
+  /**
+   * One row per PATIENT for a view in lib/views-more.ts (a waterfall's bars): values, never an
+   * identifier, but still one patient's own values, so — like plotPoints and coxRows — only a
+   * patient-level participant has this method. An aggregate-only or remote resolver cannot be
+   * asked, because the method does not exist on it.
+   */
+  async moreRows(label: string, def: CohortDef | null | undefined,
+    build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]> {
+    const r = await this.runLogged<ChRow>(label, build(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
+    return r.data;
   }
 
   /**

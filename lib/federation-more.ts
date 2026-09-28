@@ -478,3 +478,127 @@ export function incidenceCountsSql(cohortSql: string, study: string, db: string,
     "FROM cls GROUP BY kind, entry, t, cause, late ORDER BY t"
   );
 }
+
+// ---------------------------------------------------------------------------
+// labs: a lab value's course from treatment start, as % change from baseline
+
+export interface LabSpec {
+  /** the event type holding lab results, and the key/value naming this test (e.g. TEST = PSA) */
+  eventType: string; testKey: string; test: string;
+  /** the attribute holding the numeric result */
+  resultKey: string;
+}
+export interface LabOpts {
+  /** baseline: the last value within this many days before (or on) the anchor */
+  baselineDays: number;
+  /** window around the anchor, and bin width, in days */
+  fromDays: number; toDays: number; binDays: number;
+}
+/**
+ * % change is binned in 2-point steps CENTRED on −100, −98, … +300 (so an unchanged value sits
+ * exactly at 0, not at a bin's edge); values above +300 share the top bin.
+ */
+export const LAB_PCT_BIN = 2, LAB_PCT_MIN = -100, LAB_PCT_MAX = 300;
+export const LAB_PCT_BINS = (LAB_PCT_MAX - LAB_PCT_MIN) / LAB_PCT_BIN + 1;
+
+function labCtes(cohortSql: string, study: string, db: string, lab: LabSpec, anchor: IncidenceAnchor, o: LabOpts): string {
+  const pick = anchor.occurrence === "LAST" ? "max" : "min";
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "anch AS (\n" +
+    "  SELECT p.stable_id AS pid, " + pick + "(ce.start_date) AS day\n" +
+    "  FROM " + db + ".clinical_event ce\n" +
+    "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND ce.event_type = " + sq(anchor.eventType) + "\n" +
+    (anchor.key ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE key = " +
+      sq(anchor.key) + " AND value = " + sq(String(anchor.value ?? "")) + ")\n" : "") +
+    "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    "),\n" +
+    "lab AS (\n" +
+    "  SELECT p.stable_id AS pid, ce.start_date AS day, toFloat64OrNull(r.value) AS v\n" +
+    "  FROM " + db + ".clinical_event ce\n" +
+    "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "  JOIN " + db + ".clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND t.key = " + sq(lab.testKey) + " AND t.value = " + sq(lab.test) + "\n" +
+    "  JOIN " + db + ".clinical_event_data r ON r.clinical_event_id = ce.clinical_event_id AND r.key = " + sq(lab.resultKey) + "\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND ce.event_type = " + sq(lab.eventType) + "\n" +
+    "    AND p.stable_id IN (SELECT pid FROM anch) AND toFloat64OrNull(r.value) IS NOT NULL\n" +
+    "),\n" +
+    "base AS (\n" +
+    "  SELECT lab.pid AS pid, argMax(lab.v, lab.day) AS b, max(lab.day) AS bday FROM lab INNER JOIN anch ON anch.pid = lab.pid\n" +
+    "  WHERE lab.day >= anch.day - " + Math.floor(o.baselineDays) + " AND lab.day <= anch.day GROUP BY lab.pid\n" +
+    "),\n" +
+    "chg AS (\n" +
+    "  SELECT lab.pid AS pid, lab.day - anch.day AS rel, 100 * (lab.v - base.b) / base.b AS pc\n" +
+    "  FROM lab INNER JOIN anch ON anch.pid = lab.pid INNER JOIN base ON base.pid = lab.pid\n" +
+    "  WHERE base.b > 0 AND lab.day != base.bday\n" +
+    "    AND lab.day - anch.day >= " + Math.floor(o.fromDays) + " AND lab.day - anch.day <= " + Math.floor(o.toDays) + "\n" +
+    ")"
+  );
+}
+
+const pctBin = (x: string) =>
+  "toInt32(floor((least(" + LAB_PCT_MAX + ", greatest(" + LAB_PCT_MIN + ", " + x + ")) - (" + LAB_PCT_MIN + ") + " + (LAB_PCT_BIN / 2) + ") / " + LAB_PCT_BIN + "))";
+
+/**
+ * The course: per time bin, the histogram of % change from baseline (each patient's mean within
+ * the bin, so a patient tested weekly weighs no more than one tested monthly). The baseline
+ * reading itself — 0% by definition — is not part of the course. Counts only.
+ */
+export function labCourseSql(cohortSql: string, study: string, db: string, lab: LabSpec, anchor: IncidenceAnchor, o: LabOpts): string {
+  return (
+    labCtes(cohortSql, study, db, lab, anchor, o) + "\n" +
+    "SELECT tbin, pbin, count() AS n FROM (\n" +
+    "  SELECT pid, toInt32(floor(rel / " + Math.max(1, Math.floor(o.binDays)) + ")) AS tbin, " + pctBin("avg(pc)") + " AS pbin\n" +
+    "  FROM chg GROUP BY pid, tbin\n" +
+    ") GROUP BY tbin, pbin ORDER BY tbin, pbin"
+  );
+}
+
+/**
+ * Best response: each patient's lowest % change after the anchor (within the window), binned;
+ * how many fell by at least `responseDrop` percent, counted exactly rather than from the bins;
+ * and the counts behind the denominators — patients anchored, with a baseline, with a positive
+ * baseline, and with any value after the anchor.
+ */
+export function labBestSql(cohortSql: string, study: string, db: string, lab: LabSpec, anchor: IncidenceAnchor, o: LabOpts, responseDrop: number): string {
+  const best = "(SELECT pid, min(pc) AS best FROM chg WHERE rel > 0 GROUP BY pid)";
+  return (
+    labCtes(cohortSql, study, db, lab, anchor, o) + "\n" +
+    "SELECT 'best' AS what, " + pctBin("best") + " AS pbin, count() AS n FROM " + best + " GROUP BY pbin\n" +
+    "UNION ALL SELECT 'responders' AS what, 0 AS pbin, countIf(best <= " + (-Math.abs(Number(responseDrop))) + ") AS n FROM " + best + "\n" +
+    "UNION ALL SELECT 'anchored' AS what, 0 AS pbin, count() AS n FROM anch\n" +
+    "UNION ALL SELECT 'baseline' AS what, 0 AS pbin, count() AS n FROM base\n" +
+    "UNION ALL SELECT 'positive_baseline' AS what, 0 AS pbin, countIf(b > 0) AS n FROM base\n" +
+    "UNION ALL SELECT 'after' AS what, 0 AS pbin, uniqExactIf(pid, rel > 0) AS n FROM chg"
+  );
+}
+
+/**
+ * Each patient's best % change, one row per patient and no identifier — the values behind a
+ * waterfall. Patient-level: only PatientLevelResolver.moreRows runs it, the same entitlement
+ * that lets a plot draw its points.
+ */
+export function labWaterfallSql(cohortSql: string, study: string, db: string, lab: LabSpec, anchor: IncidenceAnchor, o: LabOpts, cap: number): string {
+  return (
+    labCtes(cohortSql, study, db, lab, anchor, o) + "\n" +
+    "SELECT round(best, 1) AS best FROM (SELECT pid, min(pc) AS best FROM chg WHERE rel > 0 GROUP BY pid)\n" +
+    "ORDER BY best LIMIT " + Math.max(1, Math.floor(cap))
+  );
+}
+
+/** The tests a lab event type holds, with how many patients and results each has. */
+export function labTestsSql(cohortSql: string, study: string, db: string, eventType: string, testKey: string): string {
+  return (
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT t.value AS test, uniqExact(ce.patient_id) AS patients, count() AS results\n" +
+    "FROM " + db + ".clinical_event ce\n" +
+    "JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "JOIN " + db + ".clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND t.key = " + sq(testKey) + "\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND ce.event_type = " + sq(eventType) + " AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+    "GROUP BY test ORDER BY patients DESC LIMIT 40"
+  );
+}

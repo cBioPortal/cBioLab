@@ -172,6 +172,10 @@
       "NSCLC": 7809,
       "Breast": 5368,
       "Colorectal": 5543
+    },
+    "PSA response to hormone therapy, by TP53 status": {
+      "Prostate, TP53 mutant": 849,
+      "Prostate, TP53 wild-type": 2284
     }
   }
 }

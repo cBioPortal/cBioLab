@@ -41,6 +41,8 @@ export const MORE_KINDS: Record<string, MoreKindUi> = {
   attrition: { label: "Cohort attrition (CONSORT)", title: "Cohort attrition", maxCohorts: 6 },
   genome: { label: "Genome-wide copy number", title: "Genome-wide copy number", maxCohorts: 4 },
   pathways: { label: "Oncogenic pathways", title: "Oncogenic signalling pathways", maxCohorts: 4 },
+  labs: { label: "Lab course and response (e.g. PSA50)", title: "Lab course", maxCohorts: 4,
+    why: (k) => k.events.some((e) => /lab/i.test(e.canonical)) ? null : "this study records no lab-test timeline events" },
   incidence: { label: "Cumulative incidence (competing risks)", title: "Cumulative incidence", maxCohorts: 6,
     why: (k) => k.events.length ? null : "this study records no timeline events to estimate the incidence of" },
   clonality: { label: "Clonality (FACETS)", title: "Clonality", genes: true, maxCohorts: 3 },
@@ -69,6 +71,11 @@ export interface MoreCtx {
 /** A one-line subtitle for the card header. */
 export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "attrition") return "patients left after each clause, in order";
+  if (kind === "labs") {
+    const an = spec.anchor || {};
+    return (spec.test || "no test chosen") + " from first " + (an.eventType || "?") + (an.key ? " [" + an.key + "=" + an.value + "]" : "") +
+      " · responders fell ≥" + (spec.responseDrop ?? 50) + "%";
+  }
   if (kind === "incidence") {
     const e = spec.event || {};
     const an = spec.anchor;
@@ -130,6 +137,45 @@ export function MoreControls({ c }: { c: MoreCtx }) {
       </div>
     </div>
   );
+  if (spec.kind === "labs") {
+    const an = spec.anchor || { eventType: "" };
+    const types = c.events.map((x) => x.label);
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">test</span>
+          <label className="tbfield" title="the lab test, as its timeline attribute names it (e.g. PSA, CEA, CA_19-9)">
+            <DraftInput value={spec.test || ""} disabled={busy} width="7rem" onCommit={(t) => patch({ test: t.trim() })} />
+          </label>
+          <label className="tbfield" title="a responder's best fall from baseline, in percent">
+            responder <select value={String(spec.responseDrop ?? 50)} disabled={busy} onChange={(e) => patch({ responseDrop: Number(e.target.value) })}>
+              {[30, 50, 90].map((d) => <option key={d} value={d}>fell ≥{d}%</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="tbz"><span className="tbl">clock</span>
+          <label className="tbfield" title="the treatment start the course is read from">
+            from first <select value={an.eventType || ""} disabled={busy} onChange={(e) => patch({ anchor: { ...an, eventType: e.target.value } })}>
+              {!types.includes(an.eventType) && <option value={an.eventType || ""}>{an.eventType || "choose…"}</option>}
+              {types.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+          <label className="tbfield" title="only anchor events with this attribute (e.g. SUBTYPE); empty for any">
+            where <DraftInput value={an.key || ""} disabled={busy} width="6rem" placeholder="attribute"
+              onCommit={(t) => patch({ anchor: { eventType: an.eventType, ...(t.trim() ? { key: t.trim(), value: an.value || "" } : {}) } })} />
+          </label>
+          <label className="tbfield" title="the value that attribute must take (e.g. Hormone)">
+            = <DraftInput value={an.value || ""} disabled={busy} width="6rem" placeholder="value"
+              onCommit={(t) => patch({ anchor: { ...an, value: t } })} />
+          </label>
+          <label className="tbfield" title="how far after the start to follow">
+            to <select value={String(spec.toWeeks ?? 52)} disabled={busy} onChange={(e) => patch({ toWeeks: Number(e.target.value) })}>
+              {[12, 26, 52, 104].map((w) => <option key={w} value={w}>{w} weeks</option>)}
+            </select>
+          </label>
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "incidence") {
     const e = spec.event || { eventType: "" }, a0 = (e.attrs || [])[0] || { key: "", value: "" };
     const an = spec.anchor || null;
@@ -227,6 +273,10 @@ export function MoreControls({ c }: { c: MoreCtx }) {
 
 /** The view a fresh "add view" click starts from, built from what the study is known to have. */
 export function defaultMoreView(kind: string, known: Known): Record<string, unknown> {
+  if (kind === "labs") {
+    const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));
+    return { kind, test: "PSA", anchor: { eventType: tx ? tx.label : "Treatment" } };
+  }
   if (kind === "incidence") {
     const ev = known.events.find((e) => /diagnos|progress|status/i.test(e.canonical)) || known.events[0];
     return { kind, event: { eventType: ev ? ev.label : "" } };

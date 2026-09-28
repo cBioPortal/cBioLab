@@ -811,10 +811,53 @@ export interface IncidenceResult {
   gray?: import("./stats.ts").GrayTest;
   excludedStudies?: { study: string; reason: string }[];
 }
+/**
+ * A lab value's course from a treatment start: % change from each patient's baseline over time
+ * (median and interquartile band per bin), the best response and the share responding (e.g.
+ * PSA50, PCWG3), and — from a participant entitled to patient-level values — a waterfall.
+ */
+export interface LabsView {
+  note?: string;
+  kind: "labs"; cohorts?: string[];
+  /** the test, as its event attribute names it (e.g. "PSA", "CEA") */
+  test: string;
+  /** where lab results live (defaults: event type Lab_Test, the test in TEST, the value in RESULT) */
+  eventType?: string; testKey?: string; resultKey?: string;
+  /** the clock's start: the treatment whose effect is read */
+  anchor: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
+  /** baseline is the last value this many days before, or on, the anchor (default 90) */
+  baselineDays?: number;
+  /** the window, in weeks around the anchor (default −12 to 52), and its bin width (default 4) */
+  fromWeeks?: number; toWeeks?: number; binWeeks?: number;
+  /** a responder's best fall from baseline, in percent (default 50, PCWG3's PSA50) */
+  responseDrop?: number;
+}
+export interface LabsPanel {
+  cohort: string;
+  /** the denominators: anchored, with a baseline, with a positive baseline, with a value after the anchor */
+  anchored: number; baseline: number; positiveBaseline: number; evaluable: number;
+  /** per bin: its start in weeks, the patients measured, and the quartiles of % change */
+  course: { week: number; n: number; q1: number | null; median: number | null; q3: number | null }[];
+  /** best % change after the anchor, in 2-point bins centred on −100, −98, … +300 (the last holds everything above) */
+  best: number[];
+  responders: number;
+  /** each patient's best % change, sorted — present only from patient-level participants */
+  waterfall?: number[];
+  /** patients whose best could not be drawn as a bar (an aggregate-only participant's) */
+  waterfallWithheld?: number;
+}
+export interface LabsResult {
+  test: string; anchoredTo: string; responseDrop: number;
+  fromWeeks: number; toWeeks: number; binWeeks: number; baselineDays: number;
+  panels: LabsPanel[];
+  /** two cohorts: Fisher on responders */
+  responseP?: number;
+  excluded?: { study: string; reason: string }[];
+}
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
-  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView;
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -1090,6 +1133,7 @@ export interface ViewResult {
   paired?: PairedResult;                    // paired-sample concordance
   clonality?: ClonalityResult;              // FACETS clonality, WGD, purity/ploidy
   incidence?: IncidenceResult;              // competing-risks cumulative incidence
+  labs?: LabsResult;                        // lab-value course and response
 }
 /**
  * Therapy transitions, ready to draw: nodes in columns, flows between them.

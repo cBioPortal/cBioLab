@@ -172,3 +172,20 @@ describe("incidence", () => {
     assert.ok(viewToSvg(v)!.includes("no shuffle of 2000 as extreme"));
   });
 });
+
+describe("labs", () => {
+  const panel = (cohort: string, waterfall?: number[]) => ({ cohort, anchored: 10, baseline: 9, positiveBaseline: 9, evaluable: 8,
+    course: [{ week: 0, n: 8, q1: -80, median: -60, q3: -20 }, { week: 4, n: 8, q1: -95, median: -90, q3: -50 }],
+    best: new Array(201).fill(0).map((_, i) => i === 5 ? 6 : i === 60 ? 2 : 0), responders: 6,
+    ...(waterfall ? { waterfall } : { waterfallWithheld: 8 }) });
+  const res = (panels: any[]): ViewResult => ({ kind: "labs", cohorts: panels.map((pn) => pn.cohort), caveat: "measured, not everyone",
+    labs: { test: "PSA", anchoredTo: "Treatment [SUBTYPE=Hormone]", responseDrop: 50, fromWeeks: -12, toWeeks: 52, binWeeks: 4, baselineDays: 90, panels } });
+  test("reports the response rate with its numerator and denominator", () => {
+    const svg = viewToSvg(res([panel("A", [-99, -90, -80, -70, -60, -55, 10, 40])]))!;
+    assert.ok(svg.includes("75.0% fell ≥50% (6/8)"));
+  });
+  test("without patient-level values it draws a histogram, not bars it may not have", () => {
+    const svg = viewToSvg(res([panel("A")]))!;
+    assert.ok(svg.includes("histogram, −100 → +300%"));
+  });
+});
