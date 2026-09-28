@@ -1,4 +1,5 @@
 import { buildContract } from "../../../lib/oncoprint";
+import { cachedContract } from "../../../lib/next-cache.ts";
 import { packContract } from "../../../lib/oncoprint-binary";
 import { gzipSync } from "node:zlib";
 import { contractToSvg } from "../../../lib/oncoprint-svg";
@@ -15,7 +16,8 @@ export async function POST(req: Request) {
     const sp = new URL(req.url).searchParams;
     const log: { label: string; sql: string; ms?: number; study?: string }[] = [];
     const provenance = sp.get("provenance") === "1";
-    const contract = await buildContract(spec, provenance ? { log, provenance } : {});
+    // a provenance request wants the queries this run issues, so it is never answered from the cache
+    const contract = provenance ? await buildContract(spec, { log, provenance }) : await cachedContract(spec);
     const engineMs = Date.now() - t0;
     const fmt = sp.get("format");
     if (fmt === "svg" || fmt === "tsv") {

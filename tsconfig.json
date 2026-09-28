@@ -10,7 +10,7 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
@@ -34,7 +34,9 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-gate/types/**/*.ts"
+    ".next-gate/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    ".next-gate/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

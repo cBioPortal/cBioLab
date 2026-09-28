@@ -5,7 +5,6 @@ import { join } from "node:path";
 import ImportOncoprint from "./ImportOncoprint.tsx";
 
 export const metadata = { title: "Oncoprint from pasted data — cbio-lab" };
-export const dynamic = "force-dynamic";
 
 export default function ImportPage() {
   const fix = join(process.cwd(), "test", "fixtures", "oncoprint");

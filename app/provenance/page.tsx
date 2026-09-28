@@ -8,7 +8,7 @@ import { contractToSvg } from "../../lib/oncoprint-svg.ts";
 
 export const metadata = { title: "Oncoprint provenance — cbio-lab" };
 export const maxDuration = 60;
-export const dynamic = "force-dynamic";
+export const instant = false;
 
 export default async function ProvenancePage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const sp = await searchParams;

@@ -119,6 +119,22 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
    participants never emit or receive patient identifiers, and the guarantee is a *missing
    method* rather than a flag. Views degrade and say so rather than silently narrowing.
    Never add an id-returning path to `AggregateResolver` / `RemoteAggregateResolver`.
+11. **Results are cached with `'use cache: remote'`** (`lib/next-cache.ts`; Next 16 Cache
+   Components). On Vercel it is Runtime Cache, shared by every function instance; elsewhere it
+   is process memory. Analyses, oncoprint contracts, Explore, the study catalog and the study
+   list all go through it, from the web routes, `/api/mcp` and chat alike.
+   - **A deploy clears it** (Next keys every entry by deployment), a data import or OncoKB
+     release does too (`dataVersion()` is an argument of every cached function), and entries
+     regenerate after a day.
+   - **Only a returned value is stored.** A refusal, a partial answer (an instance that did not
+     reply) or an abandoned query must THROW, or it is served to everyone for a day. Validate
+     requests before entering the cache; an error's class does not survive the cache boundary.
+   - **Arguments are the key.** A cached function takes only serializable arguments and computes
+     everything else itself; a function passed in cannot be called. Anything that changes the
+     answer must be an argument.
+   - Entries are gzipped JSON (`pack`/`unpack`): Runtime Cache refuses items over 2 MB.
+   - `next/cache` exists only under Next, so the stdio MCP server, CLI and tests run the engine
+     uncached; `registerTools` takes the engine to use.
 
 ## UI conventions — the layout system
 

@@ -4,7 +4,7 @@
 import OncoprintLab from "./OncoprintLab.tsx";
 
 export const metadata = { title: "Oncoprint lab — cbio-lab" };
-export const dynamic = "force-dynamic";
+export const instant = false;
 
 const GENES = ["TP53", "KRAS", "EGFR", "STK11", "KEAP1", "PIK3CA", "ARID1A"];
 const BIG = ["msk_impact_50k_2026", "msk_ch_2023", "msk_met_2021", "msk_chord_2024", "msk_ch_2020", "msk_impact_2017",

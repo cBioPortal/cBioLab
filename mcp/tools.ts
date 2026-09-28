@@ -12,7 +12,7 @@ import { runAnalysis, resolveStudy, studyProfiles } from "../lib/analysis.ts";
 import { resolverFor, carriesPatientIds, studyRouting } from "../lib/federation.ts";
 import { buildExplore } from "../lib/explore.ts";
 import { PRIMARY } from "../lib/ch.ts";
-import type { AnalysisDoc, CohortDef, OncoprintSpec, ViewResult } from "../lib/types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, Contract, OncoprintSpec, ViewResult } from "../lib/types.ts";
 import type { PidsCarrier } from "../lib/oncoprint.ts";
 
 // ---------- shared zod fragments (mirrors docs/cohort-query.schema.json) ----------
@@ -62,7 +62,17 @@ function cohortCaveats(args: any): string[] {
 
 function text(t: string) { return { content: [{ type: "text", text: t }] }; }
 
-export function registerTools(server: any): void {
+/**
+ * The engine the tools run on. The Next route passes the cached one (lib/next-cache.ts); the
+ * stdio server has no Next runtime, so it runs the engine directly.
+ */
+export interface ToolEngine {
+  runAnalysis: (doc: AnalysisDoc) => Promise<AnalysisResult>;
+  buildContract: (spec: OncoprintSpec) => Promise<Contract>;
+}
+const DIRECT: ToolEngine = { runAnalysis: (doc) => runAnalysis(doc), buildContract: (spec) => buildContract(spec) };
+
+export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
 
   // ---- federation endpoint -------------------------------------------------
   // What a peer instance exposes to another cbio-lab: AGGREGATES ONLY.
@@ -197,7 +207,7 @@ export function registerTools(server: any): void {
     },
     async ({ document }: { document: AnalysisDoc }) => {
       let r;
-      try { r = await runAnalysis(document); }
+      try { r = await engine.runAnalysis(document); }
       catch (e) { return text("REJECTED: " + String((e as Error)?.message || e) + "\nCall describe_dsl for the grammar and runnable examples."); }
       const base = process.env.APP_BASE_URL || "https://cohort-lab.vercel.app";
       const docB64 = Buffer.from(JSON.stringify(document)).toString("base64url");
@@ -485,7 +495,7 @@ export function registerTools(server: any): void {
         conventions: { lineGap: 90 }
       };
       ensureFonts();
-      const contract = await buildContract(spec);
+      const contract = await engine.buildContract(spec);
       const svg = contractToSvg(contract, 1200);
       const png = await sharp(Buffer.from(svg), { density: 144 }).png().toBuffer();
       const stats = contract.tracks.filter((t) => t.kind === "gene")

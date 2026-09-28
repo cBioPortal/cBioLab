@@ -1,7 +1,8 @@
 // In-app chat: a Claude tool-use loop over the Analysis document.
 // The model reads the current document + result summary and may call
 // update_document to modify it; the client applies the returned doc and re-runs.
-import { runAnalysis } from "../../../lib/analysis.ts";
+import { cachedAnalysis } from "../../../lib/next-cache.ts";
+import { connection } from "next/server";
 import type { AnalysisDoc } from "../../../lib/types.ts";
 import { catalogText } from "../../../lib/catalog-text.ts";
 import { CHAT_GRAMMAR } from "../../../lib/dsl-reference.ts";
@@ -51,6 +52,7 @@ const TOOLS = [{
 
 
 export async function GET() {
+  await connection();
   return new Response(null, { status: process.env.ANTHROPIC_API_KEY ? 204 : 501 });
 }
 
@@ -93,7 +95,7 @@ export async function POST(req: Request) {
         newDoc = toolUse.input.document as AnalysisDoc;
         // validate by running; feed a compact result back so the model can narrate real numbers
         try {
-          const r = await runAnalysis(newDoc);
+          const r = await cachedAnalysis(newDoc);
           lastResult = r;
           // Feed back what each VIEW actually analysed, not just cohort sizes.
           // An anchored survival view drops patients without the anchor event, so
