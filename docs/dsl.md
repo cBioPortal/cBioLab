@@ -2454,7 +2454,7 @@ tmb_mskcc_2018 is pan-cancer, so a plain percentile would mix histologies with v
 }
 ```
 
-### Example 37: Cohort attrition: which criterion removed whom
+### Example 40: Cohort attrition: which criterion removed whom
 
 KRAS G12C lung adenocarcinoma treated with immunotherapy, with at least six months of follow-up, beside KRAS wild-type lung adenocarcinoma. The G12C arm loses most of its patients to the genotype, and a further 78 to the follow-up requirement — the kind of step a reader needs to see before trusting a survival curve drawn from what is left.
 
@@ -2527,7 +2527,7 @@ KRAS G12C lung adenocarcinoma treated with immunotherapy, with at least six mont
 }
 ```
 
-### Example 38: Genome-wide copy number: colorectal against breast
+### Example 41: Genome-wide copy number: colorectal against breast
 
 Colorectal and breast cancers in MSK-IMPACT, 2 Mb bins. The textbook colorectal pattern is all there — 20q gained in 60%, 13q in 42%, 8q in 32%, 18q lost in 54% — beside breast cancer's 1q and 8q gains and 16q loss. The strip underneath marks every bin where the two differ at q < 0.05, coloured by which cohort is higher.
 
@@ -2569,7 +2569,7 @@ Colorectal and breast cancers in MSK-IMPACT, 2 Mb bins. The textbook colorectal 
 }
 ```
 
-### Example 39: Oncogenic signalling pathways: colorectal against pancreatic
+### Example 42: Oncogenic signalling pathways: colorectal against pancreatic
 
 Colorectal and pancreatic cancer in MSK-CHORD. WNT separates them almost completely (82% against 8%, nearly all APC); RTK-RAS is higher in pancreatic cancer (84%, KRAS 81%), and so is the cell cycle (39%, CDKN2A 33%); PI3K and NOTCH (FBXW7) are colorectal. The canonical pathways also show how much a targeted panel misses: 56 of WNT's 68 genes are on no panel here.
 
@@ -2610,7 +2610,7 @@ Colorectal and pancreatic cancer in MSK-CHORD. WNT separates them almost complet
 }
 ```
 
-### Example 40: Differential expression and enrichment: basal-like against luminal A breast cancer
+### Example 43: Differential expression and enrichment: basal-like against luminal A breast cancer
 
 TCGA PanCancer Atlas breast cancer, PAM50 basal-like against luminal A, on mRNA z-scores. The luminal genes (ESR1, PGR, FOXA1, GATA3) and the basal ones (FOXC1, and proliferation — MKI67, CDC20, AURKB) come out as expected, and so does the enrichment: E2F targets, the G2M checkpoint and MYC targets in basal-like tumours, early estrogen response in luminal A.
 
@@ -2650,7 +2650,7 @@ TCGA PanCancer Atlas breast cancer, PAM50 basal-like against luminal A, on mRNA 
 }
 ```
 
-### Example 41: Paired samples: what differs between a patient's primary and metastasis
+### Example 44: Paired samples: what differs between a patient's primary and metastasis
 
 MSK-IMPACT, the 2,278 patients sequenced at both a primary and a metastatic site. Truncal drivers agree (TP53 78% concordant); what the metastasis alone carries is the resistance biology — ESR1 mutations (49 metastasis-only against 7 primary-only) and AR alterations (71 against 1), both selected under hormone therapy — and MYC amplification and CDKN2A loss.
 
@@ -2680,7 +2680,7 @@ MSK-IMPACT, the 2,278 patients sequenced at both a primary and a metastatic site
 }
 ```
 
-### Example 42: Clonality, LOH and genome doubling from FACETS
+### Example 45: Clonality, LOH and genome doubling from FACETS
 
 Colorectal against breast cancer. Tumour suppressors show the classic second hit — TP53 is ~88% clonal with its other allele lost 77–89% of the time, CDH1 in breast 95% — while the oncogene KRAS rarely loses its partner. PIK3CA is markedly more often subclonal in colorectal cancer (68% clonal) than in breast (84%), in keeping with a later event there. Around a third of both cohorts' tumours have doubled their genome.
 
@@ -2730,7 +2730,7 @@ Colorectal against breast cancer. Tumour suppressors show the classic second hit
 }
 ```
 
-### Example 43: Brain metastasis, with death as a competing risk
+### Example 46: Brain metastasis, with death as a competing risk
 
 MSK-CHORD, from each patient's day 0, among those without a brain metastasis by then. At five years 24.7% of NSCLC patients have one — where 1 − Kaplan–Meier would have said 30.4% — against 20.6% in breast and 10.8% in colorectal cancer (1 − KM: 14.4%, a third too high, because so many colorectal patients die first).
 
@@ -2793,7 +2793,7 @@ MSK-CHORD, from each patient's day 0, among those without a brain metastasis by 
 }
 ```
 
-### Example 44: PSA response to hormone therapy, by TP53 status
+### Example 47: PSA response to hormone therapy, by TP53 status
 
 Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a median of more than 95% within three months in both groups, but 93.0% of TP53 wild-type patients reach PSA50 against 85.8% of TP53-mutant ones (Fisher p = 1.4e-6), and the mutant group's upper quartile turns back upward within a year.
 
