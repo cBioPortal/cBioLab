@@ -4,7 +4,7 @@ import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
 import { mergeExplore } from "../../../lib/explore.ts";
 import { PRIMARY, withChContext, ensureChContext } from "../../../lib/ch.ts";
 import { cacheLife } from "next/cache";
-import { pack, unpack, dataVersion } from "../../../lib/next-cache.ts";
+import { pack, throughCache, dataVersion } from "../../../lib/next-cache.ts";
 import { studyProfiles, resolveStudy } from "../../../lib/analysis.ts";
 import { chQuery } from "../../../lib/ch.ts";
 
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 async function handle(req: Request) {
   try {
     const body = await req.json();
-    return Response.json(unpack(await exploreEntry(body, await dataVersion())));
+    return Response.json(await throughCache(async () => exploreEntry(body, await dataVersion()), () => ensureChContext(() => exploreFor(body))));
   } catch (e) {
     // The reader superseded this request: not a failure, and there is nobody left to tell.
     if ((e as { name?: string })?.name === "AbortError" || req.signal.aborted)
@@ -38,7 +38,7 @@ async function handle(req: Request) {
 }
 
 
-async function exploreEntry(body: any, _version: string): Promise<Uint8Array> {
+async function exploreEntry(body: any, _version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
   return pack(await ensureChContext(() => exploreFor(body)));

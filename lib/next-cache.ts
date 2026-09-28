@@ -13,12 +13,19 @@
 // Only a value the function returns is stored. A thrown error, a refused request or a query the
 // reader abandoned is never cached, so every path that means "no answer" must throw.
 //
-// Entries hold gzipped JSON: Runtime Cache refuses items over 2 MB, and a 450k-patient oncoprint
-// contract is 22 MB as JSON but 1.9 MB gzipped.
+// Every read goes through `throughCache`, which answers directly when the cached call throws.
+// That is how an error reaches the reader at all: a production build replaces the message of
+// anything thrown inside a cached function with a generic one, so the direct run is what reports
+// what was actually wrong. It also means a cache that cannot be read costs one uncached run
+// rather than a failed request.
+//
+// Entries hold gzipped JSON as base64 text. Text, because Runtime Cache has returned typed arrays
+// corrupted; gzipped, because it refuses items over 2 MB (a 450k-patient oncoprint contract is
+// 22 MB as JSON, 2.5 MB this way, so that one is simply not kept).
 //
 // A cached function takes only serializable arguments and computes its answer itself, so each
 // route keeps its own small one (`catalogEntry`, `studiesEntry`, `exploreEntry`) beside the code
-// it caches, built from `pack`, `unpack` and `dataVersion` here.
+// it caches, built from `pack`, `throughCache` and `dataVersion` here.
 //
 // Next-only: `next/cache` exists only under the Next runtime, so the stdio MCP server, the CLI
 // and the tests use the uncached engine directly.
@@ -33,12 +40,19 @@ import type { AnalysisDoc, AnalysisResult, Contract, OncoprintSpec } from "./typ
 type Json = unknown;
 
 /** Typed arrays become plain arrays, which every consumer of the contract also accepts. */
-export function pack(v: Json): Uint8Array {
+export function pack(v: Json): string {
   const text = JSON.stringify(v, (_k, x) => ArrayBuffer.isView(x) && !(x instanceof DataView) ? Array.from(x as unknown as ArrayLike<number>) : x);
-  return new Uint8Array(gzipSync(text, { level: 6 }));
+  return gzipSync(text, { level: 6 }).toString("base64");
 }
-export function unpack<T>(b: Uint8Array): T {
-  return JSON.parse(gunzipSync(b).toString("utf8")) as T;
+function unpack<T>(s: string): T {
+  return JSON.parse(gunzipSync(Buffer.from(s, "base64")).toString("utf8")) as T;
+}
+
+/** The cached answer, or the direct one when the cache throws or hands back something unreadable. */
+export async function throughCache<T>(read: () => Promise<string>, direct: () => Promise<T>): Promise<T> {
+  let packed: string;
+  try { packed = await read(); } catch { return direct(); }
+  try { return unpack<T>(packed); } catch { return direct(); }
 }
 
 let versionMemo: { at: number; value: Promise<string> } | null = null;
@@ -66,20 +80,21 @@ export function dataVersion(): Promise<string> {
   return value;
 }
 
-async function analysisEntry(doc: AnalysisDoc, oncoprint: "svg" | "spec", _version: string): Promise<Uint8Array> {
+async function analysisEntry(doc: AnalysisDoc, oncoprint: "svg" | "spec", _version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
   return pack(await runAnalysis(doc, { oncoprint }));
 }
 export async function cachedAnalysis(doc: AnalysisDoc, opts: { oncoprint?: "svg" | "spec" } = {}): Promise<AnalysisResult> {
-  return unpack<AnalysisResult>(await analysisEntry(doc, opts.oncoprint ?? "svg", await dataVersion()));
+  const oncoprint = opts.oncoprint ?? "svg";
+  return throughCache(async () => analysisEntry(doc, oncoprint, await dataVersion()), () => runAnalysis(doc, { oncoprint }));
 }
 
-async function contractEntry(spec: OncoprintSpec, _version: string): Promise<Uint8Array> {
+async function contractEntry(spec: OncoprintSpec, _version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
   return pack(await buildContract(spec));
 }
 export async function cachedContract(spec: OncoprintSpec): Promise<Contract> {
-  return unpack<Contract>(await contractEntry(spec, await dataVersion()));
+  return throughCache(async () => contractEntry(spec, await dataVersion()), () => buildContract(spec));
 }

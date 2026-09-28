@@ -2,7 +2,7 @@ import { chQuery, STUDY, PORTAL } from "../../../lib/ch";
 import { catalogSqls, lineCatalogSqls, LINE_TYPE } from "../../../lib/compiler";
 import { survivalEndpointsSql, studyRouting, restrictedStudies } from "../../../lib/federation";
 import { cacheLife } from "next/cache";
-import { pack, unpack, dataVersion } from "../../../lib/next-cache.ts";
+import { pack, throughCache, dataVersion } from "../../../lib/next-cache.ts";
 
 export async function GET(req: Request) {
   try {
@@ -14,13 +14,13 @@ export async function GET(req: Request) {
     // Checked before the cache: a refusal is an answer to give, not one to keep.
     if (!(await studyRouting()).has(study)) return Response.json({ error: restrictedStudies.has(study)
       ? "Study '" + study + "' is restricted and not available here" : "Study '" + study + "' not found" }, { status: 400 });
-    return Response.json(unpack(await catalogEntry(study, await dataVersion())));
+    return Response.json(await throughCache(async () => catalogEntry(study, await dataVersion()), () => catalogFor(study)));
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 500 });
   }
 }
 
-async function catalogEntry(study: string, _version: string): Promise<Uint8Array> {
+async function catalogEntry(study: string, _version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
   return pack(await catalogFor(study));

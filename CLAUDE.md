@@ -73,7 +73,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   over samples, which is what makes pooling safe; averaging per-study percentages is never safe.
   Guarded by `test/denominator.test.ts` and `npm run check:denominators` (in the e2e gate).
   Read before claiming this project is "fast": on a cached single chart the portal is ~20x
-  quicker, we have no application cache, and our advantage is data movement (36x less to the
+  quicker (those measurements predate the result cache of invariant 11, which answers only
+  exact repeats), and our advantage is data movement (36x less to the
   browser), not speed. Also records the ~20,000-id ceiling on explicit patient lists.
 
 ## Invariants — do not break these
@@ -127,12 +128,15 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
      release does too (`dataVersion()` is an argument of every cached function), and entries
      regenerate after a day.
    - **Only a returned value is stored.** A refusal, a partial answer (an instance that did not
-     reply) or an abandoned query must THROW, or it is served to everyone for a day. Validate
-     requests before entering the cache; an error's class does not survive the cache boundary.
+     reply) or an abandoned query must THROW, or it is served to everyone for a day.
+   - **Read through `throughCache(cached, direct)`.** A production build replaces the message of
+     anything thrown inside a cached function, so when the cached call throws the direct one runs
+     and reports the real error. It also covers a cache that cannot be read.
    - **Arguments are the key.** A cached function takes only serializable arguments and computes
      everything else itself; a function passed in cannot be called. Anything that changes the
      answer must be an argument.
-   - Entries are gzipped JSON (`pack`/`unpack`): Runtime Cache refuses items over 2 MB.
+   - Entries are gzipped JSON as base64 text (`pack`): Runtime Cache refuses items over 2 MB,
+     and has handed typed arrays back corrupted.
    - `next/cache` exists only under Next, so the stdio MCP server, CLI and tests run the engine
      uncached; `registerTools` takes the engine to use.
 
