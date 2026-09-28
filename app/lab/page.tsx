@@ -53,6 +53,11 @@ const PIE_ATTRIBUTES = new Set([
   "SAMPLE_TYPE", "SOMATIC_STATUS"
 ]);
 
+/** Explore's "Derived" card (data-shape facets: follow-up, history, distinct altered
+ *  genes) is hidden for now, at the user's request — flip back on rather than delete
+ *  the render, since the underlying facets/logic are unaffected. */
+const SHOW_DERIVED_FACETS = false;
+
 /** Prompts where a figure is the answer, not decoration. */
 const CHAT_STARTERS = [
   "Do STK11-mutant lung cancers do worse on immunotherapy? Measure survival from when they started it, not from sequencing.",
@@ -315,6 +320,10 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const [genesFor, setGenesFor] = useState<number | null>(null);
   const genesDialog = useRef<HTMLDialogElement | null>(null);
   const saveDialog = useRef<HTMLDialogElement | null>(null);   // Explore action-bar feedback
+  /** Explore's "+ Add chart": clinical/gene/derived-timeline filter builders live
+   *  here instead of as three permanent cards above the facet grid. */
+  const addChartDialog = useRef<HTMLDialogElement | null>(null);
+  const [chartTab, setChartTab] = useState<"clinical" | "gene" | "derived">("clinical");
   const tabRef = useRef<string>(tabFromParams(sp));            // the tab syncUrl should record
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
   const exAbort = useRef<AbortController | null>(null);      // cancel a facet request the reader has moved past
@@ -2801,78 +2810,274 @@ function Latency({ v }: { v: any }) {
           {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "var(--t-md)", margin: 0 }}>
             No studies selected — check one or more above to explore.</p></div>}
           {!explore && exStudies.length > 0 && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
-          {/* Per-gene alteration facets — the portal's "EGFR: Somatic mutations"
-              and "EGFR: Copy-number alterations". Filterable, and counted in
-              PATIENTS because that is the unit a click selects in; the gene
-              tables on the right count samples and say so. */}
+          {/* Clinical/gene-status/derived-timeline filter builders used to sit here as
+              three permanent cards, pushing the facet grid below the fold before you'd
+              touched any of them. One button, one modal with a tab per kind instead. */}
           {explore && (
-            <div className="card">
-              <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
-                <h2 style={{ margin: 0 }}>Gene status <span className="plain">— alteration state per gene, click to filter</span></h2>
-                <span className="spacer" />
-                <input className="genesearch" type="search" placeholder="chart a gene (e.g. EGFR)"
-                  value={geneChartInput} disabled={exploreBusy}
-                  onChange={e => setGeneChartInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") chartGene(geneChartInput); }} />
-                <button disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}>add</button>
-              </div>
-              {!geneCharts.length && (
-                <p className="note" style={{ margin: "0.4rem 0 0" }}>
-                  Name a gene to see how many patients are altered, unaltered, or <strong>never tested</strong> for
-                  it. The third is the one a frequency cannot show: in GENIE public, 86,353 patients are on no panel
-                  covering EGFR copy number.
-                </p>
-              )}
-              {geneCharts.map(g => (
-                <span key={g} className="qchip" style={{ marginRight: "0.3rem" }}>
-                  {g}
-                  <button className="linklike" style={{ marginLeft: "0.3rem" }} title={"stop charting " + g}
-                    onClick={() => unchartGene(g)}>×</button>
-                </span>
-              ))}
-              {(explore.geneFacets || []).map(f => {
-                const max = Math.max(...f.states.map(x => x.n), 1);
-                return (
-                  <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type}
-                    style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0", marginTop: "0.4rem" }}>
-                    <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}>
-                      {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
-                      <span className="meta"> · patient-level · {f.total.toLocaleString()} patients</span>
-                    </div>
-                    <div className="vallist">
-                      {f.states.map(st => (
-                        <button key={st.state} className="valrow"
-                          title={st.label + " — " + st.n.toLocaleString() + " patients (click to filter)"}
-                          onClick={() => addClauses(geneStateClauses(f.gene, f.type, st.state))}>
-                          <span className="vname" style={st.state === "notProfiled" ? { color: "var(--muted)" } : undefined}>
-                            {st.label}
-                          </span>
-                          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * st.n / max)) + "%" }} /></span>
-                          <span className="vn">{st.n.toLocaleString()}</span>
-                          <span className="vpct">{f.total ? (Math.round(1000 * st.n / f.total) / 10) + "%" : ""}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {f.overlap ? (
-                      <p className="note" style={{ margin: "0.25rem 0 0" }}>
-                        {f.overlap.toLocaleString()} patient{f.overlap === 1 ? " is" : "s are"} counted in both
-                        Amplified and Deleted — amplified in one sample, deleted in another — so these rows
-                        over-sum the cohort by that much.
-                      </p>
-                    ) : null}
-                    {f.alteredUnprofiled ? (
-                      <p className="note" style={{ margin: "0.25rem 0 0" }}>
-                        {f.alteredUnprofiled.toLocaleString()} patient{f.alteredUnprofiled === 1 ? " has" : "s have"} a
-                        call for {f.gene} but sit on no panel covering it — a contradiction in the source data. They are
-                        counted as not profiled.
-                      </p>
-                    ) : null}
-                  </div>
-                );
-              })}
+            <div className="row" style={{ marginBottom: "1rem" }}>
+              <button className="tbbtn" onClick={() => addChartDialog.current?.showModal()}>+ Add chart</button>
+              {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
             </div>
           )}
-          {explore && explore.derived && explore.derived.length > 0 && (
+          {explore && (
+            <dialog ref={addChartDialog} className="addchartdialog"
+              onClick={e => { if (e.target === addChartDialog.current) addChartDialog.current?.close(); }}>
+              <h3>Add chart</h3>
+              <div className="tabs">
+                <button className={chartTab === "clinical" ? "active" : ""} onClick={() => setChartTab("clinical")}>Clinical</button>
+                <button className={chartTab === "gene" ? "active" : ""} onClick={() => setChartTab("gene")}>Gene status</button>
+                <button className={chartTab === "derived" ? "active" : ""} onClick={() => setChartTab("derived")}>Derived timeline filters</button>
+              </div>
+              {chartTab === "clinical" && (() => {
+                const visible = visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical;
+                const shown = Math.min(visible.length, attrLimit);
+                return (
+                  <div>
+                    <p className="note" style={{ marginTop: 0 }}>
+                      Finds an attribute (or one of its values) among the {explore.clinical.length} this selection
+                      carries — the matching tiles are what the facet grid below shows.
+                    </p>
+                    <div className="row" style={{ alignItems: "baseline" }}>
+                      <input className="genesearch" type="search" placeholder="find attribute or value" value={clinFilter}
+                        title="matches an attribute's name or any of its values" autoFocus
+                        onChange={e => setClinFilter(e.target.value)} />
+                      <span className="meta">{shown < visible.length
+                        ? "showing " + shown + " of " + visible.length + " attributes"
+                        : visible.length + " attributes"}
+                        {attrCoverage > 0 && visible.length < explore.clinical.length
+                          ? " (" + (explore.clinical.length - visible.length) + " hidden as study-specific)" : ""}</span>
+                      {exStudies.length > 1 && (
+                        <select value={String(attrCoverage)} disabled={exploreBusy}
+                          title="attributes carried by only one study are that study's own vocabulary, not something the selection shares"
+                          onChange={e => {
+                            const v = Number(e.target.value);
+                            setAttrCoverage(v);
+                            // Refetch UNNARROWED so the bar can be lowered again
+                            // later; the filtering below is what the reader sees,
+                            // and subsequent fetches narrow the server's work.
+                            setTimeout(() => fetchExplore(undefined, undefined, []), 0);
+                          }}>
+                          <option value="0">every attribute</option>
+                          <option value="0.5">in most studies</option>
+                          <option value="1">in every study</option>
+                        </select>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+              {chartTab === "gene" && (
+                <div>
+                  <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
+                    <input className="genesearch" type="search" placeholder="chart a gene (e.g. EGFR)" autoFocus
+                      value={geneChartInput} disabled={exploreBusy}
+                      onChange={e => setGeneChartInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") chartGene(geneChartInput); }} />
+                    <button disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}>add</button>
+                  </div>
+                  {!geneCharts.length && (
+                    <p className="note" style={{ margin: "0.4rem 0 0" }}>
+                      Name a gene to see how many patients are altered, unaltered, or <strong>never tested</strong> for
+                      it. The third is the one a frequency cannot show: in GENIE public, 86,353 patients are on no panel
+                      covering EGFR copy number.
+                    </p>
+                  )}
+                  {geneCharts.map(g => (
+                    <span key={g} className="qchip" style={{ marginRight: "0.3rem" }}>
+                      {g}
+                      <button className="linklike" style={{ marginLeft: "0.3rem" }} title={"stop charting " + g}
+                        onClick={() => unchartGene(g)}>×</button>
+                    </span>
+                  ))}
+                  {(explore.geneFacets || []).map(f => {
+                    const max = Math.max(...f.states.map(x => x.n), 1);
+                    return (
+                      <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type}
+                        style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0", marginTop: "0.4rem" }}>
+                        <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}>
+                          {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
+                          <span className="meta"> · patient-level · {f.total.toLocaleString()} patients</span>
+                        </div>
+                        <div className="vallist">
+                          {f.states.map(st => (
+                            <button key={st.state} className="valrow"
+                              title={st.label + " — " + st.n.toLocaleString() + " patients (click to filter)"}
+                              onClick={() => addClauses(geneStateClauses(f.gene, f.type, st.state))}>
+                              <span className="vname" style={st.state === "notProfiled" ? { color: "var(--muted)" } : undefined}>
+                                {st.label}
+                              </span>
+                              <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * st.n / max)) + "%" }} /></span>
+                              <span className="vn">{st.n.toLocaleString()}</span>
+                              <span className="vpct">{f.total ? (Math.round(1000 * st.n / f.total) / 10) + "%" : ""}</span>
+                            </button>
+                          ))}
+                        </div>
+                        {f.overlap ? (
+                          <p className="note" style={{ margin: "0.25rem 0 0" }}>
+                            {f.overlap.toLocaleString()} patient{f.overlap === 1 ? " is" : "s are"} counted in both
+                            Amplified and Deleted — amplified in one sample, deleted in another — so these rows
+                            over-sum the cohort by that much.
+                          </p>
+                        ) : null}
+                        {f.alteredUnprofiled ? (
+                          <p className="note" style={{ margin: "0.25rem 0 0" }}>
+                            {f.alteredUnprofiled.toLocaleString()} patient{f.alteredUnprofiled === 1 ? " has" : "s have"} a
+                            call for {f.gene} but sit on no panel covering it — a contradiction in the source data. They are
+                            counted as not profiled.
+                          </p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {chartTab === "derived" && (explore.events.length === 0 ? (
+                <p className="note" style={{ marginTop: 0 }}>This study has no clinical timeline events to derive a filter from.</p>
+              ) : (() => {
+                const tx = treatmentEventType();
+                const dr = parseDraft();
+                const leaves = ((dr && dr.all) || []);
+                const linesFacet = tx && explore.derived
+                  ? explore.derived.find((d) => d.metric === "lines" && d.eventType === tx.label) : null;
+                const naiveFirst = (): any => tx && ({ kind: "event",
+                  a: { eventType: tx.label, occurrence: "FIRST" }, rel: { type: "NONE" }, priorGuard: true });
+                const isNaiveFirst = tx && leaves.some((c: any) => c && c.kind === "event" &&
+                  c.a?.eventType === tx.label && c.a?.occurrence === "FIRST" && c.priorGuard === true);
+                const isLineBucket = (b: { gte?: number; lt?: number }) => tx && leaves.some((c: any) => c && c.kind === "derived" &&
+                  c.metric === "lines" && c.eventType === tx.label && (c.range || {}).gte === b.gte && (c.range || {}).lt === b.lt);
+                return (
+                  <div>
+                    {!tx && (
+                      <p className="note" style={{ margin: "0.3rem 0" }}>This study records no treatment-like timeline events, so there is no generic "lines" example to offer — build a custom sequence below instead.</p>
+                    )}
+                    {tx && !linesFacet && (
+                      <p className="note" style={{ margin: "0.3rem 0" }}>computing this study's line-count breakdown…</p>
+                    )}
+                    {tx && linesFacet && (() => {
+                      const max = Math.max(...linesFacet.buckets.map((b) => b.n), 1);
+                      return (
+                        <div style={{ margin: "0.3rem 0" }}>
+                          <span className="meta">{linesFacet.label} <span title={linesFacet.note}>· {linesFacet.covered.toLocaleString()} patients</span></span>
+                          <div className="vallist">
+                            {linesFacet.buckets.map((b) => (
+                              <button key={b.label} className={isLineBucket(b) ? "valrow on" : "valrow"}
+                                title={linesFacet.note + " — click to filter"}
+                                onClick={() => addClause({ kind: "derived", metric: "lines", eventType: tx!.label, lineGap: linesFacet.lineGap,
+                                  range: { ...(b.gte != null ? { gte: b.gte } : {}), ...(b.lt != null ? { lt: b.lt } : {}) } })}>
+                                <span className="vname">{b.label} line{b.label === "1" ? "" : "s"}</span>
+                                <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * b.n / max)) + "%" }} /></span>
+                                <span className="vn">{b.n.toLocaleString()}</span>
+                              </button>
+                            ))}
+                          </div>
+                          <button className={isNaiveFirst ? "facet on" : "facet"} style={{ marginTop: "0.4rem" }}
+                            title={"first '" + tx.label + "' event, with no treatment recorded before it — exact count shown once added"}
+                            onClick={() => addClause(naiveFirst())}>first '{tx.label}', treatment-naive</button>
+                        </div>
+                      );
+                    })()}
+                    <details className="gearmenu inline" ref={seqFilterMenu.ref} onToggle={seqFilterMenu.onToggle}>
+                      <summary title="build any A/B temporal relationship — followed-by, during, not-followed-by — with a duration constraint">custom…</summary>
+                      <div className="gearmenu-items wide">
+                        <span className="meta">one event, or two related in time — built from this study's own timeline</span>
+                        <div className="setrow">
+                          <span className="meta">event</span>
+                          <select value={seq.aType} onChange={e => setSeq(s => ({ ...s, aType: e.target.value }))}>
+                            <option value="">choose…</option>
+                            {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
+                            {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
+                              <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
+                            ))}
+                          </select>
+                          {seq.aType === LINE_TYPE ? (
+                            <>
+                              <select value={seq.aLineOp} onChange={e => setSeq(s => ({ ...s, aLineOp: e.target.value as any }))}>
+                                <option value="=">line #</option>
+                                <option value=">=">line ≥</option>
+                                <option value="<=">line ≤</option>
+                              </select>
+                              <input type="number" min={1} placeholder="n" value={seq.aLineNo}
+                                onChange={e => setSeq(s => ({ ...s, aLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
+                            </>
+                          ) : seq.aType && (
+                            <select value={seq.aOcc} onChange={e => setSeq(s => ({ ...s, aOcc: e.target.value as any }))}>
+                              <option value="ANY">any occurrence</option>
+                              <option value="FIRST">first</option>
+                              <option value="LAST">last</option>
+                            </select>
+                          )}
+                        </div>
+                        <div className="setrow">
+                          <span className="meta">relationship</span>
+                          <select value={seq.rel} onChange={e => setSeq(s => ({ ...s, rel: e.target.value as any }))}>
+                            <option value="NONE">just has this event</option>
+                            <option value="BEFORE">→ followed by, within</option>
+                            <option value="DURING">happens during</option>
+                            <option value="NOT_FOLLOWED_BY">not followed by, within</option>
+                          </select>
+                          {(seq.rel === "BEFORE" || seq.rel === "NOT_FOLLOWED_BY") && (
+                            <>
+                              <input type="number" min={1} value={seq.days}
+                                onChange={e => setSeq(s => ({ ...s, days: e.target.value }))} style={{ width: "4rem" }} />
+                              <span className="meta">days</span>
+                            </>
+                          )}
+                        </div>
+                        {seq.rel !== "NONE" && (
+                          <div className="setrow">
+                            <span className="meta">{seq.rel === "DURING" ? "during" : "second event"}</span>
+                            <select value={seq.bType} onChange={e => setSeq(s => ({ ...s, bType: e.target.value }))}>
+                              <option value="">choose…</option>
+                              {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
+                              {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
+                                <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
+                              ))}
+                            </select>
+                            {seq.bType === LINE_TYPE ? (
+                              <>
+                                <select value={seq.bLineOp} onChange={e => setSeq(s => ({ ...s, bLineOp: e.target.value as any }))}>
+                                  <option value="=">line #</option>
+                                  <option value=">=">line ≥</option>
+                                  <option value="<=">line ≤</option>
+                                </select>
+                                <input type="number" min={1} placeholder="n" value={seq.bLineNo}
+                                  onChange={e => setSeq(s => ({ ...s, bLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
+                              </>
+                            ) : seq.bType && (
+                              <select value={seq.bOcc} onChange={e => setSeq(s => ({ ...s, bOcc: e.target.value as any }))}>
+                                <option value="ANY">any occurrence</option>
+                                <option value="FIRST">first</option>
+                                <option value="LAST">last</option>
+                              </select>
+                            )}
+                          </div>
+                        )}
+                        {(seq.aType === LINE_TYPE || seq.bType === LINE_TYPE) && (
+                          <div className="setrow">
+                            <span className="meta">new line after</span>
+                            <select value={String(seq.lineGap)} onChange={e => setSeq(s => ({ ...s, lineGap: Number(e.target.value) }))}>
+                              {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
+                            </select>
+                          </div>
+                        )}
+                        <label className="chk" title="restricts the first event to patients with no treatment recorded before it">
+                          <input type="checkbox" checked={seq.priorGuard}
+                            onChange={e => setSeq(s => ({ ...s, priorGuard: e.target.checked }))} />
+                          treatment-naive before the first event
+                        </label>
+                        <hr />
+                        <button className="facet" disabled={!seqReady} onClick={addSeqFilter}>add filter</button>
+                      </div>
+                    </details>
+                  </div>
+                );
+              })())}
+              <div className="row" style={{ marginTop: "1rem", justifyContent: "flex-end" }}>
+                <button className="primary" onClick={() => addChartDialog.current?.close()}>Done</button>
+              </div>
+            </dialog>
+          )}
+          {SHOW_DERIVED_FACETS && explore && explore.derived && explore.derived.length > 0 && (
             <div className="card">
               <div className="row" style={{ alignItems: "baseline" }}>
                 <h2 style={{ margin: 0 }}>Derived <span className="plain">— computed from the data's shape, so these mean the same thing in any study</span></h2>
@@ -2943,188 +3148,7 @@ function Latency({ v }: { v: any }) {
               </div>
             </div>
           )}
-          {explore && explore.events.length > 0 && (() => {
-            const tx = treatmentEventType();
-            const dr = parseDraft();
-            const leaves = ((dr && dr.all) || []);
-            const linesFacet = tx && explore.derived
-              ? explore.derived.find((d) => d.metric === "lines" && d.eventType === tx.label) : null;
-            const naiveFirst = (): any => tx && ({ kind: "event",
-              a: { eventType: tx.label, occurrence: "FIRST" }, rel: { type: "NONE" }, priorGuard: true });
-            const isNaiveFirst = tx && leaves.some((c: any) => c && c.kind === "event" &&
-              c.a?.eventType === tx.label && c.a?.occurrence === "FIRST" && c.priorGuard === true);
-            const isLineBucket = (b: { gte?: number; lt?: number }) => tx && leaves.some((c: any) => c && c.kind === "derived" &&
-              c.metric === "lines" && c.eventType === tx.label && (c.range || {}).gte === b.gte && (c.range || {}).lt === b.lt);
-            return (
-              <div className="card">
-                <div className="row" style={{ alignItems: "baseline" }}>
-                  <h2 style={{ margin: 0 }}>Derived timeline filters <span className="plain">— found from a sequence of events, not a single recorded fact</span></h2>
-                </div>
-                {!tx && (
-                  <p className="note" style={{ margin: "0.3rem 0" }}>This study records no treatment-like timeline events, so there is no generic "lines" example to offer — build a custom sequence below instead.</p>
-                )}
-                {tx && !linesFacet && (
-                  <p className="note" style={{ margin: "0.3rem 0" }}>computing this study's line-count breakdown…</p>
-                )}
-                {tx && linesFacet && (() => {
-                  const max = Math.max(...linesFacet.buckets.map((b) => b.n), 1);
-                  return (
-                    <div style={{ margin: "0.3rem 0" }}>
-                      <span className="meta">{linesFacet.label} <span title={linesFacet.note}>· {linesFacet.covered.toLocaleString()} patients</span></span>
-                      <div className="vallist">
-                        {linesFacet.buckets.map((b) => (
-                          <button key={b.label} className={isLineBucket(b) ? "valrow on" : "valrow"}
-                            title={linesFacet.note + " — click to filter"}
-                            onClick={() => addClause({ kind: "derived", metric: "lines", eventType: tx!.label, lineGap: linesFacet.lineGap,
-                              range: { ...(b.gte != null ? { gte: b.gte } : {}), ...(b.lt != null ? { lt: b.lt } : {}) } })}>
-                            <span className="vname">{b.label} line{b.label === "1" ? "" : "s"}</span>
-                            <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * b.n / max)) + "%" }} /></span>
-                            <span className="vn">{b.n.toLocaleString()}</span>
-                          </button>
-                        ))}
-                      </div>
-                      <button className={isNaiveFirst ? "facet on" : "facet"} style={{ marginTop: "0.4rem" }}
-                        title={"first '" + tx.label + "' event, with no treatment recorded before it — exact count shown once added"}
-                        onClick={() => addClause(naiveFirst())}>first '{tx.label}', treatment-naive</button>
-                    </div>
-                  );
-                })()}
-                <details className="gearmenu inline" ref={seqFilterMenu.ref} onToggle={seqFilterMenu.onToggle}>
-                  <summary title="build any A/B temporal relationship — followed-by, during, not-followed-by — with a duration constraint">custom…</summary>
-                  <div className="gearmenu-items wide">
-                    <span className="meta">one event, or two related in time — built from this study's own timeline</span>
-                    <div className="setrow">
-                      <span className="meta">event</span>
-                      <select value={seq.aType} onChange={e => setSeq(s => ({ ...s, aType: e.target.value }))}>
-                        <option value="">choose…</option>
-                        {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
-                        {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
-                          <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
-                        ))}
-                      </select>
-                      {seq.aType === LINE_TYPE ? (
-                        <>
-                          <select value={seq.aLineOp} onChange={e => setSeq(s => ({ ...s, aLineOp: e.target.value as any }))}>
-                            <option value="=">line #</option>
-                            <option value=">=">line ≥</option>
-                            <option value="<=">line ≤</option>
-                          </select>
-                          <input type="number" min={1} placeholder="n" value={seq.aLineNo}
-                            onChange={e => setSeq(s => ({ ...s, aLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
-                        </>
-                      ) : seq.aType && (
-                        <select value={seq.aOcc} onChange={e => setSeq(s => ({ ...s, aOcc: e.target.value as any }))}>
-                          <option value="ANY">any occurrence</option>
-                          <option value="FIRST">first</option>
-                          <option value="LAST">last</option>
-                        </select>
-                      )}
-                    </div>
-                    <div className="setrow">
-                      <span className="meta">relationship</span>
-                      <select value={seq.rel} onChange={e => setSeq(s => ({ ...s, rel: e.target.value as any }))}>
-                        <option value="NONE">just has this event</option>
-                        <option value="BEFORE">→ followed by, within</option>
-                        <option value="DURING">happens during</option>
-                        <option value="NOT_FOLLOWED_BY">not followed by, within</option>
-                      </select>
-                      {(seq.rel === "BEFORE" || seq.rel === "NOT_FOLLOWED_BY") && (
-                        <>
-                          <input type="number" min={1} value={seq.days}
-                            onChange={e => setSeq(s => ({ ...s, days: e.target.value }))} style={{ width: "4rem" }} />
-                          <span className="meta">days</span>
-                        </>
-                      )}
-                    </div>
-                    {seq.rel !== "NONE" && (
-                      <div className="setrow">
-                        <span className="meta">{seq.rel === "DURING" ? "during" : "second event"}</span>
-                        <select value={seq.bType} onChange={e => setSeq(s => ({ ...s, bType: e.target.value }))}>
-                          <option value="">choose…</option>
-                          {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
-                          {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
-                            <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
-                          ))}
-                        </select>
-                        {seq.bType === LINE_TYPE ? (
-                          <>
-                            <select value={seq.bLineOp} onChange={e => setSeq(s => ({ ...s, bLineOp: e.target.value as any }))}>
-                              <option value="=">line #</option>
-                              <option value=">=">line ≥</option>
-                              <option value="<=">line ≤</option>
-                            </select>
-                            <input type="number" min={1} placeholder="n" value={seq.bLineNo}
-                              onChange={e => setSeq(s => ({ ...s, bLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
-                          </>
-                        ) : seq.bType && (
-                          <select value={seq.bOcc} onChange={e => setSeq(s => ({ ...s, bOcc: e.target.value as any }))}>
-                            <option value="ANY">any occurrence</option>
-                            <option value="FIRST">first</option>
-                            <option value="LAST">last</option>
-                          </select>
-                        )}
-                      </div>
-                    )}
-                    {(seq.aType === LINE_TYPE || seq.bType === LINE_TYPE) && (
-                      <div className="setrow">
-                        <span className="meta">new line after</span>
-                        <select value={String(seq.lineGap)} onChange={e => setSeq(s => ({ ...s, lineGap: Number(e.target.value) }))}>
-                          {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
-                        </select>
-                      </div>
-                    )}
-                    <label className="chk" title="restricts the first event to patients with no treatment recorded before it">
-                      <input type="checkbox" checked={seq.priorGuard}
-                        onChange={e => setSeq(s => ({ ...s, priorGuard: e.target.checked }))} />
-                      treatment-naive before the first event
-                    </label>
-                    <hr />
-                    <button className="facet" disabled={!seqReady} onClick={addSeqFilter}>add filter</button>
-                  </div>
-                </details>
-              </div>
-            );
-          })()}
           {explore && <>
-            {/* Toolbar for the facet grid below, not a tile in it — the search and
-                coverage controls apply across every clinical attribute at once, so they
-                sit above the grid the way "Add a view" sits above the Analysis cards. */}
-            <div className="card">
-              {(() => {
-                const visible = visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical;
-                const shown = Math.min(visible.length, attrLimit);
-                return (
-                  <div className="row" style={{ alignItems: "baseline" }}>
-                    <h2 style={{ margin: 0 }}>Clinical <span className="plain">— counted in each attribute's own unit, as the portal does</span></h2>
-                    <span className="spacer" />
-                    <input className="genesearch" type="search" placeholder="find attribute or value" value={clinFilter}
-                      title="matches an attribute's name or any of its values"
-                      onChange={e => setClinFilter(e.target.value)} />
-                    <span className="meta">{shown < visible.length
-                      ? "showing " + shown + " of " + visible.length + " attributes"
-                      : visible.length + " attributes"}
-                      {attrCoverage > 0 && visible.length < explore.clinical.length
-                        ? " (" + (explore.clinical.length - visible.length) + " hidden as study-specific)" : ""}</span>
-                    {exStudies.length > 1 && (
-                      <select value={String(attrCoverage)} disabled={exploreBusy}
-                        title="attributes carried by only one study are that study's own vocabulary, not something the selection shares"
-                        onChange={e => {
-                          const v = Number(e.target.value);
-                          setAttrCoverage(v);
-                          // Refetch UNNARROWED so the bar can be lowered again
-                          // later; the filtering below is what the reader sees,
-                          // and subsequent fetches narrow the server's work.
-                          setTimeout(() => fetchExplore(undefined, undefined, []), 0);
-                        }}>
-                        <option value="0">every attribute</option>
-                        <option value="0.5">in most studies</option>
-                        <option value="1">in every study</option>
-                      </select>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
             <div className="facetgrid">
               {(visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical)
                 .slice(0, attrLimit).map(c => (

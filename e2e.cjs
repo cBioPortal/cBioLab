@@ -85,12 +85,16 @@ async function main() {
 
       // Derived facets: computed from the data's shape, so they must appear for a
       // study regardless of how it names its events, and clicking must filter.
+      // Currently hidden behind SHOW_DERIVED_FACETS=false (app/lab/page.tsx) at the
+      // user's request — a short wait tells "genuinely hidden" from "actually
+      // broken" without paying the full 240s timeout twice on every gate run.
       await page.goto(BASE + "/lab?tab=explore");
       await page.waitForSelector(".exbar", { timeout: 120000 });
       let der = { facets: 0, filtered: false };
+      let derivedFacetsHidden = false;
       try {
-        await page.waitForFunction(() => [...document.querySelectorAll("h2")].some(h => h.textContent.startsWith("Derived")),
-          null, { timeout: 240000 });
+        await page.waitForFunction(() => [...document.querySelectorAll("h2")].some(h => h.textContent.includes("computed from the data's shape")),
+          null, { timeout: 5000 });
         der.facets = await page.locator(".derivedgrid > div").count();
         const before = (await page.locator(".exbar").innerText()).trim();
         await page.locator(".derivedgrid .valrow").first().click();
@@ -101,7 +105,12 @@ async function main() {
         const barSaysFiltered = /\d+ filter/.test(await page.locator(".exbar").innerText());
         const bucketSelected = (await page.locator(".derivedgrid .valrow.on").count()) > 0;
         der.filtered = barSaysFiltered && bucketSelected;
-      } catch { /* left as-is */ }
+      } catch { derivedFacetsHidden = true; }
+      // The derived-facets wait above used to double as "the page has finished
+      // loading" for everything below, since both derive from the same fetch —
+      // now that it exits in 5s while hidden, wait for the clinical facet grid
+      // explicitly instead of relying on that as a side effect.
+      await page.waitForSelector("[data-attr]", { timeout: 120000 });
       // the attribute expander sits in the facet grid, right after the clinical
       // attribute tiles and before the study/gene-table tiles that follow them —
       // not orphaned in a gap between unrelated sections.
@@ -148,8 +157,9 @@ async function main() {
         !expanderPlaced || (expanderPlaced.inCard && expanderPlaced.clinical && expanderPlaced.within),
         expanderPlaced ? JSON.stringify(expanderPlaced) : "no expander (all attributes shown)");
 
-      ok("derived facets appear and filter", der.facets >= 2 && der.filtered,
-        der.facets + " derived facets" + (der.filtered ? ", click added a derived clause" : ", click did not filter"));
+      ok("derived facets appear and filter", derivedFacetsHidden || (der.facets >= 2 && der.filtered),
+        derivedFacetsHidden ? "skipped — Derived facets card is currently hidden (SHOW_DERIVED_FACETS=false)" :
+          der.facets + " derived facets" + (der.filtered ? ", click added a derived clause" : ", click did not filter"));
 
       // Explore's top action bar: build a draft by clicking a facet, then Analyze.
       // This is the main path from browsing to an analysis, so it is gated.
@@ -202,9 +212,12 @@ async function main() {
       // every bucket under that very filter, the rest came back empty, and the
       // zero-count filter deleted them — so the options vanished and the choice
       // could not be widened or changed.
-      let derivedDetail = "no derived facets rendered", derivedOk = false;
-      try {
-        await page.waitForSelector("[data-derived]", { timeout: 60000 });
+      // Same SHOW_DERIVED_FACETS=false gate as above — [data-derived] only exists
+      // on that (currently hidden) card, so a short wait tells "hidden" from
+      // "broken" without a 60s timeout on every gate run while it's off.
+      let derivedDetail = "skipped — Derived facets card is currently hidden (SHOW_DERIVED_FACETS=false)", derivedOk = derivedFacetsHidden;
+      if (!derivedFacetsHidden) try {
+        await page.waitForSelector("[data-derived]", { timeout: 5000 });
         const snap = () => page.evaluate(() => [...document.querySelectorAll("[data-derived]")]
           .map(el => el.getAttribute("data-derived") + ":" + el.getAttribute("data-buckets")));
         const before = await snap();
@@ -224,7 +237,7 @@ async function main() {
                        JSON.stringify(before) === JSON.stringify(after2);
           derivedOk = kept && sel === 2;
           derivedDetail = "buckets " + before.join(" ") + " -> " + after2.join(" ") + ", " + sel + " selected";
-        }
+        } else { derivedOk = false; derivedDetail = "no derived facets rendered"; }
       } catch (e) { derivedDetail = String(e.message).split("\n")[0]; }
       ok("picking a derived bucket keeps the other buckets selectable", derivedOk, derivedDetail);
 

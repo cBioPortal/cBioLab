@@ -727,16 +727,21 @@ details.gearmenu.inline[open] > summary {
 
 /* Name-a-cohort dialog. Native <dialog>, so Esc, focus trapping and the
    backdrop are the platform's rather than ours. */
-.namedialog, .genedialog, .docdialog, .exportdialog {
+.namedialog, .genedialog, .docdialog, .exportdialog, .addchartdialog {
   border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card);
   color: var(--ink); padding: 1rem 1.1rem; min-width: 20rem; max-width: 26rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
 }
-.namedialog::backdrop, .genedialog::backdrop, .docdialog::backdrop, .exportdialog::backdrop { background: rgba(0, 0, 0, 0.32); }
-.namedialog h3, .genedialog h3, .docdialog h3, .exportdialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
+.namedialog::backdrop, .genedialog::backdrop, .docdialog::backdrop, .exportdialog::backdrop, .addchartdialog::backdrop { background: rgba(0, 0, 0, 0.32); }
+.namedialog h3, .genedialog h3, .docdialog h3, .exportdialog h3, .addchartdialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
 /* The document's JSON, run/clear controls and generated SQL — wide enough for
    both, and tall enough to scroll internally rather than push past the viewport. */
 .docdialog { width: min(90vw, 48rem); max-width: 48rem; max-height: 85vh; overflow: auto; }
+/* Explore's "+ Add chart": one tab per filter kind (clinical/gene/derived-timeline),
+   each of which used to be its own permanent card above the facet grid — wide enough
+   for the busiest of the three (the custom sequence builder's several setrows). */
+.addchartdialog { width: min(92vw, 46rem); max-width: 46rem; max-height: 85vh; overflow: auto; }
+.addchartdialog .tabs { margin-bottom: 0.8rem; }
 .namedialog .meta { display: block; margin-bottom: 0.6rem; }
 .namedialog input { width: 100%; box-sizing: border-box; }
 .genedialog { min-width: 24rem; max-width: 30rem; }
