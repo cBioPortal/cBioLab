@@ -316,6 +316,9 @@ async function pathwaysView(view: PathwaysView, ctx: ViewCtx): Promise<ViewResul
   if (!drawn.length) return refuse("pathways", ctx, "no pathway or set to draw");
   const allGenes = [...new Set(drawn.flatMap((p) => p.genes.map((g) => g.gene)))];
 
+  const emptyCohorts = vNames.filter((n) => !cohorts[n].count);
+  if (emptyCohorts.length) return refuse("pathways", ctx, "nothing to count: cohort " + emptyCohorts.map((n) => "“" + n + "”").join(" and ") +
+    (emptyCohorts.length === 1 ? " is" : " are") + " empty — check its definition; the genes are not the problem");
   const { ok, excluded } = answering(ctx);
   if (!Object.keys(ok).length) return refuse("pathways", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
   // per cohort: gene counts and set counts, summed across studies (both halves are additive)
