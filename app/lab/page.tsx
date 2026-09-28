@@ -1524,6 +1524,11 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     const next = { ...v };
     if (names.length && names.length < all.length) next.cohorts = all.filter((n) => names.includes(n));
     else delete next.cohorts;
+    // splitBy always targets the view's own single chosen cohort (no picker of its own — see
+    // SplitByControl) — so narrowing to exactly one carries an existing split along to it,
+    // same attribute/gene/oql, rather than leaving it pointed at whatever it last targeted.
+    if (next.splitBy && names.length === 1 && next.splitBy.cohort !== names[0])
+      next.splitBy = { ...next.splitBy, cohort: names[0] };
     return next;
   });
   const setViewAttrs = (vi: number, attributes: string[]) => updateView(vi, (v: any) => ({ ...v, attributes }));
@@ -1802,26 +1807,29 @@ function ViewHelpButton({ kind, menuId, menuStore }: { kind: string; menuId: str
 }
 
 /**
- * "split by" in a view's header: auto-split one named cohort into an arm per value of a
- * categorical attribute, instead of hand-writing one cohort per value. The arms are computed
- * server-side (lib/cohort-splitby.ts) and never added to the document's own cohort list — this
- * control only ever patches the view's own `splitBy` field. `cohortNames` reuses whatever the
- * header's own cohort picker already has on hand, so this needs no new per-call-site data beyond
- * the attribute catalog every view already fetches for its own axis pickers.
+ * "split by" in a view's header: auto-split the view's own single selected cohort into an arm
+ * per value of a categorical attribute, per a gene's mutation status, or per a list of OQL
+ * queries. The arms are computed server-side (lib/cohort-splitby.ts) and never added to the
+ * document's own cohort list — this control only ever patches the view's own `splitBy` field.
+ * No cohort picker of its own: splitBy can only ever target ONE cohort, and the view's own
+ * cohorts picker already does exactly that job, so a second, independent picker here would just
+ * silently override the first the moment both were touched. Disabled (with a title saying why)
+ * whenever that picker doesn't currently resolve to exactly one cohort.
+ *
+ * The "split on" mode toggle is pure local UI state — it does NOT call `onChange` by itself (an
+ * earlier version did, which cleared the split and re-ran the query on every toggle click;
+ * re-running remounts this component, which reset the toggle right back — the mode selection
+ * could never stick). Only an actual selection (an attribute chosen, a gene or oql list
+ * submitted) replaces whatever split was there before.
  */
-/**
- * "split by" in a view's header: auto-split one named cohort into an arm per value of a
- * categorical attribute, OR per a gene's mutation status — two different data sources (a
- * clinical attribute vs. an OQL mutation call) behind one control, since both answer the same
- * felt need ("give me groups without hand-writing cohort JSON") and a reader has no reason to
- * know in advance which mechanism a given split needs. The "split on" toggle is pure local UI
- * state — it does NOT call `onChange` by itself (an earlier version did, which cleared the
- * split and re-ran the query on every toggle click; re-running remounts this component, which
- * reset the toggle right back — the mode selection could never stick). Only an actual
- * selection (an attribute chosen, a gene submitted) replaces whatever split was there before.
- */
-function SplitByControl({ current, cohortNames, attrs, busy, menuId, menuStore, onChange }: {
-  current?: SplitBy; cohortNames: string[]; attrs: { attribute: string; kind: string }[]; busy?: boolean;
+function SplitByControl({ current, cohort, attrs, busy, menuId, menuStore, onChange }: {
+  current?: SplitBy;
+  /** the view's own single selected cohort — the only thing splitBy ever targets, so there's no
+   *  separate cohort picker here; `undefined` when the view's cohorts picker has 0 or 2+ chosen
+   *  (splitBy needs exactly one to make sense of, so the control disables rather than offering a
+   *  second, independent way to pick a cohort that would silently override the first). */
+  cohort?: string;
+  attrs: { attribute: string; kind: string }[]; busy?: boolean;
   menuId: string; menuStore: Map<string, boolean>; onChange: (next: SplitBy | undefined) => void;
 }) {
   const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
@@ -1829,8 +1837,17 @@ function SplitByControl({ current, cohortNames, attrs, busy, menuId, menuStore, 
   const [mode, setMode] = useState<"attribute" | "gene" | "oql">(current?.gene ? "gene" : current?.oql ? "oql" : "attribute");
   const [geneDraft, setGeneDraft] = useState(current?.gene || "");
   const [oqlDraft, setOqlDraft] = useState((current?.oql || []).join("\n"));
-  if (!cohortNames.length) return null;
-  const cohort = current?.cohort ?? cohortNames[0];
+  const label = current ? "split: " + (current.gene || current.attribute || (current.oql && current.oql.length + " OQL quer" + (current.oql.length === 1 ? "y" : "ies"))) : "+ split by";
+  if (!cohort) {
+    return (
+      <button type="button" className="tbbtn" disabled
+        title={current
+          ? "splitting “" + current.cohort + "” — narrow the cohorts picker above to exactly that one to edit this split"
+          : "split needs exactly one cohort chosen above — narrow the cohorts picker to one first"}>
+        {label}
+      </button>
+    );
+  }
   const applyGene = () => {
     const g = geneDraft.trim().toUpperCase();
     if (g) onChange({ cohort, gene: g });
@@ -1841,16 +1858,13 @@ function SplitByControl({ current, cohortNames, attrs, busy, menuId, menuStore, 
   };
   return (
     <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title="auto-split one cohort into an arm per value of an attribute, per a gene's mutation status, or per a list of OQL queries — live from the data">
-        {current ? "split: " + (current.gene || current.attribute || (current.oql && current.oql.length + " OQL quer" + (current.oql.length === 1 ? "y" : "ies"))) : "+ split by"}
+      <summary className="tbbtn" title="auto-split this cohort into an arm per value of an attribute, per a gene's mutation status, or per a list of OQL queries — live from the data">
+        {label}
       </summary>
       <div className="gearmenu-items">
         <div className="setrow">
           <span className="meta">cohort</span>
-          <select value={cohort} disabled={busy}
-            onChange={(e) => onChange(current ? { ...current, cohort: e.target.value } : undefined)}>
-            {cohortNames.map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
+          <span>{cohort}</span>
         </div>
         <div className="setrow">
           <span className="meta">split on</span>
@@ -1903,7 +1917,7 @@ function SplitByControl({ current, cohortNames, attrs, busy, menuId, menuStore, 
           <span className="meta">max arms</span>
           <input type="number" min={2} max={8} disabled={busy} style={{ width: "4rem" }}
             value={current.maxArms ?? 8}
-            onChange={(e) => onChange({ ...current, maxArms: e.target.value ? Number(e.target.value) : undefined })}
+            onChange={(e) => onChange({ ...current, cohort, maxArms: e.target.value ? Number(e.target.value) : undefined })}
             title="at most this many arms, including a pooled &quot;Other&quot; for whatever doesn't fit" />
         </div>}
         {current && <button type="button" className="linklike" onClick={() => onChange(undefined)}>remove split</button>}
@@ -1984,8 +1998,9 @@ function ViewHead({ v, title, sub, actions, chips, cohorts, splitBy, onMoveUp, o
   onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void; onEditNote?: () => void; menuStore: Map<string, boolean>;
   /** which cohorts this view draws; absent when the document has only one */
   cohorts?: { chosen: string[]; all: string[]; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void };
-  /** auto-split one cohort into an arm per attribute value; reuses `cohorts.all`/`.busy` above */
-  splitBy?: { current?: SplitBy; attrs: { attribute: string; kind: string }[]; onChange: (next: SplitBy | undefined) => void };
+  /** auto-split the view's own single selected cohort into an arm per attribute value; no
+   *  cohort of its own to pick — see SplitByControl's `cohort` prop */
+  splitBy?: { current?: SplitBy; cohort?: string; attrs: { attribute: string; kind: string }[]; onChange: (next: SplitBy | undefined) => void };
 }) {
   const menuKey = cohorts?.viewKey ?? "vh";
   return (
@@ -2000,8 +2015,8 @@ function ViewHead({ v, title, sub, actions, chips, cohorts, splitBy, onMoveUp, o
               onChange={cohorts.onChange} min={1} max={cohorts.max} busy={cohorts.busy} menuId={"pick:" + menuKey} menuStore={menuStore} />
           )}
           {splitBy && cohorts && (
-            <SplitByControl current={splitBy.current} cohortNames={cohorts.all} attrs={splitBy.attrs} busy={cohorts.busy}
-              menuId={"split:" + menuKey} menuStore={menuStore} onChange={splitBy.onChange} />
+            <SplitByControl {...splitBy} busy={cohorts.busy}
+              menuId={"split:" + menuKey} menuStore={menuStore} />
           )}
           {actions}
           {chips}
@@ -2108,9 +2123,15 @@ function Latency({ v }: { v: any }) {
   };
 
   /** "split by" for a view's own ViewHead — reuses the same attribute catalog every axis
-   *  picker already fetches, patches just this one view's `splitBy` field. */
-  const splitByChoice = (vi: number, v: any) =>
-    ({ current: v.splitBy as SplitBy | undefined, attrs: catalogAttrs(), onChange: (next: SplitBy | undefined) => patchView(vi, { splitBy: next }) });
+   *  picker already fetches, patches just this one view's `splitBy` field. `cohort` is the
+   *  view's own single selected cohort (from the same picker `cohortChoice` feeds) — splitBy
+   *  has no picker of its own, since it can only ever target that one cohort; `undefined` when
+   *  0 or 2+ are chosen disables the control rather than offering a second, independent choice. */
+  const splitByChoice = (vi: number, v: any) => {
+    const chosen = cohortChoice(vi, v).chosen;
+    return { current: v.splitBy as SplitBy | undefined, cohort: chosen.length === 1 ? chosen[0] : undefined,
+      attrs: catalogAttrs(), onChange: (next: SplitBy | undefined) => patchView(vi, { splitBy: next }) };
+  };
 
   /** the view at index vi, read as an oncoprint view (its editor only renders there) */
   const ocView = (vi: number): OncoprintView => ((doc.views || [])[vi] || {}) as OncoprintView;
@@ -4412,7 +4433,7 @@ function Latency({ v }: { v: any }) {
                         options={Object.keys((result && result.cohorts) || {}).map((n) => ({ value: n, label: n }))}
                         chosen={cohortChoice(vi, docView(vi)).chosen} min={1}
                         onChange={(next) => setViewCohorts(vi, next, Object.keys((result && result.cohorts) || {}))} />
-                      <SplitByControl {...splitByChoice(vi, docView(vi))} cohortNames={Object.keys((result && result.cohorts) || {})} busy={busy}
+                      <SplitByControl {...splitByChoice(vi, docView(vi))} busy={busy}
                         menuId={"split:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} />
                     <details className="gearmenu inline">
                       <summary title="clinical course options">settings</summary>
