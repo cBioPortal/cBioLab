@@ -41,6 +41,17 @@ export default function ReproductionsPage() {
           drift slightly as the warehouse reloads, which each view's own caveat discloses rather
           than something this page freezes in place.
         </p>
+        <p className="lede" style={{ marginTop: "var(--s3)" }}>
+          Reassessed on 28 September 2026, after eight new view kinds landed. Three papers moved:
+          Jonsson's 1p/19q co-deletion, blocked until now, reproduces from the copy-number segments,
+          alongside its cell-cycle and recurrence findings; Razavi's endocrine-resistance genes
+          (ESR1, NF1, ERBB2) reproduce against the closest proxy the study records; and Jee's
+          tissue-versus-plasma finding is compared within patients. The rest were checked and are
+          unchanged. The sarcoma study still has no copy-number data, and gastric cancer's
+          immunotherapy outcomes are too sparse and oddly coded. Endometrial survival is simply not
+          significant on this release. The prostate race analysis still needs a comparison held
+          within a second attribute (stage), which none of the new views provides.
+        </p>
         <div className="repro-tiles">
           <div className="repro-tile"><span className="n">{REPRODUCTIONS.length}</span><span className="l">papers</span></div>
           <div className="repro-tile ok"><span className="n">{counts.full || 0}</span><span className="l">fully reproduced</span></div>

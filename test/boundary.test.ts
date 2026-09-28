@@ -118,6 +118,15 @@ describe("aggregate-only resolvers cannot expose patient-level data", () => {
     assert.equal(typeof (pl as unknown as { members?: unknown }).members, "function");
   });
 
+  test("the per-patient rows behind a waterfall are the same kind of missing method", () => {
+    assert.equal(typeof (agg as unknown as { moreRows?: unknown }).moreRows, "undefined");
+    assert.equal(typeof (pl as unknown as { moreRows?: unknown }).moreRows, "function");
+    // and a remote peer answers neither the per-patient rows nor the new aggregates
+    const remote = RemoteAggregateResolver.prototype as unknown as { moreRows?: unknown; moreAggregate?: unknown };
+    assert.equal(typeof remote.moreRows, "undefined");
+    assert.equal(typeof remote.moreAggregate, "undefined");
+  });
+
   test("isPatientLevel discriminates correctly", () => {
     assert.equal(isPatientLevel(agg), false);
     assert.equal(isPatientLevel(pl), true);
@@ -203,6 +212,9 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   const catAxis2 = axisSelect({ source: "alteration", gene: "TP53", by: "mutationType" }, axisCtx, "cat");
   const catAxisGeneSet = axisSelect({ source: "alteration", genes: ["TP53", "KRAS", "APC"], by: "mutated" }, axisCtx, "cat");
 
+  const LAB = { eventType: "Lab_Test", testKey: "TEST", test: "PSA", resultKey: "RESULT" };
+  const LAB_ANCHOR = { eventType: "Treatment", key: "SUBTYPE", value: "Hormone", occurrence: "FIRST" as const };
+  const LAB_OPTS = { baselineDays: 90, fromDays: -84, toDays: 364, binDays: 28 };
   const BUILDERS: Record<string, () => string> = {
     // Plots: an axis selects (id, value) per case, but every builder here groups the id away.
   // If one ever projected a case id, this suite is what would stop it reaching a peer.
@@ -263,7 +275,42 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "coxRowsSql:customColumns": () => coxRowsSql(cohortSql, "x", "db", "CUSTOM", [{ label: "c0", sel: catAxis }], { months: "PFS_MONTHS_FIRST_LINE_TX", status: "PROGRESSION_STATUS" }),
     // Same shape as coxRowsSql: the outcome is just another axis-selected CTE, joined the same
     // way — no identifier ever reaches the outer SELECT here either.
-    "logisticRowsSql": () => logisticRowsSql(cohortSql, { label: "y0", sel: catAxis }, [{ label: "c0", sel: numAxis }])
+    "logisticRowsSql": () => logisticRowsSql(cohortSql, { label: "y0", sel: catAxis }, [{ label: "c0", sel: numAxis }]),
+    // lib/federation-more.ts, re-exported through lib/federation.ts: the genome view's bins group
+    // the sample id away inside `binned`; only (chrom, bin) and counts cross.
+    "genomeBinsSql": () => federation.genomeBinsSql(cohortSql, "x", "db", { binBp: 2e6, threshold: 0.2, includeX: false }),
+    "genomeBinsSql:withX": () => federation.genomeBinsSql(cohortSql, "x", "db", { binBp: 1e6, threshold: 0.3, includeX: true }),
+    "genomeCoverageSql": () => federation.genomeCoverageSql(cohortSql, "x", "db"),
+    "studyGenomeSql": () => federation.studyGenomeSql("x", "db"),
+    // pathways: `per` holds (set, patient) rows, but the outer SELECT only counts them per set
+    "geneSetCountsSql": () => federation.geneSetCountsSql(cohortSql, [{ name: "RTK-RAS", genes: ["KRAS", "NRAS"] }, { name: "TP53", genes: ["TP53"] }], "x", "v7.5", "db"),
+    "geneSetCountsSql:no-annotation-pin": () => federation.geneSetCountsSql(cohortSql, [{ name: "set", genes: ["APC"] }], "x", null, "db"),
+    // diffexpr: `vals` is per (patient, gene); only per-gene totals leave
+    "profileMomentsAllSql": () => federation.profileMomentsAllSql(cohortSql, "x", "db", "rna_seq_v2_mrna_median_Zscores", false),
+    "profileMomentsAllSql:log2": () => federation.profileMomentsAllSql(cohortSql, "x", "db", "rna_seq_v2_mrna", true),
+    // gene-set membership is reference data, not patient data — no cohort at all
+    "genesetMembersSql": () => federation.genesetMembersSql(["HALLMARK_E2F_TARGETS"], null, "db"),
+    "genesetMembersSql:prefix": () => federation.genesetMembersSql([], "HALLMARK_", "db"),
+    // paired: `ps`/`per` hold samples and patients; the outer SELECT counts them per gene
+    "pairedCountsSql": () => federation.pairedCountsSql(cohortSql, "x", "db", ["TP53", "ESR1"], { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }, "v7.5", "driver"),
+    "pairedCountsSql:any": () => federation.pairedCountsSql(cohortSql, "x", "db", ["TP53"], { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis", "Recurrence"] }, null, "any"),
+    "pairedPatientsSql": () => federation.pairedPatientsSql(cohortSql, "x", "db", { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }),
+    "sampleAttributeValuesSql": () => federation.sampleAttributeValuesSql(cohortSql, "x", "db", "SAMPLE_TYPE"),
+    // clonality: `calls` is per (gene, sample); only per-gene counts and CCF bins leave
+    "clonalityGenesSql": () => federation.clonalityGenesSql(cohortSql, "x", "db", ["TP53"], "v7.5", "driver", true),
+    "clonalityGenesSql:any-noqc": () => federation.clonalityGenesSql(cohortSql, "x", "db", ["TP53", "KRAS"], null, "any", false),
+    "facetsSummarySql": () => federation.facetsSummarySql(cohortSql, "x", "db", true),
+    "facetsHistogramSql": () => federation.facetsHistogramSql(cohortSql, "x", "db", false),
+    "ascnStudiesSql": () => federation.ascnStudiesSql("x", "db"),
+    // incidence: `per`/`cls` are per patient; the outer SELECT groups them into (kind, entry, t, cause) tallies
+    "incidenceCountsSql": () => federation.incidenceCountsSql(cohortSql, "x", "db", { eventType: "Diagnosis", attrs: [{ key: "TUMOR_SITE", value: "CNS/Brain" }] }, null),
+    "incidenceCountsSql:anchored": () => federation.incidenceCountsSql(cohortSql, "x", "db", { eventType: "Status" }, { eventType: "Treatment", key: "SUBTYPE", value: "Chemo", occurrence: "FIRST" }),
+    // labs: per-patient % changes stay inside; the course and best-response queries return histograms
+    "labCourseSql": () => federation.labCourseSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS),
+    "labBestSql": () => federation.labBestSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS, 50),
+    // one row per patient — its best % change — but no identifier; run only by PatientLevelResolver.moreRows
+    "labWaterfallSql": () => federation.labWaterfallSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS, 5000),
+    "labTestsSql": () => federation.labTestsSql(cohortSql, "x", "db", "Lab_Test", "TEST")
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

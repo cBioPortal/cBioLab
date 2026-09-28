@@ -21,57 +21,9 @@ import { categoryColor, isAbsent, jitterFor } from "./plot.ts";
 import { IMPACT_COLORS } from "./lollipop.ts";
 import { survivalAxis } from "./stats.ts";
 import type { ViewResult, KmCurve, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind, PlotData } from "./types.ts";
-
-/** Cohort names and data values reach <text>; they must never reach it raw. */
-export const esc = (s: unknown): string =>
-  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
-export const SERIES = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
-const INK = "var(--ink, #16232b)";
-const MUTED = "var(--muted, #5b6b76)";
-const LINE = "var(--line, #dde4e8)";
-const BG = "var(--bg, #ffffff)";
-
-export interface SvgOpts { width?: number; theme?: "auto" | "light" }
-
-/** Palette resolution: "light" bakes literals in, for rasterising outside the app. */
-function palette(theme: SvgOpts["theme"]) {
-  return theme === "light"
-    ? { ink: "#16232b", muted: "#5b6b76", line: "#dde4e8", bg: "#ffffff" }
-    : { ink: INK, muted: MUTED, line: LINE, bg: BG };
-}
-
-const num = (n: number): string => (Math.round(n * 100) / 100).toString();
-const fmt = (n: number): string => n.toLocaleString("en-US");
-const pFmt = (p: number): string => p === 0 ? "p < 1e-300" : p < 1e-4 ? "p=" + p.toExponential(1) : "p=" + p.toFixed(4);
-
-/**
- * `grown`: the renderer widened the figure past the width it was asked for, to fit every group
- * or category rather than drop some. Such a figure must not be scaled back down to the
- * container (every label would shrink below legibility), so it keeps its width as a minimum and
- * the container scrolls. A figure at its requested width still scales to fit, as before.
- */
-function frame(w: number, h: number, body: string, bg: string, grown = false): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" ` +
-    `style="max-width:${w}px;${grown ? `min-width:${w}px;` : ""}height:auto;display:block;font-family:'IBM Plex Sans',system-ui,sans-serif">` +
-    `<rect width="${w}" height="${h}" fill="${bg}"/>${body}</svg>`;
-}
-
-/** Wrapped caption lines — the caveat travels WITH the figure, never separately. */
-function caption(text: string, w: number, y0: number, muted: string, perLine = 96): { svg: string; height: number } {
-  const words = String(text).split(/\s+/);
-  const lines: string[] = [];
-  let line = "";
-  for (const word of words) {
-    if ((line + " " + word).trim().length > perLine) { lines.push(line.trim()); line = word; }
-    else line += " " + word;
-  }
-  if (line.trim()) lines.push(line.trim());
-  return {
-    svg: lines.map((l, i) => `<text x="8" y="${y0 + 12 + i * 13}" font-size="10" fill="${muted}">${esc(l)}</text>`).join(""),
-    height: lines.length * 13 + 8
-  };
-}
+import { moreViewToSvg, moreViewTitle } from "./view-svg-more.ts";
+import { esc, SERIES, palette, num, fmt, pFmt, frame, caption, type SvgOpts } from "./svg-kit.ts";
+export { esc, SERIES, type SvgOpts };
 
 // ---------------------------------------------------------------------------
 
@@ -847,7 +799,7 @@ export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {
   if (v.kind === "compare" && v.rows && v.rows.length) return compareSvg(v, o);
   if (v.kind === "coexpression" && v.coexpression && v.coexpression.length) return coexpressionSvg(v, o);
   if (v.kind === "clinical" && v.clinical && v.clinical.some((r) => !r.skipped)) return clinicalSvg(v, o);
-  return null;
+  return moreViewToSvg(v, o);
 }
 
 /** A one-line title for a figure, for alt text and chat captions. */
@@ -865,6 +817,6 @@ export function viewTitle(v: ViewResult): string {
     : v.kind === "course" ? "Clinical course" +
         (v.course && v.course.length ? " — " + [...new Set(v.course.map((z) => z.eventType))].join(", ") : "")
     : v.kind === "compare" ? "Alteration frequencies"
-    : v.kind === "oncoprint" ? "Oncoprint" : v.kind;
+    : v.kind === "oncoprint" ? "Oncoprint" : moreViewTitle(v) || v.kind;
   return c ? base + " — " + c : base;
 }

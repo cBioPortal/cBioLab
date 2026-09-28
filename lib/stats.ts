@@ -974,3 +974,276 @@ export function kruskalWallis(histograms: Histogram[][]): KruskalWallisTest {
   const df = k - 1;
   return { h: Math.round(h * 1e4) / 1e4, df, p: chiSquareP(h, df) };
 }
+
+// ---------------------------------------------------------------------------
+// Preranked gene-set enrichment (Subramanian et al., PNAS 2005)
+
+/** A small seeded PRNG (mulberry32), so a permutation null is the same on every run. */
+export function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** A stable 32-bit seed from a string (FNV-1a). */
+export function seedOf(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+
+/**
+ * The enrichment score of a set whose members sit at `positions` (0-based, ascending) in a
+ * ranking of `n` genes, each weighted by |score| (weight exponent 1, the GSEA default). The
+ * running sum rises by w/ΣW at a member and falls by 1/(n-k) at a non-member, so its maximum
+ * is reached just after a member and its minimum just before one (or at the end) — which is
+ * why this needs only the k member positions, not a walk over all n genes.
+ */
+export function enrichmentScore(positions: ArrayLike<number>, weights: ArrayLike<number>, n: number): number {
+  const k = positions.length;
+  if (!k || k >= n) return 0;
+  let nr = 0;
+  for (let i = 0; i < k; i++) nr += weights[i];
+  // all-zero weights: fall back to the unweighted (Kolmogorov–Smirnov) walk
+  const unweighted = !(nr > 0);
+  if (unweighted) nr = k;
+  const miss = 1 / (n - k);
+  let cum = 0, best = 0;
+  for (let i = 0; i < k; i++) {
+    const before = cum / nr - (positions[i] - i) * miss;           // just before this member
+    if (Math.abs(before) > Math.abs(best)) best = before;
+    cum += unweighted ? 1 : weights[i];
+    const after = cum / nr - (positions[i] + 1 - (i + 1)) * miss; // just after it
+    if (Math.abs(after) > Math.abs(best)) best = after;
+  }
+  return best;
+}
+
+export interface GseaResult {
+  name: string;
+  /** members found in the ranking, of the set's full size */
+  size: number; setSize: number;
+  es: number; nes: number;
+  /** permutation p, (b + 1) / (m + 1) over the m null sets of the same sign (never exactly 0) */
+  p: number;
+  /** members ranked at or before the peak (after it, for a negative score) */
+  leadingEdge: string[];
+  /** the running sum sampled at `curveAt` ranks, for drawing */
+  curve: number[]; curveAt: number[];
+  /** every member's rank */
+  hits: number[];
+}
+
+/**
+ * Preranked GSEA: `ranked` is the whole ranking, best first. Significance is by gene-set
+ * permutation (random sets of the same size drawn from the same ranking), the method GSEA's own
+ * preranked mode uses, seeded from the set's name so a shared document reproduces its p-values.
+ */
+export function preRankedGsea(ranked: { gene: string; score: number }[], sets: { name: string; genes: string[] }[],
+  opts: { permutations?: number; minSize?: number; curvePoints?: number } = {}): GseaResult[] {
+  const n = ranked.length, perms = opts.permutations ?? 1000, minSize = opts.minSize ?? 10, CP = opts.curvePoints ?? 200;
+  const rankOf = new Map<string, number>();
+  ranked.forEach((r, i) => { if (!rankOf.has(r.gene)) rankOf.set(r.gene, i); });
+  const absW = Float64Array.from(ranked, (r) => Math.abs(r.score));
+  const out: GseaResult[] = [];
+  for (const set of sets) {
+    const pos = [...new Set(set.genes)].map((g) => rankOf.get(g)).filter((x): x is number => x != null).sort((a, b) => a - b);
+    const k = pos.length;
+    if (k < minSize || k >= n) continue;
+    const w = pos.map((i) => absW[i]);
+    const es = enrichmentScore(pos, w, n);
+    // the null: random sets of k ranks (Floyd's sampling), their ES computed the same way
+    const rnd = seededRandom(seedOf(set.name));
+    const nullPos: number[] = [], nullNeg: number[] = [];
+    const pick = new Int32Array(k), pw = new Float64Array(k);
+    for (let b = 0; b < perms; b++) {
+      const chosen = new Set<number>();
+      for (let j = n - k; j < n; j++) {
+        const t = Math.floor(rnd() * (j + 1));
+        chosen.add(chosen.has(t) ? j : t);
+      }
+      let m = 0;
+      for (const x of chosen) pick[m++] = x;
+      pick.sort();
+      for (let i = 0; i < k; i++) pw[i] = absW[pick[i]];
+      const e = enrichmentScore(pick, pw, n);
+      (e >= 0 ? nullPos : nullNeg).push(e);
+    }
+    const mean = (xs: number[]) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+    const nes = es >= 0 ? (mean(nullPos) > 0 ? es / mean(nullPos) : 0) : (mean(nullNeg) < 0 ? -es / mean(nullNeg) : 0);
+    const same = es >= 0 ? nullPos : nullNeg;
+    const beyond = same.filter((e) => es >= 0 ? e >= es : e <= es).length;
+    const p = (beyond + 1) / (same.length + 1);
+    // the running sum, sampled for a figure, and where it peaks
+    const curve: number[] = [], curveAt: number[] = [];
+    const inSet = new Uint8Array(n);
+    for (const i of pos) inSet[i] = 1;
+    let nr = 0;
+    for (const x of w) nr += x;
+    const unweighted = !(nr > 0);
+    if (unweighted) nr = k;
+    const miss = 1 / (n - k), step = Math.max(1, Math.floor(n / CP));
+    let rs = 0, peakAt = 0, peak = 0;
+    for (let i = 0; i < n; i++) {
+      rs += inSet[i] ? (unweighted ? 1 : absW[i]) / nr : -miss;
+      if (Math.abs(rs) > Math.abs(peak)) { peak = rs; peakAt = i; }
+      if (i % step === 0 || i === n - 1) { curve.push(Math.round(rs * 1e4) / 1e4); curveAt.push(i); }
+    }
+    const leadingEdge = pos.filter((i) => es >= 0 ? i <= peakAt : i >= peakAt).map((i) => ranked[i].gene);
+    out.push({ name: set.name, size: k, setSize: new Set(set.genes).size, es: Math.round(es * 1e4) / 1e4,
+      nes: Math.round(nes * 1e3) / 1e3, p, leadingEdge, curve, curveAt, hits: pos });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Paired proportions
+
+/**
+ * Exact McNemar test: of the discordant pairs, `b` changed one way and `c` the other; under
+ * the null each discordant pair is a fair coin, so the two-sided p is twice the smaller binomial
+ * tail (capped at 1). Concordant pairs carry no information about the direction and do not enter.
+ */
+export function mcnemarExact(b: number, c: number): number {
+  const n = b + c;
+  if (n === 0) return 1;
+  const k = Math.min(b, c);
+  let tail = 0;
+  for (let i = 0; i <= k; i++) tail += Math.exp(logFact(n) - logFact(i) - logFact(n - i) - n * Math.LN2);
+  return Math.min(1, 2 * tail);
+}
+
+// ---------------------------------------------------------------------------
+// Competing risks: cumulative incidence (Aalen–Johansen) and Gray's test
+
+/**
+ * One subject's competing-risks follow-up: leaves at `t` by `cause` 1 (the event of interest),
+ * 2 (the competing event) or 0 (censored), having become observable at `entry` (left truncation;
+ * omit for "observed from time zero").
+ */
+export interface CrRecord { t: number; cause: 0 | 1 | 2; entry?: number }
+
+export interface CifPoint { t: number; f1: number; f2: number; se1: number; atRisk: number }
+export interface CifCurve { n: number; events: number; competing: number; censored: number; points: CifPoint[] }
+
+/**
+ * Aalen–Johansen: at each distinct exit time, F1 rises by S(t−)·d1/R and F2 by S(t−)·d2/R,
+ * where S is the all-cause Kaplan–Meier survival and R the number at risk — entered strictly
+ * before t and not yet left, so delayed entry is honoured. 1 − KM of cause 1 alone overstates
+ * incidence whenever the competing event is common, because it treats the dead as still at risk.
+ * The standard error is the delta-method (Aalen 1978) estimator.
+ */
+export function aalenJohansen(recs: CrRecord[]): CifCurve {
+  const n = recs.length;
+  const byT = [...recs].sort((a, b) => a.t - b.t);
+  const entries = recs.map((r) => r.entry ?? -Infinity).sort((a, b) => a - b);
+  const times: { t: number; d1: number; d2: number; c: number; R: number }[] = [];
+  let ei = 0, left = 0, i = 0;
+  while (i < byT.length) {
+    const t = byT[i].t;
+    let d1 = 0, d2 = 0, c = 0;
+    while (i < byT.length && byT[i].t === t) { const x = byT[i++]; if (x.cause === 1) d1++; else if (x.cause === 2) d2++; else c++; }
+    while (ei < entries.length && entries[ei] < t) ei++;
+    const R = ei - left;
+    left += d1 + d2 + c;
+    times.push({ t, d1, d2, c, R });
+  }
+  // cumulative quantities, then the delta-method variance at each event time
+  const pts: CifPoint[] = [];
+  let S = 1, F1 = 0, F2 = 0;
+  const hist: { F1: number; Sprev: number; d: number; d1: number; R: number }[] = [];
+  for (const x of times) {
+    if (x.R <= 0) continue;
+    const Sprev = S, d = x.d1 + x.d2;
+    F1 += Sprev * x.d1 / x.R; F2 += Sprev * x.d2 / x.R;
+    S *= 1 - d / x.R;
+    hist.push({ F1, Sprev, d, d1: x.d1, R: x.R });
+    if (d > 0) {
+      let v = 0;
+      for (const h of hist) {
+        if (h.d === 0) continue;
+        const diff = F1 - h.F1;
+        v += (h.R - h.d > 0 ? diff * diff * h.d / (h.R * (h.R - h.d)) : 0) +
+          h.Sprev * h.Sprev * h.d1 * (h.R - h.d1) / (h.R * h.R * h.R) -
+          2 * diff * h.Sprev * h.d1 / (h.R * h.R);
+      }
+      pts.push({ t: x.t, f1: F1, f2: F2, se1: Math.sqrt(Math.max(0, v)), atRisk: x.R });
+    }
+  }
+  return { n, events: recs.filter((r) => r.cause === 1).length, competing: recs.filter((r) => r.cause === 2).length,
+    censored: recs.filter((r) => r.cause === 0).length, points: pts };
+}
+
+/** F1 at time t: the step function's value, 0 before the first event. */
+export function cifAt(c: CifCurve, t: number): { f1: number; se1: number } {
+  let f1 = 0, se1 = 0;
+  for (const p of c.points) { if (p.t > t) break; f1 = p.f1; se1 = p.se1; }
+  return { f1, se1 };
+}
+
+/**
+ * Gray's (1988) statistic for K groups, weight 1: per group, observed cause-1 events minus the
+ * number expected from the pooled subdistribution hazard, with each group's subdistribution risk
+ * set R_k = Y_k (1 − F1_k(t−)) / S_k(t−) (those still at risk, plus those who died of the
+ * competing cause, reweighted). Returned as Σ z_k² / E_k over groups, a chi-squared-shaped
+ * summary; its p-value comes from grayPermutationTest rather than an asymptotic variance.
+ */
+function grayStatistic(order: Int32Array, t: Float64Array, cause: Uint8Array, groupOf: Int32Array, entryOrder: Int32Array,
+  entry: Float64Array, K: number): number {
+  const Y = new Float64Array(K), S = new Float64Array(K).fill(1), F = new Float64Array(K);
+  const z = new Float64Array(K), E = new Float64Array(K);
+  const d1 = new Float64Array(K), d2 = new Float64Array(K), cc = new Float64Array(K), R = new Float64Array(K);
+  let i = 0, ei = 0;
+  const n = order.length;
+  while (i < n) {
+    const tj = t[order[i]];
+    while (ei < n && entry[entryOrder[ei]] < tj) { Y[groupOf[entryOrder[ei]]]++; ei++; }
+    d1.fill(0); d2.fill(0); cc.fill(0);
+    while (i < n && t[order[i]] === tj) {
+      const r = order[i++], g = groupOf[r];
+      if (cause[r] === 1) d1[g]++; else if (cause[r] === 2) d2[g]++; else cc[g]++;
+    }
+    let D1 = 0, Rtot = 0;
+    for (let k = 0; k < K; k++) { R[k] = Y[k] > 0 && S[k] > 0 ? Y[k] * (1 - F[k]) / S[k] : 0; D1 += d1[k]; Rtot += R[k]; }
+    if (D1 > 0 && Rtot > 0) for (let k = 0; k < K; k++) { const e = R[k] * D1 / Rtot; z[k] += d1[k] - e; E[k] += e; }
+    for (let k = 0; k < K; k++) {
+      if (Y[k] > 0) { F[k] += S[k] * d1[k] / Y[k]; S[k] *= 1 - (d1[k] + d2[k]) / Y[k]; }
+      Y[k] -= d1[k] + d2[k] + cc[k];
+    }
+  }
+  let stat = 0;
+  for (let k = 0; k < K; k++) if (E[k] > 0) stat += z[k] * z[k] / E[k];
+  return stat;
+}
+
+export interface GrayTest { statistic: number; p: number; permutations: number; groups: number }
+
+/**
+ * Gray's test by permutation: group labels are shuffled over the pooled records (a seeded
+ * shuffle, so the p-value is reproducible), which is exact under the null that every group's
+ * records come from one distribution — entry times included — and needs nothing but the records
+ * themselves. p = (b + 1) / (m + 1).
+ */
+export function grayPermutationTest(groups: CrRecord[][], permutations = 2000, seed = 1): GrayTest {
+  const K = groups.length;
+  const all = groups.flatMap((g, k) => g.map((r) => ({ ...r, k })));
+  const n = all.length;
+  const t = Float64Array.from(all, (r) => r.t), entry = Float64Array.from(all, (r) => r.entry ?? -Infinity);
+  const cause = Uint8Array.from(all, (r) => r.cause);
+  const labels = Int32Array.from(all, (r) => r.k);
+  const order = Int32Array.from({ length: n }, (_, i) => i).sort((a, b) => t[a] - t[b]);
+  const entryOrder = Int32Array.from({ length: n }, (_, i) => i).sort((a, b) => entry[a] - entry[b]);
+  const observed = grayStatistic(order, t, cause, labels, entryOrder, entry, K);
+  const rnd = seededRandom(seed), perm = Int32Array.from(labels);
+  let beyond = 0;
+  for (let b = 0; b < permutations; b++) {
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const x = perm[i]; perm[i] = perm[j]; perm[j] = x; }
+    if (grayStatistic(order, t, cause, perm, entryOrder, entry, K) >= observed - 1e-12) beyond++;
+  }
+  return { statistic: observed, p: (beyond + 1) / (permutations + 1), permutations, groups: K };
+}

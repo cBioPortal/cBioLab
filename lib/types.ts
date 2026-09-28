@@ -581,9 +581,283 @@ export interface SequenceView {
   /** distinct labels kept before the rest fold into "other" (default 6) */
   topN?: number;
 }
+/**
+ * Cohort attrition: for each cohort, the patients remaining after each successive clause of its
+ * `all`, CONSORT-style — so a reader sees which criterion removed whom before trusting any
+ * downstream number. Counts only; every participant can answer.
+ */
+export interface AttritionView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string;
+  kind: "attrition"; cohorts?: string[];
+}
+export interface AttritionStep {
+  /** the clause, in the same plain language as the cohort readback */
+  label: string;
+  /** patients left after this clause and every clause above it */
+  n: number;
+  /** removed by this clause alone, given the ones above it */
+  excluded: number;
+  /** n as a share of the study base, one decimal */
+  pctOfBase: number | null;
+}
+export interface AttritionPanel { cohort: string; base: number; steps: AttritionStep[]; studies: string[] }
+/**
+ * Genome-wide copy-number frequency: the share of each cohort's segmented samples gained or lost
+ * in every bin along the genome, from the copy-number SEGMENTS (not the per-gene calls), with a
+ * per-bin Fisher test when exactly two cohorts are drawn. Counts only.
+ */
+export interface GenomeView {
+  note?: string;
+  kind: "genome"; cohorts?: string[];
+  /** bin width in megabases, 1-50 (default 2) */
+  binMb?: number;
+  /** |log2 segment mean| at or past which a bin is gained / lost (default 0.2) */
+  threshold?: number;
+  /** draw chromosome X too (default false: its log ratio mostly records sex) */
+  includeX?: boolean;
+}
+export interface GenomeSeries {
+  cohort: string;
+  /** the cohort's samples, and how many of them have any segment at all */
+  samples: number; segmented: number;
+  /** per bin, aligned with GenomeResult.bins */
+  profiled: number[]; gain: number[]; loss: number[];
+}
+export interface GenomeResult {
+  build: "hg19" | "hg38"; binMb: number; threshold: number; includeX: boolean;
+  /** every bin, in genome order: its chromosome and start (bp) */
+  bins: { chrom: string; start: number }[];
+  series: GenomeSeries[];
+  /** exactly two cohorts: Benjamini–Hochberg q per bin (null where either cohort has no sample) */
+  test?: { gainQ: (number | null)[]; lossQ: (number | null)[]; significantGain: number; significantLoss: number };
+  /** studies left out because they could not answer (a remote peer, or no segments at all) */
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Oncogenic signalling pathways: for each pathway (the ten of Sanchez-Vega et al. 2018, and/or
+ * the document's own gene sets), the share of each cohort with at least one member altered —
+ * over the union of the members' panels, the oncoprint's merged-row rule — and its most-altered
+ * member genes, each with its own panel-aware denominator. Counts only.
+ */
+export interface PathwaysView {
+  note?: string;
+  kind: "pathways"; cohorts?: string[];
+  /** which of the ten canonical pathways to draw (default: all ten) */
+  pathways?: string[];
+  /** the document's own gene sets, drawn after the canonical ones: ≤4 sets of ≤40 genes */
+  sets?: { name: string; genes: string[] }[];
+  /** count OncoKB drivers only (default, as the paper curated oncogenic events) or any alteration */
+  measure?: "driver" | "any";
+  /** member genes drawn per pathway, the rest pooled and counted (default 6, max 12) */
+  topGenes?: number;
+}
+export interface PathwayCell { cohort: string; profiled: number; altered: number; pct: number | null }
+export interface PathwayRow {
+  name: string; source: "Sanchez-Vega 2018" | "document";
+  /** member genes, and how many were profiled in at least one cohort */
+  genes: number; profiledGenes: number;
+  cells: PathwayCell[];
+  /** two cohorts: two-sided Fisher p, and BH q across the pathways drawn */
+  p?: number; q?: number;
+  top: { gene: string; role: "OG" | "TSG" | null; cells: PathwayCell[]; q?: number }[];
+  /** member genes altered somewhere but not among `top` — pooled, never dropped */
+  otherAltered: number;
+  /** member genes no cohort was profiled for */
+  notProfiled: string[];
+}
+export interface PathwaysResult {
+  measure: "driver" | "any"; rows: PathwayRow[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Differential expression between exactly two cohorts on one molecular profile: every gene's
+ * Welch t-test from per-cohort moments (n, Σv, Σv² — additive, so exact across sites), drawn as
+ * a volcano, and preranked GSEA of that t ranking against MSigDB gene sets.
+ */
+export interface DiffexprView {
+  note?: string;
+  kind: "diffexpr"; cohorts?: string[];
+  /** the profile to compare on (mRNA z-scores, RNA-seq, protein, methylation…) */
+  profileType: string;
+  /** compare log2(v + 1) rather than v; defaults to true for a non-z-score RNA-seq profile */
+  log2?: boolean;
+  /** MSigDB sets to test (≤12 names); default every HALLMARK_ set. [] skips enrichment */
+  geneSets?: string[];
+  /** genes labelled on the volcano (default 12, max 40) */
+  label?: number;
+}
+export interface DiffexprGene { gene: string; nA: number; nB: number; meanA: number; meanB: number; effect: number; t: number; p: number; q: number }
+export interface DiffexprResult {
+  profileType: string; log2: boolean;
+  /** what `effect` is: a difference of means on the compared scale */
+  effectLabel: string;
+  /** cohorts in order: effect = first − second */
+  groups: [string, string];
+  tested: number;
+  /** genes left out for fewer than 3 patients in a cohort, or no variance in either */
+  skipped: number;
+  up: number; down: number;
+  /** genes at q < 0.05, and the labelled ones, drawn individually (≤1,500, the most significant) */
+  points: DiffexprGene[];
+  /** every other tested gene, binned on the axes below: [x bin, y bin, count, 0 not significant | 1 higher in the first cohort | 2 in the second] */
+  grid: { xMax: number; yMax: number; nx: number; ny: number; cells: [number, number, number, 0 | 1 | 2][] };
+  /** genes q < 0.05 not drawn individually because of the cap */
+  pooledSignificant: number;
+  labels: string[];
+  gsea?: { ranking: string; permutations: number; sets: (import("./stats.ts").GseaResult & { q: number })[]; skipped: string[] };
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Paired samples: among patients with a sample of each of two kinds (by default primary and
+ * metastasis), gene by gene, how often an alteration is on both, only the first or only the
+ * second — counted only where BOTH sides were profiled for the gene — with an exact McNemar test
+ * of whether discordance runs one way. Counts only.
+ */
+export interface PairedView {
+  note?: string;
+  kind: "paired"; cohorts?: string[];
+  genes: string[];
+  /** a sample-level attribute and the values on each side (default SAMPLE_TYPE: Primary / Metastasis) */
+  pairBy?: { attribute: string; a: string | string[]; b: string | string[] };
+  /** count OncoKB drivers only (default) or any alteration */
+  measure?: "driver" | "any";
+}
+export interface PairedGene {
+  gene: string;
+  /** patients with each side profiled for this gene */
+  pairs: number; both: number; aOnly: number; bOnly: number; neither: number;
+  /** both ÷ (both + aOnly + bOnly): of the patients altered anywhere, altered on both sides */
+  concordance: number | null;
+  /** exact McNemar p on aOnly vs bOnly, and BH q across the genes of this cohort */
+  p: number; q: number;
+}
+export interface PairedPanel { cohort: string; patients: number; aSamples: number; bSamples: number; genes: PairedGene[] }
+export interface PairedResult {
+  pairBy: { attribute: string; a: string[]; b: string[] }; measure: "driver" | "any";
+  panels: PairedPanel[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Clonality from FACETS allele-specific copy number: for each gene, whether the cohort's
+ * mutation calls are clonal or subclonal, how often the mutated locus has lost its other allele,
+ * and their cancer-cell fractions; per cohort, whole-genome doubling, purity and ploidy. Only
+ * studies with allele-specific copy number can answer. Counts only.
+ */
+export interface ClonalityView {
+  note?: string;
+  kind: "clonality"; cohorts?: string[];
+  genes: string[];
+  /** OncoKB driver mutations only (default) or every mutation call */
+  measure?: "driver" | "any";
+  /** use only samples whose FACETS_QC is Pass (default true) */
+  qc?: boolean;
+}
+export interface ClonalityGene {
+  gene: string;
+  /** mutation calls with a FACETS estimate, and the samples they are in */
+  calls: number; samples: number;
+  clonal: number; subclonal: number; indeterminate: number; uncalled: number;
+  /** calls where the locus has no minor allele, of calls where the minor copy number is known */
+  loh: number; lohKnown: number;
+  /** cancer-cell fraction, ten bins of 0.1 */
+  ccf: number[];
+  /** two cohorts: Fisher on clonal vs subclonal, BH across genes */
+  p?: number; q?: number;
+}
+export interface ClonalityPanel {
+  cohort: string; samples: number; ascnSamples: number; qcPass: number; qcFail: number;
+  wgd: { yes: number; no: number };
+  /** FACETS purity in 0.05 bins over 0–1, ploidy in 0.25 bins over 0–8 */
+  purity: number[]; ploidy: number[];
+  genes: ClonalityGene[];
+}
+export interface ClonalityResult {
+  measure: "driver" | "any"; qc: boolean;
+  panels: ClonalityPanel[];
+  /** two cohorts: Fisher on whole-genome doubling */
+  wgdP?: number;
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Cumulative incidence of a timeline event with death as a competing risk (Aalen–Johansen, with
+ * the survival view's left truncation), Gray's test between cohorts, and — beside it — what
+ * 1 − Kaplan–Meier would have claimed, which treats the dead as still at risk and so overstates
+ * incidence whenever death is common. Counts only: (entry, time, cause) tallies per site.
+ */
+export interface IncidenceView {
+  note?: string;
+  kind: "incidence"; cohorts?: string[];
+  /** the event of interest: its first occurrence after the anchor */
+  event: { eventType: string; attrs?: { key: string; value: string }[]; label?: string };
+  /** the clock's start (default: the study's day 0), as in the survival view */
+  anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
+  /** months at which incidence is read off and compared (default [12, 24, 60]) */
+  horizons?: number[];
+}
+export interface IncidenceCurve {
+  cohort: string;
+  n: number; events: number; competing: number; censored: number;
+  points: { t: number; f1: number; f2: number; se1: number; atRisk: number }[];
+  /** patients who could not enter the risk set, by reason */
+  excluded: { prior: number; unobserved: number; noFollowup: number; noAnchor: number };
+  /** kept, but their first event was recorded after their last follow-up */
+  late: number;
+}
+export interface IncidenceResult {
+  eventLabel: string; anchoredTo?: string;
+  curves: IncidenceCurve[];
+  horizons: { months: number; cells: { cohort: string; f1: number; lo: number; hi: number; naive: number; atRisk: number }[] }[];
+  gray?: import("./stats.ts").GrayTest;
+  excludedStudies?: { study: string; reason: string }[];
+}
+/**
+ * A lab value's course from a treatment start: % change from each patient's baseline over time
+ * (median and interquartile band per bin), the best response and the share responding (e.g.
+ * PSA50, PCWG3), and — from a participant entitled to patient-level values — a waterfall.
+ */
+export interface LabsView {
+  note?: string;
+  kind: "labs"; cohorts?: string[];
+  /** the test, as its event attribute names it (e.g. "PSA", "CEA") */
+  test: string;
+  /** where lab results live (defaults: event type Lab_Test, the test in TEST, the value in RESULT) */
+  eventType?: string; testKey?: string; resultKey?: string;
+  /** the clock's start: the treatment whose effect is read */
+  anchor: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
+  /** baseline is the last value this many days before, or on, the anchor (default 90) */
+  baselineDays?: number;
+  /** the window, in weeks around the anchor (default −12 to 52), and its bin width (default 4) */
+  fromWeeks?: number; toWeeks?: number; binWeeks?: number;
+  /** a responder's best fall from baseline, in percent (default 50, PCWG3's PSA50) */
+  responseDrop?: number;
+}
+export interface LabsPanel {
+  cohort: string;
+  /** the denominators: anchored, with a baseline, with a positive baseline, with a value after the anchor */
+  anchored: number; baseline: number; positiveBaseline: number; evaluable: number;
+  /** per bin: its start in weeks, the patients measured, and the quartiles of % change */
+  course: { week: number; n: number; q1: number | null; median: number | null; q3: number | null }[];
+  /** best % change after the anchor, in 2-point bins centred on −100, −98, … +300 (the last holds everything above) */
+  best: number[];
+  responders: number;
+  /** each patient's best % change, sorted — present only from patient-level participants */
+  waterfall?: number[];
+  /** patients whose best could not be drawn as a bar (an aggregate-only participant's) */
+  waterfallWithheld?: number;
+}
+export interface LabsResult {
+  test: string; anchoredTo: string; responseDrop: number;
+  fromWeeks: number; toWeeks: number; binWeeks: number; baselineDays: number;
+  panels: LabsPanel[];
+  /** two cohorts: Fisher on responders */
+  responseP?: number;
+  excluded?: { study: string; reason: string }[];
+}
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView;
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -852,6 +1126,14 @@ export interface ViewResult {
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
   cox?: CoxResult;                          // multivariate Cox
   logistic?: LogisticResult;                // multivariate logistic regression
+  attrition?: AttritionPanel[];             // cohort attrition
+  genome?: GenomeResult;                    // genome-wide copy-number frequency
+  pathways?: PathwaysResult;                // oncogenic signalling pathways
+  diffexpr?: DiffexprResult;                // differential expression + GSEA
+  paired?: PairedResult;                    // paired-sample concordance
+  clonality?: ClonalityResult;              // FACETS clonality, WGD, purity/ploidy
+  incidence?: IncidenceResult;              // competing-risks cumulative incidence
+  labs?: LabsResult;                        // lab-value course and response
 }
 /**
  * Therapy transitions, ready to draw: nodes in columns, flows between them.

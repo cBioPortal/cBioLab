@@ -28,6 +28,7 @@ import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validate
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
   type AxisKind, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
+export * from "./federation-more.ts";
 export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
 export type { PlotData, PlotRequest, PlotGroup, PlotPoint } from "./plot.ts";
 import type { Moments } from "./stats.ts";
@@ -223,9 +224,9 @@ export async function instanceForStudy(study: string): Promise<Instance> {
 // ---------------------------------------------------------------------------
 
 /** high-level CNA only, matching the oncoprint/compare convention (±2) */
-const ALTERED_COND = "(g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)";
+export const ALTERED_COND = "(g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)";
 
-function driverJoin(pin: string): string {
+export function driverJoin(pin: string): string {
   return (
     "  LEFT JOIN oncokb_annotation.variant_annotation ann\n" +
     "    ON ann.oncokb_version = " + sq(pin) + " AND ann.is_driver\n" +
@@ -1221,6 +1222,8 @@ export interface PatientLevelCapable extends AggregateCapable {
   /** per-patient rows for a logistic fit — same reason as coxRows */
   logisticRows(def: CohortDef | null | undefined, outcome: PlotAxis, covariates: PlotAxis[]):
     Promise<{ rows: { y: number | string; values: (number | string)[] }[]; outcomeKind: AxisKind; kinds: AxisKind[] }>;
+  /** one row per patient (never an identifier) for a lib/views-more.ts view — see PatientLevelResolver.moreRows */
+  moreRows(label: string, def: CohortDef | null | undefined, build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
 }
 
 export type Resolver = AggregateCapable | PatientLevelCapable;
@@ -1250,6 +1253,19 @@ export interface FederatedPlotCapable {
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]>;
   plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ total: number; nx: number; ny: number }>;
+}
+/**
+ * The aggregates behind the view kinds in lib/views-more.ts. Every local participant has them,
+ * aggregate-only included; a remote MCP peer does not yet, so those views name it as unable to
+ * answer rather than silently leaving its patients out.
+ */
+export interface MoreAggregateCapable {
+  moreAggregate(label: string, def: CohortDef | null | undefined,
+    build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
+  moreMeta(label: string, build: (study: string, db: string) => string): Promise<ChRow[]>;
+}
+export function hasMoreAggregates(r: Resolver): r is Resolver & MoreAggregateCapable {
+  return typeof (r as unknown as Partial<MoreAggregateCapable>).moreAggregate === "function";
 }
 export function hasFederatedPlot(r: Resolver): r is Resolver & FederatedPlotCapable {
   return typeof (r as unknown as Partial<FederatedPlotCapable>).plotAxisKinds === "function";
@@ -1676,6 +1692,22 @@ abstract class BaseResolver implements AggregateCapable {
     });
   }
 
+  /**
+   * One of lib/federation-more.ts's aggregates, for a view in lib/views-more.ts: this resolver
+   * supplies its own cohort SQL (which, on an aggregate-only instance, refuses an id-carrying
+   * definition), study and database, and logs what ran. `build` is a function, never text, so a
+   * document cannot reach it; every builder it is given is swept by test/boundary.test.ts.
+   */
+  async moreAggregate(label: string, def: CohortDef | null | undefined,
+    build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]> {
+    const r = await this.runLogged<ChRow>(label, build(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
+    return r.data;
+  }
+  /** Study metadata for those views (no cohort involved), logged the same way. */
+  async moreMeta(label: string, build: (study: string, db: string) => string): Promise<ChRow[]> {
+    const r = await this.runLogged<ChRow>(label, build(this.study, this.instance.conn.db), this.instance.conn);
+    return r.data;
+  }
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
     if (!pairs.length) return [];
     const r = await this.runLogged<ChRow>("pairCounts",
@@ -1757,6 +1789,18 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
       values: covariates.map((_, i) => kinds[i] === "num" ? Number(row["c" + i]) : String(row["c" + i]))
     }));
     return { rows, kinds };
+  }
+
+  /**
+   * One row per PATIENT for a view in lib/views-more.ts (a waterfall's bars): values, never an
+   * identifier, but still one patient's own values, so — like plotPoints and coxRows — only a
+   * patient-level participant has this method. An aggregate-only or remote resolver cannot be
+   * asked, because the method does not exist on it.
+   */
+  async moreRows(label: string, def: CohortDef | null | undefined,
+    build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]> {
+    const r = await this.runLogged<ChRow>(label, build(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
+    return r.data;
   }
 
   /**

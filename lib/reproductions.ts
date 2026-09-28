@@ -41,6 +41,14 @@ export interface PaperReproduction {
   doc: AnalysisDoc;
 }
 
+/**
+ * breast_msk_2018 records where each sample was taken but not what treatment preceded it. Every
+ * SAMPLE_SITE other than "Treatment Naive Primary" (post-neoadjuvant and post-treatment
+ * primaries, and every metastatic site) is a sample taken after the disease had been treated —
+ * the closest stand-in this study offers for the paper's "previously exposed to hormonal therapy".
+ */
+const RAZAVI_AFTER_TREATMENT_SITES = ["Liver", "Breast", "Post-Treatment Primary", "Chest Wall", "Lung", "Brain", "Lymph Node", "Bone", "Post-Neo Primary", "Local Recurrence/Breast", "Soft Tissue", "Ovary", "Uterus", "Skin", "Pleura", "Peritoneum", "Pericardium", "Local Recurrence/Lymph Node", "Epidural Mass", "Bowel", "Stomach", "Appendix", "Bladder/Ureter", "Lymph node", "Parotid", "Orbit", "Trachea", "Local Recurrence", "Spleen", "Esophegus"];
+
 export const REPRODUCTIONS: PaperReproduction[] = [
   {
     slug: "mondaca-walch-crc-apc-2020",
@@ -132,28 +140,34 @@ export const REPRODUCTIONS: PaperReproduction[] = [
     citation: "Jee et al., Nature Medicine 2022",
     studyIds: ["nsclc_ctdx_msk_2022"],
     badge: "full",
-    summary: "Every genomic, clinical, and survival association in this paper's EGFR-mutant-vs-wildtype comparison reproduced cleanly — including the never-smoker enrichment at p=7.5e-19.",
+    summary: "Every genomic, clinical, and survival association in this paper's EGFR-mutant-vs-wildtype comparison reproduced cleanly — including the never-smoker enrichment at p=7.5e-19. The paper's ctDNA-versus-tissue finding is now reachable too: the paired view compares each patient's plasma and tissue gene by gene, and plasma-only calls are concentrated in PIK3CA, as the paper says, rather than in truncal drivers like EGFR.",
     findings: [
       { claim: "KRAS mutation is depleted in EGFR-mutant NSCLC (the two are largely mutually exclusive)", result: "7.9% vs 29.4%, p=1.1e-15", verdict: "match" },
       { claim: "TP53 co-mutation rate differs between EGFR-mutant and wildtype NSCLC", result: "64.7% vs 46.8%, p=1.3e-7", verdict: "match" },
       { claim: "Never-smoker status is enriched in EGFR-mutant NSCLC", result: "68.5% never/light-smoker (EGFR-mut) vs 38.6% (EGFR-wt), p=7.5e-19", verdict: "match" },
-      { claim: "EGFR-mutant NSCLC has better overall survival than EGFR-wildtype", result: "median 35.4mo vs 23.6mo, log-rank p=4.4e-4", verdict: "match" }
+      { claim: "EGFR-mutant NSCLC has better overall survival than EGFR-wildtype", result: "median 35.4mo vs 23.6mo, log-rank p=4.4e-4", verdict: "match" },
+      { claim: "Alterations in ctDNA not seen in tissue sequencing (25% of patients, time-matched) disproportionately feature subclonal resistance drivers such as PIK3CA and RICTOR", result: "682 patients with both tissue and plasma: 39% of PIK3CA plasma calls (9 of 23) are absent from tissue, against 4% for EGFR (7 of 158) and ~11% for KRAS and TP53. Not time-matched (no sample dates here), so tissue-only calls dominate wherever ctDNA was simply undetectable; RICTOR is on too few plasma panels to test (128 patients profiled on both sides, no plasma-only call)", verdict: "partial" }
     ],
     doc: {
       study: "nsclc_ctdx_msk_2022",
       title: "Jee 2022 — metastatic NSCLC ctDNA-guided therapy",
-      notes: "Jee et al.'s EGFR-mutant vs EGFR-wildtype comparison in metastatic NSCLC: co-alteration pattern, smoking history, and overall survival, all in one document since all three claims share the same two cohorts. Survival here is plain OS_MONTHS/OS_STATUS, not anchored to a timeline event — an earlier attempt anchored on a \"Treatment\" event and collapsed to 1-2 patients per arm (a near-empty marker in this release), which is why this version deliberately stays unanchored.",
+      notes: "Jee et al.'s EGFR-mutant vs EGFR-wildtype comparison in metastatic NSCLC: co-alteration pattern, smoking history, and overall survival, all in one document since all three claims share the same two cohorts. Survival here is plain OS_MONTHS/OS_STATUS, not anchored to a timeline event — an earlier attempt anchored on a \"Treatment\" event and collapsed to 1-2 patients per arm (a near-empty marker in this release), which is why this version deliberately stays unanchored. The tissue-versus-plasma comparison uses SAMPLE_CLASS (Tumor / cfDNA), counting a gene only where both samples' panels covered it.",
       cohorts: {
         "EGFR-mutant": { all: [{ kind: "oql", q: "EGFR: MUT" }] },
-        "EGFR-wildtype": { all: [{ not: { kind: "oql", q: "EGFR:" } }, { kind: "profiled", type: "MUTATION" }] }
+        "EGFR-wildtype": { all: [{ not: { kind: "oql", q: "EGFR:" } }, { kind: "profiled", type: "MUTATION" }] },
+        "All patients": { all: [] }
       },
       views: [
-        { kind: "compare", genes: ["KRAS", "TP53"],
+        { kind: "compare", genes: ["KRAS", "TP53"], cohorts: ["EGFR-mutant", "EGFR-wildtype"],
           note: "Reproduces the paper's co-alteration comparison: KRAS is markedly depleted in EGFR-mutant tumors (7.9% vs 29.4%, p=1.1e-15) and TP53 co-mutation rate also differs (64.7% vs 46.8%, p=1.3e-7) — consistent with the largely mutually-exclusive driver biology the paper describes." },
-        { kind: "clinical", attributes: ["SMOKING_STATUS"],
+        { kind: "clinical", attributes: ["SMOKING_STATUS"], cohorts: ["EGFR-mutant", "EGFR-wildtype"],
           note: "Reproduces the paper's smoking-history association: 68.5% of EGFR-mutant patients are never/light-smokers vs 38.6% of EGFR-wildtype (p=7.5e-19) — the textbook EGFR/never-smoker association, reproduced almost exactly." },
-        { kind: "survival", endpoint: "OS",
-          note: "Reproduces the paper's overall-survival comparison: median 35.4mo (EGFR-mutant) vs 23.6mo (EGFR-wildtype), log-rank p=4.4e-4 — matching the paper's reported figures closely, using plain unanchored OS rather than a sparse timeline event." }
+        { kind: "survival", endpoint: "OS", cohorts: ["EGFR-mutant", "EGFR-wildtype"],
+          note: "Reproduces the paper's overall-survival comparison: median 35.4mo (EGFR-mutant) vs 23.6mo (EGFR-wildtype), log-rank p=4.4e-4 — matching the paper's reported figures closely, using plain unanchored OS rather than a sparse timeline event." },
+        { kind: "paired", cohorts: ["All patients"], measure: "any",
+          genes: ["EGFR", "KRAS", "TP53", "PIK3CA", "RICTOR", "STK11", "MET", "ERBB2", "BRAF", "ALK"],
+          pairBy: { attribute: "SAMPLE_CLASS", a: "Tumor", b: "cfDNA" },
+          note: "The paper's ctDNA-only alterations: among the 682 patients with both a tissue and a plasma sample, the share of each gene's plasma calls that tissue did not find — 39% for PIK3CA (9 of 23), against 4% for truncal EGFR and ~11% for KRAS and TP53 — the paper's point that plasma catches heterogeneous, subclonal drivers tissue misses. The samples are not time-matched here, so tissue-only calls (where ctDNA was simply undetectable) dominate the counts." }
       ]
     }
   },
@@ -163,25 +177,50 @@ export const REPRODUCTIONS: PaperReproduction[] = [
     citation: "Jonsson et al., Clin Cancer Res 2019",
     studyIds: ["glioma_mskcc_2019"],
     badge: "partial",
-    summary: "IDH mutation status — one of oncology's strongest prognostic splits — reproduced almost perfectly, along with the paper's age and MGMT associations. The paper's other defining axis, 1p/19q co-deletion, still can't be expressed: there is no chromosome-arm-level copy-number leaf, only per-gene CNA.",
+    summary: "IDH mutation status, one of oncology's strongest prognostic splits, reproduced almost exactly. The 1p/19q co-deletion that used to be out of reach now reproduces too: the genome view reads it straight off the copy-number segments (1p lost in 94%, 19q in 95% of codeleted oligodendrogliomas), and the codeleted tumours live longer. The paper's cell-cycle finding lands in the right direction with a weaker contrast, and its recurrence story (cell-cycle changes first, mismatch-repair hits only at recurrence) is visible but underpowered in 52 paired patients.",
     findings: [
       { claim: "IDH-mutant glioma has dramatically better overall survival than IDH-wildtype", result: "median OS 207mo vs 24.2mo, log-rank chi2=249.0, p=4.3e-56", verdict: "match" },
       { claim: "IDH-mutant patients are younger at diagnosis", result: "mean age 37.6 vs 57.2, Welch's t p=5.0e-86", verdict: "match" },
-      { claim: "1p/19q co-deletion further stratifies IDH-mutant glioma into oligodendroglioma vs astrocytoma", result: "no chromosome-arm-level CNA leaf exists in this DSL — cannot be expressed at all", verdict: "gap" }
+      { claim: "1p/19q co-deletion separates IDH-mutant glioma into oligodendroglioma (codeleted) and astrocytoma, and the two differ in outcome", result: "genome view on the segments: 1p lost in 94% and 19q in 95% of the 119 segmented codeleted oligodendrogliomas vs ~5% and 22% of IDH-mutant astrocytomas (and IDH-wildtype glioblastoma shows the classic +7 in 77%, -10 in 76-82%); median OS 248mo vs 136mo, log-rank p=6.6e-4", verdict: "match" },
+      { claim: "In astrocytomas, cell-cycle alterations arise preferentially in enhancing tumours (abstract: 44% vs 8%, P < 0.001)", result: "OncoKB-driver alterations in CDKN2A/B, CDKN2C, CDK4/6, CCND1/2 or RB1: 46.0% of enhancing vs 19.7% of non-enhancing astrocytomas (grade 2-3, IDH-mutant or wildtype; q=2.2e-5) — the enhancing rate matches, the non-enhancing one is higher than the paper's 8%; the paper's exact gene list and its per-sample pairing are not reproducible from the data as loaded", verdict: "partial" },
+      { claim: "Cell-cycle alterations likely preceded the acquisition of alkylating-therapy-associated hypermutation", result: "in the 52 patients with a primary and a recurrence sample: IDH1/TP53/ATRX concordant (88-92%), CDKN2A mostly already present at the primary (15 both, 6 recurrence-only), while MSH6/MSH2/PMS2/MLH1 alterations appear only at recurrence (11 recurrence-only, 0 primary-only) — the paper's order, but no single gene is significant at this size", verdict: "partial" }
     ],
     doc: {
       study: "glioma_mskcc_2019",
       title: "Jonsson 2019 — glioma genomics and survival",
-      notes: "Jonsson et al., Clin Cancer Res 2019;25(18):5537-5547. This study has no precomputed IDH clinical flag, so IDH status is read directly off IDH1/IDH2 mutation calls via OQL, exactly the genomic definition the paper itself uses. The paper's second defining split, 1p/19q co-deletion, is NOT expressible here: it requires chromosome-arm-level copy number, and this DSL only has per-gene CNA.",
+      notes: "Jonsson et al., Clin Cancer Res 2019;25(18):5537-5547. IDH status is read directly off IDH1/IDH2 mutation calls via OQL, the paper's own genomic definition. The WHO diagnosis (WHO_CLASSIFICATION_OF_DX_TUMOR) names the 1p/19q-codeleted tumours, and the genome view checks that label against the copy-number segments themselves rather than taking it on trust. The cell-cycle gene set is the Sanchez-Vega cell-cycle effectors present on the panels; the paper's own list is not given in its abstract.",
       cohorts: {
         "IDH-mutant": { all: [{ kind: "oql", q: "IDH1: MUT; IDH2: MUT" }] },
-        "IDH-wildtype": { all: [{ not: { kind: "oql", q: "IDH1: MUT; IDH2: MUT" } }, { kind: "profiled", type: "MUTATION" }] }
+        "IDH-wildtype": { all: [{ not: { kind: "oql", q: "IDH1: MUT; IDH2: MUT" } }, { kind: "profiled", type: "MUTATION" }] },
+        "Oligodendroglioma, 1p/19q-codeleted": { all: [{ kind: "clinical", attribute: "WHO_CLASSIFICATION_OF_DX_TUMOR",
+          values: ["Oligodendroglioma, IDH-mutant and 1p/19q-codeleted", "Anaplastic oligodendroglioma, IDH-mutant and 1p/19q-codeleted"] }] },
+        "Astrocytoma, IDH-mutant": { all: [{ kind: "clinical", attribute: "WHO_CLASSIFICATION_OF_DX_TUMOR",
+          values: ["Diffuse astrocytoma, IDH-mutant", "Anaplastic astrocytoma, IDH-mutant", "Glioblastoma, IDH-mutant"] }] },
+        "Glioblastoma, IDH-wildtype": { all: [{ kind: "clinical", attribute: "WHO_CLASSIFICATION_OF_DX_TUMOR", values: ["Glioblastoma, IDH-wildtype"] }] },
+        "Astrocytoma, enhancing": { all: [
+          { kind: "clinical", attribute: "WHO_CLASSIFICATION_OF_DX_TUMOR", values: ["Diffuse astrocytoma, IDH-mutant", "Anaplastic astrocytoma, IDH-mutant", "Diffuse astrocytoma, IDH-wildtype", "Anaplastic astrocytoma, IDH-wildtype"] },
+          { kind: "clinical", attribute: "ENHANCING", values: ["Yes"], per: "sample" }] },
+        "Astrocytoma, non-enhancing": { all: [
+          { kind: "clinical", attribute: "WHO_CLASSIFICATION_OF_DX_TUMOR", values: ["Diffuse astrocytoma, IDH-mutant", "Anaplastic astrocytoma, IDH-mutant", "Diffuse astrocytoma, IDH-wildtype", "Anaplastic astrocytoma, IDH-wildtype"] },
+          { kind: "clinical", attribute: "ENHANCING", values: ["No"], per: "sample" }] },
+        "All gliomas": { all: [] }
       },
       views: [
-        { kind: "survival",
+        { kind: "survival", cohorts: ["IDH-mutant", "IDH-wildtype"],
           note: "Reproduces the paper's headline finding: IDH-mutant median OS 207mo vs IDH-wildtype 24.2mo (chi2=249.0, p=4.3e-56) — one of the strongest prognostic splits in oncology, reproduced almost exactly against the paper's own reported figures." },
-        { kind: "clinical", attributes: ["AGE", "MGMT_STATUS", "TMZ_HYPERMUTATED"],
-          note: "Reproduces the paper's supporting associations: IDH-mutant patients are markedly younger at diagnosis (37.6 vs 57.2 years, p=5.0e-86), and both MGMT promoter methylation and temozolomide-induced hypermutation associate with IDH status, as the paper describes. What this document CANNOT show: the paper's 1p/19q co-deletion axis, which separates IDH-mutant glioma into oligodendroglioma (co-deleted) vs astrocytoma (not) — that needs chromosome-arm-level copy number, a leaf kind this DSL doesn't have yet." }
+        { kind: "clinical", attributes: ["AGE", "MGMT_STATUS", "TMZ_HYPERMUTATED"], cohorts: ["IDH-mutant", "IDH-wildtype"],
+          note: "Reproduces the paper's supporting associations: IDH-mutant patients are markedly younger at diagnosis (37.6 vs 57.2 years, p=5.0e-86), and both MGMT promoter methylation and temozolomide-induced hypermutation associate with IDH status, as the paper describes." },
+        { kind: "genome", binMb: 5, cohorts: ["Oligodendroglioma, 1p/19q-codeleted", "Astrocytoma, IDH-mutant", "Glioblastoma, IDH-wildtype"],
+          note: "The 1p/19q co-deletion, read off the copy-number segments rather than the diagnosis label: 1p lost in 94% and 19q in 95% of codeleted oligodendrogliomas, against ~5% and 22% of IDH-mutant astrocytomas. IDH-wildtype glioblastoma shows its own classic signature, chromosome 7 gained (77%) and 10 lost (76-82%). This was a gap before the genome view existed: no view read the segments at all." },
+        { kind: "survival", cohorts: ["Oligodendroglioma, 1p/19q-codeleted", "Astrocytoma, IDH-mutant"],
+          note: "Among IDH-mutant gliomas, the codeleted oligodendrogliomas live longer: median OS 248mo vs 136mo, log-rank p=6.6e-4." },
+        { kind: "pathways", pathways: [], cohorts: ["Astrocytoma, enhancing", "Astrocytoma, non-enhancing"],
+          sets: [{ name: "Cell-cycle effectors", genes: ["CDKN2A", "CDKN2B", "CDKN2C", "CDK4", "CDK6", "CCND1", "CCND2", "RB1"] }],
+          note: "The paper's cell-cycle finding: in astrocytomas, alterations in cell-cycle effectors are far more common in contrast-enhancing tumours — 46.0% vs 19.7% here (q=2.2e-5), against the paper's 44% vs 8%. The direction and the enhancing rate match; the non-enhancing rate does not, most likely because the paper's own gene list and sample-level pairing differ from this patient-level approximation." },
+        { kind: "paired", cohorts: ["All gliomas"], measure: "any",
+          genes: ["IDH1", "TP53", "ATRX", "CDKN2A", "CDK4", "RB1", "MSH6", "MSH2", "PMS2", "MLH1"],
+          pairBy: { attribute: "SAMPLE_TYPE", a: "Primary", b: "Recurrence" },
+          note: "The paper's order of events, within the 52 patients sequenced at both a primary and a recurrence: the founding alterations (IDH1, TP53, ATRX) are shared, cell-cycle hits like CDKN2A are mostly present already at the primary, and mismatch-repair genes — the route to temozolomide-associated hypermutation — are hit only at recurrence (11 recurrence-only, none primary-only). Too few pairs for any single gene to be significant." }
       ]
     }
   },
@@ -191,27 +230,41 @@ export const REPRODUCTIONS: PaperReproduction[] = [
     citation: "Razavi et al., Cancer Cell 2018",
     studyIds: ["breast_msk_2018"],
     badge: "partial",
-    summary: "The four-way receptor-subtype genomic comparison reproduced cleanly, and the k-group Welch's-ANOVA/Kruskal-Wallis test this project built specifically closes a gap the first reproduction attempt hit (numeric attributes used to be refused outright above 2 cohorts). The paper's actual headline claim — ESR1 mutation enrichment specifically after endocrine therapy — stays unreachable: this study records no treatment-timing data at all.",
+    summary: "The four-way receptor-subtype genomic comparison reproduced cleanly, and the k-group Welch's-ANOVA/Kruskal-Wallis test this project built specifically closes a gap the first reproduction attempt hit (numeric attributes used to be refused outright above 2 cohorts). The paper's headline — ESR1 and MAPK-pathway alterations enriched after endocrine therapy — was out of reach while no view could separate samples by when they were taken; this study still records no treatment exposure, but its sample sites do say which samples came before any treatment, and against that proxy ESR1, NF1 and ERBB2 all line up with the paper.",
     findings: [
       { claim: "The four receptor subtypes differ genomically (TP53, PIK3CA, CDH1, GATA3, ESR1)", result: "TP53 p=1.6e-67, PIK3CA p=7.6e-10, CDH1 p=7.3e-8, GATA3 p=4.6e-7, ESR1 p=3.8e-5 — all match the paper's directions", verdict: "match" },
       { claim: "Survival differs by receptor subtype, worst in triple-negative", result: "median OS 176mo (HR+/HER2-) / 46mo (TNBC) / 262mo (HR+/HER2+) / 114mo (HR-/HER2+), k-group log-rank chi2=145.1, p=3.0e-31", verdict: "match" },
-      { claim: "ESR1 mutations are enriched specifically in tumors previously exposed to endocrine therapy", result: "this study records no treatment-timing data — unreachable regardless of DSL features", verdict: "gap" }
+      { claim: "ESR1 ligand-binding-domain mutations are present in 18% of HR+/HER2- tumours collected after endocrine therapy, and rare before it", result: "OncoKB-driver ESR1 in 0.7% of HR+/HER2- patients with only treatment-naive primary samples vs 14.3% of those with a sample taken after treatment (q=3.7e-20); within the 42 patients with both, 7 have ESR1 only in the later sample and none only in the naive primary. The proxy is sampling site, not recorded endocrine exposure, so it mixes in tumours treated otherwise", verdict: "partial" },
+      { claim: "Activating ERBB2 mutations and NF1 loss-of-function mutations are more than twice as common in endocrine-resistant tumours", result: "any alteration, naive primary only vs sampled after treatment: NF1 2.0% vs 7.4% (q=1.5e-5), ERBB2 2.9% vs 8.2% (q=1.1e-4) — both more than twice as common; MYC also enriched (5.9% vs 10.4%), as the paper reports", verdict: "match" }
     ],
     doc: {
       study: "breast_msk_2018",
       title: "Razavi 2018 — breast cancer receptor subtypes",
-      notes: "Razavi et al.'s four-way receptor-subtype comparison. The FIRST time the survival half of this was attempted, it came back \"skipped: tested only for exactly 2 cohorts\" — the k-group generalization of the log-rank test didn't exist yet. It does now, which is what makes the survival comparison below complete rather than blocked.",
+      notes: "Razavi et al.'s four-way receptor-subtype comparison. The FIRST time the survival half of this was attempted, it came back \"skipped: tested only for exactly 2 cohorts\" — the k-group generalization of the log-rank test didn't exist yet. It does now, which is what makes the survival comparison below complete rather than blocked. The endocrine-resistance half uses SAMPLE_SITE: this study records where each sample came from but not what treatment preceded it, so \"sampled after treatment\" (any site other than a treatment-naive primary) stands in for the paper's \"previously exposed to hormonal therapy\" — broader than the paper's definition, and said so in each view.",
       cohorts: {
         "HR+/HER2-": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2-"], per: "sample" }] },
         "TNBC": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["Triple Negative"], per: "sample" }] },
         "HR+/HER2+": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2+"], per: "sample" }] },
-        "HR-/HER2+": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR-/HER2+"], per: "sample" }] }
+        "HR-/HER2+": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR-/HER2+"], per: "sample" }] },
+        "HR+/HER2-, treatment-naive primary only": { all: [
+          { kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2-"], per: "sample" },
+          { kind: "clinical", attribute: "SAMPLE_SITE", values: ["Treatment Naive Primary"], per: "sample" },
+          { not: { kind: "clinical", attribute: "SAMPLE_SITE", values: RAZAVI_AFTER_TREATMENT_SITES, per: "sample" } }] },
+        "HR+/HER2-, sampled after treatment": { all: [
+          { kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2-"], per: "sample" },
+          { kind: "clinical", attribute: "SAMPLE_SITE", values: RAZAVI_AFTER_TREATMENT_SITES, per: "sample" }] }
       },
       views: [
-        { kind: "compare", genes: ["TP53", "PIK3CA", "CDH1", "GATA3", "ESR1"],
+        { kind: "compare", genes: ["TP53", "PIK3CA", "CDH1", "GATA3", "ESR1"], cohorts: ["HR+/HER2-", "TNBC", "HR+/HER2+", "HR-/HER2+"],
           note: "Reproduces the paper's subtype-genomics comparison: all five genes differ sharply across the four receptor subtypes (TP53 highest in triple-negative, PIK3CA highest in HR+/HER2-, ESR1 essentially confined to HR+ subtypes), directions matching the paper." },
-        { kind: "survival",
-          note: "Reproduces the paper's subtype-stratified survival comparison: triple-negative's markedly shorter survival relative to the HR+/HER2+ and HR+/HER2- subtypes matches the paper's reported outcome differences — the k-group log-rank (chi2=145.1, p=3.0e-31) is only computable at all because of this session's own k-group generalization; before it, 3+ cohorts got a picture with no test. What this document cannot show: the paper's actual headline (ESR1 mutations enriched specifically after endocrine therapy) needs treatment-timing data this study simply does not record — a data gap, not a DSL one." }
+        { kind: "survival", cohorts: ["HR+/HER2-", "TNBC", "HR+/HER2+", "HR-/HER2+"],
+          note: "Reproduces the paper's subtype-stratified survival comparison: triple-negative's markedly shorter survival relative to the HR+/HER2+ and HR+/HER2- subtypes matches the paper's reported outcome differences — the k-group log-rank (chi2=145.1, p=3.0e-31) is only computable at all because of this session's own k-group generalization; before it, 3+ cohorts got a picture with no test. What this document cannot show: the paper's actual headline (ESR1 mutations enriched after endocrine therapy) is taken up by the two views below, against the closest proxy this study has." },
+        { kind: "compare", genes: ["ESR1", "NF1", "ERBB2", "MYC", "KRAS", "EGFR", "FOXA1", "CTCF", "TBX3"],
+          cohorts: ["HR+/HER2-, treatment-naive primary only", "HR+/HER2-, sampled after treatment"],
+          note: "The paper's endocrine-resistance genes, before and after treatment: ESR1 drivers 0.7% vs 14.3% (the paper: 18% after endocrine therapy), NF1 and ERBB2 each more than twice as common after (2.0% vs 7.4%, 2.9% vs 8.2%), MYC enriched too. \"After treatment\" is any sample other than a treatment-naive primary — this study does not record endocrine exposure itself, so it includes tumours treated in other ways." },
+        { kind: "paired", genes: ["ESR1", "NF1", "ERBB2", "MYC", "FOXA1"], cohorts: ["HR+/HER2-, sampled after treatment"], measure: "any",
+          pairBy: { attribute: "SAMPLE_SITE", a: "Treatment Naive Primary", b: RAZAVI_AFTER_TREATMENT_SITES },
+          note: "The same question within patients, where it cannot be confounded by who gets sampled: among the 42 HR+/HER2- patients with both a treatment-naive primary and a later sample, ESR1 appears only in the later one in 7 and only in the primary in none — acquired, as the paper argues, though 42 pairs are too few for significance." }
       ]
     }
   },

@@ -194,7 +194,7 @@ export function registerTools(server: any): void {
 
   server.tool(
     "run_analysis",
-    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes) and oncoprint. Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
+    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes), oncoprint, attrition (CONSORT-style counts after each cohort clause), genome (genome-wide copy-number gain/loss frequency from segments), pathways (the ten Sanchez-Vega oncogenic pathways, % altered per cohort), diffexpr (two-cohort differential expression volcano plus preranked GSEA), paired (primary-vs-metastasis concordance within patients), clonality (FACETS clonal/subclonal calls, LOH, genome doubling, purity, ploidy), incidence (cumulative incidence of a timeline event with death as a competing risk, Gray's test), labs (a lab value's course and response from a treatment start, e.g. PSA50, with a waterfall). Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
     {
       document: z.object({}).passthrough()
         .describe("The Analysis document: {study, cohorts: {name: def, ...}, views: [...]}. Grammar and examples: describe_dsl.")
@@ -364,6 +364,83 @@ export function registerTools(server: any): void {
           out.push(`Oncoprint: ${v.nColumns!.toLocaleString()} patients — ` +
             v.genes!.map((g) => `${g.gene} ${g.driverPct}%/${g.anyPct}%`).join(", ") +
             ` — annotation ${v.annotation}.` + noteOf(v));
+        } else if (v.kind === "genome") {
+          const g = v.genome!;
+          // per chromosome, the highest gained and lost share of each cohort — enough to name the
+          // regions without reciting every bin
+          const perChrom = (s: typeof g.series[number]) => {
+            const best = new Map<string, { gain: number; loss: number }>();
+            g.bins.forEach((b, i) => {
+              if (!s.profiled[i]) return;
+              const cur = best.get(b.chrom) || { gain: 0, loss: 0 };
+              cur.gain = Math.max(cur.gain, 100 * s.gain[i] / s.profiled[i]);
+              cur.loss = Math.max(cur.loss, 100 * s.loss[i] / s.profiled[i]);
+              best.set(b.chrom, cur);
+            });
+            return [...best].map(([c, x]) => `chr${c} +${x.gain.toFixed(0)}/−${x.loss.toFixed(0)}`).join(", ");
+          };
+          out.push(`Genome-wide copy number (${g.build}, ${g.binMb} Mb bins, |log2| ≥ ${g.threshold}; peak % gained/lost per chromosome):\n` +
+            g.series.map((s) => `  ${s.cohort} (${s.segmented.toLocaleString()} segmented samples): ${perChrom(s)}`).join("\n") +
+            (g.test ? `\n  bins differing at q<0.05: ${g.test.significantGain} for gains, ${g.test.significantLoss} for losses, of ${g.bins.length}` : "") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "pathways") {
+          const pw = v.pathways!;
+          out.push(`Oncogenic signalling pathways (% of patients with ≥1 member ${pw.measure === "driver" ? "driver" : "altered"}; union-of-panels denominator):\n` +
+            pw.rows.map((r) => `  ${r.name} (${r.profiledGenes}/${r.genes} genes profiled): ` +
+              r.cells.map((c) => `${c.cohort} ${c.pct == null ? "not profiled" : c.pct + "%"}`).join(" | ") +
+              (r.q != null ? ` q=${pFmt(r.q)}` : "") +
+              (r.top.length ? `; top: ` + r.top.map((t) => `${t.gene} ${t.cells.map((c) => c.pct == null ? "–" : c.pct + "%").join("/")}`).join(", ") : "") +
+              (r.otherAltered ? `, +${r.otherAltered} more altered` : "")).join("\n") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "diffexpr") {
+          const d = v.diffexpr!;
+          const top = (sign: 1 | -1) => d.points.filter((g) => g.q < 0.05 && Math.sign(g.effect) === sign).slice(0, 12)
+            .map((g) => `${g.gene} ${g.effect > 0 ? "+" : ""}${g.effect.toFixed(2)} (q=${pFmt(g.q)})`).join(", ");
+          out.push(`Differential expression, ${d.groups[0]} vs ${d.groups[1]} on ${d.profileType}${d.log2 ? " (log2)" : ""}: ` +
+            `${d.tested.toLocaleString()} genes tested, ${d.up.toLocaleString()} higher in ${d.groups[0]} and ${d.down.toLocaleString()} higher in ${d.groups[1]} at q<0.05 (${d.effectLabel}).\n` +
+            `  most significant, higher in ${d.groups[0]}: ${top(1) || "none"}\n` +
+            `  most significant, higher in ${d.groups[1]}: ${top(-1) || "none"}` +
+            (d.gsea ? `\n  GSEA (${d.gsea.ranking}; ${d.gsea.permutations} gene-set permutations):\n` +
+              d.gsea.sets.slice(0, 12).map((x) => `    ${x.name}: NES ${x.nes.toFixed(2)}, q=${pFmt(x.q)}, ${x.size} genes, leading edge ${x.leadingEdge.slice(0, 8).join(" ")}${x.leadingEdge.length > 8 ? " …" : ""}`).join("\n") : "") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "paired") {
+          const pr = v.paired!, aL = pr.pairBy.a.join("/"), bL = pr.pairBy.b.join("/");
+          out.push(`Paired samples, ${pr.pairBy.attribute} ${aL} vs ${bL} (${pr.measure === "driver" ? "drivers" : "any alteration"}; profiled on both sides):\n` +
+            pr.panels.map((pn) => `  ${pn.cohort} (${pn.patients.toLocaleString()} patients with both):\n` +
+              pn.genes.map((g) => `    ${g.gene}: both ${g.both}, ${aL}-only ${g.aOnly}, ${bL}-only ${g.bOnly} of ${g.pairs} pairs` +
+                (g.concordance != null ? `, ${Math.round(100 * g.concordance)}% concordant` : "") +
+                (g.aOnly + g.bOnly ? `, McNemar q=${pFmt(g.q)}` : "")).join("\n")).join("\n") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "clonality") {
+          const cr = v.clonality!;
+          out.push(`Clonality (FACETS; ${cr.measure === "driver" ? "driver mutation calls" : "all mutation calls"}${cr.qc ? ", QC-passing samples" : ""}):\n` +
+            cr.panels.map((pn) => `  ${pn.cohort}: WGD ${pn.wgd.yes + pn.wgd.no ? (100 * pn.wgd.yes / (pn.wgd.yes + pn.wgd.no)).toFixed(1) + "%" : "—"} of ${(pn.wgd.yes + pn.wgd.no).toLocaleString()} samples\n` +
+              pn.genes.map((g) => `    ${g.gene}: ${g.calls} calls, ${g.clonal + g.subclonal ? Math.round(100 * g.clonal / (g.clonal + g.subclonal)) + "% clonal" : "—"}` +
+                ` (${g.clonal} clonal, ${g.subclonal} subclonal, ${g.indeterminate} indeterminate), LOH ${g.lohKnown ? Math.round(100 * g.loh / g.lohKnown) + "%" : "—"}` +
+                (g.q != null ? `, q=${pFmt(g.q)}` : "")).join("\n")).join("\n") +
+            (cr.wgdP != null ? `\n  WGD difference: Fisher p=${pFmt(cr.wgdP)}` : "") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "incidence") {
+          const inc = v.incidence!;
+          out.push(`Cumulative incidence of ${inc.eventLabel}${inc.anchoredTo ? " from " + inc.anchoredTo : ""}, death competing (Aalen-Johansen):\n` +
+            inc.curves.map((c) => `  ${c.cohort}: n=${c.n.toLocaleString()}, ${c.events} events, ${c.competing} died first, ${c.censored} censored; ` +
+              `not at risk: ${c.excluded.prior} already had it, ${c.excluded.unobserved} before observation, ${c.excluded.noAnchor} no anchor, ${c.excluded.noFollowup} no follow-up`).join("\n") + "\n" +
+            inc.horizons.map((h) => `  at ${h.months} months: ` + h.cells.map((c) => `${c.cohort} ${(100 * c.f1).toFixed(1)}% (95% CI ${(100 * c.lo).toFixed(1)}-${(100 * c.hi).toFixed(1)}; 1-KM would say ${(100 * c.naive).toFixed(1)}%)`).join(" | ")).join("\n") +
+            (inc.gray ? `\n  Gray's test: statistic ${inc.gray.statistic.toFixed(2)}, permutation p=${pFmt(inc.gray.p)} (${inc.gray.permutations} shuffles)` : "") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "labs") {
+          const lb = v.labs!;
+          out.push(`Lab course: ${lb.test} % change from baseline, weeks from ${lb.anchoredTo}:\n` +
+            lb.panels.map((pn) => `  ${pn.cohort}: ${pn.anchored.toLocaleString()} started, ${pn.baseline.toLocaleString()} with a baseline, ${pn.evaluable.toLocaleString()} measured after; ` +
+              `${pn.evaluable ? (100 * pn.responders / pn.evaluable).toFixed(1) : "—"}% fell ≥${lb.responseDrop}% (${pn.responders}/${pn.evaluable})\n` +
+              `    median [IQR] by week: ` + pn.course.filter((c) => c.n >= 5).map((c) => `${c.week}w ${c.median}% [${c.q1}, ${c.q3}]`).join(", ")).join("\n") +
+            (lb.responseP != null ? `\n  response rates differ: Fisher p=${pFmt(lb.responseP)}` : "") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "attrition") {
+          out.push("Cohort attrition (patients left after each clause, in order):\n" + v.attrition!.map((pn) =>
+            `  ${pn.cohort}: study base ${pn.base.toLocaleString()}\n` +
+            pn.steps.map((st) => `    → ${st.label}: ${st.n.toLocaleString()} (−${st.excluded.toLocaleString()})`).join("\n")).join("\n") +
+            caveatOf(v) + noteOf(v));
         } else {
           // A view kind with no branch above used to append nothing at all: the
           // numbers were computed and the model was simply never told. Saying so

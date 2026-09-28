@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-09-27",
+  "generated": "2026-09-28",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -144,6 +144,38 @@
       "NSCLC": 350,
       "NSCLC high-TMB": 69,
       "NSCLC low-TMB": 281
+    },
+    "Cohort attrition: which criterion removed whom": {
+      "LUAD KRAS G12C, immunotherapy": 279,
+      "LUAD KRAS wild-type": 3976
+    },
+    "Genome-wide copy number: colorectal against breast": {
+      "Colorectal": 4993,
+      "Breast": 5803
+    },
+    "Oncogenic signalling pathways: colorectal against pancreatic": {
+      "Colorectal": 5543,
+      "Pancreatic": 3109
+    },
+    "Differential expression and enrichment: basal-like against luminal A breast cancer": {
+      "Basal-like": 171,
+      "Luminal A": 499
+    },
+    "Paired samples: what differs between a patient's primary and metastasis": {
+      "all patients": 48179
+    },
+    "Clonality, LOH and genome doubling from FACETS": {
+      "Colorectal": 4993,
+      "Breast": 5803
+    },
+    "Brain metastasis, with death as a competing risk": {
+      "NSCLC": 7809,
+      "Breast": 5368,
+      "Colorectal": 5543
+    },
+    "PSA response to hormone therapy, by TP53 status": {
+      "Prostate, TP53 mutant": 849,
+      "Prostate, TP53 wild-type": 2284
     }
   }
 }
