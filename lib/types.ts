@@ -210,6 +210,61 @@ export interface CohortDef {
   notes?: string;
 }
 
+/**
+ * Auto-split ONE existing named cohort into an arm per distinct value of a categorical clinical
+ * attribute, live from the data — instead of hand-writing one cohort per value. Lives on a VIEW,
+ * not a cohort: the synthetic arms it produces are not added to the document's own named-cohort
+ * map (so they don't compete for the 16-cohort cap or clutter the Cohorts tab), but each arm
+ * still carries full provenance — its own compiled SQL and count — attached to that view's own
+ * result (ViewResult.splitBy). Resolved once per view, live, before that view's own queries run
+ * (lib/cohort-splitby.ts), the same "resolve once before compilation" shape as `extends` and a
+ * clinical leaf's `percentile`.
+ */
+export interface SplitBy {
+  /** which existing named cohort to split */
+  cohort: string;
+  /**
+   * Exactly one of `attribute`/`gene`/`oql` must be given — three different sources of grouping,
+   * all producing the same kind of ephemeral, view-scoped arms.
+   */
+  /** a categorical clinical attribute; a numeric one is refused (use a percentile cutoff on a
+   *  cohort instead — this splits into groups, it doesn't threshold a continuous value) */
+  attribute?: string;
+  /**
+   * A gene symbol: splits into exactly two arms (mutated / not mutated via OQL) rather than a
+   * live-discovered value distribution — no query needed to know the group names in advance,
+   * unlike `attribute`. Sugar for the single-gene case of `oql` below, with its complement
+   * ("Not mutated") auto-generated — `oql` itself never auto-generates a complement, since with
+   * an arbitrary list of queries there's no single obvious "everything else" to name that way.
+   * `maxArms`/`minCount` don't apply here (always exactly 2) and are refused if given alongside
+   * `gene`, to avoid silently implying a knob that does nothing.
+   */
+  gene?: string;
+  /**
+   * One or more portal-OQL queries (1-8 — the same limit the compiler's own `{any:[...]}` clause
+   * enforces everywhere else, since the Other arm and the overlap check both need every query to
+   * fit inside one such clause; the same subset lib/oql.ts compiles for a cohort's own
+   * `{kind:"oql"}` leaf) — one arm per query, named from the query text itself, so this reaches
+   * anything OQL can express: a specific mutation type, a driver-only call, a multi-gene
+   * co-alteration ("TP53: MUT; KRAS: MUT"), copy number, and so on — not just plain mutation
+   * status. A patient matching more than one query appears in EVERY arm it matches — arms are
+   * NOT forced into a partition — and the total overlap is disclosed, not hidden; a patient
+   * matching none of them falls into a disclosed "Other" arm, same as attribute mode's leftover
+   * values. `maxArms`/`minCount` don't apply (you named the arms yourself; there's no
+   * data-discovered long tail to cap or pool) and are refused if given alongside `oql`.
+   */
+  oql?: string[];
+  /** at most this many arms, INCLUDING a pooled "Other" if the attribute has more distinct
+   *  values than this (default 8) — never silently drops a value, always discloses what got
+   *  pooled and why, the same "+N more" idiom the oncoprint legend and sequence view use.
+   *  `attribute` mode only. */
+  maxArms?: number;
+  /** an arm with fewer than this many matching patients pools into "Other" instead of standing
+   *  alone (default 10 — the same floor the survival view's log-rank guard uses: below it, a
+   *  group's own statistics are too unstable to read as a real arm). `attribute` mode only. */
+  minCount?: number;
+}
+
 /** Context threaded into every leaf compiler. */
 export interface CompileCtx {
   study: string;
@@ -228,12 +283,12 @@ export type { GeneTrackSpec };
 export interface CompareView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "compare"; genes: string[]; cohorts?: string[];
+  kind: "compare"; genes: string[]; cohorts?: string[]; splitBy?: SplitBy;
 }
 export interface SurvivalView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "survival"; cohorts?: string[];
+  kind: "survival"; cohorts?: string[]; splitBy?: SplitBy;
   /** endpoint prefix: OS (default), PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS */
   endpoint?: string;
   /**
@@ -277,7 +332,7 @@ export type CoxCovariate = PlotAxis & { reference?: string };
 export interface CoxView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "cox"; cohorts?: string[];
+  kind: "cox"; cohorts?: string[]; splitBy?: SplitBy;
   /** endpoint prefix: OS (default), PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS */
   endpoint?: string;
   /** same escape hatch as SurvivalView.monthsAttribute/statusAttribute, for the same reason */
@@ -339,7 +394,7 @@ export interface CoxResult {
 export interface LogisticView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "logistic"; cohorts?: string[];
+  kind: "logistic"; cohorts?: string[]; splitBy?: SplitBy;
   /** the binary outcome, as a plot axis (clinical, molecular, or alteration status) */
   outcome: PlotAxis;
   /**
@@ -405,7 +460,7 @@ export interface CooccurrenceView {
   note?: string; kind: "cooccurrence"; genes: string[]; cohorts?: string[] }
 export interface ClinicalView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
-  note?: string; kind: "clinical"; attributes: string[]; cohorts?: string[] }
+  note?: string; kind: "clinical"; attributes: string[]; cohorts?: string[]; splitBy?: SplitBy }
 export interface CoexpressionView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string; kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[] }
@@ -425,7 +480,7 @@ export interface HotspotsView {
 export interface CourseView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
-  kind: "course"; cohorts?: string[];
+  kind: "course"; cohorts?: string[]; splitBy?: SplitBy;
   /** canonical event names to measure; case is folded (lib/event-names.ts) */
   eventTypes: string[];
   anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
@@ -488,7 +543,7 @@ export interface OncoprintView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
   /** rows: a gene symbol, or {label?, genes} for one merged row over several genes */
-  kind: "oncoprint"; genes: GeneTrackSpec[]; cohorts?: string[];
+  kind: "oncoprint"; genes: GeneTrackSpec[]; cohorts?: string[]; splitBy?: SplitBy;
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
   /** what a column is (default "patient"); "sample" draws every sample of the cohort's patients */
   unit?: "patient" | "sample";
@@ -741,6 +796,27 @@ export interface ViewResult {
   /** the aggregate queries that produced THIS view's numbers, in order */
   queries?: { study: string; label: string; sql: string; ms?: number; remote?: boolean }[];
   cohorts?: string[]; annotation?: string;
+  /**
+   * Present only when the view asked for `splitBy`: the synthetic arms it produced, with full
+   * provenance (each arm's own compiled SQL and count) since they aren't in the document's own
+   * `cohorts` map (see SplitBy's own comment for why). `cohorts` above already lists their names
+   * as this view's drawn cohorts; this is where a reader finds out what each one actually means.
+   */
+  splitBy?: {
+    /** echoes exactly one of the view's own splitBy.attribute/gene/oql */
+    attribute?: string; gene?: string; oql?: string[]; cohort: string;
+    arms: { name: string; count: number; text: string; sql: string }[];
+    /** raw values this split saw but pooled into "Other" rather than giving their own arm —
+     *  because there were too many to fit `maxArms`, or too few patients to clear `minCount`
+     *  (attribute mode), or matched none of the given queries (oql mode). Never set for gene
+     *  mode — its two arms (mutated / not) are already a complete partition by construction. */
+    otherValues?: string[];
+    /** patients counted toward more than one of the NAMED arms above (never "Other", which is
+     *  disjoint from them by construction) — arms are not forced into a partition, so this
+     *  discloses by how much they overlap rather than leaving it to be discovered by the arm
+     *  counts not summing to the base cohort. 0/undefined when there's no overlap to report. */
+    overlapCount?: number;
+  };
   rows?: CompareRow[];                      // compare
   curves?: KmCurve[]; caveat?: string;      // survival
   endpoint?: string;                        // survival: which endpoint was used

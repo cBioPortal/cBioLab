@@ -255,6 +255,7 @@ details.gearmenu > .gearmenu-items {
   display: flex; flex-direction: column; gap: 0.25rem;
 }
 .gearmenu-items a { color: var(--accent-ink); font-size: var(--t-md); }
+.viewhelp-text { margin: 0; font-size: var(--t-md); line-height: 1.5; color: var(--ink); }
 /* a <button> centers its text by default; every other item in this column
    (links, checkboxes) reads flush left, so a button among them looked adrift. */
 .gearmenu-items > button.linklike { text-align: left; }

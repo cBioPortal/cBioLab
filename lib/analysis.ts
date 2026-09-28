@@ -20,7 +20,8 @@ import { fisherExact, kaplanMeier, logRank, logRankK, benjaminiHochberg, cochran
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
 import { viewToSvg } from "./view-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, LogRankK, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate, LogisticView, LogisticCoefficient } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, LogRankK, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate, LogisticView, LogisticCoefficient, SplitBy } from "./types.ts";
+import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
@@ -195,10 +196,13 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   { const e = overLimit("an analysis document", 6, (doc.views || []).length); if (e) throw new Error(e.replace("at most 6", "at most 6 views")); }
 
   // ---- evaluate cohorts: per study, sum the counts ------------------------
-  const cohorts: Record<string, { studies: string[]; perStudy: Record<string, { sql: string; count: number; mode: string }>; count: number; text: string }> = {};
+  type EvaledCohort = { studies: string[]; perStudy: Record<string, { sql: string; count: number; mode: string }>; count: number; text: string };
+  const cohorts: Record<string, EvaledCohort> = {};
   const resolvers: Record<string, Resolver> = {}; // study -> its instance's resolver
-  for (const name of names) {
-    const def = doc.cohorts[name];
+  // Extracted so a splitBy arm (a synthetic cohort, never in `doc.cohorts`/`names`) can be
+  // evaluated the exact same way as a named one — same studies/perStudy/count/text shape, same
+  // provenance — without duplicating this block.
+  const evalCohortDef = async (def: CohortDef): Promise<EvaledCohort> => {
     const studies = [];
     for (const s of cohortStudies(def, docStudy)) studies.push(await resolveStudy(s, docStudy));
     const perStudy: Record<string, { sql: string; count: number; mode: string }> = {};
@@ -219,14 +223,15 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     for (const { s, res, sql, count } of evals) {
       perStudy[s] = { sql, count, mode: res.instance.mode };
     }
-    cohorts[name] = {
+    return {
       studies, perStudy,
       count: Object.values(perStudy).reduce((n, x) => n + x.count, 0),
       text: describeCohortDef(def) +
         (studies.length > 1 ? " — across " + studies.length + " studies" :
          studies[0] !== docStudy ? " — in " + studies[0] : "")
     };
-  }
+  };
+  for (const name of names) cohorts[name] = await evalCohortDef(doc.cohorts[name]);
   const involved = [...new Set(Object.values(cohorts).flatMap((c) => c.studies))];
 
   // ---- views --------------------------------------------------------------
@@ -259,8 +264,89 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   };
 
   const views: ViewResult[] = [];
-  for (const view of (doc.views || [])) {
-    const vNames = (view.cohorts && view.cohorts.length ? view.cohorts : names).filter((n) => cohorts[n]);
+  const splitByForView: Record<number, NonNullable<ViewResult["splitBy"]>> = {};
+  for (let vi = 0; vi < (doc.views || []).length; vi++) {
+    const view = (doc.views || [])[vi];
+    let vNames: string[];
+    const sb = (view as { splitBy?: SplitBy }).splitBy;
+    if (sb) {
+      const baseName = sb.cohort;
+      if (!cohorts[baseName]) {
+        views.push({ kind: view.kind, error: "splitBy names cohort “" + baseName + "”, which doesn't exist" });
+        continue;
+      }
+      const baseDef = doc.cohorts[baseName];
+      // Same additive-across-studies shape every other federated feature here uses: each study
+      // answers for its own patients (attributeStats is on AggregateCapable, so this works for
+      // an aggregate-only or remote participant too — splitBy needs no patient-level access),
+      // and disagreeing declared types across studies is refused, not silently merged, the same
+      // rule the clinical view's own cross-study comparison already follows.
+      const distributionFor = async (attribute: string): Promise<AttributeDistribution> => {
+        const perStudyStats = await Promise.all(cohorts[baseName].studies.map(async (s) => {
+          const [stat] = await resolvers[s].attributeStats(baseDef, [attribute]);
+          return stat;
+        }));
+        const skipped = perStudyStats.find((s) => s?.skipped);
+        if (skipped) return { kind: "cat", per: "patient", skipped: skipped!.skipped! };
+        const kinds = new Set(perStudyStats.map((s) => s?.kind).filter((k) => k != null));
+        if (kinds.size > 1)
+          return { kind: "cat", per: "patient",
+            skipped: "'" + attribute + "' is declared inconsistently (numeric in one study, categorical in another) across “" + baseName + "”'s studies" };
+        const kind = (perStudyStats[0]?.kind ?? "cat") as "cat" | "num";
+        const per = (perStudyStats[0]?.per ?? "patient") as "patient" | "sample";
+        if (kind === "num") return { kind, per };
+        const merged = new Map<string, number>();
+        for (const s of perStudyStats) for (const { v, n } of (s?.values || [])) merged.set(v, (merged.get(v) || 0) + n);
+        return { kind: "cat", per, values: [...merged.entries()].map(([v, n]) => ({ v, n })) };
+      };
+      try {
+        const resolved = await resolveSplitBy(sb, names, baseDef, distributionFor);
+        // Every one of the 12 view branches below reads its cohort's DEFINITION via
+        // doc.cohorts[n] directly (never through the `cohorts` evaluation-result map, which only
+        // holds studies/count/text/sql) — so an arm invisible to doc.cohorts would be invisible
+        // to every query too, silently falling back to no filter at all. Writing it here, into
+        // this run's own already-resolved `doc` (never the caller's original document — see
+        // resolveCohortPercentiles above), makes every branch see it for free with no changes to
+        // any of them, while `names`/`result.cohorts` (captured before this point) still don't.
+        for (const arm of resolved.arms) { doc.cohorts[arm.name] = arm.def; cohorts[arm.name] = await evalCohortDef(arm.def); }
+        // oql mode always includes an "Other" arm (unlike attribute mode, whether it's needed
+        // can't be known ahead of a live count) — drop it here if it turns out empty, rather
+        // than showing an always-empty bucket.
+        let keptArms = resolved.arms;
+        if (resolved.otherArmName && cohorts[resolved.otherArmName].count === 0) {
+          keptArms = resolved.arms.filter((a) => a.name !== resolved.otherArmName);
+          delete cohorts[resolved.otherArmName];
+          delete doc.cohorts[resolved.otherArmName];
+        }
+        vNames = keptArms.map((a) => a.name);
+        // Arms are not forced into a partition (a patient can match more than one), so disclose
+        // by how much they overlap rather than leaving a reader to notice the arm counts don't
+        // sum to the base cohort on their own. Never counts "Other" itself, which is disjoint
+        // from the named arms by construction.
+        let overlapCount: number | undefined;
+        if (resolved.overlapCheckDef) {
+          const namedArms = keptArms.filter((a) => a.name !== resolved.otherArmName);
+          const sumCount = namedArms.reduce((n, a) => n + cohorts[a.name].count, 0);
+          const overlapEval = await evalCohortDef(resolved.overlapCheckDef);
+          overlapCount = sumCount - overlapEval.count;
+        }
+        splitByForView[vi] = {
+          ...(resolved.gene ? { gene: resolved.gene } : resolved.oql ? { oql: resolved.oql } : { attribute: resolved.attribute }),
+          cohort: baseName,
+          arms: keptArms.map((a) => ({
+            name: a.name, count: cohorts[a.name].count, text: cohorts[a.name].text,
+            sql: Object.entries(cohorts[a.name].perStudy).map(([s, x]) => "-- " + s + "\n" + x.sql).join("\n\n")
+          })),
+          ...(resolved.otherValues.length ? { otherValues: resolved.otherValues } : {}),
+          ...(overlapCount ? { overlapCount } : {})
+        };
+      } catch (e) {
+        views.push({ kind: view.kind, error: (e as Error).message });
+        continue;
+      }
+    } else {
+      vNames = (view.cohorts && view.cohorts.length ? view.cohorts : names).filter((n) => cohorts[n]);
+    }
     const vStudies = [...new Set(vNames.flatMap((n) => cohorts[n].studies))];
     const mark = queryMark(), pushedBefore = views.length, viewT0 = Date.now();
 
@@ -1752,6 +1838,9 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     const note = v.note;
     if (views[i] && typeof note === "string" && note.trim()) views[i].annotationNote = note.trim();
   });
+  // Same reason: splitBy's resolved arms are cheaper to attach by position, once, than to
+  // thread through every one of the 12 kind-specific branches above.
+  for (const [i, info] of Object.entries(splitByForView)) if (views[+i]) views[+i].splitBy = info;
 
   return {
     study: docStudy, involvedStudies: involved, oncokbPin: pin,
