@@ -974,3 +974,129 @@ export function kruskalWallis(histograms: Histogram[][]): KruskalWallisTest {
   const df = k - 1;
   return { h: Math.round(h * 1e4) / 1e4, df, p: chiSquareP(h, df) };
 }
+
+// ---------------------------------------------------------------------------
+// Preranked gene-set enrichment (Subramanian et al., PNAS 2005)
+
+/** A small seeded PRNG (mulberry32), so a permutation null is the same on every run. */
+export function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** A stable 32-bit seed from a string (FNV-1a). */
+export function seedOf(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+
+/**
+ * The enrichment score of a set whose members sit at `positions` (0-based, ascending) in a
+ * ranking of `n` genes, each weighted by |score| (weight exponent 1, the GSEA default). The
+ * running sum rises by w/ΣW at a member and falls by 1/(n-k) at a non-member, so its maximum
+ * is reached just after a member and its minimum just before one (or at the end) — which is
+ * why this needs only the k member positions, not a walk over all n genes.
+ */
+export function enrichmentScore(positions: ArrayLike<number>, weights: ArrayLike<number>, n: number): number {
+  const k = positions.length;
+  if (!k || k >= n) return 0;
+  let nr = 0;
+  for (let i = 0; i < k; i++) nr += weights[i];
+  // all-zero weights: fall back to the unweighted (Kolmogorov–Smirnov) walk
+  const unweighted = !(nr > 0);
+  if (unweighted) nr = k;
+  const miss = 1 / (n - k);
+  let cum = 0, best = 0;
+  for (let i = 0; i < k; i++) {
+    const before = cum / nr - (positions[i] - i) * miss;           // just before this member
+    if (Math.abs(before) > Math.abs(best)) best = before;
+    cum += unweighted ? 1 : weights[i];
+    const after = cum / nr - (positions[i] + 1 - (i + 1)) * miss; // just after it
+    if (Math.abs(after) > Math.abs(best)) best = after;
+  }
+  return best;
+}
+
+export interface GseaResult {
+  name: string;
+  /** members found in the ranking, of the set's full size */
+  size: number; setSize: number;
+  es: number; nes: number;
+  /** permutation p, (b + 1) / (m + 1) over the m null sets of the same sign (never exactly 0) */
+  p: number;
+  /** members ranked at or before the peak (after it, for a negative score) */
+  leadingEdge: string[];
+  /** the running sum sampled at `curveAt` ranks, for drawing */
+  curve: number[]; curveAt: number[];
+  /** every member's rank */
+  hits: number[];
+}
+
+/**
+ * Preranked GSEA: `ranked` is the whole ranking, best first. Significance is by gene-set
+ * permutation (random sets of the same size drawn from the same ranking), the method GSEA's own
+ * preranked mode uses, seeded from the set's name so a shared document reproduces its p-values.
+ */
+export function preRankedGsea(ranked: { gene: string; score: number }[], sets: { name: string; genes: string[] }[],
+  opts: { permutations?: number; minSize?: number; curvePoints?: number } = {}): GseaResult[] {
+  const n = ranked.length, perms = opts.permutations ?? 1000, minSize = opts.minSize ?? 10, CP = opts.curvePoints ?? 200;
+  const rankOf = new Map<string, number>();
+  ranked.forEach((r, i) => { if (!rankOf.has(r.gene)) rankOf.set(r.gene, i); });
+  const absW = Float64Array.from(ranked, (r) => Math.abs(r.score));
+  const out: GseaResult[] = [];
+  for (const set of sets) {
+    const pos = [...new Set(set.genes)].map((g) => rankOf.get(g)).filter((x): x is number => x != null).sort((a, b) => a - b);
+    const k = pos.length;
+    if (k < minSize || k >= n) continue;
+    const w = pos.map((i) => absW[i]);
+    const es = enrichmentScore(pos, w, n);
+    // the null: random sets of k ranks (Floyd's sampling), their ES computed the same way
+    const rnd = seededRandom(seedOf(set.name));
+    const nullPos: number[] = [], nullNeg: number[] = [];
+    const pick = new Int32Array(k), pw = new Float64Array(k);
+    for (let b = 0; b < perms; b++) {
+      const chosen = new Set<number>();
+      for (let j = n - k; j < n; j++) {
+        const t = Math.floor(rnd() * (j + 1));
+        chosen.add(chosen.has(t) ? j : t);
+      }
+      let m = 0;
+      for (const x of chosen) pick[m++] = x;
+      pick.sort();
+      for (let i = 0; i < k; i++) pw[i] = absW[pick[i]];
+      const e = enrichmentScore(pick, pw, n);
+      (e >= 0 ? nullPos : nullNeg).push(e);
+    }
+    const mean = (xs: number[]) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+    const nes = es >= 0 ? (mean(nullPos) > 0 ? es / mean(nullPos) : 0) : (mean(nullNeg) < 0 ? -es / mean(nullNeg) : 0);
+    const same = es >= 0 ? nullPos : nullNeg;
+    const beyond = same.filter((e) => es >= 0 ? e >= es : e <= es).length;
+    const p = (beyond + 1) / (same.length + 1);
+    // the running sum, sampled for a figure, and where it peaks
+    const curve: number[] = [], curveAt: number[] = [];
+    const inSet = new Uint8Array(n);
+    for (const i of pos) inSet[i] = 1;
+    let nr = 0;
+    for (const x of w) nr += x;
+    const unweighted = !(nr > 0);
+    if (unweighted) nr = k;
+    const miss = 1 / (n - k), step = Math.max(1, Math.floor(n / CP));
+    let rs = 0, peakAt = 0, peak = 0;
+    for (let i = 0; i < n; i++) {
+      rs += inSet[i] ? (unweighted ? 1 : absW[i]) / nr : -miss;
+      if (Math.abs(rs) > Math.abs(peak)) { peak = rs; peakAt = i; }
+      if (i % step === 0 || i === n - 1) { curve.push(Math.round(rs * 1e4) / 1e4); curveAt.push(i); }
+    }
+    const leadingEdge = pos.filter((i) => es >= 0 ? i <= peakAt : i >= peakAt).map((i) => ranked[i].gene);
+    out.push({ name: set.name, size: k, setSize: new Set(set.genes).size, es: Math.round(es * 1e4) / 1e4,
+      nes: Math.round(nes * 1e3) / 1e3, p, leadingEdge, curve, curveAt, hits: pos });
+  }
+  return out;
+}

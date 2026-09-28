@@ -12,12 +12,23 @@ export interface MoreKindUi {
   genes?: boolean;
   /** the most cohorts this view can draw at once */
   maxCohorts?: number;
+  /** why the add button is disabled for this study, or null when it can be added */
+  why?: (known: Known) => string | null;
+}
+
+/** What the page knows about the study before a view is added. */
+export interface Known {
+  genes: string[]; attrs: { attribute: string; kind: string }[]; profiles: string[];
+  events: { canonical: string; label: string; n: number }[]; cohorts: string[];
 }
 
 export const MORE_KINDS: Record<string, MoreKindUi> = {
   attrition: { label: "Cohort attrition (CONSORT)", title: "Cohort attrition", maxCohorts: 6 },
   genome: { label: "Genome-wide copy number", title: "Genome-wide copy number", maxCohorts: 4 },
-  pathways: { label: "Oncogenic pathways", title: "Oncogenic signalling pathways", maxCohorts: 4 }
+  pathways: { label: "Oncogenic pathways", title: "Oncogenic signalling pathways", maxCohorts: 4 },
+  diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2,
+    why: (k) => k.cohorts.length < 2 ? "compares exactly two cohorts — this analysis has one"
+      : !k.profiles.length ? "this study has no molecular profile to compare expression on" : null }
 };
 
 export const isMoreKind = (k: unknown): boolean => Object.prototype.hasOwnProperty.call(MORE_KINDS, String(k));
@@ -39,6 +50,7 @@ export interface MoreCtx {
 /** A one-line subtitle for the card header. */
 export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "attrition") return "patients left after each clause, in order";
+  if (kind === "diffexpr") return (spec.profileType || "no profile") + (v.diffexpr ? (v.diffexpr.log2 ? ", log2(v+1)" : "") + " · volcano and GSEA" : "");
   if (kind === "pathways") return (spec.measure === "any" ? "any alteration" : "OncoKB drivers") + ", Sanchez-Vega et al. 2018";
   if (kind === "genome") return v.genome ? v.genome.build + ", " + v.genome.binMb + " Mb bins, from segments" : "from copy-number segments";
   void spec; void v;
@@ -67,6 +79,26 @@ export function MoreControls({ c }: { c: MoreCtx }) {
       </div>
     </div>
   );
+  if (spec.kind === "diffexpr") return (
+    <div className="viewtb">
+      <div className="tbz"><span className="tbl">data</span>
+        <label className="tbfield" title="the molecular profile both cohorts are compared on">
+          profile <select value={spec.profileType || ""} disabled={busy} onChange={(e) => patch({ profileType: e.target.value, log2: undefined })}>
+            {!c.profiles.includes(spec.profileType) && <option value={spec.profileType || ""}>{spec.profileType || "choose…"}</option>}
+            {c.profiles.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
+          </select>
+        </label>
+        <label className="chk" title="compare log2(v + 1) instead of the stored value; on by default for a non-z-score RNA-seq profile">
+          <input type="checkbox" checked={c.v.diffexpr ? !!c.v.diffexpr.log2 : spec.log2 === true} disabled={busy}
+            onChange={(e) => patch({ log2: e.target.checked })} /> log2
+        </label>
+        <label className="chk" title="preranked GSEA against the 50 MSigDB Hallmark sets; untick to draw the volcano alone">
+          <input type="checkbox" checked={!(Array.isArray(spec.geneSets) && spec.geneSets.length === 0)} disabled={busy}
+            onChange={(e) => patch({ geneSets: e.target.checked ? undefined : [] })} /> enrichment
+        </label>
+      </div>
+    </div>
+  );
   if (spec.kind === "pathways") return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
@@ -87,10 +119,11 @@ export function MoreControls({ c }: { c: MoreCtx }) {
 }
 
 /** The view a fresh "add view" click starts from, built from what the study is known to have. */
-export function defaultMoreView(kind: string, known: {
-  genes: string[]; attrs: { attribute: string; kind: string }[]; profiles: string[];
-  events: { canonical: string; label: string; n: number }[]; cohorts: string[];
-}): Record<string, unknown> {
-  void known;
+export function defaultMoreView(kind: string, known: Known): Record<string, unknown> {
+  if (kind === "diffexpr") {
+    const profile = known.profiles.find((p) => /zscore/i.test(p) && /mrna|rna_seq/i.test(p))
+      || known.profiles.find((p) => /mrna|rna_seq/i.test(p)) || known.profiles[0] || "";
+    return { kind, profileType: profile, ...(known.cohorts.length > 2 ? { cohorts: known.cohorts.slice(0, 2) } : {}) };
+  }
   return { kind };
 }

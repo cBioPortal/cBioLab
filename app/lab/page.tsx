@@ -886,7 +886,9 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     { kind: "sequence", label: "Treatment sequence", loading: () => !viewEvents().length && (catLoading || exploreBusy),
       why: () => viewEvents().some(e => /treat|therap|regimen|drug|medicat/.test(e.canonical)) ? null
         : "this study records no treatment events, so there are no lines of therapy to sequence" },
-    ...Object.entries(MORE_KINDS).map(([kind, k]) => ({ kind, label: k.label }))
+    ...Object.entries(MORE_KINDS).map(([kind, k]) => ({ kind, label: k.label,
+      ...(k.why ? { why: () => k.why!({ genes: [], attrs: catalogAttrs(), profiles: profileOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) }),
+                    loading: () => !profileOptions().length && (trackAttrsLoading || exploreBusy) } : {}) }))
   ];
 
   /**

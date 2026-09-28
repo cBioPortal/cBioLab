@@ -4,6 +4,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg, viewTitle } from "../lib/view-svg.ts";
 import { wrap } from "../lib/view-svg-more.ts";
+import { niceCeil, defaultLog2 } from "../lib/views-more.ts";
 import type { ViewResult, GenomeResult } from "../lib/types.ts";
 
 describe("wrap", () => {
@@ -80,5 +81,37 @@ describe("pathways", () => {
   test("a significant member is starred, and the caveat travels with the figure", () => {
     const svg = viewToSvg(v)!;
     assert.ok(svg.includes("KRAS ★") && svg.includes("union of panels"));
+  });
+});
+
+describe("diffexpr", () => {
+  test("axis ends are readable round numbers", () => {
+    assert.equal(niceCeil(219.09), 250);
+    assert.equal(niceCeil(4.25), 5);
+    assert.equal(niceCeil(0.031), 0.05);
+    assert.equal(niceCeil(10), 10);
+  });
+  test("log2 by default only for a stored RNA-seq profile, never for z-scores or protein", () => {
+    assert.equal(defaultLog2("rna_seq_v2_mrna"), true);
+    assert.equal(defaultLog2("rna_seq_v2_mrna_median_Zscores"), false);
+    assert.equal(defaultLog2("rppa"), false);
+    assert.equal(defaultLog2("methylation_hm450"), false);
+  });
+  const g = (gene: string, effect: number, p: number, q: number) => ({ gene, nA: 10, nB: 10, meanA: effect, meanB: 0, effect, t: effect * 10, p, q });
+  const v: ViewResult = { kind: "diffexpr", cohorts: ["<A>", "B"], caveat: "moments only",
+    diffexpr: { profileType: "z", log2: false, effectLabel: "difference in mean z-score", groups: ["<A>", "B"], tested: 3, skipped: 0, up: 1, down: 1,
+      points: [g("UP1", 2, 1e-20, 1e-18), g("DN1", -2, 1e-10, 1e-9)], grid: { xMax: 5, yMax: 25, nx: 90, ny: 60, cells: [[45, 1, 1, 0]] },
+      pooledSignificant: 0, labels: ["UP1", "DN1"],
+      gsea: { ranking: "t", permutations: 1000, skipped: [], sets: [{ name: "HALLMARK_E2F_TARGETS", size: 20, setSize: 20, es: 0.7, nes: 2.5, p: 0.001, q: 0.01,
+        leadingEdge: ["UP1"], curve: [0, 0.7, 0], curveAt: [0, 1, 2], hits: [0], }] } } };
+  test("labels both directions, escapes cohort names, and draws the enrichment curve", () => {
+    const svg = viewToSvg(v)!;
+    assert.ok(svg.includes(">UP1<") && svg.includes(">DN1<"));
+    assert.ok(!svg.includes("<A>") && svg.includes("&lt;A&gt;"));
+    assert.ok(svg.includes("e2f targets") && svg.includes("leading-edge"));
+  });
+  test("enrichment switched off draws the volcano alone", () => {
+    const svg = viewToSvg({ ...v, diffexpr: { ...v.diffexpr!, gsea: undefined } })!;
+    assert.ok(!svg.includes("gene-set enrichment"));
   });
 });

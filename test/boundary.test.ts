@@ -272,7 +272,13 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "studyGenomeSql": () => federation.studyGenomeSql("x", "db"),
     // pathways: `per` holds (set, patient) rows, but the outer SELECT only counts them per set
     "geneSetCountsSql": () => federation.geneSetCountsSql(cohortSql, [{ name: "RTK-RAS", genes: ["KRAS", "NRAS"] }, { name: "TP53", genes: ["TP53"] }], "x", "v7.5", "db"),
-    "geneSetCountsSql:no-annotation-pin": () => federation.geneSetCountsSql(cohortSql, [{ name: "set", genes: ["APC"] }], "x", null, "db")
+    "geneSetCountsSql:no-annotation-pin": () => federation.geneSetCountsSql(cohortSql, [{ name: "set", genes: ["APC"] }], "x", null, "db"),
+    // diffexpr: `vals` is per (patient, gene); only per-gene totals leave
+    "profileMomentsAllSql": () => federation.profileMomentsAllSql(cohortSql, "x", "db", "rna_seq_v2_mrna_median_Zscores", false),
+    "profileMomentsAllSql:log2": () => federation.profileMomentsAllSql(cohortSql, "x", "db", "rna_seq_v2_mrna", true),
+    // gene-set membership is reference data, not patient data — no cohort at all
+    "genesetMembersSql": () => federation.genesetMembersSql(["HALLMARK_E2F_TARGETS"], null, "db"),
+    "genesetMembersSql:prefix": () => federation.genesetMembersSql([], "HALLMARK_", "db")
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

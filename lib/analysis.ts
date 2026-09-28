@@ -1819,7 +1819,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         void oncoQueryMs;
       }
     } else if (isMoreViewKind(view.kind)) {
-      views.push(await runMoreView(view, { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, overLimit }));
+      views.push(await runMoreView(view, { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, overLimit, studyProfiles }));
     } else {
       // unreachable for well-typed documents, but documents arrive as untrusted
       // JSON from clients/chat/MCP, so an unknown kind must still be reported

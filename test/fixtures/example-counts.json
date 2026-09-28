@@ -156,6 +156,10 @@
     "Oncogenic signalling pathways: colorectal against pancreatic": {
       "Colorectal": 5543,
       "Pancreatic": 3109
+    },
+    "Differential expression and enrichment: basal-like against luminal A breast cancer": {
+      "Basal-like": 171,
+      "Luminal A": 499
     }
   }
 }
