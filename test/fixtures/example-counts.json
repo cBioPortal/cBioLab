@@ -160,6 +160,9 @@
     "Differential expression and enrichment: basal-like against luminal A breast cancer": {
       "Basal-like": 171,
       "Luminal A": 499
+    },
+    "Paired samples: what differs between a patient's primary and metastasis": {
+      "all patients": 48179
     }
   }
 }

@@ -115,3 +115,21 @@ describe("diffexpr", () => {
     assert.ok(!svg.includes("gene-set enrichment"));
   });
 });
+
+describe("paired", () => {
+  const gene = (g: string, pairs: number, both: number, aOnly: number, bOnly: number, q: number) =>
+    ({ gene: g, pairs, both, aOnly, bOnly, neither: pairs - both - aOnly - bOnly, concordance: both / (both + aOnly + bOnly || 1), p: q, q });
+  const v: ViewResult = { kind: "paired", cohorts: ["all"], caveat: "where, not when",
+    paired: { pairBy: { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }, measure: "driver",
+      panels: [{ cohort: "all", patients: 100, aSamples: 110, bSamples: 120,
+        genes: [gene("ESR1", 100, 4, 7, 49, 1e-8), gene("NOPE", 0, 0, 0, 0, 1)] }] } };
+  test("names the side discordance favours, and a gene never profiled on both sides says so", () => {
+    const svg = viewToSvg(v)!;
+    assert.ok(svg.includes("more Metastasis-only"));
+    assert.ok(svg.includes("never profiled on both sides"));
+    assert.ok(svg.includes("where, not when"));
+  });
+  test("no patient with both sides, no figure", () => {
+    assert.equal(viewToSvg({ ...v, paired: { ...v.paired!, panels: [{ ...v.paired!.panels[0], patients: 0 }] } }), null);
+  });
+});

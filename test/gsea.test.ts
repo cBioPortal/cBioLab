@@ -2,7 +2,7 @@
 // running sum, and the permutation null against what a null must look like.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { enrichmentScore, preRankedGsea, seededRandom } from "../lib/stats.ts";
+import { enrichmentScore, preRankedGsea, seededRandom, mcnemarExact } from "../lib/stats.ts";
 
 /** The running sum walked gene by gene, exactly as Subramanian et al. define it. */
 function bruteEs(inSet: boolean[], w: number[]): number {
@@ -70,5 +70,21 @@ describe("preRankedGsea", () => {
   });
   test("a set with fewer than minSize members in the ranking is skipped, not scored", () => {
     assert.equal(preRankedGsea(ranked, [{ name: "tiny", genes: ["G1", "G2", "NOPE"] }]).length, 0);
+  });
+});
+
+describe("mcnemarExact", () => {
+  test("matches the closed-form binomial: 1 vs 9 discordant pairs", () => {
+    // P(X <= 1 | n=10, 0.5) = (1 + 10) / 1024; two-sided doubles it
+    assert.ok(Math.abs(mcnemarExact(1, 9) - 22 / 1024) < 1e-12);
+    assert.ok(Math.abs(mcnemarExact(9, 1) - 22 / 1024) < 1e-12, "symmetric in direction");
+  });
+  test("balanced discordance, or none at all, is no evidence", () => {
+    assert.equal(mcnemarExact(5, 5), 1);
+    assert.equal(mcnemarExact(0, 0), 1);
+  });
+  test("large counts stay finite and tiny", () => {
+    const p = mcnemarExact(1, 71);
+    assert.ok(p > 0 && p < 1e-18, String(p));
   });
 });

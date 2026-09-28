@@ -2,7 +2,22 @@
 // Cards for the view kinds in lib/views-more.ts. The page draws every one of them the same way —
 // ViewHead, then this kind's controls, then the server-rendered figure — so all that differs
 // per kind lives here: its title, whether it takes a gene list, and its own settings.
-import React from "react";
+import React, { useEffect, useState } from "react";
+
+/**
+ * A text field that keeps what is being typed to itself and hands the page the value only on
+ * Enter or blur — the page is one large component, and a keystroke in page state re-renders
+ * every card.
+ */
+function DraftInput({ value, onCommit, disabled, width, placeholder, title }: {
+  value: string; onCommit: (v: string) => void; disabled?: boolean; width?: string; placeholder?: string; title?: string;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => { setDraft(value); }, [value]);
+  const commit = () => { if (draft !== value) onCommit(draft); };
+  return <input type="text" value={draft} disabled={disabled} placeholder={placeholder} title={title} style={{ width: width || "8rem" }}
+    onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); }} />;
+}
 
 export interface MoreKindUi {
   label: string;
@@ -26,6 +41,7 @@ export const MORE_KINDS: Record<string, MoreKindUi> = {
   attrition: { label: "Cohort attrition (CONSORT)", title: "Cohort attrition", maxCohorts: 6 },
   genome: { label: "Genome-wide copy number", title: "Genome-wide copy number", maxCohorts: 4 },
   pathways: { label: "Oncogenic pathways", title: "Oncogenic signalling pathways", maxCohorts: 4 },
+  paired: { label: "Paired samples (primary vs metastasis)", title: "Paired samples", genes: true, maxCohorts: 3 },
   diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2,
     why: (k) => k.cohorts.length < 2 ? "compares exactly two cohorts — this analysis has one"
       : !k.profiles.length ? "this study has no molecular profile to compare expression on" : null }
@@ -50,6 +66,11 @@ export interface MoreCtx {
 /** A one-line subtitle for the card header. */
 export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "attrition") return "patients left after each clause, in order";
+  if (kind === "paired") {
+    const pb = spec.pairBy || { attribute: "SAMPLE_TYPE", a: "Primary", b: "Metastasis" };
+    const j = (x: any) => Array.isArray(x) ? x.join("/") : String(x ?? "");
+    return pb.attribute + ": " + j(pb.a) + " vs " + j(pb.b) + (spec.measure === "any" ? ", any alteration" : ", drivers");
+  }
   if (kind === "diffexpr") return (spec.profileType || "no profile") + (v.diffexpr ? (v.diffexpr.log2 ? ", log2(v+1)" : "") + " · volcano and GSEA" : "");
   if (kind === "pathways") return (spec.measure === "any" ? "any alteration" : "OncoKB drivers") + ", Sanchez-Vega et al. 2018";
   if (kind === "genome") return v.genome ? v.genome.build + ", " + v.genome.binMb + " Mb bins, from segments" : "from copy-number segments";
@@ -99,6 +120,32 @@ export function MoreControls({ c }: { c: MoreCtx }) {
       </div>
     </div>
   );
+  if (spec.kind === "paired") {
+    const pb = spec.pairBy || { attribute: "SAMPLE_TYPE", a: "Primary", b: "Metastasis" };
+    const csv = (x: any) => (Array.isArray(x) ? x : [x]).filter((y: any) => y != null && y !== "").join(", ");
+    const parse = (t: string) => { const xs = t.split(",").map((y) => y.trim()).filter(Boolean); return xs.length === 1 ? xs[0] : xs; };
+    const setBy = (k: "attribute" | "a" | "b", t: string) => patch({ pairBy: { ...pb, [k]: k === "attribute" ? t.trim() : parse(t) } });
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="a SAMPLE-level attribute that says which kind each sample is">
+            pair by <DraftInput value={pb.attribute} disabled={busy} width="9rem" onCommit={(t) => setBy("attribute", t)} />
+          </label>
+          <label className="tbfield" title="the value(s) of that attribute on the first side; comma-separated for several">
+            <DraftInput value={csv(pb.a)} disabled={busy} onCommit={(t) => setBy("a", t)} />
+          </label>
+          <label className="tbfield" title="the value(s) on the second side">
+            vs <DraftInput value={csv(pb.b)} disabled={busy} onCommit={(t) => setBy("b", t)} />
+          </label>
+          <label className="tbfield" title="count only OncoKB drivers, or every alteration">
+            count <select value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onChange={(e) => patch({ measure: e.target.value === "any" ? "any" : undefined })}>
+              <option value="driver">drivers</option><option value="any">any alteration</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "pathways") return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
@@ -120,6 +167,7 @@ export function MoreControls({ c }: { c: MoreCtx }) {
 
 /** The view a fresh "add view" click starts from, built from what the study is known to have. */
 export function defaultMoreView(kind: string, known: Known): Record<string, unknown> {
+  if (kind === "paired") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "PIK3CA", "ESR1", "AR", "CDKN2A", "MYC", "TERT"] };
   if (kind === "diffexpr") {
     const profile = known.profiles.find((p) => /zscore/i.test(p) && /mrna|rna_seq/i.test(p))
       || known.profiles.find((p) => /mrna|rna_seq/i.test(p)) || known.profiles[0] || "";

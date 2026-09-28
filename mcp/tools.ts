@@ -194,7 +194,7 @@ export function registerTools(server: any): void {
 
   server.tool(
     "run_analysis",
-    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes), oncoprint, attrition (CONSORT-style counts after each cohort clause), genome (genome-wide copy-number gain/loss frequency from segments), pathways (the ten Sanchez-Vega oncogenic pathways, % altered per cohort), diffexpr (two-cohort differential expression volcano plus preranked GSEA). Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
+    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes), oncoprint, attrition (CONSORT-style counts after each cohort clause), genome (genome-wide copy-number gain/loss frequency from segments), pathways (the ten Sanchez-Vega oncogenic pathways, % altered per cohort), diffexpr (two-cohort differential expression volcano plus preranked GSEA), paired (primary-vs-metastasis concordance within patients). Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
     {
       document: z.object({}).passthrough()
         .describe("The Analysis document: {study, cohorts: {name: def, ...}, views: [...]}. Grammar and examples: describe_dsl.")
@@ -402,6 +402,14 @@ export function registerTools(server: any): void {
             `  most significant, higher in ${d.groups[1]}: ${top(-1) || "none"}` +
             (d.gsea ? `\n  GSEA (${d.gsea.ranking}; ${d.gsea.permutations} gene-set permutations):\n` +
               d.gsea.sets.slice(0, 12).map((x) => `    ${x.name}: NES ${x.nes.toFixed(2)}, q=${pFmt(x.q)}, ${x.size} genes, leading edge ${x.leadingEdge.slice(0, 8).join(" ")}${x.leadingEdge.length > 8 ? " …" : ""}`).join("\n") : "") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "paired") {
+          const pr = v.paired!, aL = pr.pairBy.a.join("/"), bL = pr.pairBy.b.join("/");
+          out.push(`Paired samples, ${pr.pairBy.attribute} ${aL} vs ${bL} (${pr.measure === "driver" ? "drivers" : "any alteration"}; profiled on both sides):\n` +
+            pr.panels.map((pn) => `  ${pn.cohort} (${pn.patients.toLocaleString()} patients with both):\n` +
+              pn.genes.map((g) => `    ${g.gene}: both ${g.both}, ${aL}-only ${g.aOnly}, ${bL}-only ${g.bOnly} of ${g.pairs} pairs` +
+                (g.concordance != null ? `, ${Math.round(100 * g.concordance)}% concordant` : "") +
+                (g.aOnly + g.bOnly ? `, McNemar q=${pFmt(g.q)}` : "")).join("\n")).join("\n") +
             caveatOf(v) + noteOf(v));
         } else if (v.kind === "attrition") {
           out.push("Cohort attrition (patients left after each clause, in order):\n" + v.attrition!.map((pn) =>

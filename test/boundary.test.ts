@@ -278,7 +278,12 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "profileMomentsAllSql:log2": () => federation.profileMomentsAllSql(cohortSql, "x", "db", "rna_seq_v2_mrna", true),
     // gene-set membership is reference data, not patient data — no cohort at all
     "genesetMembersSql": () => federation.genesetMembersSql(["HALLMARK_E2F_TARGETS"], null, "db"),
-    "genesetMembersSql:prefix": () => federation.genesetMembersSql([], "HALLMARK_", "db")
+    "genesetMembersSql:prefix": () => federation.genesetMembersSql([], "HALLMARK_", "db"),
+    // paired: `ps`/`per` hold samples and patients; the outer SELECT counts them per gene
+    "pairedCountsSql": () => federation.pairedCountsSql(cohortSql, "x", "db", ["TP53", "ESR1"], { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }, "v7.5", "driver"),
+    "pairedCountsSql:any": () => federation.pairedCountsSql(cohortSql, "x", "db", ["TP53"], { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis", "Recurrence"] }, null, "any"),
+    "pairedPatientsSql": () => federation.pairedPatientsSql(cohortSql, "x", "db", { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }),
+    "sampleAttributeValuesSql": () => federation.sampleAttributeValuesSql(cohortSql, "x", "db", "SAMPLE_TYPE")
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

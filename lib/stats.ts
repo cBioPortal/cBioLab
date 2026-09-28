@@ -1100,3 +1100,20 @@ export function preRankedGsea(ranked: { gene: string; score: number }[], sets: {
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Paired proportions
+
+/**
+ * Exact McNemar test: of the discordant pairs, `b` changed one way and `c` the other; under
+ * the null each discordant pair is a fair coin, so the two-sided p is twice the smaller binomial
+ * tail (capped at 1). Concordant pairs carry no information about the direction and do not enter.
+ */
+export function mcnemarExact(b: number, c: number): number {
+  const n = b + c;
+  if (n === 0) return 1;
+  const k = Math.min(b, c);
+  let tail = 0;
+  for (let i = 0; i <= k; i++) tail += Math.exp(logFact(n) - logFact(i) - logFact(n - i) - n * Math.LN2);
+  return Math.min(1, 2 * tail);
+}

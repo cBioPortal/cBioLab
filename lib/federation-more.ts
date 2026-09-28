@@ -4,6 +4,7 @@
 // participant, aggregate-only included, can answer.
 import { sq } from "./compiler.ts";
 import { ALTERED_COND, driverJoin } from "./federation.ts";
+import { clinicalValueFoldSql } from "./event-names.ts";
 
 /** bare patient id for a *_unique_id column of this study */
 const pidOf = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
@@ -191,4 +192,89 @@ export function genesetMembersSql(names: string[], prefix: string | null, db: st
     "JOIN " + db + ".geneset_gene gg ON gg.geneset_id = gs.id\n" +
     "JOIN " + db + ".gene g ON g.entrez_gene_id = gg.entrez_gene_id\n" +
     "WHERE " + cond + " GROUP BY set_name ORDER BY set_name";
+}
+
+// ---------------------------------------------------------------------------
+// paired: one patient's two kinds of sample, gene by gene
+
+export interface PairBy { attribute: string; a: string[]; b: string[] }
+
+/**
+ * The cohort's samples split into side 'a' and side 'b' by a SAMPLE-level attribute (folded on
+ * case and whitespace in both the data and the values, the one fold every clinical predicate
+ * uses), restricted to patients with at least one sample on each side.
+ */
+function pairedSidesCtes(cohortSql: string, study: string, db: string, by: PairBy): string {
+  const fold = (x: string) => clinicalValueFoldSql(x);
+  const lit = (vs: string[]) => vs.map((v) => fold(sq(v))).join(",");
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "sides AS (\n" +
+    "  SELECT sample_unique_id AS suid, " + pidOf("patient_unique_id", study) + " AS pid,\n" +
+    "         multiIf(" + fold("attribute_value") + " IN (" + lit(by.a) + "), 'a', " + fold("attribute_value") + " IN (" + lit(by.b) + "), 'b', '') AS side\n" +
+    "  FROM " + db + ".clinical_data_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(by.attribute) + "\n" +
+    "    AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "),\n" +
+    "paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),\n" +
+    "ps AS (SELECT suid, pid, side FROM sides WHERE side != '' AND pid IN (SELECT pid FROM paired))"
+  );
+}
+
+/**
+ * Per gene, among patients with a sample on each side AND profiled for the gene on each side
+ * (by that side's own panels — a gene one side never assayed says nothing about concordance):
+ * altered on both sides, on side a only, on side b only. A patient with several samples on a
+ * side is altered on that side if any of them is. Counts only.
+ */
+export function pairedCountsSql(cohortSql: string, study: string, db: string, genes: string[], by: PairBy,
+  pin: string | null, measure: "driver" | "any"): string {
+  const geneList = genes.map(sq).join(",");
+  const hit = measure === "driver" ? "max(ann.is_driver)" : "1";
+  return (
+    pairedSidesCtes(cohortSql, study, db, by) + ",\n" +
+    "alt AS (\n" +
+    "  SELECT g.hugo_gene_symbol AS gene, ps.pid AS pid, ps.side AS side, " + (pin || measure === "any" ? hit : "0") + " AS hit\n" +
+    "  FROM " + db + ".genomic_event_derived g\n" +
+    (pin && measure === "driver" ? driverJoin(pin) : "") +
+    "  INNER JOIN ps ON ps.suid = g.sample_unique_id\n" +
+    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
+    "  GROUP BY gene, pid, side\n" +
+    "),\n" +
+    "cov AS (\n" +
+    "  SELECT DISTINCT pg.gene AS gene, ps.pid AS pid, ps.side AS side\n" +
+    "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + geneList + ")\n" +
+    "  INNER JOIN ps ON ps.suid = sp.sample_unique_id\n" +
+    "  WHERE sp.cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')\n" +
+    "),\n" +
+    "per AS (\n" +
+    "  SELECT gene, pid, max(side = 'a') AS pa, max(side = 'b') AS pb,\n" +
+    "         max(side = 'a' AND hit > 0) AS aa, max(side = 'b' AND hit > 0) AS ab\n" +
+    "  FROM (SELECT gene, pid, side, hit FROM alt UNION ALL SELECT gene, pid, side, 0 AS hit FROM cov)\n" +
+    "  GROUP BY gene, pid\n" +
+    ")\n" +
+    "SELECT gene, count() AS pairs, countIf(aa AND ab) AS both, countIf(aa AND NOT ab) AS a_only, countIf(ab AND NOT aa) AS b_only\n" +
+    "FROM per WHERE pa AND pb GROUP BY gene"
+  );
+}
+
+/** How many of the cohort's patients have a sample on each side, and how many samples each side holds. */
+export function pairedPatientsSql(cohortSql: string, study: string, db: string, by: PairBy): string {
+  return (
+    pairedSidesCtes(cohortSql, study, db, by) + "\n" +
+    "SELECT uniqExact(pid) AS patients, countIf(side = 'a') AS a_samples, countIf(side = 'b') AS b_samples FROM ps"
+  );
+}
+
+/** Every value the attribute takes among the cohort's samples, for a refusal that names them. */
+export function sampleAttributeValuesSql(cohortSql: string, study: string, db: string, attribute: string): string {
+  return (
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT attribute_value AS value, count() AS samples FROM " + db + ".clinical_data_derived\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(attribute) + "\n" +
+    "  AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "GROUP BY value ORDER BY samples DESC LIMIT 50"
+  );
 }

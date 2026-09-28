@@ -4,13 +4,16 @@
 // federate and disclose under the same rules — they just live in their own module rather
 // than growing that file's if/else chain further.
 import type { AnalysisDoc, CohortDef, ViewResult, ViewParticipation, AttritionView, AttritionPanel,
-  GenomeView, GenomeSeries, PathwaysView, PathwayRow, PathwayCell, DiffexprView, DiffexprGene } from "./types.ts";
+  GenomeView, GenomeSeries, PathwaysView, PathwayRow, PathwayCell, DiffexprView, DiffexprGene,
+  PairedView, PairedPanel } from "./types.ts";
 import { SANCHEZ_VEGA_2018, PATHWAY_NAMES, type PathwayRole } from "./pathways.ts";
 import { cohortClauses, describeClause } from "./cohort2.ts";
 import { hasMoreAggregates, type Resolver, type MoreAggregateCapable } from "./federation.ts";
 import { genomeBinsSql, genomeCoverageSql, studyGenomeSql, geneSetCountsSql, profileMomentsAllSql, genesetMembersSql,
+  pairedCountsSql, pairedPatientsSql, sampleAttributeValuesSql,
   CHROM_LENGTHS, GENOME_CHROMS } from "./federation-more.ts";
-import { fisherExact, benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea } from "./stats.ts";
+import { fisherExact, benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea, mcnemarExact } from "./stats.ts";
+import { geneSymbols } from "./gene-tracks.ts";
 import { viewToSvg } from "./view-svg.ts";
 
 export interface EvaluatedCohort {
@@ -36,7 +39,7 @@ export interface ViewCtx {
   overLimit: (what: string, max: number, given: number) => string | null;
 }
 
-export const MORE_VIEW_KINDS = ["attrition", "genome", "pathways", "diffexpr"] as const;
+export const MORE_VIEW_KINDS = ["attrition", "genome", "pathways", "diffexpr", "paired"] as const;
 
 export function isMoreViewKind(kind: unknown): boolean {
   return (MORE_VIEW_KINDS as readonly string[]).includes(String(kind));
@@ -49,6 +52,7 @@ export async function runMoreView(view: { kind: string }, ctx: ViewCtx): Promise
     else if (view.kind === "genome") r = await genomeView(view as GenomeView, ctx);
     else if (view.kind === "pathways") r = await pathwaysView(view as PathwaysView, ctx);
     else if (view.kind === "diffexpr") r = await diffexprView(view as DiffexprView, ctx);
+    else if (view.kind === "paired") r = await pairedView(view as PairedView, ctx);
     else r = { kind: view.kind, error: "unknown view kind" };
   } catch (e) {
     r = { kind: view.kind, cohorts: ctx.vNames, error: (e as Error).message };
@@ -535,5 +539,87 @@ async function diffexprView(view: DiffexprView, ctx: ViewCtx): Promise<ViewResul
         "Gene-set permutation ignores gene–gene correlation, so it is anti-conservative next to phenotype permutation, which needs patient-level values. " : "") +
       (multi ? "Values are pooled across " + ctx.vStudies.length + " studies with no batch correction. " : "") +
       (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
+  };
+}
+
+// ---------------------------------------------------------------------------
+// paired: primary against metastasis (or any two kinds of sample), within patients
+
+const ATTR_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
+
+async function pairedView(view: PairedView, ctx: ViewCtx): Promise<ViewResult> {
+  const { doc, cohorts, vNames, pin } = ctx;
+  { const e = ctx.overLimit("a paired view", 3, vNames.length); if (e) return refuse("paired", ctx, e.replace("at most 3", "at most 3 cohorts")); }
+  let genes: string[];
+  try { genes = geneSymbols(view.genes || []); } catch (e) { return refuse("paired", ctx, (e as Error).message); }
+  if (!genes.length) return refuse("paired", ctx, "a paired view needs genes");
+  { const e = ctx.overLimit("a paired view", 20, genes.length); if (e) return refuse("paired", ctx, e.replace("at most 20", "at most 20 genes")); }
+  const measure: "driver" | "any" = view.measure === "any" ? "any" : "driver";
+  if (measure === "driver" && !pin)
+    return refuse("paired", ctx, "no OncoKB annotation pin is available here, so drivers cannot be called — use measure: \"any\"");
+  const raw = view.pairBy || { attribute: "SAMPLE_TYPE", a: "Primary", b: "Metastasis" };
+  const list = (x: string | string[] | undefined) => (Array.isArray(x) ? x : x == null ? [] : [x]).map((v) => String(v).trim()).filter(Boolean);
+  const by = { attribute: String(raw.attribute || "").trim(), a: list(raw.a), b: list(raw.b) };
+  if (!ATTR_NAME.test(by.attribute)) return refuse("paired", ctx, "pairBy.attribute must be a sample attribute name; got " + JSON.stringify(by.attribute).slice(0, 40));
+  if (!by.a.length || !by.b.length) return refuse("paired", ctx, "pairBy needs at least one value for each side, a and b");
+  const fold = (v: string) => v.toLowerCase().trim();
+  const overlap = by.a.filter((v) => by.b.map(fold).includes(fold(v)));
+  if (overlap.length) return refuse("paired", ctx, "a value cannot be on both sides of a pair: " + overlap.join(", "));
+
+  const { ok, excluded } = answering(ctx);
+  if (!Object.keys(ok).length) return refuse("paired", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
+  const panels: PairedPanel[] = [];
+  const tallies = new Map<string, { pairs: number; both: number; aOnly: number; bOnly: number }>();
+  for (const n of vNames) {
+    const panel: PairedPanel = { cohort: n, patients: 0, aSamples: 0, bSamples: 0, genes: [] };
+    await Promise.all(cohorts[n].studies.filter((st) => ok[st]).map(async (st) => {
+      const def = doc.cohorts[n];
+      const [pp, rows] = await Promise.all([
+        ok[st].moreAggregate("paired:patients:" + n, def, (c, s, d) => pairedPatientsSql(c, s, d, by)),
+        ok[st].moreAggregate("paired:genes:" + n, def, (c, s, d) => pairedCountsSql(c, s, d, genes, by, pin, measure))
+      ]);
+      panel.patients += Number(pp[0]?.patients || 0);
+      panel.aSamples += Number(pp[0]?.a_samples || 0); panel.bSamples += Number(pp[0]?.b_samples || 0);
+      for (const r of rows) {
+        const k = n + "|" + String(r.gene), cur = tallies.get(k) || { pairs: 0, both: 0, aOnly: 0, bOnly: 0 };
+        cur.pairs += Number(r.pairs); cur.both += Number(r.both); cur.aOnly += Number(r.a_only); cur.bOnly += Number(r.b_only);
+        tallies.set(k, cur);
+      }
+    }));
+    panel.genes = genes.map((g) => {
+      const t = tallies.get(n + "|" + g) || { pairs: 0, both: 0, aOnly: 0, bOnly: 0 };
+      const anywhere = t.both + t.aOnly + t.bOnly;
+      return { gene: g, ...t, neither: t.pairs - anywhere, concordance: anywhere ? Math.round(1000 * t.both / anywhere) / 1000 : null,
+        p: mcnemarExact(t.aOnly, t.bOnly), q: 1 };
+    });
+    const tested = panel.genes.filter((g) => g.aOnly + g.bOnly > 0);
+    benjaminiHochberg(tested.map((g) => g.p)).forEach((q, i) => { tested[i].q = q; });
+    panels.push(panel);
+  }
+  if (!panels.some((pn) => pn.patients)) {
+    // say what the attribute actually holds here, so the fix is one edit away
+    const st = Object.keys(ok)[0];
+    const vals = await ok[st].moreAggregate("paired:values", doc.cohorts[vNames[0]], (c, s, d) => sampleAttributeValuesSql(c, s, d, by.attribute));
+    return refuse("paired", ctx, "no patient in " + (vNames.length === 1 ? "this cohort" : "these cohorts") + " has both a " +
+      by.attribute + " = " + by.a.join("/") + " sample and a " + by.b.join("/") + " sample" +
+      (vals.length ? " — " + by.attribute + " here takes: " + vals.map((v) => String(v.value) + " (" + Number(v.samples).toLocaleString("en-US") + ")").join(", ")
+        : " — " + st + " has no sample attribute " + by.attribute));
+  }
+  const multi = ctx.vStudies.length > 1;
+  const aL = by.a.join("/"), bL = by.b.join("/");
+  return {
+    kind: "paired", cohorts: vNames,
+    paired: { pairBy: by, measure, panels, ...(excluded.length ? { excluded } : {}) },
+    participation: ctx.participationFor(ctx.vStudies, false),
+    ...(multi ? { studies: ctx.vStudies } : {}),
+    caveat: "Within patients who have both a " + by.attribute + " = " + aL + " sample and a " + bL + " sample (" +
+      panels.map((pn) => pn.cohort + ": " + plural(pn.patients, "patient")).join("; ") + "), per gene, among those profiled for it on BOTH sides by each side's own panels: " +
+      (measure === "driver" ? "an OncoKB driver (" + pin + ")" : "any alteration") + " on both sides, on the " + aL + " side only, or the " + bL + " side only; " +
+      "a patient with several samples on a side counts as altered there if any is. " +
+      "Concordance is both ÷ altered anywhere. The exact McNemar test asks whether discordance runs one way; q is Benjamini–Hochberg across the genes of each cohort. " +
+      "A sample's " + by.attribute + " records where the tissue came from, not when it was taken, so " + bL + "-only is not the same as \"acquired later\"; " +
+      "and patients sampled twice are a selected group, typically with longer or harder disease courses." +
+      (multi ? " Counts are summed across " + ctx.vStudies.length + " studies." : "") +
+      (excluded.length ? " Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
   };
 }

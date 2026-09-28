@@ -708,10 +708,40 @@ export interface DiffexprResult {
   gsea?: { ranking: string; permutations: number; sets: (import("./stats.ts").GseaResult & { q: number })[]; skipped: string[] };
   excluded?: { study: string; reason: string }[];
 }
+/**
+ * Paired samples: among patients with a sample of each of two kinds (by default primary and
+ * metastasis), gene by gene, how often an alteration is on both, only the first or only the
+ * second — counted only where BOTH sides were profiled for the gene — with an exact McNemar test
+ * of whether discordance runs one way. Counts only.
+ */
+export interface PairedView {
+  note?: string;
+  kind: "paired"; cohorts?: string[];
+  genes: string[];
+  /** a sample-level attribute and the values on each side (default SAMPLE_TYPE: Primary / Metastasis) */
+  pairBy?: { attribute: string; a: string | string[]; b: string | string[] };
+  /** count OncoKB drivers only (default) or any alteration */
+  measure?: "driver" | "any";
+}
+export interface PairedGene {
+  gene: string;
+  /** patients with each side profiled for this gene */
+  pairs: number; both: number; aOnly: number; bOnly: number; neither: number;
+  /** both ÷ (both + aOnly + bOnly): of the patients altered anywhere, altered on both sides */
+  concordance: number | null;
+  /** exact McNemar p on aOnly vs bOnly, and BH q across the genes of this cohort */
+  p: number; q: number;
+}
+export interface PairedPanel { cohort: string; patients: number; aSamples: number; bSamples: number; genes: PairedGene[] }
+export interface PairedResult {
+  pairBy: { attribute: string; a: string[]; b: string[] }; measure: "driver" | "any";
+  panels: PairedPanel[];
+  excluded?: { study: string; reason: string }[];
+}
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
-  | AttritionView | GenomeView | PathwaysView | DiffexprView;
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -984,6 +1014,7 @@ export interface ViewResult {
   genome?: GenomeResult;                    // genome-wide copy-number frequency
   pathways?: PathwaysResult;                // oncogenic signalling pathways
   diffexpr?: DiffexprResult;                // differential expression + GSEA
+  paired?: PairedResult;                    // paired-sample concordance
 }
 /**
  * Therapy transitions, ready to draw: nodes in columns, flows between them.

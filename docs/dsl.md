@@ -176,6 +176,7 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | `genome` | `binMb?:2, threshold?:0.2, includeX?:false, cohorts?:[names] (≤4)` | **genome-wide copy-number frequency** from the copy-number SEGMENTS: the share of each cohort's segmented samples gained (log2 segment mean ≥ `threshold`) or lost (≤ −`threshold`) in every `binMb`-megabase bin (1–50) along chromosomes 1–22 (and X with `includeX` — its log ratio mostly records sex, so it is off by default), drawn as gains up and losses down, one panel per cohort. Each bin's denominator is the samples whose segmentation covers it — a bin nothing covers is drawn as unmeasured, never as copy-neutral. A bin takes the value of the segment over its midpoint, so an event narrower than a bin can be missed; the caption says so. Unit is the SAMPLE, not the patient. Exactly two cohorts add a per-bin two-sided Fisher test (gains and losses separately, Benjamini–Hochberg across bins), drawn as a strip coloured by which cohort is higher. Studies on different reference genomes (hg19/hg38) are refused rather than drawn on one axis. Counts only; a remote peer cannot answer yet and is named as left out |
 | `pathways` | `pathways?:[names], sets?:[{name, genes:[≤40]} ×≤4], measure?:"driver"|"any", topGenes?:6, cohorts?:[names] (≤4)` | **oncogenic signalling pathways**: the ten canonical pathways of Sanchez-Vega et al. (Cell 2018, Table S3: RTK-RAS, PI3K, TP53, Cell cycle, MYC, WNT, NOTCH, Hippo, TGF-β, NRF2 — 334 genes), and/or the document's own `sets`, each as the share of the cohort with at least one member altered. `measure` defaults to `"driver"` (OncoKB-annotated drivers, as the paper counted curated oncogenic events; refused without an annotation pin) or `"any"`. A pathway's denominator is the patients profiled for at least ONE member (the union of the members' panels, the oncoprint's merged-row rule, computed in the database with the same event table, CNA rule and driver join as `compare`, so a one-gene set equals that gene's own count); each member's % is over the patients profiled for THAT gene. The `topGenes` most-altered members are drawn per pathway; the rest are pooled as "+N more altered", and members on no participating panel are listed as never profiled. Two cohorts add Fisher tests with BH q across pathways, and separately across member genes. Counts only; a remote peer cannot answer yet and is named |
 | `diffexpr` | `profileType, log2?, geneSets?:[≤12 MSigDB names], label?:12, cohorts:[2 names]` | **differential expression between exactly two cohorts** on one molecular profile (mRNA z-scores, RNA-seq, protein, methylation — refused, listing what the study has, if absent): per gene, Welch's t-test from each cohort's n, Σv and Σv² — additive, so the pooled test is exact across sites and no value is ever sent — with each patient contributing the mean of their samples. `log2` compares log2(v+1) and defaults to true for a non-z-score RNA-seq profile; the effect is the difference of means (first cohort minus second) on the compared scale, a log2 fold change under log2. q is Benjamini–Hochberg across every gene tested; genes with fewer than 3 patients in a cohort or no variance are left out and counted. Drawn as a volcano — the 1,500 most significant genes as points, the rest as density, `label` genes named, split between the two directions. Then **preranked GSEA** (Subramanian 2005, weight 1) of the unrounded t ranking against `geneSets` (default: the 50 MSigDB Hallmark sets; `[]` skips it): NES, a permutation p from 1,000 random same-size sets seeded by the set's name (so a shared link reproduces it), BH q across the sets, the leading edge, and the running sum for the strongest set each way. Gene-set permutation ignores gene–gene correlation (anti-conservative next to phenotype permutation, which would need patient-level values) — the caption says so. A remote peer cannot answer yet and is named |
+| `paired` | `genes:[≤20], pairBy?:{attribute, a, b}, measure?:"driver"|"any", cohorts?:[names] (≤3)` | **paired samples within patients**: among patients with at least one sample on each side of `pairBy` (a SAMPLE-level attribute and its values for side a and side b — default `SAMPLE_TYPE` Primary / Metastasis; values fold on case and whitespace like every clinical predicate), per gene, the patients with a driver (or, with `measure:"any"`, any alteration) on both sides, on side a only, on side b only — counted only among patients profiled for that gene on BOTH sides by each side's own panels, so a gene one side never assayed never reads as discordant. A patient with several samples on a side is altered there if any is. Concordance = both ÷ altered anywhere; an exact McNemar test (two-sided binomial on the discordant patients) asks whether discordance runs one way, BH q across the genes of each cohort. When no patient has both sides, the refusal lists the values the attribute actually takes. Sample type records where tissue came from, not when — the caption says "metastasis-only" is not "acquired later". Counts only; a remote peer cannot answer yet and is named |
 | `oncoprint` | `genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], unit?:"patient"\|"sample", display?:{…}, overlays?:[≤2], derivedCohorts?:[≤3], cohorts?:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 `views[].note` is the analyst's own one-line annotation, carried through to the result and
@@ -2641,6 +2642,36 @@ TCGA PanCancer Atlas breast cancer, PAM50 basal-like against luminal A, on mRNA 
     {
       "kind": "diffexpr",
       "profileType": "rna_seq_v2_mrna_median_all_sample_Zscores"
+    }
+  ]
+}
+```
+
+### Example 41: Paired samples: what differs between a patient's primary and metastasis
+
+MSK-IMPACT, the 2,278 patients sequenced at both a primary and a metastatic site. Truncal drivers agree (TP53 78% concordant); what the metastasis alone carries is the resistance biology — ESR1 mutations (49 metastasis-only against 7 primary-only) and AR alterations (71 against 1), both selected under hormone therapy — and MYC amplification and CDKN2A loss.
+
+```json
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "paired",
+      "genes": [
+        "TP53",
+        "KRAS",
+        "PIK3CA",
+        "ESR1",
+        "AR",
+        "CDKN2A",
+        "MYC",
+        "TERT"
+      ]
     }
   ]
 }
