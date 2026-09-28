@@ -194,7 +194,7 @@ export function registerTools(server: any): void {
 
   server.tool(
     "run_analysis",
-    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes), oncoprint, attrition (CONSORT-style counts after each cohort clause), genome (genome-wide copy-number gain/loss frequency from segments), pathways (the ten Sanchez-Vega oncogenic pathways, % altered per cohort), diffexpr (two-cohort differential expression volcano plus preranked GSEA), paired (primary-vs-metastasis concordance within patients). Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
+    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes), oncoprint, attrition (CONSORT-style counts after each cohort clause), genome (genome-wide copy-number gain/loss frequency from segments), pathways (the ten Sanchez-Vega oncogenic pathways, % altered per cohort), diffexpr (two-cohort differential expression volcano plus preranked GSEA), paired (primary-vs-metastasis concordance within patients), clonality (FACETS clonal/subclonal calls, LOH, genome doubling, purity, ploidy). Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
     {
       document: z.object({}).passthrough()
         .describe("The Analysis document: {study, cohorts: {name: def, ...}, views: [...]}. Grammar and examples: describe_dsl.")
@@ -410,6 +410,15 @@ export function registerTools(server: any): void {
               pn.genes.map((g) => `    ${g.gene}: both ${g.both}, ${aL}-only ${g.aOnly}, ${bL}-only ${g.bOnly} of ${g.pairs} pairs` +
                 (g.concordance != null ? `, ${Math.round(100 * g.concordance)}% concordant` : "") +
                 (g.aOnly + g.bOnly ? `, McNemar q=${pFmt(g.q)}` : "")).join("\n")).join("\n") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "clonality") {
+          const cr = v.clonality!;
+          out.push(`Clonality (FACETS; ${cr.measure === "driver" ? "driver mutation calls" : "all mutation calls"}${cr.qc ? ", QC-passing samples" : ""}):\n` +
+            cr.panels.map((pn) => `  ${pn.cohort}: WGD ${pn.wgd.yes + pn.wgd.no ? (100 * pn.wgd.yes / (pn.wgd.yes + pn.wgd.no)).toFixed(1) + "%" : "—"} of ${(pn.wgd.yes + pn.wgd.no).toLocaleString()} samples\n` +
+              pn.genes.map((g) => `    ${g.gene}: ${g.calls} calls, ${g.clonal + g.subclonal ? Math.round(100 * g.clonal / (g.clonal + g.subclonal)) + "% clonal" : "—"}` +
+                ` (${g.clonal} clonal, ${g.subclonal} subclonal, ${g.indeterminate} indeterminate), LOH ${g.lohKnown ? Math.round(100 * g.loh / g.lohKnown) + "%" : "—"}` +
+                (g.q != null ? `, q=${pFmt(g.q)}` : "")).join("\n")).join("\n") +
+            (cr.wgdP != null ? `\n  WGD difference: Fisher p=${pFmt(cr.wgdP)}` : "") +
             caveatOf(v) + noteOf(v));
         } else if (v.kind === "attrition") {
           out.push("Cohort attrition (patients left after each clause, in order):\n" + v.attrition!.map((pn) =>

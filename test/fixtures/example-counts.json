@@ -163,6 +163,10 @@
     },
     "Paired samples: what differs between a patient's primary and metastasis": {
       "all patients": 48179
+    },
+    "Clonality, LOH and genome doubling from FACETS": {
+      "Colorectal": 4993,
+      "Breast": 5803
     }
   }
 }

@@ -41,6 +41,7 @@ export const MORE_KINDS: Record<string, MoreKindUi> = {
   attrition: { label: "Cohort attrition (CONSORT)", title: "Cohort attrition", maxCohorts: 6 },
   genome: { label: "Genome-wide copy number", title: "Genome-wide copy number", maxCohorts: 4 },
   pathways: { label: "Oncogenic pathways", title: "Oncogenic signalling pathways", maxCohorts: 4 },
+  clonality: { label: "Clonality (FACETS)", title: "Clonality", genes: true, maxCohorts: 3 },
   paired: { label: "Paired samples (primary vs metastasis)", title: "Paired samples", genes: true, maxCohorts: 3 },
   diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2,
     why: (k) => k.cohorts.length < 2 ? "compares exactly two cohorts — this analysis has one"
@@ -66,6 +67,7 @@ export interface MoreCtx {
 /** A one-line subtitle for the card header. */
 export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "attrition") return "patients left after each clause, in order";
+  if (kind === "clonality") return "FACETS allele-specific copy number" + (spec.measure === "any" ? ", every mutation" : ", driver mutations") + (spec.qc === false ? ", all samples" : ", QC-passing samples");
   if (kind === "paired") {
     const pb = spec.pairBy || { attribute: "SAMPLE_TYPE", a: "Primary", b: "Metastasis" };
     const j = (x: any) => Array.isArray(x) ? x.join("/") : String(x ?? "");
@@ -120,6 +122,20 @@ export function MoreControls({ c }: { c: MoreCtx }) {
       </div>
     </div>
   );
+  if (spec.kind === "clonality") return (
+    <div className="viewtb">
+      <div className="tbz"><span className="tbl">data</span>
+        <label className="tbfield" title="OncoKB driver mutations only, or every mutation call">
+          count <select value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onChange={(e) => patch({ measure: e.target.value === "any" ? "any" : undefined })}>
+            <option value="driver">driver mutations</option><option value="any">every mutation</option>
+          </select>
+        </label>
+        <label className="chk" title="use only samples whose FACETS_QC is Pass">
+          <input type="checkbox" checked={spec.qc !== false} disabled={busy} onChange={(e) => patch({ qc: e.target.checked ? undefined : false })} /> FACETS QC pass only
+        </label>
+      </div>
+    </div>
+  );
   if (spec.kind === "paired") {
     const pb = spec.pairBy || { attribute: "SAMPLE_TYPE", a: "Primary", b: "Metastasis" };
     const csv = (x: any) => (Array.isArray(x) ? x : [x]).filter((y: any) => y != null && y !== "").join(", ");
@@ -167,6 +183,7 @@ export function MoreControls({ c }: { c: MoreCtx }) {
 
 /** The view a fresh "add view" click starts from, built from what the study is known to have. */
 export function defaultMoreView(kind: string, known: Known): Record<string, unknown> {
+  if (kind === "clonality") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "APC", "PIK3CA", "SMAD4", "CDH1"] };
   if (kind === "paired") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "PIK3CA", "ESR1", "AR", "CDKN2A", "MYC", "TERT"] };
   if (kind === "diffexpr") {
     const profile = known.profiles.find((p) => /zscore/i.test(p) && /mrna|rna_seq/i.test(p))

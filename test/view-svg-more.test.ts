@@ -133,3 +133,23 @@ describe("paired", () => {
     assert.equal(viewToSvg({ ...v, paired: { ...v.paired!, panels: [{ ...v.paired!.panels[0], patients: 0 }] } }), null);
   });
 });
+
+describe("clonality", () => {
+  const gene = (g: string, calls: number) => ({ gene: g, calls, samples: calls, clonal: Math.round(calls * 0.8), subclonal: Math.round(calls * 0.1),
+    indeterminate: calls - Math.round(calls * 0.8) - Math.round(calls * 0.1), uncalled: 0, loh: Math.round(calls * 0.7), lohKnown: calls, ccf: new Array(10).fill(0) });
+  const panel = (cohort: string) => ({ cohort, samples: 100, ascnSamples: 98, qcPass: 90, qcFail: 8, wgd: { yes: 30, no: 60 },
+    purity: new Array(20).fill(1), ploidy: new Array(32).fill(1), genes: [gene("TP53", 50), gene("ESR1", 0)] });
+  const v: ViewResult = { kind: "clonality", cohorts: ["A"], caveat: "purity-limited",
+    clonality: { measure: "driver", qc: true, panels: [panel("A")] } };
+  test("shows % clonal, LOH and WGD, and says when a gene has no call rather than drawing nothing", () => {
+    const svg = viewToSvg(v)!;
+    // clonal share is of the calls that were called either way: 40 / (40 + 5)
+    assert.ok(svg.includes("89% clonal") && svg.includes("LOH 70%"));
+    assert.ok(svg.includes("33.3%"), "30 of 90 doubled");
+    assert.ok(svg.includes("no driver mutation call with a FACETS estimate"));
+  });
+  test("tspans that follow a number keep their space", () => {
+    const svg = viewToSvg(v)!;
+    assert.ok(!/%<tspan[^>]*>of /.test(svg) && !/clonal<tspan[^>]*>·/.test(svg));
+  });
+});
