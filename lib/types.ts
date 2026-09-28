@@ -634,10 +634,46 @@ export interface GenomeResult {
   /** studies left out because they could not answer (a remote peer, or no segments at all) */
   excluded?: { study: string; reason: string }[];
 }
+/**
+ * Oncogenic signalling pathways: for each pathway (the ten of Sanchez-Vega et al. 2018, and/or
+ * the document's own gene sets), the share of each cohort with at least one member altered —
+ * over the union of the members' panels, the oncoprint's merged-row rule — and its most-altered
+ * member genes, each with its own panel-aware denominator. Counts only.
+ */
+export interface PathwaysView {
+  note?: string;
+  kind: "pathways"; cohorts?: string[];
+  /** which of the ten canonical pathways to draw (default: all ten) */
+  pathways?: string[];
+  /** the document's own gene sets, drawn after the canonical ones: ≤4 sets of ≤40 genes */
+  sets?: { name: string; genes: string[] }[];
+  /** count OncoKB drivers only (default, as the paper curated oncogenic events) or any alteration */
+  measure?: "driver" | "any";
+  /** member genes drawn per pathway, the rest pooled and counted (default 6, max 12) */
+  topGenes?: number;
+}
+export interface PathwayCell { cohort: string; profiled: number; altered: number; pct: number | null }
+export interface PathwayRow {
+  name: string; source: "Sanchez-Vega 2018" | "document";
+  /** member genes, and how many were profiled in at least one cohort */
+  genes: number; profiledGenes: number;
+  cells: PathwayCell[];
+  /** two cohorts: two-sided Fisher p, and BH q across the pathways drawn */
+  p?: number; q?: number;
+  top: { gene: string; role: "OG" | "TSG" | null; cells: PathwayCell[]; q?: number }[];
+  /** member genes altered somewhere but not among `top` — pooled, never dropped */
+  otherAltered: number;
+  /** member genes no cohort was profiled for */
+  notProfiled: string[];
+}
+export interface PathwaysResult {
+  measure: "driver" | "any"; rows: PathwayRow[];
+  excluded?: { study: string; reason: string }[];
+}
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
-  | AttritionView | GenomeView;
+  | AttritionView | GenomeView | PathwaysView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -908,6 +944,7 @@ export interface ViewResult {
   logistic?: LogisticResult;                // multivariate logistic regression
   attrition?: AttritionPanel[];             // cohort attrition
   genome?: GenomeResult;                    // genome-wide copy-number frequency
+  pathways?: PathwaysResult;                // oncogenic signalling pathways
 }
 /**
  * Therapy transitions, ready to draw: nodes in columns, flows between them.

@@ -194,7 +194,7 @@ export function registerTools(server: any): void {
 
   server.tool(
     "run_analysis",
-    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes), oncoprint, attrition (CONSORT-style counts after each cohort clause), genome (genome-wide copy-number gain/loss frequency from segments). Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
+    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes), oncoprint, attrition (CONSORT-style counts after each cohort clause), genome (genome-wide copy-number gain/loss frequency from segments), pathways (the ten Sanchez-Vega oncogenic pathways, % altered per cohort). Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
     {
       document: z.object({}).passthrough()
         .describe("The Analysis document: {study, cohorts: {name: def, ...}, views: [...]}. Grammar and examples: describe_dsl.")
@@ -382,6 +382,15 @@ export function registerTools(server: any): void {
           out.push(`Genome-wide copy number (${g.build}, ${g.binMb} Mb bins, |log2| ≥ ${g.threshold}; peak % gained/lost per chromosome):\n` +
             g.series.map((s) => `  ${s.cohort} (${s.segmented.toLocaleString()} segmented samples): ${perChrom(s)}`).join("\n") +
             (g.test ? `\n  bins differing at q<0.05: ${g.test.significantGain} for gains, ${g.test.significantLoss} for losses, of ${g.bins.length}` : "") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "pathways") {
+          const pw = v.pathways!;
+          out.push(`Oncogenic signalling pathways (% of patients with ≥1 member ${pw.measure === "driver" ? "driver" : "altered"}; union-of-panels denominator):\n` +
+            pw.rows.map((r) => `  ${r.name} (${r.profiledGenes}/${r.genes} genes profiled): ` +
+              r.cells.map((c) => `${c.cohort} ${c.pct == null ? "not profiled" : c.pct + "%"}`).join(" | ") +
+              (r.q != null ? ` q=${pFmt(r.q)}` : "") +
+              (r.top.length ? `; top: ` + r.top.map((t) => `${t.gene} ${t.cells.map((c) => c.pct == null ? "–" : c.pct + "%").join("/")}`).join(", ") : "") +
+              (r.otherAltered ? `, +${r.otherAltered} more altered` : "")).join("\n") +
             caveatOf(v) + noteOf(v));
         } else if (v.kind === "attrition") {
           out.push("Cohort attrition (patients left after each clause, in order):\n" + v.attrition!.map((pn) =>

@@ -59,3 +59,26 @@ describe("genome", () => {
     assert.equal(viewToSvg({ kind: "genome", genome: { ...one, series: [] } }), null);
   });
 });
+
+describe("pathways", () => {
+  const cell = (cohort: string, profiled: number, altered: number) =>
+    ({ cohort, profiled, altered, pct: profiled ? Math.round(1000 * altered / profiled) / 10 : null });
+  const v: ViewResult = { kind: "pathways", cohorts: ["A", "B"], caveat: "union of panels",
+    pathways: { measure: "driver", rows: [{ name: "RTK-RAS", source: "Sanchez-Vega 2018", genes: 3, profiledGenes: 2,
+      cells: [cell("A", 100, 60), cell("B", 50, 45)], p: 1e-5, q: 0,
+      top: [{ gene: "KRAS", role: "OG", cells: [cell("A", 100, 40), cell("B", 50, 40)], q: 0.001 }],
+      otherAltered: 4, notProfiled: ["<X>"] }] } };
+  test("pooled and unprofiled members are counted, never silently dropped", () => {
+    const svg = viewToSvg(v)!;
+    assert.ok(svg.includes("+4 more altered"));
+    assert.ok(svg.includes("1 never profiled"));
+  });
+  test("an underflowed q never prints as zero", () => {
+    const svg = viewToSvg(v)!;
+    assert.ok(svg.includes("q&lt;1e-300") && !/q=0(e\+0)?</.test(svg));
+  });
+  test("a significant member is starred, and the caveat travels with the figure", () => {
+    const svg = viewToSvg(v)!;
+    assert.ok(svg.includes("KRAS ★") && svg.includes("union of panels"));
+  });
+});

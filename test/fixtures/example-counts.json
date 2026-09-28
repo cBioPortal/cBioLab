@@ -152,6 +152,10 @@
     "Genome-wide copy number: colorectal against breast": {
       "Colorectal": 4993,
       "Breast": 5803
+    },
+    "Oncogenic signalling pathways: colorectal against pancreatic": {
+      "Colorectal": 5543,
+      "Pancreatic": 3109
     }
   }
 }

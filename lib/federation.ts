@@ -224,9 +224,9 @@ export async function instanceForStudy(study: string): Promise<Instance> {
 // ---------------------------------------------------------------------------
 
 /** high-level CNA only, matching the oncoprint/compare convention (±2) */
-const ALTERED_COND = "(g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)";
+export const ALTERED_COND = "(g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)";
 
-function driverJoin(pin: string): string {
+export function driverJoin(pin: string): string {
   return (
     "  LEFT JOIN oncokb_annotation.variant_annotation ann\n" +
     "    ON ann.oncokb_version = " + sq(pin) + " AND ann.is_driver\n" +

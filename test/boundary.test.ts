@@ -269,7 +269,10 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "genomeBinsSql": () => federation.genomeBinsSql(cohortSql, "x", "db", { binBp: 2e6, threshold: 0.2, includeX: false }),
     "genomeBinsSql:withX": () => federation.genomeBinsSql(cohortSql, "x", "db", { binBp: 1e6, threshold: 0.3, includeX: true }),
     "genomeCoverageSql": () => federation.genomeCoverageSql(cohortSql, "x", "db"),
-    "studyGenomeSql": () => federation.studyGenomeSql("x", "db")
+    "studyGenomeSql": () => federation.studyGenomeSql("x", "db"),
+    // pathways: `per` holds (set, patient) rows, but the outer SELECT only counts them per set
+    "geneSetCountsSql": () => federation.geneSetCountsSql(cohortSql, [{ name: "RTK-RAS", genes: ["KRAS", "NRAS"] }, { name: "TP53", genes: ["TP53"] }], "x", "v7.5", "db"),
+    "geneSetCountsSql:no-annotation-pin": () => federation.geneSetCountsSql(cohortSql, [{ name: "set", genes: ["APC"] }], "x", null, "db")
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

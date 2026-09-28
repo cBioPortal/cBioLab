@@ -16,7 +16,8 @@ export interface MoreKindUi {
 
 export const MORE_KINDS: Record<string, MoreKindUi> = {
   attrition: { label: "Cohort attrition (CONSORT)", title: "Cohort attrition", maxCohorts: 6 },
-  genome: { label: "Genome-wide copy number", title: "Genome-wide copy number", maxCohorts: 4 }
+  genome: { label: "Genome-wide copy number", title: "Genome-wide copy number", maxCohorts: 4 },
+  pathways: { label: "Oncogenic pathways", title: "Oncogenic signalling pathways", maxCohorts: 4 }
 };
 
 export const isMoreKind = (k: unknown): boolean => Object.prototype.hasOwnProperty.call(MORE_KINDS, String(k));
@@ -38,6 +39,7 @@ export interface MoreCtx {
 /** A one-line subtitle for the card header. */
 export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "attrition") return "patients left after each clause, in order";
+  if (kind === "pathways") return (spec.measure === "any" ? "any alteration" : "OncoKB drivers") + ", Sanchez-Vega et al. 2018";
   if (kind === "genome") return v.genome ? v.genome.build + ", " + v.genome.binMb + " Mb bins, from segments" : "from copy-number segments";
   void spec; void v;
   return null;
@@ -61,6 +63,22 @@ export function MoreControls({ c }: { c: MoreCtx }) {
         </label>
         <label className="chk" title="chromosome X's log ratio mostly records sex against the reference, so it is off by default">
           <input type="checkbox" checked={spec.includeX === true} disabled={busy} onChange={(e) => patch({ includeX: e.target.checked || undefined })} /> chrX
+        </label>
+      </div>
+    </div>
+  );
+  if (spec.kind === "pathways") return (
+    <div className="viewtb">
+      <div className="tbz"><span className="tbl">data</span>
+        <label className="tbfield" title="count only OncoKB-annotated drivers (as the paper counted curated oncogenic events), or every alteration">
+          count <select value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onChange={(e) => patch({ measure: e.target.value === "any" ? "any" : undefined })}>
+            <option value="driver">drivers</option><option value="any">any alteration</option>
+          </select>
+        </label>
+        <label className="tbfield" title="how many of each pathway's most-altered genes to draw; the rest are pooled and counted, never dropped">
+          genes shown <select value={String(spec.topGenes ?? 6)} disabled={busy} onChange={(e) => patch({ topGenes: Number(e.target.value) })}>
+            {[3, 6, 9, 12].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
         </label>
       </div>
     </div>
