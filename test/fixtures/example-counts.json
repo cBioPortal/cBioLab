@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-09-27",
+  "generated": "2026-09-28",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -144,6 +144,14 @@
       "NSCLC": 350,
       "NSCLC high-TMB": 69,
       "NSCLC low-TMB": 281
+    },
+    "Cohort attrition: which criterion removed whom": {
+      "LUAD KRAS G12C, immunotherapy": 279,
+      "LUAD KRAS wild-type": 3976
+    },
+    "Genome-wide copy number: colorectal against breast": {
+      "Colorectal": 4993,
+      "Breast": 5803
     }
   }
 }

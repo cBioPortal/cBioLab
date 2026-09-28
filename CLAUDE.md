@@ -44,6 +44,12 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   sort key; `lib/oncoprint-detail.ts` answers one column at a time for tooltips. **`lib/view-svg.ts`** — the same contract for every other view kind (survival,
   hotspots, compare, cooccurrence, coexpression, clinical); used by the in-app chat today and
   by MCP `run_analysis` for the oncoprint image.
+- **`lib/views-more.ts`** — the view kinds added after the first thirteen (`attrition`, `genome`,
+  …). `runAnalysis` evaluates cohorts and resolvers as for every view and hands them to
+  `runMoreView`; their SQL lives in **`lib/federation-more.ts`** (re-exported by
+  `lib/federation.ts`, so the boundary suite sweeps it) and runs through the resolvers'
+  `moreAggregate`/`moreMeta` — present on every local participant, absent on a remote peer, which
+  those views name as left out. Figures: **`lib/view-svg-more.ts`**; cards: `app/lab/more-views.tsx`.
 - **`lib/event-names.ts`** — **THE only place timeline event names are normalized.** Case-fold and
   trim, nothing else; measured to be complete for event types and attribute keys (zero residual
   collisions). Folds are disclosed in the caveat, never silent. Do not fork it.
@@ -140,8 +146,9 @@ still holds, against a running server.
   `.chk` for a checkbox. Underlined link-buttons are not a fourth kind of control.
 - **Apparatus goes in `.vfoot`.** Legend, methodology caveats and provenance stay on the page and
   a step down in weight, so they read as apparatus rather than as findings.
-- **Server-rendered figures share the palette.** `lib/view-svg.ts` owns `palette()`, `SERIES` and
-  the frame/caption helpers; a renderer that invents a colour is drifting from every other view.
+- **Server-rendered figures share the palette.** `lib/svg-kit.ts` owns `palette()`, `SERIES` and
+  the frame/caption helpers, for `lib/view-svg.ts` and `lib/view-svg-more.ts` alike; a renderer
+  that invents a colour is drifting from every other view.
 - **Geometry stays inline, styling does not.** A tooltip's position and a legend swatch's colour
   are data computed from the drawing; borders, padding and type are classes.
 

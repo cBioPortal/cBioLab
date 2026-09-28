@@ -508,11 +508,20 @@ export function describeCohortDef(def: CohortDef | null | undefined): string {
   if (!def) return "all patients in the study";
   const d = normalizeSugar(def);
   if (Array.isArray(d.all) && d.all.length === 0) return "all patients in the study";
-  return (d.all || []).map((c: any) => {
-    if (c.any) return "(" + c.any.map(leafText).join(" OR ") + ")";
-    if (c.not) return c.not.any
-      ? "NOT (" + c.not.any.map(leafText).join(" OR ") + ")"
-      : "NOT " + leafText(c.not);
-    return leafText(c);
-  }).join(" AND ");
+  return (d.all || []).map(describeClause).join(" AND ");
+}
+
+/** One clause of a cohort's `all`, in the same plain language as describeCohortDef. */
+export function describeClause(c: any): string {
+  if (c.any) return "(" + c.any.map(leafText).join(" OR ") + ")";
+  if (c.not) return c.not.any
+    ? "NOT (" + c.not.any.map(leafText).join(" OR ") + ")"
+    : "NOT " + leafText(c.not);
+  return leafText(c);
+}
+
+/** A cohort's clauses as a list, v1 sugar normalized — what an attrition view steps through. */
+export function cohortClauses(def: CohortDef | null | undefined): Clause[] {
+  if (!def) return [];
+  return normalizeSugar(def).all || [];
 }

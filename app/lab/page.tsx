@@ -1,6 +1,7 @@
 "use client";
 import { use, useEffect, useLayoutEffect, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
+import { MORE_KINDS, isMoreKind, moreSub, MoreControls, defaultMoreView } from "./more-views";
 import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
 import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
@@ -884,7 +885,8 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
         : "this study records no timeline events (only 131 of 545 studies have any)" },
     { kind: "sequence", label: "Treatment sequence", loading: () => !viewEvents().length && (catLoading || exploreBusy),
       why: () => viewEvents().some(e => /treat|therap|regimen|drug|medicat/.test(e.canonical)) ? null
-        : "this study records no treatment events, so there are no lines of therapy to sequence" }
+        : "this study records no treatment events, so there are no lines of therapy to sequence" },
+    ...Object.entries(MORE_KINDS).map(([kind, k]) => ({ kind, label: k.label }))
   ];
 
   /**
@@ -893,7 +895,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
    * would otherwise be a bare red box the reader can't remove without editing the JSON.
    */
   const drawsOwnHead = (v: any): boolean =>
-    v.kind === "cox" || v.kind === "logistic" || v.kind === "plot" ||
+    isMoreKind(v.kind) || v.kind === "cox" || v.kind === "logistic" || v.kind === "plot" ||
     (v.kind === "compare" && !!v.rows) || (v.kind === "hotspots" && !!v.hotspots) ||
     (v.kind === "coexpression" && !!v.coexpression) || (v.kind === "clinical" && !!v.clinical) ||
     (v.kind === "cooccurrence" && !!v.pairs) || (v.kind === "survival" && !!v.curves) ||
@@ -979,6 +981,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
       : kind === "cooccurrence" ? { kind, genes: genes.slice(0, 6) }
       : kind === "oncoprint" ? { kind, genes: genes.slice(0, 5) }
       : kind === "cox" ? { kind, covariates: [{ source: "alteration", gene: genes[0] || "TP53", by: "mutated" }] }
+      : isMoreKind(kind) ? defaultMoreView(kind, { genes, attrs: catalogAttrs(), profiles: profileOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) })
       : kind === "logistic" ? { kind,
           outcome: { source: "alteration", gene: genes[0] || "TP53", by: "mutated" }, outcomeEvent: "Mutated",
           covariates: [{ source: "clinical", attribute: viewAttrs()[0] || "SEX" }] }
@@ -4227,6 +4230,22 @@ function Latency({ v }: { v: any }) {
                       </div>
                     );
                   })()}
+                  {v.svg
+                    ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
+                    : !v.error && <p className="note">nothing to draw</p>}
+                </>}
+                {isMoreKind(v.kind) && <>
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title={MORE_KINDS[v.kind].title}
+                    sub={moreSub(v.kind, docView(vi), v)}
+                    cohorts={cohortChoice(vi, docView(vi), MORE_KINDS[v.kind].maxCohorts)}
+                    onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined}
+                    onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                    actions={MORE_KINDS[v.kind].genes
+                      ? <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
+                      : undefined} />
+                  <MoreControls c={{ vi, spec: docView(vi), v, busy, patch: (p) => patchView(vi, p),
+                    attrs: catalogAttrs(), profiles: profileOptions(), events: viewEvents() }} />
+                  {v.note && <p className="note">{v.note}</p>}
                   {v.svg
                     ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
                     : !v.error && <p className="note">nothing to draw</p>}

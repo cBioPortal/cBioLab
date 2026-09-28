@@ -194,7 +194,7 @@ export function registerTools(server: any): void {
 
   server.tool(
     "run_analysis",
-    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes) and oncoprint. Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
+    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes), oncoprint, attrition (CONSORT-style counts after each cohort clause), genome (genome-wide copy-number gain/loss frequency from segments). Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
     {
       document: z.object({}).passthrough()
         .describe("The Analysis document: {study, cohorts: {name: def, ...}, views: [...]}. Grammar and examples: describe_dsl.")
@@ -364,6 +364,30 @@ export function registerTools(server: any): void {
           out.push(`Oncoprint: ${v.nColumns!.toLocaleString()} patients — ` +
             v.genes!.map((g) => `${g.gene} ${g.driverPct}%/${g.anyPct}%`).join(", ") +
             ` — annotation ${v.annotation}.` + noteOf(v));
+        } else if (v.kind === "genome") {
+          const g = v.genome!;
+          // per chromosome, the highest gained and lost share of each cohort — enough to name the
+          // regions without reciting every bin
+          const perChrom = (s: typeof g.series[number]) => {
+            const best = new Map<string, { gain: number; loss: number }>();
+            g.bins.forEach((b, i) => {
+              if (!s.profiled[i]) return;
+              const cur = best.get(b.chrom) || { gain: 0, loss: 0 };
+              cur.gain = Math.max(cur.gain, 100 * s.gain[i] / s.profiled[i]);
+              cur.loss = Math.max(cur.loss, 100 * s.loss[i] / s.profiled[i]);
+              best.set(b.chrom, cur);
+            });
+            return [...best].map(([c, x]) => `chr${c} +${x.gain.toFixed(0)}/−${x.loss.toFixed(0)}`).join(", ");
+          };
+          out.push(`Genome-wide copy number (${g.build}, ${g.binMb} Mb bins, |log2| ≥ ${g.threshold}; peak % gained/lost per chromosome):\n` +
+            g.series.map((s) => `  ${s.cohort} (${s.segmented.toLocaleString()} segmented samples): ${perChrom(s)}`).join("\n") +
+            (g.test ? `\n  bins differing at q<0.05: ${g.test.significantGain} for gains, ${g.test.significantLoss} for losses, of ${g.bins.length}` : "") +
+            caveatOf(v) + noteOf(v));
+        } else if (v.kind === "attrition") {
+          out.push("Cohort attrition (patients left after each clause, in order):\n" + v.attrition!.map((pn) =>
+            `  ${pn.cohort}: study base ${pn.base.toLocaleString()}\n` +
+            pn.steps.map((st) => `    → ${st.label}: ${st.n.toLocaleString()} (−${st.excluded.toLocaleString()})`).join("\n")).join("\n") +
+            caveatOf(v) + noteOf(v));
         } else {
           // A view kind with no branch above used to append nothing at all: the
           // numbers were computed and the model was simply never told. Saying so

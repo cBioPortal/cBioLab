@@ -263,7 +263,13 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "coxRowsSql:customColumns": () => coxRowsSql(cohortSql, "x", "db", "CUSTOM", [{ label: "c0", sel: catAxis }], { months: "PFS_MONTHS_FIRST_LINE_TX", status: "PROGRESSION_STATUS" }),
     // Same shape as coxRowsSql: the outcome is just another axis-selected CTE, joined the same
     // way — no identifier ever reaches the outer SELECT here either.
-    "logisticRowsSql": () => logisticRowsSql(cohortSql, { label: "y0", sel: catAxis }, [{ label: "c0", sel: numAxis }])
+    "logisticRowsSql": () => logisticRowsSql(cohortSql, { label: "y0", sel: catAxis }, [{ label: "c0", sel: numAxis }]),
+    // lib/federation-more.ts, re-exported through lib/federation.ts: the genome view's bins group
+    // the sample id away inside `binned`; only (chrom, bin) and counts cross.
+    "genomeBinsSql": () => federation.genomeBinsSql(cohortSql, "x", "db", { binBp: 2e6, threshold: 0.2, includeX: false }),
+    "genomeBinsSql:withX": () => federation.genomeBinsSql(cohortSql, "x", "db", { binBp: 1e6, threshold: 0.3, includeX: true }),
+    "genomeCoverageSql": () => federation.genomeCoverageSql(cohortSql, "x", "db"),
+    "studyGenomeSql": () => federation.studyGenomeSql("x", "db")
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

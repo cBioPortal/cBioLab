@@ -685,6 +685,42 @@ export const EXAMPLES: DslExample[] = [
       },
       views: [{ kind: "survival", cohorts: ["NSCLC high-TMB", "NSCLC low-TMB"] }]
     }
+  },
+  {
+    title: "Cohort attrition: which criterion removed whom",
+    demonstrates: "An `attrition` view: the CONSORT-style flow a clinicogenomic paper reports before any result — the study base, then the patients left after each clause of the cohort, in the order written, with how many that clause alone removed. Each step is the cohort a reader would get by stopping there, compiled and counted like any other cohort, so the last box is the cohort's own count by construction.",
+    tags: ["attrition", "consort", "cohort-definition"],
+    note: "KRAS G12C lung adenocarcinoma treated with immunotherapy, with at least six months of follow-up, beside KRAS wild-type lung adenocarcinoma. The G12C arm loses most of its patients to the genotype, and a further 78 to the follow-up requirement — the kind of step a reader needs to see before trusting a survival curve drawn from what is left.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "LUAD KRAS G12C, immunotherapy": { all: [
+          { kind: "clinical", attribute: "CANCER_TYPE_DETAILED", values: ["Lung Adenocarcinoma"], per: "sample" },
+          { kind: "oql", q: "KRAS: G12C" },
+          { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } },
+          { kind: "derived", metric: "followupMonths", range: { gte: 6 } }
+        ] },
+        "LUAD KRAS wild-type": { all: [
+          { kind: "clinical", attribute: "CANCER_TYPE_DETAILED", values: ["Lung Adenocarcinoma"], per: "sample" },
+          { not: { kind: "oql", q: "KRAS" } }
+        ] }
+      },
+      views: [{ kind: "attrition" }]
+    }
+  },
+  {
+    title: "Genome-wide copy number: colorectal against breast",
+    demonstrates: "A `genome` view: the copy-number SEGMENTS (33M of them in this warehouse, unused by every other view) binned along the genome, as the share of each cohort's segmented samples gained or lost in each bin, with a per-bin Fisher test between exactly two cohorts. Each bin's denominator is the samples whose segmentation actually covers it, the same panel-aware rule every per-gene frequency follows.",
+    tags: ["genome", "copy-number", "segments"],
+    note: "Colorectal and breast cancers in MSK-IMPACT, 2 Mb bins. The textbook colorectal pattern is all there — 20q gained in 60%, 13q in 42%, 8q in 32%, 18q lost in 54% — beside breast cancer's 1q and 8q gains and 16q loss. The strip underneath marks every bin where the two differ at q < 0.05, coloured by which cohort is higher.",
+    doc: {
+      study: "msk_impact_50k_2026",
+      cohorts: {
+        "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" }] },
+        "Breast": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"], per: "sample" }] }
+      },
+      views: [{ kind: "genome", binMb: 2 }]
+    }
   }
 ];
 
@@ -867,6 +903,8 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | \`course\` | \`eventTypes:[\u22646], anchor?:{eventType,key?,value?,occurrence?}, binMonths?:3, fromMonths?:-12, toMonths?:60, cohorts?:[names]\` | the **clinical course**: per time bin, the share of the cohort in each event state. Two things it refuses to fake. (1) The denominator is the patients still under observation in that bin \u2014 first recorded event to last contact (the later of their last event and their OS follow-up) \u2014 never the whole cohort, which would make a curve fall merely because follow-up ran out. (2) \`anchor\` is optional for one study but **required across studies**: day 0 is birth in some studies and first sequencing in others, and nothing in the schema records which, so raw day 0 compares incomparable clocks. Event types that carry real durations are drawn as a state the patient is IN; the rest as an event that HAPPENED \u2014 read from the data, not from the name. Bins are half-open [t, t+w). Event-name spellings differing only in case are folded (\`Treatment\`/\`TREATMENT\`) and the fold is named in the caveat; nothing else is merged |
 | \`sequence\` | \`labelKey?:"SUBTYPE", eventType?:"treatment", exclude?:[values], lineGap?:90, maxSteps?:3, topN?:8, cohorts?:[names]\` | **what follows what**: therapy transitions as lines, drawn as a Sankey. Records are first grouped into LINES \u2014 therapies less than \`lineGap\` days apart are one line, labelled by their whole combination (sorted, so \`A + B\` and \`B + A\` are one regimen). That grouping is the point: a patient has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision. Paths that end flow into TWO explicit terminals, never one: **no further line** (the study watched for at least one \`lineGap\` and saw no further therapy) and **record ends here** (it did not, so nothing can be concluded). Measured on MSK-CHORD, 68% of patients have under three months of observation after their last therapy and the median is 15 days \u2014 so collapsing the two would turn record-keeping into an apparent clinical decision. Flows out of a node sum to it, so nobody vanishes. Up to two cohorts are drawn as panels sharing one scale and one colour per regimen. \`exclude\` drops label values that are not therapies; it is a parameter and not an engine rule because such markers are **not structurally distinguishable** (MSK\u2019s \`Prior Medications to MSK\` carries no duration, but neither do \`Radiation Therapy\` or \`Investigational\`), so the choice belongs in the document where a reader can see it. One cohort only |
 | \`plot\` | \`x:axis, y:axis, unit?:"patient"\\|"sample", bins?:[240,160], points?:true, colorBy?:axis, ringBy?:axis, cohorts?:[names]\` | two axes over the same cases, aggregated **inside the database**: a scatter comes back as counts per grid cell, a box as quartiles per group, two categoricals as a contingency table. The payload is a few kilobytes whatever the cohort's size |
+| \`attrition\` | \`cohorts?:[names] (≤6)\` | **cohort attrition**, CONSORT-style: for each cohort, the study base and then the patients left after each clause of its \`all\`, in the order written, with how many that clause alone removed. Each step is evaluated as its own cohort (the first k clauses ANDed), with the same compiler and the same per-study counts, so the last step is the cohort's own count by construction — a mismatch is reported, never smoothed over. The order of clauses changes the path, never the final count. Counts only, so every participant (aggregate-only and remote included) can answer; across studies the counts are summed and overlap is not deduplicated |
+| \`genome\` | \`binMb?:2, threshold?:0.2, includeX?:false, cohorts?:[names] (≤4)\` | **genome-wide copy-number frequency** from the copy-number SEGMENTS: the share of each cohort's segmented samples gained (log2 segment mean ≥ \`threshold\`) or lost (≤ −\`threshold\`) in every \`binMb\`-megabase bin (1–50) along chromosomes 1–22 (and X with \`includeX\` — its log ratio mostly records sex, so it is off by default), drawn as gains up and losses down, one panel per cohort. Each bin's denominator is the samples whose segmentation covers it — a bin nothing covers is drawn as unmeasured, never as copy-neutral. A bin takes the value of the segment over its midpoint, so an event narrower than a bin can be missed; the caption says so. Unit is the SAMPLE, not the patient. Exactly two cohorts add a per-bin two-sided Fisher test (gains and losses separately, Benjamini–Hochberg across bins), drawn as a strip coloured by which cohort is higher. Studies on different reference genomes (hg19/hg38) are refused rather than drawn on one axis. Counts only; a remote peer cannot answer yet and is named as left out |
 | \`oncoprint\` | \`genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], unit?:"patient"\\|"sample", display?:{…}, overlays?:[≤2], derivedCohorts?:[≤3], cohorts?:[names]\` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 \`views[].note\` is the analyst's own one-line annotation, carried through to the result and
@@ -1139,6 +1177,10 @@ export const CHAT_GRAMMAR = `Document shape:
                //        | {"source":"alteration","genes":[G,...(2-20)],"by":"mutated"?}  // any-of-N as one category; only "mutated"
                // two numeric axes -> scatter (binned, never points); one categorical -> box;
                // two categorical -> a contingency table
+             {"kind":"attrition","cohorts":[names?(max 6)]},
+             {"kind":"genome","binMb":2,"threshold":0.2,"includeX":false,"cohorts":[names?(max 4)]},
+               // % of segmented samples gained/lost per genomic bin, from copy-number segments; 2 cohorts add per-bin Fisher q
+               // the study base, then patients left after each clause of each cohort, in order (CONSORT-style)
              {"kind":"oncoprint","genes":[...(max 12)],"clinical":["<attribute>", ...(max 8)]?,
               "heatmap":[{"profileType":"<profile>","genes":[...]?}, ...(max 4)]?,
               "sort":["<track>"|"-<track>"|"genomic", ...(max 4)]?,"cohorts":[names?]} ] }

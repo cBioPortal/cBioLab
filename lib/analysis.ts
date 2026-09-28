@@ -32,6 +32,7 @@ import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
+import { runMoreView, isMoreViewKind } from "./views-more.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -1817,6 +1818,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           nColumns: contract.stats.nColumns, annotation: contract.conventions.annotation });
         void oncoQueryMs;
       }
+    } else if (isMoreViewKind(view.kind)) {
+      views.push(await runMoreView(view, { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, overLimit }));
     } else {
       // unreachable for well-typed documents, but documents arrive as untrusted
       // JSON from clients/chat/MCP, so an unknown kind must still be reported

@@ -581,9 +581,63 @@ export interface SequenceView {
   /** distinct labels kept before the rest fold into "other" (default 6) */
   topN?: number;
 }
+/**
+ * Cohort attrition: for each cohort, the patients remaining after each successive clause of its
+ * `all`, CONSORT-style — so a reader sees which criterion removed whom before trusting any
+ * downstream number. Counts only; every participant can answer.
+ */
+export interface AttritionView {
+  /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
+  note?: string;
+  kind: "attrition"; cohorts?: string[];
+}
+export interface AttritionStep {
+  /** the clause, in the same plain language as the cohort readback */
+  label: string;
+  /** patients left after this clause and every clause above it */
+  n: number;
+  /** removed by this clause alone, given the ones above it */
+  excluded: number;
+  /** n as a share of the study base, one decimal */
+  pctOfBase: number | null;
+}
+export interface AttritionPanel { cohort: string; base: number; steps: AttritionStep[]; studies: string[] }
+/**
+ * Genome-wide copy-number frequency: the share of each cohort's segmented samples gained or lost
+ * in every bin along the genome, from the copy-number SEGMENTS (not the per-gene calls), with a
+ * per-bin Fisher test when exactly two cohorts are drawn. Counts only.
+ */
+export interface GenomeView {
+  note?: string;
+  kind: "genome"; cohorts?: string[];
+  /** bin width in megabases, 1-50 (default 2) */
+  binMb?: number;
+  /** |log2 segment mean| at or past which a bin is gained / lost (default 0.2) */
+  threshold?: number;
+  /** draw chromosome X too (default false: its log ratio mostly records sex) */
+  includeX?: boolean;
+}
+export interface GenomeSeries {
+  cohort: string;
+  /** the cohort's samples, and how many of them have any segment at all */
+  samples: number; segmented: number;
+  /** per bin, aligned with GenomeResult.bins */
+  profiled: number[]; gain: number[]; loss: number[];
+}
+export interface GenomeResult {
+  build: "hg19" | "hg38"; binMb: number; threshold: number; includeX: boolean;
+  /** every bin, in genome order: its chromosome and start (bp) */
+  bins: { chrom: string; start: number }[];
+  series: GenomeSeries[];
+  /** exactly two cohorts: Benjamini–Hochberg q per bin (null where either cohort has no sample) */
+  test?: { gainQ: (number | null)[]; lossQ: (number | null)[]; significantGain: number; significantLoss: number };
+  /** studies left out because they could not answer (a remote peer, or no segments at all) */
+  excluded?: { study: string; reason: string }[];
+}
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView;
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
+  | AttritionView | GenomeView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -852,6 +906,8 @@ export interface ViewResult {
   genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
   cox?: CoxResult;                          // multivariate Cox
   logistic?: LogisticResult;                // multivariate logistic regression
+  attrition?: AttritionPanel[];             // cohort attrition
+  genome?: GenomeResult;                    // genome-wide copy-number frequency
 }
 /**
  * Therapy transitions, ready to draw: nodes in columns, flows between them.
