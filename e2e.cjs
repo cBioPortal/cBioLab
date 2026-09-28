@@ -102,15 +102,19 @@ async function main() {
         const bucketSelected = (await page.locator(".derivedgrid .valrow.on").count()) > 0;
         der.filtered = barSaysFiltered && bucketSelected;
       } catch { /* left as-is */ }
-      // the attribute expander belongs to the Clinical card, not the gap between columns
+      // the attribute expander sits in the facet grid, right after the clinical
+      // attribute tiles and before the study/gene-table tiles that follow them —
+      // not orphaned in a gap between unrelated sections.
       const expanderPlaced = await page.evaluate(() => {
         const btn = [...document.querySelectorAll("button")].find(b2 => /more attributes/.test(b2.textContent));
         if (!btn) return null;
-        const card = btn.closest(".card");
-        if (!card) return { inCard: false };
-        const br = btn.getBoundingClientRect(), cr = card.getBoundingClientRect();
-        return { inCard: true, clinical: /counted in each attribute/.test(card.textContent),
-          within: br.left >= cr.left && br.right <= cr.right && br.bottom <= cr.bottom + 1 };
+        const grid = btn.closest(".facetgrid");
+        if (!grid) return { inCard: false };
+        const kids = [...grid.children];
+        const i = kids.indexOf(btn);
+        const before = kids.slice(0, i).some(k => k.hasAttribute && k.hasAttribute("data-attr"));
+        const after = kids.slice(i + 1).some(k => /^Studies|^Data types|^Mutated Genes/.test(k.textContent || ""));
+        return { inCard: true, clinical: before, within: after };
       });
       // Categorical values are shown in full and scrolled, not trimmed to a few;
       // and the ranked lists carry no inline bar charts.

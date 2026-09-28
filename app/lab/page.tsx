@@ -3085,51 +3085,56 @@ function Latency({ v }: { v: any }) {
               </div>
             );
           })()}
-          {explore && <div className="two-col" style={{ alignItems: "start" }}>
-            <div>
-              <div className="card">
-                {(() => {
-                  const visible = visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical;
-                  const shown = Math.min(visible.length, attrLimit);
-                  return (
-                    <div className="row" style={{ alignItems: "baseline" }}>
-                      <h2 style={{ margin: 0 }}>Clinical <span className="plain">— counted in each attribute's own unit, as the portal does</span></h2>
-                      <span className="spacer" />
-                      <input className="genesearch" type="search" placeholder="find attribute or value" value={clinFilter}
-                        title="matches an attribute's name or any of its values"
-                        onChange={e => setClinFilter(e.target.value)} />
-                      <span className="meta">{shown < visible.length
-                        ? "showing " + shown + " of " + visible.length + " attributes"
-                        : visible.length + " attributes"}
-                        {attrCoverage > 0 && visible.length < explore.clinical.length
-                          ? " (" + (explore.clinical.length - visible.length) + " hidden as study-specific)" : ""}</span>
-                      {exStudies.length > 1 && (
-                        <select value={String(attrCoverage)} disabled={exploreBusy}
-                          title="attributes carried by only one study are that study's own vocabulary, not something the selection shares"
-                          onChange={e => {
-                            const v = Number(e.target.value);
-                            setAttrCoverage(v);
-                            // Refetch UNNARROWED so the bar can be lowered again
-                            // later; the filtering below is what the reader sees,
-                            // and subsequent fetches narrow the server's work.
-                            setTimeout(() => fetchExplore(undefined, undefined, []), 0);
-                          }}>
-                          <option value="0">every attribute</option>
-                          <option value="0.5">in most studies</option>
-                          <option value="1">in every study</option>
-                        </select>
-                      )}
-                    </div>
-                  );
-                })()}
-                {(visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical)
-                  .slice(0, attrLimit).map(c => (
-                  /* data-attr / data-shape make the facet identifiable from outside
-                     React — the e2e suite asserts that an attribute's shape does not
-                     change when the draft does. */
-                  <div key={c.per + c.attribute} data-attr={c.per + "|" + c.attribute}
-                    data-shape={c.kind === "cat" ? (PIE_ATTRIBUTES.has(c.attribute) ? "pie" : "list") : c.kind}
-                    style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0" }}>
+          {explore && <>
+            {/* Toolbar for the facet grid below, not a tile in it — the search and
+                coverage controls apply across every clinical attribute at once, so they
+                sit above the grid the way "Add a view" sits above the Analysis cards. */}
+            <div className="card">
+              {(() => {
+                const visible = visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical;
+                const shown = Math.min(visible.length, attrLimit);
+                return (
+                  <div className="row" style={{ alignItems: "baseline" }}>
+                    <h2 style={{ margin: 0 }}>Clinical <span className="plain">— counted in each attribute's own unit, as the portal does</span></h2>
+                    <span className="spacer" />
+                    <input className="genesearch" type="search" placeholder="find attribute or value" value={clinFilter}
+                      title="matches an attribute's name or any of its values"
+                      onChange={e => setClinFilter(e.target.value)} />
+                    <span className="meta">{shown < visible.length
+                      ? "showing " + shown + " of " + visible.length + " attributes"
+                      : visible.length + " attributes"}
+                      {attrCoverage > 0 && visible.length < explore.clinical.length
+                        ? " (" + (explore.clinical.length - visible.length) + " hidden as study-specific)" : ""}</span>
+                    {exStudies.length > 1 && (
+                      <select value={String(attrCoverage)} disabled={exploreBusy}
+                        title="attributes carried by only one study are that study's own vocabulary, not something the selection shares"
+                        onChange={e => {
+                          const v = Number(e.target.value);
+                          setAttrCoverage(v);
+                          // Refetch UNNARROWED so the bar can be lowered again
+                          // later; the filtering below is what the reader sees,
+                          // and subsequent fetches narrow the server's work.
+                          setTimeout(() => fetchExplore(undefined, undefined, []), 0);
+                        }}>
+                        <option value="0">every attribute</option>
+                        <option value="0.5">in most studies</option>
+                        <option value="1">in every study</option>
+                      </select>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="facetgrid">
+              {(visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical)
+                .slice(0, attrLimit).map(c => (
+                /* data-attr / data-shape make the facet identifiable from outside
+                   React — the e2e suite asserts that an attribute's shape does not
+                   change when the draft does. One tile per attribute, the portal's
+                   own study-view density — see .facetgrid's own comment. */
+                <div key={c.per + c.attribute} data-attr={c.per + "|" + c.attribute}
+                  data-shape={c.kind === "cat" ? (PIE_ATTRIBUTES.has(c.attribute) ? "pie" : "list") : c.kind}
+                  className="card">
                     {(() => {
                       // A facet already in the draft is re-queried WITHOUT its own
                       // clauses (disjunctive faceting) so its other values stay
@@ -3260,19 +3265,16 @@ function Latency({ v }: { v: any }) {
                       <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>≥ median</button>
                       <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>&lt; median</button>
                     </div>}
-                  </div>
-                ))}
-                {explore.clinical.length > attrLimit && (
-                  <button className="linklike" style={{ marginTop: "0.5rem" }}
-                    onClick={() => setAttrLimit(attrLimit + 20)}>
-                    show {Math.min(20, explore.clinical.length - attrLimit)} more attributes
-                  </button>
-                )}
-              </div>
-            </div>
-            <div>
+                </div>
+              ))}
+              {explore.clinical.length > attrLimit && (
+                <button className="linklike" style={{ gridColumn: "1 / -1", textAlign: "center" }}
+                  onClick={() => setAttrLimit(attrLimit + 20)}>
+                  show {Math.min(20, explore.clinical.length - attrLimit)} more attributes
+                </button>
+              )}
               {explore.studyBreakdown && explore.studyBreakdown.length > 0 && (
-                <div className="card">
+                <div className="card wide">
                   <h2>Studies <span className="plain">— how {explore.draftCount != null ? "the draft" : "the selection"} breaks down{exStudies.length > 1 ? " across the " + exStudies.length + " selected studies" : ""}</span></h2>
                   {(() => {
                     const rows = explore.studyBreakdown!;
@@ -3297,7 +3299,7 @@ function Latency({ v }: { v: any }) {
                 </div>
               )}
               {explore.dataTypes && explore.dataTypes.length > 0 && (
-                <div className="card">
+                <div className="card wide">
                   <h2>Data types <span className="plain">— samples with each kind of molecular data</span></h2>
                   {(() => {
                     const FILTERABLE: Record<string, "MUTATION" | "CNA" | "SV"> = {
@@ -3344,7 +3346,7 @@ function Latency({ v }: { v: any }) {
                 const rows = needle ? all.filter((g: any) => g.gene.toUpperCase().includes(needle)) : all;
                 if (!all.length) return null;
                 return (
-                  <div className="card" key={kind}>
+                  <div className="card wide" key={kind}>
                     <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
                       <h2 style={{ margin: 0 }}>{meta.title} <span className="plain">— samples, panel-aware frequency</span></h2>
                       <span className="spacer" />
@@ -3468,7 +3470,7 @@ function Latency({ v }: { v: any }) {
                 <p className="note">Profiles here: {(explore.profiles || []).join(", ") || "none"}{explore.gaProfiles && explore.gaProfiles.length ? " · assays: " + explore.gaProfiles.join(", ") : ""} · facet counts {explore.draftCount != null ? "narrowed to your draft" : "study-wide"} · {explore.stats.ms}ms</p>
               </div>
             </div>
-          </div>}
+          </>}
           </div>
         </div>}
 
