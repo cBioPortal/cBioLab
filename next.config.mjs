@@ -7,6 +7,10 @@ const nextConfig = {
   // is also built in is what silently broke the tailnet instance three times.
   // Unset in production, so Vercel builds to `.next` as normal.
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // `'use cache: remote'` (lib/next-cache.ts) needs Cache Components
+  cacheComponents: true,
+  // `next dev` otherwise appends its own section to CLAUDE.md on every start
+  agentRules: false,
   // ship the bundled font (and its dir) inside the serverless function for the MCP route,
   // so SVG->PNG rasterization has a font on Vercel (no system fonts in functions)
   outputFileTracingIncludes: {

@@ -13,7 +13,7 @@ import { decodeSpec, isLocalSpec } from "../../../lib/lab-links.ts";
 import { formatGeneList } from "../../../lib/gene-tracks.ts";
 
 export const metadata = { title: "Oncoprint CLI — cbio-lab" };
-export const dynamic = "force-dynamic";
+export const instant = false;
 export const maxDuration = 300;
 
 const run = promisify(execFile);

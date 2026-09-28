@@ -1,5 +1,8 @@
 import { chQuery, connections, type ChConn } from "../../../lib/ch.ts";
 import { isRestrictedStudy } from "../../../lib/federation.ts";
+import { cacheLife } from "next/cache";
+import { pack, throughCache, dataVersion } from "../../../lib/next-cache.ts";
+import { connection } from "next/server";
 
 type StudyRow = {
   id: string; name: string; cancerType: string;
@@ -8,8 +11,6 @@ type StudyRow = {
   /** which instance holds it — federation-aware catalog */
   instance: string; instanceLabel: string;
 };
-
-let cache: StudyRow[] | null = null;
 
 /** Catalog one instance. Failures are isolated: an unreachable peer contributes nothing. */
 async function studiesFor(conn: ChConn): Promise<StudyRow[]> {
@@ -66,22 +67,37 @@ async function studiesFor(conn: ChConn): Promise<StudyRow[]> {
   });
 }
 
+async function allStudies(): Promise<StudyRow[]> {
+  let failed = 0;
+  const per = await Promise.all(connections().map((c) =>
+    studiesFor(c).catch(() => { failed++; return [] as StudyRow[]; })));   // one bad peer must not empty the catalog
+  const seen = new Set<string>();
+  const merged: StudyRow[] = [];
+  for (const rows of per) for (const row of rows) {
+    if (seen.has(row.id)) continue;                      // first instance wins a collision
+    seen.add(row.id);
+    merged.push(row);
+  }
+  merged.sort((a, b) => b.patients - a.patients);
+  // ...but a catalog missing an instance is served, not kept for a day
+  if (failed) throw new Partial(merged);
+  return merged;
+}
+async function studiesEntry(_version: string): Promise<string> {
+  "use cache: remote";
+  cacheLife("days");
+  return pack(await allStudies());
+}
+/** what the reachable instances returned, when one of them did not answer */
+class Partial extends Error { constructor(readonly rows: StudyRow[]) { super("an instance did not answer"); } }
+
 export async function GET() {
+  await connection();
   try {
-    if (!cache) {
-      const per = await Promise.all(connections().map((c) =>
-        studiesFor(c).catch(() => [] as StudyRow[])));   // one bad peer must not empty the catalog
-      const seen = new Set<string>();
-      const merged: StudyRow[] = [];
-      for (const rows of per) for (const row of rows) {
-        if (seen.has(row.id)) continue;                  // first instance wins a collision
-        seen.add(row.id);
-        merged.push(row);
-      }
-      merged.sort((a, b) => b.patients - a.patients);
-      cache = merged;
-    }
-    return Response.json({ studies: cache });
+    let studies: StudyRow[];
+    try { studies = await throughCache(async () => studiesEntry(await dataVersion()), allStudies); }
+    catch (e) { if (!(e instanceof Partial)) throw e; studies = e.rows; }
+    return Response.json({ studies });
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 500 });
   }

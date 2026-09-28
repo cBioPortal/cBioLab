@@ -22,7 +22,6 @@ import { oncoprintNotebook, notebookStats } from "../../../../../../lib/notebook
 import type { Contract } from "../../../../../../lib/types.ts";
 
 export const maxDuration = 120;
-export const dynamic = "force-dynamic";
 
 // Chrome's Private Network Access blocks a public page (jupyter.org) from fetching a server on a
 // private/tailnet/local address unless the preflight explicitly allows it — without this header,

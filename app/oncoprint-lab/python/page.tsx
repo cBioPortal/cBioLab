@@ -6,7 +6,7 @@ import PyNotebook from "./PyNotebook.tsx";
 import { decodeSpec, ipynbPath, jupyterLiteUrl } from "../../../lib/lab-links.ts";
 
 export const metadata = { title: "Oncoprint in Python — cbio-lab" };
-export const dynamic = "force-dynamic";
+export const instant = false;
 
 export default async function PythonPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const sp = await searchParams;

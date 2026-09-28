@@ -122,6 +122,13 @@ suite fail. A test that cannot fail is decoration.
 - **Restricted studies** (consortium/private) are excluded at the *routing*
   layer by `isRestrictedStudy()`, so they are unreachable rather than merely
   hidden from the picker. See `STUDY_DENY` / `STUDY_ALLOW_RESTRICTED`.
+- **Cached results can hold patient ids.** `lib/next-cache.ts` stores whole
+  answers (an oncoprint contract carries its column ids) in Vercel Runtime
+  Cache, inside the same project and environment as the functions that
+  computed them, so the trust boundary does not move. Nothing a participant is
+  not entitled to is ever computed, so nothing it is not entitled to is cached.
+  Anyone pointing this at restricted data should decide whether that store is
+  acceptable, or skip caching for patient-level answers.
 
 ## If you are about to weaken this
 

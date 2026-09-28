@@ -5,6 +5,8 @@
 // bookmarks still land somewhere useful.
 import { redirect } from "next/navigation";
 
+export const instant = false;
+
 export default function RootPage() {
   redirect("/lab");
 }
