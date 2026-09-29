@@ -403,8 +403,6 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const [saved, setSaved] = useState<Record<string, { id: string; def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null }>>({});
   const [cName, setCName] = useState("");
   const [cDefText, setCDefText] = useState(JSON.stringify({ studies: [...DEFAULT_EXPLORE_STUDIES], all: [] }, null, 2));
-  const [cPreview, setCPreview] = useState<{ error?: string; count?: number; text?: string } | null>(null);
-  const [cBusy, setCBusy] = useState(false);
   const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
   const [studies, setStudies] = useState<{ id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string }[]>([]);
   const [study, setStudy] = useState("msk_chord_2024");
@@ -436,9 +434,6 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
    * click. Keyed by `per|attribute` to match the `data-attr` the DOM uses.
    */
   const attrOrderRef = useRef<string[] | null>(null);
-  const [qaAttr, setQaAttr] = useState("");                             // creator quick-add: attribute
-  const [qaVal, setQaVal] = useState("");                               // creator quick-add: numeric threshold
-  const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
   const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
   /**
    * Minimum share of the selected studies an attribute must appear in to be
@@ -711,26 +706,6 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     if (j.error) throw new Error(j.error);
     const c = Object.values(j.cohorts)[0] as { count: number; text: string };
     return { count: c.count, text: c.text };
-  };
-
-  const previewCohort = async () => {
-    setCBusy(true); setCPreview(null);
-    try {
-      const def = JSON.parse(cDefText);
-      const ev = await evalDef(cName, def);
-      setCPreview(ev);
-      return { def, ev };
-    } catch (e) { setCPreview({ error: String((e as Error)?.message || e) }); return null; }
-    finally { setCBusy(false); }
-  };
-
-  const saveCohort = async () => {
-    const name = cName.trim();
-    if (!name) { setCPreview({ error: "give the cohort a name" }); return; }
-    const r = await previewCohort();
-    if (!r) return;
-    try { await persist(name, r.def, r.ev); }
-    catch (e) { setCPreview({ error: "could not save: " + String((e as Error)?.message || e) }); }
   };
 
   /** Explore's top action bar: acting on the draft you have built by clicking facets. */
@@ -3504,70 +3479,7 @@ function Latency({ v }: { v: any }) {
             <button className={cohortsSubTab === "cohorts" ? "active" : ""} onClick={() => setCohortsSubTab("cohorts")}>Cohorts</button>
             <button className={cohortsSubTab === "analyses" ? "active" : ""} onClick={() => setCohortsSubTab("analyses")}>Analyses</button>
           </div>
-          {cohortsSubTab === "cohorts" && <div className="grid2">
-          <div className="card">
-            <h2>Create a cohort</h2>
-            <label>Name</label>
-            <input style={{ width: "100%" }} value={cName} onChange={e => setCName(e.target.value)} placeholder="e.g. KRAS-driver never-smokers" />
-            <label>Definition</label>
-            <textarea value={cDefText} onChange={e => setCDefText(e.target.value)} spellCheck={false}
-              style={{ width: "100%", height: "16rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
-            {explore && (
-              <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.4rem" }}>
-                <span className="meta">quick add:</span>
-                <select value={qaAttr} onChange={e => { setQaAttr(e.target.value); setQaVal(""); }} style={{ fontSize: "var(--t-md)", maxWidth: "14rem" }}>
-                  <option value="">attribute…</option>
-                  {explore.clinical.map(a => <option key={a.per + a.attribute} value={a.per + "|" + a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric)" : ""}{a.per === "sample" ? " ·sample" : ""}</option>)}
-                </select>
-                {(() => {
-                  const a = explore.clinical.find(x => qaAttr === x.per + "|" + x.attribute);
-                  if (!a) return null;
-                  const perExtra = a.per === "sample" ? { per: "sample" } : {};
-                  if (a.kind === "num") return (
-                    <>
-                      <span className="meta">min {a.min} · median {a.median} · max {a.max} —</span>
-                      <input placeholder="≥" value={qaVal} onChange={e => setQaVal(e.target.value)} style={{ width: "4.5rem", fontSize: "var(--t-md)" }} />
-                      <button className="facet" disabled={!Number.isFinite(Number(qaVal)) || qaVal === ""}
-                        onClick={() => { addClause({ kind: "clinical", attribute: a.attribute, range: { gte: Number(qaVal) }, ...perExtra }); setQaVal(""); }}>add ≥</button>
-                      <button className="facet" disabled={!Number.isFinite(Number(qaVal)) || qaVal === ""}
-                        onClick={() => { addClause({ kind: "clinical", attribute: a.attribute, range: { lt: Number(qaVal) }, ...perExtra }); setQaVal(""); }}>add &lt;</button>
-                    </>
-                  );
-                  return (
-                    <select value="" onChange={e => { if (e.target.value !== "") addClause({ kind: "clinical", attribute: a.attribute, op: "=", value: e.target.value, ...perExtra }); }}
-                      style={{ fontSize: "var(--t-md)", maxWidth: "14rem" }}>
-                      <option value="">value… (patients)</option>
-                      {a.values.map(v => <option key={v.v} value={v.v}>{v.v} ({v.n.toLocaleString()})</option>)}
-                    </select>
-                  );
-                })()}
-                <input list="qa-genes" placeholder="gene → OQL" value={qaGene} onChange={e => setQaGene(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter" && qaGene.trim()) { addClause({ kind: "oql", q: qaGene.trim().toUpperCase() + ":" }); setQaGene(""); } }}
-                  style={{ width: "9rem", fontSize: "var(--t-md)" }} />
-                <datalist id="qa-genes">
-                  {explore.genes.map(g => <option key={g.gene} value={g.gene}>{g.n.toLocaleString()} altered</option>)}
-                </datalist>
-                <button className="facet" disabled={!qaGene.trim()}
-                  onClick={() => { addClause({ kind: "oql", q: qaGene.trim().toUpperCase() + ":" }); setQaGene(""); }}>add gene</button>
-              </div>
-            )}
-            {(() => { let d = null; try { d = JSON.parse(cDefText); } catch {} return d ? (
-              <div style={{ margin: "0.55rem 0" }}>
-                <CohortPills def={d} onRemoveClause={(i: any) => {
-                  const nd = normalizeDef(JSON.parse(cDefText));
-                  nd.all = nd.all.filter((_: any, j: any) => j !== i);
-                  setCDefText(JSON.stringify(nd, null, 2)); setCPreview(null);
-                }} />
-              </div>) : <p className="note">⚠ definition JSON doesn’t parse yet</p>; })()}
-            <div className="row" style={{ marginTop: "0.5rem" }}>
-              <button className="primary" disabled={cBusy} onClick={previewCohort}>{cBusy && <span className="spinner onprimary" />}Preview</button>
-              <button className="primary" disabled={cBusy} onClick={saveCohort}>Save</button>
-            </div>
-            {cPreview && (cPreview.error
-              ? <div className="error">{cPreview.error}</div>
-              : <p className="qdesc" style={{ marginTop: "0.6rem" }}><strong>{cPreview.count?.toLocaleString()}</strong> patients — {cPreview.text}</p>)}
-            <p className="note">Clause kinds: <code>oql</code> (genomic status, portal OQL syntax), <code>clinical</code> (attribute/op/value), <code>event</code> (timeline), <code>patients</code>; composed with <code>all</code> / <code>any</code> / <code>not</code>. Start from an example on the right, or ask chat above.</p>
-          </div>
+          {cohortsSubTab === "cohorts" && <div>
           <div className="card">
             <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.2rem" }}>
               <h2 style={{ margin: 0 }}>Cohorts <span className="plain">— tick any, then analyse them together</span></h2>
@@ -3597,7 +3509,6 @@ function Latency({ v }: { v: any }) {
                     {ev && ev.busy && <span className="spinner" />}
                     <span className="spacer" />
                     <button className="linklike" onClick={() => previewExample(ex)}>preview</button>
-                    <button className="linklike" onClick={() => { setCName(ex.name); setCDefText(JSON.stringify(ex.def, null, 2)); setCPreview(null); }}>open in editor</button>
                     <button className="linklike" onClick={() => saveExample(ex)}>save</button>
                   </div>
                   {ev && ev.error && <div className="error">{ev.error}</div>}
@@ -3605,9 +3516,9 @@ function Latency({ v }: { v: any }) {
               );
             })}
             <h2 style={{ marginTop: "1.2rem" }}>
-              Saved cohorts <span className="plain">— shared with everyone using this app; no per-user ownership yet. Tick any to include above; edit or delete here.</span>
+              Saved cohorts <span className="plain">— shared with everyone using this app; no per-user ownership yet. Tick any to include above; delete here.</span>
             </h2>
-            {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, create one on the left, or ask chat.</p>}
+            {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, build one on the Explore page, or ask chat.</p>}
             {Object.entries(saved)
               .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
               .map(([n, s2]) => (
@@ -3620,10 +3531,6 @@ function Latency({ v }: { v: any }) {
                   {s2.lastEval && <span className="meta">{s2.lastEval.count.toLocaleString()} pts</span>}
                   <span className="meta">saved {s2.savedAt}</span>
                   <span className="spacer" />
-                  <button className="linklike"
-                    onClick={() => { setCName(n); setCDefText(JSON.stringify(s2.def, null, 2)); setCPreview(s2.lastEval || null); }}>
-                    edit
-                  </button>
                   <button className="linklike" onClick={() => removeSaved(n)}>delete</button>
                 </div>
                 <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} /></div>
