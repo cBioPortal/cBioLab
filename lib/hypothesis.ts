@@ -83,6 +83,20 @@ export function primaryCohorts(h: Hypothesis): string[] {
   return v?.cohorts && v.cohorts.length ? v.cohorts : Object.keys(h.doc.cohorts || {});
 }
 
+/**
+ * The same hypothesis with its primary view's cohort order written down as an array.
+ * "direction" reads the FIRST cohort against the SECOND, and an implicit order is only the
+ * key order of `doc.cohorts` — which a jsonb store does not preserve (it sorts shorter keys
+ * first). Pinned at registration, before hashing and storage, the order survives every copy.
+ */
+export function pinCohortOrder(h: Hypothesis): Hypothesis {
+  const views = h.doc?.views || [];
+  const v = views[h.primary?.view] as { cohorts?: string[] } | undefined;
+  if (!v || (v.cohorts && v.cohorts.length)) return h;
+  const pinned = views.map((x, i) => i === h.primary.view ? { ...x, cohorts: Object.keys(h.doc.cohorts || {}) } : x);
+  return { ...h, doc: { ...h.doc, views: pinned as AnalysisDoc["views"] } };
+}
+
 /** Structural checks that need no data. Throws with what is wrong, never repairs. */
 export function validateHypothesis(h: Hypothesis): void {
   if (!h || typeof h !== "object") throw new Error("hypothesis must be an object");
@@ -227,3 +241,32 @@ export function replicated(discovery: Outcome, validation: Outcome, plan: Plan =
   return validation.ok && validation.p! < plan.replicationAlpha &&
     validation.directionOk !== false && (discovery.observed == null || validation.observed === discovery.observed);
 }
+
+// ---- the format, for whoever writes hypotheses (an AI generator, MCP or WebMCP client, a person) ----
+
+export const HYPOTHESIS_GRAMMAR = `A HYPOTHESIS is one testable claim:
+{ "statement": "<the claim in plain language a non-scientist can follow>",
+  "rationale": "<why it is plausible: prior literature, mechanism, clinical experience — NEVER a result from this data, which you have not seen>",
+  "doc": <an Analysis document: {study, cohorts: {name: cohortDef, ...}, views: [ONE view]}>,
+  "primary": <the single result that decides it — see below>,
+  "direction": "higher" | "lower" | "any" }
+
+primary, by view kind (the view must have exactly two cohorts unless it is cox):
+- {"view":0,"stat":"compare","gene":"STK11","measure":"any"|"driver"}  — that gene's alteration frequency, FIRST cohort vs SECOND
+- {"view":0,"stat":"survival"}                                        — log-rank; "higher" = the FIRST cohort has the higher hazard (worse survival)
+- {"view":0,"stat":"clinical","attribute":"TMB_NONSYNONYMOUS"}         — that attribute's test; for numeric, "higher" = FIRST cohort's mean is higher
+- {"view":0,"stat":"cox","term":"<coefficient label>"}                — one coefficient; "higher" = hazard ratio > 1
+
+Rules:
+- ONE view per document, holding only what the primary needs (a compare view lists just the one gene).
+  Every extra gene or attribute would be an extra test nobody counted.
+- Cohort order matters: "direction" reads FIRST cohort relative to SECOND. State it explicitly in the view,
+  e.g. {"kind":"compare","genes":["STK11"],"cohorts":["early failure","durable response"]}; without that list the
+  order of doc.cohorts is used and pinned at registration. Name cohorts so a reader can follow.
+- Declare a direction whenever the rationale predicts one. A result in the other direction will count as NOT supported.
+- Do NOT add {"kind":"split"} clauses. The campaign owns the held-out split and adds it itself.
+- When several hypotheses compare the same two groups, define those groups IDENTICALLY in each (same clauses)
+  so the results are comparable.
+- Timeline hypotheses are welcome — progression, lines of therapy, what follows what — and are where this tool is
+  strongest. For "no event within N days" always set "observed": true so patients lost to follow-up are not counted.
+- Each arm needs at least ${DEFAULT_PLAN.minArm} patients in each half of the study; very narrow cohorts will be marked untestable.`;

@@ -15,7 +15,7 @@
 import { createHash } from "node:crypto";
 import { dbQuery } from "./db.ts";
 import {
-  DEFAULT_PLAN, extractPrimary, testIdentity, primaryCohorts, replicated, scoreDiscovery,
+  DEFAULT_PLAN, extractPrimary, testIdentity, primaryCohorts, pinCohortOrder, replicated, scoreDiscovery,
   validateHypothesis, withSplit, type Hypothesis, type Outcome, type Plan, type Verdict
 } from "./hypothesis.ts";
 import type { AnalysisDoc, AnalysisResult } from "./types.ts";
@@ -134,7 +134,7 @@ export async function addHypotheses(id: string, hyps: Hypothesis[], source: "gen
   const out: AddResult = { added: [], rejected: [] };
   let position = c.hypotheses.reduce((m, h) => Math.max(m, h.position), 0);
   const checked = await Promise.all(hyps.map(async (h) => {
-    const hh = { ...h, doc: { ...h.doc, study: h.doc?.study || c.study } };
+    const hh = pinCohortOrder({ ...h, doc: { ...h.doc, study: h.doc?.study || c.study } });
     try { validateHypothesis(hh); } catch (e) { return { h: hh, reason: errText(e) }; }
     return { h: hh, feas: await checkFeasibility(hh, run, c.plan) };
   }));

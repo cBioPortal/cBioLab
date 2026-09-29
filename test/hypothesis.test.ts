@@ -2,7 +2,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
-  canonicalJson, validateHypothesis, withSplit, extractPrimary,
+  canonicalJson, validateHypothesis, withSplit, extractPrimary, pinCohortOrder, primaryCohorts,
   scoreDiscovery, replicated, type Hypothesis, type Outcome
 } from "../lib/hypothesis.ts";
 import { ledgerHash, funnel, checkFeasibility, hypothesisHash, type Campaign } from "../lib/campaign.ts";
@@ -187,5 +187,29 @@ describe("a categorical result names the value that moved", () => {
     ] }] };
     const o = extractPrimary(h, r);
     assert.equal(o.effect, "Former/Current: 80.0% vs 90.0% (chi-squared)", "Unknown is absent from one list, so it is not compared");
+  });
+});
+
+describe("cohort order survives storage", () => {
+  // jsonb returns object keys shortest-first; "direction" must not flip when it does
+  const reorder = (doc: any) => ({ ...doc, cohorts: Object.fromEntries(Object.entries(doc.cohorts).sort(([a], [b]) => a.length - b.length || (a < b ? -1 : 1))) });
+  const longFirst = (): Hypothesis => ({ ...base(), doc: { ...base().doc, cohorts: { "early progression": { all: [] }, "durable control": { all: [] } } } });
+  test("without pinning, a key reorder silently swaps the first cohort — the bug this guards", () => {
+    const h = longFirst();
+    assert.equal(primaryCohorts(h)[0], "early progression");
+    assert.equal(primaryCohorts({ ...h, doc: reorder(h.doc) })[0], "durable control");
+  });
+  test("pinned, the order is an array and a reorder cannot touch it", () => {
+    const p = pinCohortOrder(longFirst());
+    assert.deepEqual((p.doc.views![0] as any).cohorts, ["early progression", "durable control"]);
+    assert.deepEqual(primaryCohorts({ ...p, doc: reorder(p.doc) }), ["early progression", "durable control"]);
+  });
+  test("an explicit order is left alone, and the input is not mutated", () => {
+    const h = longFirst();
+    (h.doc.views![0] as any).cohorts = ["durable control", "early progression"];
+    assert.equal(pinCohortOrder(h), h);
+    const g = longFirst();
+    pinCohortOrder(g);
+    assert.equal((g.doc.views![0] as any).cohorts, undefined);
   });
 });
