@@ -42,7 +42,7 @@ export default function CampaignIndex() {
       <main className="camp">
         <section className="camp-explain">
           <div><strong>1 · You ask</strong><p>A research question, in plain words.</p></div>
-          <div><strong>2 · AI proposes</strong><p>Claude writes candidate hypotheses as precise, checkable analyses. You edit the list and add your own.</p></div>
+          <div><strong>2 · AI proposes</strong><p>Your AI assistant — Claude in the Chrome sidebar — writes candidate hypotheses as precise, checkable analyses through this site's tools. You edit the list and add your own.</p></div>
           <div><strong>3 · Lock in</strong><p>The list is timestamped and frozen before any result exists. Nothing can be quietly dropped later.</p></div>
           <div><strong>4 · The tool referees</strong><p>Each is tested on half the patients, corrected for how many were tried, and rechecked on the other half.</p></div>
         </section>

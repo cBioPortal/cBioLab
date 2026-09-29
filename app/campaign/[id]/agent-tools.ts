@@ -64,9 +64,11 @@ export function agentTools(id: string, study: string, refresh: () => void): Agen
       inputSchema: { type: "object", required: ["hypothesis"], properties: { hypothesis: HYPOTHESIS_SCHEMA } },
       run: async ({ hypothesis }) => (await call(id, { action: "check", hypothesis })).note },
     { name: "campaign_register", description: "Register hypotheses on this draft campaign. Malformed ones are rejected with the engine's reason (fix and resubmit); groups too small to test register as untestable; duplicates are refused.",
-      inputSchema: { type: "object", required: ["hypotheses"], properties: { hypotheses: { type: "array", items: HYPOTHESIS_SCHEMA, maxItems: 40 } } },
-      run: async ({ hypotheses }) => {
-        const j: any = await mutate({ action: "add", source: "generator", hypotheses });
+      inputSchema: { type: "object", required: ["hypotheses"], properties: {
+        hypotheses: { type: "array", items: HYPOTHESIS_SCHEMA, maxItems: 40 },
+        source: { type: "string", enum: ["generator", "researcher"], description: "\"researcher\" when these write down the user's own idea; default \"generator\" (proposed by you)" } } },
+      run: async ({ hypotheses, source }) => {
+        const j: any = await mutate({ action: "add", source: source === "researcher" ? "researcher" : "generator", hypotheses });
         return { added: j.note.added.map((h: any) => ({ position: h.position, statement: h.statement, testable: !!h.feasibility?.ok, detail: h.feasibility?.ok ? h.feasibility.n : h.feasibility?.reason })), rejected: j.note.rejected };
       } },
     { name: "campaign_remove", description: "Remove a hypothesis from the draft by its number. Not possible after the campaign is locked.",
@@ -102,7 +104,7 @@ export function installAgentTools(id: string, study: string, refresh: () => void
     getFormat: () => tools[1].run({}),
     getVocabulary: () => tools[2].run({}),
     checkHypothesis: (hypothesis: Json) => tools[3].run({ hypothesis }),
-    registerHypotheses: (hypotheses: Json[]) => tools[4].run({ hypotheses }),
+    registerHypotheses: (hypotheses: Json[], source?: "generator" | "researcher") => tools[4].run({ hypotheses, source }),
     removeHypothesis: (position: number) => tools[5].run({ position }),
     lock: () => tools[6].run({}),
     run: () => tools[7].run({}),

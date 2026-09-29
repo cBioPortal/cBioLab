@@ -1,10 +1,11 @@
 // One campaign: read it, and move it through draft → locked → complete.
 // Every step is a POST {action}; the order is enforced by lib/campaign.ts and the database.
+// Nothing here calls a model: hypotheses arrive already written — from the researcher's AI
+// assistant in the browser (WebMCP / window.cohortLab), an MCP client, or pasted JSON.
 import {
   getCampaign, addHypotheses, removeHypothesis, lockCampaign, runCampaign, funnel, priorTests,
   checkFeasibility, reportText
 } from "../../../../lib/campaign.ts";
-import { proposeHypotheses } from "../../../../lib/generator.ts";
 import { cachedAnalysis } from "../../../../lib/next-cache.ts";
 import type { AnalysisDoc } from "../../../../lib/types.ts";
 
@@ -36,14 +37,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const c = await getCampaign(id);
     let note: unknown = null;
-    if (body.action === "propose" || body.action === "idea") {
-      const idea = body.action === "idea" ? String(body.idea || "").trim() : undefined;
-      if (body.action === "idea" && !idea) return fail("describe the idea to test");
-      const p = await proposeHypotheses({ question: c.question, study: c.study, count: Math.min(Number(body.count) || 12, 30),
-        idea, existing: c.hypotheses.map((h) => h.statement), run });
-      const added = await addHypotheses(id, p.hypotheses, idea ? "researcher" : "generator", run);
-      note = { added: added.added.length, rejected: [...added.rejected, ...p.unresolved] };
-    } else if (body.action === "add") {
+    if (body.action === "add") {
       note = await addHypotheses(id, Array.isArray(body.hypotheses) ? body.hypotheses : [body.hypothesis], body.source === "generator" ? "generator" : "researcher", run);
     } else if (body.action === "check") {
       const h = body.hypothesis || {};
@@ -56,7 +50,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       await lockCampaign(id);
     } else if (body.action === "run") {
       await runCampaign(id, run);
-    } else return fail("action must be propose, idea, add, check, remove, lock or run");
+    } else return fail("action must be add, check, remove, lock or run");
     return Response.json({ ...(await view(id)), note });
   } catch (e) { return fail(e); }
 }

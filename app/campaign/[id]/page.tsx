@@ -3,7 +3,7 @@
 // lock (pre-register) → test on the discovery half → replicate on the held-out half → report.
 // Everything the page shows comes from /api/campaign/[id]; the order of steps is enforced
 // there and in the database, so this page cannot skip one even by accident.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { encodeSpec } from "../../../lib/lab-links.ts";
 import { withSplit, primaryCohorts, type Hypothesis } from "../../../lib/hypothesis.ts";
@@ -57,8 +57,6 @@ export default function CampaignPage() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | string>(null);
   const [note, setNote] = useState<string | null>(null);
-  const [count, setCount] = useState(12);
-  const idea = useRef<HTMLTextAreaElement>(null);
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/campaign/${id}`, { cache: "no-store" });
@@ -93,11 +91,8 @@ export default function CampaignPage() {
       if (j.error) setErr(j.error);
       else {
         setV(j);
-        const rej = j.note?.rejected || [];
         if (action === "add")
           setNote(`${j.note.added.length} registered.` + (j.note.rejected.length ? ` ${j.note.rejected.length} rejected: ` + j.note.rejected.map((x: any) => `“${x.statement}” (${x.reason})`).join("; ") : ""));
-        if (action === "propose" || action === "idea")
-          setNote(`${j.note.added} added.` + (rej.length ? ` ${rej.length} could not be written as a valid test: ` + rej.map((x: any) => `“${x.statement}” (${x.reason})`).join("; ") : ""));
       }
     } catch (e) { setErr(String(e)); }
     finally { setBusy(null); }
@@ -133,29 +128,15 @@ export default function CampaignPage() {
           <section className="card camp-draft">
             <h2>Build the list of hypotheses</h2>
             <p className="camp-help">
-              Claude reads the study's vocabulary and proposes hypotheses, each written as a precise, checkable
-              analysis — never as prose. The engine checks every one before it goes on the list: malformed ones go back
-              to Claude to fix, and ones the data cannot answer are marked <em>untestable</em>. Nobody sees any result yet.
+              This page does not call an AI model. Hypotheses are written by <strong>your AI assistant in the browser</strong> —
+              Claude in the Chrome sidebar — through the tools this page exposes (<a href="#for-ai-agents">For AI agents</a>, below).
+              The engine checks everything it submits: a malformed hypothesis comes back with the reason, and one the data cannot
+              answer is marked <em>untestable</em>. Nobody sees a result until the list is locked and run.
             </p>
-            <div className="camp-actions">
-              <div className="camp-act">
-                <button className="primary" disabled={!!busy} onClick={() => act("propose", { count })}>
-                  {busy === "propose" ? <><span className="spinner onprimary" /> Claude is writing hypotheses…</> : "Ask Claude for hypotheses"}
-                </button>
-                <label className="camp-inline">how many
-                  <select value={count} onChange={(e) => setCount(Number(e.target.value))} disabled={!!busy}>
-                    {[6, 12, 20].map((n) => <option key={n}>{n}</option>)}
-                  </select>
-                </label>
-              </div>
-              <div className="camp-act camp-idea">
-                <textarea ref={idea} rows={2} placeholder="Or add your own idea in plain words, e.g. “never-smokers who fail early are more often EGFR-mutant”" disabled={!!busy} />
-                <button disabled={!!busy} onClick={() => act("idea", { idea: idea.current?.value || "" }).then(() => { if (idea.current) idea.current.value = ""; })}>
-                  {busy === "idea" ? <><span className="spinner" /> formalizing…</> : "Formalize & add"}
-                </button>
-              </div>
+            <div className="camp-prompts">
+              <Prompt label="Ask the sidebar for hypotheses" text={PROPOSE_PROMPT} />
+              <Prompt label="Have it add your own idea" text={IDEA_PROMPT} />
             </div>
-            {busy === "propose" && <p className="camp-help">This takes about a minute: Claude writes the documents, then the engine checks each against the data's vocabulary and counts the patients in every group.</p>}
             {note && <p className="camp-note">{note}</p>}
           </section>
         )}
@@ -208,36 +189,54 @@ export default function CampaignPage() {
           <section className="card camp-lock">
             <h2>Lock in</h2>
             <p className="camp-help">
-              Locking pre-registers these {testable.length} hypotheses: the list is timestamped and hashed, and from then on
+              Locking pre-registers {testable.length === 1 ? "this hypothesis" : `these ${testable.length} hypotheses`}: the list is timestamped and hashed, and from then on
               nothing can be added, removed or reworded — the database itself refuses. This is what lets the final report
               say “1 of {testable.length} tested” and mean it.
             </p>
             <button className="primary" disabled={!!busy} onClick={() => act("lock")}>
-              {busy === "lock" ? <><span className="spinner onprimary" /> locking…</> : `Lock in ${testable.length} hypotheses`}
+              {busy === "lock" ? <><span className="spinner onprimary" /> locking…</> : `Lock in ${testable.length} ${testable.length === 1 ? "hypothesis" : "hypotheses"}`}
             </button>
           </section>
         )}
-        <AgentPanel c={c} webmcp={webmcp} busy={!!busy} onSubmit={(hs) => act("add", { hypotheses: hs, source: "generator" })} />
+        <AgentPanel c={c} webmcp={webmcp} busy={!!busy} onSubmit={(hs, source) => act("add", { hypotheses: hs, source })} />
       </main>
     </>
   );
 }
 
+const PROPOSE_PROMPT = `Read the "For AI agents" section of this page. Using window.cohortLab, read the hypothesis format (getFormat) and the study vocabulary (getVocabulary), then write 10 diverse hypotheses for this campaign's research question, each grounded in published work. Check any you are unsure of with checkHypothesis, register them with registerHypotheses, and fix and resubmit any that are rejected. Do not lock the campaign.`;
+const IDEA_PROMPT = `Using window.cohortLab on this page, write my idea below as ONE hypothesis in the campaign's hypothesis format (getFormat, getVocabulary), faithful to what I mean, and register it with registerHypotheses([hypothesis], "researcher"). If the data cannot express it exactly, tell me what you had to change. My idea: `;
+
+function Prompt({ label, text }: { label: string; text: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }
+    catch { /* clipboard blocked: the text is on screen to select by hand */ }
+  }
+  return (
+    <div className="camp-prompt">
+      <div className="camp-prompt-head"><strong>{label}</strong><button onClick={copy}>{copied ? "copied" : "copy prompt"}</button></div>
+      <p>{text}{text.endsWith(": ") && <em>…</em>}</p>
+    </div>
+  );
+}
+
 const TOOL_LIST: [string, string][] = [
   ["campaign_get", "getCampaign()"], ["campaign_format", "getFormat()"], ["campaign_vocabulary", "getVocabulary()"],
-  ["campaign_check_hypothesis", "checkHypothesis(h)"], ["campaign_register", "registerHypotheses([h, …])"],
+  ["campaign_check_hypothesis", "checkHypothesis(h)"], ["campaign_register", "registerHypotheses([h, …], source?)"],
   ["campaign_remove", "removeHypothesis(n)"], ["campaign_lock", "lock()"], ["campaign_run", "run()"], ["campaign_report", "report()"]
 ];
 
 /** How an AI agent in the browser drives this page — visible, so an agent reading the page finds it. */
-function AgentPanel({ c, webmcp, busy, onSubmit }: { c: Campaign; webmcp: boolean | null; busy: boolean; onSubmit: (hs: unknown[]) => void }) {
+function AgentPanel({ c, webmcp, busy, onSubmit }: { c: Campaign; webmcp: boolean | null; busy: boolean; onSubmit: (hs: unknown[], source: "generator" | "researcher") => void }) {
   const [text, setText] = useState("");
+  const [mine, setMine] = useState(false);
   const [bad, setBad] = useState<string | null>(null);
   function submit() {
     setBad(null);
     let hs: unknown;
     try { hs = JSON.parse(text); } catch (e) { setBad("not valid JSON: " + (e as Error).message); return; }
-    onSubmit(Array.isArray(hs) ? hs : [hs]);
+    onSubmit(Array.isArray(hs) ? hs : [hs], mine ? "researcher" : "generator");
   }
   return (
     <details className="card camp-agent" open={c.status === "draft"} id="for-ai-agents">
@@ -265,6 +264,7 @@ function AgentPanel({ c, webmcp, busy, onSubmit }: { c: Campaign; webmcp: boolea
           placeholder='[{"statement": "…", "rationale": "…", "doc": {"study": "…", "cohorts": {…}, "views": [{…}]}, "primary": {"view": 0, "stat": "compare", "gene": "…"}, "direction": "higher"}]' />
         <div className="row">
           <button disabled={busy || !text.trim()} onClick={submit}>Submit hypotheses</button>
+          <label className="chk camp-inline"><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> these are the researcher's own ideas</label>
           {bad && <span className="camp-err">{bad}</span>}
         </div>
       </>}

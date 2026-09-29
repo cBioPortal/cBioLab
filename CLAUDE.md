@@ -73,8 +73,10 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   `extractPrimary` reads the deciding number; campaign-wide BH and the replication rule.
   **`lib/campaign.ts`**: the Postgres ledger (`db/migrations/0002_campaigns.sql`) and the procedure
   (feasibility from cohort sizes only → lock → discovery half → one correction → survivors on the
-  validation half). **`lib/generator.ts`**: Claude as an in-app generator (needs a valid
-  `ANTHROPIC_API_KEY`); any other agent does the same job over MCP. The held-out half is the
+  validation half). **The app never calls a model**: hypotheses are written by the
+  researcher's AI assistant in the browser (Claude in the Chrome sidebar) through the campaign
+  page's tools — WebMCP plus `window.cohortLab` (`app/campaign/[id]/agent-tools.ts`) — or by
+  any MCP client. Do not add a server-side model call. The held-out half is the
   engine's `split` leaf (`lib/cohort2.ts`): a salted hash of the patient id inside ClickHouse,
   salt pinned by `test/cohort.test.ts` — changing it reshuffles every reported result.
   **A locked campaign is immutable at the database level** (triggers); never work around them in
