@@ -2938,47 +2938,8 @@ function Latency({ v }: { v: any }) {
                 <p className="note" style={{ marginTop: 0 }}>This study has no clinical timeline events to derive a filter from.</p>
               ) : (() => {
                 const tx = treatmentEventType();
-                const dr = parseDraft();
-                const leaves = ((dr && dr.all) || []);
-                const linesFacet = tx && explore.derived
-                  ? explore.derived.find((d) => d.metric === "lines" && d.eventType === tx.label) : null;
-                const naiveFirst = (): any => tx && ({ kind: "event",
-                  a: { eventType: tx.label, occurrence: "FIRST" }, rel: { type: "NONE" }, priorGuard: true });
-                const isNaiveFirst = tx && leaves.some((c: any) => c && c.kind === "event" &&
-                  c.a?.eventType === tx.label && c.a?.occurrence === "FIRST" && c.priorGuard === true);
-                const isLineBucket = (b: { gte?: number; lt?: number }) => tx && leaves.some((c: any) => c && c.kind === "derived" &&
-                  c.metric === "lines" && c.eventType === tx.label && (c.range || {}).gte === b.gte && (c.range || {}).lt === b.lt);
                 return (
                   <div>
-                    {!tx && (
-                      <p className="note" style={{ margin: "0.3rem 0" }}>This study records no treatment-like timeline events, so there is no generic "lines" example to offer — build a custom sequence below instead.</p>
-                    )}
-                    {tx && !linesFacet && (
-                      <p className="note" style={{ margin: "0.3rem 0" }}>computing this study's line-count breakdown…</p>
-                    )}
-                    {tx && linesFacet && (() => {
-                      const max = Math.max(...linesFacet.buckets.map((b) => b.n), 1);
-                      return (
-                        <div style={{ margin: "0.3rem 0" }}>
-                          <span className="meta">{linesFacet.label} <span title={linesFacet.note}>· {linesFacet.covered.toLocaleString()} patients</span></span>
-                          <div className="vallist">
-                            {linesFacet.buckets.map((b) => (
-                              <button key={b.label} className={isLineBucket(b) ? "valrow on" : "valrow"}
-                                title={linesFacet.note + " — click to filter"}
-                                onClick={() => addClause({ kind: "derived", metric: "lines", eventType: tx!.label, lineGap: linesFacet.lineGap,
-                                  range: { ...(b.gte != null ? { gte: b.gte } : {}), ...(b.lt != null ? { lt: b.lt } : {}) } })}>
-                                <span className="vname">{b.label} line{b.label === "1" ? "" : "s"}</span>
-                                <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * b.n / max)) + "%" }} /></span>
-                                <span className="vn">{b.n.toLocaleString()}</span>
-                              </button>
-                            ))}
-                          </div>
-                          <button className={isNaiveFirst ? "facet on" : "facet"} style={{ marginTop: "0.4rem" }}
-                            title={"first '" + tx.label + "' event, with no treatment recorded before it — exact count shown once added"}
-                            onClick={() => addClause(naiveFirst())}>first '{tx.label}', treatment-naive</button>
-                        </div>
-                      );
-                    })()}
                     <div className="customseq">
                       <h4>Custom sequence filter</h4>
                       <p className="note" style={{ margin: "0 0 0.2rem" }}>
