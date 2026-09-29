@@ -3732,9 +3732,11 @@ function Latency({ v }: { v: any }) {
                 either Explore or the JSON editor opening ON TOP of an
                 analysis already in progress (a modal, most likely) — a bigger
                 piece of work than this pass, and not yet scoped. */}
-            <h2 className="vtitle" style={{ marginBottom: "0.9rem" }}>
-              Cohorts{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
-            </h2>
+            {(busy || result) && (
+              <h2 className="vtitle" style={{ marginBottom: "0.9rem" }}>
+                Cohorts{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
+              </h2>
+            )}
             <div className="cohortlist">
               {busy && !result
                 ? Array.from({ length: Math.max(1, Object.keys(doc.cohorts || {}).length) }).map((_, i) => (
@@ -3798,49 +3800,50 @@ function Latency({ v }: { v: any }) {
             )}
           </dialog>
           <div>
-            <div className="row" style={{ alignItems: "baseline", marginBottom: "0.9rem", gap: "0.6rem" }}>
-              <h2 className="vtitle">
-                Analysis{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
-              </h2>
-              <div className="vmeta">
-                {/* The workspace lives behind this one button + a dialog, not
-                    a permanent card at the top of the column — it is read
-                    when setting the workspace up and almost never while
-                    reading the figures. What it's called and whether it's
-                    saved is what the dialog it opens is for; this button's
-                    own label stays fixed. */}
-                {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
-                  <button disabled={busy} onClick={openWorkspaceSave}
-                    style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
-                    title={doc.title
-                      ? "“" + doc.title + "” — " + (spaces[doc.title] && JSON.stringify(spaces[doc.title].doc) === JSON.stringify(doc)
-                          ? "saved " + spaces[doc.title].savedAt : "unsaved changes")
-                      : "save this analysis as a named, reopenable workspace"}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
-                      <path d="M17 21v-8H7v8" />
-                      <path d="M7 3v5h8" />
-                    </svg>
-                    Save analysis
+            {(busy || result) && (
+              <div className="row" style={{ alignItems: "baseline", marginBottom: "0.9rem", gap: "0.6rem" }}>
+                <h2 className="vtitle">
+                  Analysis{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
+                </h2>
+                <div className="vmeta">
+                  {/* The workspace lives behind this one button + a dialog, not
+                      a permanent card at the top of the column — it is read
+                      when setting the workspace up and almost never while
+                      reading the figures. What it's called and whether it's
+                      saved is what the dialog it opens is for; this button's
+                      own label stays fixed. */}
+                  {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
+                    <button disabled={busy} onClick={openWorkspaceSave}
+                      style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
+                      title={doc.title
+                        ? "“" + doc.title + "” — " + (spaces[doc.title] && JSON.stringify(spaces[doc.title].doc) === JSON.stringify(doc)
+                            ? "saved " + spaces[doc.title].savedAt : "unsaved changes")
+                        : "save this analysis as a named, reopenable workspace"}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+                        <path d="M17 21v-8H7v8" />
+                        <path d="M7 3v5h8" />
+                      </svg>
+                      Save analysis
+                    </button>
+                  )}
+                  <button className="linklike" onClick={() => docDialog.current?.showModal()}
+                    title="open the document's raw JSON — edit it, run it, or view generated SQL">
+                    show document json
                   </button>
-                )}
-                <button className="linklike" onClick={() => docDialog.current?.showModal()}
-                  title="open the document's raw JSON — edit it, run it, or view generated SQL">
-                  show document json
-                </button>
+                </div>
               </div>
-            </div>
+            )}
             {busy && !result && <div className="skeleton skeleton-addview" />}
             {busy && !result && Array.from({ length: Math.max(1, (doc.views || []).length) }).map((_, i) => (
               <div key={i} className="skeleton skeleton-view" />
             ))}
             {!busy && !result && (
               <div className="card">
-                <h2>Nothing here yet</h2>
-                <p className="note" style={{ fontSize: "var(--t-md)" }}>
-                  The analysis document is empty. Add cohorts from the <button className="linklike" onClick={() => goTab("cohorts")}>Saved tab</button>,
-                  ask chat above (e.g. “compare STK11-driver vs wild-type immunotherapy patients”), or open <button className="linklike" onClick={() => docDialog.current?.showModal()}>show document json</button> and paste one in.
+                <p className="note" style={{ fontSize: "var(--t-md)", margin: 0 }}>
+                  Make a cohort on the <button className="linklike" onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore page</button>,
+                  {" "}or choose cohorts on the <button className="linklike" onClick={() => goTab("cohorts")}>Cohorts page</button>.
                 </p>
               </div>
             )}
