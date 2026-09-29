@@ -2863,19 +2863,29 @@ function Latency({ v }: { v: any }) {
                       )}
                     </div>
                     {!rows.length && <p className="note">No attribute matches “{clinFilter}”.</p>}
-                    <div className="attrpicker">
-                      {rows.map((c) => (
-                        <label key={attrKey(c)} className="chk">
-                          <input type="checkbox" checked={!hiddenAttrs.has(attrKey(c))}
-                            onChange={() => setHiddenAttrs(prev => {
+                    <div className="attrtablewrap">
+                      <table className="attrtable">
+                        <thead>
+                          <tr><th></th><th>Attribute</th><th>Type</th><th>Level</th></tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((c) => {
+                            const toggle = () => setHiddenAttrs(prev => {
                               const next = new Set(prev);
                               if (next.has(attrKey(c))) next.delete(attrKey(c)); else next.add(attrKey(c));
                               return next;
-                            })} />
-                          {c.displayName || c.attribute}
-                          <span className="meta"> · {c.kind === "num" ? "numeric" : "categorical"}{c.per === "sample" ? " · sample-level" : ""}</span>
-                        </label>
-                      ))}
+                            });
+                            return (
+                              <tr key={attrKey(c)} onClick={(e) => { if ((e.target as HTMLElement).tagName !== "INPUT") toggle(); }}>
+                                <td><input type="checkbox" checked={!hiddenAttrs.has(attrKey(c))} onChange={toggle} /></td>
+                                <td>{c.displayName || c.attribute}</td>
+                                <td className="meta">{c.kind === "num" ? "numeric" : "categorical"}</td>
+                                <td className="meta">{c.per === "sample" ? "sample" : "patient"}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 );
@@ -2903,46 +2913,12 @@ function Latency({ v }: { v: any }) {
                         onClick={() => unchartGene(g)}>×</button>
                     </span>
                   ))}
-                  {(explore.geneFacets || []).map(f => {
-                    const max = Math.max(...f.states.map(x => x.n), 1);
-                    return (
-                      <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type}
-                        style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0", marginTop: "0.4rem" }}>
-                        <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}>
-                          {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
-                          <span className="meta"> · patient-level · {f.total.toLocaleString()} patients</span>
-                        </div>
-                        <div className="vallist">
-                          {f.states.map(st => (
-                            <button key={st.state} className="valrow"
-                              title={st.label + " — " + st.n.toLocaleString() + " patients (click to filter)"}
-                              onClick={() => addClauses(geneStateClauses(f.gene, f.type, st.state))}>
-                              <span className="vname" style={st.state === "notProfiled" ? { color: "var(--muted)" } : undefined}>
-                                {st.label}
-                              </span>
-                              <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * st.n / max)) + "%" }} /></span>
-                              <span className="vn">{st.n.toLocaleString()}</span>
-                              <span className="vpct">{f.total ? (Math.round(1000 * st.n / f.total) / 10) + "%" : ""}</span>
-                            </button>
-                          ))}
-                        </div>
-                        {f.overlap ? (
-                          <p className="note" style={{ margin: "0.25rem 0 0" }}>
-                            {f.overlap.toLocaleString()} patient{f.overlap === 1 ? " is" : "s are"} counted in both
-                            Amplified and Deleted — amplified in one sample, deleted in another — so these rows
-                            over-sum the cohort by that much.
-                          </p>
-                        ) : null}
-                        {f.alteredUnprofiled ? (
-                          <p className="note" style={{ margin: "0.25rem 0 0" }}>
-                            {f.alteredUnprofiled.toLocaleString()} patient{f.alteredUnprofiled === 1 ? " has" : "s have"} a
-                            call for {f.gene} but sit on no panel covering it — a contradiction in the source data. They are
-                            counted as not profiled.
-                          </p>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                  {geneCharts.length > 0 && (
+                    <p className="note" style={{ margin: "0.4rem 0 0" }}>
+                      Each charted gene's mutation and copy-number status is drawn as its own tile in the
+                      facet grid, alongside the clinical attributes — close this dialog to see them.
+                    </p>
+                  )}
                 </div>
               )}
               {chartTab === "derived" && (explore.events.length === 0 ? (
@@ -3306,6 +3282,49 @@ function Latency({ v }: { v: any }) {
                     </div>}
                 </div>
               ))}
+              {/* Charted genes (added from "+ Add chart" > Gene status) — one tile per
+                  gene per alteration type, the same tile shape a clinical attribute gets,
+                  so a chart you configured actually reaches this grid rather than only
+                  living inside the dialog that configured it. */}
+              {(explore.geneFacets || []).map(f => {
+                const max = Math.max(...f.states.map(x => x.n), 1);
+                return (
+                  <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type} className="card">
+                    <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}>
+                      {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
+                      <span className="meta"> · patient-level · {f.total.toLocaleString()} patients</span>
+                    </div>
+                    <div className="vallist">
+                      {f.states.map(st => (
+                        <button key={st.state} className="valrow"
+                          title={st.label + " — " + st.n.toLocaleString() + " patients (click to filter)"}
+                          onClick={() => addClauses(geneStateClauses(f.gene, f.type, st.state))}>
+                          <span className="vname" style={st.state === "notProfiled" ? { color: "var(--muted)" } : undefined}>
+                            {st.label}
+                          </span>
+                          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * st.n / max)) + "%" }} /></span>
+                          <span className="vn">{st.n.toLocaleString()}</span>
+                          <span className="vpct">{f.total ? (Math.round(1000 * st.n / f.total) / 10) + "%" : ""}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {f.overlap ? (
+                      <p className="note" style={{ margin: "0.25rem 0 0" }}>
+                        {f.overlap.toLocaleString()} patient{f.overlap === 1 ? " is" : "s are"} counted in both
+                        Amplified and Deleted — amplified in one sample, deleted in another — so these rows
+                        over-sum the cohort by that much.
+                      </p>
+                    ) : null}
+                    {f.alteredUnprofiled ? (
+                      <p className="note" style={{ margin: "0.25rem 0 0" }}>
+                        {f.alteredUnprofiled.toLocaleString()} patient{f.alteredUnprofiled === 1 ? " has" : "s have"} a
+                        call for {f.gene} but sit on no panel covering it — a contradiction in the source data. They are
+                        counted as not profiled.
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
               {explore.studyBreakdown && explore.studyBreakdown.length > 0 && (
                 <div className="card wide">
                   <h2>Studies <span className="plain">— how {explore.draftCount != null ? "the draft" : "the selection"} breaks down{exStudies.length > 1 ? " across the " + exStudies.length + " selected studies" : ""}</span></h2>

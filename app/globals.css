@@ -757,10 +757,22 @@ details.gearmenu.inline[open] > summary {
 .customseq { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.8rem; padding-top: 0.6rem;
   border-top: 1px solid var(--line); max-width: 34rem; }
 .customseq h4 { margin: 0 0 0.2rem; font-size: var(--t-md); font-weight: 600; }
-/* The clinical attribute checklist: many short rows, so pack them into columns
-   across the dialog's width instead of one long scroll. */
-.attrpicker { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.3rem 1rem; margin-top: 0.6rem; }
-.attrpicker .chk { font-size: var(--t-md); }
+/* The clinical attribute checklist: a plain single-column table, not tiled into
+   several columns — multi-column checkboxes read as disorienting (which row
+   continues where?), where a table's one reading order and aligned columns don't.
+   Scrolls within its own box rather than growing the dialog to fit 60+ rows. */
+.attrtablewrap { max-height: 52vh; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: var(--r-md); margin-top: 0.6rem; }
+.attrtable { width: 100%; border-collapse: collapse; font-size: var(--t-md); }
+.attrtable thead th {
+  position: sticky; top: 0; z-index: 1; background: var(--card); text-align: left;
+  padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line);
+  font-size: var(--t-xs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
+}
+.attrtable tbody tr { border-top: 1px solid var(--line); cursor: pointer; }
+.attrtable tbody tr:first-child { border-top: none; }
+.attrtable tbody tr:hover { background: var(--code-bg); }
+.attrtable td { padding: 0.3rem 0.6rem; }
+.attrtable td.meta { white-space: nowrap; }
 .namedialog .meta { display: block; margin-bottom: 0.6rem; }
 .namedialog input { width: 100%; box-sizing: border-box; }
 .genedialog { min-width: 24rem; max-width: 30rem; }
