@@ -72,7 +72,9 @@ the audience watches the page fill in:
 - The **"For AI agents"** panel at the bottom of the page says all of this in plain text — that
   is how the sidebar finds out — and has a JSON paste box for an agent that only types.
 
-Open a new campaign on the demo server, then ask the sidebar something like: *"Read the For AI
+Start on `/campaign` with the sidebar open: its "Start a campaign" prompt has the sidebar call
+`createCampaign(question)`, which opens the new campaign's page and its tools. Or, on an
+existing draft, ask the sidebar something like: *"Read the For AI
 agents section of this page. Use window.cohortLab to read the hypothesis format and the study
 vocabulary, write 10 hypotheses for this question, check any you are unsure of, and register
 them. Stop before locking."* Then lock and run it yourself, or tell it to once you have looked

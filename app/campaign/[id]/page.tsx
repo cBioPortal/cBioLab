@@ -8,7 +8,8 @@ import { useParams } from "next/navigation";
 import { encodeSpec } from "../../../lib/lab-links.ts";
 import { withSplit, primaryCohorts, type Hypothesis } from "../../../lib/hypothesis.ts";
 import type { Campaign, Funnel, HypothesisRow } from "../../../lib/campaign.ts";
-import { installAgentTools } from "./agent-tools.ts";
+import { installAgentTools } from "../agent-tools.ts";
+import { Prompt } from "../prompt.tsx";
 
 type Prior = { campaignId: string; question: string; verdict: string | null; p: number | null; lockedAt: string | null };
 type View = { campaign: Campaign; funnel: Funnel; prior: Record<string, Prior[]>; note?: any };
@@ -206,20 +207,6 @@ export default function CampaignPage() {
 
 const PROPOSE_PROMPT = `Read the "For AI agents" section of this page. Using window.cohortLab, read the hypothesis format (getFormat) and the study vocabulary (getVocabulary), then write 10 diverse hypotheses for this campaign's research question, each grounded in published work. Check any you are unsure of with checkHypothesis, register them with registerHypotheses, and fix and resubmit any that are rejected. Do not lock the campaign.`;
 const IDEA_PROMPT = `Using window.cohortLab on this page, write my idea below as ONE hypothesis in the campaign's hypothesis format (getFormat, getVocabulary), faithful to what I mean, and register it with registerHypotheses([hypothesis], "researcher"). If the data cannot express it exactly, tell me what you had to change. My idea: `;
-
-function Prompt({ label, text }: { label: string; text: string }) {
-  const [copied, setCopied] = useState(false);
-  async function copy() {
-    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }
-    catch { /* clipboard blocked: the text is on screen to select by hand */ }
-  }
-  return (
-    <div className="camp-prompt">
-      <div className="camp-prompt-head"><strong>{label}</strong><button onClick={copy}>{copied ? "copied" : "copy prompt"}</button></div>
-      <p>{text}{text.endsWith(": ") && <em>…</em>}</p>
-    </div>
-  );
-}
 
 const TOOL_LIST: [string, string][] = [
   ["campaign_get", "getCampaign()"], ["campaign_format", "getFormat()"], ["campaign_vocabulary", "getVocabulary()"],

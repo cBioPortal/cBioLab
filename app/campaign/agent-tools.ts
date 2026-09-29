@@ -88,28 +88,23 @@ export function agentTools(id: string, study: string, refresh: () => void): Agen
 
 const asText = (x: unknown) => typeof x === "string" ? x : JSON.stringify(x, null, 2);
 
-/** Register the tools; returns how they were exposed and a cleanup for unmount. */
-export function installAgentTools(id: string, study: string, refresh: () => void): { webmcp: boolean; cleanup: () => void } {
-  const tools = agentTools(id, study, refresh);
+/**
+ * Expose tools as WebMCP (when the browser offers it) and as window.cohortLab — `api` adds
+ * named shortcuts next to the generic `call(name, args)`. Returns how they were exposed and a
+ * cleanup for unmount.
+ */
+function exposeTools(tools: AgentTool[], api: Record<string, unknown>): { webmcp: boolean; cleanup: () => void } {
   const w = window as any;
-  w.cohortLab = {
-    campaignId: id,
+  const global = {
+    ...api,
     tools: tools.map((t) => ({ name: t.name, description: t.description, input: t.inputSchema })),
     call: (name: string, args: Json = {}) => {
       const t = tools.find((x) => x.name === name);
       if (!t) throw new Error(`no tool ${name}; have ${tools.map((x) => x.name).join(", ")}`);
       return t.run(args);
-    },
-    getCampaign: () => tools[0].run({}),
-    getFormat: () => tools[1].run({}),
-    getVocabulary: () => tools[2].run({}),
-    checkHypothesis: (hypothesis: Json) => tools[3].run({ hypothesis }),
-    registerHypotheses: (hypotheses: Json[], source?: "generator" | "researcher") => tools[4].run({ hypotheses, source }),
-    removeHypothesis: (position: number) => tools[5].run({ position }),
-    lock: () => tools[6].run({}),
-    run: () => tools[7].run({}),
-    report: () => tools[8].run({})
+    }
   };
+  w.cohortLab = global;
   const mc = (document as any).modelContext ?? (navigator as any).modelContext;
   const registered: string[] = [];
   if (mc && typeof mc.registerTool === "function") {
@@ -130,7 +125,50 @@ export function installAgentTools(id: string, study: string, refresh: () => void
     webmcp: !!mc && typeof mc.registerTool === "function",
     cleanup: () => {
       for (const n of registered) try { mc.unregisterTool(n); } catch { /* gone already */ }
-      if (w.cohortLab?.campaignId === id) delete w.cohortLab;
+      if (w.cohortLab === global) delete w.cohortLab;
     }
   };
+}
+
+/** The campaign page: every step of one campaign. */
+export function installAgentTools(id: string, study: string, refresh: () => void): { webmcp: boolean; cleanup: () => void } {
+  const tools = agentTools(id, study, refresh);
+  const run = (i: number) => (args: Json = {}) => tools[i].run(args);
+  return exposeTools(tools, {
+    campaignId: id,
+    getCampaign: run(0), getFormat: run(1), getVocabulary: run(2),
+    checkHypothesis: (hypothesis: Json) => tools[3].run({ hypothesis }),
+    registerHypotheses: (hypotheses: Json[], source?: "generator" | "researcher") => tools[4].run({ hypotheses, source }),
+    removeHypothesis: (position: number) => tools[5].run({ position }),
+    lock: run(6), run: run(7), report: run(8)
+  });
+}
+
+/** The start page: list campaigns, and start one — which then opens its own page and tools. */
+export function installIndexTools(): { webmcp: boolean; cleanup: () => void } {
+  const tools: AgentTool[] = [
+    { name: "campaign_list", description: "Existing hypothesis campaigns: id, research question, study, status (draft/locked/running/complete) and page URL.",
+      inputSchema: { type: "object", properties: {} },
+      run: async () => {
+        const j = await (await fetch("/api/campaign", { cache: "no-store" })).json();
+        if (j.error) throw new Error(j.error);
+        return j.campaigns.map((c: any) => ({ id: c.id, question: c.question, study: c.study, status: c.status, url: `${location.origin}/campaign/${c.id}` }));
+      } },
+    { name: "campaign_create", description: "Start a hypothesis campaign for the user's research question (in their words). Its decision rules are fixed now. The browser then opens the campaign's page, which exposes the tools for writing, checking, registering, locking and running hypotheses — continue there with window.cohortLab.",
+      inputSchema: { type: "object", required: ["question"], properties: {
+        question: { type: "string", description: "the research question, as the user put it" },
+        study: { type: "string", description: "cBioPortal study id; default msk_chord_2024" } } },
+      run: async ({ question, study }) => {
+        const r = await fetch("/api/campaign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question, study: study || "msk_chord_2024" }) });
+        const j = await r.json();
+        if (j.error) throw new Error(j.error);
+        const url = `${location.origin}/campaign/${j.campaign.id}`;
+        setTimeout(() => location.assign(url), 400);
+        return { id: j.campaign.id, url, plan: j.campaign.plan, next: "Opening the campaign page. Once it loads, read its \"For AI agents\" section and use window.cohortLab there (getFormat, getVocabulary, checkHypothesis, registerHypotheses)." };
+      } }
+  ];
+  return exposeTools(tools, {
+    listCampaigns: () => tools[0].run({}),
+    createCampaign: (question: string, study?: string) => tools[1].run({ question, study })
+  });
 }

@@ -1026,13 +1026,6 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
 .camp-err { color: var(--err); background: var(--err-soft); padding: var(--s2) var(--s3); border-radius: var(--r-sm); font-size: var(--t-md); }
 .camp-note { font-size: var(--t-md); background: var(--accent-soft); color: var(--accent-ink); padding: var(--s2) var(--s3); border-radius: var(--r-sm); }
 .camp-inline { display: flex; align-items: center; gap: var(--s2); margin: 0; }
-.camp-qin {
-  flex: 1; min-width: 14rem; font: inherit; font-size: var(--t-md); color: var(--ink); background: var(--paper);
-  border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--s2) var(--s3); resize: vertical;
-}
-.camp-qin { width: 100%; font-size: var(--t-base); }
-.camp-examples { display: flex; flex-direction: column; gap: var(--s1); margin: var(--s2) 0 var(--s3); }
-.camp-ex { text-align: left; font-size: var(--t-sm); color: var(--accent-ink); background: var(--accent-soft); border-color: transparent; }
 .camp-explain { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s3); margin: var(--s3) 0 var(--s4); }
 @media (max-width: 760px) { .camp-explain { grid-template-columns: 1fr 1fr; } }
 .camp-explain > div { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s3); }
@@ -1109,3 +1102,5 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .camp-prompt-head { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); font-size: var(--t-md); }
 .camp-prompt-head button { font-size: var(--t-sm); padding: var(--s0) var(--s2); }
 .camp-prompt p { font-family: "IBM Plex Mono", monospace; font-size: var(--t-sm); color: var(--muted); margin: var(--s2) 0 0; }
+.camp-exlist { margin: 0; padding-left: var(--s5); font-size: var(--t-md); color: var(--muted); }
+.camp-exlist li { margin-bottom: var(--s1); }
