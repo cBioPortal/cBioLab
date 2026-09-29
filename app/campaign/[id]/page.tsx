@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import { encodeSpec } from "../../../lib/lab-links.ts";
 import { withSplit, primaryCohorts, type Hypothesis } from "../../../lib/hypothesis.ts";
 import type { Campaign, Funnel, HypothesisRow } from "../../../lib/campaign.ts";
+import { installAgentTools } from "./agent-tools.ts";
 
 type Prior = { campaignId: string; question: string; verdict: string | null; p: number | null; lockedAt: string | null };
 type View = { campaign: Campaign; funnel: Funnel; prior: Record<string, Prior[]>; note?: any };
@@ -67,6 +68,16 @@ export default function CampaignPage() {
   }, [id]);
   useEffect(() => { load(); }, [load]);
 
+  // the page's steps as WebMCP tools and window.cohortLab, once the study is known
+  const study = v?.campaign.study;
+  const [webmcp, setWebmcp] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!study) return;
+    const t = installAgentTools(id, study, () => { load(); });
+    setWebmcp(t.webmcp);
+    return t.cleanup;
+  }, [id, study, load]);
+
   // poll while the server works, so results appear row by row
   useEffect(() => {
     if (busy !== "run" && v?.campaign.status !== "running") return;
@@ -83,6 +94,8 @@ export default function CampaignPage() {
       else {
         setV(j);
         const rej = j.note?.rejected || [];
+        if (action === "add")
+          setNote(`${j.note.added.length} registered.` + (j.note.rejected.length ? ` ${j.note.rejected.length} rejected: ` + j.note.rejected.map((x: any) => `“${x.statement}” (${x.reason})`).join("; ") : ""));
         if (action === "propose" || action === "idea")
           setNote(`${j.note.added} added.` + (rej.length ? ` ${rej.length} could not be written as a valid test: ` + rej.map((x: any) => `“${x.statement}” (${x.reason})`).join("; ") : ""));
       }
@@ -204,8 +217,58 @@ export default function CampaignPage() {
             </button>
           </section>
         )}
+        <AgentPanel c={c} webmcp={webmcp} busy={!!busy} onSubmit={(hs) => act("add", { hypotheses: hs, source: "generator" })} />
       </main>
     </>
+  );
+}
+
+const TOOL_LIST: [string, string][] = [
+  ["campaign_get", "getCampaign()"], ["campaign_format", "getFormat()"], ["campaign_vocabulary", "getVocabulary()"],
+  ["campaign_check_hypothesis", "checkHypothesis(h)"], ["campaign_register", "registerHypotheses([h, …])"],
+  ["campaign_remove", "removeHypothesis(n)"], ["campaign_lock", "lock()"], ["campaign_run", "run()"], ["campaign_report", "report()"]
+];
+
+/** How an AI agent in the browser drives this page — visible, so an agent reading the page finds it. */
+function AgentPanel({ c, webmcp, busy, onSubmit }: { c: Campaign; webmcp: boolean | null; busy: boolean; onSubmit: (hs: unknown[]) => void }) {
+  const [text, setText] = useState("");
+  const [bad, setBad] = useState<string | null>(null);
+  function submit() {
+    setBad(null);
+    let hs: unknown;
+    try { hs = JSON.parse(text); } catch (e) { setBad("not valid JSON: " + (e as Error).message); return; }
+    onSubmit(Array.isArray(hs) ? hs : [hs]);
+  }
+  return (
+    <details className="card camp-agent" open={c.status === "draft"} id="for-ai-agents">
+      <summary><h2>For AI agents <span className="plain">· drive this campaign with tools</span></h2></summary>
+      <p className="camp-help">
+        Every step on this page is also a tool. A browser agent that supports <strong>WebMCP</strong> finds them through
+        {" "}<code>document.modelContext</code>; any agent that can run JavaScript here can call them as{" "}
+        <code>window.cohortLab.*</code> (each returns a promise). The engine checks everything submitted, exactly as for
+        the buttons above. {webmcp === null ? "" : webmcp ? "WebMCP: tools registered in this browser." : "WebMCP is not available in this browser — use window.cohortLab."}
+      </p>
+      <table className="camp-table camp-tools">
+        <thead><tr><th>WebMCP tool</th><th>window.cohortLab</th></tr></thead>
+        <tbody>{TOOL_LIST.map(([a, b]) => <tr key={a}><td><code>{a}</code></td><td><code>{b}</code></td></tr>)}</tbody>
+      </table>
+      <p className="camp-help">
+        Workflow: read <a href="/api/campaign/format" target="_blank" rel="noreferrer">the hypothesis format</a> and{" "}
+        <a href={`/api/catalog?study=${encodeURIComponent(c.study)}`} target="_blank" rel="noreferrer">the study vocabulary</a>,
+        write hypotheses, <code>checkHypothesis</code> any you are unsure of, <code>registerHypotheses</code>, then — after the
+        user confirms — <code>lock()</code> and <code>run()</code>, and report what <code>report()</code> says, failures included.
+        Plain-text report: <a href={`/api/campaign/${c.id}?format=text`} target="_blank" rel="noreferrer">/api/campaign/{c.id.slice(0, 8)}…?format=text</a>.
+      </p>
+      {c.status === "draft" && <>
+        <label htmlFor="agent-json">Or paste hypotheses as JSON (one object or an array)</label>
+        <textarea id="agent-json" className="camp-json" rows={6} value={text} onChange={(e) => setText(e.target.value)}
+          placeholder='[{"statement": "…", "rationale": "…", "doc": {"study": "…", "cohorts": {…}, "views": [{…}]}, "primary": {"view": 0, "stat": "compare", "gene": "…"}, "direction": "higher"}]' />
+        <div className="row">
+          <button disabled={busy || !text.trim()} onClick={submit}>Submit hypotheses</button>
+          {bad && <span className="camp-err">{bad}</span>}
+        </div>
+      </>}
+    </details>
   );
 }
 

@@ -10,32 +10,8 @@
 import { catalogText } from "./catalog-text.ts";
 import { CHAT_GRAMMAR } from "./dsl-reference.ts";
 import { checkFeasibility, type Run } from "./campaign.ts";
-import { DEFAULT_PLAN, type Hypothesis } from "./hypothesis.ts";
+import { HYPOTHESIS_GRAMMAR, type Hypothesis } from "./hypothesis.ts";
 
-export const HYPOTHESIS_GRAMMAR = `A HYPOTHESIS is one testable claim:
-{ "statement": "<the claim in plain language a non-scientist can follow>",
-  "rationale": "<why it is plausible: prior literature, mechanism, clinical experience — NEVER a result from this data, which you have not seen>",
-  "doc": <an Analysis document: {study, cohorts: {name: cohortDef, ...}, views: [ONE view]}>,
-  "primary": <the single result that decides it — see below>,
-  "direction": "higher" | "lower" | "any" }
-
-primary, by view kind (the view must have exactly two cohorts unless it is cox):
-- {"view":0,"stat":"compare","gene":"STK11","measure":"any"|"driver"}  — that gene's alteration frequency, FIRST cohort vs SECOND
-- {"view":0,"stat":"survival"}                                        — log-rank; "higher" = the FIRST cohort has the higher hazard (worse survival)
-- {"view":0,"stat":"clinical","attribute":"TMB_NONSYNONYMOUS"}         — that attribute's test; for numeric, "higher" = FIRST cohort's mean is higher
-- {"view":0,"stat":"cox","term":"<coefficient label>"}                — one coefficient; "higher" = hazard ratio > 1
-
-Rules:
-- ONE view per document, holding only what the primary needs (a compare view lists just the one gene).
-  Every extra gene or attribute would be an extra test nobody counted.
-- Cohort order matters: "direction" reads FIRST cohort relative to SECOND. Name cohorts so a reader can follow.
-- Declare a direction whenever the rationale predicts one. A result in the other direction will count as NOT supported.
-- Do NOT add {"kind":"split"} clauses. The campaign owns the held-out split and adds it itself.
-- When several hypotheses compare the same two groups, define those groups IDENTICALLY in each (same clauses)
-  so the results are comparable.
-- Timeline hypotheses are welcome — progression, lines of therapy, what follows what — and are where this tool is
-  strongest. For "no event within N days" always set "observed": true so patients lost to follow-up are not counted.
-- Each arm needs at least ${DEFAULT_PLAN.minArm} patients in each half of the study; very narrow cohorts will be marked untestable.`;
 
 const SYSTEM = (study: string, catalog: string) => `You are a hypothesis generator for cancer research, working with cbio-lab, a
 cohort-analysis engine over cBioPortal data. A researcher gives you a question. You propose hypotheses that could

@@ -20,3 +20,6 @@ python/dist/
 
 # gate build output — a production build beside the dev server (scripts/gate.sh)
 .next-gate
+
+# demo server build output — a production snapshot served for demos (serve-demo-*.sh)
+.next-demo

@@ -1097,3 +1097,12 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .camp-status.locked, .camp-status.running { background: var(--accent-soft); color: var(--accent-ink); }
 .camp-foot { color: var(--muted); font-size: var(--t-sm); margin-top: var(--s4); }
 @media (max-width: 700px) { .camp-table thead { display: none; } .camp-table tr { display: grid; grid-template-columns: 2rem 1fr; } .camp-table td { border: 0; } .camp-table tr { border-bottom: 1px solid var(--line); } }
+.camp-agent summary { cursor: pointer; list-style: none; }
+.camp-agent summary::-webkit-details-marker { display: none; }
+.camp-agent summary h2 { display: inline; }
+.camp-agent summary::before { content: "▸ "; color: var(--muted); }
+.camp-agent[open] summary::before { content: "▾ "; }
+.camp-agent code { font-family: "IBM Plex Mono", monospace; font-size: var(--t-sm); background: var(--code-bg); padding: 0 var(--s1); border-radius: var(--r-sm); }
+.camp-tools { max-width: 36rem; margin: var(--s2) 0; }
+.camp-tools td { padding: var(--s1) var(--s2); }
+.camp-json { width: 100%; font-family: "IBM Plex Mono", monospace; font-size: var(--t-sm); color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--s2); resize: vertical; margin-bottom: var(--s2); }

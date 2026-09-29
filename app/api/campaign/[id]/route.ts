@@ -1,7 +1,8 @@
 // One campaign: read it, and move it through draft → locked → complete.
 // Every step is a POST {action}; the order is enforced by lib/campaign.ts and the database.
 import {
-  getCampaign, addHypotheses, removeHypothesis, lockCampaign, runCampaign, funnel, priorTests
+  getCampaign, addHypotheses, removeHypothesis, lockCampaign, runCampaign, funnel, priorTests,
+  checkFeasibility, reportText
 } from "../../../../lib/campaign.ts";
 import { proposeHypotheses } from "../../../../lib/generator.ts";
 import { cachedAnalysis } from "../../../../lib/next-cache.ts";
@@ -18,9 +19,14 @@ async function view(id: string) {
   return { campaign: c, funnel: funnel(c), prior };
 }
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  try { return Response.json(await view(id)); } catch (e) { return fail(e, 404); }
+  try {
+    // ?format=text: the same report the MCP tools return, for agents that read rather than parse
+    if (new URL(req.url).searchParams.get("format") === "text")
+      return new Response(reportText(await getCampaign(id), new URL(req.url).origin), { headers: { "content-type": "text/plain; charset=utf-8" } });
+    return Response.json(await view(id));
+  } catch (e) { return fail(e, 404); }
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -39,13 +45,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       note = { added: added.added.length, rejected: [...added.rejected, ...p.unresolved] };
     } else if (body.action === "add") {
       note = await addHypotheses(id, Array.isArray(body.hypotheses) ? body.hypotheses : [body.hypothesis], body.source === "generator" ? "generator" : "researcher", run);
+    } else if (body.action === "check") {
+      const h = body.hypothesis || {};
+      note = await checkFeasibility({ ...h, doc: { ...h.doc, study: h.doc?.study || c.study } }, run, c.plan);
     } else if (body.action === "remove") {
-      await removeHypothesis(id, String(body.hypothesisId));
+      const byPos = body.position != null ? c.hypotheses.find((h) => h.position === Number(body.position)) : undefined;
+      if (body.position != null && !byPos) return fail(`no hypothesis #${body.position}`);
+      await removeHypothesis(id, byPos ? byPos.id : String(body.hypothesisId));
     } else if (body.action === "lock") {
       await lockCampaign(id);
     } else if (body.action === "run") {
       await runCampaign(id, run);
-    } else return fail("action must be propose, idea, add, remove, lock or run");
+    } else return fail("action must be propose, idea, add, check, remove, lock or run");
     return Response.json({ ...(await view(id)), note });
   } catch (e) { return fail(e); }
 }

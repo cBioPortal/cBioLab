@@ -11,7 +11,7 @@ import { renderDslMarkdown } from "../lib/dsl-reference.ts";
 import {
   createCampaign, getCampaign, addHypotheses, lockCampaign, runCampaign, checkFeasibility, reportText
 } from "../lib/campaign.ts";
-import { HYPOTHESIS_GRAMMAR } from "../lib/generator.ts";
+import { HYPOTHESIS_GRAMMAR } from "../lib/hypothesis.ts";
 import { runAnalysis, resolveStudy, studyProfiles } from "../lib/analysis.ts";
 import { resolverFor, carriesPatientIds, studyRouting } from "../lib/federation.ts";
 import { buildExplore } from "../lib/explore.ts";

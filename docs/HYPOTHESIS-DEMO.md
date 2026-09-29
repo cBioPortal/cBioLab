@@ -30,8 +30,7 @@ Point out:
 - **Untestable is said out loud** (the NSCLC campaign has two: MSI-high NSCLC has 10 patients;
   the researcher's never-smoker idea has 21 durable responders). A literature-only generator has
   no idea what data exists.
-- The gap at #7 is a hypothesis removed while still a draft — a stated direction that contradicted
-  its own sentence. Removal is allowed until the lock, and never after.
+- *remove* works until the lock, and never after.
 
 **3. Lock in** (click it, 20 s). The list is timestamped and hashed. From here the database
 itself — triggers, not app code — refuses any addition, removal or rewording. This is what lets
@@ -55,6 +54,28 @@ decided inside the database by a hash of their id, so no one, human or AI, can c
 **6. Close** (20 s). Nothing here chose what to test. The generator can be as creative as it
 likes because the tester cannot be persuaded: fixed halves, one correction, a frozen list, and
 failures kept on the record.
+
+## Variant: the Claude browser sidebar as the generator
+
+The campaign page exposes every step as a tool, so a browser agent can be the generator while
+the audience watches the page fill in:
+
+- **WebMCP** — registered with `document.modelContext` (`navigator.modelContext` before
+  Chromium 150) as `campaign_get`, `campaign_format`, `campaign_vocabulary`,
+  `campaign_check_hypothesis`, `campaign_register`, `campaign_remove`, `campaign_lock`,
+  `campaign_run`, `campaign_report`.
+- **`window.cohortLab`** — the same functions as a page global (`getFormat()`,
+  `registerHypotheses([...])`, `lock()`, `run()`, `report()`, …), because as of mid-2026 the
+  Claude in Chrome extension does not *discover* WebMCP tools on its own, but can call them
+  when told to run page JavaScript (anthropics/claude-code#76809).
+- The **"For AI agents"** panel at the bottom of the page says all of this in plain text — that
+  is how the sidebar finds out — and has a JSON paste box for an agent that only types.
+
+Open a new campaign on the demo server, then ask the sidebar something like: *"Read the For AI
+agents section of this page. Use window.cohortLab to read the hypothesis format and the study
+vocabulary, write 10 hypotheses for this question, check any you are unsure of, and register
+them. Stop before locking."* Then lock and run it yourself, or tell it to once you have looked
+at the list.
 
 ## Running it yourself
 
