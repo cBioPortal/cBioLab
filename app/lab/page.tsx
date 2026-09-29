@@ -2837,6 +2837,8 @@ function Latency({ v }: { v: any }) {
                     <p className="note" style={{ marginTop: 0 }}>
                       Check an attribute to draw it as a tile in the facet grid below; uncheck to hide
                       it. The search here only narrows this list — it doesn't touch the grid itself.
+                      {exStudies.length > 1 && <> An attribute marked <b>*</b> isn't carried by every
+                      selected study — hover it for which share of the {exStudies.length} do.</>}
                     </p>
                     <div className="row" style={{ alignItems: "baseline" }}>
                       <input className="genesearch" type="search" placeholder="find an attribute" value={clinFilter}
@@ -2875,10 +2877,21 @@ function Latency({ v }: { v: any }) {
                               if (next.has(attrKey(c))) next.delete(attrKey(c)); else next.add(attrKey(c));
                               return next;
                             });
+                            // Shown regardless — the checklist is the union across the
+                            // selection (see visibleClinical's own comment) — but an
+                            // attribute only SOME of the selected studies actually carry
+                            // reads as universal without this, so mark it rather than
+                            // leave the reader to discover the gap study by study.
+                            const partial = exStudies.length > 1 && (c.studyCount ?? 1) < exStudies.length;
                             return (
                               <tr key={attrKey(c)} onClick={(e) => { if ((e.target as HTMLElement).tagName !== "INPUT") toggle(); }}>
                                 <td><input type="checkbox" checked={!hiddenAttrs.has(attrKey(c))} onChange={toggle} /></td>
-                                <td>{c.displayName || c.attribute}</td>
+                                <td>
+                                  {c.displayName || c.attribute}
+                                  {partial && (
+                                    <span className="meta" title={"carried by " + (c.studyCount ?? 1) + " of " + exStudies.length + " selected studies, not all of them"}> *</span>
+                                  )}
+                                </td>
                                 <td className="meta">{c.kind === "num" ? "numeric" : "categorical"}</td>
                                 <td className="meta">{c.per === "sample" ? "sample" : "patient"}</td>
                               </tr>
