@@ -353,7 +353,6 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
   const menuOpenRef = useRef(new Map<string, boolean>());
   const moreDerivedMenu = useGearmenuOpen("explore:more-derivations", menuOpenRef.current);
-  const seqFilterMenu = useGearmenuOpen("explore:sequence-filter", menuOpenRef.current);
   const keyFor = (v: object): number => {
     let k = viewKeys.current.get(v);
     if (k == null) { k = nextViewKey.current++; viewKeys.current.set(v, k); }
@@ -437,7 +436,6 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const [qaVal, setQaVal] = useState("");                               // creator quick-add: numeric threshold
   const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
   const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
-  const [attrLimit, setAttrLimit] = useState(20);
   /**
    * Minimum share of the selected studies an attribute must appear in to be
    * shown. Across 64 studies the union of vocabularies is 1,634 facets, and the
@@ -466,7 +464,11 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   /** the header lists selected studies as chips; past a handful it is summarised */
   const [studyChipsOpen, setStudyChipsOpen] = useState(false);
   const [geneFilter, setGeneFilter] = useState<Record<string, string>>({});   // per-table gene box, client-side
-  const [clinFilter, setClinFilter] = useState("");                            // matches an attribute name OR one of its values
+  const [clinFilter, setClinFilter] = useState("");                            // narrows the attribute checklist in "+ Add chart", not the grid itself
+  /** attributes unchecked in the "+ Add chart" > Clinical picker — keyed "per|attribute",
+   *  matching data-attr. Empty means every attribute shows, the same default as before
+   *  there was a picker at all. */
+  const [hiddenAttrs, setHiddenAttrs] = useState<Set<string>>(new Set());
   const [attrCoverage, setAttrCoverage] = useState(0);                       // clinical attributes shown
   /**
    * The "sequence / line filter" popover's draft — an A/[B] pair plus a
@@ -1011,27 +1013,24 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
 
   const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
 
-  /** attributes meeting a coverage bar, from the last unnarrowed response */
+  /** "per|attribute", matching data-attr — the one key format every attribute lookup here uses */
+  const attrKey = (c: { per: string; attribute: string }) => c.per + "|" + c.attribute;
+
   /**
    * Which clinical facets are on screen. ONE definition, because this was two
    * copies — one computing the header's count, one filtering the render — and
    * they disagreed the moment a search box was added: the header read
    * "8 attributes" while all 20 were still drawn.
    *
-   * The search matches an attribute's name AND the values inside it, so "lung"
-   * finds Cancer Type by its contents when the reader does not know the
-   * attribute's name. With 805 values in Cancer Type Detailed, scanning was the
-   * weakest part of this page next to the portal's per-chart search.
+   * Coverage (carried by enough of the selected studies) and the reader's own
+   * checklist (hiddenAttrs, set from "+ Add chart" > Clinical) are both "is this
+   * attribute allowed to show" concerns, so both live here; clinFilter is a
+   * different thing now — it narrows the CHECKLIST's own rows, not this.
    */
-  const visibleClinical = (list: { attribute: string; displayName?: string; kind: string; studyCount?: number; values?: { v: string }[] }[]): typeof list => {
-    const q = clinFilter.trim().toLowerCase();
+  const visibleClinical = (list: { attribute: string; per: string; studyCount?: number }[]): typeof list => {
     const coverageOk = (c: { studyCount?: number }) =>
       attrCoverage === 0 || (c.studyCount ?? 1) >= Math.ceil(attrCoverage * exStudies.length);
-    const textOk = (c: { attribute: string; displayName?: string; kind: string; values?: { v: string }[] }) => !q ||
-      (c.attribute || "").toLowerCase().includes(q) ||
-      (c.displayName || "").toLowerCase().includes(q) ||
-      (c.kind === "cat" && (c.values || []).some((v) => String(v.v).toLowerCase().includes(q)));
-    return list.filter((c) => coverageOk(c) && textOk(c));
+    return list.filter((c) => coverageOk(c) && !hiddenAttrs.has(attrKey(c)));
   };
 
   const attrsForBar = (bar: number, studiesOverride?: string[] | string): string[] => {
@@ -2829,23 +2828,23 @@ function Latency({ v }: { v: any }) {
                 <button className={chartTab === "derived" ? "active" : ""} onClick={() => setChartTab("derived")}>Derived timeline filters</button>
               </div>
               {chartTab === "clinical" && (() => {
-                const visible = visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical;
-                const shown = Math.min(visible.length, attrLimit);
+                const q = clinFilter.trim().toLowerCase();
+                const rows = !q ? explore.clinical : explore.clinical.filter((c) =>
+                  (c.attribute || "").toLowerCase().includes(q) || (c.displayName || "").toLowerCase().includes(q));
+                const shownCount = visibleClinical(explore.clinical as never).length;
                 return (
                   <div>
                     <p className="note" style={{ marginTop: 0 }}>
-                      Finds an attribute (or one of its values) among the {explore.clinical.length} this selection
-                      carries — the matching tiles are what the facet grid below shows.
+                      Check an attribute to draw it as a tile in the facet grid below; uncheck to hide
+                      it. The search here only narrows this list — it doesn't touch the grid itself.
                     </p>
                     <div className="row" style={{ alignItems: "baseline" }}>
-                      <input className="genesearch" type="search" placeholder="find attribute or value" value={clinFilter}
-                        title="matches an attribute's name or any of its values" autoFocus
+                      <input className="genesearch" type="search" placeholder="find an attribute" value={clinFilter}
+                        title="narrows this checklist by attribute name" autoFocus
                         onChange={e => setClinFilter(e.target.value)} />
-                      <span className="meta">{shown < visible.length
-                        ? "showing " + shown + " of " + visible.length + " attributes"
-                        : visible.length + " attributes"}
-                        {attrCoverage > 0 && visible.length < explore.clinical.length
-                          ? " (" + (explore.clinical.length - visible.length) + " hidden as study-specific)" : ""}</span>
+                      <span className="meta">{shownCount} of {explore.clinical.length} checked</span>
+                      <button className="linklike" onClick={() => setHiddenAttrs(new Set())}>check all</button>
+                      <button className="linklike" onClick={() => setHiddenAttrs(new Set(explore.clinical.map(attrKey)))}>check none</button>
                       {exStudies.length > 1 && (
                         <select value={String(attrCoverage)} disabled={exploreBusy}
                           title="attributes carried by only one study are that study's own vocabulary, not something the selection shares"
@@ -2862,6 +2861,21 @@ function Latency({ v }: { v: any }) {
                           <option value="1">in every study</option>
                         </select>
                       )}
+                    </div>
+                    {!rows.length && <p className="note">No attribute matches “{clinFilter}”.</p>}
+                    <div className="attrpicker">
+                      {rows.map((c) => (
+                        <label key={attrKey(c)} className="chk">
+                          <input type="checkbox" checked={!hiddenAttrs.has(attrKey(c))}
+                            onChange={() => setHiddenAttrs(prev => {
+                              const next = new Set(prev);
+                              if (next.has(attrKey(c))) next.delete(attrKey(c)); else next.add(attrKey(c));
+                              return next;
+                            })} />
+                          {c.displayName || c.attribute}
+                          <span className="meta"> · {c.kind === "num" ? "numeric" : "categorical"}{c.per === "sample" ? " · sample-level" : ""}</span>
+                        </label>
+                      ))}
                     </div>
                   </div>
                 );
@@ -2976,10 +2990,12 @@ function Latency({ v }: { v: any }) {
                         </div>
                       );
                     })()}
-                    <details className="gearmenu inline" ref={seqFilterMenu.ref} onToggle={seqFilterMenu.onToggle}>
-                      <summary title="build any A/B temporal relationship — followed-by, during, not-followed-by — with a duration constraint">custom…</summary>
-                      <div className="gearmenu-items wide">
-                        <span className="meta">one event, or two related in time — built from this study's own timeline</span>
+                    <div className="customseq">
+                      <h4>Custom sequence filter</h4>
+                      <p className="note" style={{ margin: "0 0 0.2rem" }}>
+                        Build any A/B temporal relationship — followed-by, during, not-followed-by —
+                        with a duration constraint, from this study's own timeline.
+                      </p>
                         <div className="setrow">
                           <span className="meta">event</span>
                           <select value={seq.aType} onChange={e => setSeq(s => ({ ...s, aType: e.target.value }))}>
@@ -3067,8 +3083,7 @@ function Latency({ v }: { v: any }) {
                         </label>
                         <hr />
                         <button className="facet" disabled={!seqReady} onClick={addSeqFilter}>add filter</button>
-                      </div>
-                    </details>
+                    </div>
                   </div>
                 );
               })())}
@@ -3151,7 +3166,7 @@ function Latency({ v }: { v: any }) {
           {explore && <>
             <div className="facetgrid">
               {(visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical)
-                .slice(0, attrLimit).map(c => (
+                .map(c => (
                 /* data-attr / data-shape make the facet identifiable from outside
                    React — the e2e suite asserts that an attribute's shape does not
                    change when the draft does. One tile per attribute, the portal's
@@ -3291,12 +3306,6 @@ function Latency({ v }: { v: any }) {
                     </div>}
                 </div>
               ))}
-              {explore.clinical.length > attrLimit && (
-                <button className="linklike" style={{ gridColumn: "1 / -1", textAlign: "center" }}
-                  onClick={() => setAttrLimit(attrLimit + 20)}>
-                  show {Math.min(20, explore.clinical.length - attrLimit)} more attributes
-                </button>
-              )}
               {explore.studyBreakdown && explore.studyBreakdown.length > 0 && (
                 <div className="card wide">
                   <h2>Studies <span className="plain">— how {explore.draftCount != null ? "the draft" : "the selection"} breaks down{exStudies.length > 1 ? " across the " + exStudies.length + " selected studies" : ""}</span></h2>

@@ -738,10 +738,29 @@ details.gearmenu.inline[open] > summary {
    both, and tall enough to scroll internally rather than push past the viewport. */
 .docdialog { width: min(90vw, 48rem); max-width: 48rem; max-height: 85vh; overflow: auto; }
 /* Explore's "+ Add chart": one tab per filter kind (clinical/gene/derived-timeline),
-   each of which used to be its own permanent card above the facet grid — wide enough
-   for the busiest of the three (the custom sequence builder's several setrows). */
-.addchartdialog { width: min(92vw, 46rem); max-width: 46rem; max-height: 85vh; overflow: auto; }
+   each of which used to be its own permanent card above the facet grid. Most of the
+   screen on purpose — a checkbox list of 60+ clinical attributes and the custom
+   sequence builder's several setrows both want real width to breathe, not a
+   form-sized dialog forcing everything into one cramped column. */
+.addchartdialog { width: 94vw; max-width: 94vw; height: 90vh; max-height: 90vh; overflow: auto; }
 .addchartdialog .tabs { margin-bottom: 0.8rem; }
+/* The custom sequence builder's setrows, inline in the Derived tab rather than
+   behind their own nested dropdown — same row shape .gearmenu-items gives a
+   popover's setrows, scoped to this dialog instead of a details>summary. */
+.addchartdialog .setrow { display: flex; align-items: center; gap: 0.4rem; font-size: var(--t-sm); padding: 0.15rem 0; }
+.addchartdialog .setrow > .meta { min-width: 5.2rem; color: var(--muted); flex: none; }
+.addchartdialog .setrow select { flex: 1; min-width: 0; }
+.addchartdialog hr { border: none; border-top: 1px solid var(--line); margin: 0.5rem 0; }
+/* The dialog itself is huge on purpose, but a <select> or button stretched to
+   94vw wide reads as broken, not spacious — cap the form's own width the same
+   way .gearmenu-items.wide used to, independent of the dialog around it. */
+.customseq { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.8rem; padding-top: 0.6rem;
+  border-top: 1px solid var(--line); max-width: 34rem; }
+.customseq h4 { margin: 0 0 0.2rem; font-size: var(--t-md); font-weight: 600; }
+/* The clinical attribute checklist: many short rows, so pack them into columns
+   across the dialog's width instead of one long scroll. */
+.attrpicker { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.3rem 1rem; margin-top: 0.6rem; }
+.attrpicker .chk { font-size: var(--t-md); }
 .namedialog .meta { display: block; margin-bottom: 0.6rem; }
 .namedialog input { width: 100%; box-sizing: border-box; }
 .genedialog { min-width: 24rem; max-width: 30rem; }

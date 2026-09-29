@@ -111,20 +111,6 @@ async function main() {
       // now that it exits in 5s while hidden, wait for the clinical facet grid
       // explicitly instead of relying on that as a side effect.
       await page.waitForSelector("[data-attr]", { timeout: 120000 });
-      // the attribute expander sits in the facet grid, right after the clinical
-      // attribute tiles and before the study/gene-table tiles that follow them —
-      // not orphaned in a gap between unrelated sections.
-      const expanderPlaced = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll("button")].find(b2 => /more attributes/.test(b2.textContent));
-        if (!btn) return null;
-        const grid = btn.closest(".facetgrid");
-        if (!grid) return { inCard: false };
-        const kids = [...grid.children];
-        const i = kids.indexOf(btn);
-        const before = kids.slice(0, i).some(k => k.hasAttribute && k.hasAttribute("data-attr"));
-        const after = kids.slice(i + 1).some(k => /^Studies|^Data types|^Mutated Genes/.test(k.textContent || ""));
-        return { inCard: true, clinical: before, within: after };
-      });
       // Categorical values are shown in full and scrolled, not trimmed to a few;
       // and the ranked lists carry no inline bar charts.
       const vals = await page.evaluate(() => {
@@ -153,9 +139,12 @@ async function main() {
       ok("value bars stay small", !!vals.bars && !!barBox && barBox.h <= 10 && barBox.w <= 80,
         barBox ? vals.bars + " bars, " + barBox.w + "x" + barBox.h + "px" : "no bars found");
 
-      ok("the attribute expander sits inside the Clinical card",
-        !expanderPlaced || (expanderPlaced.inCard && expanderPlaced.clinical && expanderPlaced.within),
-        expanderPlaced ? JSON.stringify(expanderPlaced) : "no expander (all attributes shown)");
+      // Every clinical attribute shows by default now (checked/unchecked from
+      // "+ Add chart" > Clinical, not a positional "show N more" cutoff) — this
+      // selection carries 66 attributes, well past the old default cap of 20.
+      const attrTileCount = await page.locator("[data-attr]").count();
+      ok("every clinical attribute shows by default, no positional cutoff",
+        attrTileCount > 20, attrTileCount + " attribute tiles");
 
       ok("derived facets appear and filter", derivedFacetsHidden || (der.facets >= 2 && der.filtered),
         derivedFacetsHidden ? "skipped — Derived facets card is currently hidden (SHOW_DERIVED_FACETS=false)" :
