@@ -292,7 +292,7 @@ async function main() {
         await page.locator("dialog.savedialog button:has-text('Save')").click();
         await page.waitForFunction(() => /saved/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 120000 });
-        await page.locator(".tabs button:has-text('Cohorts')").click();
+        await page.locator(".tabs button:text-is('Saved')").click();
         await page.waitForTimeout(1500);
         const inList = await page.locator("text=e2e dialog cohort").count();
         savedOk = !!prefilled && closedOnEsc && inList > 0;
@@ -304,7 +304,7 @@ async function main() {
       // DIFFERENTLY-named cohort first, so replacement is provable: the bar now
       // derives the name from the draft, so two Analyze runs share a name and
       // counting cohorts could not tell replace from overwrite.
-      await page.locator(".tabs button:has-text('Cohorts')").click();
+      await page.locator(".tabs button:text-is('Saved')").click();
       await page.waitForSelector(".pick input", { timeout: 240000 });
       let seeded = [];
       try {
@@ -531,7 +531,7 @@ async function main() {
 
       // Cohorts tab: tick cohorts, submit them together. No per-row "add" links.
       await page.goto(BASE + "/lab");
-      await page.locator(".tabs button:has-text('Cohorts')").click();
+      await page.locator(".tabs button:text-is('Saved')").click();
       await page.waitForSelector(".pick input", { timeout: 240000 });
       ok("cohort rows use checkboxes, not per-row add links",
         (await page.locator("button:has-text('add to analysis')").count()) === 0,

@@ -12,7 +12,7 @@ import type { ViewParticipation } from "../../lib/types.ts";
 import { survivalAxis } from "../../lib/stats.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 
-const TABS = ["explore", "cohorts", "saved", "analysis", "examples"] as const;
+const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -312,7 +312,11 @@ function ParamRow({ name, value, busy, onChange }:
 
 export default function AnalysisPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = use(searchParams);
-  const [tab, setTab] = useState<"explore" | "cohorts" | "saved" | "analysis" | "examples">(() => tabFromParams(sp));
+  const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">(() => tabFromParams(sp));
+  /** The "Saved" tab's own sub-tabs (Cohorts / Analyses) — these used to be
+   *  two separate top-level tabs ("Cohorts" and "Saved") with a cross-link
+   *  between them ("manage on the Saved tab"); one tab, two sub-tabs instead. */
+  const [cohortsSubTab, setCohortsSubTab] = useState<"cohorts" | "analyses">("cohorts");
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   const [copied, setCopied] = useState<string | null>(null);
   const [exMsg, setExMsg] = useState<string | null>(null);
@@ -2585,8 +2589,7 @@ function Latency({ v }: { v: any }) {
         </dialog>
         <div className="tabs">
           <button className={tab === "explore" ? "active" : ""} onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
-          <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Cohorts</button>
-          <button className={tab === "saved" ? "active" : ""} onClick={() => goTab("saved")}>Saved</button>
+          <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Saved</button>
           <button className={tab === "analysis" ? "active" : ""} onClick={() => goTab("analysis")}>Analysis</button>
           <button className={tab === "examples" ? "active" : ""} onClick={() => goTab("examples")}>Examples</button>
         </div>
@@ -2766,7 +2769,7 @@ function Latency({ v }: { v: any }) {
                       Analyze needs no name, so a permanent field implied one was
                       required for both. */}
                   <button onClick={openSaveDialog} disabled={!ready}
-                    title={ready ? "keep this definition in the Cohorts tab without running anything" : "select a study first"}>
+                    title={ready ? "keep this definition on the Saved tab without running anything" : "select a study first"}>
                     Save as a Cohort
                   </button>
                   <button className="linklike" onClick={clearDraft}>clear</button>
@@ -3492,8 +3495,16 @@ function Latency({ v }: { v: any }) {
           </div>
         </div>}
 
-        {/* ================= Cohorts tab ================= */}
-        {tab === "cohorts" && <div className="grid2">
+        {/* ================= Saved tab ================= */}
+        {tab === "cohorts" && <div>
+          {/* Saved cohorts and saved analyses used to be two top-level tabs
+              ("Cohorts" and "Saved") with a cross-link between them ("manage
+              on the Saved tab") — one tab, two sub-tabs instead. */}
+          <div className="tabs">
+            <button className={cohortsSubTab === "cohorts" ? "active" : ""} onClick={() => setCohortsSubTab("cohorts")}>Cohorts</button>
+            <button className={cohortsSubTab === "analyses" ? "active" : ""} onClick={() => setCohortsSubTab("analyses")}>Analyses</button>
+          </div>
+          {cohortsSubTab === "cohorts" && <div className="grid2">
           <div className="card">
             <h2>Create a cohort</h2>
             <label>Name</label>
@@ -3594,65 +3605,53 @@ function Latency({ v }: { v: any }) {
               );
             })}
             <h2 style={{ marginTop: "1.2rem" }}>
-              Saved cohorts <span className="plain">— tick any to include below; manage (rename, delete) on the <button className="linklike" onClick={() => goTab("saved")}>Saved tab</button></span>
+              Saved cohorts <span className="plain">— shared with everyone using this app; no per-user ownership yet. Tick any to include above; edit or delete here.</span>
             </h2>
             {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, create one on the left, or ask chat.</p>}
-            {Object.entries(saved).map(([n, s2]) => (
+            {Object.entries(saved)
+              .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
+              .map(([n, s2]) => (
               <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
-                <label className="pick">
-                  <input type="checkbox" checked={picked.includes("saved:" + n)} onChange={() => togglePick("saved:" + n)} />
-                  <strong>{n}</strong>
+                <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
+                  <label className="pick">
+                    <input type="checkbox" checked={picked.includes("saved:" + n)} onChange={() => togglePick("saved:" + n)} />
+                    <strong>{n}</strong>
+                  </label>
                   {s2.lastEval && <span className="meta">{s2.lastEval.count.toLocaleString()} pts</span>}
-                </label>
+                  <span className="meta">saved {s2.savedAt}</span>
+                  <span className="spacer" />
+                  <button className="linklike"
+                    onClick={() => { setCName(n); setCDefText(JSON.stringify(s2.def, null, 2)); setCPreview(s2.lastEval || null); }}>
+                    edit
+                  </button>
+                  <button className="linklike" onClick={() => removeSaved(n)}>delete</button>
+                </div>
                 <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} /></div>
               </div>
             ))}
           </div>
-        </div>}
-
-        {/* ================= Saved tab ================= */}
-        {tab === "saved" && <div className="grid2">
-          <div className="card">
-            <h2>Saved cohorts <span className="plain">— shared with everyone using this app; no per-user ownership yet</span></h2>
-            {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — build one on the Cohorts tab, or save an example there.</p>}
-            {Object.entries(saved)
-              .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
-              .map(([n, s2]) => (
-                <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
-                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                    <strong>{n}</strong>
-                    {s2.lastEval && <span className="meta">{s2.lastEval.count.toLocaleString()} pts</span>}
-                    <span className="meta">saved {s2.savedAt}</span>
-                    <span className="spacer" />
-                    <button className="linklike"
-                      onClick={() => { setCName(n); setCDefText(JSON.stringify(s2.def, null, 2)); setCPreview(s2.lastEval || null); goTab("cohorts"); }}>
-                      edit
-                    </button>
-                    <button className="linklike" onClick={() => removeSaved(n)}>delete</button>
+          </div>}
+          {cohortsSubTab === "analyses" && <div className="grid2">
+            <div className="card">
+              <h2>Saved analyses <span className="plain">— shared with everyone using this app; no per-user ownership yet</span></h2>
+              {Object.keys(spaces).length === 0 && <p className="note">Nothing saved yet — build an analysis with at least one view, then "Save workspace" on the Analysis tab.</p>}
+              {Object.entries(spaces)
+                .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
+                .map(([n, w]) => (
+                  <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
+                    <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
+                      <strong>{n}</strong>
+                      <span className="meta">{(w.doc.views || []).length} view{(w.doc.views || []).length === 1 ? "" : "s"}</span>
+                      <span className="meta">saved {w.savedAt}</span>
+                      <span className="spacer" />
+                      <button className="linklike" onClick={() => openWorkspace(n)}>open</button>
+                      <button className="linklike" onClick={() => deleteWorkspace(n)}>delete</button>
+                    </div>
                   </div>
-                  <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} /></div>
-                </div>
-              ))}
-          </div>
-          <div className="card">
-            <h2>Saved workspaces <span className="plain">— shared with everyone using this app; no per-user ownership yet</span></h2>
-            {Object.keys(spaces).length === 0 && <p className="note">Nothing saved yet — build an analysis with at least one view, then "Save workspace" on the Analysis tab.</p>}
-            {Object.entries(spaces)
-              .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
-              .map(([n, w]) => (
-                <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
-                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                    <strong>{n}</strong>
-                    <span className="meta">{(w.doc.views || []).length} view{(w.doc.views || []).length === 1 ? "" : "s"}</span>
-                    <span className="meta">saved {w.savedAt}</span>
-                    <span className="spacer" />
-                    <button className="linklike" onClick={() => openWorkspace(n)}>open</button>
-                    <button className="linklike" onClick={() => deleteWorkspace(n)}>delete</button>
-                  </div>
-                </div>
-              ))}
-            {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
-          </div>
+                ))}
+              {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
+            </div>
+          </div>}
         </div>}
 
         {/* ================= Examples tab ================= */}
@@ -3840,7 +3839,7 @@ function Latency({ v }: { v: any }) {
               <div className="card">
                 <h2>Nothing here yet</h2>
                 <p className="note" style={{ fontSize: "var(--t-md)" }}>
-                  The analysis document is empty. Add cohorts from the <button className="linklike" onClick={() => goTab("cohorts")}>Cohorts tab</button>,
+                  The analysis document is empty. Add cohorts from the <button className="linklike" onClick={() => goTab("cohorts")}>Saved tab</button>,
                   ask chat above (e.g. “compare STK11-driver vs wild-type immunotherapy patients”), or open <button className="linklike" onClick={() => docDialog.current?.showModal()}>show document json</button> and paste one in.
                 </p>
               </div>
