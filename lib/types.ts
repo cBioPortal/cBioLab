@@ -60,6 +60,12 @@ export interface ClinicalLeaf {
  */
 export interface SampleListLeaf { kind: "sampleList"; ids: string[] }
 export interface PatientListLeaf { kind: "patientList"; ids: string[] }
+/**
+ * A fixed, engine-owned half of the study's patients: a salted hash of the study-qualified
+ * patient id decides the half, so the partition is reproducible, identical for every caller,
+ * and never passes through the client as an id list.
+ */
+export interface SplitLeaf { kind: "split"; part: "discovery" | "validation" }
 export interface GeneStateFacet {
   gene: string;
   type: "MUTATION" | "CNA";
@@ -177,7 +183,7 @@ export interface DerivedLeaf {
 export type Leaf =
   | OqlLeaf | ClinicalLeaf | EventLeaf | SampleListLeaf | PatientListLeaf | ProfiledLeaf
   | CaseListLeaf | GenomicDataLeaf | GenericAssayLeaf | AlterationLeaf | DerivedLeaf
-  | ProteinPositionLeaf
+  | ProteinPositionLeaf | SplitLeaf
   /** back-compat: the flat v1 event shape, accepted without a `kind` */
   | EventLeafFields;
 

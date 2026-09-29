@@ -20,7 +20,7 @@ import { clinicalValueFoldSql, canonicalEventName } from "./event-names.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
-  SampleListLeaf, PatientListLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
+  SampleListLeaf, PatientListLeaf, SplitLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
 } from "./types.ts";
 
 /** Every leaf compiler receives a fully-resolved context. */
@@ -378,6 +378,20 @@ function patientListLeafSql(leaf: PatientListLeaf, ctx: Ctx): string {
   return basePatientsSql(ctx.study, dbOf(ctx)) + "\n    AND " + PID("patient_unique_id", ctx.study) + " IN (" + ids.map(sq).join(",") + ")";
 }
 
+// The salt is part of what every held-out result means: changing it reshuffles every
+// discovery/validation partition ever reported. test/cohort.test.ts pins it.
+export const SPLIT_SALT = "cohort-lab-split-v1";
+const SPLIT_PARTS: Record<string, number> = { discovery: 0, validation: 1 };
+
+function splitLeafSql(leaf: SplitLeaf, ctx: Ctx): string {
+  const bucket = SPLIT_PARTS[String(leaf.part)];
+  if (bucket === undefined) throw new Error('split clause: part must be "discovery" or "validation"');
+  const pid = PID("patient_unique_id", ctx.study);
+  return "SELECT DISTINCT " + pid + " AS pid FROM " + dbOf(ctx) + ".sample_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(ctx.study) + "\n" +
+    "    AND cityHash64(concat(" + sq(SPLIT_SALT + ":" + ctx.study + ":") + ", " + pid + ")) % 2 = " + bucket;
+}
+
 function leafSql(leaf: any, ctx: Ctx): string {
   if (leaf.kind === "oql") return oqlLeafSql(leaf.q, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx) });
   if (leaf.kind === "alteration") return oqlLeafSql(alterationToOql(leaf), { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx) }); // deprecated alias
@@ -391,6 +405,7 @@ function leafSql(leaf: any, ctx: Ctx): string {
   if (leaf.kind === "derived") return derivedLeafSql(leaf, ctx);
   if (leaf.kind === "sampleList") return sampleListLeafSql(leaf, ctx);
   if (leaf.kind === "patientList") return patientListLeafSql(leaf, ctx);
+  if (leaf.kind === "split") return splitLeafSql(leaf, ctx);
   // v1 flat event shape without kind
   if (leaf.a && leaf.rel) return eventLeafSql(leaf, ctx);
   throw new Error("unknown clause kind: " + JSON.stringify(Object.keys(leaf)));
@@ -468,6 +483,7 @@ function leafText(leaf: any): string {
     return m + of + " " + parts.join(" and ") + unit;
   }
   if (leaf.kind === "caseList") return "in case list " + leaf.id;
+  if (leaf.kind === "split") return "in the " + leaf.part + " half (fixed held-out split)";
   if (leaf.kind === "genomicData") return leaf.gene + " " + leaf.profileType + " " + JSON.stringify(leaf.range || leaf.values);
   if (leaf.kind === "genericAssay") return leaf.entity + " " + JSON.stringify(leaf.range || leaf.values);
   if (leaf.kind === "proteinPosition") return leaf.gene + " protein position " + JSON.stringify(leaf.range || {});

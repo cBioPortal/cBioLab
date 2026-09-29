@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-09-28",
+  "generated": "2026-09-29",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -36,6 +36,12 @@
     "Derived treatment lines: who reaches a third line?": {
       "reached 3rd line": 3088,
       "first line only": 13620
+    },
+    "Held-out replication: one question, two halves of the patients": {
+      "early failure (discovery)": 827,
+      "durable response (discovery)": 215,
+      "early failure (validation)": 738,
+      "durable response (validation)": 193
     },
     "True first line: fast progression versus durable control": {
       "progressed within 180d of 1L chemo": 3319,

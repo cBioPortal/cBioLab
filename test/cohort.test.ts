@@ -1,7 +1,7 @@
 // Cohort-definition semantics that are easy to regress and expensive to get wrong.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { compileCohortDef, describeCohortDef } from "../lib/cohort2.ts";
+import { compileCohortDef, describeCohortDef, SPLIT_SALT } from "../lib/cohort2.ts";
 
 const ctx = { study: "s1", db: "db" };
 
@@ -145,5 +145,29 @@ describe("proteinPosition: an N-/C-terminal split without a clinical attribute f
   test("reads back in plain language", () => {
     assert.equal(describeCohortDef({ all: [{ kind: "proteinPosition", gene: "APC", range: { lt: 1400 } }] }),
       'APC protein position {"lt":1400}');
+  });
+});
+
+describe("split: a fixed, engine-owned held-out partition", () => {
+  test("the salt is pinned — changing it reshuffles every reported discovery/validation result", () => {
+    assert.equal(SPLIT_SALT, "cohort-lab-split-v1");
+  });
+  test("the two halves differ only in their bucket", () => {
+    const d = compileCohortDef({ all: [{ kind: "split", part: "discovery" }] }, ctx);
+    const v = compileCohortDef({ all: [{ kind: "split", part: "validation" }] }, ctx);
+    assert.match(d, /% 2 = 0\)$/);
+    assert.match(v, /% 2 = 1\)$/);
+    assert.equal(d.replace(/% 2 = 0\)$/, ""), v.replace(/% 2 = 1\)$/, ""));
+  });
+  test("the hash is salted per study, inside the database", () => {
+    const sql = compileCohortDef({ all: [{ kind: "split", part: "discovery" }] }, ctx);
+    assert.match(sql, /cityHash64\(concat\('cohort-lab-split-v1:s1:', /);
+  });
+  test("anything but the two named parts is refused, never passed into SQL", () => {
+    for (const part of ["test", "0", "discovery' OR 1=1 --", ""])
+      assert.throws(() => compileCohortDef({ all: [{ kind: "split", part } as any] }, ctx), /part must be/);
+  });
+  test("reads back as the held-out half it is", () => {
+    assert.match(describeCohortDef({ all: [{ kind: "split", part: "validation" }] }), /validation half/);
   });
 });
