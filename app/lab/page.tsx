@@ -2595,69 +2595,6 @@ function Latency({ v }: { v: any }) {
         {/* ================= Explore tab ================= */}
         {tab === "explore" && <div>
           {(() => {
-            // Acting on the draft is the point of this page, so the actions live at
-            // the top and stay there while you scroll the facets that build it.
-            const d = parseDraft();
-            const clauses = d && Array.isArray(d.all) ? d.all.length : 0;
-            const ready = exStudies.length > 0;      // a study alone is enough to analyse
-            return (
-              <div className="card exbar">
-                <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <strong style={{ fontSize: "var(--t-md)" }}>
-                    {!ready ? "No studies selected"
-                      : clauses ? clauses + (clauses === 1 ? " filter" : " filters")
-                      : "No filters"}
-                  </strong>
-                  <span className="meta">
-                    {!ready ? "— pick a study below"
-                      : clauses
-                        ? (explore && explore.draftCount != null
-                            ? "· " + explore.draftCount.toLocaleString() + " patients match"
-                            : "· counting…")
-                        : "· every patient in " + (exStudies.length === 1 ? exStudies[0] : exStudies.length + " selected studies") +
-                          (explore?.totals ? " (" + explore.totals.patients.toLocaleString() + ")" : "")}
-                  </span>
-                  {exploreBusy && <span className="spinner" />}
-                  <span className="spacer" />
-                  <button className="primary" onClick={analyzeDraft} disabled={!ready}
-                    title={ready ? "start a fresh analysis of this cohort (replaces the current document)" : "select a study first"}>
-                    Analyze
-                  </button>
-                  <span className="meta">or</span>
-                  {/* Naming is asked for on demand rather than sitting in the bar:
-                      Analyze needs no name, so a permanent field implied one was
-                      required for both. */}
-                  <button onClick={openSaveDialog} disabled={!ready}
-                    title={ready ? "keep this definition in the Cohorts tab without running anything" : "select a study first"}>
-                    Save as a Cohort
-                  </button>
-                  {clauses > 0 && <button className="linklike" onClick={clearDraft}>clear</button>}
-                </div>
-                {clauses > 0 && (
-                  <div className="row" style={{ marginTop: "0.4rem" }}>
-                    {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} />; })()}
-                  </div>
-                )}
-                {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
-                {/* A native <dialog> so Esc, focus trapping and the backdrop come
-                    from the platform rather than being re-implemented. */}
-                <dialog ref={saveDialog} className="namedialog savedialog"
-                  onClose={() => setSaveName("")}
-                  onClick={e => { if (e.target === saveDialog.current) saveDialog.current?.close(); }}>
-                  <form method="dialog" onSubmit={e => { e.preventDefault(); confirmSave(); }}>
-                    <h3>Save as a cohort</h3>
-                    <p className="meta">{clauses ? clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies") : "every patient in " + (exStudies.length === 1 ? exStudies[0] : exStudies.length + " selected studies")}</p>
-                    <DraftText key={draftGen} draft={saveDraft} initial={saveName} onFilled={setDraftFilled} autoFocus placeholder="cohort name…" />
-                    <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
-                      <button type="button" className="linklike" onClick={() => saveDialog.current?.close()}>cancel</button>
-                      <button className="primary" type="submit" disabled={!draftFilled}>Save</button>
-                    </div>
-                  </form>
-                </dialog>
-              </div>
-            );
-          })()}
-          {(() => {
             const CAP_FILTERS: [string, string, (s: any) => boolean][] = [
               ["timeline", "timeline events", (s: any) => s.timelinePatients > 0],
               ["mrna", "mRNA", (s: any) => s.caps && s.caps.mrna],
@@ -2668,6 +2605,7 @@ function Latency({ v }: { v: any }) {
             ];
             const byId = new Map(studies.map((s) => [s.id, s] as const));
             const selPts = exStudies.reduce((n: number, id: string) => n + (byId.get(id)?.patients ?? 0), 0);
+            const ready = exStudies.length > 0;      // a study alone is enough to analyse
             // Two toggles on purpose. The chips in the header are an edit to a
             // selection the reader has already committed, so they apply at once.
             // The checkboxes below are them composing a new one, so they stage.
@@ -2733,6 +2671,10 @@ function Latency({ v }: { v: any }) {
                     );
                   })()}
                   <span className="spacer" />
+                  <button className="primary" onClick={analyzeDraft} disabled={!ready}
+                    title={ready ? "start a fresh analysis of this cohort (replaces the current document)" : "select a study first"}>
+                    Analyze
+                  </button>
                   <button onClick={() => {
                     if (exPanelOpen) { setExDraftStudies(null); setExPanelOpen(false); }   // close discards
                     else { setExDraftStudies(exStudies); setExPanelOpen(true); }           // open seeds
@@ -2798,6 +2740,56 @@ function Latency({ v }: { v: any }) {
                     {hits.length > 200 && <p className="note">Showing the 200 largest of {hits.length.toLocaleString()} matches — refine the search.</p>}
                   </div>
                 </>}
+              </div>
+            );
+          })()}
+          {/* Underneath study selection, and only present once there's something to
+              show — Analyze lives in the studies card above regardless of whether any
+              filters exist, so this block's whole job now is the filters themselves. */}
+          {(() => {
+            const d = parseDraft();
+            const clauses = d && Array.isArray(d.all) ? d.all.length : 0;
+            if (!clauses) return null;
+            const ready = exStudies.length > 0;
+            return (
+              <div className="card exbar">
+                <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <strong style={{ fontSize: "var(--t-md)" }}>{clauses + (clauses === 1 ? " filter" : " filters")}</strong>
+                  <span className="meta">
+                    {explore && explore.draftCount != null
+                      ? "· " + explore.draftCount.toLocaleString() + " patients match"
+                      : "· counting…"}
+                  </span>
+                  {exploreBusy && <span className="spinner" />}
+                  <span className="spacer" />
+                  {/* Naming is asked for on demand rather than sitting in the bar:
+                      Analyze needs no name, so a permanent field implied one was
+                      required for both. */}
+                  <button onClick={openSaveDialog} disabled={!ready}
+                    title={ready ? "keep this definition in the Cohorts tab without running anything" : "select a study first"}>
+                    Save as a Cohort
+                  </button>
+                  <button className="linklike" onClick={clearDraft}>clear</button>
+                </div>
+                <div className="row" style={{ marginTop: "0.4rem" }}>
+                  {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} />; })()}
+                </div>
+                {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
+                {/* A native <dialog> so Esc, focus trapping and the backdrop come
+                    from the platform rather than being re-implemented. */}
+                <dialog ref={saveDialog} className="namedialog savedialog"
+                  onClose={() => setSaveName("")}
+                  onClick={e => { if (e.target === saveDialog.current) saveDialog.current?.close(); }}>
+                  <form method="dialog" onSubmit={e => { e.preventDefault(); confirmSave(); }}>
+                    <h3>Save as a cohort</h3>
+                    <p className="meta">{clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies")}</p>
+                    <DraftText key={draftGen} draft={saveDraft} initial={saveName} onFilled={setDraftFilled} autoFocus placeholder="cohort name…" />
+                    <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
+                      <button type="button" className="linklike" onClick={() => saveDialog.current?.close()}>cancel</button>
+                      <button className="primary" type="submit" disabled={!draftFilled}>Save</button>
+                    </div>
+                  </form>
+                </dialog>
               </div>
             );
           })()}

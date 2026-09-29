@@ -89,7 +89,9 @@ async function main() {
       // user's request — a short wait tells "genuinely hidden" from "actually
       // broken" without paying the full 240s timeout twice on every gate run.
       await page.goto(BASE + "/lab?tab=explore");
-      await page.waitForSelector(".exbar", { timeout: 120000 });
+      // .exbar (the filters bar) only renders once a filter exists now — the
+      // Exploring/studies card is the one thing always present on this tab.
+      await page.waitForSelector('h2:has-text("Exploring")', { timeout: 120000 });
       let der = { facets: 0, filtered: false };
       let derivedFacetsHidden = false;
       try {
@@ -150,21 +152,24 @@ async function main() {
         derivedFacetsHidden ? "skipped — Derived facets card is currently hidden (SHOW_DERIVED_FACETS=false)" :
           der.facets + " derived facets" + (der.filtered ? ", click added a derived clause" : ", click did not filter"));
 
-      // Explore's top action bar: build a draft by clicking a facet, then Analyze.
-      // This is the main path from browsing to an analysis, so it is gated.
+      // Explore's studies card: Analyze must work on a study alone — every
+      // patient in it — before any filtering. Analyze lives in this card now
+      // (the filters bar below it only renders once a filter exists), so this
+      // is the main path from browsing to an analysis with zero filters set.
       await page.goto(BASE + "/lab");
       await page.locator("button:has-text('Explore')").first().click();
-      await page.waitForSelector(".exbar", { timeout: 120000 });
-      // A study alone is a cohort — every patient in it — so Analyze must work
-      // before any filtering, and the bar must say what it would analyse.
+      await page.waitForSelector('h2:has-text("Exploring")', { timeout: 120000 });
       let unfiltered = "";
       try {
-        await page.waitForFunction(() => /every patient in/.test(document.querySelector(".exbar")?.textContent || ""),
-          null, { timeout: 240000 });
-        unfiltered = (await page.locator(".exbar").innerText()).replace(/\s+/g, " ").split(" Analyze")[0];
+        await page.waitForFunction(() => {
+          const h2 = [...document.querySelectorAll("h2")].find(h => h.textContent.startsWith("Exploring"));
+          return !!h2 && /patients/.test(h2.textContent);
+        }, null, { timeout: 240000 });
+        unfiltered = (await page.locator('h2:has-text("Exploring")').innerText()).replace(/\s+/g, " ");
       } catch { /* left empty */ }
-      const canAnalyseUnfiltered = !(await page.locator(".exbar button:has-text('Analyze')").isDisabled());
-      ok("a study with no filters is analysable", canAnalyseUnfiltered && !!unfiltered, unfiltered || "bar never offered the unfiltered cohort");
+      const analyzeBtn = page.locator('button:text-is("Analyze")');
+      const canAnalyseUnfiltered = (await analyzeBtn.count()) > 0 && !(await analyzeBtn.isDisabled());
+      ok("a study with no filters is analysable", canAnalyseUnfiltered && !!unfiltered, unfiltered || "studies card never showed a patient count");
 
       // A facet's SHAPE must not depend on the draft. Narrowing a cohort drops an
       // attribute's distinct-value count, so keying pie-vs-list off it made
@@ -235,7 +240,7 @@ async function main() {
       // suggests Analyze needs a name too.
       const noDraftCard = (await page.locator("h2:has-text('Draft cohort')").count()) === 0;
       const noGeneFinder = (await page.locator("input[placeholder='gene symbol…']").count()) === 0;
-      const noNameBox = (await page.locator('.exbar input[placeholder="name…"]').count()) === 0;
+      const noNameBox = (await page.locator('input[placeholder="name…"]').count()) === 0;
       ok("the explore bar carries only its two actions",
         noDraftCard && noGeneFinder && noNameBox,
         "no card: " + noDraftCard + ", no gene finder: " + noGeneFinder + ", no name box: " + noNameBox);
@@ -247,8 +252,10 @@ async function main() {
           null, { timeout: 240000 });
       } catch { drafted = false; }
       ok("clicking a facet builds a draft and counts it", drafted,
-        drafted ? (await page.locator(".exbar").innerText()).replace(/\s+/g, " ").split(" Analyze")[0] : "no count appeared");
-      await page.locator(".exbar button:has-text('Analyze')").click();
+        drafted ? (await page.locator(".exbar").innerText()).replace(/\s+/g, " ") : "no count appeared");
+      // Analyze lives in the studies card, not the filters bar (.exbar) it sits
+      // below — it works regardless of whether any filter is set.
+      await page.locator('button:text-is("Analyze")').click();
       let landed = false, views = [];
       try {
         await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 1, null, { timeout: 300000 });
@@ -314,7 +321,7 @@ async function main() {
         await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 240000 });
       } catch { /* count may already be shown */ }
-      await page.locator(".exbar button:has-text('Analyze')").click();
+      await page.locator('button:text-is("Analyze")').click();
       let replaced = false, after = [];
       try {
         await page.waitForFunction((gone) => {
