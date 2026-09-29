@@ -8,6 +8,10 @@ import { viewToSvg, viewTitle } from "../lib/view-svg.ts";
 import sharp from "sharp";
 import { ensureFonts } from "../lib/fonts.ts";
 import { renderDslMarkdown } from "../lib/dsl-reference.ts";
+import {
+  createCampaign, getCampaign, addHypotheses, lockCampaign, runCampaign, checkFeasibility, reportText
+} from "../lib/campaign.ts";
+import { HYPOTHESIS_GRAMMAR } from "../lib/generator.ts";
 import { runAnalysis, resolveStudy, studyProfiles } from "../lib/analysis.ts";
 import { resolverFor, carriesPatientIds, studyRouting } from "../lib/federation.ts";
 import { buildExplore } from "../lib/explore.ts";
@@ -627,5 +631,84 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       };
     });
 
+
+  // ---- hypothesis campaigns: this tool as the referee for any hypothesis generator ----------
+  const appBase = () => process.env.APP_BASE_URL || "https://cohort-lab.vercel.app";
+  const campaignErr = (e: unknown) => text("REJECTED: " + String((e as Error)?.message || e));
+  const zHyp = z.object({
+    statement: z.string().max(400), rationale: z.string().max(2000).nullish(),
+    doc: z.object({}).passthrough(), primary: z.object({}).passthrough(),
+    direction: z.enum(["higher", "lower", "any"]).nullish()
+  });
+
+  server.tool(
+    "campaign_create",
+    "Start a hypothesis campaign: a research question whose hypotheses this tool will pre-register, test on a fixed discovery half of the patients, correct for multiplicity across the whole campaign, and replicate on the held-out half. Use this when you are GENERATING hypotheses and want them tested honestly. Returns the campaign id and the hypothesis format. Workflow: campaign_create → campaign_check_hypothesis (optional, per hypothesis) → campaign_register → campaign_lock → campaign_run → campaign_report.",
+    { question: z.string().min(5).max(1000), study: z.string().max(120).nullish() },
+    async ({ question, study }: { question: string; study?: string | null }) => {
+      try {
+        const c = await createCampaign(question, study || "msk_chord_2024");
+        return text(`Campaign ${c.id} created for ${c.study}.\nPage for the researcher: ${appBase()}/campaign/${c.id}\n` +
+          `Plan (fixed now): FDR ${c.plan.fdr} across all tested hypotheses; replication p < ${c.plan.replicationAlpha} on the held-out half; arms ≥ ${c.plan.minArm}.\n\n` +
+          HYPOTHESIS_GRAMMAR + "\n\nThe Analysis document grammar is in describe_dsl.");
+      } catch (e) { return campaignErr(e); }
+    }
+  );
+
+  server.tool(
+    "campaign_check_hypothesis",
+    "Check one hypothesis without registering it: is the document well-formed, does the engine accept it, and how many patients fall in each compared group on the discovery half. Returns cohort sizes only — never an outcome — so checking cannot leak a result into the choice of what to test.",
+    { hypothesis: zHyp, study: z.string().max(120).nullish() },
+    async ({ hypothesis, study }: { hypothesis: any; study?: string | null }) => {
+      const h = { ...hypothesis, doc: { ...hypothesis.doc, study: hypothesis.doc?.study || study || "msk_chord_2024" } };
+      const f = await checkFeasibility(h, engine.runAnalysis);
+      return text(f.ok ? `TESTABLE. Discovery-half group sizes: ${JSON.stringify(f.n)}` : `NOT TESTABLE: ${f.reason}` + (f.n ? ` (sizes: ${JSON.stringify(f.n)})` : ""));
+    }
+  );
+
+  server.tool(
+    "campaign_register",
+    "Register hypotheses on a draft campaign. Each is validated and checked for feasibility; malformed ones are rejected with the reason, groups too small to test register as untestable (they stay on the record). Identical tests are refused as duplicates.",
+    { campaign_id: z.string().max(40), hypotheses: z.array(zHyp).min(1).max(40), source: z.enum(["generator", "researcher"]).nullish() },
+    async ({ campaign_id, hypotheses, source }: { campaign_id: string; hypotheses: any[]; source?: "generator" | "researcher" | null }) => {
+      try {
+        const r = await addHypotheses(campaign_id, hypotheses, source || "generator", engine.runAnalysis);
+        return text(`Registered ${r.added.length}:\n` + r.added.map((h) => `  #${h.position} ${h.feasibility?.ok ? "testable " + JSON.stringify(h.feasibility.n) : "UNTESTABLE — " + h.feasibility?.reason}: ${h.statement}`).join("\n") +
+          (r.rejected.length ? `\nRejected ${r.rejected.length} (fix and resubmit):\n` + r.rejected.map((x) => `  "${x.statement}": ${x.reason}`).join("\n") : ""));
+      } catch (e) { return campaignErr(e); }
+    }
+  );
+
+  server.tool(
+    "campaign_lock",
+    "Pre-register: freeze the campaign's hypothesis list and hash it, before any result exists. Irreversible — the database refuses any later addition, removal or edit. Confirm with the user before calling.",
+    { campaign_id: z.string().max(40) },
+    async ({ campaign_id }: { campaign_id: string }) => {
+      try {
+        const c = await lockCampaign(campaign_id);
+        return text(`Locked at ${c.lockedAt}. Receipt (sha256 over every registered test): ${c.ledgerHash}\n${c.hypotheses.filter((h) => h.feasibility?.ok).length} testable hypotheses will be run.`);
+      } catch (e) { return campaignErr(e); }
+    }
+  );
+
+  server.tool(
+    "campaign_run",
+    "Run a locked campaign: every testable hypothesis on the discovery half, one Benjamini–Hochberg correction across all of them, and replication of the survivors on the held-out validation half. Returns the full report, nulls included. Report it to the user as it is — the funnel and the failures are the point.",
+    { campaign_id: z.string().max(40) },
+    async ({ campaign_id }: { campaign_id: string }) => {
+      try { return text(reportText(await runCampaign(campaign_id, engine.runAnalysis), appBase())); }
+      catch (e) { return campaignErr(e); }
+    }
+  );
+
+  server.tool(
+    "campaign_report",
+    "The current state of a campaign: every registered hypothesis with its result so far, and the funnel from registered to replicated.",
+    { campaign_id: z.string().max(40) },
+    async ({ campaign_id }: { campaign_id: string }) => {
+      try { return text(reportText(await getCampaign(campaign_id), appBase())); }
+      catch (e) { return campaignErr(e); }
+    }
+  );
 }
 

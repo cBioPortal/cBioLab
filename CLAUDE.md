@@ -67,6 +67,18 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   event tools). MCP returns oncoprints as a static image rendered from the server SVG; the
   interactive figure is the web app's, not a third renderer.
 - **`lib/dsl-reference.ts`** — **THE single source of truth for DSL documentation.**
+- **Hypothesis campaigns** (`/campaign`, MCP `campaign_*`) — this tool as the referee for an AI
+  hypothesis generator. **`lib/hypothesis.ts`** (pure, browser-safe): a hypothesis is a document
+  plus ONE declared primary result and a direction; `withSplit` restricts it to one half;
+  `extractPrimary` reads the deciding number; campaign-wide BH and the replication rule.
+  **`lib/campaign.ts`**: the Postgres ledger (`db/migrations/0002_campaigns.sql`) and the procedure
+  (feasibility from cohort sizes only → lock → discovery half → one correction → survivors on the
+  validation half). **`lib/generator.ts`**: Claude as an in-app generator (needs a valid
+  `ANTHROPIC_API_KEY`); any other agent does the same job over MCP. The held-out half is the
+  engine's `split` leaf (`lib/cohort2.ts`): a salted hash of the patient id inside ClickHouse,
+  salt pinned by `test/cohort.test.ts` — changing it reshuffles every reported result.
+  **A locked campaign is immutable at the database level** (triggers); never work around them in
+  application code.
 
 ## Docs worth reading before changing things
 
