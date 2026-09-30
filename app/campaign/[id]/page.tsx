@@ -164,9 +164,22 @@ export default function CampaignPage() {
               <strong>validation half</strong> — patients no step so far has touched. Which half a patient is in is fixed by the
               engine, not chosen by anyone.
             </p>
-            <button className="primary" disabled={!!busy || c.status === "running"} onClick={() => act("run")}>
-              {busy === "run" || c.status === "running" ? <><span className="spinner onprimary" /> testing… {c.hypotheses.filter((h) => h.discovery).length}/{testable.length} on the discovery half</> : `Run all ${testable.length} tests`}
-            </button>
+            {busy === "run" ? (
+              <button className="primary" disabled><span className="spinner onprimary" /> testing… {c.hypotheses.filter((h) => h.discovery).length}/{testable.length} on the discovery half</button>
+            ) : c.status === "running" ? (
+              // Marked running, but not by this page: another tab or agent is running it, or a run
+              // was cut off (a server time limit). Results so far are saved and a resume re-runs
+              // only what is missing, so offering it is safe either way.
+              <div className="camp-act-row">
+                <button className="primary" disabled={!!busy} onClick={() => act("run")}>Resume the run</button>
+                <span className="camp-dim">
+                  {c.hypotheses.filter((h) => h.discovery).length}/{testable.length} tested so far. A run is in progress elsewhere or
+                  was interrupted; resuming re-runs only what is missing.
+                </span>
+              </div>
+            ) : (
+              <button className="primary" disabled={!!busy} onClick={() => act("run")}>{`Run all ${testable.length} tests`}</button>
+            )}
           </section>
         )}
 
