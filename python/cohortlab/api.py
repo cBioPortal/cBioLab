@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import urllib.request
 from typing import Any
 
@@ -35,10 +36,18 @@ class Oncoprint:
         return cls(assemble_contract(**assemble_kwargs))
 
     @classmethod
-    def from_server(cls, spec: dict[str, Any], server: str = "http://localhost:3107", timeout: float = 300) -> "Oncoprint":
-        """Ask a Cohort Lab instance to compile and run the spec; receive the binary contract."""
+    def from_server(cls, spec: dict[str, Any], server: str = "http://localhost:3107", timeout: float = 300,
+                    token: str | None = None) -> "Oncoprint":
+        """Ask a Cohort Lab instance to compile and run the spec; receive the binary contract.
+
+        token: the instance's SITE_API_TOKEN, for a password-protected deployment
+        (defaults to the COHORTLAB_TOKEN environment variable)."""
+        headers = {"Content-Type": "application/json"}
+        token = token or os.environ.get("COHORTLAB_TOKEN")
+        if token:
+            headers["Authorization"] = "Bearer " + token
         req = urllib.request.Request(server.rstrip("/") + "/api/oncoprint?format=bin", data=json.dumps(spec).encode("utf-8"),
-                                     headers={"Content-Type": "application/json"}, method="POST")
+                                     headers=headers, method="POST")
         with urllib.request.urlopen(req, timeout=timeout) as r:
             if r.headers.get("Content-Type", "").startswith("application/json"):
                 raise RuntimeError(json.loads(r.read()).get("error", "server error"))

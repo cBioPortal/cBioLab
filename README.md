@@ -32,6 +32,19 @@ msk_chord_2024 counts. A machine-readable contract is in
 
 Copy them into `.env.local` for local dev; set them in Vercel Project Settings → Environment Variables for deploys.
 
+### Site password
+
+`proxy.ts` puts the whole site behind one shared password (`lib/site-auth.ts`). There are no
+per-user accounts; everyone who signs in shares the same saved cohorts and workspaces.
+
+| var | meaning |
+|---|---|
+| `SITE_PASSWORD` | the password. Unset → no gate (local dev, e2e); on a Vercel deployment an unset password answers 503 rather than serving the site open |
+| `AUTH_SECRET` | signs the 30-day session cookie; any long random string (`openssl rand -hex 32`). Changing it or the password signs everyone out |
+| `SITE_API_TOKEN` | optional. `Authorization: Bearer <token>` is accepted on `/api/*` for scripts and the Python client (`COHORTLAB_TOKEN`). When set it is also **required** on `/api/mcp`; when unset `/api/mcp` stays open, so MCP connectors that cannot sign in keep working |
+
+Set all three for both Production and Preview. Sign out with `POST /api/logout`.
+
 ## MCP server
 
 The MCP endpoint ships inside the Next.js app at **`/api/mcp`** (`app/api/[transport]/route.js`
@@ -45,6 +58,8 @@ denominators) for the model to surface. Register in Claude Code:
 
 ```bash
 claude mcp add --transport http cohort-lab https://<your-deployment>/api/mcp
+# with SITE_API_TOKEN set on the deployment:
+claude mcp add --transport http cohort-lab https://<your-deployment>/api/mcp --header "Authorization: Bearer <token>"
 ```
 
 `mcp/test-client.mjs` exercises all four tools end to end.
