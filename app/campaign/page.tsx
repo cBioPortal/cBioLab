@@ -47,13 +47,13 @@ export default function CampaignIndex() {
         </section>
 
         <section className="card">
-          <h2>Start a campaign over WebMCP</h2>
+          <h2>Start a campaign</h2>
           <p className="camp-help">
             This site does not call an AI model. Your assistant in the browser starts the campaign and writes its hypotheses
             through the tools this page exposes (<a href="#for-ai-agents">For AI agents</a>, below); the site checks everything
             it submits against the data and keeps the record. Open the sidebar on this page and give it your question:
           </p>
-          <Prompt label="Start a campaign" text={START_PROMPT} />
+          <Prompt label="Start a campaign over WebMCP" text={START_PROMPT} />
           <p className="camp-help">Example questions, on msk_chord_2024:</p>
           <ul className="camp-exlist">{EXAMPLES.map((x) => <li key={x}>{x}</li>)}</ul>
         </section>
