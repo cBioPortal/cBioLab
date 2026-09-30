@@ -802,6 +802,35 @@ async function main() {
       await page.waitForTimeout(300);
       const zeroState = await page.locator(".exbar:has-text('no filters yet')").count();
       ok("the builder's draft bar stays visible at zero, unlike Explore's", zeroState > 0);
+
+      // Quick add: one textarea, live suggestions merged across clinical
+      // attributes/values, genes and timeline events — every row is a direct
+      // addClause, the typed text itself is never submitted as a clause.
+      await page.goto(BASE + "/lab");
+      await page.waitForSelector("[data-attr]", { timeout: 120000 });
+      await page.locator(".tabs button:text-is('Quick add')").click();
+      await page.waitForSelector("h2:has-text('Quick add')", { timeout: 60000 });
+      let quickOk = false, quickInfo = "";
+      try {
+        await page.waitForSelector(".quickaddbox", { timeout: 60000 });
+        await page.locator(".quickaddbox").fill("lung");
+        await page.waitForSelector(".qsrow", { timeout: 30000 });
+        const clinicalRows = await page.locator(".qskind-clinical").count();
+        await page.locator(".quickaddbox").fill("tp53");
+        await page.waitForFunction(() => document.querySelectorAll(".qskind-gene").length > 0, null, { timeout: 30000 });
+        const geneRows = await page.locator(".qskind-gene").count();
+        await page.locator(".qsrow", { hasText: "TP53 — mutated" }).click();
+        await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""),
+          null, { timeout: 120000 });
+        const draftText = (await page.locator(".exbar").innerText()).replace(/\s+/g, " ");
+        // Re-searching the same term now shows the "already added" marker.
+        await page.locator(".quickaddbox").fill("tp53");
+        await page.waitForFunction(() => /already added/.test(document.querySelector(".quicksuggest")?.textContent || ""),
+          null, { timeout: 30000 });
+        quickOk = clinicalRows > 0 && geneRows > 0 && /TP53: MUT/.test(draftText);
+        quickInfo = clinicalRows + " clinical rows for 'lung', " + geneRows + " gene rows for 'tp53' -> " + draftText;
+      } catch (e) { quickInfo = String(e.message || e).split("\n")[0]; }
+      ok("Quick add suggests across kinds as you type and adds on click", quickOk, quickInfo);
     } else {
       await page.screenshot({ path: "shot-next-dark.png", fullPage: false });
     }

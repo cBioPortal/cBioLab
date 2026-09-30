@@ -760,6 +760,25 @@ details.gearmenu.inline[open] > summary {
 .customseq { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.8rem; padding-top: 0.6rem;
   border-top: 1px solid var(--line); max-width: 34rem; }
 .customseq h4 { margin: 0 0 0.2rem; font-size: var(--t-md); font-weight: 600; }
+/* Quick add: one textarea, a ranked list of directly-clickable suggestions
+   below it. Kind colors match CohortPills' own KIND_META exactly (gene/OQL
+   pink, clinical blue, timeline green) so a suggestion and the pill it turns
+   into read as the same thing. */
+.quickaddbox { width: 100%; max-width: 40rem; box-sizing: border-box; margin-top: 0.5rem; padding: 0.5rem 0.6rem;
+  font: inherit; font-size: var(--t-base); border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--card); color: var(--ink); resize: vertical; }
+.quickaddbox:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.quicksuggest { display: flex; flex-direction: column; gap: 0.15rem; margin-top: 0.6rem; max-width: 40rem;
+  max-height: 22rem; overflow-y: auto; overscroll-behavior: contain; }
+.qsrow { display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left; padding: 0.35rem 0.5rem;
+  border: 1px solid transparent; border-radius: var(--r-sm); background: none; cursor: pointer; font-size: var(--t-base); }
+.qsrow:hover { background: var(--code-bg); border-color: var(--line); }
+.qskind { flex: none; font-size: var(--t-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 0.05rem 0.35rem; border-radius: var(--r-pill); color: #fff; }
+.qskind-clinical { background: #0072B2; }
+.qskind-gene { background: #CC79A7; }
+.qskind-event { background: #009E73; }
+.qslabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The clinical attribute checklist: a plain single-column table, not tiled into
    several columns — multi-column checkboxes read as disorienting (which row
    continues where?), where a table's one reading order and aligned columns don't.

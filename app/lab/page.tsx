@@ -1,5 +1,5 @@
 "use client";
-import { use, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { use, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
 import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
 import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
@@ -12,7 +12,7 @@ import type { ViewParticipation } from "../../lib/types.ts";
 import { survivalAxis } from "../../lib/stats.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 
-const TABS = ["explore", "builder", "cohorts", "analysis", "examples"] as const;
+const TABS = ["explore", "builder", "quickadd", "cohorts", "analysis", "examples"] as const;
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -312,7 +312,7 @@ function ParamRow({ name, value, busy, onChange }:
 
 export default function AnalysisPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = use(searchParams);
-  const [tab, setTab] = useState<"explore" | "builder" | "cohorts" | "analysis" | "examples">(() => tabFromParams(sp));
+  const [tab, setTab] = useState<"explore" | "builder" | "quickadd" | "cohorts" | "analysis" | "examples">(() => tabFromParams(sp));
   /** The "Saved" tab's own sub-tabs (Cohorts / Analyses) — these used to be
    *  two separate top-level tabs ("Cohorts" and "Saved") with a cross-link
    *  between them ("manage on the Saved tab"); one tab, two sub-tabs instead. */
@@ -333,6 +333,10 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
    *  Explore's own facet-clicking writes to, so the two surfaces stay in sync. */
   const [builderKind, setBuilderKind] = useState<"clinical" | "gene" | "timeline">("clinical");
   const [builderAttr, setBuilderAttr] = useState("");            // Clinical builder: chosen attribute key
+  /** "Quick add" tab: one free-text box, live suggestions below — never
+   *  parses the typed text itself into a clause (that would risk silently
+   *  guessing wrong); every add happens by clicking a suggestion row. */
+  const [quickQuery, setQuickQuery] = useState("");
   const [gcGene, setGcGene] = useState("");                      // Gene-condition builder: gene symbol
   const [gcType, setGcType] = useState<"ANY" | "MUT" | "MUT_SPECIFIC" | "MUT_CLASS" | "AMP" | "HOMDEL" | "CNA" | "FUSION" | "EXP">("ANY");
   const [gcPchange, setGcPchange] = useState("");                // specific protein change, e.g. G12C
@@ -1485,6 +1489,86 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   };
 
   /**
+   * "Quick add": one free-text box, ranked suggestions below, merged across
+   * clinical attribute/value names, genes, and timeline event types — a
+   * simple case-insensitive substring match, not a parser. Every suggestion
+   * IS a directly clickable action (its own addClause call), never a
+   * category header needing a second drill-down, and never the typed text
+   * itself submitted as-is. Capped per kind so one very common substring
+   * (e.g. "a") can't flood the list.
+   */
+  const QUICK_CAP_PER_KIND = 10, QUICK_CAP_TOTAL = 40;
+  const quickSuggestions = useMemo(() => {
+    const q = quickQuery.trim().toLowerCase();
+    if (!explore || !q) return [];
+    const out: { kind: "clinical" | "gene" | "event"; label: string; meta?: string; on: () => void }[] = [];
+    const d = parseDraft();
+    const attrs = visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical;
+    for (const c of attrs) {
+      const anyCC = c as any;
+      const attrName = (c.displayName || c.attribute).toLowerCase();
+      const attrHit = attrName.includes(q);
+      if (c.kind === "cat") {
+        for (const v of anyCC.values as { v: string; n: number }[]) {
+          if (out.filter(s => s.kind === "clinical").length >= QUICK_CAP_PER_KIND) break;
+          if (attrHit || String(v.v).toLowerCase().includes(q)) {
+            const already = !!(d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === c.attribute &&
+              ((cl.values || []).includes(v.v) || cl.value === v.v)));
+            out.push({
+              kind: "clinical", label: (c.displayName || c.attribute) + ": " + v.v,
+              meta: (already ? "already added · " : "") + v.n.toLocaleString(),
+              on: () => addClause({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v, ...(c.per === "sample" ? { per: "sample" } : {}) })
+            });
+          }
+        }
+      } else if (c.kind === "num" && attrHit && out.filter(s => s.kind === "clinical").length < QUICK_CAP_PER_KIND) {
+        const per = c.per === "sample" ? { per: "sample" as const } : {};
+        out.push({ kind: "clinical", label: (c.displayName || c.attribute) + " ≥ median (" + (Math.round(anyCC.median * 10) / 10) + ")",
+          on: () => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(anyCC.median * 10) / 10 }, ...per }) });
+        out.push({ kind: "clinical", label: (c.displayName || c.attribute) + " < median (" + (Math.round(anyCC.median * 10) / 10) + ")",
+          on: () => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(anyCC.median * 10) / 10 }, ...per }) });
+      }
+    }
+    // Genes: known symbols from every table this study has, plus the typed
+    // text itself if it already looks like a valid gene symbol — so a gene
+    // this study never showed in a top-N table (rare, still valid OQL) is
+    // still reachable, matching what the Gene condition panel accepts.
+    // "Already added" here needs its own check: a draft's OQL clause merges
+    // every gene into ONE clause with a ";"-joined q (see addClause's oql
+    // branch), so membership means splitting that string, not comparing it
+    // as a whole — a plain c.q === "..." check would never match once a
+    // second gene had been added.
+    const oqlClause = d && d.all.find((cl: any) => cl.kind === "oql");
+    const oqlEntries = oqlClause ? String((oqlClause as any).q).split(/[;\n]/).map((s: string) => s.trim().toUpperCase()) : [];
+    const geneAlready = (gene: string, tok?: string) => {
+      const target = (tok ? gene + ": " + tok : gene).toUpperCase();
+      return oqlEntries.includes(target);
+    };
+    const geneSet = new Set<string>();
+    for (const list of [explore.mutatedGenes, explore.cnaGenes, explore.svGenes, explore.genes] as any[])
+      for (const g of list || []) geneSet.add(g.gene);
+    const typed = quickQuery.trim().toUpperCase();
+    if (/^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/.test(typed)) geneSet.add(typed);
+    const genes = [...geneSet].filter(g => g.toLowerCase().includes(q)).slice(0, QUICK_CAP_PER_KIND);
+    for (const g of genes) {
+      out.push({ kind: "gene", label: g + " — any alteration", meta: geneAlready(g) ? "already added" : undefined,
+        on: () => addClause({ kind: "oql", q: g }) });
+      out.push({ kind: "gene", label: g + " — mutated", meta: geneAlready(g, "MUT") ? "already added" : undefined,
+        on: () => addClause({ kind: "oql", q: g + ": MUT" }) });
+    }
+    // Timeline events
+    for (const e of explore.events || []) {
+      if (out.filter(s => s.kind === "event").length >= QUICK_CAP_PER_KIND) break;
+      if (e.type.toLowerCase().includes(q)) {
+        const already = !!(d && d.all.some((cl: any) => cl.kind === "event" && cl.rel?.type === "NONE" && cl.a?.eventType === e.type));
+        out.push({ kind: "event", label: "has " + e.type, meta: (already ? "already added · " : "") + e.n.toLocaleString(),
+          on: () => addClause({ kind: "event", a: { eventType: e.type }, rel: { type: "NONE" } }) });
+      }
+    }
+    return out.slice(0, QUICK_CAP_TOTAL);
+  }, [quickQuery, explore, cDefText]);
+
+  /**
    * One clinical-attribute tile: pie/list for categorical, histogram for
    * numeric, click-to-filter throughout. Shared by the main facet grid AND
    * the Cohort builder's Clinical panel (given one chosen attribute) — a
@@ -1768,7 +1852,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
 
   // the Cohort builder tab needs clinical/gene/timeline facets even before Explore is visited
   useEffect(() => {
-    if ((tab === "cohorts" || tab === "builder") && !explore && !exploreBusy && exStudies.length) fetchExplore(null);
+    if ((tab === "cohorts" || tab === "builder" || tab === "quickadd") && !explore && !exploreBusy && exStudies.length) fetchExplore(null);
   }, [tab, study, explore]); // eslint-disable-line
 
   const updateView = (vi: number, patch: (v: any) => any) => {
@@ -2938,6 +3022,7 @@ function Latency({ v }: { v: any }) {
         <div className="tabs">
           <button className={tab === "explore" ? "active" : ""} onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
           <button className={tab === "builder" ? "active" : ""} onClick={() => { goTab("builder"); if (!explore) fetchExplore(); }}>Cohort builder</button>
+          <button className={tab === "quickadd" ? "active" : ""} onClick={() => { goTab("quickadd"); if (!explore) fetchExplore(); }}>Quick add</button>
           <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Saved</button>
           <button className={tab === "analysis" ? "active" : ""} onClick={() => goTab("analysis")}>Analysis</button>
           <button className={tab === "examples" ? "active" : ""} onClick={() => goTab("examples")}>Examples</button>
@@ -3655,6 +3740,53 @@ function Latency({ v }: { v: any }) {
                 </div>
               )}
               {builderKind === "timeline" && <div style={{ marginTop: "0.6rem" }}>{renderTimelineSeqBuilder()}</div>}
+            </>}
+          </div>
+          {renderDraftBar({ alwaysShow: true })}
+        </div>}
+
+        {/* ================= Quick add tab ================= */}
+        {/* A second, experimental way to build the same draft as the Cohort
+            builder tab: one free-text box instead of picking a kind first,
+            with live suggestions merged across all three kinds below it.
+            Every suggestion is a direct addClause — the typed text itself is
+            never parsed/submitted, only used to rank/filter what's shown. */}
+        {tab === "quickadd" && <div>
+          <div className="card">
+            <h2>Quick add <span className="plain">— type anything; click a suggestion below to add it</span></h2>
+            <p className="meta">
+              Building for {exStudies.length} stud{exStudies.length === 1 ? "y" : "ies"}
+              {exStudies.length > 0 ? ": " + exStudies.join(", ") : ""} — change the selection on the{" "}
+              <button className="linklike" onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore tab</button>.
+            </p>
+            {exStudies.length === 0 && <p className="note">No studies selected — pick some on the Explore tab first.</p>}
+            {exStudies.length > 0 && !explore && <div className="loading-block"><span className="spinner" /> Building study facets…</div>}
+            {exStudies.length > 0 && explore && <>
+              <textarea className="quickaddbox" rows={2} autoFocus
+                placeholder="a gene (TP53), part of a clinical attribute or value (lung, stage), a timeline event (progression)…"
+                value={quickQuery} onChange={e => setQuickQuery(e.target.value)} />
+              {!quickQuery.trim() && (
+                <p className="note" style={{ marginTop: "0.5rem" }}>
+                  Start typing — matches against clinical attributes and their values, gene symbols, and timeline event types appear below as you go.
+                </p>
+              )}
+              {quickQuery.trim() && (
+                quickSuggestions.length ? (
+                  <div className="quicksuggest">
+                    {quickSuggestions.map((s, i) => (
+                      <button key={i} className="qsrow" onClick={s.on}>
+                        <span className={"qskind qskind-" + s.kind}>{s.kind}</span>
+                        <span className="qslabel">{s.label}</span>
+                        {s.meta && <span className="meta">{s.meta}</span>}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="note" style={{ marginTop: "0.5rem" }}>
+                    No matches for "{quickQuery.trim()}" among clinical attributes/values, genes, or timeline events.
+                  </p>
+                )
+              )}
             </>}
           </div>
           {renderDraftBar({ alwaysShow: true })}
