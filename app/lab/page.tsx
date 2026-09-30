@@ -349,9 +349,19 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
    *  condition form wherever it renders (Cohort builder tab, Quick add). */
   const [gcAndOr, setGcAndOr] = useState<"OR" | "AND">("OR");
   /** Quick add: which multi-step clause is currently being built in the
-   *  trailing input — "idle" shows the plain search+suggestions list, "gene"/
-   *  "event" swap in the full Gene condition / Timeline sequence form inline. */
-  const [quickMode, setQuickMode] = useState<"idle" | "gene" | "event">("idle");
+   *  trailing input — "idle" shows the plain search+suggestions list; "gene"/
+   *  "event" swap in the full Gene condition / Timeline sequence form;
+   *  "clinical" swaps in a searchable value picker for one attribute. */
+  const [quickMode, setQuickMode] = useState<"idle" | "gene" | "event" | "clinical">("idle");
+  /** Arrow-key highlight for the idle suggestion list — -1 means none
+   *  highlighted (nothing to commit on Enter). */
+  const [qsHighlight, setQsHighlight] = useState(-1);
+  /** The clinical value picker's own search box (client-side, over whatever
+   *  values are already loaded — same honesty as the gene-table search: it
+   *  narrows what's loaded, not the full server-side distinct count) and its
+   *  own arrow-key highlight. */
+  const [qvSearch, setQvSearch] = useState("");
+  const [qvHighlight, setQvHighlight] = useState(0);
   const tabRef = useRef<string>(tabFromParams(sp));            // the tab syncUrl should record
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
   const exAbort = useRef<AbortController | null>(null);      // cancel a facet request the reader has moved past
@@ -1662,6 +1672,18 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   };
   const quickChips = useMemo(() => deriveQuickChips(parseDraft()), [cDefText]); // eslint-disable-line
 
+  /** Shared arrow-key behavior for a suggestion/value list: Down/Up move a
+   *  highlighted index (clamped, never wrapping — reaching either end just
+   *  stops there), Enter commits whatever's highlighted, Escape clears the
+   *  highlight. Used by both Quick add's idle suggestion list and its
+   *  clinical value picker so keyboard-only use works the same way in both. */
+  const arrowNavKeyDown = (e: any, count: number, index: number, setIndex: (i: number) => void, onCommit: (i: number) => void) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setIndex(Math.min(index + 1, count - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setIndex(Math.max(index - 1, 0)); }
+    else if (e.key === "Enter") { if (index >= 0 && index < count) { e.preventDefault(); onCommit(index); } }
+    else if (e.key === "Escape") { e.preventDefault(); setIndex(-1); }
+  };
+
   /** Remove one chip — a sub-entry of a merged clause if it has siblings
    *  (splice out of q's ";"-joined entries, or a clinical values[]), else the
    *  whole `all` entry. Mirrors removeDraftClause's own JSON-surgery style. */
@@ -1706,16 +1728,30 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
       const attrName = (c.displayName || c.attribute).toLowerCase();
       const attrHit = attrName.includes(q);
       if (c.kind === "cat") {
-        for (const v of anyCC.values as { v: string; n: number }[]) {
-          if (out.filter(s => s.kind === "clinical").length >= QUICK_CAP_PER_KIND) break;
-          if (attrHit || String(v.v).toLowerCase().includes(q)) {
-            const already = !!(d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === c.attribute &&
-              ((cl.values || []).includes(v.v) || cl.value === v.v)));
-            out.push({
-              kind: "clinical", label: (c.displayName || c.attribute) + ": " + v.v,
-              meta: (already ? "already added · " : "") + v.n.toLocaleString(),
-              on: () => addClause({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v, ...(c.per === "sample" ? { per: "sample" } : {}) })
-            });
+        // Matching the ATTRIBUTE by name (typing "sex") opens the dedicated,
+        // searchable value picker instead of dumping every value inline —
+        // the picker can reach every loaded value regardless of how many
+        // there are (see quickMode "clinical"), where a flat capped list
+        // here could silently never reach the one the reader wants. Matching
+        // a VALUE directly (typing "lung") keeps the fast one-click path.
+        if (attrHit) {
+          out.push({
+            kind: "clinical", label: (c.displayName || c.attribute) + " — search values…",
+            meta: anyCC.values.length.toLocaleString() + (anyCC.distinct > anyCC.values.length ? " of " + anyCC.distinct.toLocaleString() + " loaded" : ""),
+            on: () => { setBuilderAttr(c.per + "|" + c.attribute); setQuickMode("clinical"); setQvSearch(""); setQvHighlight(0); }
+          });
+        } else {
+          for (const v of anyCC.values as { v: string; n: number }[]) {
+            if (out.filter(s => s.kind === "clinical").length >= QUICK_CAP_PER_KIND) break;
+            if (String(v.v).toLowerCase().includes(q)) {
+              const already = !!(d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === c.attribute &&
+                ((cl.values || []).includes(v.v) || cl.value === v.v)));
+              out.push({
+                kind: "clinical", label: (c.displayName || c.attribute) + ": " + v.v,
+                meta: (already ? "already added · " : "") + v.n.toLocaleString(),
+                on: () => addClause({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v, ...(c.per === "sample" ? { per: "sample" } : {}) })
+              });
+            }
           }
         }
       } else if (c.kind === "num" && attrHit && out.filter(s => s.kind === "clinical").length < QUICK_CAP_PER_KIND) {
@@ -1771,6 +1807,24 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     }
     return out.slice(0, QUICK_CAP_TOTAL);
   }, [quickQuery, explore, cDefText]);
+  // A fresh suggestion list starts with its first row highlighted — Enter
+  // commits immediately without needing Down first, standard combobox feel.
+  useEffect(() => { setQsHighlight(quickSuggestions.length ? 0 : -1); }, [quickSuggestions]);
+
+  /** Quick add's clinical value picker: whatever values are already loaded
+   *  for the chosen attribute, narrowed by its own search box — client-side
+   *  only (same honesty as the gene-table search: narrows what's loaded, not
+   *  the server's full distinct count, which quickSuggestions' "N of M
+   *  loaded" meta already discloses before this panel even opens). */
+  const qvFiltered = useMemo(() => {
+    if (!explore || quickMode !== "clinical") return [] as { v: string; n: number }[];
+    const attrs = visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical;
+    const found: any = attrs.find((c: any) => c.per + "|" + c.attribute === builderAttr);
+    if (!found || found.kind !== "cat") return [] as { v: string; n: number }[];
+    const s = qvSearch.trim().toLowerCase();
+    return (found.values as { v: string; n: number }[]).filter(v => !s || String(v.v).toLowerCase().includes(s));
+  }, [explore, builderAttr, qvSearch, quickMode]);
+  useEffect(() => { setQvHighlight(qvFiltered.length ? 0 : -1); }, [qvFiltered]);
 
   /**
    * One clinical-attribute tile: pie/list for categorical, histogram for
@@ -3937,17 +3991,20 @@ function Latency({ v }: { v: any }) {
               {quickMode === "idle" && <>
                 <input className="quickaddbox" type="text" autoFocus
                   placeholder="a gene (TP53), part of a clinical attribute or value (lung, stage), a timeline event (progression)…"
-                  value={quickQuery} onChange={e => setQuickQuery(e.target.value)} />
+                  value={quickQuery} onChange={e => setQuickQuery(e.target.value)}
+                  onKeyDown={e => arrowNavKeyDown(e, quickSuggestions.length, qsHighlight, setQsHighlight,
+                    i => { quickSuggestions[i].on(); setQuickQuery(""); })} />
                 {!quickQuery.trim() && (
                   <p className="note" style={{ marginTop: "0.5rem" }}>
-                    Start typing — matches against clinical attributes and their values, gene symbols, and timeline event types appear below as you go.
+                    Start typing — matches against clinical attributes and their values, gene symbols, and timeline event types appear below as you go. Arrow keys move the highlight, Enter picks it.
                   </p>
                 )}
                 {quickQuery.trim() && (
                   quickSuggestions.length ? (
                     <div className="quicksuggest">
                       {quickSuggestions.map((s, i) => (
-                        <button key={i} className="qsrow" onClick={() => { s.on(); setQuickQuery(""); }}>
+                        <button key={i} className={"qsrow" + (i === qsHighlight ? " qsrow-hl" : "")}
+                          onMouseEnter={() => setQsHighlight(i)} onClick={() => { s.on(); setQuickQuery(""); }}>
                           <span className={"qskind qskind-" + s.kind}>{s.kind}</span>
                           <span className="qslabel">{s.label}</span>
                           {s.meta && <span className="meta">{s.meta}</span>}
@@ -3970,6 +4027,40 @@ function Latency({ v }: { v: any }) {
                 {renderTimelineSeqBuilder(() => { setQuickMode("idle"); setQuickQuery(""); })}
                 <button className="linklike" style={{ marginTop: "0.3rem" }} onClick={() => setQuickMode("idle")}>‹ cancel, back to search</button>
               </div>}
+              {quickMode === "clinical" && (() => {
+                const attrs = visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical;
+                const found: any = attrs.find((c: any) => c.per + "|" + c.attribute === builderAttr);
+                if (!found) return null;
+                const d = parseDraft();
+                const already = (v: string) => !!(d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === found.attribute &&
+                  ((cl.values || []).includes(v) || cl.value === v)));
+                const commit = (v: { v: string; n: number }) => addClause({ kind: "clinical", attribute: found.attribute, op: "=", value: v.v,
+                  ...(found.per === "sample" ? { per: "sample" } : {}) });
+                return (
+                  <div className="customseq" style={{ marginTop: "0.6rem" }}>
+                    <h4>{found.displayName || found.attribute}</h4>
+                    <input type="text" className="quickaddbox" autoFocus placeholder="search values…"
+                      value={qvSearch} onChange={e => setQvSearch(e.target.value)}
+                      onKeyDown={e => arrowNavKeyDown(e, qvFiltered.length, qvHighlight, setQvHighlight, i => commit(qvFiltered[i]))} />
+                    {found.distinct > found.values.length && (
+                      <p className="note" style={{ margin: "0.3rem 0 0" }}>
+                        Searching the {found.values.length.toLocaleString()} values loaded, of {found.distinct.toLocaleString()} total — a value not among these isn't reachable here yet.
+                      </p>
+                    )}
+                    <div className="quicksuggest" style={{ marginTop: "0.5rem" }}>
+                      {qvFiltered.map((v, i) => (
+                        <button key={v.v} className={"qsrow" + (i === qvHighlight ? " qsrow-hl" : "")}
+                          onMouseEnter={() => setQvHighlight(i)} onClick={() => commit(v)}>
+                          <span className="qslabel">{v.v}</span>
+                          <span className="meta">{(already(v.v) ? "already added · " : "") + v.n.toLocaleString()}</span>
+                        </button>
+                      ))}
+                      {!qvFiltered.length && <p className="note" style={{ margin: "0.3rem 0" }}>No loaded values match "{qvSearch}".</p>}
+                    </div>
+                    <button className="linklike" style={{ marginTop: "0.5rem" }} onClick={() => setQuickMode("idle")}>‹ cancel, back to search</button>
+                  </div>
+                );
+              })()}
             </>}
           </div>
           {renderDraftBar({ alwaysShow: true })}

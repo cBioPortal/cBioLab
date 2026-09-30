@@ -895,6 +895,41 @@ async function main() {
         eventInfo = JSON.stringify(chips) + " · back to idle: " + (backToIdle > 0);
       } catch (e) { eventInfo = String(e.message || e).split("\n")[0]; }
       ok("Quick add: a timeline event's suggestion opens the sequence form inline and commits one chip", eventOk, eventInfo);
+
+      // Keyboard-only flow: matching an ATTRIBUTE by name (not a value) opens
+      // a dedicated, searchable value picker rather than flooding the list
+      // with every value — arrow keys move a highlight, Enter commits it, in
+      // both the top-level suggestion list and the picker's own search box.
+      let kbOk = false, kbInfo = "";
+      try {
+        await page.locator(".exbar button:text-is('clear')").click();
+        await page.waitForTimeout(300);
+        await page.locator(".quickaddbox").fill("sex");
+        await page.waitForSelector(".qsrow", { hasText: "search values" });
+        const initialHl = await page.locator(".qsrow-hl").first().innerText();
+        await page.locator(".quickaddbox").press("ArrowDown");
+        const afterDown = await page.locator(".qsrow-hl").first().innerText();
+        await page.locator(".quickaddbox").press("Enter");
+        await page.waitForSelector(".customseq h4");
+        const panelTitle = await page.locator(".customseq h4").innerText();
+        const valueRows = await page.locator(".quicksuggest .qsrow").count();
+        await page.locator(".customseq input.quickaddbox").fill("fem");
+        await page.waitForTimeout(200);
+        const filteredRows = await page.locator(".quicksuggest .qsrow").allTextContents();
+        await page.locator(".customseq input.quickaddbox").fill("");
+        await page.waitForTimeout(200);
+        await page.locator(".customseq input.quickaddbox").press("ArrowDown");
+        const valueHl = await page.locator(".customseq .qsrow-hl").first().innerText();
+        await page.locator(".customseq input.quickaddbox").press("Enter");
+        await page.waitForFunction(() => /1 filter/.test(document.querySelector(".exbar")?.textContent || ""),
+          null, { timeout: 30000 });
+        kbOk = initialHl !== afterDown && /search values/.test(afterDown) && valueRows >= 2
+          && filteredRows.length === 1 && /Female/.test(filteredRows[0]) && !!valueHl;
+        kbInfo = "1st: " + initialHl.split("\n")[0] + " -> after Down: " + afterDown.split("\n")[0] +
+          " | panel: " + panelTitle + " (" + valueRows + " values) | 'fem' filtered to: " + JSON.stringify(filteredRows) +
+          " | picked via keyboard: " + (await page.locator(".exbar").innerText()).replace(/\s+/g, " ");
+      } catch (e) { kbInfo = String(e.message || e).split("\n")[0]; }
+      ok("Quick add: arrow keys navigate suggestions and the clinical value picker's own search", kbOk, kbInfo);
     } else {
       await page.screenshot({ path: "shot-next-dark.png", fullPage: false });
     }

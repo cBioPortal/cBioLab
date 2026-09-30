@@ -774,6 +774,7 @@ details.gearmenu.inline[open] > summary {
 .qsrow { display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left; padding: 0.35rem 0.5rem;
   border: 1px solid transparent; border-radius: var(--r-sm); background: none; cursor: pointer; font-size: var(--t-base); }
 .qsrow:hover { background: var(--code-bg); border-color: var(--line); }
+.qsrow-hl { background: var(--accent-soft); border-color: var(--accent); }
 .qskind { flex: none; font-size: var(--t-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
   padding: 0.05rem 0.35rem; border-radius: var(--r-pill); color: #fff; }
 .qskind-clinical { background: #0072B2; }
