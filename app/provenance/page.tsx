@@ -5,6 +5,7 @@ import { buildContract } from "../../lib/oncoprint.ts";
 import { specToQueries } from "../../lib/oncoprint.ts";
 import { oncokbPin } from "../../lib/annotation.ts";
 import { contractToSvg } from "../../lib/oncoprint-svg.ts";
+import { PageTools } from "../_agent/PageTools.tsx";
 
 export const metadata = { title: "Oncoprint provenance — cbio-lab" };
 export const maxDuration = 60;
@@ -33,6 +34,7 @@ export default async function ProvenancePage({ searchParams }: { searchParams: P
           <a href={"/oncoprint-lab/cli?spec=" + sp.spec} style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>command line →</a>
           <a href={"/oncoprint-lab/python?spec=" + sp.spec} style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>python notebook →</a>
         </>}
+        <PageTools kind="provenance" spec={spec} />
       </header>
       <main>
         {error && <div className="error">{error}</div>}

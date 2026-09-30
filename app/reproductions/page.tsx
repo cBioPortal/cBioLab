@@ -8,6 +8,7 @@
 // view's own `note` are what actually explain the paper connection, so it travels with the
 // analysis rather than living only on this listing page.
 import { REPRODUCTIONS, type PaperReproduction } from "../../lib/reproductions.ts";
+import { PageTools } from "../_agent/PageTools.tsx";
 
 export const metadata = { title: "Paper reproductions — cbio-lab" };
 
@@ -30,6 +31,8 @@ export default function ReproductionsPage() {
       <div className="repro-nav">
         <a href="/lab">← back to the app</a>
         <a href="/rationale">rationale</a>
+        <span className="spacer" />
+        <PageTools kind="reproductions" />
       </div>
 
       <div className="repro-intro">

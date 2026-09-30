@@ -620,7 +620,7 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .chatfigbody svg { display: block; }
 
 /* ---------------- /rationale — RATIONALE.md rendered as a page ---------------- */
-.rationale-nav { margin-bottom: 1.2rem; }
+.rationale-nav { margin-bottom: 1.2rem; display: flex; align-items: center; gap: var(--s4); }
 .rationale-nav a { color: var(--accent-ink); font-size: var(--t-md); text-decoration: none; }
 .rationale-nav a:hover { text-decoration: underline; }
 
@@ -970,7 +970,7 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
    gallery card per paper, same .card base every other page's cards use.
    --------------------------------------------------------------------------- */
 .repro-page { max-width: 900px; margin: 0 auto; padding: var(--s5) var(--s4) var(--s6); }
-.repro-nav { display: flex; gap: var(--s4); margin-bottom: var(--s5); }
+.repro-nav { display: flex; align-items: center; gap: var(--s4); margin-bottom: var(--s5); }
 .repro-nav a { color: var(--accent-ink); font-size: var(--t-md); text-decoration: none; }
 .repro-nav a:hover { text-decoration: underline; }
 .repro-intro h1 { font-family: "IBM Plex Serif", Georgia, serif; font-size: var(--t-2xl); margin: 0 0 var(--s2); }
@@ -1105,3 +1105,19 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .camp-exlist { margin: 0; padding-left: var(--s5); font-size: var(--t-md); color: var(--muted); }
 .camp-exlist li { margin-bottom: var(--s1); }
 .camp-act-row { display: flex; gap: var(--s3); align-items: center; flex-wrap: wrap; }
+
+/* ---- "AI tools" header disclosure (app/_agent/AgentToolsMenu.tsx) ------------------------ */
+.agent-menu { position: relative; font-size: var(--t-md); margin-top: 0; }
+.agent-menu summary { cursor: pointer; list-style: none; color: var(--accent-ink); text-decoration: underline; }
+.agent-menu summary::-webkit-details-marker { display: none; }
+.agent-pop {
+  position: absolute; right: 0; top: calc(100% + var(--s2)); z-index: 50; width: min(34rem, 92vw);
+  max-height: 70vh; overflow: auto; background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: var(--s3) var(--s4); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.agent-pop p { margin: 0 0 var(--s2); color: var(--ink); }
+.agent-pop .agent-how { color: var(--muted); font-size: var(--t-sm); }
+.agent-pop table { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
+.agent-pop th { text-align: left; font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: var(--s1); border-bottom: 1px solid var(--line); }
+.agent-pop td { padding: var(--s0) var(--s1); border-bottom: 1px solid var(--line); }
+.agent-pop code { font-family: "IBM Plex Mono", monospace; font-size: var(--t-xs); }

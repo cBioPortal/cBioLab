@@ -8,13 +8,7 @@
 // Both call /api/campaign/[id], so everything an agent submits is checked by the engine and
 // frozen by the database exactly as it is for the MCP tools and the buttons on the page.
 
-type Json = Record<string, unknown>;
-export interface AgentTool {
-  name: string;
-  description: string;
-  inputSchema: Json;
-  run: (args: any) => Promise<unknown>;
-}
+import { exposeTools, type AgentTool, type Json } from "../../lib/webmcp.ts";
 
 const HYPOTHESIS_SCHEMA = {
   type: "object", required: ["statement", "doc", "primary"],
@@ -86,55 +80,11 @@ export function agentTools(id: string, study: string, refresh: () => void): Agen
   ];
 }
 
-const asText = (x: unknown) => typeof x === "string" ? x : JSON.stringify(x, null, 2);
-
-/**
- * Expose tools as WebMCP (when the browser offers it) and as window.cohortLab — `api` adds
- * named shortcuts next to the generic `call(name, args)`. Returns how they were exposed and a
- * cleanup for unmount.
- */
-function exposeTools(tools: AgentTool[], api: Record<string, unknown>): { webmcp: boolean; cleanup: () => void } {
-  const w = window as any;
-  const global = {
-    ...api,
-    tools: tools.map((t) => ({ name: t.name, description: t.description, input: t.inputSchema })),
-    call: (name: string, args: Json = {}) => {
-      const t = tools.find((x) => x.name === name);
-      if (!t) throw new Error(`no tool ${name}; have ${tools.map((x) => x.name).join(", ")}`);
-      return t.run(args);
-    }
-  };
-  w.cohortLab = global;
-  const mc = (document as any).modelContext ?? (navigator as any).modelContext;
-  const registered: string[] = [];
-  if (mc && typeof mc.registerTool === "function") {
-    for (const t of tools) {
-      try {
-        mc.registerTool({
-          name: t.name, description: t.description, inputSchema: t.inputSchema,
-          execute: async (args: any) => {
-            try { return { content: [{ type: "text", text: asText(await t.run(args || {})) }] }; }
-            catch (e) { return { content: [{ type: "text", text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true }; }
-          }
-        });
-        registered.push(t.name);
-      } catch { /* already registered (a remount) — the existing registration serves */ }
-    }
-  }
-  return {
-    webmcp: !!mc && typeof mc.registerTool === "function",
-    cleanup: () => {
-      for (const n of registered) try { mc.unregisterTool(n); } catch { /* gone already */ }
-      if (w.cohortLab === global) delete w.cohortLab;
-    }
-  };
-}
-
 /** The campaign page: every step of one campaign. */
 export function installAgentTools(id: string, study: string, refresh: () => void): { webmcp: boolean; cleanup: () => void } {
   const tools = agentTools(id, study, refresh);
   const run = (i: number) => (args: Json = {}) => tools[i].run(args);
-  return exposeTools(tools, {
+  return exposeTools("campaign", tools, {
     campaignId: id,
     getCampaign: run(0), getFormat: run(1), getVocabulary: run(2),
     checkHypothesis: (hypothesis: Json) => tools[3].run({ hypothesis }),
@@ -167,7 +117,7 @@ export function installIndexTools(): { webmcp: boolean; cleanup: () => void } {
         return { id: j.campaign.id, url, plan: j.campaign.plan, next: "Opening the campaign page. Once it loads, read its \"For AI agents\" section and use window.cohortLab there (getFormat, getVocabulary, checkHypothesis, registerHypotheses)." };
       } }
   ];
-  return exposeTools(tools, {
+  return exposeTools("campaign list", tools, {
     listCampaigns: () => tools[0].run({}),
     createCampaign: (question: string, study?: string) => tools[1].run({ question, study })
   });

@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { installIndexTools } from "./agent-tools.ts";
 import { Prompt } from "./prompt.tsx";
+import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 
 type Row = { id: string; question: string; study: string; status: string; lockedAt: string | null; createdAt: string };
 
@@ -37,6 +38,8 @@ export default function CampaignIndex() {
         <span className="spacer" />
         <a href="/lab" className="camp-nav">analysis app</a>
         <a href="/rationale" className="camp-nav">why this exists</a>
+        <AgentToolsMenu page="campaign list" tools={[["campaign_create", "createCampaign(question, study?)"], ["campaign_list", "listCampaigns()"]]} webmcp={webmcp}
+          intro="Your AI assistant — Claude in the Chrome sidebar — starts a campaign for your question with these tools; the campaign's own page then has the tools for its hypotheses." />
       </header>
       <main className="camp">
         <section className="camp-explain">

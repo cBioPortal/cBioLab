@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { marked } from "marked";
 import MermaidBlock from "./mermaid-block.tsx";
+import { PageTools } from "../_agent/PageTools.tsx";
 
 export const metadata = { title: "Rationale — cbio-lab" };
 
@@ -25,6 +26,8 @@ export default function RationalePage() {
     <main className="rationale-doc">
       <div className="rationale-nav">
         <a href="/lab">← back to the app</a>
+        <span className="spacer" />
+        <PageTools kind="rationale" />
       </div>
       {parts.map((part, i) =>
         i % 2 === 1

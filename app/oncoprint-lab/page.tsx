@@ -2,6 +2,7 @@
 // Spike surface for the level-of-detail client renderer over the binary contract.
 // Stateless — the link is the spec, like /provenance.
 import OncoprintLab from "./OncoprintLab.tsx";
+import { PageTools } from "../_agent/PageTools.tsx";
 
 export const metadata = { title: "Oncoprint lab — cbio-lab" };
 export const instant = false;
@@ -39,6 +40,7 @@ export default async function OncoprintLabPage({ searchParams }: { searchParams:
         <a href="/oncoprint-lab/cli" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>command line →</a>
         <a href="/oncoprint-lab/python" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>python notebook →</a>
         <a href="/lab" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>analysis →</a>
+        <PageTools kind="oncoprint-lab" spec={spec} />
       </header>
       <main>
         <p className="meta" style={{ margin: "0 0 0.6rem" }}>
