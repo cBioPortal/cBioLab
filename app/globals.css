@@ -122,6 +122,20 @@ pre {
 .note { font-size: var(--t-sm); color: var(--muted); margin-top: 0.5rem; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
 @media (max-width: 880px) { .two-col { grid-template-columns: 1fr; } }
+/* Explore: one facet (or gene table, or study breakdown) per tile, packed as many to a
+   row as fit — the portal's own study-view density, instead of a couple of full-width
+   columns each stacking every facet vertically. `auto-fill` + a fixed min width is what
+   makes it collapse to one column on a phone without a media query: below ~280px+gap
+   there is only room for one track. Each tile keeps its own `.card` look; `.vallist`
+   already caps its own height and scrolls (see its own comment), so a tile's height is
+   set by its shortest content, not by whichever facet happens to have the most values. */
+.facetgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.8rem; align-items: start; }
+.facetgrid > .card { margin-bottom: 0; min-width: 0; }
+/* Studies, data types and the three gene tables are dense multi-column rows (see
+   .sbrow/.generow's own grid-template-columns) that read as cramped at one tile's
+   width — matching the portal's own wider tiles for these same tables. */
+.facetgrid > .card.wide { grid-column: span 2; }
+@media (max-width: 620px) { .facetgrid > .card.wide { grid-column: span 1; } }
 .chk { display: flex; gap: 0.4rem; align-items: center; }
 .chk input { width: auto; }
 .qdesc {
@@ -330,7 +344,10 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .sbrow .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 
 /* Explore: gene tables (Mutated / CNA / SV) — portal-equivalent */
-.generows { display: flex; flex-direction: column; }
+/* Caps a gene table tile's height the same way .vallist already caps a clinical one's —
+   "show more" still works, it just fills this same scrolling area instead of growing
+   the tile past its neighbors every click. */
+.generows { display: flex; flex-direction: column; max-height: 20rem; overflow-y: auto; overscroll-behavior: contain; }
 .generow {
   display: grid;
   /* gene · coverage split · events|cytoband · CNA tag · freq · altered/profiled */
@@ -710,16 +727,52 @@ details.gearmenu.inline[open] > summary {
 
 /* Name-a-cohort dialog. Native <dialog>, so Esc, focus trapping and the
    backdrop are the platform's rather than ours. */
-.namedialog, .genedialog, .docdialog, .exportdialog {
+.namedialog, .genedialog, .docdialog, .exportdialog, .addchartdialog {
   border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card);
   color: var(--ink); padding: 1rem 1.1rem; min-width: 20rem; max-width: 26rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
 }
-.namedialog::backdrop, .genedialog::backdrop, .docdialog::backdrop, .exportdialog::backdrop { background: rgba(0, 0, 0, 0.32); }
-.namedialog h3, .genedialog h3, .docdialog h3, .exportdialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
+.namedialog::backdrop, .genedialog::backdrop, .docdialog::backdrop, .exportdialog::backdrop, .addchartdialog::backdrop { background: rgba(0, 0, 0, 0.32); }
+.namedialog h3, .genedialog h3, .docdialog h3, .exportdialog h3, .addchartdialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
 /* The document's JSON, run/clear controls and generated SQL — wide enough for
    both, and tall enough to scroll internally rather than push past the viewport. */
 .docdialog { width: min(90vw, 48rem); max-width: 48rem; max-height: 85vh; overflow: auto; }
+/* Explore's "+ Add chart": one tab per filter kind (clinical/gene/derived-timeline),
+   each of which used to be its own permanent card above the facet grid. Most of the
+   screen on purpose — a checkbox list of 60+ clinical attributes and the custom
+   sequence builder's several setrows both want real width to breathe, not a
+   form-sized dialog forcing everything into one cramped column. */
+.addchartdialog { width: 94vw; max-width: 94vw; height: 90vh; max-height: 90vh; overflow: auto; }
+.addchartdialog .tabs { margin-bottom: 0.8rem; }
+/* The custom sequence builder's setrows, inline in the Derived tab rather than
+   behind their own nested dropdown — same row shape .gearmenu-items gives a
+   popover's setrows, scoped to this dialog instead of a details>summary. */
+.addchartdialog .setrow { display: flex; align-items: center; gap: 0.4rem; font-size: var(--t-sm); padding: 0.15rem 0; }
+.addchartdialog .setrow > .meta { min-width: 5.2rem; color: var(--muted); flex: none; }
+.addchartdialog .setrow select { flex: 1; min-width: 0; }
+.addchartdialog hr { border: none; border-top: 1px solid var(--line); margin: 0.5rem 0; }
+/* The dialog itself is huge on purpose, but a <select> or button stretched to
+   94vw wide reads as broken, not spacious — cap the form's own width the same
+   way .gearmenu-items.wide used to, independent of the dialog around it. */
+.customseq { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.8rem; padding-top: 0.6rem;
+  border-top: 1px solid var(--line); max-width: 34rem; }
+.customseq h4 { margin: 0 0 0.2rem; font-size: var(--t-md); font-weight: 600; }
+/* The clinical attribute checklist: a plain single-column table, not tiled into
+   several columns — multi-column checkboxes read as disorienting (which row
+   continues where?), where a table's one reading order and aligned columns don't.
+   Scrolls within its own box rather than growing the dialog to fit 60+ rows. */
+.attrtablewrap { max-height: 52vh; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: var(--r-md); margin-top: 0.6rem; }
+.attrtable { width: 100%; border-collapse: collapse; font-size: var(--t-md); }
+.attrtable thead th {
+  position: sticky; top: 0; z-index: 1; background: var(--card); text-align: left;
+  padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line);
+  font-size: var(--t-xs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
+}
+.attrtable tbody tr { border-top: 1px solid var(--line); cursor: pointer; }
+.attrtable tbody tr:first-child { border-top: none; }
+.attrtable tbody tr:hover { background: var(--code-bg); }
+.attrtable td { padding: 0.3rem 0.6rem; }
+.attrtable td.meta { white-space: nowrap; }
 .namedialog .meta { display: block; margin-bottom: 0.6rem; }
 .namedialog input { width: 100%; box-sizing: border-box; }
 .genedialog { min-width: 24rem; max-width: 30rem; }

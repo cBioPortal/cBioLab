@@ -16,7 +16,7 @@ import { VIEW_HELP } from "../../lib/view-help.ts";
 import { installLabTools, LAB_TOOL_NAMES, type LabBridge } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 
-const TABS = ["explore", "cohorts", "saved", "analysis", "examples"] as const;
+const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -56,6 +56,12 @@ const PIE_ATTRIBUTES = new Set([
   "OS_STATUS", "DFS_STATUS", "DSS_STATUS", "PFS_STATUS", "RFS_STATUS",
   "SAMPLE_TYPE", "SOMATIC_STATUS"
 ]);
+
+/** Explore's "Derived" card (data-shape facets: follow-up, history, distinct altered
+ *  genes) is hidden for now, at the user's request — flip back on rather than delete
+ *  the render, since the underlying facets/logic are unaffected. */
+const SHOW_DERIVED_FACETS = false;
+
 
 /** p-values: exponent notation once fixed notation would round to zero, and an
  *  honest floor when the true value underflows double precision. Returns the
@@ -311,7 +317,11 @@ export default function AnalysisPage() {
   // ?doc= link's loading skeleton), so nothing here needs them to be reactive.
   const params = useSearchParams();
   const sp: SearchParams = Object.fromEntries(params.entries());
-  const [tab, setTab] = useState<"explore" | "cohorts" | "saved" | "analysis" | "examples">(() => tabFromParams(sp));
+  const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">(() => tabFromParams(sp));
+  /** The "Saved" tab's own sub-tabs (Cohorts / Analyses) — these used to be
+   *  two separate top-level tabs ("Cohorts" and "Saved") with a cross-link
+   *  between them ("manage on the Saved tab"); one tab, two sub-tabs instead. */
+  const [cohortsSubTab, setCohortsSubTab] = useState<"cohorts" | "analyses">("cohorts");
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   const [copied, setCopied] = useState<string | null>(null);
   const [exMsg, setExMsg] = useState<string | null>(null);
@@ -319,6 +329,10 @@ export default function AnalysisPage() {
   const [genesFor, setGenesFor] = useState<number | null>(null);
   const genesDialog = useRef<HTMLDialogElement | null>(null);
   const saveDialog = useRef<HTMLDialogElement | null>(null);   // Explore action-bar feedback
+  /** Explore's "+ Add chart": clinical/gene/derived-timeline filter builders live
+   *  here instead of as three permanent cards above the facet grid. */
+  const addChartDialog = useRef<HTMLDialogElement | null>(null);
+  const [chartTab, setChartTab] = useState<"clinical" | "gene" | "derived">("clinical");
   const tabRef = useRef<string>(tabFromParams(sp));            // the tab syncUrl should record
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
   const exAbort = useRef<AbortController | null>(null);      // cancel a facet request the reader has moved past
@@ -348,7 +362,6 @@ export default function AnalysisPage() {
   /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
   const menuOpenRef = useRef(new Map<string, boolean>());
   const moreDerivedMenu = useGearmenuOpen("explore:more-derivations", menuOpenRef.current);
-  const seqFilterMenu = useGearmenuOpen("explore:sequence-filter", menuOpenRef.current);
   const keyFor = (v: object): number => {
     let k = viewKeys.current.get(v);
     if (k == null) { k = nextViewKey.current++; viewKeys.current.set(v, k); }
@@ -395,8 +408,6 @@ export default function AnalysisPage() {
   const [saved, setSaved] = useState<Record<string, { id: string; def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null }>>({});
   const [cName, setCName] = useState("");
   const [cDefText, setCDefText] = useState(JSON.stringify({ studies: [...DEFAULT_EXPLORE_STUDIES], all: [] }, null, 2));
-  const [cPreview, setCPreview] = useState<{ error?: string; count?: number; text?: string } | null>(null);
-  const [cBusy, setCBusy] = useState(false);
   const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
   const [studies, setStudies] = useState<{ id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string }[]>([]);
   const [study, setStudy] = useState("msk_chord_2024");
@@ -428,11 +439,7 @@ export default function AnalysisPage() {
    * click. Keyed by `per|attribute` to match the `data-attr` the DOM uses.
    */
   const attrOrderRef = useRef<string[] | null>(null);
-  const [qaAttr, setQaAttr] = useState("");                             // creator quick-add: attribute
-  const [qaVal, setQaVal] = useState("");                               // creator quick-add: numeric threshold
-  const [qaGene, setQaGene] = useState("");                             // creator quick-add: gene
   const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
-  const [attrLimit, setAttrLimit] = useState(20);
   /**
    * Minimum share of the selected studies an attribute must appear in to be
    * shown. Across 64 studies the union of vocabularies is 1,634 facets, and the
@@ -461,7 +468,11 @@ export default function AnalysisPage() {
   /** the header lists selected studies as chips; past a handful it is summarised */
   const [studyChipsOpen, setStudyChipsOpen] = useState(false);
   const [geneFilter, setGeneFilter] = useState<Record<string, string>>({});   // per-table gene box, client-side
-  const [clinFilter, setClinFilter] = useState("");                            // matches an attribute name OR one of its values
+  const [clinFilter, setClinFilter] = useState("");                            // narrows the attribute checklist in "+ Add chart", not the grid itself
+  /** attributes unchecked in the "+ Add chart" > Clinical picker — keyed "per|attribute",
+   *  matching data-attr. Empty means every attribute shows, the same default as before
+   *  there was a picker at all. */
+  const [hiddenAttrs, setHiddenAttrs] = useState<Set<string>>(new Set());
   const [attrCoverage, setAttrCoverage] = useState(0);                       // clinical attributes shown
   /**
    * The "sequence / line filter" popover's draft — an A/[B] pair plus a
@@ -700,26 +711,6 @@ export default function AnalysisPage() {
     if (j.error) throw new Error(j.error);
     const c = Object.values(j.cohorts)[0] as { count: number; text: string };
     return { count: c.count, text: c.text };
-  };
-
-  const previewCohort = async () => {
-    setCBusy(true); setCPreview(null);
-    try {
-      const def = JSON.parse(cDefText);
-      const ev = await evalDef(cName, def);
-      setCPreview(ev);
-      return { def, ev };
-    } catch (e) { setCPreview({ error: String((e as Error)?.message || e) }); return null; }
-    finally { setCBusy(false); }
-  };
-
-  const saveCohort = async () => {
-    const name = cName.trim();
-    if (!name) { setCPreview({ error: "give the cohort a name" }); return; }
-    const r = await previewCohort();
-    if (!r) return;
-    try { await persist(name, r.def, r.ev); }
-    catch (e) { setCPreview({ error: "could not save: " + String((e as Error)?.message || e) }); }
   };
 
   /** Explore's top action bar: acting on the draft you have built by clicking facets. */
@@ -1010,27 +1001,24 @@ export default function AnalysisPage() {
 
   const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
 
-  /** attributes meeting a coverage bar, from the last unnarrowed response */
+  /** "per|attribute", matching data-attr — the one key format every attribute lookup here uses */
+  const attrKey = (c: { per: string; attribute: string }) => c.per + "|" + c.attribute;
+
   /**
    * Which clinical facets are on screen. ONE definition, because this was two
    * copies — one computing the header's count, one filtering the render — and
    * they disagreed the moment a search box was added: the header read
    * "8 attributes" while all 20 were still drawn.
    *
-   * The search matches an attribute's name AND the values inside it, so "lung"
-   * finds Cancer Type by its contents when the reader does not know the
-   * attribute's name. With 805 values in Cancer Type Detailed, scanning was the
-   * weakest part of this page next to the portal's per-chart search.
+   * Coverage (carried by enough of the selected studies) and the reader's own
+   * checklist (hiddenAttrs, set from "+ Add chart" > Clinical) are both "is this
+   * attribute allowed to show" concerns, so both live here; clinFilter is a
+   * different thing now — it narrows the CHECKLIST's own rows, not this.
    */
-  const visibleClinical = (list: { attribute: string; displayName?: string; kind: string; studyCount?: number; values?: { v: string }[] }[]): typeof list => {
-    const q = clinFilter.trim().toLowerCase();
+  const visibleClinical = (list: { attribute: string; per: string; studyCount?: number }[]): typeof list => {
     const coverageOk = (c: { studyCount?: number }) =>
       attrCoverage === 0 || (c.studyCount ?? 1) >= Math.ceil(attrCoverage * exStudies.length);
-    const textOk = (c: { attribute: string; displayName?: string; kind: string; values?: { v: string }[] }) => !q ||
-      (c.attribute || "").toLowerCase().includes(q) ||
-      (c.displayName || "").toLowerCase().includes(q) ||
-      (c.kind === "cat" && (c.values || []).some((v) => String(v.v).toLowerCase().includes(q)));
-    return list.filter((c) => coverageOk(c) && textOk(c));
+    return list.filter((c) => coverageOk(c) && !hiddenAttrs.has(attrKey(c)));
   };
 
   const attrsForBar = (bar: number, studiesOverride?: string[] | string): string[] => {
@@ -2633,8 +2621,7 @@ function Latency({ v }: { v: any }) {
         </dialog>
         <div className="tabs">
           <button className={tab === "explore" ? "active" : ""} onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
-          <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Cohorts</button>
-          <button className={tab === "saved" ? "active" : ""} onClick={() => goTab("saved")}>Saved</button>
+          <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Saved</button>
           <button className={tab === "analysis" ? "active" : ""} onClick={() => goTab("analysis")}>Analysis</button>
           <button className={tab === "examples" ? "active" : ""} onClick={() => goTab("examples")}>Examples</button>
         </div>
@@ -2642,69 +2629,6 @@ function Latency({ v }: { v: any }) {
 
         {/* ================= Explore tab ================= */}
         {tab === "explore" && <div>
-          {(() => {
-            // Acting on the draft is the point of this page, so the actions live at
-            // the top and stay there while you scroll the facets that build it.
-            const d = parseDraft();
-            const clauses = d && Array.isArray(d.all) ? d.all.length : 0;
-            const ready = exStudies.length > 0;      // a study alone is enough to analyse
-            return (
-              <div className="card exbar">
-                <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <strong style={{ fontSize: "var(--t-md)" }}>
-                    {!ready ? "No studies selected"
-                      : clauses ? clauses + (clauses === 1 ? " filter" : " filters")
-                      : "No filters"}
-                  </strong>
-                  <span className="meta">
-                    {!ready ? "— pick a study below"
-                      : clauses
-                        ? (explore && explore.draftCount != null
-                            ? "· " + explore.draftCount.toLocaleString() + " patients match"
-                            : "· counting…")
-                        : "· every patient in " + (exStudies.length === 1 ? exStudies[0] : exStudies.length + " selected studies") +
-                          (explore?.totals ? " (" + explore.totals.patients.toLocaleString() + ")" : "")}
-                  </span>
-                  {exploreBusy && <span className="spinner" />}
-                  <span className="spacer" />
-                  <button className="primary" onClick={analyzeDraft} disabled={!ready}
-                    title={ready ? "start a fresh analysis of this cohort (replaces the current document)" : "select a study first"}>
-                    Analyze
-                  </button>
-                  <span className="meta">or</span>
-                  {/* Naming is asked for on demand rather than sitting in the bar:
-                      Analyze needs no name, so a permanent field implied one was
-                      required for both. */}
-                  <button onClick={openSaveDialog} disabled={!ready}
-                    title={ready ? "keep this definition in the Cohorts tab without running anything" : "select a study first"}>
-                    Save as a Cohort
-                  </button>
-                  {clauses > 0 && <button className="linklike" onClick={clearDraft}>clear</button>}
-                </div>
-                {clauses > 0 && (
-                  <div className="row" style={{ marginTop: "0.4rem" }}>
-                    {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} />; })()}
-                  </div>
-                )}
-                {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
-                {/* A native <dialog> so Esc, focus trapping and the backdrop come
-                    from the platform rather than being re-implemented. */}
-                <dialog ref={saveDialog} className="namedialog savedialog"
-                  onClose={() => setSaveName("")}
-                  onClick={e => { if (e.target === saveDialog.current) saveDialog.current?.close(); }}>
-                  <form method="dialog" onSubmit={e => { e.preventDefault(); confirmSave(); }}>
-                    <h3>Save as a cohort</h3>
-                    <p className="meta">{clauses ? clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies") : "every patient in " + (exStudies.length === 1 ? exStudies[0] : exStudies.length + " selected studies")}</p>
-                    <DraftText key={draftGen} draft={saveDraft} initial={saveName} onFilled={setDraftFilled} autoFocus placeholder="cohort name…" />
-                    <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
-                      <button type="button" className="linklike" onClick={() => saveDialog.current?.close()}>cancel</button>
-                      <button className="primary" type="submit" disabled={!draftFilled}>Save</button>
-                    </div>
-                  </form>
-                </dialog>
-              </div>
-            );
-          })()}
           {(() => {
             const CAP_FILTERS: [string, string, (s: any) => boolean][] = [
               ["timeline", "timeline events", (s: any) => s.timelinePatients > 0],
@@ -2716,6 +2640,7 @@ function Latency({ v }: { v: any }) {
             ];
             const byId = new Map(studies.map((s) => [s.id, s] as const));
             const selPts = exStudies.reduce((n: number, id: string) => n + (byId.get(id)?.patients ?? 0), 0);
+            const ready = exStudies.length > 0;      // a study alone is enough to analyse
             // Two toggles on purpose. The chips in the header are an edit to a
             // selection the reader has already committed, so they apply at once.
             // The checkboxes below are them composing a new one, so they stage.
@@ -2781,6 +2706,10 @@ function Latency({ v }: { v: any }) {
                     );
                   })()}
                   <span className="spacer" />
+                  <button className="primary" onClick={analyzeDraft} disabled={!ready}
+                    title={ready ? "start a fresh analysis of this cohort (replaces the current document)" : "select a study first"}>
+                    Analyze
+                  </button>
                   <button onClick={() => {
                     if (exPanelOpen) { setExDraftStudies(null); setExPanelOpen(false); }   // close discards
                     else { setExDraftStudies(exStudies); setExPanelOpen(true); }           // open seeds
@@ -2849,6 +2778,56 @@ function Latency({ v }: { v: any }) {
               </div>
             );
           })()}
+          {/* Underneath study selection, and only present once there's something to
+              show — Analyze lives in the studies card above regardless of whether any
+              filters exist, so this block's whole job now is the filters themselves. */}
+          {(() => {
+            const d = parseDraft();
+            const clauses = d && Array.isArray(d.all) ? d.all.length : 0;
+            if (!clauses) return null;
+            const ready = exStudies.length > 0;
+            return (
+              <div className="card exbar">
+                <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <strong style={{ fontSize: "var(--t-md)" }}>{clauses + (clauses === 1 ? " filter" : " filters")}</strong>
+                  <span className="meta">
+                    {explore && explore.draftCount != null
+                      ? "· " + explore.draftCount.toLocaleString() + " patients match"
+                      : "· counting…"}
+                  </span>
+                  {exploreBusy && <span className="spinner" />}
+                  <span className="spacer" />
+                  {/* Naming is asked for on demand rather than sitting in the bar:
+                      Analyze needs no name, so a permanent field implied one was
+                      required for both. */}
+                  <button onClick={openSaveDialog} disabled={!ready}
+                    title={ready ? "keep this definition on the Saved tab without running anything" : "select a study first"}>
+                    Save as a Cohort
+                  </button>
+                  <button className="linklike" onClick={clearDraft}>clear</button>
+                </div>
+                <div className="row" style={{ marginTop: "0.4rem" }}>
+                  {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} />; })()}
+                </div>
+                {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
+                {/* A native <dialog> so Esc, focus trapping and the backdrop come
+                    from the platform rather than being re-implemented. */}
+                <dialog ref={saveDialog} className="namedialog savedialog"
+                  onClose={() => setSaveName("")}
+                  onClick={e => { if (e.target === saveDialog.current) saveDialog.current?.close(); }}>
+                  <form method="dialog" onSubmit={e => { e.preventDefault(); confirmSave(); }}>
+                    <h3>Save as a cohort</h3>
+                    <p className="meta">{clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies")}</p>
+                    <DraftText key={draftGen} draft={saveDraft} initial={saveName} onFilled={setDraftFilled} autoFocus placeholder="cohort name…" />
+                    <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
+                      <button type="button" className="linklike" onClick={() => saveDialog.current?.close()}>cancel</button>
+                      <button className="primary" type="submit" disabled={!draftFilled}>Save</button>
+                    </div>
+                  </form>
+                </dialog>
+              </div>
+            );
+          })()}
           {/* A facet click starts a recount, and a second click before it lands
               would race it — so the facets themselves greyscale until it does.
               The study picker above stays live: choosing studies is a staged,
@@ -2857,78 +2836,240 @@ function Latency({ v }: { v: any }) {
           {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "var(--t-md)", margin: 0 }}>
             No studies selected — check one or more above to explore.</p></div>}
           {!explore && exStudies.length > 0 && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
-          {/* Per-gene alteration facets — the portal's "EGFR: Somatic mutations"
-              and "EGFR: Copy-number alterations". Filterable, and counted in
-              PATIENTS because that is the unit a click selects in; the gene
-              tables on the right count samples and say so. */}
+          {/* Clinical/gene-status/derived-timeline filter builders used to sit here as
+              three permanent cards, pushing the facet grid below the fold before you'd
+              touched any of them. One button, one modal with a tab per kind instead. */}
           {explore && (
-            <div className="card">
-              <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
-                <h2 style={{ margin: 0 }}>Gene status <span className="plain">— alteration state per gene, click to filter</span></h2>
-                <span className="spacer" />
-                <input className="genesearch" type="search" placeholder="chart a gene (e.g. EGFR)"
-                  value={geneChartInput} disabled={exploreBusy}
-                  onChange={e => setGeneChartInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") chartGene(geneChartInput); }} />
-                <button disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}>add</button>
-              </div>
-              {!geneCharts.length && (
-                <p className="note" style={{ margin: "0.4rem 0 0" }}>
-                  Name a gene to see how many patients are altered, unaltered, or <strong>never tested</strong> for
-                  it. The third is the one a frequency cannot show: in GENIE public, 86,353 patients are on no panel
-                  covering EGFR copy number.
-                </p>
-              )}
-              {geneCharts.map(g => (
-                <span key={g} className="qchip" style={{ marginRight: "0.3rem" }}>
-                  {g}
-                  <button className="linklike" style={{ marginLeft: "0.3rem" }} title={"stop charting " + g}
-                    onClick={() => unchartGene(g)}>×</button>
-                </span>
-              ))}
-              {(explore.geneFacets || []).map(f => {
-                const max = Math.max(...f.states.map(x => x.n), 1);
-                return (
-                  <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type}
-                    style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0", marginTop: "0.4rem" }}>
-                    <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}>
-                      {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
-                      <span className="meta"> · patient-level · {f.total.toLocaleString()} patients</span>
-                    </div>
-                    <div className="vallist">
-                      {f.states.map(st => (
-                        <button key={st.state} className="valrow"
-                          title={st.label + " — " + st.n.toLocaleString() + " patients (click to filter)"}
-                          onClick={() => addClauses(geneStateClauses(f.gene, f.type, st.state))}>
-                          <span className="vname" style={st.state === "notProfiled" ? { color: "var(--muted)" } : undefined}>
-                            {st.label}
-                          </span>
-                          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * st.n / max)) + "%" }} /></span>
-                          <span className="vn">{st.n.toLocaleString()}</span>
-                          <span className="vpct">{f.total ? (Math.round(1000 * st.n / f.total) / 10) + "%" : ""}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {f.overlap ? (
-                      <p className="note" style={{ margin: "0.25rem 0 0" }}>
-                        {f.overlap.toLocaleString()} patient{f.overlap === 1 ? " is" : "s are"} counted in both
-                        Amplified and Deleted — amplified in one sample, deleted in another — so these rows
-                        over-sum the cohort by that much.
-                      </p>
-                    ) : null}
-                    {f.alteredUnprofiled ? (
-                      <p className="note" style={{ margin: "0.25rem 0 0" }}>
-                        {f.alteredUnprofiled.toLocaleString()} patient{f.alteredUnprofiled === 1 ? " has" : "s have"} a
-                        call for {f.gene} but sit on no panel covering it — a contradiction in the source data. They are
-                        counted as not profiled.
-                      </p>
-                    ) : null}
-                  </div>
-                );
-              })}
+            <div className="row" style={{ marginBottom: "1rem" }}>
+              <button className="tbbtn" onClick={() => addChartDialog.current?.showModal()}>+ Add chart</button>
+              {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
             </div>
           )}
-          {explore && explore.derived && explore.derived.length > 0 && (
+          {explore && (
+            <dialog ref={addChartDialog} className="addchartdialog"
+              onClick={e => { if (e.target === addChartDialog.current) addChartDialog.current?.close(); }}>
+              <h3>Add chart</h3>
+              <div className="tabs">
+                <button className={chartTab === "clinical" ? "active" : ""} onClick={() => setChartTab("clinical")}>Clinical</button>
+                <button className={chartTab === "gene" ? "active" : ""} onClick={() => setChartTab("gene")}>Gene status</button>
+                <button className={chartTab === "derived" ? "active" : ""} onClick={() => setChartTab("derived")}>Derived timeline filters</button>
+              </div>
+              {chartTab === "clinical" && (() => {
+                const q = clinFilter.trim().toLowerCase();
+                const rows = !q ? explore.clinical : explore.clinical.filter((c) =>
+                  (c.attribute || "").toLowerCase().includes(q) || (c.displayName || "").toLowerCase().includes(q));
+                const shownCount = visibleClinical(explore.clinical as never).length;
+                return (
+                  <div>
+                    <p className="note" style={{ marginTop: 0 }}>
+                      Check an attribute to draw it as a tile in the facet grid below; uncheck to hide
+                      it. The search here only narrows this list — it doesn't touch the grid itself.
+                      {exStudies.length > 1 && <> An attribute marked <b>*</b> isn't carried by every
+                      selected study — hover it for which share of the {exStudies.length} do.</>}
+                    </p>
+                    <div className="row" style={{ alignItems: "baseline" }}>
+                      <input className="genesearch" type="search" placeholder="find an attribute" value={clinFilter}
+                        title="narrows this checklist by attribute name" autoFocus
+                        onChange={e => setClinFilter(e.target.value)} />
+                      <span className="meta">{shownCount} of {explore.clinical.length} checked</span>
+                      <button className="linklike" onClick={() => setHiddenAttrs(new Set())}>check all</button>
+                      <button className="linklike" onClick={() => setHiddenAttrs(new Set(explore.clinical.map(attrKey)))}>check none</button>
+                      {exStudies.length > 1 && (
+                        <select value={String(attrCoverage)} disabled={exploreBusy}
+                          title="attributes carried by only one study are that study's own vocabulary, not something the selection shares"
+                          onChange={e => {
+                            const v = Number(e.target.value);
+                            setAttrCoverage(v);
+                            // Refetch UNNARROWED so the bar can be lowered again
+                            // later; the filtering below is what the reader sees,
+                            // and subsequent fetches narrow the server's work.
+                            setTimeout(() => fetchExplore(undefined, undefined, []), 0);
+                          }}>
+                          <option value="0">every attribute</option>
+                          <option value="0.5">in most studies</option>
+                          <option value="1">in every study</option>
+                        </select>
+                      )}
+                    </div>
+                    {!rows.length && <p className="note">No attribute matches “{clinFilter}”.</p>}
+                    <div className="attrtablewrap">
+                      <table className="attrtable">
+                        <thead>
+                          <tr><th></th><th>Attribute</th><th>Type</th><th>Level</th></tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((c) => {
+                            const toggle = () => setHiddenAttrs(prev => {
+                              const next = new Set(prev);
+                              if (next.has(attrKey(c))) next.delete(attrKey(c)); else next.add(attrKey(c));
+                              return next;
+                            });
+                            // Shown regardless — the checklist is the union across the
+                            // selection (see visibleClinical's own comment) — but an
+                            // attribute only SOME of the selected studies actually carry
+                            // reads as universal without this, so mark it rather than
+                            // leave the reader to discover the gap study by study.
+                            const partial = exStudies.length > 1 && (c.studyCount ?? 1) < exStudies.length;
+                            return (
+                              <tr key={attrKey(c)} onClick={(e) => { if ((e.target as HTMLElement).tagName !== "INPUT") toggle(); }}>
+                                <td><input type="checkbox" checked={!hiddenAttrs.has(attrKey(c))} onChange={toggle} /></td>
+                                <td>
+                                  {c.displayName || c.attribute}
+                                  {partial && (
+                                    <span className="meta" title={"carried by " + (c.studyCount ?? 1) + " of " + exStudies.length + " selected studies, not all of them"}> *</span>
+                                  )}
+                                </td>
+                                <td className="meta">{c.kind === "num" ? "numeric" : "categorical"}</td>
+                                <td className="meta">{c.per === "sample" ? "sample" : "patient"}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+              {chartTab === "gene" && (
+                <div>
+                  <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
+                    <input className="genesearch" type="search" placeholder="chart a gene (e.g. EGFR)" autoFocus
+                      value={geneChartInput} disabled={exploreBusy}
+                      onChange={e => setGeneChartInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") chartGene(geneChartInput); }} />
+                    <button disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}>add</button>
+                  </div>
+                  {!geneCharts.length && (
+                    <p className="note" style={{ margin: "0.4rem 0 0" }}>
+                      Name a gene to see how many patients are altered, unaltered, or <strong>never tested</strong> for
+                      it. The third is the one a frequency cannot show: in GENIE public, 86,353 patients are on no panel
+                      covering EGFR copy number.
+                    </p>
+                  )}
+                  {geneCharts.map(g => (
+                    <span key={g} className="qchip" style={{ marginRight: "0.3rem" }}>
+                      {g}
+                      <button className="linklike" style={{ marginLeft: "0.3rem" }} title={"stop charting " + g}
+                        onClick={() => unchartGene(g)}>×</button>
+                    </span>
+                  ))}
+                  {geneCharts.length > 0 && (
+                    <p className="note" style={{ margin: "0.4rem 0 0" }}>
+                      Each charted gene's mutation and copy-number status is drawn as its own tile in the
+                      facet grid, alongside the clinical attributes — close this dialog to see them.
+                    </p>
+                  )}
+                </div>
+              )}
+              {chartTab === "derived" && (explore.events.length === 0 ? (
+                <p className="note" style={{ marginTop: 0 }}>This study has no clinical timeline events to derive a filter from.</p>
+              ) : (() => {
+                const tx = treatmentEventType();
+                return (
+                  <div>
+                    <div className="customseq">
+                      <h4>Custom sequence filter</h4>
+                      <p className="note" style={{ margin: "0 0 0.2rem" }}>
+                        Build any A/B temporal relationship — followed-by, during, not-followed-by —
+                        with a duration constraint, from this study's own timeline.
+                      </p>
+                        <div className="setrow">
+                          <span className="meta">event</span>
+                          <select value={seq.aType} onChange={e => setSeq(s => ({ ...s, aType: e.target.value }))}>
+                            <option value="">choose…</option>
+                            {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
+                            {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
+                              <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
+                            ))}
+                          </select>
+                          {seq.aType === LINE_TYPE ? (
+                            <>
+                              <select value={seq.aLineOp} onChange={e => setSeq(s => ({ ...s, aLineOp: e.target.value as any }))}>
+                                <option value="=">line #</option>
+                                <option value=">=">line ≥</option>
+                                <option value="<=">line ≤</option>
+                              </select>
+                              <input type="number" min={1} placeholder="n" value={seq.aLineNo}
+                                onChange={e => setSeq(s => ({ ...s, aLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
+                            </>
+                          ) : seq.aType && (
+                            <select value={seq.aOcc} onChange={e => setSeq(s => ({ ...s, aOcc: e.target.value as any }))}>
+                              <option value="ANY">any occurrence</option>
+                              <option value="FIRST">first</option>
+                              <option value="LAST">last</option>
+                            </select>
+                          )}
+                        </div>
+                        <div className="setrow">
+                          <span className="meta">relationship</span>
+                          <select value={seq.rel} onChange={e => setSeq(s => ({ ...s, rel: e.target.value as any }))}>
+                            <option value="NONE">just has this event</option>
+                            <option value="BEFORE">→ followed by, within</option>
+                            <option value="DURING">happens during</option>
+                            <option value="NOT_FOLLOWED_BY">not followed by, within</option>
+                          </select>
+                          {(seq.rel === "BEFORE" || seq.rel === "NOT_FOLLOWED_BY") && (
+                            <>
+                              <input type="number" min={1} value={seq.days}
+                                onChange={e => setSeq(s => ({ ...s, days: e.target.value }))} style={{ width: "4rem" }} />
+                              <span className="meta">days</span>
+                            </>
+                          )}
+                        </div>
+                        {seq.rel !== "NONE" && (
+                          <div className="setrow">
+                            <span className="meta">{seq.rel === "DURING" ? "during" : "second event"}</span>
+                            <select value={seq.bType} onChange={e => setSeq(s => ({ ...s, bType: e.target.value }))}>
+                              <option value="">choose…</option>
+                              {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
+                              {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
+                                <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
+                              ))}
+                            </select>
+                            {seq.bType === LINE_TYPE ? (
+                              <>
+                                <select value={seq.bLineOp} onChange={e => setSeq(s => ({ ...s, bLineOp: e.target.value as any }))}>
+                                  <option value="=">line #</option>
+                                  <option value=">=">line ≥</option>
+                                  <option value="<=">line ≤</option>
+                                </select>
+                                <input type="number" min={1} placeholder="n" value={seq.bLineNo}
+                                  onChange={e => setSeq(s => ({ ...s, bLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
+                              </>
+                            ) : seq.bType && (
+                              <select value={seq.bOcc} onChange={e => setSeq(s => ({ ...s, bOcc: e.target.value as any }))}>
+                                <option value="ANY">any occurrence</option>
+                                <option value="FIRST">first</option>
+                                <option value="LAST">last</option>
+                              </select>
+                            )}
+                          </div>
+                        )}
+                        {(seq.aType === LINE_TYPE || seq.bType === LINE_TYPE) && (
+                          <div className="setrow">
+                            <span className="meta">new line after</span>
+                            <select value={String(seq.lineGap)} onChange={e => setSeq(s => ({ ...s, lineGap: Number(e.target.value) }))}>
+                              {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
+                            </select>
+                          </div>
+                        )}
+                        <label className="chk" title="restricts the first event to patients with no treatment recorded before it">
+                          <input type="checkbox" checked={seq.priorGuard}
+                            onChange={e => setSeq(s => ({ ...s, priorGuard: e.target.checked }))} />
+                          treatment-naive before the first event
+                        </label>
+                        <hr />
+                        <button className="facet" disabled={!seqReady} onClick={addSeqFilter}>add filter</button>
+                    </div>
+                  </div>
+                );
+              })())}
+              <div className="row" style={{ marginTop: "1rem", justifyContent: "flex-end" }}>
+                <button className="primary" onClick={() => addChartDialog.current?.close()}>Done</button>
+              </div>
+            </dialog>
+          )}
+          {SHOW_DERIVED_FACETS && explore && explore.derived && explore.derived.length > 0 && (
             <div className="card">
               <div className="row" style={{ alignItems: "baseline" }}>
                 <h2 style={{ margin: 0 }}>Derived <span className="plain">— computed from the data's shape, so these mean the same thing in any study</span></h2>
@@ -2999,193 +3140,17 @@ function Latency({ v }: { v: any }) {
               </div>
             </div>
           )}
-          {explore && explore.events.length > 0 && (() => {
-            const tx = treatmentEventType();
-            const dr = parseDraft();
-            const leaves = ((dr && dr.all) || []);
-            const linesFacet = tx && explore.derived
-              ? explore.derived.find((d) => d.metric === "lines" && d.eventType === tx.label) : null;
-            const naiveFirst = (): any => tx && ({ kind: "event",
-              a: { eventType: tx.label, occurrence: "FIRST" }, rel: { type: "NONE" }, priorGuard: true });
-            const isNaiveFirst = tx && leaves.some((c: any) => c && c.kind === "event" &&
-              c.a?.eventType === tx.label && c.a?.occurrence === "FIRST" && c.priorGuard === true);
-            const isLineBucket = (b: { gte?: number; lt?: number }) => tx && leaves.some((c: any) => c && c.kind === "derived" &&
-              c.metric === "lines" && c.eventType === tx.label && (c.range || {}).gte === b.gte && (c.range || {}).lt === b.lt);
-            return (
-              <div className="card">
-                <div className="row" style={{ alignItems: "baseline" }}>
-                  <h2 style={{ margin: 0 }}>Derived timeline filters <span className="plain">— found from a sequence of events, not a single recorded fact</span></h2>
-                </div>
-                {!tx && (
-                  <p className="note" style={{ margin: "0.3rem 0" }}>This study records no treatment-like timeline events, so there is no generic "lines" example to offer — build a custom sequence below instead.</p>
-                )}
-                {tx && !linesFacet && (
-                  <p className="note" style={{ margin: "0.3rem 0" }}>computing this study's line-count breakdown…</p>
-                )}
-                {tx && linesFacet && (() => {
-                  const max = Math.max(...linesFacet.buckets.map((b) => b.n), 1);
-                  return (
-                    <div style={{ margin: "0.3rem 0" }}>
-                      <span className="meta">{linesFacet.label} <span title={linesFacet.note}>· {linesFacet.covered.toLocaleString()} patients</span></span>
-                      <div className="vallist">
-                        {linesFacet.buckets.map((b) => (
-                          <button key={b.label} className={isLineBucket(b) ? "valrow on" : "valrow"}
-                            title={linesFacet.note + " — click to filter"}
-                            onClick={() => addClause({ kind: "derived", metric: "lines", eventType: tx!.label, lineGap: linesFacet.lineGap,
-                              range: { ...(b.gte != null ? { gte: b.gte } : {}), ...(b.lt != null ? { lt: b.lt } : {}) } })}>
-                            <span className="vname">{b.label} line{b.label === "1" ? "" : "s"}</span>
-                            <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * b.n / max)) + "%" }} /></span>
-                            <span className="vn">{b.n.toLocaleString()}</span>
-                          </button>
-                        ))}
-                      </div>
-                      <button className={isNaiveFirst ? "facet on" : "facet"} style={{ marginTop: "0.4rem" }}
-                        title={"first '" + tx.label + "' event, with no treatment recorded before it — exact count shown once added"}
-                        onClick={() => addClause(naiveFirst())}>first '{tx.label}', treatment-naive</button>
-                    </div>
-                  );
-                })()}
-                <details className="gearmenu inline" ref={seqFilterMenu.ref} onToggle={seqFilterMenu.onToggle}>
-                  <summary title="build any A/B temporal relationship — followed-by, during, not-followed-by — with a duration constraint">custom…</summary>
-                  <div className="gearmenu-items wide">
-                    <span className="meta">one event, or two related in time — built from this study's own timeline</span>
-                    <div className="setrow">
-                      <span className="meta">event</span>
-                      <select value={seq.aType} onChange={e => setSeq(s => ({ ...s, aType: e.target.value }))}>
-                        <option value="">choose…</option>
-                        {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
-                        {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
-                          <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
-                        ))}
-                      </select>
-                      {seq.aType === LINE_TYPE ? (
-                        <>
-                          <select value={seq.aLineOp} onChange={e => setSeq(s => ({ ...s, aLineOp: e.target.value as any }))}>
-                            <option value="=">line #</option>
-                            <option value=">=">line ≥</option>
-                            <option value="<=">line ≤</option>
-                          </select>
-                          <input type="number" min={1} placeholder="n" value={seq.aLineNo}
-                            onChange={e => setSeq(s => ({ ...s, aLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
-                        </>
-                      ) : seq.aType && (
-                        <select value={seq.aOcc} onChange={e => setSeq(s => ({ ...s, aOcc: e.target.value as any }))}>
-                          <option value="ANY">any occurrence</option>
-                          <option value="FIRST">first</option>
-                          <option value="LAST">last</option>
-                        </select>
-                      )}
-                    </div>
-                    <div className="setrow">
-                      <span className="meta">relationship</span>
-                      <select value={seq.rel} onChange={e => setSeq(s => ({ ...s, rel: e.target.value as any }))}>
-                        <option value="NONE">just has this event</option>
-                        <option value="BEFORE">→ followed by, within</option>
-                        <option value="DURING">happens during</option>
-                        <option value="NOT_FOLLOWED_BY">not followed by, within</option>
-                      </select>
-                      {(seq.rel === "BEFORE" || seq.rel === "NOT_FOLLOWED_BY") && (
-                        <>
-                          <input type="number" min={1} value={seq.days}
-                            onChange={e => setSeq(s => ({ ...s, days: e.target.value }))} style={{ width: "4rem" }} />
-                          <span className="meta">days</span>
-                        </>
-                      )}
-                    </div>
-                    {seq.rel !== "NONE" && (
-                      <div className="setrow">
-                        <span className="meta">{seq.rel === "DURING" ? "during" : "second event"}</span>
-                        <select value={seq.bType} onChange={e => setSeq(s => ({ ...s, bType: e.target.value }))}>
-                          <option value="">choose…</option>
-                          {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
-                          {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
-                            <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
-                          ))}
-                        </select>
-                        {seq.bType === LINE_TYPE ? (
-                          <>
-                            <select value={seq.bLineOp} onChange={e => setSeq(s => ({ ...s, bLineOp: e.target.value as any }))}>
-                              <option value="=">line #</option>
-                              <option value=">=">line ≥</option>
-                              <option value="<=">line ≤</option>
-                            </select>
-                            <input type="number" min={1} placeholder="n" value={seq.bLineNo}
-                              onChange={e => setSeq(s => ({ ...s, bLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
-                          </>
-                        ) : seq.bType && (
-                          <select value={seq.bOcc} onChange={e => setSeq(s => ({ ...s, bOcc: e.target.value as any }))}>
-                            <option value="ANY">any occurrence</option>
-                            <option value="FIRST">first</option>
-                            <option value="LAST">last</option>
-                          </select>
-                        )}
-                      </div>
-                    )}
-                    {(seq.aType === LINE_TYPE || seq.bType === LINE_TYPE) && (
-                      <div className="setrow">
-                        <span className="meta">new line after</span>
-                        <select value={String(seq.lineGap)} onChange={e => setSeq(s => ({ ...s, lineGap: Number(e.target.value) }))}>
-                          {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
-                        </select>
-                      </div>
-                    )}
-                    <label className="chk" title="restricts the first event to patients with no treatment recorded before it">
-                      <input type="checkbox" checked={seq.priorGuard}
-                        onChange={e => setSeq(s => ({ ...s, priorGuard: e.target.checked }))} />
-                      treatment-naive before the first event
-                    </label>
-                    <hr />
-                    <button className="facet" disabled={!seqReady} onClick={addSeqFilter}>add filter</button>
-                  </div>
-                </details>
-              </div>
-            );
-          })()}
-          {explore && <div className="two-col" style={{ alignItems: "start" }}>
-            <div>
-              <div className="card">
-                {(() => {
-                  const visible = visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical;
-                  const shown = Math.min(visible.length, attrLimit);
-                  return (
-                    <div className="row" style={{ alignItems: "baseline" }}>
-                      <h2 style={{ margin: 0 }}>Clinical <span className="plain">— counted in each attribute's own unit, as the portal does</span></h2>
-                      <span className="spacer" />
-                      <input className="genesearch" type="search" placeholder="find attribute or value" value={clinFilter}
-                        title="matches an attribute's name or any of its values"
-                        onChange={e => setClinFilter(e.target.value)} />
-                      <span className="meta">{shown < visible.length
-                        ? "showing " + shown + " of " + visible.length + " attributes"
-                        : visible.length + " attributes"}
-                        {attrCoverage > 0 && visible.length < explore.clinical.length
-                          ? " (" + (explore.clinical.length - visible.length) + " hidden as study-specific)" : ""}</span>
-                      {exStudies.length > 1 && (
-                        <select value={String(attrCoverage)} disabled={exploreBusy}
-                          title="attributes carried by only one study are that study's own vocabulary, not something the selection shares"
-                          onChange={e => {
-                            const v = Number(e.target.value);
-                            setAttrCoverage(v);
-                            // Refetch UNNARROWED so the bar can be lowered again
-                            // later; the filtering below is what the reader sees,
-                            // and subsequent fetches narrow the server's work.
-                            setTimeout(() => fetchExplore(undefined, undefined, []), 0);
-                          }}>
-                          <option value="0">every attribute</option>
-                          <option value="0.5">in most studies</option>
-                          <option value="1">in every study</option>
-                        </select>
-                      )}
-                    </div>
-                  );
-                })()}
-                {(visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical)
-                  .slice(0, attrLimit).map(c => (
-                  /* data-attr / data-shape make the facet identifiable from outside
-                     React — the e2e suite asserts that an attribute's shape does not
-                     change when the draft does. */
-                  <div key={c.per + c.attribute} data-attr={c.per + "|" + c.attribute}
-                    data-shape={c.kind === "cat" ? (PIE_ATTRIBUTES.has(c.attribute) ? "pie" : "list") : c.kind}
-                    style={{ borderTop: "1px solid var(--line)", padding: "0.45rem 0" }}>
+          {explore && <>
+            <div className="facetgrid">
+              {(visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical)
+                .map(c => (
+                /* data-attr / data-shape make the facet identifiable from outside
+                   React — the e2e suite asserts that an attribute's shape does not
+                   change when the draft does. One tile per attribute, the portal's
+                   own study-view density — see .facetgrid's own comment. */
+                <div key={c.per + c.attribute} data-attr={c.per + "|" + c.attribute}
+                  data-shape={c.kind === "cat" ? (PIE_ATTRIBUTES.has(c.attribute) ? "pie" : "list") : c.kind}
+                  className="card">
                     {(() => {
                       // A facet already in the draft is re-queried WITHOUT its own
                       // clauses (disjunctive faceting) so its other values stay
@@ -3316,19 +3281,53 @@ function Latency({ v }: { v: any }) {
                       <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>≥ median</button>
                       <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>&lt; median</button>
                     </div>}
+                </div>
+              ))}
+              {/* Charted genes (added from "+ Add chart" > Gene status) — one tile per
+                  gene per alteration type, the same tile shape a clinical attribute gets,
+                  so a chart you configured actually reaches this grid rather than only
+                  living inside the dialog that configured it. */}
+              {(explore.geneFacets || []).map(f => {
+                const max = Math.max(...f.states.map(x => x.n), 1);
+                return (
+                  <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type} className="card">
+                    <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}>
+                      {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
+                      <span className="meta"> · patient-level · {f.total.toLocaleString()} patients</span>
+                    </div>
+                    <div className="vallist">
+                      {f.states.map(st => (
+                        <button key={st.state} className="valrow"
+                          title={st.label + " — " + st.n.toLocaleString() + " patients (click to filter)"}
+                          onClick={() => addClauses(geneStateClauses(f.gene, f.type, st.state))}>
+                          <span className="vname" style={st.state === "notProfiled" ? { color: "var(--muted)" } : undefined}>
+                            {st.label}
+                          </span>
+                          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * st.n / max)) + "%" }} /></span>
+                          <span className="vn">{st.n.toLocaleString()}</span>
+                          <span className="vpct">{f.total ? (Math.round(1000 * st.n / f.total) / 10) + "%" : ""}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {f.overlap ? (
+                      <p className="note" style={{ margin: "0.25rem 0 0" }}>
+                        {f.overlap.toLocaleString()} patient{f.overlap === 1 ? " is" : "s are"} counted in both
+                        Amplified and Deleted — amplified in one sample, deleted in another — so these rows
+                        over-sum the cohort by that much.
+                      </p>
+                    ) : null}
+                    {f.alteredUnprofiled ? (
+                      <p className="note" style={{ margin: "0.25rem 0 0" }}>
+                        {f.alteredUnprofiled.toLocaleString()} patient{f.alteredUnprofiled === 1 ? " has" : "s have"} a
+                        call for {f.gene} but sit on no panel covering it — a contradiction in the source data. They are
+                        counted as not profiled.
+                      </p>
+                    ) : null}
                   </div>
-                ))}
-                {explore.clinical.length > attrLimit && (
-                  <button className="linklike" style={{ marginTop: "0.5rem" }}
-                    onClick={() => setAttrLimit(attrLimit + 20)}>
-                    show {Math.min(20, explore.clinical.length - attrLimit)} more attributes
-                  </button>
-                )}
-              </div>
-            </div>
-            <div>
+                );
+              })}
               {explore.studyBreakdown && explore.studyBreakdown.length > 0 && (
-                <div className="card">
+                <div className="card wide">
                   <h2>Studies <span className="plain">— how {explore.draftCount != null ? "the draft" : "the selection"} breaks down{exStudies.length > 1 ? " across the " + exStudies.length + " selected studies" : ""}</span></h2>
                   {(() => {
                     const rows = explore.studyBreakdown!;
@@ -3353,7 +3352,7 @@ function Latency({ v }: { v: any }) {
                 </div>
               )}
               {explore.dataTypes && explore.dataTypes.length > 0 && (
-                <div className="card">
+                <div className="card wide">
                   <h2>Data types <span className="plain">— samples with each kind of molecular data</span></h2>
                   {(() => {
                     const FILTERABLE: Record<string, "MUTATION" | "CNA" | "SV"> = {
@@ -3400,7 +3399,7 @@ function Latency({ v }: { v: any }) {
                 const rows = needle ? all.filter((g: any) => g.gene.toUpperCase().includes(needle)) : all;
                 if (!all.length) return null;
                 return (
-                  <div className="card" key={kind}>
+                  <div className="card wide" key={kind}>
                     <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
                       <h2 style={{ margin: 0 }}>{meta.title} <span className="plain">— samples, panel-aware frequency</span></h2>
                       <span className="spacer" />
@@ -3524,75 +3523,20 @@ function Latency({ v }: { v: any }) {
                 <p className="note">Profiles here: {(explore.profiles || []).join(", ") || "none"}{explore.gaProfiles && explore.gaProfiles.length ? " · assays: " + explore.gaProfiles.join(", ") : ""} · facet counts {explore.draftCount != null ? "narrowed to your draft" : "study-wide"} · {explore.stats.ms}ms</p>
               </div>
             </div>
-          </div>}
+          </>}
           </div>
         </div>}
 
-        {/* ================= Cohorts tab ================= */}
-        {tab === "cohorts" && <div className="grid2">
-          <div className="card">
-            <h2>Create a cohort</h2>
-            <label>Name</label>
-            <input style={{ width: "100%" }} value={cName} onChange={e => setCName(e.target.value)} placeholder="e.g. KRAS-driver never-smokers" />
-            <label>Definition</label>
-            <textarea value={cDefText} onChange={e => setCDefText(e.target.value)} spellCheck={false}
-              style={{ width: "100%", height: "16rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
-            {explore && (
-              <div className="row" style={{ gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.4rem" }}>
-                <span className="meta">quick add:</span>
-                <select value={qaAttr} onChange={e => { setQaAttr(e.target.value); setQaVal(""); }} style={{ fontSize: "var(--t-md)", maxWidth: "14rem" }}>
-                  <option value="">attribute…</option>
-                  {explore.clinical.map(a => <option key={a.per + a.attribute} value={a.per + "|" + a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric)" : ""}{a.per === "sample" ? " ·sample" : ""}</option>)}
-                </select>
-                {(() => {
-                  const a = explore.clinical.find(x => qaAttr === x.per + "|" + x.attribute);
-                  if (!a) return null;
-                  const perExtra = a.per === "sample" ? { per: "sample" } : {};
-                  if (a.kind === "num") return (
-                    <>
-                      <span className="meta">min {a.min} · median {a.median} · max {a.max} —</span>
-                      <input placeholder="≥" value={qaVal} onChange={e => setQaVal(e.target.value)} style={{ width: "4.5rem", fontSize: "var(--t-md)" }} />
-                      <button className="facet" disabled={!Number.isFinite(Number(qaVal)) || qaVal === ""}
-                        onClick={() => { addClause({ kind: "clinical", attribute: a.attribute, range: { gte: Number(qaVal) }, ...perExtra }); setQaVal(""); }}>add ≥</button>
-                      <button className="facet" disabled={!Number.isFinite(Number(qaVal)) || qaVal === ""}
-                        onClick={() => { addClause({ kind: "clinical", attribute: a.attribute, range: { lt: Number(qaVal) }, ...perExtra }); setQaVal(""); }}>add &lt;</button>
-                    </>
-                  );
-                  return (
-                    <select value="" onChange={e => { if (e.target.value !== "") addClause({ kind: "clinical", attribute: a.attribute, op: "=", value: e.target.value, ...perExtra }); }}
-                      style={{ fontSize: "var(--t-md)", maxWidth: "14rem" }}>
-                      <option value="">value… (patients)</option>
-                      {a.values.map(v => <option key={v.v} value={v.v}>{v.v} ({v.n.toLocaleString()})</option>)}
-                    </select>
-                  );
-                })()}
-                <input list="qa-genes" placeholder="gene → OQL" value={qaGene} onChange={e => setQaGene(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter" && qaGene.trim()) { addClause({ kind: "oql", q: qaGene.trim().toUpperCase() + ":" }); setQaGene(""); } }}
-                  style={{ width: "9rem", fontSize: "var(--t-md)" }} />
-                <datalist id="qa-genes">
-                  {explore.genes.map(g => <option key={g.gene} value={g.gene}>{g.n.toLocaleString()} altered</option>)}
-                </datalist>
-                <button className="facet" disabled={!qaGene.trim()}
-                  onClick={() => { addClause({ kind: "oql", q: qaGene.trim().toUpperCase() + ":" }); setQaGene(""); }}>add gene</button>
-              </div>
-            )}
-            {(() => { let d = null; try { d = JSON.parse(cDefText); } catch {} return d ? (
-              <div style={{ margin: "0.55rem 0" }}>
-                <CohortPills def={d} onRemoveClause={(i: any) => {
-                  const nd = normalizeDef(JSON.parse(cDefText));
-                  nd.all = nd.all.filter((_: any, j: any) => j !== i);
-                  setCDefText(JSON.stringify(nd, null, 2)); setCPreview(null);
-                }} />
-              </div>) : <p className="note">⚠ definition JSON doesn’t parse yet</p>; })()}
-            <div className="row" style={{ marginTop: "0.5rem" }}>
-              <button className="primary" disabled={cBusy} onClick={previewCohort}>{cBusy && <span className="spinner onprimary" />}Preview</button>
-              <button className="primary" disabled={cBusy} onClick={saveCohort}>Save</button>
-            </div>
-            {cPreview && (cPreview.error
-              ? <div className="error">{cPreview.error}</div>
-              : <p className="qdesc" style={{ marginTop: "0.6rem" }}><strong>{cPreview.count?.toLocaleString()}</strong> patients — {cPreview.text}</p>)}
-            <p className="note">Clause kinds: <code>oql</code> (genomic status, portal OQL syntax), <code>clinical</code> (attribute/op/value), <code>event</code> (timeline), <code>patients</code>; composed with <code>all</code> / <code>any</code> / <code>not</code>. Start from an example on the right, or ask your AI assistant in the browser sidebar.</p>
+        {/* ================= Saved tab ================= */}
+        {tab === "cohorts" && <div>
+          {/* Saved cohorts and saved analyses used to be two top-level tabs
+              ("Cohorts" and "Saved") with a cross-link between them ("manage
+              on the Saved tab") — one tab, two sub-tabs instead. */}
+          <div className="tabs">
+            <button className={cohortsSubTab === "cohorts" ? "active" : ""} onClick={() => setCohortsSubTab("cohorts")}>Cohorts</button>
+            <button className={cohortsSubTab === "analyses" ? "active" : ""} onClick={() => setCohortsSubTab("analyses")}>Analyses</button>
           </div>
+          {cohortsSubTab === "cohorts" && <div>
           <div className="card">
             <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.2rem" }}>
               <h2 style={{ margin: 0 }}>Cohorts <span className="plain">— tick any, then analyse them together</span></h2>
@@ -3622,7 +3566,6 @@ function Latency({ v }: { v: any }) {
                     {ev && ev.busy && <span className="spinner" />}
                     <span className="spacer" />
                     <button className="linklike" onClick={() => previewExample(ex)}>preview</button>
-                    <button className="linklike" onClick={() => { setCName(ex.name); setCDefText(JSON.stringify(ex.def, null, 2)); setCPreview(null); }}>open in editor</button>
                     <button className="linklike" onClick={() => saveExample(ex)}>save</button>
                   </div>
                   {ev && ev.error && <div className="error">{ev.error}</div>}
@@ -3630,65 +3573,49 @@ function Latency({ v }: { v: any }) {
               );
             })}
             <h2 style={{ marginTop: "1.2rem" }}>
-              Saved cohorts <span className="plain">— tick any to include below; manage (rename, delete) on the <button className="linklike" onClick={() => goTab("saved")}>Saved tab</button></span>
+              Saved cohorts <span className="plain">— shared with everyone using this app; no per-user ownership yet. Tick any to include above; delete here.</span>
             </h2>
-            {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, create one on the left, or ask your AI assistant in the browser sidebar.</p>}
-            {Object.entries(saved).map(([n, s2]) => (
+            {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, build one on the Explore page, or ask chat.</p>}
+            {Object.entries(saved)
+              .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
+              .map(([n, s2]) => (
               <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
-                <label className="pick">
-                  <input type="checkbox" checked={picked.includes("saved:" + n)} onChange={() => togglePick("saved:" + n)} />
-                  <strong>{n}</strong>
+                <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
+                  <label className="pick">
+                    <input type="checkbox" checked={picked.includes("saved:" + n)} onChange={() => togglePick("saved:" + n)} />
+                    <strong>{n}</strong>
+                  </label>
                   {s2.lastEval && <span className="meta">{s2.lastEval.count.toLocaleString()} pts</span>}
-                </label>
+                  <span className="meta">saved {s2.savedAt}</span>
+                  <span className="spacer" />
+                  <button className="linklike" onClick={() => removeSaved(n)}>delete</button>
+                </div>
                 <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} /></div>
               </div>
             ))}
           </div>
-        </div>}
-
-        {/* ================= Saved tab ================= */}
-        {tab === "saved" && <div className="grid2">
-          <div className="card">
-            <h2>Saved cohorts <span className="plain">— shared with everyone using this app; no per-user ownership yet</span></h2>
-            {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — build one on the Cohorts tab, or save an example there.</p>}
-            {Object.entries(saved)
-              .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
-              .map(([n, s2]) => (
-                <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
-                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                    <strong>{n}</strong>
-                    {s2.lastEval && <span className="meta">{s2.lastEval.count.toLocaleString()} pts</span>}
-                    <span className="meta">saved {s2.savedAt}</span>
-                    <span className="spacer" />
-                    <button className="linklike"
-                      onClick={() => { setCName(n); setCDefText(JSON.stringify(s2.def, null, 2)); setCPreview(s2.lastEval || null); goTab("cohorts"); }}>
-                      edit
-                    </button>
-                    <button className="linklike" onClick={() => removeSaved(n)}>delete</button>
+          </div>}
+          {cohortsSubTab === "analyses" && <div className="grid2">
+            <div className="card">
+              <h2>Saved analyses <span className="plain">— shared with everyone using this app; no per-user ownership yet</span></h2>
+              {Object.keys(spaces).length === 0 && <p className="note">Nothing saved yet — build an analysis with at least one view, then "Save workspace" on the Analysis tab.</p>}
+              {Object.entries(spaces)
+                .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
+                .map(([n, w]) => (
+                  <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
+                    <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
+                      <strong>{n}</strong>
+                      <span className="meta">{(w.doc.views || []).length} view{(w.doc.views || []).length === 1 ? "" : "s"}</span>
+                      <span className="meta">saved {w.savedAt}</span>
+                      <span className="spacer" />
+                      <button className="linklike" onClick={() => openWorkspace(n)}>open</button>
+                      <button className="linklike" onClick={() => deleteWorkspace(n)}>delete</button>
+                    </div>
                   </div>
-                  <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} /></div>
-                </div>
-              ))}
-          </div>
-          <div className="card">
-            <h2>Saved workspaces <span className="plain">— shared with everyone using this app; no per-user ownership yet</span></h2>
-            {Object.keys(spaces).length === 0 && <p className="note">Nothing saved yet — build an analysis with at least one view, then "Save workspace" on the Analysis tab.</p>}
-            {Object.entries(spaces)
-              .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
-              .map(([n, w]) => (
-                <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
-                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                    <strong>{n}</strong>
-                    <span className="meta">{(w.doc.views || []).length} view{(w.doc.views || []).length === 1 ? "" : "s"}</span>
-                    <span className="meta">saved {w.savedAt}</span>
-                    <span className="spacer" />
-                    <button className="linklike" onClick={() => openWorkspace(n)}>open</button>
-                    <button className="linklike" onClick={() => deleteWorkspace(n)}>delete</button>
-                  </div>
-                </div>
-              ))}
-            {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
-          </div>
+                ))}
+              {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
+            </div>
+          </div>}
         </div>}
 
         {/* ================= Examples tab ================= */}
@@ -3769,9 +3696,11 @@ function Latency({ v }: { v: any }) {
                 either Explore or the JSON editor opening ON TOP of an
                 analysis already in progress (a modal, most likely) — a bigger
                 piece of work than this pass, and not yet scoped. */}
-            <h2 className="vtitle" style={{ marginBottom: "0.9rem" }}>
-              Cohorts{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
-            </h2>
+            {(busy || result) && (
+              <h2 className="vtitle" style={{ marginBottom: "0.9rem" }}>
+                Cohorts{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
+              </h2>
+            )}
             <div className="cohortlist">
               {busy && !result
                 ? Array.from({ length: Math.max(1, Object.keys(doc.cohorts || {}).length) }).map((_, i) => (
@@ -3835,49 +3764,50 @@ function Latency({ v }: { v: any }) {
             )}
           </dialog>
           <div>
-            <div className="row" style={{ alignItems: "baseline", marginBottom: "0.9rem", gap: "0.6rem" }}>
-              <h2 className="vtitle">
-                Analysis{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
-              </h2>
-              <div className="vmeta">
-                {/* The workspace lives behind this one button + a dialog, not
-                    a permanent card at the top of the column — it is read
-                    when setting the workspace up and almost never while
-                    reading the figures. What it's called and whether it's
-                    saved is what the dialog it opens is for; this button's
-                    own label stays fixed. */}
-                {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
-                  <button disabled={busy} onClick={openWorkspaceSave}
-                    style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
-                    title={doc.title
-                      ? "“" + doc.title + "” — " + (spaces[doc.title] && JSON.stringify(spaces[doc.title].doc) === JSON.stringify(doc)
-                          ? "saved " + spaces[doc.title].savedAt : "unsaved changes")
-                      : "save this analysis as a named, reopenable workspace"}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
-                      <path d="M17 21v-8H7v8" />
-                      <path d="M7 3v5h8" />
-                    </svg>
-                    Save analysis
+            {(busy || result) && (
+              <div className="row" style={{ alignItems: "baseline", marginBottom: "0.9rem", gap: "0.6rem" }}>
+                <h2 className="vtitle">
+                  Analysis{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
+                </h2>
+                <div className="vmeta">
+                  {/* The workspace lives behind this one button + a dialog, not
+                      a permanent card at the top of the column — it is read
+                      when setting the workspace up and almost never while
+                      reading the figures. What it's called and whether it's
+                      saved is what the dialog it opens is for; this button's
+                      own label stays fixed. */}
+                  {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
+                    <button disabled={busy} onClick={openWorkspaceSave}
+                      style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
+                      title={doc.title
+                        ? "“" + doc.title + "” — " + (spaces[doc.title] && JSON.stringify(spaces[doc.title].doc) === JSON.stringify(doc)
+                            ? "saved " + spaces[doc.title].savedAt : "unsaved changes")
+                        : "save this analysis as a named, reopenable workspace"}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+                        <path d="M17 21v-8H7v8" />
+                        <path d="M7 3v5h8" />
+                      </svg>
+                      Save analysis
+                    </button>
+                  )}
+                  <button className="linklike" onClick={() => docDialog.current?.showModal()}
+                    title="open the document's raw JSON — edit it, run it, or view generated SQL">
+                    show document json
                   </button>
-                )}
-                <button className="linklike" onClick={() => docDialog.current?.showModal()}
-                  title="open the document's raw JSON — edit it, run it, or view generated SQL">
-                  show document json
-                </button>
+                </div>
               </div>
-            </div>
+            )}
             {busy && !result && <div className="skeleton skeleton-addview" />}
             {busy && !result && Array.from({ length: Math.max(1, (doc.views || []).length) }).map((_, i) => (
               <div key={i} className="skeleton skeleton-view" />
             ))}
             {!busy && !result && (
               <div className="card">
-                <h2>Nothing here yet</h2>
-                <p className="note" style={{ fontSize: "var(--t-md)" }}>
-                  The analysis document is empty. Add cohorts from the <button className="linklike" onClick={() => goTab("cohorts")}>Cohorts tab</button>,
-                  ask your AI assistant in the browser sidebar (e.g. “compare STK11-driver vs wild-type immunotherapy patients” — it edits this page through its AI tools), or open <button className="linklike" onClick={() => docDialog.current?.showModal()}>show document json</button> and paste one in.
+                <p className="note" style={{ fontSize: "var(--t-md)", margin: 0 }}>
+                  Make a cohort on the <button className="linklike" onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore page</button>,
+                  {" "}or choose cohorts on the <button className="linklike" onClick={() => goTab("cohorts")}>Cohorts page</button>.
                 </p>
               </div>
             )}

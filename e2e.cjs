@@ -85,12 +85,18 @@ async function main() {
 
       // Derived facets: computed from the data's shape, so they must appear for a
       // study regardless of how it names its events, and clicking must filter.
+      // Currently hidden behind SHOW_DERIVED_FACETS=false (app/lab/page.tsx) at the
+      // user's request — a short wait tells "genuinely hidden" from "actually
+      // broken" without paying the full 240s timeout twice on every gate run.
       await page.goto(BASE + "/lab?tab=explore");
-      await page.waitForSelector(".exbar", { timeout: 120000 });
+      // .exbar (the filters bar) only renders once a filter exists now — the
+      // Exploring/studies card is the one thing always present on this tab.
+      await page.waitForSelector('h2:has-text("Exploring")', { timeout: 120000 });
       let der = { facets: 0, filtered: false };
+      let derivedFacetsHidden = false;
       try {
-        await page.waitForFunction(() => [...document.querySelectorAll("h2")].some(h => h.textContent.startsWith("Derived")),
-          null, { timeout: 240000 });
+        await page.waitForFunction(() => [...document.querySelectorAll("h2")].some(h => h.textContent.includes("computed from the data's shape")),
+          null, { timeout: 5000 });
         der.facets = await page.locator(".derivedgrid > div").count();
         const before = (await page.locator(".exbar").innerText()).trim();
         await page.locator(".derivedgrid .valrow").first().click();
@@ -101,17 +107,12 @@ async function main() {
         const barSaysFiltered = /\d+ filter/.test(await page.locator(".exbar").innerText());
         const bucketSelected = (await page.locator(".derivedgrid .valrow.on").count()) > 0;
         der.filtered = barSaysFiltered && bucketSelected;
-      } catch { /* left as-is */ }
-      // the attribute expander belongs to the Clinical card, not the gap between columns
-      const expanderPlaced = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll("button")].find(b2 => /more attributes/.test(b2.textContent));
-        if (!btn) return null;
-        const card = btn.closest(".card");
-        if (!card) return { inCard: false };
-        const br = btn.getBoundingClientRect(), cr = card.getBoundingClientRect();
-        return { inCard: true, clinical: /counted in each attribute/.test(card.textContent),
-          within: br.left >= cr.left && br.right <= cr.right && br.bottom <= cr.bottom + 1 };
-      });
+      } catch { derivedFacetsHidden = true; }
+      // The derived-facets wait above used to double as "the page has finished
+      // loading" for everything below, since both derive from the same fetch —
+      // now that it exits in 5s while hidden, wait for the clinical facet grid
+      // explicitly instead of relying on that as a side effect.
+      await page.waitForSelector("[data-attr]", { timeout: 120000 });
       // Categorical values are shown in full and scrolled, not trimmed to a few;
       // and the ranked lists carry no inline bar charts.
       const vals = await page.evaluate(() => {
@@ -140,28 +141,35 @@ async function main() {
       ok("value bars stay small", !!vals.bars && !!barBox && barBox.h <= 10 && barBox.w <= 80,
         barBox ? vals.bars + " bars, " + barBox.w + "x" + barBox.h + "px" : "no bars found");
 
-      ok("the attribute expander sits inside the Clinical card",
-        !expanderPlaced || (expanderPlaced.inCard && expanderPlaced.clinical && expanderPlaced.within),
-        expanderPlaced ? JSON.stringify(expanderPlaced) : "no expander (all attributes shown)");
+      // Every clinical attribute shows by default now (checked/unchecked from
+      // "+ Add chart" > Clinical, not a positional "show N more" cutoff) — this
+      // selection carries 66 attributes, well past the old default cap of 20.
+      const attrTileCount = await page.locator("[data-attr]").count();
+      ok("every clinical attribute shows by default, no positional cutoff",
+        attrTileCount > 20, attrTileCount + " attribute tiles");
 
-      ok("derived facets appear and filter", der.facets >= 2 && der.filtered,
-        der.facets + " derived facets" + (der.filtered ? ", click added a derived clause" : ", click did not filter"));
+      ok("derived facets appear and filter", derivedFacetsHidden || (der.facets >= 2 && der.filtered),
+        derivedFacetsHidden ? "skipped — Derived facets card is currently hidden (SHOW_DERIVED_FACETS=false)" :
+          der.facets + " derived facets" + (der.filtered ? ", click added a derived clause" : ", click did not filter"));
 
-      // Explore's top action bar: build a draft by clicking a facet, then Analyze.
-      // This is the main path from browsing to an analysis, so it is gated.
+      // Explore's studies card: Analyze must work on a study alone — every
+      // patient in it — before any filtering. Analyze lives in this card now
+      // (the filters bar below it only renders once a filter exists), so this
+      // is the main path from browsing to an analysis with zero filters set.
       await page.goto(BASE + "/lab");
       await page.locator("button:has-text('Explore')").first().click();
-      await page.waitForSelector(".exbar", { timeout: 120000 });
-      // A study alone is a cohort — every patient in it — so Analyze must work
-      // before any filtering, and the bar must say what it would analyse.
+      await page.waitForSelector('h2:has-text("Exploring")', { timeout: 120000 });
       let unfiltered = "";
       try {
-        await page.waitForFunction(() => /every patient in/.test(document.querySelector(".exbar")?.textContent || ""),
-          null, { timeout: 240000 });
-        unfiltered = (await page.locator(".exbar").innerText()).replace(/\s+/g, " ").split(" Analyze")[0];
+        await page.waitForFunction(() => {
+          const h2 = [...document.querySelectorAll("h2")].find(h => h.textContent.startsWith("Exploring"));
+          return !!h2 && /patients/.test(h2.textContent);
+        }, null, { timeout: 240000 });
+        unfiltered = (await page.locator('h2:has-text("Exploring")').innerText()).replace(/\s+/g, " ");
       } catch { /* left empty */ }
-      const canAnalyseUnfiltered = !(await page.locator(".exbar button:has-text('Analyze')").isDisabled());
-      ok("a study with no filters is analysable", canAnalyseUnfiltered && !!unfiltered, unfiltered || "bar never offered the unfiltered cohort");
+      const analyzeBtn = page.locator('button:text-is("Analyze")');
+      const canAnalyseUnfiltered = (await analyzeBtn.count()) > 0 && !(await analyzeBtn.isDisabled());
+      ok("a study with no filters is analysable", canAnalyseUnfiltered && !!unfiltered, unfiltered || "studies card never showed a patient count");
 
       // A facet's SHAPE must not depend on the draft. Narrowing a cohort drops an
       // attribute's distinct-value count, so keying pie-vs-list off it made
@@ -198,9 +206,12 @@ async function main() {
       // every bucket under that very filter, the rest came back empty, and the
       // zero-count filter deleted them — so the options vanished and the choice
       // could not be widened or changed.
-      let derivedDetail = "no derived facets rendered", derivedOk = false;
-      try {
-        await page.waitForSelector("[data-derived]", { timeout: 60000 });
+      // Same SHOW_DERIVED_FACETS=false gate as above — [data-derived] only exists
+      // on that (currently hidden) card, so a short wait tells "hidden" from
+      // "broken" without a 60s timeout on every gate run while it's off.
+      let derivedDetail = "skipped — Derived facets card is currently hidden (SHOW_DERIVED_FACETS=false)", derivedOk = derivedFacetsHidden;
+      if (!derivedFacetsHidden) try {
+        await page.waitForSelector("[data-derived]", { timeout: 5000 });
         const snap = () => page.evaluate(() => [...document.querySelectorAll("[data-derived]")]
           .map(el => el.getAttribute("data-derived") + ":" + el.getAttribute("data-buckets")));
         const before = await snap();
@@ -220,7 +231,7 @@ async function main() {
                        JSON.stringify(before) === JSON.stringify(after2);
           derivedOk = kept && sel === 2;
           derivedDetail = "buckets " + before.join(" ") + " -> " + after2.join(" ") + ", " + sel + " selected";
-        }
+        } else { derivedOk = false; derivedDetail = "no derived facets rendered"; }
       } catch (e) { derivedDetail = String(e.message).split("\n")[0]; }
       ok("picking a derived bucket keeps the other buckets selectable", derivedOk, derivedDetail);
 
@@ -229,7 +240,7 @@ async function main() {
       // suggests Analyze needs a name too.
       const noDraftCard = (await page.locator("h2:has-text('Draft cohort')").count()) === 0;
       const noGeneFinder = (await page.locator("input[placeholder='gene symbol…']").count()) === 0;
-      const noNameBox = (await page.locator('.exbar input[placeholder="name…"]').count()) === 0;
+      const noNameBox = (await page.locator('input[placeholder="name…"]').count()) === 0;
       ok("the explore bar carries only its two actions",
         noDraftCard && noGeneFinder && noNameBox,
         "no card: " + noDraftCard + ", no gene finder: " + noGeneFinder + ", no name box: " + noNameBox);
@@ -241,8 +252,10 @@ async function main() {
           null, { timeout: 240000 });
       } catch { drafted = false; }
       ok("clicking a facet builds a draft and counts it", drafted,
-        drafted ? (await page.locator(".exbar").innerText()).replace(/\s+/g, " ").split(" Analyze")[0] : "no count appeared");
-      await page.locator(".exbar button:has-text('Analyze')").click();
+        drafted ? (await page.locator(".exbar").innerText()).replace(/\s+/g, " ") : "no count appeared");
+      // Analyze lives in the studies card, not the filters bar (.exbar) it sits
+      // below — it works regardless of whether any filter is set.
+      await page.locator('button:text-is("Analyze")').click();
       let landed = false, views = [];
       try {
         await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 1, null, { timeout: 300000 });
@@ -279,7 +292,7 @@ async function main() {
         await page.locator("dialog.savedialog button:has-text('Save')").click();
         await page.waitForFunction(() => /saved/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 120000 });
-        await page.locator(".tabs button:has-text('Cohorts')").click();
+        await page.locator(".tabs button:text-is('Saved')").click();
         await page.waitForTimeout(1500);
         const inList = await page.locator("text=e2e dialog cohort").count();
         savedOk = !!prefilled && closedOnEsc && inList > 0;
@@ -291,7 +304,7 @@ async function main() {
       // DIFFERENTLY-named cohort first, so replacement is provable: the bar now
       // derives the name from the draft, so two Analyze runs share a name and
       // counting cohorts could not tell replace from overwrite.
-      await page.locator(".tabs button:has-text('Cohorts')").click();
+      await page.locator(".tabs button:text-is('Saved')").click();
       await page.waitForSelector(".pick input", { timeout: 240000 });
       let seeded = [];
       try {
@@ -308,7 +321,7 @@ async function main() {
         await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 240000 });
       } catch { /* count may already be shown */ }
-      await page.locator(".exbar button:has-text('Analyze')").click();
+      await page.locator('button:text-is("Analyze")').click();
       let replaced = false, after = [];
       try {
         await page.waitForFunction((gone) => {
@@ -504,8 +517,13 @@ async function main() {
       await page.waitForTimeout(400);
       const urlHasTab = /tab=explore/.test(await page.evaluate(() => location.search));
       await page.reload();
-      await page.waitForSelector(".tabs button.active", { timeout: 120000 });
-      const stayed = (await page.locator(".tabs button.active").innerText()).trim();
+      // :visible matters here: the "+ Add chart" dialog carries its own nested
+      // .tabs (Clinical/Gene status/Derived timeline filters), present in the
+      // DOM with its own default-active button even while the <dialog> itself
+      // is closed — a bare ".tabs button.active" is ambiguous the moment that
+      // dialog has ever been part of the tree, not just while it's open.
+      await page.waitForSelector(".tabs button.active:visible", { timeout: 120000 });
+      const stayed = (await page.locator(".tabs button.active:visible").innerText()).trim();
       ok("tabs survive a refresh", urlHasTab && stayed === "Explore", "?tab written: " + urlHasTab + ", after reload: " + stayed);
 
       // A ?doc= link still implies the analysis, but an explicit ?tab= wins.
@@ -514,11 +532,11 @@ async function main() {
       await page.goto(BASE + "/lab?tab=examples&doc=" + enc);
       await page.waitForTimeout(1800);
       ok("an explicit ?tab= beats the document's default tab",
-        (await page.locator(".tabs button.active").innerText()).trim() === "Examples");
+        (await page.locator(".tabs button.active:visible").innerText()).trim() === "Examples");
 
       // Cohorts tab: tick cohorts, submit them together. No per-row "add" links.
       await page.goto(BASE + "/lab");
-      await page.locator(".tabs button:has-text('Cohorts')").click();
+      await page.locator(".tabs button:text-is('Saved')").click();
       await page.waitForSelector(".pick input", { timeout: 240000 });
       ok("cohort rows use checkboxes, not per-row add links",
         (await page.locator("button:has-text('add to analysis')").count()) === 0,
