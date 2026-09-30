@@ -42,8 +42,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   `/oncoprint-lab/import` does the same in the browser (`POST /api/oncoprint/local`).
   `lib/oncoprint-cluster.ts` orders columns by a Ward dendrogram for the `cluster:<profile>`
   sort key; `lib/oncoprint-detail.ts` answers one column at a time for tooltips. **`lib/view-svg.ts`** — the same contract for every other view kind (survival,
-  hotspots, compare, cooccurrence, coexpression, clinical); used by the in-app chat today and
-  by MCP `run_analysis` for the oncoprint image.
+  hotspots, compare, cooccurrence, coexpression, clinical); used by MCP `run_analysis`
+  for its figures (the oncoprint's image included).
 - **`lib/views-more.ts`** — the view kinds added after the first thirteen (`attrition`, `genome`,
   …). `runAnalysis` evaluates cohorts and resolvers as for every view and hands them to
   `runMoreView`; their SQL lives in **`lib/federation-more.ts`** (re-exported by
@@ -62,7 +62,11 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 - **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Cohorts /
   Analysis / Examples. The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
   demo pages were retired once the Analysis app subsumed them; `/` now redirects to `/lab`.
-- **`app/api/chat/route.ts`** — Claude tool-use loop (`update_document`, `get_catalog`).
+- **WebMCP (`lib/webmcp.ts`)** — every page's tools for the researcher's assistant in the
+  browser (Claude in the Chrome sidebar): registered with `document.modelContext` and published
+  as `window.cohortLab`. The analysis page's (`app/lab/agent-tools.ts`) read and edit the
+  document; edits are run by the engine and reach the page only if accepted. **The app never
+  calls a model** — there is no server-side model route; don't add one.
 - **`mcp/tools.ts`** — MCP registry: `describe_dsl`, `run_analysis`, `render_oncoprint` (+v1
   event tools). MCP returns oncoprints as a static image rendered from the server SVG; the
   interactive figure is the web app's, not a third renderer.
@@ -113,8 +117,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
    `npm run docs:gen`, commit both. `EXAMPLES` there is also what the app's **Examples tab**
    renders, so one edit updates the doc, the MCP `describe_dsl` tool, and the gallery at once —
    and the docs gate already proves every gallery entry runs. `npm run docs:check` (part of e2e) fails on drift and
-   EXECUTES every documented example against the live compiler. The chat prompt grammar and the
-   MCP `describe_dsl` tool render from the same module.
+   EXECUTES every documented example against the live compiler. The agent grammar (`AGENT_GRAMMAR`,
+   served by the WebMCP `dsl_reference` tool) and the MCP `describe_dsl` tool render from the same module.
    **Every example's cohort counts are pinned** in `test/fixtures/example-counts.json` and asserted
    by the same gate, so "it still runs" is not mistaken for "it still gives the same answer". A
    renamed cohort, a moved number and a pin left behind by a deleted example all fail. After an

@@ -65,9 +65,9 @@ analysis. For a scientific audience this is the feature: a skeptical reviewer ca
 whole chain without trusting either the chatbot or us.
 
 **4. One interface, many cheap surfaces — and many cheap backends.** Because everything speaks
-the document, each new surface has been thin: the in-app chat is a small loop around the same
-`runAnalysis`, the MCP tools are wrappers over the same engine, and the DSL documentation is
-*generated from* the same source module the chat prompt uses — so nothing can drift, because
+the document, each new surface has been thin: the browser assistant's WebMCP tools and the MCP tools are
+both wrappers over the same `runAnalysis`, and the DSL documentation is *generated from* the
+same source module the agents' grammar uses — so nothing can drift, because
 there is one semantics owner. The same property cuts the other way: since no SQL ever crosses a
 study boundary, the backends can multiply as cheaply as the surfaces did — cross-instance
 federation is a routing change, not a redesign (see *Cross-instance federation*, below).
@@ -90,13 +90,13 @@ optional, additive experiment on top — the load-bearing path never depends on 
 
 Every surface reads and writes the same document; the engine owns all semantics; data access is
 read-only with the licensed annotation store isolated behind its own database grant; and the
-DSL's documentation, chat grammar, and MCP self-description all render from one source module.
+DSL's documentation, agent grammar, and MCP self-description all render from one source module.
 
 ```mermaid
 flowchart TB
     subgraph SURFACES["Surfaces — all speak the same document"]
         UI["Web UI<br/>Explore · Cohorts · Analysis"]
-        CHAT["In-app chat<br/>Claude tool loop: update_document · get_catalog"]
+        CHAT["Browser assistant (WebMCP)<br/>the page's tools: read · edit · undo"]
         MCP["MCP clients<br/>run_analysis · render_oncoprint · describe_dsl"]
     end
 

@@ -57,13 +57,6 @@ const PIE_ATTRIBUTES = new Set([
   "SAMPLE_TYPE", "SOMATIC_STATUS"
 ]);
 
-/** Prompts where a figure is the answer, not decoration. */
-const CHAT_STARTERS = [
-  "Do STK11-mutant lung cancers do worse on immunotherapy? Measure survival from when they started it, not from sequencing.",
-  "Which KRAS mutations actually occur in colorectal cancer here?",
-  "Are EGFR and KRAS mutually exclusive in lung cancer?"
-];
-
 /** p-values: exponent notation once fixed notation would round to zero, and an
  *  honest floor when the true value underflows double precision. Returns the
  *  whole "p=..." / "p<..." label so the relation stays attached to the number. */
@@ -3970,7 +3963,7 @@ function Latency({ v }: { v: any }) {
                 {v.kind === "hotspots" && v.hotspots && <>
                   <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi))} sub="lollipop by protein position, as the portal's mutation tab draws it" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
-                  {/* one renderer (lib/view-svg.ts) for this figure everywhere: the app, chat and MCP;
+                  {/* one renderer (lib/view-svg.ts) for this figure everywhere: the app and MCP;
                       the caption under it carries the note, so it isn't repeated above */}
                   {v.svg
                     ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
@@ -4589,7 +4582,7 @@ function Latency({ v }: { v: any }) {
                     </div>
                   {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
       <SplitByNote v={v} />
-                  {/* The same SVG the chat and MCP clients receive \u2014 one renderer,
+                  {/* The same SVG MCP clients receive \u2014 one renderer,
                       so the figure cannot differ between surfaces. */}
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
                 </>}

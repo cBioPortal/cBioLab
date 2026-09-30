@@ -7,7 +7,7 @@
 // a tool always reads the current document even while the user is editing it too.
 import { exposeTools, type AgentTool, type Json } from "../../lib/webmcp.ts";
 import { analysisText } from "../../lib/result-text.ts";
-import { CHAT_GRAMMAR, EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
+import { AGENT_GRAMMAR, EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, ExploreResult } from "../../lib/types.ts";
 
 export interface LabBridge {
@@ -175,7 +175,7 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
       } },
     { name: "dsl_reference", description: "The Analysis document grammar: cohort clauses (OQL, clinical, timeline events, derived, split, …) and every view kind. Read this before writing cohorts or views.",
       inputSchema: { type: "object", properties: {} },
-      run: async () => CHAT_GRAMMAR },
+      run: async () => AGENT_GRAMMAR },
     { name: "study_vocabulary", description: "A study's real vocabulary: clinical attributes and values, timeline event types and attributes. Use only names that appear here. Defaults to the document's study.",
       inputSchema: { type: "object", properties: { study: { type: "string" } } },
       run: async ({ study }) => (await fetch(`/api/catalog?study=${encodeURIComponent(study || get().doc.study || get().study)}`)).json() },

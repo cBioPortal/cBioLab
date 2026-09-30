@@ -3,7 +3,8 @@
 //
 // Everything that *describes* the DSL renders from this module:
 //   - docs/dsl.md            (generated: npm run docs:gen — never edit by hand)
-//   - the chat system prompt (app/api/chat/route.js imports CHAT_GRAMMAR)
+//   - AGENT_GRAMMAR, the compact grammar the browser assistant reads (the analysis page's
+//     dsl_reference WebMCP tool, /api/campaign/format)
 //   - the MCP describe_dsl tool (mcp/tools.js serves renderDslMarkdown())
 //
 // The EXAMPLES below are executed against the live compiler by
@@ -870,7 +871,7 @@ SQL each cohort compiled to.
   "views":   [ view, ... ] }                  // max 6
 \`\`\`
 
-Sent to \`POST /api/analysis\`, edited by the in-app chat, and encoded in shareable
+Sent to \`POST /api/analysis\`, edited by the researcher's assistant through the page's WebMCP tools, and encoded in shareable
 \`/analysis?doc=<base64url>\` links.
 
 ## Cohort definitions
@@ -1262,10 +1263,10 @@ ${EXAMPLES.map(exampleBlock).join("\n")}
 `;
 }
 
-// ---- compact grammar for the chat system prompt ----------------------------
+// ---- compact grammar for agents: the browser assistant's dsl_reference tool --
 // Keep this the terse twin of the markdown above; both live in this file so
-// they are reviewed together. Behavioral guidance stays in the chat route.
-export const CHAT_GRAMMAR = `Document shape:
+// they are reviewed together. Behavioral guidance stays with the tools that serve it.
+export const AGENT_GRAMMAR = `Document shape:
 { "study": "<default study id>",
   "params"?: { "<name>": <any JSON> },   // optional; a value that is EXACTLY "$name" is replaced by it
   "notes"?: "<the analyst's own prose about this workspace>",
