@@ -36,9 +36,10 @@ instance reached both directly and as an MCP peer.
   and how (built-in, not roadmap)
 - **Living user state** *(roadmap)* — dynamic groups, versioned annotation, and membership
   diffs subsume virtual studies / groups / sessions
-- **An honest oracle for AI hypothesis generation** *(roadmap)* — a hypothesis written as a
-  document is pre-registered, testable, multiplicity-counted, and replicable across sites by
-  construction; the generator stays creative because the tester cannot be
+- **An honest oracle for AI hypothesis generation** — a hypothesis written as a document is
+  pre-registered, testable, multiplicity-counted, and replicated on held-out patients by
+  construction; the generator stays creative because the tester cannot be (built: `/campaign`
+  and the MCP `campaign_*` tools)
 
 ## The advantages of the approach
 
@@ -420,8 +421,8 @@ proven correct, not open design questions.
 
 ## An honest oracle for AI hypothesis generation
 
-*(Proposed direction — not yet built. It composes the pieces above rather than adding a new
-mechanism.)*
+*(Built: `/campaign` in the app, `campaign_*` over MCP. It composes the pieces above; the one
+engine addition is the `split` leaf.)*
 
 AI hypothesis-generation systems — Google's Co-Scientist, FutureHouse's Robin and their
 successors — generate, critique and tournament-rank hypotheses, mostly from literature. The
@@ -497,17 +498,37 @@ executable language for exactly that class, and it is where an agent can propose
 human would not have enumerated. It is also where an honest oracle matters most, because
 immortal time and observability bias are precisely the traps a code-writing agent walks into.
 
-### What it would take
+### What is built
 
-Three tools on top of the saved-definition and federation work already described:
-
-| tool | does |
+| piece | does |
 |---|---|
-| `register_hypotheses(documents[])` | hashes and timestamps a batch under a named question — the pre-registration |
-| `run_campaign(question)` | evaluates the batch with a shared multiplicity adjustment and records every result, null or not |
-| `replicate(document, study)` | re-runs one document against a named study or federated peer |
+| `{kind:"split", part}` leaf | a fixed half of every study's patients, chosen inside ClickHouse by a salted hash of the patient id — the held-out set no caller can choose or reshuffle (`lib/cohort2.ts`, salt pinned by a test) |
+| hypothesis = document + **one declared primary result** | a compare view's gene, a survival view's log-rank, a clinical attribute, or a Cox term, plus a predicted direction — so one hypothesis is one test and multiplicity is countable (`lib/hypothesis.ts`) |
+| feasibility | arm sizes on the discovery half from the cohort definitions alone — no view runs, so checking a hypothesis cannot reveal its outcome |
+| the ledger | Postgres (`db/migrations/0002_campaigns.sql`). Locking hashes the list; **triggers**, not application code, then refuse any insert, delete or edit, and make the lock permanent. Every result — nulls included — is written into the registered row |
+| the procedure | every testable hypothesis on the discovery half → one Benjamini–Hochberg correction across the whole campaign → survivors re-run unchanged on the validation half → a verdict per row: replicated, failed replication, not supported, untestable (`lib/campaign.ts`) |
+| negative-result memory | the same test (a canonical-JSON hash of document + primary + direction) registered again, in any campaign, shows what happened last time |
+| surfaces | `/campaign` for the researcher (ask → propose → review → lock → test → report); the campaign page's steps as browser-agent tools (WebMCP, and `window.cohortLab` for an agent that runs page JavaScript) so the researcher's own assistant — Claude in the Chrome sidebar — is the generator; MCP `campaign_create`, `campaign_check_hypothesis`, `campaign_register`, `campaign_lock`, `campaign_run`, `campaign_report` for any other agent. The app itself never calls a model |
 
-plus the negative-result memory, which is the result cache with a query interface. None of it
-changes the engine; all of it depends on the engine being the one place where the analytical
-choices are made.
+**The first real campaign.** "What distinguishes NSCLC patients who fail first-line
+immunotherapy within 6 months from those who respond durably?" on msk_chord_2024, with Claude
+as the generator over MCP writing 18 literature-grounded hypotheses and a researcher adding one
+idea by hand. 19 registered → 17 testable (MSI-high NSCLC and the researcher's never-smoker
+subgroup were too small, and said so before any result) → **8 reached p < 0.05 on the
+discovery half → 4 held up on the validation half**: STK11 alteration, lower TMB, higher
+copy-number burden, and PD-L1 status. KEAP1 (p = 0.037, then 0.69), ARID1A, smoking status and
+STK11-associated survival looked real on the discovery half and did not replicate. An agent
+reporting nominal p-values would have claimed eight findings; four survive.
 
+### What is still open
+
+- **Cross-site replication as a campaign option.** The split replicates within one study;
+  routing survivors to a federated peer instead is a parameter the procedure does not take yet.
+- **Enumerated forking paths.** The m-value above — how many plausible variants of a document
+  (thresholds, windows, lineGap) give a result at least as extreme — is countable from the
+  grammar and not yet counted.
+- **Identity.** A campaign has an `owner` column and no authentication, so the ledger counts per
+  campaign, not per agent, and an agent could open many campaigns. Counting everything an
+  identity ever ran needs the user-state work.
+- **Cost.** Every hypothesis is a full `runAnalysis` on each half (~3 s here); a few hundred per
+  campaign is fine, tens of thousands would want batching.

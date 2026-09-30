@@ -220,6 +220,41 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "Held-out replication: one question, two halves of the patients",
+    demonstrates: "The split leaf. The engine divides every study's patients into two fixed halves by a salted hash of the patient id, so a finding made on one half can be checked on patients it never touched \u2014 the replication step a hypothesis campaign (/campaign) automates, and the one a single-dataset analysis usually has to skip.",
+    tags: ["split", "replication", "timeline", "compare"],
+    note: "NSCLC patients who progressed within 180 days of first immunotherapy versus those with no progression in the year after it, each divided into the discovery and validation halves. STK11 is altered more often in early failures on both halves; KEAP1 separates the groups on the discovery half only. The halves are the same for every caller and every run, and the salt is pinned by a test, so a result reported on one half can always be re-checked on the other.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "early failure (discovery)": { all: [
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }], occurrence: "FIRST" },
+            b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] }, rel: { type: "BEFORE", maxDays: 180 } },
+          { kind: "split", part: "discovery" }] },
+        "durable response (discovery)": { all: [
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }], occurrence: "FIRST" },
+            b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] }, rel: { type: "NOT_FOLLOWED_BY", withinDays: 365, observed: true } },
+          { kind: "split", part: "discovery" }] },
+        "early failure (validation)": { all: [
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }], occurrence: "FIRST" },
+            b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] }, rel: { type: "BEFORE", maxDays: 180 } },
+          { kind: "split", part: "validation" }] },
+        "durable response (validation)": { all: [
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }], occurrence: "FIRST" },
+            b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] }, rel: { type: "NOT_FOLLOWED_BY", withinDays: 365, observed: true } },
+          { kind: "split", part: "validation" }] }
+      },
+      views: [
+        { kind: "compare", genes: ["STK11", "KEAP1"], cohorts: ["early failure (discovery)", "durable response (discovery)"] },
+        { kind: "compare", genes: ["STK11", "KEAP1"], cohorts: ["early failure (validation)", "durable response (validation)"] }
+      ]
+    }
+  },
+  {
     title: "True first line: fast progression versus durable control",
     demonstrates: "The prior-treatment guard. \"First line\" ordinarily means first line OBSERVED HERE \u2014 about a fifth of these patients were treated elsewhere first. priorGuard restricts to those flagged treatment-naive, which is the difference between a real first-line claim and an artefact of where the patient was referred from.",
     tags: ["timeline", "temporal", "prior-guard", "survival", "compare"],
@@ -879,6 +914,7 @@ provenance — sees the fully flattened \`all\` list, exactly as if it had been 
 | \`genomicData\` | \`{"kind":"genomicData","gene":G,"profileType":P,"range"\\|"values"}\` | continuous per-gene values (cna, mrna z-scores, …); unknown profiles error listing what the study has |
 | \`genericAssay\` | \`{"kind":"genericAssay","profileType":P,"entity":E,"range"\\|"values"}\` | generic assay values (mutational signatures, …) |
 | \`proteinPosition\` | \`{"kind":"proteinPosition","gene":G,"range":{gt,gte,lt,lte}}\` | patient carries a mutation in \`gene\` whose protein position (the stored proteinPosStart, same column the lollipop draws from) falls in \`range\` — for an N-/C-terminal split when a study doesn't deposit one as a clinical attribute. Position-only: AND with an \`oql\` leaf (e.g. \`{"kind":"oql","q":"APC: TRUNC"}\`) to also restrict by mutation type |
+| \`split\` | \`{"kind":"split","part":"discovery"\|"validation"}\` | one fixed half of the study's patients, decided inside the database by a salted hash of the patient id — the same half for every caller, reproducible, and never passed through the client as an id list. It exists for **held-out replication**: test on \`discovery\`, confirm the same document on \`validation\`. A hypothesis campaign (\`/campaign\`, MCP \`campaign_*\`) adds it itself and refuses documents that already carry one, so a generator cannot choose its own half |
 | \`alteration\` | *(deprecated)* | translated to OQL internally; do not write new ones |
 
 **\`sampleList\`/\`patientList\` ids.** Each id is \`"<study>:<bare-id>"\` — a colon, not the
@@ -1316,6 +1352,7 @@ columns are qualified per study (duplicates appear twice) and a Study track show
 clause = leaf | {"any":[leaf,...]} | {"not":leaf} | {"not":{"any":[leaf,...]}} (De Morgan's — "none of these" in one clause).
 Leaf kinds:
 - {"kind":"oql","q":"STK11: DRIVER"} — genomic status in cBioPortal OQL (preferred; full notes below).
+- {"kind":"split","part":"discovery"} (or "validation") — a fixed, engine-owned half of the study's patients, for held-out replication.
 - {"kind":"derived","metric":"followupMonths","range":{"gte":24}} (also historyMonths, alteredGenes \u2014 computed from data shape, not study vocabulary; also "lines"/"treatmentSpan", which need an explicit "eventType" since they read the study's own therapy-event vocabulary on purpose)
 - {"kind":"clinical","attribute":"GENDER","op":"=","value":"Male"} (ops = != > >= < <=; numeric values compare numerically).
   Useful attributes: OS_STATUS (0:LIVING/1:DECEASED), OS_MONTHS, GENDER, RACE, CURRENT_AGE_DEID,

@@ -15,7 +15,8 @@ const KIND_META: Record<string, { label: string; color: string }> = {
   caseList: { label: "case list", color: "#999999" },
   genomicData: { label: "data", color: "#CC79A7" },
   genericAssay: { label: "assay", color: "#CC79A7" },
-  derived: { label: "derived", color: "#D55E00" }
+  derived: { label: "derived", color: "#D55E00" },
+  split: { label: "held-out", color: "#E69F00" }
 };
 
 function leafKind(leaf: any) {
@@ -86,6 +87,7 @@ function leafText(leaf: any) {
   // one is the whole point of that facet.
   if (k === "profiled") return "profiled: " + leaf.type + (leaf.gene ? " · " + leaf.gene : "");
   if (k === "caseList") return leaf.id;
+  if (k === "split") return leaf.part + " half";
   if (k === "genomicData") return `${leaf.gene} ${leaf.profileType} ` + (leaf.range ? Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ") : "");
   if (k === "genericAssay") return `${leaf.entity} ` + JSON.stringify(leaf.range || leaf.values);
   if (k === "sampleList" || k === "patientList") {
