@@ -131,12 +131,12 @@ describe("every view kind is DOCUMENTED, not just implemented", () => {
   });
 
   test("the compact grammar names every view kind", () => {
-    const m = /CHAT_GRAMMAR = `([\s\S]*?)`;/.exec(reference);
-    assert.ok(m, "could not find CHAT_GRAMMAR");
+    const m = /AGENT_GRAMMAR = `([\s\S]*?)`;/.exec(reference);
+    assert.ok(m, "could not find AGENT_GRAMMAR");
     const named = new Set([...m![1].matchAll(/"kind":"(\w+)"/g)].map((x) => x[1]));
     const missing = engineViewKinds().filter((k) => !named.has(k));
     assert.deepEqual(missing, [],
-      "CHAT_GRAMMAR does not mention: " + missing.join(", ") +
+      "AGENT_GRAMMAR does not mention: " + missing.join(", ") +
       " — a model given only this grammar cannot use them");
   });
 });

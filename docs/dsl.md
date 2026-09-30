@@ -16,7 +16,7 @@ SQL each cohort compiled to.
   "views":   [ view, ... ] }                  // max 6
 ```
 
-Sent to `POST /api/analysis`, edited by the in-app chat, and encoded in shareable
+Sent to `POST /api/analysis`, edited by the researcher's assistant through the page's WebMCP tools, and encoded in shareable
 `/analysis?doc=<base64url>` links.
 
 ## Cohort definitions

@@ -163,7 +163,7 @@ function cohortStudies(def: CohortDef | undefined, docStudy: string): string[] {
 /**
  * `oncoprint: "spec"` returns what to ask for instead of a rendered picture: the web app
  * fetches the binary contract itself and draws it, so the run does no oncoprint queries.
- * The default, "svg", is what MCP and the in-app chat need.
+ * The default, "svg", is what MCP needs.
  */
 export interface RunOpts { oncoprint?: "svg" | "spec" }
 
@@ -830,7 +830,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               " could not contribute: aggregate-only participants have no patient-level covariates to fit on."
             : "") +
           " Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers, unlike KM/log-rank." };
-      // Rendered here, by the SAME renderer the chat and MCP use — the app draws the
+      // Rendered here, by the SAME renderer MCP uses — the app draws the
       // forest plot as this SVG rather than a second, hand-rolled chart (the pattern
       // the clinical course and treatment-sequence views already follow).
       coxResult.svg = viewToSvg(coxResult) || undefined;
@@ -1111,7 +1111,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           (unknown.length ? " Not found in this cohort, so not plotted: " + unknown.join(", ") + "." : "") +
           (dropped.length ? " Excluded for having no temporal information: " + dropped.join(", ") + "." : "") +
           (vStudies.length > 1 ? " Event vocabularies are NOT harmonized across studies beyond case." : "") };
-      // Rendered here, by the SAME renderer the chat and MCP use, so the web app
+      // Rendered here, by the SAME renderer MCP uses, so the web app
       // cannot drift into showing a second, subtly different figure — the debt
       // the survival and lollipop views still carry.
       const tCourse = Date.now();
@@ -1345,7 +1345,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             participation: participationFor(sites, false),
             note: [coverageNote(data, unit), shapeNote].filter(Boolean).join(" ") || undefined
           };
-          // drawn on the server, like every view but the oncoprint, so chat and MCP get the figure
+          // drawn on the server, like every view but the oncoprint, so MCP gets the figure
           const tPlot = Date.now();
           pr.svg = viewToSvg(pr, { width: 960 }) || undefined;
           pr.renderMs = Date.now() - tPlot;
