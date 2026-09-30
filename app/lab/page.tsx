@@ -1,5 +1,6 @@
 "use client";
-import { use, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import CohortPills, { normalizeDef } from "./pills";
 import { MORE_KINDS, isMoreKind, moreSub, MoreControls, defaultMoreView } from "./more-views";
 import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
@@ -20,9 +21,9 @@ const TABS = ["explore", "cohorts", "saved", "analysis", "examples"] as const;
 type SearchParams = { [key: string]: string | string[] | undefined };
 
 /**
- * The landing tab, from the SAME searchParams Next.js already resolves on the
- * server for this route — not a client-only re-parse of window.location. That
- * match is what avoids a hydration mismatch: read the URL again on the client
+ * The landing tab, from the SAME search params the server rendered this route
+ * with (useSearchParams, below) — not a client-only re-parse of
+ * window.location. That match is what avoids a hydration mismatch: read the URL again on the client
  * (even synchronously, even before paint) and the server's HTML — rendered
  * from ?tab=analysis — no longer matches what the client says the first
  * render should be, so React discards and re-renders the whole tree, which is
@@ -308,8 +309,15 @@ function ParamRow({ name, value, busy, onChange }:
   );
 }
 
-export default function AnalysisPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const sp = use(searchParams);
+export default function AnalysisPage() {
+  // Read through useSearchParams, never `use(searchParams)`: every syncUrl() is a
+  // history.replaceState, which hands the page a NEW searchParams promise, and
+  // `use()` of an unresolved promise suspends the whole page — the layout's
+  // Suspense then shows its empty fallback for React's minimum 300 ms, a white
+  // flash on every click. The params only seed first-render state (the tab, a
+  // ?doc= link's loading skeleton), so nothing here needs them to be reactive.
+  const params = useSearchParams();
+  const sp: SearchParams = Object.fromEntries(params.entries());
   const [tab, setTab] = useState<"explore" | "cohorts" | "saved" | "analysis" | "examples">(() => tabFromParams(sp));
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   const [copied, setCopied] = useState<string | null>(null);
