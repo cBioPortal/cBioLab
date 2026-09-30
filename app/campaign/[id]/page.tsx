@@ -10,6 +10,7 @@ import { withSplit, primaryCohorts, type Hypothesis } from "../../../lib/hypothe
 import type { Campaign, Funnel, HypothesisRow } from "../../../lib/campaign.ts";
 import { installAgentTools } from "../agent-tools.ts";
 import { Prompt } from "../prompt.tsx";
+import { AgentToolsMenu } from "../../_agent/AgentToolsMenu.tsx";
 
 type Prior = { campaignId: string; question: string; verdict: string | null; p: number | null; lockedAt: string | null };
 type View = { campaign: Campaign; funnel: Funnel; prior: Record<string, Prior[]>; note?: any };
@@ -113,6 +114,8 @@ export default function CampaignPage() {
         <span className="spacer" />
         <a href="/lab" className="camp-nav">analysis app</a>
         <a href="/rationale" className="camp-nav">why this exists</a>
+        <AgentToolsMenu page="campaign" tools={TOOL_LIST} webmcp={webmcp}
+          intro="Your AI assistant — Claude in the Chrome sidebar — writes, checks and registers this campaign's hypotheses with these tools, and can lock and run it once you agree. The engine checks everything it submits." />
       </header>
       <main className="camp">
         <section className="camp-q">

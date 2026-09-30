@@ -4,6 +4,9 @@
 // and how a person sees what their assistant can do here. The tools themselves are
 // registered by lib/webmcp.ts.
 
+/** every page also carries these (lib/webmcp.ts siteTools) */
+const SITE_ROWS = [["site_pages", "pages()"], ["site_open", "open(path)"]] as const;
+
 export function AgentToolsMenu({ page, tools, webmcp, intro }: {
   page: string; tools: readonly (readonly [string, string])[]; webmcp: boolean | null; intro: string;
 }) {
@@ -19,7 +22,7 @@ export function AgentToolsMenu({ page, tools, webmcp, intro }: {
         </p>
         <table>
           <thead><tr><th>WebMCP tool ({page})</th><th>window.cohortLab</th></tr></thead>
-          <tbody>{tools.map(([a, b]) => <tr key={a}><td><code>{a}</code></td><td><code>{b}</code></td></tr>)}</tbody>
+          <tbody>{[...tools, ...SITE_ROWS].map(([a, b]) => <tr key={a}><td><code>{a}</code></td><td><code>{b}</code></td></tr>)}</tbody>
         </table>
       </div>
     </details>

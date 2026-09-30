@@ -620,7 +620,7 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .chatfigbody svg { display: block; }
 
 /* ---------------- /rationale — RATIONALE.md rendered as a page ---------------- */
-.rationale-nav { margin-bottom: 1.2rem; }
+.rationale-nav { margin-bottom: 1.2rem; display: flex; align-items: center; gap: var(--s4); }
 .rationale-nav a { color: var(--accent-ink); font-size: var(--t-md); text-decoration: none; }
 .rationale-nav a:hover { text-decoration: underline; }
 
@@ -970,7 +970,7 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
    gallery card per paper, same .card base every other page's cards use.
    --------------------------------------------------------------------------- */
 .repro-page { max-width: 900px; margin: 0 auto; padding: var(--s5) var(--s4) var(--s6); }
-.repro-nav { display: flex; gap: var(--s4); margin-bottom: var(--s5); }
+.repro-nav { display: flex; align-items: center; gap: var(--s4); margin-bottom: var(--s5); }
 .repro-nav a { color: var(--accent-ink); font-size: var(--t-md); text-decoration: none; }
 .repro-nav a:hover { text-decoration: underline; }
 .repro-intro h1 { font-family: "IBM Plex Serif", Georgia, serif; font-size: var(--t-2xl); margin: 0 0 var(--s2); }

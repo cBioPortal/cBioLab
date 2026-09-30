@@ -8,7 +8,7 @@
 import { exposeTools, type AgentTool, type Json } from "../../lib/webmcp.ts";
 import { analysisText } from "../../lib/result-text.ts";
 import { CHAT_GRAMMAR, EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef } from "../../lib/types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ExploreResult } from "../../lib/types.ts";
 
 export interface LabBridge {
   doc: AnalysisDoc;
@@ -26,6 +26,21 @@ export interface LabBridge {
   runExample: (ex: DslExample) => void;
   save: (name: string) => Promise<void>;
   link: (d: AnalysisDoc) => string;
+  // Explore: the draft cohort built by clicking facets, over the ticked studies
+  exploreStudies: string[];
+  draft: CohortDef | null;
+  explore: ExploreResult | null;
+  exploreBusy: boolean;
+  setExploreStudies: (ids: string[]) => void;
+  addClause: (clause: unknown) => void;
+  removeDraftClause: (i: number) => void;
+  clearDraft: () => void;
+  analyzeDraft: () => void;
+  saveDraft: (name: string) => Promise<{ count: number }>;
+  // saved cohorts and analyses
+  savedCohorts: Record<string, { def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null }>;
+  savedAnalyses: Record<string, { doc: AnalysisDoc; savedAt: string }>;
+  openSaved: (name: string) => void;
 }
 
 const TABS = ["explore", "cohorts", "saved", "analysis", "examples"];
@@ -47,6 +62,47 @@ async function settled(get: () => LabBridge, d: AnalysisDoc, ms = 8000): Promise
     if (Date.now() - t0 > ms) throw new Error("the page did not show the edit within 8 s — call analysis_get_document to see its state");
     await new Promise((res) => setTimeout(res, 30));
   }
+}
+
+/** Resolve once Explore has fetched the facets for the current draft (its fetch is debounced). */
+async function exploreSettled(get: () => LabBridge, ms = 90000): Promise<void> {
+  const t0 = Date.now();
+  await new Promise((res) => setTimeout(res, 450));
+  while (get().exploreBusy) {
+    if (Date.now() - t0 > ms) throw new Error("Explore is still counting after 90 s — call explore_get_state again shortly");
+    await new Promise((res) => setTimeout(res, 100));
+  }
+}
+
+function exploreState(b: LabBridge) {
+  const e = b.explore;
+  return {
+    selectedStudies: b.exploreStudies,
+    draftCohort: b.draft || { all: [] },
+    draftFilters: (b.draft?.all || []).map((c, i) => ({ index: i, clause: c })),
+    draftPatients: e?.draftCount ?? e?.totals?.patients ?? null,
+    totals: e?.totals ?? null,
+    counting: b.exploreBusy
+  };
+}
+
+/** The facets as a reader would scan them: top values, not every bin. */
+function facetSummary(e: ExploreResult | null, section: string, limit: number) {
+  if (!e) return "Explore has not counted anything yet — select studies with explore_select_studies.";
+  const want = (k: string) => section === "all" || section === k;
+  const out: Record<string, unknown> = {};
+  if (want("clinical")) out.clinical = e.clinical.slice(0, limit).map((f: any) => f.kind === "cat"
+    ? { attribute: f.attribute, per: f.per, values: f.values.slice(0, 8) }
+    : { attribute: f.attribute, per: f.per, numeric: { min: f.min, median: f.median, max: f.max } });
+  if (want("genes")) out.genes = {
+    note: "samples altered / samples profiled for THAT gene (panel-aware)",
+    mutated: (e.mutatedGenes || []).slice(0, limit).map((g) => ({ gene: g.gene, altered: g.altered, profiled: g.profiled, pct: g.freqPct })),
+    cna: (e.cnaGenes || []).slice(0, Math.min(limit, 10)).map((g) => ({ gene: g.gene, type: g.cna === 2 ? "amplification" : g.cna === -2 ? "deep deletion" : g.cna, altered: g.altered, profiled: g.profiled, pct: g.freqPct }))
+  };
+  if (want("events")) out.timelineEvents = e.events.slice(0, limit);
+  if (want("derived")) out.derived = (e.derived || []).map((d) => ({ metric: d.metric, label: d.label, buckets: d.buckets }));
+  if (want("caseLists")) out.caseLists = e.caseLists.slice(0, limit);
+  return out;
 }
 
 /** Numbers that are legal but almost always a mistake, said out loud rather than left to be noticed. */
@@ -226,6 +282,92 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
         await get().save(n);
         return `Saved as "${n}".`;
       } },
+
+    // ---- Explore: studies, facets and the draft cohort ----------------------------------
+    { name: "explore_get_state", description: "Explore's current state: the studies ticked, the draft cohort built from facet filters (each with its index), and how many patients it holds.",
+      inputSchema: { type: "object", properties: {} },
+      run: async () => exploreState(get()) },
+    { name: "explore_get_facets", description: "What the selected studies contain, counted against the current draft: clinical attributes with their top values, the most-altered genes (panel-aware), timeline event types, derived-metric buckets and case lists.",
+      inputSchema: { type: "object", properties: { section: { type: "string", enum: ["all", "clinical", "genes", "events", "derived", "caseLists"] }, limit: { type: "integer", description: "rows per list, default 25" } } },
+      run: async ({ section, limit }) => facetSummary(get().explore, section || "all", Math.max(1, Math.min(200, Number(limit) || 25))) },
+    { name: "explore_select_studies", description: "Tick exactly these studies in Explore (ids from list_studies); the facets and the draft recount over them.",
+      inputSchema: { type: "object", required: ["studies"], properties: { studies: { type: "array", items: { type: "string" } } } },
+      run: async ({ studies }) => {
+        if (!Array.isArray(studies) || !studies.length) throw new Error("give at least one study id (see list_studies)");
+        get().goTab("explore");
+        get().setExploreStudies(studies.map(String));
+        await exploreSettled(get);
+        return exploreState(get());
+      } },
+    { name: "explore_add_filter", description: "Add a clause to the draft cohort, exactly as clicking a facet does (a second value of the same clinical attribute widens it to an OR list). The clause uses the cohort grammar in dsl_reference, e.g. {kind:'clinical', attribute:'CANCER_TYPE', op:'=', value:'Breast Cancer', per:'sample'}.",
+      inputSchema: { type: "object", required: ["clause"], properties: { clause: { type: "object" } } },
+      run: async ({ clause }) => {
+        if (!get().exploreStudies.length) throw new Error("select studies first (explore_select_studies)");
+        get().goTab("explore");
+        get().addClause(clone(clause));
+        await exploreSettled(get);
+        const st = exploreState(get());
+        return { ...st, ...(st.draftPatients === 0 ? { warning: "the draft now matches 0 patients — check the clause against explore_get_facets" } : {}) };
+      } },
+    { name: "explore_remove_filter", description: "Remove one clause from the draft cohort by its index (see explore_get_state).",
+      inputSchema: { type: "object", required: ["index"], properties: { index: { type: "integer" } } },
+      run: async ({ index }) => {
+        const n = (get().draft?.all || []).length;
+        if (!Number.isInteger(index) || index < 0 || index >= n) throw new Error(`no filter ${index}: the draft has ${n}`);
+        get().removeDraftClause(index);
+        await exploreSettled(get);
+        return exploreState(get());
+      } },
+    { name: "explore_clear_filters", description: "Remove every clause from the draft cohort (the studies stay selected).",
+      inputSchema: { type: "object", properties: {} },
+      run: async () => { get().clearDraft(); await exploreSettled(get); return exploreState(get()); } },
+    { name: "explore_analyze", description: "Start a fresh analysis of the draft cohort with the default views, replacing the analysis on the page (analysis_undo can bring it back).",
+      inputSchema: { type: "object", properties: {} },
+      run: async () => {
+        if (!get().exploreStudies.length) throw new Error("select studies first (explore_select_studies)");
+        undo.push(get().doc);
+        get().analyzeDraft();
+        return "Started an analysis of the draft cohort. Call analysis_get_results in a few seconds.";
+      } },
+    { name: "cohorts_save_draft", description: "Save the draft cohort under a name in the shared saved-cohorts list. Ask the user before calling.",
+      inputSchema: { type: "object", required: ["name"], properties: { name: { type: "string" } } },
+      run: async ({ name }) => {
+        const n = String(name || "").trim();
+        if (!n) throw new Error("a saved cohort needs a name");
+        const r = await get().saveDraft(n);
+        return `Saved cohort "${n}" (${r.count.toLocaleString()} patients).`;
+      } },
+
+    // ---- saved cohorts and analyses -----------------------------------------------------
+    { name: "cohorts_list_saved", description: "The saved cohorts (definitions and last known size) and saved analyses (names and when saved).",
+      inputSchema: { type: "object", properties: {} },
+      run: async () => {
+        const b = get();
+        return {
+          cohorts: Object.entries(b.savedCohorts).map(([name, c]) => ({ name, savedAt: c.savedAt, patients: c.lastEval?.count ?? null, definition: c.def })),
+          analyses: Object.entries(b.savedAnalyses).map(([name, w]) => ({ name, savedAt: w.savedAt, study: w.doc.study, cohorts: Object.keys(w.doc.cohorts || {}), views: (w.doc.views || []).map((v) => v.kind) }))
+        };
+      } },
+    { name: "cohorts_add_saved_to_analysis", description: "Put saved cohorts into the current analysis by name (a cohort of the same name is replaced). Validated by the engine like every edit.",
+      inputSchema: { type: "object", required: ["names"], properties: { names: { type: "array", items: { type: "string" } } } },
+      run: async ({ names }) => {
+        const b = get();
+        const missing = (names || []).filter((n: string) => !b.savedCohorts[n]);
+        if (missing.length) throw new Error(`no saved cohort ${missing.map((n: string) => `"${n}"`).join(", ")}; have ${Object.keys(b.savedCohorts).join(", ") || "none"}`);
+        const d = clone(b.doc);
+        d.cohorts = { ...(d.cohorts || {}) };
+        for (const n of names) d.cohorts[n] = clone(b.savedCohorts[n].def);
+        return edit(`add saved cohort${names.length === 1 ? "" : "s"} ${names.map((n: string) => `"${n}"`).join(", ")}`, d);
+      } },
+    { name: "analysis_open_saved", description: "Open a saved analysis by name, replacing the one on the page (analysis_undo can bring it back).",
+      inputSchema: { type: "object", required: ["name"], properties: { name: { type: "string" } } },
+      run: async ({ name }) => {
+        const b = get();
+        if (!b.savedAnalyses[name]) throw new Error(`no saved analysis "${name}"; have ${Object.keys(b.savedAnalyses).join(", ") || "none"}`);
+        undo.push(b.doc);
+        b.openSaved(name);
+        return `Opened "${name}" and started running it. Call analysis_get_results in a few seconds.`;
+      } },
     { name: "open_tab", description: `Show one of the page's tabs: ${TABS.join(", ")}.`,
       inputSchema: { type: "object", required: ["tab"], properties: { tab: { type: "string", enum: TABS } } },
       run: async ({ tab }) => { if (!TABS.includes(tab)) throw new Error(`tab is one of ${TABS.join(", ")}`); get().goTab(tab); return `showing ${tab}`; } }
@@ -253,7 +395,18 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
     loadExample: (title: string) => byName("analysis_load_example")({ title }),
     shareLink: byName("analysis_share_link"),
     save: (name: string) => byName("analysis_save")({ name }),
-    openTab: (tab: string) => byName("open_tab")({ tab })
+    openTab: (tab: string) => byName("open_tab")({ tab }),
+    exploreState: byName("explore_get_state"),
+    exploreFacets: (section?: string, limit?: number) => byName("explore_get_facets")({ section, limit }),
+    selectStudies: (studies: string[]) => byName("explore_select_studies")({ studies }),
+    addFilter: (clause: Json) => byName("explore_add_filter")({ clause }),
+    removeFilter: (index: number) => byName("explore_remove_filter")({ index }),
+    clearFilters: byName("explore_clear_filters"),
+    analyzeDraft: byName("explore_analyze"),
+    saveDraft: (name: string) => byName("cohorts_save_draft")({ name }),
+    listSaved: byName("cohorts_list_saved"),
+    addSavedToAnalysis: (names: string[]) => byName("cohorts_add_saved_to_analysis")({ names }),
+    openSaved: (name: string) => byName("analysis_open_saved")({ name })
   });
 }
 
@@ -264,5 +417,11 @@ export const LAB_TOOL_NAMES = [
   ["analysis_set_cohort", "setCohort(name, def)"], ["analysis_remove_cohort", "removeCohort(name)"], ["analysis_add_view", "addView(view, position?)"],
   ["analysis_update_view", "updateView(i, patch)"], ["analysis_remove_view", "removeView(i)"], ["analysis_move_view", "moveView(from, to)"],
   ["analysis_set_details", "setDetails({study, title, notes, params})"], ["analysis_undo", "undo()"], ["analysis_load_example", "loadExample(title)"],
-  ["analysis_share_link", "shareLink()"], ["analysis_save", "save(name)"], ["open_tab", "openTab(tab)"]
+  ["analysis_share_link", "shareLink()"], ["analysis_save", "save(name)"], ["open_tab", "openTab(tab)"],
+  ["explore_get_state", "exploreState()"], ["explore_get_facets", "exploreFacets(section?, limit?)"],
+  ["explore_select_studies", "selectStudies([ids])"], ["explore_add_filter", "addFilter(clause)"],
+  ["explore_remove_filter", "removeFilter(i)"], ["explore_clear_filters", "clearFilters()"],
+  ["explore_analyze", "analyzeDraft()"], ["cohorts_save_draft", "saveDraft(name)"],
+  ["cohorts_list_saved", "listSaved()"], ["cohorts_add_saved_to_analysis", "addSavedToAnalysis([names])"],
+  ["analysis_open_saved", "openSaved(name)"]
 ] as const;

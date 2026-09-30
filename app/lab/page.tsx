@@ -2472,7 +2472,17 @@ function Latency({ v }: { v: any }) {
   labBridge.current = {
     doc, result, busy, error, tab, study, savedAs: analysisSaved ? doc.title || null : null,
     validate: validateDoc, commit: commitDoc, goTab: (t) => goTab(t as typeof TABS[number]),
-    runExample: runDocExample, save: saveAs, link: docLink
+    runExample: runDocExample, save: saveAs, link: docLink,
+    exploreStudies: exSel.current, draft: parseDraft(), explore, exploreBusy,
+    setExploreStudies, addClause, removeDraftClause, clearDraft, analyzeDraft,
+    saveDraft: async (name: string) => {
+      const def = barDef();
+      if (!def) throw new Error("select at least one study first");
+      const ev = await evalDef(name, def);
+      await persist(name, def, ev);
+      return { count: ev.count };
+    },
+    savedCohorts: saved, savedAnalyses: spaces, openSaved: openWorkspace
   };
   const [webmcp, setWebmcp] = useState<boolean | null>(null);
   useEffect(() => {

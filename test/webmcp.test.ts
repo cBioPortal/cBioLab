@@ -29,6 +29,16 @@ describe("exposeTools: one tool list, two ways in", () => {
     assert.equal(registered.has("echo"), false);
     assert.equal((globalThis as any).cohortLab, undefined);
   });
+  test("every page also carries the site tools, and site_open stays on this site", async () => {
+    const t = exposeTools("test", [], {});
+    assert.ok(registered.has("site_pages") && registered.has("site_open"));
+    const pages = JSON.parse(await text("site_pages"));
+    assert.ok(pages.some((p: any) => p.path === "/lab") && pages.some((p: any) => p.path === "/campaign"));
+    for (const bad of ["https://evil.example", "//evil.example", "lab"])
+      assert.match(await text("site_open", { path: bad }), /^REJECTED: a path on this site/);
+    t.cleanup();
+    assert.equal(registered.size, 0);
+  });
   test("a thrown error comes back as a REJECTED result, not an exception", async () => {
     const t = exposeTools("test", [{ name: "boom", description: "", inputSchema: {}, run: async () => { throw new Error("nope"); } }], {});
     const r = await registered.get("boom").execute({});
