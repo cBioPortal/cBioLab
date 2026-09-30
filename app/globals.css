@@ -760,13 +760,14 @@ details.gearmenu.inline[open] > summary {
 .customseq { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.8rem; padding-top: 0.6rem;
   border-top: 1px solid var(--line); max-width: 34rem; }
 .customseq h4 { margin: 0 0 0.2rem; font-size: var(--t-md); font-weight: 600; }
-/* Quick add: one textarea, a ranked list of directly-clickable suggestions
-   below it. Kind colors match CohortPills' own KIND_META exactly (gene/OQL
-   pink, clinical blue, timeline green) so a suggestion and the pill it turns
-   into read as the same thing. */
+/* Quick add: finished clauses persist as chips above a single trailing text
+   input, with a ranked list of directly-clickable suggestions below it while
+   idle. Kind colors match CohortPills' own KIND_META exactly (gene/OQL pink,
+   clinical blue, timeline green) so a suggestion, a chip, and the pill it
+   would also show as in the draft bar below all read as the same thing. */
 .quickaddbox { width: 100%; max-width: 40rem; box-sizing: border-box; margin-top: 0.5rem; padding: 0.5rem 0.6rem;
   font: inherit; font-size: var(--t-base); border: 1px solid var(--line); border-radius: var(--r-md);
-  background: var(--card); color: var(--ink); resize: vertical; }
+  background: var(--card); color: var(--ink); }
 .quickaddbox:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .quicksuggest { display: flex; flex-direction: column; gap: 0.15rem; margin-top: 0.6rem; max-width: 40rem;
   max-height: 22rem; overflow-y: auto; overscroll-behavior: contain; }
@@ -779,6 +780,20 @@ details.gearmenu.inline[open] > summary {
 .qskind-gene { background: #CC79A7; }
 .qskind-event { background: #009E73; }
 .qslabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The chip row: finished clauses, in order, "or"/"and" glue between them
+   read straight off the draft's own JSON shape (same clause = or, different
+   `all` entries = and — see deriveQuickChips) rather than a separate ledger. */
+.qachips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin-top: 0.5rem; max-width: 40rem; }
+.qachip { display: inline-flex; align-items: center; gap: 0.3rem; font-size: var(--t-md);
+  padding: 0.2rem 0.3rem 0.2rem 0.55rem; border-radius: var(--r-pill); border: 1px solid var(--line);
+  background: var(--code-bg); color: var(--ink); white-space: nowrap; }
+.qachip-clinical { border-left: 3px solid #0072B2; }
+.qachip-gene { border-left: 3px solid #CC79A7; }
+.qachip-event { border-left: 3px solid #009E73; }
+.qachipx { border: none; background: none; color: var(--muted); cursor: pointer; font-size: var(--t-md);
+  line-height: 1; padding: 0 0.15rem; border-radius: var(--r-sm); }
+.qachipx:hover { background: var(--line); color: var(--ink); }
+.qaconn { font-size: var(--t-xs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
 /* The clinical attribute checklist: a plain single-column table, not tiled into
    several columns — multi-column checkboxes read as disorienting (which row
    continues where?), where a table's one reading order and aligned columns don't.

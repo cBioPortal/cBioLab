@@ -1,5 +1,5 @@
 "use client";
-import { use, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, use, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import CohortPills, { normalizeDef } from "./pills";
 import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
 import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
@@ -344,6 +344,14 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   const [gcDriver, setGcDriver] = useState(false);                // OncoKB driver-only modifier
   const [gcOp, setGcOp] = useState<">" | ">=" | "<" | "<=">(">"); // expression-threshold operator
   const [gcThresh, setGcThresh] = useState("2");                  // expression-threshold z-score
+  /** How a NEW gene condition combines with one already in the draft — only
+   *  meaningful (and only shown) once a first one exists. Shared by the Gene
+   *  condition form wherever it renders (Cohort builder tab, Quick add). */
+  const [gcAndOr, setGcAndOr] = useState<"OR" | "AND">("OR");
+  /** Quick add: which multi-step clause is currently being built in the
+   *  trailing input — "idle" shows the plain search+suggestions list, "gene"/
+   *  "event" swap in the full Gene condition / Timeline sequence form inline. */
+  const [quickMode, setQuickMode] = useState<"idle" | "gene" | "event">("idle");
   const tabRef = useRef<string>(tabFromParams(sp));            // the tab syncUrl should record
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
   const exAbort = useRef<AbortController | null>(null);      // cancel a facet request the reader has moved past
@@ -1148,6 +1156,22 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   };
 
   /**
+   * Append a clause as its OWN top-level `all` entry, bypassing addClause's
+   * same-kind merge (an oql clause's ";"-joined genes, a clinical attribute's
+   * `values` list). The escape hatch Quick add's gene and/or toggle uses for
+   * an explicit AND: two independently-required gene conditions, not one
+   * "either" clause — addClause alone has no way to produce that, since it
+   * always folds a second oql/clinical-same-attribute addition into the
+   * first ("altered by ANY entry" is the only shape addClause's merge makes).
+   */
+  const addClauseForceSeparate = (clause: any) => {
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
+    if (!d || !Array.isArray(d.all)) d = { all: [] };
+    d.all.push(clause);
+    const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d);
+  };
+
+  /**
    * Append several clauses as one action. A gene-state pick is two of them —
    * "profiled for this gene" AND the alteration — and it has to be both: the
    * facet counted 14,690 EGFR-mutant patients inside the profiled set, while
@@ -1313,11 +1337,21 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     }
   };
   const gcReady = gcBuildQ() != null;
-  const addGeneCondition = () => {
+  /** Is there already a gene condition in the draft to combine with? Only then
+   *  is and/or actually ambiguous — a first gene condition has nothing to
+   *  combine with, so no choice is offered for it. */
+  const hasExistingOql = () => !!(parseDraft()?.all || []).some((c: any) => c.kind === "oql" && String(c.q || "").trim());
+  const addGeneCondition = (onAfterAdd?: () => void) => {
     const q = gcBuildQ();
     if (!q) return;
-    addClause({ kind: "oql", q });
+    // addClause's own merge always ORs a second gene into the first oql
+    // clause ("altered by ANY entry") — matches every other gene-adding
+    // surface in the app (gene-table clicks, this same form elsewhere) by
+    // default. An explicit AND choice needs the separate, non-merging path.
+    if (gcAndOr === "AND" && hasExistingOql()) addClauseForceSeparate({ kind: "oql", q });
+    else addClause({ kind: "oql", q });
     setGcGene(""); setGcPchange("");
+    onAfterAdd?.();
   };
 
   /**
@@ -1326,7 +1360,7 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
    * Reads/writes the same `seq` state either way, so switching surfaces
    * mid-build keeps whatever was already set.
    */
-  const renderTimelineSeqBuilder = () => {
+  const renderTimelineSeqBuilder = (onAfterAdd?: () => void) => {
     if (!explore || explore.events.length === 0) {
       return <p className="note" style={{ marginTop: 0 }}>This study has no clinical timeline events to derive a filter from.</p>;
     }
@@ -1425,11 +1459,87 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
               treatment-naive before the first event
             </label>
             <hr />
-            <button className="facet" disabled={!seqReady} onClick={addSeqFilter}>add filter</button>
+            <button className="facet" disabled={!seqReady} onClick={() => { addSeqFilter(); onAfterAdd?.(); }}>add filter</button>
         </div>
       </div>
     );
   };
+
+  /**
+   * The gene-condition form — shared by the Cohort builder tab's Gene
+   * condition panel and Quick add's inline "gene" mode. The and/or row only
+   * appears once there's an existing gene condition to combine with (see
+   * hasExistingOql's own comment); v1 offers OR/AND for genes specifically
+   * because that's the one place addClause's default merge behavior is
+   * genuinely ambiguous — see docs/quick-add-intent.md.
+   */
+  const renderGeneConditionForm = (onAfterAdd?: () => void) => (
+    <div className="customseq" style={{ marginTop: "0.6rem" }}>
+      <h4>Gene condition</h4>
+      <div className="setrow">
+        <span className="meta">gene</span>
+        <input type="text" placeholder="e.g. TP53" value={gcGene}
+          onChange={e => setGcGene(e.target.value)} style={{ width: "8rem", textTransform: "uppercase" }} />
+      </div>
+      <div className="setrow">
+        <span className="meta">condition</span>
+        <select value={gcType} onChange={e => setGcType(e.target.value as any)}>
+          <option value="ANY">any alteration</option>
+          <option value="MUT">mutated (any)</option>
+          <option value="MUT_SPECIFIC">specific protein change…</option>
+          <option value="MUT_CLASS">mutation class…</option>
+          <option value="AMP">amplified</option>
+          <option value="HOMDEL">homozygously deleted</option>
+          <option value="CNA">any copy-number alteration</option>
+          <option value="FUSION">structural variant / fusion</option>
+          {gcExpAvailable && <option value="EXP">expression threshold…</option>}
+        </select>
+        {gcType === "MUT_SPECIFIC" && (
+          <input type="text" placeholder="e.g. G12C" value={gcPchange}
+            onChange={e => setGcPchange(e.target.value)} style={{ width: "6rem" }} />
+        )}
+        {gcType === "MUT_CLASS" && (
+          <select value={gcClass} onChange={e => setGcClass(e.target.value)}>
+            <option value="MISSENSE">missense</option>
+            <option value="NONSENSE">nonsense</option>
+            <option value="TRUNC">truncating</option>
+            <option value="INFRAME">in-frame indel</option>
+            <option value="SPLICE">splice</option>
+          </select>
+        )}
+        {gcType === "EXP" && (
+          <>
+            <select value={gcOp} onChange={e => setGcOp(e.target.value as any)}>
+              <option value=">">above</option>
+              <option value=">=">at or above</option>
+              <option value="<">below</option>
+              <option value="<=">at or below</option>
+            </select>
+            <input type="number" value={gcThresh}
+              onChange={e => setGcThresh(e.target.value)} style={{ width: "4rem" }} />
+            <span className="meta">z-score</span>
+          </>
+        )}
+      </div>
+      {gcType !== "EXP" && (
+        <label className="chk" title="restrict to OncoKB-annotated driver alterations">
+          <input type="checkbox" checked={gcDriver} onChange={e => setGcDriver(e.target.checked)} />
+          driver-annotated only
+        </label>
+      )}
+      {hasExistingOql() && (
+        <div className="setrow" title="how this gene condition combines with the gene condition already in the draft">
+          <span className="meta">combine as</span>
+          <select value={gcAndOr} onChange={e => setGcAndOr(e.target.value as any)}>
+            <option value="OR">OR — either is enough (default)</option>
+            <option value="AND">AND — both required independently</option>
+          </select>
+        </div>
+      )}
+      <hr />
+      <button className="facet" disabled={!gcReady} onClick={() => addGeneCondition(onAfterAdd)}>add condition</button>
+    </div>
+  );
 
   /**
    * The running-draft bar: filter count, live match count, pills with a
@@ -1486,6 +1596,93 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
         </dialog>
       </div>
     );
+  };
+
+  /** A short label for a timeline-event clause's A (or B) side, for the chip
+   *  row — the same fields seqSelector produces, read back for display. */
+  const eventSideLabel = (side: any): string => {
+    if (!side) return "";
+    if (side.eventType === LINE_TYPE) {
+      if (side.attrs) { const a = side.attrs.find((x: any) => x.key === "LINE_NO"); return "line " + (a ? a.value : "?"); }
+      if (side.numeric) return "line " + side.numeric.op + " " + side.numeric.value;
+      return "a treatment line";
+    }
+    const occ = side.occurrence && side.occurrence !== "ANY" ? " (" + side.occurrence.toLowerCase() + ")" : "";
+    return side.eventType + occ;
+  };
+  const eventClauseLabel = (cl: any): string => {
+    const a = eventSideLabel(cl.a);
+    if (!cl.rel || cl.rel.type === "NONE") return "has " + a;
+    const rel = cl.rel.type === "BEFORE" ? "→ within " + cl.rel.maxDays + "d →"
+      : cl.rel.type === "NOT_FOLLOWED_BY" ? "→ not within " + cl.rel.withinDays + "d →"
+      : "during";
+    return a + " " + rel + " " + eventSideLabel(cl.b);
+  };
+
+  /**
+   * Quick add's chip row: derived fresh from the draft on every render, not a
+   * separate ledger kept in sync by hand — so chips always match whatever is
+   * actually in cDefText regardless of which surface (Explore clicks, Cohort
+   * builder, or this composer) put it there. Two genes merged into one oql
+   * clause's ";"-joined q, or two values on one clinical attribute, become
+   * multiple chips "or"-joined (same clauseIndex); different `all` entries
+   * are always "and" in v1 — no {any:[...]} support yet, so cross-kind OR
+   * isn't buildable through this UI (see docs/quick-add-intent.md, open
+   * question 1).
+   */
+  const deriveQuickChips = (def: any): { key: string; label: string; kind: "clinical" | "gene" | "event" | "other"; clauseIndex: number; subIndex?: number }[] => {
+    const chips: { key: string; label: string; kind: "clinical" | "gene" | "event" | "other"; clauseIndex: number; subIndex?: number }[] = [];
+    if (!def || !Array.isArray(def.all)) return chips;
+    def.all.forEach((cl: any, ci: number) => {
+      if (cl.kind === "clinical") {
+        const unit = cl.per === "sample" ? " (sample)" : "";
+        if (Array.isArray(cl.values) && cl.values.length) {
+          cl.values.forEach((v: string, vi: number) =>
+            chips.push({ key: ci + ":" + vi, label: cl.attribute + " = " + v + unit, kind: "clinical", clauseIndex: ci, subIndex: vi }));
+        } else if (cl.op === "=" && cl.value != null) {
+          chips.push({ key: ci + "", label: cl.attribute + " = " + cl.value + unit, kind: "clinical", clauseIndex: ci });
+        } else if (cl.range) {
+          const r = cl.range;
+          const label = r.gte != null ? cl.attribute + " ≥ " + r.gte : r.gt != null ? cl.attribute + " > " + r.gt
+            : r.lt != null ? cl.attribute + " < " + r.lt : r.lte != null ? cl.attribute + " ≤ " + r.lte : cl.attribute;
+          chips.push({ key: ci + "", label: label + unit, kind: "clinical", clauseIndex: ci });
+        } else {
+          chips.push({ key: ci + "", label: cl.attribute + unit, kind: "clinical", clauseIndex: ci });
+        }
+      } else if (cl.kind === "oql") {
+        String(cl.q || "").split(/[;\n]/).map((s: string) => s.trim()).filter(Boolean).forEach((entry: string, ei: number) =>
+          chips.push({ key: ci + ":" + ei, label: entry, kind: "gene", clauseIndex: ci, subIndex: ei }));
+      } else if (cl.kind === "event") {
+        chips.push({ key: ci + "", label: eventClauseLabel(cl), kind: "event", clauseIndex: ci });
+      } else {
+        chips.push({ key: ci + "", label: cl.kind || "clause", kind: "other", clauseIndex: ci });
+      }
+    });
+    return chips;
+  };
+  const quickChips = useMemo(() => deriveQuickChips(parseDraft()), [cDefText]); // eslint-disable-line
+
+  /** Remove one chip — a sub-entry of a merged clause if it has siblings
+   *  (splice out of q's ";"-joined entries, or a clinical values[]), else the
+   *  whole `all` entry. Mirrors removeDraftClause's own JSON-surgery style. */
+  const removeQuickChip = (chip: { clauseIndex: number; subIndex?: number; kind: string }) => {
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { return; }
+    if (!d || !Array.isArray(d.all)) return;
+    const cl: any = d.all[chip.clauseIndex];
+    if (!cl) return;
+    if (chip.kind === "clinical" && Array.isArray(cl.values) && chip.subIndex != null) {
+      cl.values.splice(chip.subIndex, 1);
+      if (!cl.values.length) d.all.splice(chip.clauseIndex, 1);
+      else if (cl.values.length === 1) { cl.value = cl.values[0]; cl.op = "="; delete cl.values; }
+    } else if (chip.kind === "gene" && chip.subIndex != null) {
+      const entries = String(cl.q || "").split(/[;\n]/).map((s: string) => s.trim()).filter(Boolean);
+      entries.splice(chip.subIndex, 1);
+      if (!entries.length) d.all.splice(chip.clauseIndex, 1);
+      else cl.q = entries.join("; ");
+    } else {
+      d.all.splice(chip.clauseIndex, 1);
+    }
+    const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d.all.length ? d : null);
   };
 
   /**
@@ -1555,6 +1752,11 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
         on: () => addClause({ kind: "oql", q: g }) });
       out.push({ kind: "gene", label: g + " — mutated", meta: geneAlready(g, "MUT") ? "already added" : undefined,
         on: () => addClause({ kind: "oql", q: g + ": MUT" }) });
+      // The two one-click shortcuts above always OR into the existing gene
+      // condition (addClause's own default) — reaching AND, or any of the
+      // rarer alteration types, goes through the full form instead.
+      out.push({ kind: "gene", label: g + " — configure alteration type…",
+        on: () => { setGcGene(g); setQuickMode("gene"); } });
     }
     // Timeline events
     for (const e of explore.events || []) {
@@ -1563,6 +1765,8 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
         const already = !!(d && d.all.some((cl: any) => cl.kind === "event" && cl.rel?.type === "NONE" && cl.a?.eventType === e.type));
         out.push({ kind: "event", label: "has " + e.type, meta: (already ? "already added · " : "") + e.n.toLocaleString(),
           on: () => addClause({ kind: "event", a: { eventType: e.type }, rel: { type: "NONE" } }) });
+        out.push({ kind: "event", label: e.type + " — build a sequence…",
+          on: () => { setSeq(s => ({ ...s, aType: e.type })); setQuickMode("event"); } });
       }
     }
     return out.slice(0, QUICK_CAP_TOTAL);
@@ -3682,63 +3886,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 );
               })()}
-              {builderKind === "gene" && (
-                <div className="customseq" style={{ marginTop: "0.6rem" }}>
-                  <div className="setrow">
-                    <span className="meta">gene</span>
-                    <input type="text" placeholder="e.g. TP53" value={gcGene}
-                      onChange={e => setGcGene(e.target.value)} style={{ width: "8rem", textTransform: "uppercase" }} />
-                  </div>
-                  <div className="setrow">
-                    <span className="meta">condition</span>
-                    <select value={gcType} onChange={e => setGcType(e.target.value as any)}>
-                      <option value="ANY">any alteration</option>
-                      <option value="MUT">mutated (any)</option>
-                      <option value="MUT_SPECIFIC">specific protein change…</option>
-                      <option value="MUT_CLASS">mutation class…</option>
-                      <option value="AMP">amplified</option>
-                      <option value="HOMDEL">homozygously deleted</option>
-                      <option value="CNA">any copy-number alteration</option>
-                      <option value="FUSION">structural variant / fusion</option>
-                      {gcExpAvailable && <option value="EXP">expression threshold…</option>}
-                    </select>
-                    {gcType === "MUT_SPECIFIC" && (
-                      <input type="text" placeholder="e.g. G12C" value={gcPchange}
-                        onChange={e => setGcPchange(e.target.value)} style={{ width: "6rem" }} />
-                    )}
-                    {gcType === "MUT_CLASS" && (
-                      <select value={gcClass} onChange={e => setGcClass(e.target.value)}>
-                        <option value="MISSENSE">missense</option>
-                        <option value="NONSENSE">nonsense</option>
-                        <option value="TRUNC">truncating</option>
-                        <option value="INFRAME">in-frame indel</option>
-                        <option value="SPLICE">splice</option>
-                      </select>
-                    )}
-                    {gcType === "EXP" && (
-                      <>
-                        <select value={gcOp} onChange={e => setGcOp(e.target.value as any)}>
-                          <option value=">">above</option>
-                          <option value=">=">at or above</option>
-                          <option value="<">below</option>
-                          <option value="<=">at or below</option>
-                        </select>
-                        <input type="number" value={gcThresh}
-                          onChange={e => setGcThresh(e.target.value)} style={{ width: "4rem" }} />
-                        <span className="meta">z-score</span>
-                      </>
-                    )}
-                  </div>
-                  {gcType !== "EXP" && (
-                    <label className="chk" title="restrict to OncoKB-annotated driver alterations">
-                      <input type="checkbox" checked={gcDriver} onChange={e => setGcDriver(e.target.checked)} />
-                      driver-annotated only
-                    </label>
-                  )}
-                  <hr />
-                  <button className="facet" disabled={!gcReady} onClick={addGeneCondition}>add condition</button>
-                </div>
-              )}
+              {builderKind === "gene" && renderGeneConditionForm()}
               {builderKind === "timeline" && <div style={{ marginTop: "0.6rem" }}>{renderTimelineSeqBuilder()}</div>}
             </>}
           </div>
@@ -3746,14 +3894,21 @@ function Latency({ v }: { v: any }) {
         </div>}
 
         {/* ================= Quick add tab ================= */}
-        {/* A second, experimental way to build the same draft as the Cohort
-            builder tab: one free-text box instead of picking a kind first,
-            with live suggestions merged across all three kinds below it.
-            Every suggestion is a direct addClause — the typed text itself is
-            never parsed/submitted, only used to rank/filter what's shown. */}
+        {/* A second way to build the same draft as the Cohort builder tab:
+            one input instead of picking a kind first. Finished clauses
+            persist as chips ABOVE the input (derived live from the draft
+            itself — see deriveQuickChips's own comment — so they never drift
+            out of sync with what Explore or Cohort builder also write into
+            the same cDefText). Typing a gene or a timeline event switches the
+            trailing input into that clause's own multi-step form (reusing
+            the Cohort builder's Gene condition / Timeline sequence builders
+            verbatim); committing it adds one more chip and returns to plain
+            search. Every chip still comes from a clicked suggestion — the
+            typed text itself is never parsed as a clause. See
+            docs/quick-add-intent.md for the full design and open questions. */}
         {tab === "quickadd" && <div>
           <div className="card">
-            <h2>Quick add <span className="plain">— type anything; click a suggestion below to add it</span></h2>
+            <h2>Quick add <span className="plain">— type anything; finished filters collect above as chips</span></h2>
             <p className="meta">
               Building for {exStudies.length} stud{exStudies.length === 1 ? "y" : "ies"}
               {exStudies.length > 0 ? ": " + exStudies.join(", ") : ""} — change the selection on the{" "}
@@ -3762,31 +3917,59 @@ function Latency({ v }: { v: any }) {
             {exStudies.length === 0 && <p className="note">No studies selected — pick some on the Explore tab first.</p>}
             {exStudies.length > 0 && !explore && <div className="loading-block"><span className="spinner" /> Building study facets…</div>}
             {exStudies.length > 0 && explore && <>
-              <textarea className="quickaddbox" rows={2} autoFocus
-                placeholder="a gene (TP53), part of a clinical attribute or value (lung, stage), a timeline event (progression)…"
-                value={quickQuery} onChange={e => setQuickQuery(e.target.value)} />
-              {!quickQuery.trim() && (
-                <p className="note" style={{ marginTop: "0.5rem" }}>
-                  Start typing — matches against clinical attributes and their values, gene symbols, and timeline event types appear below as you go.
-                </p>
+              {quickChips.length > 0 && (
+                <div className="qachips">
+                  {quickChips.map((chip, i) => (
+                    <Fragment key={chip.key}>
+                      {i > 0 && (
+                        <span className={"qaconn" + (quickChips[i - 1].clauseIndex === chip.clauseIndex ? " qaconn-or" : " qaconn-and")}>
+                          {quickChips[i - 1].clauseIndex === chip.clauseIndex ? "or" : "and"}
+                        </span>
+                      )}
+                      <span className={"qachip qachip-" + chip.kind}>
+                        {chip.label}
+                        <button className="qachipx" title="remove" onClick={() => removeQuickChip(chip)}>×</button>
+                      </span>
+                    </Fragment>
+                  ))}
+                </div>
               )}
-              {quickQuery.trim() && (
-                quickSuggestions.length ? (
-                  <div className="quicksuggest">
-                    {quickSuggestions.map((s, i) => (
-                      <button key={i} className="qsrow" onClick={s.on}>
-                        <span className={"qskind qskind-" + s.kind}>{s.kind}</span>
-                        <span className="qslabel">{s.label}</span>
-                        {s.meta && <span className="meta">{s.meta}</span>}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
+              {quickMode === "idle" && <>
+                <input className="quickaddbox" type="text" autoFocus
+                  placeholder="a gene (TP53), part of a clinical attribute or value (lung, stage), a timeline event (progression)…"
+                  value={quickQuery} onChange={e => setQuickQuery(e.target.value)} />
+                {!quickQuery.trim() && (
                   <p className="note" style={{ marginTop: "0.5rem" }}>
-                    No matches for "{quickQuery.trim()}" among clinical attributes/values, genes, or timeline events.
+                    Start typing — matches against clinical attributes and their values, gene symbols, and timeline event types appear below as you go.
                   </p>
-                )
-              )}
+                )}
+                {quickQuery.trim() && (
+                  quickSuggestions.length ? (
+                    <div className="quicksuggest">
+                      {quickSuggestions.map((s, i) => (
+                        <button key={i} className="qsrow" onClick={() => { s.on(); setQuickQuery(""); }}>
+                          <span className={"qskind qskind-" + s.kind}>{s.kind}</span>
+                          <span className="qslabel">{s.label}</span>
+                          {s.meta && <span className="meta">{s.meta}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="note" style={{ marginTop: "0.5rem" }}>
+                      No matches for "{quickQuery.trim()}" among clinical attributes/values, genes, or timeline events.
+                    </p>
+                  )
+                )}
+              </>}
+              {quickMode === "gene" && <div>
+                {renderGeneConditionForm(() => { setQuickMode("idle"); setQuickQuery(""); })}
+                <button className="linklike" style={{ marginTop: "0.3rem" }}
+                  onClick={() => { setQuickMode("idle"); setGcGene(""); setGcPchange(""); }}>‹ cancel, back to search</button>
+              </div>}
+              {quickMode === "event" && <div>
+                {renderTimelineSeqBuilder(() => { setQuickMode("idle"); setQuickQuery(""); })}
+                <button className="linklike" style={{ marginTop: "0.3rem" }} onClick={() => setQuickMode("idle")}>‹ cancel, back to search</button>
+              </div>}
             </>}
           </div>
           {renderDraftBar({ alwaysShow: true })}

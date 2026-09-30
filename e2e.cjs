@@ -803,9 +803,11 @@ async function main() {
       const zeroState = await page.locator(".exbar:has-text('no filters yet')").count();
       ok("the builder's draft bar stays visible at zero, unlike Explore's", zeroState > 0);
 
-      // Quick add: one textarea, live suggestions merged across clinical
-      // attributes/values, genes and timeline events — every row is a direct
-      // addClause, the typed text itself is never submitted as a clause.
+      // Quick add: one trailing input, live suggestions below while idle —
+      // every row is a direct addClause, the typed text itself is never
+      // submitted as a clause. Finished clauses persist as chips above the
+      // input, derived live from the draft (see deriveQuickChips), so they
+      // stay correct regardless of which surface wrote the underlying clause.
       await page.goto(BASE + "/lab");
       await page.waitForSelector("[data-attr]", { timeout: 120000 });
       await page.locator(".tabs button:text-is('Quick add')").click();
@@ -822,15 +824,77 @@ async function main() {
         await page.locator(".qsrow", { hasText: "TP53 — mutated" }).click();
         await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 120000 });
-        const draftText = (await page.locator(".exbar").innerText()).replace(/\s+/g, " ");
-        // Re-searching the same term now shows the "already added" marker.
-        await page.locator(".quickaddbox").fill("tp53");
-        await page.waitForFunction(() => /already added/.test(document.querySelector(".quicksuggest")?.textContent || ""),
+        // The chip row picked up the commit: one chip, and the input is
+        // clear and ready for the next thing (mode returned to "idle").
+        const chip1 = await page.locator(".qachip").allTextContents();
+        const inputVisible = await page.locator(".quickaddbox").count();
+
+        // A second gene, one-click shortcut, with no connector typed —
+        // OR-merges into the same oql clause (addClause's own default),
+        // shown as a second chip glued by "or" to the first.
+        await page.locator(".quickaddbox").fill("egfr");
+        await page.waitForFunction(() => document.querySelectorAll(".qskind-gene").length > 0, null, { timeout: 30000 });
+        await page.locator(".qsrow", { hasText: "EGFR — mutated" }).click();
+        await page.waitForTimeout(400);
+        const chip2 = await page.locator(".qachip").allTextContents();
+        const conn2 = await page.locator(".qaconn").allTextContents();
+        const draft2 = (await page.locator(".exbar").innerText()).replace(/\s+/g, " ");
+
+        // "configure alteration type…" opens the full Gene condition form
+        // inline, with an and/or choice now that a gene condition exists —
+        // choosing AND produces a genuinely separate, independently-required
+        // clause: TP53+EGFR are still one merged (OR) clause, so this is the
+        // draft's SECOND filter, not a third OR'd entry in the same one —
+        // 3 chips, but 2 filters.
+        await page.locator(".quickaddbox").fill("kras");
+        await page.waitForSelector(".qsrow", { hasText: "configure alteration type" });
+        await page.locator(".qsrow", { hasText: "KRAS — configure alteration type" }).click();
+        await page.waitForSelector(".customseq h4:has-text('Gene condition')");
+        // The and/or select is whichever <select> in the form offers an AND option.
+        const andOrSelect = page.locator(".customseq select", { has: page.locator("option[value=AND]") });
+        await andOrSelect.selectOption("AND");
+        await page.click(".customseq button:text-is('add condition')");
+        await page.waitForFunction(() => /2 filters/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 30000 });
-        quickOk = clinicalRows > 0 && geneRows > 0 && /TP53: MUT/.test(draftText);
-        quickInfo = clinicalRows + " clinical rows for 'lung', " + geneRows + " gene rows for 'tp53' -> " + draftText;
+        const chip3 = await page.locator(".qachip").allTextContents();
+        const conn3 = await page.locator(".qaconn").allTextContents();
+
+        // Removing a chip that shares its underlying clause with a sibling
+        // (the "or"'d EGFR) should leave the other one intact.
+        await page.locator(".qachipx").nth(1).click(); // EGFR chip
+        await page.waitForTimeout(400);
+        const afterRemove = await page.locator(".qachip").allTextContents();
+
+        quickOk = clinicalRows > 0 && geneRows > 0 && inputVisible > 0
+          && chip1.length === 1 && /TP53/.test(chip1[0])
+          && chip2.length === 2 && conn2[0] === "or" && /TP53: MUT; EGFR: MUT/.test(draft2)
+          && chip3.length === 3 && conn3.includes("and")
+          && afterRemove.length === 2 && !afterRemove.some(c => /EGFR/.test(c));
+        quickInfo = clinicalRows + " clinical/" + geneRows + " gene rows · chips " + JSON.stringify(chip3) +
+          " conns " + JSON.stringify(conn3) + " · after removing EGFR: " + JSON.stringify(afterRemove);
       } catch (e) { quickInfo = String(e.message || e).split("\n")[0]; }
-      ok("Quick add suggests across kinds as you type and adds on click", quickOk, quickInfo);
+      ok("Quick add: chips persist inline, or-merge by default, and/or is choosable, removal is surgical", quickOk, quickInfo);
+
+      // Timeline event: "build a sequence…" opens the shared sequence form
+      // inline (same one the Cohort builder tab uses); committing produces
+      // one chip for the whole A/rel/B clause, and the input returns to idle.
+      let eventOk = false, eventInfo = "";
+      try {
+        await page.locator(".exbar button:text-is('clear')").click();
+        await page.waitForTimeout(300);
+        await page.locator(".quickaddbox").fill("treat");
+        await page.waitForSelector(".qsrow", { hasText: "build a sequence" });
+        await page.locator(".qsrow", { hasText: "build a sequence" }).first().click();
+        await page.waitForSelector(".customseq h4:has-text('Custom sequence filter')");
+        await page.click(".customseq button:text-is('add filter')"); // "just has this event", no relationship needed
+        await page.waitForFunction(() => /1 filter/.test(document.querySelector(".exbar")?.textContent || ""),
+          null, { timeout: 30000 });
+        const chips = await page.locator(".qachip").allTextContents();
+        const backToIdle = await page.locator(".quickaddbox").count();
+        eventOk = chips.length === 1 && /has /.test(chips[0]) && backToIdle > 0;
+        eventInfo = JSON.stringify(chips) + " · back to idle: " + (backToIdle > 0);
+      } catch (e) { eventInfo = String(e.message || e).split("\n")[0]; }
+      ok("Quick add: a timeline event's suggestion opens the sequence form inline and commits one chip", eventOk, eventInfo);
     } else {
       await page.screenshot({ path: "shot-next-dark.png", fullPage: false });
     }
