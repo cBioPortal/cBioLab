@@ -47,7 +47,7 @@ export default function CampaignIndex() {
         </section>
 
         <section className="card">
-          <h2>Start a campaign</h2>
+          <h2>Start a campaign over WebMCP</h2>
           <p className="camp-help">
             This site does not call an AI model. Your assistant in the browser starts the campaign and writes its hypotheses
             through the tools this page exposes (<a href="#for-ai-agents">For AI agents</a>, below); the site checks everything
