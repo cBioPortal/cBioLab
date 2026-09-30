@@ -12,7 +12,7 @@ import type { ViewParticipation } from "../../lib/types.ts";
 import { survivalAxis } from "../../lib/stats.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 
-const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
+const TABS = ["explore", "builder", "cohorts", "analysis", "examples"] as const;
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -312,7 +312,7 @@ function ParamRow({ name, value, busy, onChange }:
 
 export default function AnalysisPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = use(searchParams);
-  const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">(() => tabFromParams(sp));
+  const [tab, setTab] = useState<"explore" | "builder" | "cohorts" | "analysis" | "examples">(() => tabFromParams(sp));
   /** The "Saved" tab's own sub-tabs (Cohorts / Analyses) — these used to be
    *  two separate top-level tabs ("Cohorts" and "Saved") with a cross-link
    *  between them ("manage on the Saved tab"); one tab, two sub-tabs instead. */
@@ -328,6 +328,18 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
    *  here instead of as three permanent cards above the facet grid. */
   const addChartDialog = useRef<HTMLDialogElement | null>(null);
   const [chartTab, setChartTab] = useState<"clinical" | "gene" | "derived">("clinical");
+  /** The "Cohort builder" tab: pick a clause kind, then a kind-specific form —
+   *  never raw JSON/OQL text. Shares the same draft (cDefText/addClause) that
+   *  Explore's own facet-clicking writes to, so the two surfaces stay in sync. */
+  const [builderKind, setBuilderKind] = useState<"clinical" | "gene" | "timeline">("clinical");
+  const [builderAttr, setBuilderAttr] = useState("");            // Clinical builder: chosen attribute key
+  const [gcGene, setGcGene] = useState("");                      // Gene-condition builder: gene symbol
+  const [gcType, setGcType] = useState<"ANY" | "MUT" | "MUT_SPECIFIC" | "MUT_CLASS" | "AMP" | "HOMDEL" | "CNA" | "FUSION" | "EXP">("ANY");
+  const [gcPchange, setGcPchange] = useState("");                // specific protein change, e.g. G12C
+  const [gcClass, setGcClass] = useState("MISSENSE");            // mutation class token
+  const [gcDriver, setGcDriver] = useState(false);                // OncoKB driver-only modifier
+  const [gcOp, setGcOp] = useState<">" | ">=" | "<" | "<=">(">"); // expression-threshold operator
+  const [gcThresh, setGcThresh] = useState("2");                  // expression-threshold z-score
   const tabRef = useRef<string>(tabFromParams(sp));            // the tab syncUrl should record
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
   const exAbort = useRef<AbortController | null>(null);      // cancel a facet request the reader has moved past
@@ -1260,6 +1272,367 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
   };
 
   /**
+   * The Cohort builder's "Gene condition" panel composes a valid OQL token
+   * from structured picks — gene, alteration type, optional protein
+   * change/class/threshold, optional driver-only — and hands `addClause` a
+   * `{kind:"oql", q:"GENE: TOKEN"}` string it builds itself. The mapping
+   * mirrors lib/oql.ts's parseSpec exactly (suffix `_DRIVER` combines with
+   * any token there); nothing here invents new OQL grammar, and the
+   * composed string is never shown to the user as text — the widgets ARE
+   * the interface, per the "never see JSON/OQL" ask that started this tab.
+   */
+  const GENE_RE_CLIENT = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
+  const gcExpAvailable = !!explore && (explore.profiles || []).some(p => /mrna|rna_seq|protein|rppa/i.test(p));
+  const gcBuildQ = (): string | null => {
+    const gene = gcGene.trim().toUpperCase();
+    if (!GENE_RE_CLIENT.test(gene)) return null;
+    const driverSuffix = gcDriver ? "_DRIVER" : "";
+    switch (gcType) {
+      case "ANY": return gcDriver ? gene + ": DRIVER" : gene;
+      case "MUT": return gene + ": MUT" + driverSuffix;
+      case "MUT_SPECIFIC": {
+        const pc = gcPchange.trim();
+        if (!pc || !/^[A-Za-z0-9*_.-]{1,40}$/.test(pc)) return null;
+        return gene + ": MUT=" + (gcDriver ? "DRIVER_" + pc : pc);
+      }
+      case "MUT_CLASS": return gene + ": " + gcClass + driverSuffix;
+      case "AMP": return gene + ": AMP" + driverSuffix;
+      case "HOMDEL": return gene + ": HOMDEL" + driverSuffix;
+      case "CNA": return gene + ": CNA" + driverSuffix;
+      case "FUSION": return gene + ": FUSION" + driverSuffix;
+      case "EXP": {
+        const z = Number(gcThresh);
+        if (!Number.isFinite(z)) return null;
+        return gene + ": EXP" + gcOp + z;
+      }
+      default: return null;
+    }
+  };
+  const gcReady = gcBuildQ() != null;
+  const addGeneCondition = () => {
+    const q = gcBuildQ();
+    if (!q) return;
+    addClause({ kind: "oql", q });
+    setGcGene(""); setGcPchange("");
+  };
+
+  /**
+   * The A/B temporal-sequence builder — shared by the "+ Add chart" modal's
+   * Derived timeline filters tab and the Cohort builder's Timeline panel.
+   * Reads/writes the same `seq` state either way, so switching surfaces
+   * mid-build keeps whatever was already set.
+   */
+  const renderTimelineSeqBuilder = () => {
+    if (!explore || explore.events.length === 0) {
+      return <p className="note" style={{ marginTop: 0 }}>This study has no clinical timeline events to derive a filter from.</p>;
+    }
+    const tx = treatmentEventType();
+    return (
+      <div>
+        <div className="customseq">
+          <h4>Custom sequence filter</h4>
+          <p className="note" style={{ margin: "0 0 0.2rem" }}>
+            Build any A/B temporal relationship — followed-by, during, not-followed-by —
+            with a duration constraint, from this study's own timeline.
+          </p>
+            <div className="setrow">
+              <span className="meta">event</span>
+              <select value={seq.aType} onChange={e => setSeq(s => ({ ...s, aType: e.target.value }))}>
+                <option value="">choose…</option>
+                {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
+                {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
+                  <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
+                ))}
+              </select>
+              {seq.aType === LINE_TYPE ? (
+                <>
+                  <select value={seq.aLineOp} onChange={e => setSeq(s => ({ ...s, aLineOp: e.target.value as any }))}>
+                    <option value="=">line #</option>
+                    <option value=">=">line ≥</option>
+                    <option value="<=">line ≤</option>
+                  </select>
+                  <input type="number" min={1} placeholder="n" value={seq.aLineNo}
+                    onChange={e => setSeq(s => ({ ...s, aLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
+                </>
+              ) : seq.aType && (
+                <select value={seq.aOcc} onChange={e => setSeq(s => ({ ...s, aOcc: e.target.value as any }))}>
+                  <option value="ANY">any occurrence</option>
+                  <option value="FIRST">first</option>
+                  <option value="LAST">last</option>
+                </select>
+              )}
+            </div>
+            <div className="setrow">
+              <span className="meta">relationship</span>
+              <select value={seq.rel} onChange={e => setSeq(s => ({ ...s, rel: e.target.value as any }))}>
+                <option value="NONE">just has this event</option>
+                <option value="BEFORE">→ followed by, within</option>
+                <option value="DURING">happens during</option>
+                <option value="NOT_FOLLOWED_BY">not followed by, within</option>
+              </select>
+              {(seq.rel === "BEFORE" || seq.rel === "NOT_FOLLOWED_BY") && (
+                <>
+                  <input type="number" min={1} value={seq.days}
+                    onChange={e => setSeq(s => ({ ...s, days: e.target.value }))} style={{ width: "4rem" }} />
+                  <span className="meta">days</span>
+                </>
+              )}
+            </div>
+            {seq.rel !== "NONE" && (
+              <div className="setrow">
+                <span className="meta">{seq.rel === "DURING" ? "during" : "second event"}</span>
+                <select value={seq.bType} onChange={e => setSeq(s => ({ ...s, bType: e.target.value }))}>
+                  <option value="">choose…</option>
+                  {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
+                  {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
+                    <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
+                  ))}
+                </select>
+                {seq.bType === LINE_TYPE ? (
+                  <>
+                    <select value={seq.bLineOp} onChange={e => setSeq(s => ({ ...s, bLineOp: e.target.value as any }))}>
+                      <option value="=">line #</option>
+                      <option value=">=">line ≥</option>
+                      <option value="<=">line ≤</option>
+                    </select>
+                    <input type="number" min={1} placeholder="n" value={seq.bLineNo}
+                      onChange={e => setSeq(s => ({ ...s, bLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
+                  </>
+                ) : seq.bType && (
+                  <select value={seq.bOcc} onChange={e => setSeq(s => ({ ...s, bOcc: e.target.value as any }))}>
+                    <option value="ANY">any occurrence</option>
+                    <option value="FIRST">first</option>
+                    <option value="LAST">last</option>
+                  </select>
+                )}
+              </div>
+            )}
+            {(seq.aType === LINE_TYPE || seq.bType === LINE_TYPE) && (
+              <div className="setrow">
+                <span className="meta">new line after</span>
+                <select value={String(seq.lineGap)} onChange={e => setSeq(s => ({ ...s, lineGap: Number(e.target.value) }))}>
+                  {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
+                </select>
+              </div>
+            )}
+            <label className="chk" title="restricts the first event to patients with no treatment recorded before it">
+              <input type="checkbox" checked={seq.priorGuard}
+                onChange={e => setSeq(s => ({ ...s, priorGuard: e.target.checked }))} />
+              treatment-naive before the first event
+            </label>
+            <hr />
+            <button className="facet" disabled={!seqReady} onClick={addSeqFilter}>add filter</button>
+        </div>
+      </div>
+    );
+  };
+
+  /**
+   * The running-draft bar: filter count, live match count, pills with a
+   * remove on each, Save as a Cohort / clear. Shared by Explore's own action
+   * bar (hidden until a filter exists) and the Cohort builder tab (always
+   * shown, so the tab's whole point — "here's what you've built so far" —
+   * is visible even at zero). Same `saveDialog` ref either way; only one of
+   * the two call sites is ever mounted at a time (the tabs are mutually
+   * exclusive), so sharing it is safe.
+   */
+  const renderDraftBar = ({ alwaysShow }: { alwaysShow?: boolean } = {}) => {
+    const d = parseDraft();
+    const clauses = d && Array.isArray(d.all) ? d.all.length : 0;
+    if (!clauses && !alwaysShow) return null;
+    const ready = exStudies.length > 0;
+    return (
+      <div className="card exbar">
+        <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+          <strong style={{ fontSize: "var(--t-md)" }}>{clauses ? clauses + (clauses === 1 ? " filter" : " filters") : "no filters yet"}</strong>
+          {!!clauses && <span className="meta">
+            {explore && explore.draftCount != null
+              ? "· " + explore.draftCount.toLocaleString() + " patients match"
+              : "· counting…"}
+          </span>}
+          {exploreBusy && <span className="spinner" />}
+          <span className="spacer" />
+          {/* Naming is asked for on demand rather than sitting in the bar:
+              Analyze needs no name, so a permanent field implied one was
+              required for both. */}
+          <button onClick={openSaveDialog} disabled={!ready || !clauses}
+            title={!ready ? "select a study first" : !clauses ? "build a filter below first" : "keep this definition on the Saved tab without running anything"}>
+            Save as a Cohort
+          </button>
+          {!!clauses && <button className="linklike" onClick={clearDraft}>clear</button>}
+        </div>
+        {!!clauses && <div className="row" style={{ marginTop: "0.4rem" }}>
+          {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} />; })()}
+        </div>}
+        {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
+        {/* A native <dialog> so Esc, focus trapping and the backdrop come
+            from the platform rather than being re-implemented. */}
+        <dialog ref={saveDialog} className="namedialog savedialog"
+          onClose={() => setSaveName("")}
+          onClick={e => { if (e.target === saveDialog.current) saveDialog.current?.close(); }}>
+          <form method="dialog" onSubmit={e => { e.preventDefault(); confirmSave(); }}>
+            <h3>Save as a cohort</h3>
+            <p className="meta">{clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies")}</p>
+            <DraftText key={draftGen} draft={saveDraft} initial={saveName} onFilled={setDraftFilled} autoFocus placeholder="cohort name…" />
+            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
+              <button type="button" className="linklike" onClick={() => saveDialog.current?.close()}>cancel</button>
+              <button className="primary" type="submit" disabled={!draftFilled}>Save</button>
+            </div>
+          </form>
+        </dialog>
+      </div>
+    );
+  };
+
+  /**
+   * One clinical-attribute tile: pie/list for categorical, histogram for
+   * numeric, click-to-filter throughout. Shared by the main facet grid AND
+   * the Cohort builder's Clinical panel (given one chosen attribute) — a
+   * single implementation of "how a clinical facet looks and behaves",
+   * not two that could drift.
+   */
+  const renderClinicalTile = (c: any) => (
+    /* data-attr / data-shape make the facet identifiable from outside
+       React — the e2e suite asserts that an attribute's shape does not
+       change when the draft does. One tile per attribute, the portal's
+       own study-view density — see .facetgrid's own comment. */
+    <div key={c.per + c.attribute} data-attr={c.per + "|" + c.attribute}
+      data-shape={c.kind === "cat" ? (PIE_ATTRIBUTES.has(c.attribute) ? "pie" : "list") : c.kind}
+      className="card">
+        {(() => {
+          // A facet already in the draft is re-queried WITHOUT its own
+          // clauses (disjunctive faceting) so its other values stay
+          // selectable — so its total is the draft-minus-itself total,
+          // not the draft total. Say so rather than show two numbers
+          // that cannot be reconciled.
+          const disj = c.kind === "cat" && (c as any).disjunctive;
+          const shown = disj ? c.values.reduce((n: number, v: any) => n + v.n, 0) : c.patients;
+          const unit = c.per === "sample" ? " samples" : " patients";
+          return (
+            <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}
+              title={[c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
+                .filter(Boolean).join(" — ") || undefined}>
+              {c.displayName || c.attribute}{" "}
+              <span className="meta">
+                {(c.per === "sample" ? "· sample-level · " : "· ") + shown.toLocaleString() + unit}
+                {disj ? " · not narrowed by its own filter" : ""}
+              </span>
+            </div>
+          );
+        })()}
+        {c.kind === "cat" && (() => {
+          const total = c.values.reduce((n: number, v: any) => n + v.n, 0) || 1;
+          const d = parseDraft();
+          const isSel = (v: any) => !!(d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === c.attribute &&
+            ((cl.values || []).includes(v.v) || cl.value === v.v)));
+          const clause = (v: any) => ({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v,
+            ...(c.per === "sample" ? { per: "sample" } : {}) });
+          // slice geometry: cumulative angles over the returned values.
+          // The shape comes from PIE_ATTRIBUTES, a fixed allowlist — see
+          // its own comment for why cardinality (the study's, or worse,
+          // the draft's) can't be trusted to decide this.
+          const asList = !PIE_ATTRIBUTES.has(c.attribute);
+          let acc = 0;
+          const R = 34, CX = 36, CY = 36;
+          const arcs = c.values.map((v: any, i: number) => {
+            const frac = v.n / total, a0 = acc * 2 * Math.PI - Math.PI / 2;
+            acc += frac;
+            const a1 = acc * 2 * Math.PI - Math.PI / 2;
+            const large = frac > 0.5 ? 1 : 0;
+            const p = (a: number) => [CX + R * Math.cos(a), CY + R * Math.sin(a)];
+            const [x0, y0] = p(a0), [x1, y1] = p(a1);
+            // a single value covering everything cannot be drawn as an arc
+            const path = frac >= 0.999
+              ? "M " + CX + " " + (CY - R) + " A " + R + " " + R + " 0 1 1 " + (CX - 0.01) + " " + (CY - R) + " Z"
+              : "M " + CX + " " + CY + " L " + x0 + " " + y0 + " A " + R + " " + R + " 0 " + large + " 1 " + x1 + " " + y1 + " Z";
+            return { v, path, color: CAT_COLORS[i % CAT_COLORS.length], frac };
+          });
+          if (asList) {
+            const max = Math.max(...c.values.map((v: any) => v.n), 1);
+            return (
+              <div className="vallist">
+                {c.values.map((v: any, i: number) => (
+                  <button key={i} className={isSel(v) ? "valrow on" : "valrow"} onClick={() => addClause(clause(v))}
+                    title={v.v + " — " + v.n.toLocaleString() + " (click to filter)"}>
+                    <span className="vname">{v.v}</span>
+                    <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * v.n / max)) + "%" }} /></span>
+                    <span className="vn">{v.n.toLocaleString()}</span>
+                    {/* share of the cases that HAVE a value for this
+                        attribute, which is the facet's own total — not
+                        the whole cohort, since that would make every
+                        sparsely-recorded attribute look small. `total`,
+                        not `c.patients`: once this attribute is itself
+                        drafted, c.patients is the draft's (self-narrowed)
+                        count, while `total` is the disjunctive-safe sum
+                        of this facet's own values — the same one the pie
+                        view's arcs already use, which is why only the
+                        list view had every other value's share collapse
+                        around whichever one you had just clicked. */}
+                    <span className="vpct">{(Math.round(1000 * v.n / total) / 10) + "%"}</span>
+                  </button>
+                ))}
+                {(c.distinct ?? 0) > c.values.length && (
+                  <span className="meta" style={{ padding: "0.1rem 0.3rem" }}>
+                    showing {c.values.length.toLocaleString()} of {c.distinct!.toLocaleString()} values
+                  </span>
+                )}
+              </div>
+            );
+          }
+          return (
+            <div className="piewrap">
+              <svg viewBox="0 0 72 72" className="pie" role="img" aria-label={c.attribute + " distribution"}>
+                {arcs.map((a: any, i: number) => (
+                  <path key={i} d={a.path} fill={a.color} className={isSel(a.v) ? "slice on" : "slice"}
+                    onClick={() => addClause(clause(a.v))}>
+                    <title>{a.v.v + " — " + a.v.n.toLocaleString() + " (" + Math.round(1000 * a.frac) / 10 + "%)"}</title>
+                  </path>
+                ))}
+              </svg>
+              <div className="pielegend">
+                {arcs.map((a: any, i: number) => (
+                  <button key={i} className={isSel(a.v) ? "pikey on" : "pikey"} onClick={() => addClause(clause(a.v))}
+                    title={"click to filter to " + a.v.v}>
+                    <span className="swatch" style={{ background: a.color }} />
+                    <span className="pname">{a.v.v}</span>
+                    <span className="pn">{a.v.n.toLocaleString()}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+        {c.kind === "num" && c.bins && c.bins.length > 1 && (() => {
+          const maxN = Math.max(...c.bins.map((b: any) => b.count), 1);
+          const clauseFor = (b: any) => {
+            const per = c.per === "sample" ? { per: "sample" } : {};
+            if (b.special === "<=") return { kind: "clinical", attribute: c.attribute, range: { lte: b.end }, ...per };
+            if (b.special === ">") return { kind: "clinical", attribute: c.attribute, range: { gt: b.start }, ...per };
+            return { kind: "clinical", attribute: c.attribute, range: { gt: b.start, lte: b.end }, ...per };
+          };
+          const label = (b: any) => b.special === "<=" ? "≤" + b.end : b.special === ">" ? ">" + b.start : b.start + "–" + b.end;
+          return (
+            <div className="histo" style={{ marginTop: "0.3rem" }}>
+              {c.bins.map((b: any, i: number) => (
+                <button key={i} className="hbar" title={label(b) + " · " + b.count.toLocaleString() + " " + (c.per === "sample" ? "samples" : "patients") + " — click to filter"}
+                  onClick={() => addClause(clauseFor(b))}>
+                  <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
+                  <span className="hlab">{b.special === "<=" ? "≤" + b.end : b.special === ">" ? ">" + b.start : b.start}</span>
+                </button>
+              ))}
+              {!!c.naCount && <span className="meta" style={{ alignSelf: "end", paddingLeft: "0.3rem" }}>NA {c.naCount.toLocaleString()}</span>}
+            </div>
+          );
+        })()}
+        {c.kind === "num" && <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", marginTop: "0.25rem", flexWrap: "wrap" }}>
+          <span className="meta">min {Math.round(c.min * 10) / 10} · median {Math.round(c.median * 10) / 10} · max {Math.round(c.max * 10) / 10}</span>
+          <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>≥ median</button>
+          <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>&lt; median</button>
+        </div>}
+    </div>
+  );
+
+  /**
    * The real, per-study "lines" bucket counts the "Derived timeline filters"
    * card shows are just the existing "lines" derived metric — the same one
    * "show more derivations" used to offer manually — kept in sync here
@@ -1393,9 +1766,9 @@ export default function AnalysisPage({ searchParams }: { searchParams: Promise<S
     runViewDelta(d, views[i]);
   };
 
-  // the creator's quick-add row needs the study catalog even before Explore is visited
+  // the Cohort builder tab needs clinical/gene/timeline facets even before Explore is visited
   useEffect(() => {
-    if (tab === "cohorts" && !explore && !exploreBusy && exStudies.length) fetchExplore(null);
+    if ((tab === "cohorts" || tab === "builder") && !explore && !exploreBusy && exStudies.length) fetchExplore(null);
   }, [tab, study, explore]); // eslint-disable-line
 
   const updateView = (vi: number, patch: (v: any) => any) => {
@@ -2564,6 +2937,7 @@ function Latency({ v }: { v: any }) {
         </dialog>
         <div className="tabs">
           <button className={tab === "explore" ? "active" : ""} onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
+          <button className={tab === "builder" ? "active" : ""} onClick={() => { goTab("builder"); if (!explore) fetchExplore(); }}>Cohort builder</button>
           <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Saved</button>
           <button className={tab === "analysis" ? "active" : ""} onClick={() => goTab("analysis")}>Analysis</button>
           <button className={tab === "examples" ? "active" : ""} onClick={() => goTab("examples")}>Examples</button>
@@ -2724,53 +3098,7 @@ function Latency({ v }: { v: any }) {
           {/* Underneath study selection, and only present once there's something to
               show — Analyze lives in the studies card above regardless of whether any
               filters exist, so this block's whole job now is the filters themselves. */}
-          {(() => {
-            const d = parseDraft();
-            const clauses = d && Array.isArray(d.all) ? d.all.length : 0;
-            if (!clauses) return null;
-            const ready = exStudies.length > 0;
-            return (
-              <div className="card exbar">
-                <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <strong style={{ fontSize: "var(--t-md)" }}>{clauses + (clauses === 1 ? " filter" : " filters")}</strong>
-                  <span className="meta">
-                    {explore && explore.draftCount != null
-                      ? "· " + explore.draftCount.toLocaleString() + " patients match"
-                      : "· counting…"}
-                  </span>
-                  {exploreBusy && <span className="spinner" />}
-                  <span className="spacer" />
-                  {/* Naming is asked for on demand rather than sitting in the bar:
-                      Analyze needs no name, so a permanent field implied one was
-                      required for both. */}
-                  <button onClick={openSaveDialog} disabled={!ready}
-                    title={ready ? "keep this definition on the Saved tab without running anything" : "select a study first"}>
-                    Save as a Cohort
-                  </button>
-                  <button className="linklike" onClick={clearDraft}>clear</button>
-                </div>
-                <div className="row" style={{ marginTop: "0.4rem" }}>
-                  {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} />; })()}
-                </div>
-                {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
-                {/* A native <dialog> so Esc, focus trapping and the backdrop come
-                    from the platform rather than being re-implemented. */}
-                <dialog ref={saveDialog} className="namedialog savedialog"
-                  onClose={() => setSaveName("")}
-                  onClick={e => { if (e.target === saveDialog.current) saveDialog.current?.close(); }}>
-                  <form method="dialog" onSubmit={e => { e.preventDefault(); confirmSave(); }}>
-                    <h3>Save as a cohort</h3>
-                    <p className="meta">{clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies")}</p>
-                    <DraftText key={draftGen} draft={saveDraft} initial={saveName} onFilled={setDraftFilled} autoFocus placeholder="cohort name…" />
-                    <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
-                      <button type="button" className="linklike" onClick={() => saveDialog.current?.close()}>cancel</button>
-                      <button className="primary" type="submit" disabled={!draftFilled}>Save</button>
-                    </div>
-                  </form>
-                </dialog>
-              </div>
-            );
-          })()}
+          {renderDraftBar()}
           {/* A facet click starts a recount, and a second click before it lands
               would race it — so the facets themselves greyscale until it does.
               The study picker above stays live: choosing studies is a staged,
@@ -2904,109 +3232,7 @@ function Latency({ v }: { v: any }) {
                   )}
                 </div>
               )}
-              {chartTab === "derived" && (explore.events.length === 0 ? (
-                <p className="note" style={{ marginTop: 0 }}>This study has no clinical timeline events to derive a filter from.</p>
-              ) : (() => {
-                const tx = treatmentEventType();
-                return (
-                  <div>
-                    <div className="customseq">
-                      <h4>Custom sequence filter</h4>
-                      <p className="note" style={{ margin: "0 0 0.2rem" }}>
-                        Build any A/B temporal relationship — followed-by, during, not-followed-by —
-                        with a duration constraint, from this study's own timeline.
-                      </p>
-                        <div className="setrow">
-                          <span className="meta">event</span>
-                          <select value={seq.aType} onChange={e => setSeq(s => ({ ...s, aType: e.target.value }))}>
-                            <option value="">choose…</option>
-                            {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
-                            {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
-                              <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
-                            ))}
-                          </select>
-                          {seq.aType === LINE_TYPE ? (
-                            <>
-                              <select value={seq.aLineOp} onChange={e => setSeq(s => ({ ...s, aLineOp: e.target.value as any }))}>
-                                <option value="=">line #</option>
-                                <option value=">=">line ≥</option>
-                                <option value="<=">line ≤</option>
-                              </select>
-                              <input type="number" min={1} placeholder="n" value={seq.aLineNo}
-                                onChange={e => setSeq(s => ({ ...s, aLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
-                            </>
-                          ) : seq.aType && (
-                            <select value={seq.aOcc} onChange={e => setSeq(s => ({ ...s, aOcc: e.target.value as any }))}>
-                              <option value="ANY">any occurrence</option>
-                              <option value="FIRST">first</option>
-                              <option value="LAST">last</option>
-                            </select>
-                          )}
-                        </div>
-                        <div className="setrow">
-                          <span className="meta">relationship</span>
-                          <select value={seq.rel} onChange={e => setSeq(s => ({ ...s, rel: e.target.value as any }))}>
-                            <option value="NONE">just has this event</option>
-                            <option value="BEFORE">→ followed by, within</option>
-                            <option value="DURING">happens during</option>
-                            <option value="NOT_FOLLOWED_BY">not followed by, within</option>
-                          </select>
-                          {(seq.rel === "BEFORE" || seq.rel === "NOT_FOLLOWED_BY") && (
-                            <>
-                              <input type="number" min={1} value={seq.days}
-                                onChange={e => setSeq(s => ({ ...s, days: e.target.value }))} style={{ width: "4rem" }} />
-                              <span className="meta">days</span>
-                            </>
-                          )}
-                        </div>
-                        {seq.rel !== "NONE" && (
-                          <div className="setrow">
-                            <span className="meta">{seq.rel === "DURING" ? "during" : "second event"}</span>
-                            <select value={seq.bType} onChange={e => setSeq(s => ({ ...s, bType: e.target.value }))}>
-                              <option value="">choose…</option>
-                              {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
-                              {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
-                                <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
-                              ))}
-                            </select>
-                            {seq.bType === LINE_TYPE ? (
-                              <>
-                                <select value={seq.bLineOp} onChange={e => setSeq(s => ({ ...s, bLineOp: e.target.value as any }))}>
-                                  <option value="=">line #</option>
-                                  <option value=">=">line ≥</option>
-                                  <option value="<=">line ≤</option>
-                                </select>
-                                <input type="number" min={1} placeholder="n" value={seq.bLineNo}
-                                  onChange={e => setSeq(s => ({ ...s, bLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
-                              </>
-                            ) : seq.bType && (
-                              <select value={seq.bOcc} onChange={e => setSeq(s => ({ ...s, bOcc: e.target.value as any }))}>
-                                <option value="ANY">any occurrence</option>
-                                <option value="FIRST">first</option>
-                                <option value="LAST">last</option>
-                              </select>
-                            )}
-                          </div>
-                        )}
-                        {(seq.aType === LINE_TYPE || seq.bType === LINE_TYPE) && (
-                          <div className="setrow">
-                            <span className="meta">new line after</span>
-                            <select value={String(seq.lineGap)} onChange={e => setSeq(s => ({ ...s, lineGap: Number(e.target.value) }))}>
-                              {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
-                            </select>
-                          </div>
-                        )}
-                        <label className="chk" title="restricts the first event to patients with no treatment recorded before it">
-                          <input type="checkbox" checked={seq.priorGuard}
-                            onChange={e => setSeq(s => ({ ...s, priorGuard: e.target.checked }))} />
-                          treatment-naive before the first event
-                        </label>
-                        <hr />
-                        <button className="facet" disabled={!seqReady} onClick={addSeqFilter}>add filter</button>
-                    </div>
-                  </div>
-                );
-              })())}
+              {chartTab === "derived" && renderTimelineSeqBuilder()}
               <div className="row" style={{ marginTop: "1rem", justifyContent: "flex-end" }}>
                 <button className="primary" onClick={() => addChartDialog.current?.close()}>Done</button>
               </div>
@@ -3086,146 +3312,7 @@ function Latency({ v }: { v: any }) {
           {explore && <>
             <div className="facetgrid">
               {(visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical)
-                .map(c => (
-                /* data-attr / data-shape make the facet identifiable from outside
-                   React — the e2e suite asserts that an attribute's shape does not
-                   change when the draft does. One tile per attribute, the portal's
-                   own study-view density — see .facetgrid's own comment. */
-                <div key={c.per + c.attribute} data-attr={c.per + "|" + c.attribute}
-                  data-shape={c.kind === "cat" ? (PIE_ATTRIBUTES.has(c.attribute) ? "pie" : "list") : c.kind}
-                  className="card">
-                    {(() => {
-                      // A facet already in the draft is re-queried WITHOUT its own
-                      // clauses (disjunctive faceting) so its other values stay
-                      // selectable — so its total is the draft-minus-itself total,
-                      // not the draft total. Say so rather than show two numbers
-                      // that cannot be reconciled.
-                      const disj = c.kind === "cat" && (c as any).disjunctive;
-                      const shown = disj ? c.values.reduce((n: number, v: any) => n + v.n, 0) : c.patients;
-                      const unit = c.per === "sample" ? " samples" : " patients";
-                      return (
-                        <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}
-                          title={[c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
-                            .filter(Boolean).join(" — ") || undefined}>
-                          {c.displayName || c.attribute}{" "}
-                          <span className="meta">
-                            {(c.per === "sample" ? "· sample-level · " : "· ") + shown.toLocaleString() + unit}
-                            {disj ? " · not narrowed by its own filter" : ""}
-                          </span>
-                        </div>
-                      );
-                    })()}
-                    {c.kind === "cat" && (() => {
-                      const total = c.values.reduce((n: number, v: any) => n + v.n, 0) || 1;
-                      const d = parseDraft();
-                      const isSel = (v: any) => !!(d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === c.attribute &&
-                        ((cl.values || []).includes(v.v) || cl.value === v.v)));
-                      const clause = (v: any) => ({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v,
-                        ...(c.per === "sample" ? { per: "sample" } : {}) });
-                      // slice geometry: cumulative angles over the returned values.
-                      // The shape comes from PIE_ATTRIBUTES, a fixed allowlist — see
-                      // its own comment for why cardinality (the study's, or worse,
-                      // the draft's) can't be trusted to decide this.
-                      const asList = !PIE_ATTRIBUTES.has(c.attribute);
-                      let acc = 0;
-                      const R = 34, CX = 36, CY = 36;
-                      const arcs = c.values.map((v: any, i: number) => {
-                        const frac = v.n / total, a0 = acc * 2 * Math.PI - Math.PI / 2;
-                        acc += frac;
-                        const a1 = acc * 2 * Math.PI - Math.PI / 2;
-                        const large = frac > 0.5 ? 1 : 0;
-                        const p = (a: number) => [CX + R * Math.cos(a), CY + R * Math.sin(a)];
-                        const [x0, y0] = p(a0), [x1, y1] = p(a1);
-                        // a single value covering everything cannot be drawn as an arc
-                        const path = frac >= 0.999
-                          ? "M " + CX + " " + (CY - R) + " A " + R + " " + R + " 0 1 1 " + (CX - 0.01) + " " + (CY - R) + " Z"
-                          : "M " + CX + " " + CY + " L " + x0 + " " + y0 + " A " + R + " " + R + " 0 " + large + " 1 " + x1 + " " + y1 + " Z";
-                        return { v, path, color: CAT_COLORS[i % CAT_COLORS.length], frac };
-                      });
-                      if (asList) {
-                        const max = Math.max(...c.values.map((v: any) => v.n), 1);
-                        return (
-                          <div className="vallist">
-                            {c.values.map((v: any, i: number) => (
-                              <button key={i} className={isSel(v) ? "valrow on" : "valrow"} onClick={() => addClause(clause(v))}
-                                title={v.v + " — " + v.n.toLocaleString() + " (click to filter)"}>
-                                <span className="vname">{v.v}</span>
-                                <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * v.n / max)) + "%" }} /></span>
-                                <span className="vn">{v.n.toLocaleString()}</span>
-                                {/* share of the cases that HAVE a value for this
-                                    attribute, which is the facet's own total — not
-                                    the whole cohort, since that would make every
-                                    sparsely-recorded attribute look small. `total`,
-                                    not `c.patients`: once this attribute is itself
-                                    drafted, c.patients is the draft's (self-narrowed)
-                                    count, while `total` is the disjunctive-safe sum
-                                    of this facet's own values — the same one the pie
-                                    view's arcs already use, which is why only the
-                                    list view had every other value's share collapse
-                                    around whichever one you had just clicked. */}
-                                <span className="vpct">{(Math.round(1000 * v.n / total) / 10) + "%"}</span>
-                              </button>
-                            ))}
-                            {(c.distinct ?? 0) > c.values.length && (
-                              <span className="meta" style={{ padding: "0.1rem 0.3rem" }}>
-                                showing {c.values.length.toLocaleString()} of {c.distinct!.toLocaleString()} values
-                              </span>
-                            )}
-                          </div>
-                        );
-                      }
-                      return (
-                        <div className="piewrap">
-                          <svg viewBox="0 0 72 72" className="pie" role="img" aria-label={c.attribute + " distribution"}>
-                            {arcs.map((a: any, i: number) => (
-                              <path key={i} d={a.path} fill={a.color} className={isSel(a.v) ? "slice on" : "slice"}
-                                onClick={() => addClause(clause(a.v))}>
-                                <title>{a.v.v + " — " + a.v.n.toLocaleString() + " (" + Math.round(1000 * a.frac) / 10 + "%)"}</title>
-                              </path>
-                            ))}
-                          </svg>
-                          <div className="pielegend">
-                            {arcs.map((a: any, i: number) => (
-                              <button key={i} className={isSel(a.v) ? "pikey on" : "pikey"} onClick={() => addClause(clause(a.v))}
-                                title={"click to filter to " + a.v.v}>
-                                <span className="swatch" style={{ background: a.color }} />
-                                <span className="pname">{a.v.v}</span>
-                                <span className="pn">{a.v.n.toLocaleString()}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                    {c.kind === "num" && c.bins && c.bins.length > 1 && (() => {
-                      const maxN = Math.max(...c.bins.map((b: any) => b.count), 1);
-                      const clauseFor = (b: any) => {
-                        const per = c.per === "sample" ? { per: "sample" } : {};
-                        if (b.special === "<=") return { kind: "clinical", attribute: c.attribute, range: { lte: b.end }, ...per };
-                        if (b.special === ">") return { kind: "clinical", attribute: c.attribute, range: { gt: b.start }, ...per };
-                        return { kind: "clinical", attribute: c.attribute, range: { gt: b.start, lte: b.end }, ...per };
-                      };
-                      const label = (b: any) => b.special === "<=" ? "≤" + b.end : b.special === ">" ? ">" + b.start : b.start + "–" + b.end;
-                      return (
-                        <div className="histo" style={{ marginTop: "0.3rem" }}>
-                          {c.bins.map((b: any, i: number) => (
-                            <button key={i} className="hbar" title={label(b) + " · " + b.count.toLocaleString() + " " + (c.per === "sample" ? "samples" : "patients") + " — click to filter"}
-                              onClick={() => addClause(clauseFor(b))}>
-                              <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
-                              <span className="hlab">{b.special === "<=" ? "≤" + b.end : b.special === ">" ? ">" + b.start : b.start}</span>
-                            </button>
-                          ))}
-                          {!!c.naCount && <span className="meta" style={{ alignSelf: "end", paddingLeft: "0.3rem" }}>NA {c.naCount.toLocaleString()}</span>}
-                        </div>
-                      );
-                    })()}
-                    {c.kind === "num" && <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", marginTop: "0.25rem", flexWrap: "wrap" }}>
-                      <span className="meta">min {Math.round(c.min * 10) / 10} · median {Math.round(c.median * 10) / 10} · max {Math.round(c.max * 10) / 10}</span>
-                      <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>≥ median</button>
-                      <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>&lt; median</button>
-                    </div>}
-                </div>
-              ))}
+                .map(c => renderClinicalTile(c))}
               {/* Charted genes (added from "+ Add chart" > Gene status) — one tile per
                   gene per alteration type, the same tile shape a clinical attribute gets,
                   so a chart you configured actually reaches this grid rather than only
@@ -3468,6 +3555,109 @@ function Latency({ v }: { v: any }) {
             </div>
           </>}
           </div>
+        </div>}
+
+        {/* ================= Cohort builder tab ================= */}
+        {/* The old "Create a cohort" card (name + raw JSON textarea) was removed
+            entirely — this replaces it: pick a clause KIND, then a kind-specific
+            form. Nothing here is ever shown as JSON or OQL text; the widgets
+            compose it. Shares Explore's own draft (cDefText/addClause), so a
+            clause built here and one built by clicking a facet on Explore sit
+            in the same running definition. */}
+        {tab === "builder" && <div>
+          <div className="card">
+            <h2>Cohort builder <span className="plain">— add a filter by type, then save or analyze it</span></h2>
+            <p className="meta">
+              Building for {exStudies.length} stud{exStudies.length === 1 ? "y" : "ies"}
+              {exStudies.length > 0 ? ": " + exStudies.join(", ") : ""} — change the selection on the{" "}
+              <button className="linklike" onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore tab</button>.
+            </p>
+            <div className="tabs">
+              <button className={builderKind === "clinical" ? "active" : ""} onClick={() => setBuilderKind("clinical")}>Clinical</button>
+              <button className={builderKind === "gene" ? "active" : ""} onClick={() => setBuilderKind("gene")}>Gene condition</button>
+              <button className={builderKind === "timeline" ? "active" : ""} onClick={() => setBuilderKind("timeline")}>Timeline sequence</button>
+            </div>
+            {exStudies.length === 0 && <p className="note">No studies selected — pick some on the Explore tab first.</p>}
+            {exStudies.length > 0 && !explore && <div className="loading-block"><span className="spinner" /> Building study facets…</div>}
+            {exStudies.length > 0 && explore && <>
+              {builderKind === "clinical" && (() => {
+                const attrs = visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical;
+                const found = attrs.find(c => (c.per + "|" + c.attribute) === builderAttr) || null;
+                return (
+                  <div style={{ marginTop: "0.6rem" }}>
+                    <select value={builderAttr} onChange={e => setBuilderAttr(e.target.value)} style={{ maxWidth: "26rem" }}>
+                      <option value="">choose a clinical attribute…</option>
+                      {attrs.map(c => (
+                        <option key={c.per + c.attribute} value={c.per + "|" + c.attribute}>
+                          {(c.displayName || c.attribute) + (c.per === "sample" ? " (sample-level)" : "")}
+                        </option>
+                      ))}
+                    </select>
+                    {found && <div className="facetgrid" style={{ marginTop: "0.6rem" }}>{renderClinicalTile(found)}</div>}
+                  </div>
+                );
+              })()}
+              {builderKind === "gene" && (
+                <div className="customseq" style={{ marginTop: "0.6rem" }}>
+                  <div className="setrow">
+                    <span className="meta">gene</span>
+                    <input type="text" placeholder="e.g. TP53" value={gcGene}
+                      onChange={e => setGcGene(e.target.value)} style={{ width: "8rem", textTransform: "uppercase" }} />
+                  </div>
+                  <div className="setrow">
+                    <span className="meta">condition</span>
+                    <select value={gcType} onChange={e => setGcType(e.target.value as any)}>
+                      <option value="ANY">any alteration</option>
+                      <option value="MUT">mutated (any)</option>
+                      <option value="MUT_SPECIFIC">specific protein change…</option>
+                      <option value="MUT_CLASS">mutation class…</option>
+                      <option value="AMP">amplified</option>
+                      <option value="HOMDEL">homozygously deleted</option>
+                      <option value="CNA">any copy-number alteration</option>
+                      <option value="FUSION">structural variant / fusion</option>
+                      {gcExpAvailable && <option value="EXP">expression threshold…</option>}
+                    </select>
+                    {gcType === "MUT_SPECIFIC" && (
+                      <input type="text" placeholder="e.g. G12C" value={gcPchange}
+                        onChange={e => setGcPchange(e.target.value)} style={{ width: "6rem" }} />
+                    )}
+                    {gcType === "MUT_CLASS" && (
+                      <select value={gcClass} onChange={e => setGcClass(e.target.value)}>
+                        <option value="MISSENSE">missense</option>
+                        <option value="NONSENSE">nonsense</option>
+                        <option value="TRUNC">truncating</option>
+                        <option value="INFRAME">in-frame indel</option>
+                        <option value="SPLICE">splice</option>
+                      </select>
+                    )}
+                    {gcType === "EXP" && (
+                      <>
+                        <select value={gcOp} onChange={e => setGcOp(e.target.value as any)}>
+                          <option value=">">above</option>
+                          <option value=">=">at or above</option>
+                          <option value="<">below</option>
+                          <option value="<=">at or below</option>
+                        </select>
+                        <input type="number" value={gcThresh}
+                          onChange={e => setGcThresh(e.target.value)} style={{ width: "4rem" }} />
+                        <span className="meta">z-score</span>
+                      </>
+                    )}
+                  </div>
+                  {gcType !== "EXP" && (
+                    <label className="chk" title="restrict to OncoKB-annotated driver alterations">
+                      <input type="checkbox" checked={gcDriver} onChange={e => setGcDriver(e.target.checked)} />
+                      driver-annotated only
+                    </label>
+                  )}
+                  <hr />
+                  <button className="facet" disabled={!gcReady} onClick={addGeneCondition}>add condition</button>
+                </div>
+              )}
+              {builderKind === "timeline" && <div style={{ marginTop: "0.6rem" }}>{renderTimelineSeqBuilder()}</div>}
+            </>}
+          </div>
+          {renderDraftBar({ alwaysShow: true })}
         </div>}
 
         {/* ================= Saved tab ================= */}

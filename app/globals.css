@@ -746,11 +746,14 @@ details.gearmenu.inline[open] > summary {
 .addchartdialog .tabs { margin-bottom: 0.8rem; }
 /* The custom sequence builder's setrows, inline in the Derived tab rather than
    behind their own nested dropdown — same row shape .gearmenu-items gives a
-   popover's setrows, scoped to this dialog instead of a details>summary. */
-.addchartdialog .setrow { display: flex; align-items: center; gap: 0.4rem; font-size: var(--t-sm); padding: 0.15rem 0; }
-.addchartdialog .setrow > .meta { min-width: 5.2rem; color: var(--muted); flex: none; }
-.addchartdialog .setrow select { flex: 1; min-width: 0; }
-.addchartdialog hr { border: none; border-top: 1px solid var(--line); margin: 0.5rem 0; }
+   popover's setrows, scoped to this dialog instead of a details>summary.
+   Also scoped to .customseq directly (not just .addchartdialog) since the
+   same builder markup is reused, unmodified, by the Cohort builder tab —
+   a plain page section, not a dialog. */
+.addchartdialog .setrow, .customseq .setrow { display: flex; align-items: center; gap: 0.4rem; font-size: var(--t-sm); padding: 0.15rem 0; }
+.addchartdialog .setrow > .meta, .customseq .setrow > .meta { min-width: 5.2rem; color: var(--muted); flex: none; }
+.addchartdialog .setrow select, .customseq .setrow select { flex: 1; min-width: 0; }
+.addchartdialog hr, .customseq hr { border: none; border-top: 1px solid var(--line); margin: 0.5rem 0; }
 /* The dialog itself is huge on purpose, but a <select> or button stretched to
    94vw wide reads as broken, not spacious — cap the form's own width the same
    way .gearmenu-items.wide used to, independent of the dialog around it. */

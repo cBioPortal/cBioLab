@@ -21,8 +21,21 @@ async function main() {
     page.on("response", r => {
       if (r.status() >= 500) errors.push("http " + r.status() + " " + r.request().method() + " " + r.url());
     });
-    page.on("requestfailed", r => errors.push("requestfailed " + r.method() + " " + r.url() +
-      " (" + ((r.failure() || {}).errorText || "?") + ")"));
+    page.on("requestfailed", r => {
+      // /api/explore requests are deliberately cancelled when a newer facet
+      // request supersedes one already in flight (exAbort in app/lab/page.tsx:
+      // "stop paying for an answer the reader already moved past"). Several
+      // independent triggers can also fire near-simultaneously on a fresh page
+      // load (a ?tab= deep link, the tab button, the catalog resolving the
+      // default study selection — see fetchExplore's own comment), so this can
+      // legitimately abort one of its own near-duplicates even with no clause
+      // added yet. That is by design, not a bug — it does not count as a JS
+      // error. Any OTHER failure on this endpoint (a real network error) still does,
+      // and every other endpoint is unaffected.
+      if (/\/api\/explore$/.test(r.url()) && (r.failure() || {}).errorText === "net::ERR_ABORTED") return;
+      errors.push("requestfailed " + r.method() + " " + r.url() +
+        " (" + ((r.failure() || {}).errorText || "?") + ")");
+    });
 
     // "/" no longer serves the standalone query-builder UI — it redirects into
     // the Analysis app, which subsumes it. Verify the redirect itself once
@@ -734,6 +747,61 @@ async function main() {
         ok("example runs and renders: " + label, shown,
           shown ? "" : "no " + sel + " after running “" + title + "”");
       }
+
+      // The Cohort builder tab: pick a clause KIND, then a kind-specific form —
+      // replaces the old raw-JSON "Create a cohort" card. Shares Explore's own
+      // draft (cDefText/addClause), so this exercises the same save path as
+      // the .exbar test above, from a different surface.
+      await page.goto(BASE + "/lab");
+      // Let the default Explore tab's own facet grid render before switching
+      // away, so this is a real interaction on a loaded page rather than a
+      // race against the initial mount fetch (which is not fully avoidable
+      // here — see the requestfailed handler's own comment above).
+      await page.waitForSelector("[data-attr]", { timeout: 120000 });
+      await page.locator(".tabs button:text-is('Cohort builder')").click();
+      await page.waitForSelector("h2:has-text('Cohort builder')", { timeout: 60000 });
+      const builderKinds = await page.locator(".tabs button").filter({ hasText: /Clinical|Gene condition|Timeline sequence/ }).count();
+      ok("Cohort builder offers Clinical / Gene condition / Timeline sequence", builderKinds === 3,
+        builderKinds + " kind tabs found");
+
+      let builderOk = false, builderInfo = "";
+      try {
+        // Clinical: pick the first real attribute (index 0 is the placeholder), click a value.
+        await page.waitForSelector("select", { timeout: 120000 });
+        await page.locator("select").first().selectOption({ index: 1 });
+        await page.waitForSelector(".facetgrid .valrow, .facetgrid .pikey", { timeout: 30000 });
+        await page.locator(".facetgrid .valrow, .facetgrid .pikey").first().click();
+        // Wait for the recount to actually LAND (not just the clause-count text,
+        // which updates from the local draft before its fetch resolves), so the
+        // assertion below sees a real "N patients match" rather than "counting…".
+        await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""),
+          null, { timeout: 120000 });
+
+        // Gene condition: a bare gene (any alteration) composes to just the gene symbol.
+        await page.locator(".tabs button:text-is('Gene condition')").click();
+        await page.locator("input[placeholder='e.g. TP53']").fill("egfr");
+        await page.locator("button:text-is('add condition')").click();
+        await page.waitForFunction(() => /2 filters/.test(document.querySelector(".exbar")?.textContent || ""),
+          null, { timeout: 30000 });
+        await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""),
+          null, { timeout: 120000 });
+        const pillsText = (await page.locator(".exbar").innerText()).replace(/\s+/g, " ");
+
+        // Timeline sequence: same builder the "+ Add chart" modal uses, reused verbatim.
+        await page.locator(".tabs button:text-is('Timeline sequence')").click();
+        const hasSeqForm = await page.locator(".customseq h4:has-text('Custom sequence filter')").count();
+
+        builderOk = /EGFR/.test(pillsText) && hasSeqForm > 0;
+        builderInfo = pillsText + " | timeline form: " + (hasSeqForm > 0);
+      } catch (e) { builderInfo = String(e.message || e).split("\n")[0]; }
+      ok("Cohort builder composes a clinical + a gene-condition clause into one draft", builderOk, builderInfo);
+
+      // clear leaves the always-visible bar showing its zero state, not hidden
+      // (the Explore tab's own bar hides at zero — this one is the point of the tab).
+      await page.locator(".exbar button:text-is('clear')").click();
+      await page.waitForTimeout(300);
+      const zeroState = await page.locator(".exbar:has-text('no filters yet')").count();
+      ok("the builder's draft bar stays visible at zero, unlike Explore's", zeroState > 0);
     } else {
       await page.screenshot({ path: "shot-next-dark.png", fullPage: false });
     }
