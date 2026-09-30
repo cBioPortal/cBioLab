@@ -12,6 +12,8 @@ import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-referen
 import type { ViewParticipation } from "../../lib/types.ts";
 import { survivalAxis } from "../../lib/stats.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
+import { installLabTools, LAB_TOOL_NAMES, type LabBridge } from "./agent-tools.ts";
+import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 
 const TABS = ["explore", "cohorts", "saved", "analysis", "examples"] as const;
 
@@ -2433,16 +2435,51 @@ function Latency({ v }: { v: any }) {
     try { await persist(ex.name, ex.def, lastEval); } catch { /* the Examples tab has no error banner of its own */ }
   };
 
-  // ---- chat ---------------------------------------------------------------
-  const summarize = (r: any) => {
-    if (!r) return "no results yet (document may be empty)";
-    const parts = Object.entries(r.cohorts as Record<string, { count: number; text: string }>).map(([n, c]) => `${n}: ${c.count} patients (${c.text})`);
-    for (const v of r.views) {
-      if (v.kind === "compare" && v.rows) parts.push("compare top: " + v.rows.slice(0, 4).map((x: any) => `${x.gene} ${x.cells[0].anyPct}% vs ${x.cells[1] ? x.cells[1].anyPct : "-"}% p=${x.pAny ? x.pAny.toExponential(1) : "-"}`).join("; "));
-      if (v.kind === "survival") parts.push("survival medians: " + v.curves.map((c: any) => `${c.cohort}=${c.median ? c.median.toFixed(1) : ">obs"}mo (n=${c.n})`).join("; "));
-    }
-    return parts.join(" | ");
+  // ---- AI tools ----------------------------------------------------------
+  // The page's analysis as WebMCP tools and window.cohortLab (app/lab/agent-tools.ts), for the
+  // researcher's assistant in the browser. The bridge is rebuilt every render, so a tool always
+  // sees the current document; edits are validated by the engine before they reach the page.
+  const validateDoc = async (d: AnalysisDoc): Promise<AnalysisResult> => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/analysis?oncoprint=spec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ study: d.study || study, ...d }) });
+      const j = await res.json();
+      if (j.error) throw new Error(j.error);
+      return j as AnalysisResult;
+    } catch (e) { setBusy(false); throw e; }
   };
+  const commitDoc = (d: AnalysisDoc, r: AnalysisResult) => {
+    // an unchanged view keeps its identity key, so its card (and a drawn oncoprint) is not remounted
+    const old = new Map((doc.views || []).map((v) => [JSON.stringify(v), v]));
+    for (const v of d.views || []) {
+      const was = old.get(JSON.stringify(v));
+      const k = was ? viewKeys.current.get(was) : undefined;
+      if (k != null) viewKeys.current.set(v, k);
+    }
+    resultViewKeys.current = (d.views || []).map((v: any) => keyFor(v));
+    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    if (d.study && d.study !== study) setStudy(d.study);
+    setResult(r); setError(null); setBusy(false);
+    goTab("analysis");
+    syncUrl(undefined, d);
+  };
+  const saveAs = async (name: string) => {
+    const d = { ...doc, title: name };
+    setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
+    await persistSpaces(name, d);
+  };
+  const labBridge = useRef<LabBridge | null>(null);
+  labBridge.current = {
+    doc, result, busy, error, tab, study, savedAs: analysisSaved ? doc.title || null : null,
+    validate: validateDoc, commit: commitDoc, goTab: (t) => goTab(t as typeof TABS[number]),
+    runExample: runDocExample, save: saveAs, link: docLink
+  };
+  const [webmcp, setWebmcp] = useState<boolean | null>(null);
+  useEffect(() => {
+    const t = installLabTools(() => labBridge.current!);
+    setWebmcp(t.webmcp);
+    return t.cleanup;
+  }, []);
 
 
   return (
@@ -2454,6 +2491,8 @@ function Latency({ v }: { v: any }) {
         <a href="/reproductions" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>paper reproductions</a>
         <a href="/campaign" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>hypothesis campaigns</a>
         <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>rationale</a>
+        <AgentToolsMenu page="analysis" tools={LAB_TOOL_NAMES} webmcp={webmcp}
+          intro="Your AI assistant — Claude in the Chrome sidebar — can read and edit this analysis with these tools. Every edit is run by the engine first and reaches the page only if it is accepted; analysis_undo reverts the assistant's edits." />
       </header>
       <main className="analysis-main">
         {/* Suggestions for every view's gene editor: the most-altered genes this
@@ -3541,7 +3580,7 @@ function Latency({ v }: { v: any }) {
             {cPreview && (cPreview.error
               ? <div className="error">{cPreview.error}</div>
               : <p className="qdesc" style={{ marginTop: "0.6rem" }}><strong>{cPreview.count?.toLocaleString()}</strong> patients — {cPreview.text}</p>)}
-            <p className="note">Clause kinds: <code>oql</code> (genomic status, portal OQL syntax), <code>clinical</code> (attribute/op/value), <code>event</code> (timeline), <code>patients</code>; composed with <code>all</code> / <code>any</code> / <code>not</code>. Start from an example on the right, or ask chat above.</p>
+            <p className="note">Clause kinds: <code>oql</code> (genomic status, portal OQL syntax), <code>clinical</code> (attribute/op/value), <code>event</code> (timeline), <code>patients</code>; composed with <code>all</code> / <code>any</code> / <code>not</code>. Start from an example on the right, or ask your AI assistant in the browser sidebar.</p>
           </div>
           <div className="card">
             <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.2rem" }}>
@@ -3582,7 +3621,7 @@ function Latency({ v }: { v: any }) {
             <h2 style={{ marginTop: "1.2rem" }}>
               Saved cohorts <span className="plain">— tick any to include below; manage (rename, delete) on the <button className="linklike" onClick={() => goTab("saved")}>Saved tab</button></span>
             </h2>
-            {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, create one on the left, or ask chat.</p>}
+            {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, create one on the left, or ask your AI assistant in the browser sidebar.</p>}
             {Object.entries(saved).map(([n, s2]) => (
               <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
                 <label className="pick">
@@ -3827,7 +3866,7 @@ function Latency({ v }: { v: any }) {
                 <h2>Nothing here yet</h2>
                 <p className="note" style={{ fontSize: "var(--t-md)" }}>
                   The analysis document is empty. Add cohorts from the <button className="linklike" onClick={() => goTab("cohorts")}>Cohorts tab</button>,
-                  ask chat above (e.g. “compare STK11-driver vs wild-type immunotherapy patients”), or open <button className="linklike" onClick={() => docDialog.current?.showModal()}>show document json</button> and paste one in.
+                  ask your AI assistant in the browser sidebar (e.g. “compare STK11-driver vs wild-type immunotherapy patients” — it edits this page through its AI tools), or open <button className="linklike" onClick={() => docDialog.current?.showModal()}>show document json</button> and paste one in.
                 </p>
               </div>
             )}
@@ -3836,7 +3875,7 @@ function Latency({ v }: { v: any }) {
                 <h2>Cohorts evaluated — no views defined</h2>
                 <p className="note" style={{ fontSize: "var(--t-md)" }}>
                   Add a views array to the document (e.g. <code>{`{"kind":"survival"}`}</code>),{" "}
-                  <button className="linklike" onClick={() => { const d = { ...doc, views: DEFAULT_VIEWS }; setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d); }}>add the default views</button>, or ask chat.
+                  <button className="linklike" onClick={() => { const d = { ...doc, views: DEFAULT_VIEWS }; setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d); }}>add the default views</button>, or ask your AI assistant in the browser sidebar.
                 </p>
               </div>
             )}

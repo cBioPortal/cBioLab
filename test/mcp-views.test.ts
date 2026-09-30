@@ -13,6 +13,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const tools = readFileSync(new URL("../mcp/tools.ts", import.meta.url), "utf8");
+// the per-view text lives in lib/result-text.ts, shared by run_analysis and the WebMCP tools
+const renderer = readFileSync(new URL("../lib/result-text.ts", import.meta.url), "utf8");
 const types = readFileSync(new URL("../lib/types.ts", import.meta.url), "utf8");
 const reference = readFileSync(new URL("../lib/dsl-reference.ts", import.meta.url), "utf8");
 
@@ -24,15 +26,20 @@ function engineViewKinds(): string[] {
 }
 
 /** the kinds run_analysis has a formatter branch for */
+function viewLoop(): string {
+  const start = renderer.indexOf("for (const v of r.views)");
+  assert.ok(start > 0, "could not find the view loop in lib/result-text.ts");
+  return renderer.slice(start, renderer.indexOf("return out;", start));
+}
 function describedKinds(): string[] {
-  const start = tools.indexOf("for (const v of r.views)");
-  assert.ok(start > 0, "could not find the view loop in mcp/tools.ts");
-  const end = tools.indexOf("Interactive editor", start);
-  const body = tools.slice(start, end);
+  const body = viewLoop();
   return [...new Set([...body.matchAll(/v\.kind === "(\w+)"/g)].map((x) => x[1]))].sort();
 }
 
 describe("MCP run_analysis describes every view the engine can produce", () => {
+  test("run_analysis uses the shared renderer, not a copy of it", () => {
+    assert.match(tools, /const out = analysisText\(document, r\);/);
+  });
   test("no view kind is silently omitted", () => {
     const engine = engineViewKinds();
     const described = describedKinds();
@@ -40,7 +47,7 @@ describe("MCP run_analysis describes every view the engine can produce", () => {
     const missing = engine.filter((k) => !described.includes(k));
     assert.deepEqual(missing, [],
       "these view kinds run but say nothing back to the model — add a branch in " +
-      "mcp/tools.ts run_analysis: " + missing.join(", "));
+      "lib/result-text.ts: " + missing.join(", "));
   });
 
   test("the tool description and describe_dsl's views table name every kind", () => {
@@ -60,8 +67,7 @@ describe("MCP run_analysis describes every view the engine can produce", () => {
   test("and an unknown kind still says so rather than vanishing", () => {
     // Belt and braces: even if someone adds a view and forgets the branch, the
     // response must admit it rather than quietly drop the figure.
-    const start = tools.indexOf("for (const v of r.views)");
-    const body = tools.slice(start, tools.indexOf("Interactive editor", start));
+    const body = viewLoop();
     assert.match(body, /\}\s*else\s*\{/,
       "the if/else chain needs a final else, or an unhandled kind appends nothing");
     assert.match(body, /has no text rendering for it yet/);
@@ -71,16 +77,15 @@ describe("MCP run_analysis describes every view the engine can produce", () => {
     // lib/analysis.ts writes the AUTHOR's per-view note to `annotationNote`;
     // `note` is the engine's own (federation caveats and the like). Reading the
     // wrong one meant notes written through MCP never came back.
-    assert.match(tools, /annotationNote/,
-      "run_analysis must surface the author's note field");
+    assert.match(renderer, /annotationNote/,
+      "the result text must surface the author's note field");
   });
 
   test("engine caveats reach the model for every described view", () => {
     // Methodology the engine attaches (left truncation, panel-aware
     // denominators, non-harmonised vocabularies) is what stops a model
     // overstating a result, so it must not be dropped in formatting.
-    const start = tools.indexOf("for (const v of r.views)");
-    const body = tools.slice(start, tools.indexOf("Interactive editor", start));
+    const body = viewLoop();
     const branches = (body.match(/v\.kind === "\w+"/g) || []).length;
     const caveats = (body.match(/caveatOf\(v\)|v\.caveat/g) || []).length;
     assert.ok(caveats >= branches - 2,
