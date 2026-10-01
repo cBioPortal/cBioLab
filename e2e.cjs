@@ -565,6 +565,19 @@ async function main() {
       ok("a lollipop view can be added from the UI", added.includes("hotspots") && dots > 0,
         added.length ? added.join(", ") + " · " + dots + " dots" : "view was not added");
 
+      // A kind already in the document shows as a selected pill, and clicking it removes the view.
+      let pillOn = false, pillOff = false, left = [];
+      try {
+        const pill = page.locator(".addview button.facet:has-text('Lollipop')");
+        pillOn = /\bon\b/.test(await pill.getAttribute("class") || "");
+        await pill.click();
+        await page.waitForFunction(() => !document.querySelector(".viewfig circle.lollipop-head"), null, { timeout: 30000 });
+        left = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).map(v => v.kind);
+        pillOff = !/\bon\b/.test(await pill.getAttribute("class") || "");
+      } catch { /* left as failed */ }
+      ok("a selected view pill removes its view when clicked", pillOn && pillOff && !left.includes("hotspots") && left.length > 0,
+        "selected " + pillOn + " · deselected " + pillOff + " · views now " + (left.join(", ") || "none"));
+
       // The oncoprint does not go through a resolver, so its provenance is a separate
       // code path — and the one most likely to be left behind. It is also the one view
       // the BROWSER draws, from the binary contract, so the card must hold a canvas and

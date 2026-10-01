@@ -9,6 +9,9 @@ const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // `'use cache: remote'` (lib/next-cache.ts) needs Cache Components
   cacheComponents: true,
+  // hosts besides localhost that may load `next dev`'s scripts and HMR socket (e.g. a tailnet
+  // proxy in front of a dev server); comma-separated, dev only
+  allowedDevOrigins: (process.env.ALLOWED_DEV_ORIGINS || "").split(",").map((h) => h.trim()).filter(Boolean),
   // `next dev` otherwise appends its own section to CLAUDE.md on every start
   agentRules: false,
   // ship the bundled font (and its dir) inside the serverless function for the MCP route,

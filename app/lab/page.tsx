@@ -902,15 +902,18 @@ export default function AnalysisPage() {
    *  and the cohort definitions it draws from, neither of which removal
    *  touches — so this splices `result.views` locally instead of re-running
    *  everything, the same way moveView (below) already does. */
-  const removeView = (i: number) => {
-    const views = (doc.views || []).filter((_: any, j: number) => j !== i);
+  const removeViews = (drop: (v: any, i: number) => boolean) => {
+    const all = doc.views || [];
+    const keep = all.map((v: any, j: number) => !drop(v, j));
+    const views = all.filter((_: any, j: number) => keep[j]);
     const d = { ...doc, views };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
     syncUrl(undefined, d);
     if (!views.length) { setResult(null); return; }   // nothing left to show
-    setResult(prev => prev ? { ...prev, views: prev.views.filter((_, j) => j !== i) } : prev);
-    resultViewKeys.current = resultViewKeys.current.filter((_, j) => j !== i);
+    setResult(prev => prev ? { ...prev, views: prev.views.filter((_, j) => keep[j]) } : prev);
+    resultViewKeys.current = resultViewKeys.current.filter((_, j) => keep[j]);
   };
+  const removeView = (i: number) => removeViews((_, j) => j === i);
 
   /** Swap a view with its neighbour. Order is cosmetic — the computed result for
    *  each view is unchanged, so this reorders `result.views` too rather than
@@ -3827,6 +3830,13 @@ function Latency({ v }: { v: any }) {
                   <span className="meta">{(doc.views || []).length} of 6 in this document</span>
                   <span className="spacer" />
                   {VIEW_KINDS.map(({ kind, label, why, loading }) => {
+                    // a kind already in the document is selected; clicking it again removes it
+                    const present = (doc.views || []).filter((v: any) => v.kind === kind).length;
+                    if (present) return (
+                      <button key={kind} className="facet on" disabled={busy}
+                        title={"remove the " + label.toLowerCase() + " view" + (present > 1 ? "s (" + present + ")" : "")}
+                        onClick={() => removeViews((v) => v.kind === kind)}>{label}{present > 1 && " ×" + present} <span aria-hidden="true">✕</span></button>
+                    );
                     const full = (doc.views || []).length >= 6;
                     const waiting = !full && !!loading && loading();
                     const blocked = full ? "this document already has the maximum of 6 views"
