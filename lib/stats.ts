@@ -128,6 +128,9 @@ export interface CoxFit {
   loglik: number; n: number; events: number; iterations: number;
 }
 
+/** The 97.5% standard-normal quantile, for 95% Wald intervals (scipy.stats.norm.ppf(0.975)). */
+const Z_975 = 1.959963984540054;
+
 function zeros(n: number): number[] { return new Array(n).fill(0); }
 function zerosMat(n: number): number[][] { return Array.from({ length: n }, () => zeros(n)); }
 function dot(a: number[], b: number[]): number { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
@@ -257,8 +260,8 @@ export function coxRegression(rows: CoxRow[]): CoxFit {
   const variances = inverseDiagonal(finalHess);
   const se = variances.map((v) => Math.sqrt(Math.max(0, v)));
   const hr = beta.map((b) => Math.exp(b));
-  const ciLow = beta.map((b, a) => Math.exp(b - 1.96 * se[a]));
-  const ciHigh = beta.map((b, a) => Math.exp(b + 1.96 * se[a]));
+  const ciLow = beta.map((b, a) => Math.exp(b - Z_975 * se[a]));
+  const ciHigh = beta.map((b, a) => Math.exp(b + Z_975 * se[a]));
   const pvals = beta.map((b, a) => se[a] > 0 ? chiSquareP1df((b / se[a]) * (b / se[a])) : 1);
   return { beta, se, hr, ciLow, ciHigh, p: pvals, loglik: ll, n: rows.length, events, iterations };
 }
@@ -342,8 +345,8 @@ export function logisticRegression(rows: LogisticRow[]): LogisticFit {
   // drop the intercept (index 0) from what's reported — a forest plot has no row for it
   const betaCov = beta.slice(1), seCov = se.slice(1);
   const or = betaCov.map((b) => Math.exp(b));
-  const ciLow = betaCov.map((b, a) => Math.exp(b - 1.96 * seCov[a]));
-  const ciHigh = betaCov.map((b, a) => Math.exp(b + 1.96 * seCov[a]));
+  const ciLow = betaCov.map((b, a) => Math.exp(b - Z_975 * seCov[a]));
+  const ciHigh = betaCov.map((b, a) => Math.exp(b + Z_975 * seCov[a]));
   const pvals = betaCov.map((b, a) => seCov[a] > 0 ? chiSquareP1df((b / seCov[a]) * (b / seCov[a])) : 1);
   return { intercept: beta[0], beta: betaCov, se: seCov, or, ciLow, ciHigh, p: pvals, loglik: finalLl, n: rows.length, events, iterations };
 }
