@@ -33,7 +33,7 @@ import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
-import { coxMethod, logisticMethod, survivalMethod, type CoxTrace } from "./method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, type CoxTrace } from "./method.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -380,6 +380,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             tally.set(k, cur);
           }
         })));
+      // arrival order is whichever study answered first; fix it so the method record is stable
+      perSite.sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.study < y.study ? -1 : 1));
       const aggOnly = vStudies.filter((st) => !isPatientLevel(resolvers[st]));
       const annSource = (await buildAnnotationIndex([], genes, vStudies.length === 1 ? vStudies[0] : vStudies)).source;
       const rows: CompareRow[] = genes.map((g) => {
@@ -450,6 +452,11 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           (aggOnly.length ? "; " + aggOnly.join(", ") + " contributed aggregate counts only (no patient-level access)" : ""));
       }
       views.push({ kind: "compare", cohorts: vNames, annotation: annSource, rows,
+        method: compareMethod({
+          oncokbPin: pin, cohorts: vNames, genes,
+          perSite: perSite.map((p) => ({ cohort: p.cohort, study: p.study, cohortPatients: cohorts[p.cohort].perStudy[p.study]?.count || 0 })),
+          counts: perSite.flatMap((p) => p.counts.map((c) => ({ cohort: p.cohort, study: p.study, gene: c.gene, profiled: c.profiled, altered: c.altered, driver: c.driver }))),
+        }),
         participation: participationFor(vStudies, false),
         ...(vStudies.length > 1 ? { studies: vStudies } : {}),
         ...(noteParts.length ? { note: noteParts.join(". ") } : {}) });

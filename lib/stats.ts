@@ -583,7 +583,10 @@ export function cochranMantelHaenszel(tables: { a: number; b: number; c: number;
     den += (t.b * t.c) / n;
     used++;
   }
-  const corrected = Math.max(0, Math.abs(sumA - sumE) - 0.5);
+  // continuity correction as R's mantelhaen.test applies it: only when |Δ| >= 0.5, so it never
+  // overshoots past zero (subtracting it from a smaller |Δ| and squaring would inflate chi2)
+  const delta = Math.abs(sumA - sumE);
+  const corrected = delta >= 0.5 ? delta - 0.5 : delta;
   const chi2 = sumV > 0 ? (corrected * corrected) / sumV : 0;
   return {
     chi2: Math.round(chi2 * 1e4) / 1e4,

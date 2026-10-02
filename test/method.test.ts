@@ -3,7 +3,7 @@
 // codes each term the way the fit did.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { coxMethod, logisticMethod, survivalMethod, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
 import type { CoxCovariate } from "../lib/types.ts";
 
 const tp53: CoxCovariate = { source: "alteration", gene: "TP53", by: "mutated" };
@@ -187,5 +187,40 @@ describe("survivalMethod", () => {
     const m = survivalMethod(trace({ counts: big }));
     assert.match(m.python, /too many to include here: export them as survival_counts\.csv/);
     assert.doesNotMatch(m.python, /io\.StringIO/);
+  });
+});
+
+describe("compareMethod", () => {
+  const counts = [
+    { cohort: "A", study: "s1", gene: "TP53", profiled: 10, altered: 4, driver: 3 },
+    { cohort: "A", study: "s2", gene: "TP53", profiled: 5, altered: 1, driver: 1 },
+    { cohort: "B", study: "s1", gene: "TP53", profiled: 8, altered: 1, driver: 0 },
+  ];
+  const base = { oncokbPin: "v4.20", genes: ["TP53"], counts,
+    perSite: [{ cohort: "A", study: "s1", cohortPatients: 12 }, { cohort: "A", study: "s2", cohortPatients: 6 }, { cohort: "B", study: "s1", cohortPatients: 9 }] };
+
+  test("two cohorts: Fisher per gene, then BH, and the pooling across studies is stated", () => {
+    const m = compareMethod({ ...base, cohorts: ["A", "B"] });
+    assert.deepEqual(m.steps.map((s) => s.title).slice(-3), ["Sum each cohort's counts across its studies", "Fisher's exact test per gene", "Benjamini–Hochberg across genes"]);
+    assert.match(m.steps[0].detail, /OncoKB release pinned for this run \(v4\.20\)/);
+    assert.match(m.python, /fisher_exact\(\[\[a, pa - a\], \[b, pb - b\]\], alternative="two-sided"\)/);
+    assert.match(m.python, /A,s2,TP53,5,1,1/);
+    assert.deepEqual(m.implementation.functions, ["fisherExact", "benjaminiHochberg"]);
+  });
+
+  test("three cohorts: an uncorrected chi-squared on 2 df", () => {
+    const m = compareMethod({ ...base, cohorts: ["A", "B", "C"] });
+    assert.equal(m.steps.find((s) => s.title === "Pearson χ² test per gene")!.params!.find(([k]) => k === "df")![1], "2");
+    assert.match(m.python, /chi2_contingency\(table\.to_numpy\(\), correction=False\)/);
+  });
+
+  test("one cohort: no test, and no verification claim", () => {
+    const m = compareMethod({ ...base, cohorts: ["A"], perSite: base.perSite.slice(0, 1), counts: counts.slice(0, 1) });
+    assert.equal(m.steps.at(-1)!.title, "No test");
+    assert.equal(m.verification, undefined);
+  });
+
+  test("with no OncoKB pin it says nothing counts as a driver", () => {
+    assert.match(compareMethod({ ...base, oncokbPin: null, cohorts: ["A", "B"] }).steps[0].detail, /no OncoKB release is pinned/);
   });
 });

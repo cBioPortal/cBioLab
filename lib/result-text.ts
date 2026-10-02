@@ -57,7 +57,7 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         `  ${c.cohort}: median ${c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n=${c.n}, ${c.events} events${c.missing ? ", " + c.missing + " missing OS" : ""})`).join("\n") +
         (v.logrank ? `\n  log-rank p=${pFmt(v.logrank.p)}${v.logrank.strata > 1 ? " (stratified by study)" : ""}`
           : v.logrankK ? `\n  k-group log-rank p=${pFmt(v.logrankK.p)}` : "") +
-        "\nCAVEAT (tell the user): " + v.caveat + methodOf(v));
+        "\nCAVEAT (tell the user): " + v.caveat);
     } else if (v.kind === "cox") {
       // stratifyByCohort: no pooled coefficients — one independent fit per cohort instead.
       out.push(v.cox!.byCohort
@@ -68,18 +68,18 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
               c.coefficients.map((cf) =>
                 `    ${cf.label}${cf.reference ? " vs " + cf.reference : ""}: HR ${cf.hr.toFixed(2)} ` +
                 `(95% CI ${cf.ciLow.toFixed(2)}-${cf.ciHigh.toFixed(2)}) p=${pFmt(cf.p)}`).join("\n")
-          ).join("\n") + caveatOf(v) + methodOf(v)
+          ).join("\n") + caveatOf(v)
         : `Cox regression (${v.endpoint || "OS"}, n=${v.cox!.n.toLocaleString()}, ${v.cox!.events.toLocaleString()} events):\n` +
           v.cox!.coefficients.map((c) =>
             `  ${c.label}${c.reference ? " vs " + c.reference : ""}: HR ${c.hr.toFixed(2)} ` +
             `(95% CI ${c.ciLow.toFixed(2)}-${c.ciHigh.toFixed(2)}) p=${pFmt(c.p)}`).join("\n") +
-          caveatOf(v) + methodOf(v));
+          caveatOf(v));
     } else if (v.kind === "logistic") {
       out.push(`Logistic regression (n=${v.logistic!.n.toLocaleString()}, ${v.logistic!.events.toLocaleString()} with the outcome):\n` +
         v.logistic!.coefficients.map((c) =>
           `  ${c.label}${c.reference ? " vs " + c.reference : ""}: OR ${c.or.toFixed(2)} ` +
           `(95% CI ${c.ciLow.toFixed(2)}-${c.ciHigh.toFixed(2)}) p=${pFmt(c.p)}`).join("\n") +
-        caveatOf(v) + methodOf(v));
+        caveatOf(v));
     } else if (v.kind === "cooccurrence") {
       out.push("Co-occurrence (2x2 per pair, among patients profiled for BOTH genes):\n" +
         (v.pairs || []).slice(0, 20).map((x) =>
@@ -262,6 +262,7 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
       out.push(`View "${v.kind}" ran but this tool has no text rendering for it yet — ` +
         `open the interactive editor link below to see it.`);
     }
+    if (v.method) out[out.length - 1] += methodOf(v);
   }
   return out;
 }
