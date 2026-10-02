@@ -129,7 +129,7 @@ export interface CoxFit {
 }
 
 /** The 97.5% standard-normal quantile, for 95% Wald intervals (scipy.stats.norm.ppf(0.975)). */
-const Z_975 = 1.959963984540054;
+export const Z_975 = 1.959963984540054;
 
 function zeros(n: number): number[] { return new Array(n).fill(0); }
 function zerosMat(n: number): number[][] { return Array.from({ length: n }, () => zeros(n)); }

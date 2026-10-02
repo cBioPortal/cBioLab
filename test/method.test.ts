@@ -3,7 +3,7 @@
 // codes each term the way the fit did.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, diffexprMethod, GSEA_NULL_PY, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, diffexprMethod, incidenceMethod, GSEA_NULL_PY, GRAY_NULL_PY, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
 import type { CoxCovariate } from "../lib/types.ts";
 
 const tp53: CoxCovariate = { source: "alteration", gene: "TP53", by: "mutated" };
@@ -319,5 +319,29 @@ describe("diffexprMethod", () => {
     assert.ok(m.python.includes(GSEA_NULL_PY.trimEnd()));
     assert.match(m.python, /HALLMARK_X/);
     assert.match(m.python, /preranked_gsea\(ranked, sets, permutations=1000, min_size=10\)/);
+  });
+});
+
+describe("incidenceMethod", () => {
+  const ex = { prior: 3, unobserved: 0, noFollowup: 2, noAnchor: 0 };
+  const base = { eventLabel: "brain metastasis", horizons: [12, 24],
+    perSite: [{ cohort: "A", study: "s1", cohortPatients: 20 }, { cohort: "B", study: "s1", cohortPatients: 25 }],
+    cohorts: [{ name: "A", n: 15, events: 4, competing: 3, censored: 8, late: 0, excluded: ex }, { name: "B", n: 23, events: 2, competing: 5, censored: 16, late: 1, excluded: ex }],
+    counts: [{ cohort: "A", study: "s1", entry: 0, t: 5, cause: 1, n: 2 }, { cohort: "B", study: "s1", entry: 0, t: 7, cause: 2, n: 1 }],
+    gray: { statistic: 1.5, p: 0.2, permutations: 2000 } };
+  test("no delayed entry: statsmodels for the curves, the seeded Gray port for the test, records in the test's order", () => {
+    const m = incidenceMethod(base);
+    assert.match(m.python, /CumIncidenceRight\(/);
+    assert.doesNotMatch(m.python, /def aalen_johansen/);
+    assert.ok(m.python.includes(GRAY_NULL_PY.trimEnd()));
+    assert.match(m.python, /sort_values\(\["t", "cause", "entry"\], kind="stable"\)/);
+    assert.match(m.steps.find((s) => s.title === "Gray-type test by permutation")!.detail, /not Gray's variance-standardised χ²/);
+    assert.match(m.steps[2].params![1][1], /1 recorded late, kept/);
+  });
+  test("delayed entry: the explicit Aalen-Johansen, since statsmodels takes no entry times", () => {
+    const m = incidenceMethod({ ...base, anchor: "first Treatment", counts: base.counts.map((r) => ({ ...r, entry: 2 })) });
+    assert.match(m.python, /def aalen_johansen\(t, cause, entry\)/);
+    assert.doesNotMatch(m.python, /CumIncidenceRight/);
+    assert.match(m.steps[0].detail, /delayed entry/);
   });
 });

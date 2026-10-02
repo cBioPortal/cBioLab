@@ -15,11 +15,11 @@ import { genomeBinsSql, genomeCoverageSql, studyGenomeSql, geneSetCountsSql, pro
   clonalityGenesSql, facetsSummarySql, facetsHistogramSql, ascnStudiesSql, incidenceCountsSql,
   labCourseSql, labBestSql, labWaterfallSql, labTestsSql, LAB_PCT_BIN, LAB_PCT_MIN, LAB_PCT_BINS,
   CHROM_LENGTHS, GENOME_CHROMS } from "./federation-more.ts";
-import { fisherExact, benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea, mcnemarExact,
+import { fisherExact, benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea, mcnemarExact, Z_975,
   aalenJohansen, cifAt, grayPermutationTest, kaplanMeier, quantilesFromHistogram, type CrRecord } from "./stats.ts";
 import { geneSymbols } from "./gene-tracks.ts";
 import { viewToSvg } from "./view-svg.ts";
-import { diffexprMethod } from "./method.ts";
+import { diffexprMethod, incidenceMethod, type IncidenceTrace } from "./method.ts";
 
 export interface EvaluatedCohort {
   studies: string[];
@@ -766,6 +766,7 @@ async function incidenceView(view: IncidenceView, ctx: ViewCtx): Promise<ViewRes
   if (!Object.keys(ok).length) return refuse("incidence", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
   const recsBy: Record<string, CrRecord[]> = {};
   const curves: IncidenceCurve[] = [];
+  const countRows: IncidenceTrace["counts"] = [];
   for (const n of vNames) {
     const recs: CrRecord[] = [];
     const ex = { prior: 0, unobserved: 0, noFollowup: 0, noAnchor: 0 };
@@ -782,9 +783,14 @@ async function incidenceView(view: IncidenceView, ctx: ViewCtx): Promise<ViewRes
         if (Number(r.late)) late += cnt;
         const entry = Number(r.entry), t = Number(r.t), cause = Number(r.cause) as 0 | 1 | 2;
         for (let i = 0; i < cnt; i++) recs.push(entry > 0 ? { t, cause, entry } : { t, cause });
+        countRows.push({ cohort: n, study: st, entry, t, cause, n: cnt });
       }
     }));
     ex.noAnchor = Math.max(0, cohortN - seen);
+    // a canonical order, independent of which study answered first or how the database ordered
+    // tied rows: the permutation test shuffles labels by position, so its seeded p depends on it
+    const entryKey = (r: CrRecord) => r.entry ?? -Infinity;
+    recs.sort((x, y) => x.t - y.t || x.cause - y.cause || (entryKey(x) < entryKey(y) ? -1 : entryKey(x) > entryKey(y) ? 1 : 0));
     recsBy[n] = recs;
     const c = aalenJohansen(recs);
     curves.push({ cohort: n, n: c.n, events: c.events, competing: c.competing, censored: c.censored,
@@ -804,7 +810,7 @@ async function incidenceView(view: IncidenceView, ctx: ViewCtx): Promise<ViewRes
     let s = 1;
     for (const pt of km.points) { if (pt.t > months) break; s = pt.s; }
     const atRisk = recs.filter((r) => (r.entry ?? -Infinity) < months && r.t >= months).length;
-    return { cohort: c.cohort, f1: at.f1, lo: Math.max(0, at.f1 - 1.96 * at.se1), hi: Math.min(1, at.f1 + 1.96 * at.se1), naive: 1 - s, atRisk };
+    return { cohort: c.cohort, f1: at.f1, lo: Math.max(0, at.f1 - Z_975 * at.se1), hi: Math.min(1, at.f1 + Z_975 * at.se1), naive: 1 - s, atRisk };
   }) }));
   let gray: ReturnType<typeof grayPermutationTest> | undefined;
   const live = curves.filter((c) => c.n);
@@ -815,6 +821,16 @@ async function incidenceView(view: IncidenceView, ctx: ViewCtx): Promise<ViewRes
   const exTotal = (k: keyof IncidenceCurve["excluded"]) => curves.reduce((a, c) => a + c.excluded[k], 0);
   return {
     kind: "incidence", cohorts: vNames,
+    method: incidenceMethod({
+      eventLabel, horizons,
+      ...(anchor ? { anchor: (anchor.occurrence === "LAST" ? "last " : "first ") + anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "") } : {}),
+      perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
+        .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+      cohorts: curves.map((c) => ({ name: c.cohort, n: c.n, events: c.events, competing: c.competing, censored: c.censored, late: c.late, excluded: c.excluded })),
+      counts: countRows.sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.study < y.study ? -1 : x.study > y.study ? 1 : 0) ||
+        x.t - y.t || x.cause - y.cause || x.entry - y.entry),
+      ...(gray ? { gray: { statistic: gray.statistic, p: gray.p, permutations: gray.permutations } } : {}),
+    }),
     incidence: { eventLabel, ...(anchor ? { anchoredTo: anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "") } : {}),
       curves, horizons: hz, ...(gray ? { gray } : {}), ...(excluded.length ? { excludedStudies: excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
