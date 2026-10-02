@@ -33,7 +33,7 @@ import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
-import { coxMethod, logisticMethod, survivalMethod, compareMethod, type CoxTrace } from "./method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, type CoxTrace } from "./method.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -1743,6 +1743,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       rows.length = 0; rows.push(...assessable);
       views.push({ kind: "cooccurrence", cohorts: [cn], rows: undefined, pairs: rows,
         studies: cohorts[cn].studies,
+        method: cooccurrenceMethod({
+          cohort: cn, pairs: pairs.length, assessable: assessable.length,
+          cohortPatients: [...sites].sort().map((st) => ({ study: st, patients: cohorts[cn].perStudy[st]?.count || 0 })),
+          counts: [...sites].sort().flatMap((st) => pairs.map(([a, b]) => find(st, a, b)).filter((x): x is PairCounts => !!x)
+            .map((x) => ({ study: st, a: x.a, b: x.b, both: x.both, onlyA: x.onlyA, onlyB: x.onlyB, neither: x.neither }))),
+        }),
         participation: participationFor(cohorts[cn].studies, false),
         note: "Pairwise co-occurrence within “" + cn + "”" +
           (vNames.length > 1 ? " (the first cohort in this view; co-occurrence describes one cohort, not a contrast)" : "") +

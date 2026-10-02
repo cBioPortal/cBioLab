@@ -3,7 +3,7 @@
 // codes each term the way the fit did.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { coxMethod, logisticMethod, survivalMethod, compareMethod, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
 import type { CoxCovariate } from "../lib/types.ts";
 
 const tp53: CoxCovariate = { source: "alteration", gene: "TP53", by: "mutated" };
@@ -222,5 +222,28 @@ describe("compareMethod", () => {
 
   test("with no OncoKB pin it says nothing counts as a driver", () => {
     assert.match(compareMethod({ ...base, oncokbPin: null, cohorts: ["A", "B"] }).steps[0].detail, /no OncoKB release is pinned/);
+  });
+});
+
+describe("cooccurrenceMethod", () => {
+  const counts = [
+    { study: "s1", a: "TP53", b: "KRAS", both: 3, onlyA: 5, onlyB: 4, neither: 20 },
+    { study: "s2", a: "TP53", b: "KRAS", both: 1, onlyA: 2, onlyB: 6, neither: 9 },
+  ];
+  test("one study: Fisher, then BH over the assessable pairs; pairs no panel covers are named as set aside", () => {
+    const m = cooccurrenceMethod({ cohort: "C", cohortPatients: [{ study: "s1", patients: 40 }], counts: counts.slice(0, 1), pairs: 3, assessable: 1 });
+    assert.deepEqual(m.steps.map((s) => s.title), ["Count each gene pair's 2×2 table", "Set aside pairs no panel covers",
+      "Log₂ odds ratio per pair", "Fisher's exact test per pair", "Benjamini–Hochberg across pairs"]);
+    assert.match(m.steps[0].detail, /mutation panel covering both genes/);
+    assert.doesNotMatch(m.python, /StratifiedTable/);
+    assert.match(m.python, /p = result\["p_fisher"\]/);
+  });
+  test("several studies: CMH stratified by study ranks the pairs, with R's continuity rule and the p from the chi-squared tail", () => {
+    const m = cooccurrenceMethod({ cohort: "C", cohortPatients: [{ study: "s1", patients: 40 }, { study: "s2", patients: 20 }], counts, pairs: 1, assessable: 1 });
+    assert.match(m.steps.find((s) => s.kind === "statistic" && /Mantel/.test(s.title))!.detail, /\|Σa − ΣE\[a\]\| ≥ 0\.5/);
+    assert.match(m.python, /correction=bool\(delta >= 0\.5\)/);
+    assert.match(m.python, /chi2_dist\.sf\(stat, 1\)/);
+    assert.match(m.python, /p = result\["p_cmh"\]/);
+    assert.ok(m.implementation.functions.includes("cochranMantelHaenszel"));
   });
 });

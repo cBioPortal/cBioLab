@@ -22,7 +22,7 @@ import pathlib
 import numpy as np
 import scipy
 import statsmodels
-from scipy.stats import chi2_contingency, fisher_exact
+from scipy.stats import chi2 as chi2_dist, chi2_contingency, fisher_exact
 from statsmodels.stats.contingency_tables import StratifiedTable
 from statsmodels.stats.multitest import multipletests
 
@@ -76,7 +76,8 @@ def cmh(strata):
     # R's mantelhaen.test convention: the 0.5 continuity correction only when |sum(a) - sum(E[a])| >= 0.5
     delta = abs(sum(s[0] - (s[0] + s[1]) * (s[0] + s[2]) / sum(s) for s in used))
     test = st.test_null_odds(correction=bool(delta >= 0.5))
-    return {"strata": strata, "chi2": float(test.statistic), "p": float(test.pvalue),
+    # p from the chi-squared tail: test_null_odds' own pvalue is 1 - cdf, which loses precision below ~1e-12
+    return {"strata": strata, "chi2": float(test.statistic), "p": float(chi2_dist.sf(test.statistic, 1)),
             "oddsRatio": float(st.oddsratio_pooled), "tables": len(used)}
 
 cmh_cases = [
