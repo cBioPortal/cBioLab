@@ -1,5 +1,6 @@
 import { buildContract } from "../../../lib/oncoprint";
 import { cachedContract } from "../../../lib/next-cache.ts";
+import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { packContract } from "../../../lib/oncoprint-binary";
 import { gzipSync } from "node:zlib";
 import { contractToSvg } from "../../../lib/oncoprint-svg";
@@ -11,13 +12,14 @@ export const maxDuration = 120;
 // POST /api/oncoprint?format=bin -> contract as OPB1 binary (cells as typed arrays)
 export async function POST(req: Request) {
   try {
-    const spec = await req.json();
+    const { customData, ...spec } = await req.json();
     const t0 = Date.now();
     const sp = new URL(req.url).searchParams;
     const log: { label: string; sql: string; ms?: number; study?: string }[] = [];
     const provenance = sp.get("provenance") === "1";
     // a provenance request wants the queries this run issues, so it is never answered from the cache
-    const contract = provenance ? await buildContract(spec, { log, provenance }) : await cachedContract(spec);
+    const contract = await withRequestCustomData(customData, () =>
+      provenance ? buildContract(spec, { log, provenance }) : cachedContract(spec));
     const engineMs = Date.now() - t0;
     const fmt = sp.get("format");
     if (fmt === "svg" || fmt === "tsv") {

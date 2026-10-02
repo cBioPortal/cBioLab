@@ -5,6 +5,7 @@
 import { sq } from "./compiler.ts";
 import { ALTERED_COND, driverJoin } from "./federation.ts";
 import { clinicalValueFoldSql, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
+import { clinicalTable } from "./custom-data.ts";
 
 /** bare patient id for a *_unique_id column of this study */
 const pidOf = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
@@ -212,7 +213,7 @@ function pairedSidesCtes(cohortSql: string, study: string, db: string, by: PairB
     "sides AS (\n" +
     "  SELECT sample_unique_id AS suid, " + pidOf("patient_unique_id", study) + " AS pid,\n" +
     "         multiIf(" + fold("attribute_value") + " IN (" + lit(by.a) + "), 'a', " + fold("attribute_value") + " IN (" + lit(by.b) + "), 'b', '') AS side\n" +
-    "  FROM " + db + ".clinical_data_derived\n" +
+    "  FROM " + clinicalTable(db, [by.attribute]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(by.attribute) + "\n" +
     "    AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
     "),\n" +
@@ -272,7 +273,7 @@ export function pairedPatientsSql(cohortSql: string, study: string, db: string, 
 export function sampleAttributeValuesSql(cohortSql: string, study: string, db: string, attribute: string): string {
   return (
     "WITH cohort AS (" + cohortSql + ")\n" +
-    "SELECT attribute_value AS value, count() AS samples FROM " + db + ".clinical_data_derived\n" +
+    "SELECT attribute_value AS value, count() AS samples FROM " + clinicalTable(db, [attribute]) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(attribute) + "\n" +
     "  AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
     "GROUP BY value ORDER BY samples DESC LIMIT 50"
@@ -290,7 +291,7 @@ function facetsSamplesCte(cohortSql: string, study: string, db: string, qc: bool
     "  SELECT internal_id AS sid, sample_unique_id AS suid FROM " + db + ".sample_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
     (qc
-      ? "    AND sample_unique_id IN (SELECT sample_unique_id FROM " + db + ".clinical_data_derived\n" +
+      ? "    AND sample_unique_id IN (SELECT sample_unique_id FROM " + clinicalTable(db, ["FACETS_QC"]) + "\n" +
         "      WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = 'FACETS_QC'\n" +
         "        AND " + clinicalValueFoldSql("attribute_value") + " = 'pass')\n"
       : "") +
@@ -343,7 +344,7 @@ export function clonalityGenesSql(cohortSql: string, study: string, db: string, 
  * them, and whole-genome doubling among the samples considered (QC-passing ones, with `qc`).
  */
 export function facetsSummarySql(cohortSql: string, study: string, db: string, qc: boolean): string {
-  const attr = (name: string) => "(SELECT sample_unique_id AS suid, " + clinicalValueFoldSql("attribute_value") + " AS v FROM " + db + ".clinical_data_derived\n" +
+  const attr = (name: string) => "(SELECT sample_unique_id AS suid, " + clinicalValueFoldSql("attribute_value") + " AS v FROM " + clinicalTable(db, [name]) + "\n" +
     "    WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(name) + ")";
   const considered = qc ? " AND suid IN (SELECT suid FROM qcv WHERE v = 'pass')" : "";
   return (
@@ -373,7 +374,7 @@ export function facetsHistogramSql(cohortSql: string, study: string, db: string,
     "       toInt32(floor(least(if(attribute_name = 'FACETS_PURITY', 0.9999, 7.9999), greatest(0, toFloat64OrNull(attribute_value))) /\n" +
     "         if(attribute_name = 'FACETS_PURITY', 0.05, 0.25))) AS bin,\n" +
     "       count() AS n\n" +
-    "FROM " + db + ".clinical_data_derived\n" +
+    "FROM " + clinicalTable(db, ["FACETS_PURITY", "FACETS_PLOIDY"]) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name IN ('FACETS_PURITY', 'FACETS_PLOIDY')\n" +
     "  AND sample_unique_id IN (SELECT suid FROM samp) AND toFloat64OrNull(attribute_value) IS NOT NULL\n" +
     "GROUP BY attr, bin ORDER BY attr, bin"
@@ -442,7 +443,7 @@ export function incidenceCountsSql(cohortSql: string, study: string, db: string,
     "  SELECT " + pid + " AS pid,\n" +
     "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) AS months,\n" +
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status\n" +
-    "  FROM " + db + ".clinical_data_derived\n" +
+    "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
     "  GROUP BY pid\n" +

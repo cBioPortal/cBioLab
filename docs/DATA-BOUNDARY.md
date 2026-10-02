@@ -130,6 +130,24 @@ suite fail. A test that cannot fail is decoration.
   Anyone pointing this at restricted data should decide whether that store is
   acceptable, or skip caching for patient-level answers.
 
+- **Uploaded custom data is patient-level, and goes only where the request
+  boundary sends it.** A researcher's upload (`lib/custom-data.ts`) lives in
+  their browser and arrives as `customData` beside a request. The route checks
+  every study it names (`customContext` in `lib/custom-data-server.ts`): a study
+  held by a remote peer or an aggregate-only instance is refused outright. The
+  rows are then merged into the clinical tables of the allowed connections'
+  databases only, as ClickHouse external tables, and `lib/ch.ts` refuses to
+  upload them with a statement bound for any other connection. Answers that use
+  them are never written to the shared result cache (`hasCustomData()` in
+  `lib/next-cache.ts` and the Explore route), and they never enter a `?doc=`
+  link: a document names `custom:<dataset>/<COLUMN>`, never a value. Covered by
+  `test/boundary.test.ts` ("uploaded custom data") and `test/custom-data.test.ts`.
+  One edge, stated: a study flagged aggregate-only by `AGGREGATE_ONLY_STUDIES`
+  on an otherwise patient-level connection cannot be given custom data, but
+  rows uploaded for another study on that same connection still travel to it
+  (filtered by study in SQL), since that instance already holds patient-level
+  data for the study they belong to.
+
 ## If you are about to weaken this
 
 Don't. If a feature seems to require patient-level data from an aggregate-only

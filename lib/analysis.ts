@@ -35,6 +35,7 @@ import { resolveExtends } from "./cohort-extends.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
 import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, type CoxTrace } from "./method.ts";
+import { ATTR_NAME_RE, assertCustomDataPresent } from "./custom-data.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -178,6 +179,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   // cohort's `all` is already the full, flattened list.
   const { doc: paramsDoc, params: usedParams, unused: unusedParams } = resolveParams(template);
   const extendsDoc = resolveExtends(paramsDoc);
+  assertCustomDataPresent(extendsDoc);
   const docStudy = await resolveStudy(extendsDoc.study);
   // A percentile leaf needs a real query (a percentile is a fact about the data, not the
   // document's own JSON), so this runs after extends/params but before anything compiles a
@@ -1614,7 +1616,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
 
     } else if (view.kind === "clinical") {
       const attrs = ((view as ClinicalView).attributes || [])
-        .map((a) => String(a).trim()).filter((a) => /^[A-Za-z0-9_]{1,64}$/.test(a));
+        .map((a) => String(a).trim()).filter((a) => ATTR_NAME_RE.test(a));
       if (!attrs.length) { views.push({ kind: "clinical", error: "clinical view needs attributes" }); continue; }
       { const e = overLimit("a clinical view", 20, attrs.length); if (e) { views.push({ kind: "clinical", error: e.replace("at most 20", "at most 20 attributes") }); continue; } }
       if (vNames.length < 2) { views.push({ kind: "clinical", error: "clinical comparison needs at least 2 cohorts" }); continue; }

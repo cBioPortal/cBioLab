@@ -8,6 +8,7 @@ import { compileCohortDef } from "./cohort2.ts";
 
 import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet, ExtraDerivedRequest } from "./types.ts";
 import { clinicalValueFoldSql } from "./event-names.ts";
+import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor } from "./custom-data.ts";
 
 /**
  * cBioPortal's linear bin intervals (LinearDataBinner). The binner picks the
@@ -156,7 +157,7 @@ async function attachHistograms(opts: {
     const unit = f.per === "sample" ? "sample_unique_id" : "patient_unique_id";
     const source =
       "(SELECT toFloat64OrNull(attribute_value) AS v, " + unit + " AS id\n" +
-      " FROM " + db + ".clinical_data_derived\n" +
+      " FROM " + clinicalTable(db, [f.attribute]) + "\n" +
       " WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(f.attribute) +
       "   AND type = " + sq(f.per) + " AND attribute_value != ''" + cond + ")";
     // portal bins are (start, end]: a value on an edge belongs to the lower bar
@@ -206,7 +207,9 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // once, a reader wants the handful of attributes those studies SHARE, not the
   // union of every study's own vocabulary — which reached 1,634 facets across 64
   // studies. Empty means "everything", so nothing changes by default.
-  const attrAllow = [...new Set((attributes || []).map(String).filter((a) => /^[A-Za-z0-9_]{1,64}$/.test(a)))].slice(0, 60);
+  const attrAllow = [...new Set((attributes || []).map(String).filter((a) => ATTR_NAME_RE.test(a)))].slice(0, 60);
+  // the reader's own uploads are always faceted, whatever the allow-list narrows to
+  if (attrAllow.length) for (const c of customAttributesFor(study)) if (!attrAllow.includes(c.attribute)) attrAllow.push(c.attribute);
   let cond = "", sampleCond = "", panelSampleCond = "", draftCount = null, dsql = null;
   if (draft && Array.isArray(draft.all) && draft.all.length) {
     dsql = compileCohortDef(draft, { oncokbPin, profiles, gaProfiles, study, db });
@@ -247,7 +250,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   const metaRows = await chQuery<ChRow>(
     "SELECT cam.attr_id AS a, cam.datatype AS datatype, cam.display_name AS display_name,\n" +
     "       cam.description AS description, cam.priority AS priority, cam.patient_attribute AS patient_attribute\n" +
-    "FROM " + db + ".clinical_attribute_meta cam\n" +
+    "FROM " + clinicalMetaTable(db) + " cam\n" +
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study), conn).catch(() => ({ data: [] as ChRow[] }));
   const meta = new Map(metaRows.data.map((r) => [r.a, r]));
@@ -263,7 +266,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     "  quantileExact(0.75)(toFloat64OrNull(attribute_value)) AS q3,\n" +
     "  countIf(toFloat64OrNull(attribute_value) IS NULL) AS na,\n" +
     "  countIf(toFloat64OrNull(attribute_value) = round(toFloat64OrNull(attribute_value))) = countIf(toFloat64OrNull(attribute_value) IS NOT NULL) AS allints\n" +
-    "FROM " + db + ".clinical_data_derived\n" +
+    "FROM " + clinicalTable(db, attrAllow.length ? attrAllow : "all") + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''" + cond +
     (attrAllow.length ? "\n  AND attribute_name IN (" + attrAllow.map(sq).join(",") + ")" : "") + "\n" +
     "GROUP BY type, a ORDER BY np DESC LIMIT 250", conn);
@@ -289,7 +292,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
       "       topK(1)(attribute_value)[1] AS v,\n" +
       "       " + clinicalValueFoldSql("attribute_value") + " AS vkey,\n" +
       "       uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
-      "FROM " + db + ".clinical_data_derived\n" +
+      "FROM " + clinicalTable(db, catAttrs.map((r) => String(r.a))) + "\n" +
       "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
       "  AND attribute_name IN (" + catAttrs.map(r => sq(r.a)).join(",") + ")" + cond + "\n" +
       "GROUP BY type, a, vkey ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT + " BY type, a", conn);
@@ -316,7 +319,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     const v = await chQuery(
       "SELECT topK(1)(attribute_value)[1] AS v, " + clinicalValueFoldSql("attribute_value") + " AS vkey,\n" +
       "       uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
-      "FROM " + db + ".clinical_data_derived\n" +
+      "FROM " + clinicalTable(db, [attr]) + "\n" +
       "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
       "  AND type = " + sq(per) + " AND attribute_name = " + sq(attr) + subCond + "\n" +
       "GROUP BY vkey ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT, conn);

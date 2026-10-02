@@ -66,6 +66,17 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   before (`AnalysisDoc` = resolved, `TemplateDoc` = as authored). `runAnalysis` is the boundary.
   Also `parameterize()`, the one-click lift of study + a shared gene list.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
+- **Custom data** — a researcher's uploaded annotations, named `custom:<dataset>/<COLUMN>` and
+  usable anywhere a clinical attribute is. **`lib/custom-data.ts`**: the rows live in the browser
+  (IndexedDB, `app/lab/custom-data-client.ts`) and ride beside each request as `customData`; for
+  that request `clinicalTable(db, attrs)` / `clinicalMetaTable(db)` merge them into the clinical
+  tables as ClickHouse external tables. **Every read of `clinical_data_derived` or
+  `clinical_attribute_meta` goes through those two functions** — a new reader that names the
+  table directly silently ignores uploads. `attrs` is what the statement reads ("all" only when it
+  truly reads every attribute), so a statement about built-in attributes gets the plain table and
+  ships nothing. `lib/custom-data-server.ts` is the request boundary (patient-level studies only,
+  id matching, "save as feature" membership). Results that use uploads bypass the shared cache;
+  a document naming an upload the request lacks is refused (`assertCustomDataPresent`).
 - **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Cohorts /
   Analysis / Examples. The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
   demo pages were retired once the Analysis app subsumed them; `/` now redirects to `/lab`.

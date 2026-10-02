@@ -89,6 +89,11 @@ export interface OncoprintFigureProps {
    * dialog.
    */
   onCreateCohort?: (sel: ColumnSelection) => void | Promise<void>;
+  /**
+   * Freeze a dragged selection into a yes/no attribute: the selected columns against every
+   * other column in the figure (`all`). Absent means no such action. Throwing refuses, as above.
+   */
+  onSaveFeature?: (sel: ColumnSelection, all: string[]) => void | Promise<void>;
 }
 
 /** what a drag across the plot picked out */
@@ -538,6 +543,16 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     setSelBusy(false);
   };
 
+  const saveFeature = async () => {
+    if (!data || !props.onSaveFeature) return;
+    setSelBusy(true); setSelError(null);
+    try {
+      await props.onSaveFeature({ ids: selectionIds(), unit: data.unit, name: selName.trim() || "selection", groups: selGroups }, data.columns());
+      clearSelection();
+    } catch (e) { setSelError(String((e as Error).message || e)); }
+    setSelBusy(false);
+  };
+
   // a selection is a position in the drawn order, so a re-sort or a change of visible columns
   // retires it rather than pointing at whatever now sits in those slots
   useEffect(() => { setSel(null); setSelRanges(null); setSelError(null); }, [visible]);
@@ -903,6 +918,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 <button className="primary" disabled={selBusy || tooMany} onClick={createCohort}>
                   {selBusy ? "making the cohort…" : "New cohort"}</button>
               </>}
+              {props.onSaveFeature && (
+                <button className="tbbtn" disabled={selBusy}
+                  title={"save this selection as a yes/no custom attribute: the selected " + data.unit + "s are Yes, every other " + data.unit + " in the figure No"}
+                  onClick={saveFeature}>Save as feature</button>
+              )}
               <button className="linklike" onClick={zoomToSelection}>Zoom to selection</button>
               <button className="linklike" onClick={async () => {
                 const ids = selectionIds();

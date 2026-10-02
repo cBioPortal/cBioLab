@@ -789,6 +789,23 @@ details.gearmenu.inline[open] > summary {
 .attrtable tbody tr:hover { background: var(--code-bg); }
 .attrtable td { padding: 0.3rem 0.6rem; }
 .attrtable td.meta { white-space: nowrap; }
+/* Custom data: the reader's own uploads, marked wherever an attribute name is shown */
+.customtag {
+  font-family: "IBM Plex Mono", monospace; font-size: var(--t-xs); font-weight: 500;
+  color: var(--accent-ink); background: var(--accent-soft);
+  padding: 0.05rem 0.4rem; border-radius: var(--r-sm); margin-right: var(--s1);
+}
+.customdata { max-width: 60rem; }
+.customwarn { border-color: var(--accent); font-size: var(--t-md); }
+.toast {
+  position: fixed; left: 50%; bottom: var(--s5); transform: translateX(-50%); z-index: 50; max-width: min(46rem, 92vw);
+  background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: var(--s3) var(--s4); font-size: var(--t-md); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22); cursor: pointer;
+}
+.customdata h4 { margin: var(--s4) 0 var(--s1); font-size: var(--t-md); font-weight: 600; }
+.customdata-text { width: 100%; box-sizing: border-box; font-family: "IBM Plex Mono", monospace; font-size: var(--t-sm); margin: var(--s2) 0; }
+.customlist td { vertical-align: top; }
+.customlist td.meta { white-space: normal; }
 .namedialog .meta { display: block; margin-bottom: 0.6rem; }
 .namedialog input { width: 100%; box-sizing: border-box; }
 .genedialog { min-width: 24rem; max-width: 30rem; }
