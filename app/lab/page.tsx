@@ -18,6 +18,8 @@ import { VIEW_HELP } from "../../lib/view-help.ts";
 import { installLabTools, LAB_TOOL_NAMES, type LabBridge } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import CustomDataPanel, { useCustomDatasets } from "./custom-data-panel.tsx";
+import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
+import type { OnCustomData } from "./pills";
 import { installCustomDataFetch, customDatasets, saveCustomDataset, referencedDatasets, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
 import { isCustomAttr, attributeLabel } from "../../lib/custom-data-names.ts";
 
@@ -331,6 +333,10 @@ export default function AnalysisPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [exMsg, setExMsg] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [cdFocus, setCdFocus] = useState<CustomDataFocus | null>(null);
+  /** the `custom` tag on a cohort's pill: that clause's upload, scoped to the clause */
+  const showClauseData = (cohort?: string): OnCustomData => (attribute, leaf, negated) =>
+    setCdFocus({ datasets: referencedDatasets({ a: attribute }), clause: { attribute, leaf, cohort, negated } });
   const [saveName, setSaveName] = useState("");
   const [genesFor, setGenesFor] = useState<number | null>(null);
   const genesDialog = useRef<HTMLDialogElement | null>(null);
@@ -2887,7 +2893,7 @@ function Latency({ v }: { v: any }) {
                   <button className="linklike" onClick={clearDraft}>clear</button>
                 </div>
                 <div className="row" style={{ marginTop: "0.4rem" }}>
-                  {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} />; })()}
+                  {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} onCustomData={showClauseData()} />; })()}
                 </div>
                 {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
                 {/* A native <dialog> so Esc, focus trapping and the backdrop come
@@ -3677,7 +3683,7 @@ function Latency({ v }: { v: any }) {
                   <span className="spacer" />
                   <button className="linklike" onClick={() => removeSaved(n)}>delete</button>
                 </div>
-                <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} /></div>
+                <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} onCustomData={showClauseData(n)} /></div>
               </div>
             ))}
           </div>
@@ -3808,7 +3814,7 @@ function Latency({ v }: { v: any }) {
                       </div>
                       <CohortStudies ids={c.studies && c.studies.length ? c.studies : [doc.cohorts?.[n]?.study || doc.study || result.study].filter(Boolean) as string[]}
                         names={studyNames} />
-                      {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} />}
+                      {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} onCustomData={showClauseData(n)} />}
                       {/* A note only shows here — passively, read-only — once the
                           cohort is actually saved as a reusable artifact AND
                           someone bothered to write one; an ad-hoc cohort that
@@ -3885,6 +3891,15 @@ function Latency({ v }: { v: any }) {
                       Save analysis
                     </button>
                   )}
+                  {(() => {
+                    const used = referencedDatasets(doc);
+                    return used.length > 0 && (
+                      <button className="linklike" onClick={() => setCdFocus({ datasets: used })}
+                        title="the uploads this analysis names, as stored in this browser">
+                        custom data ({used.length})
+                      </button>
+                    );
+                  })()}
                   <button className="linklike" onClick={() => docDialog.current?.showModal()}
                     title="open the document's raw JSON — edit it, run it, or view generated SQL">
                     show document json
@@ -4732,6 +4747,13 @@ function Latency({ v }: { v: any }) {
         </div>}
       </main>
       {toast && <div className="toast" role="status" onClick={() => setToast(null)}>{toast}</div>}
+      <CustomDataDialog focus={cdFocus} onClose={() => setCdFocus(null)}
+        demos={DOC_EXAMPLES.flatMap((e) => e.customData || [])}
+        onImportDemos={async (ids) => {
+          await importExampleData(DOC_EXAMPLES.flatMap((e) => e.customData || []).filter((d) => ids.includes(d.id)));
+          if (tabRef.current === "analysis") { setError(null); run(doc); }
+        }}
+        onManage={() => { goTab("explore"); if (!explore) fetchExplore(); setChartTab("custom"); setTimeout(() => addChartDialog.current?.showModal(), 0); }} />
     </>
   );
 }

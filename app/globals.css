@@ -797,6 +797,12 @@ details.gearmenu.inline[open] > summary {
 }
 .customdata { max-width: 60rem; }
 .customwarn { border-color: var(--accent); font-size: var(--t-md); }
+button.customtag { border: none; cursor: pointer; line-height: inherit; }
+button.customtag:hover { text-decoration: underline; }
+.customdatadialog .cdview { border-top: 1px solid var(--line); padding-top: var(--s3); margin-top: var(--s4); }
+.customdatadialog .cdview h4 { font-size: var(--t-base); }
+.customdatadialog .focus { background: var(--accent-soft); }
+.customdatadialog .cdcols td.meta { white-space: normal; }
 .toast {
   position: fixed; left: 50%; bottom: var(--s5); transform: translateX(-50%); z-index: 50; max-width: min(46rem, 92vw);
   background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-md);
