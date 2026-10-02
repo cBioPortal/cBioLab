@@ -8,6 +8,7 @@ const REPO = "https://github.com/cBioPortal/cohort-lab";
 
 function Commit({ commit, file }: { commit: string | null; file: string }) {
   if (!commit) return <>at an unrecorded commit</>;
+  if (commit === "dev") return <>as it stands in the working tree this development server is serving</>;
   const dirty = commit.endsWith("+dirty"), sha = commit.replace(/\+dirty$/, "");
   return dirty
     ? <>at commit <code>{sha.slice(0, 7)}</code> plus uncommitted changes</>
@@ -17,6 +18,7 @@ function Commit({ commit, file }: { commit: string | null; file: string }) {
 export function MethodPanel({ method }: { method: MethodRecord }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
+    if (!method.python) return;
     navigator.clipboard?.writeText(method.python).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 1500);
     }, () => {});
@@ -44,19 +46,20 @@ export function MethodPanel({ method }: { method: MethodRecord }) {
         ))}
       </ol>
       <p className="mdetail">
-        Code: <code>{method.implementation.functions.join(", ")}</code> in <code>{method.implementation.file}</code>{" "}
+        Code: {method.implementation.functions.length > 0 && <><code>{method.implementation.functions.join(", ")}</code> in </>}
+        <code>{method.implementation.file}</code>{" "}
         <Commit commit={method.implementation.commit} file={method.implementation.file} />.
         {method.verification && <> {method.verification}</>}
       </p>
-      <details className="mpy">
-        <summary className="meta">Python equivalent — refit the same model with a standard library</summary>
+      {method.python && <details className="mpy">
+        <summary className="meta">Python equivalent — recompute these numbers with standard libraries</summary>
         <div className="provq">
           <div className="provhead">
             <button className="tbbtn" onClick={copy}>{copied ? "copied" : "copy"}</button>
           </div>
           <pre>{method.python}</pre>
         </div>
-      </details>
+      </details>}
     </div>
   );
 }

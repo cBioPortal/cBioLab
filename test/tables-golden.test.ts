@@ -8,7 +8,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { fisherExact, chiSquareTest, benjaminiHochberg, cochranMantelHaenszel } from "../lib/stats.ts";
+import { fisherExact, chiSquareTest, benjaminiHochberg, cochranMantelHaenszel, mcnemarExact } from "../lib/stats.ts";
 import { VERIFIED } from "../lib/method.ts";
 
 const golden = JSON.parse(readFileSync("test/fixtures/golden/tables.json", "utf8"));
@@ -59,6 +59,10 @@ describe("cochranMantelHaenszel matches statsmodels StratifiedTable (R's continu
       close4(r.oddsRatio!, c.oddsRatio, "Mantel-Haenszel odds ratio");
     });
   }
+});
+
+describe("mcnemarExact matches statsmodels mcnemar(exact=True)", () => {
+  for (const c of golden.mcnemar) test(c.b + " vs " + c.c + " discordant", () => closeRel(mcnemarExact(c.b, c.c), c.p, "p"));
 });
 
 test("the table tests' verification claim names the library versions this fixture was made with", () => {

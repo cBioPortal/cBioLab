@@ -19,7 +19,7 @@ import { fisherExact, benjaminiHochberg, varianceFromMoments, welchT, preRankedG
   aalenJohansen, cifAt, grayPermutationTest, kaplanMeier, quantilesFromHistogram, type CrRecord } from "./stats.ts";
 import { geneSymbols } from "./gene-tracks.ts";
 import { viewToSvg } from "./view-svg.ts";
-import { diffexprMethod, incidenceMethod, type IncidenceTrace } from "./method.ts";
+import { diffexprMethod, incidenceMethod, pairedMethod, genomeMethod, pathwaysMethod, attritionMethod, type IncidenceTrace, type PairedTrace } from "./method.ts";
 
 export interface EvaluatedCohort {
   studies: string[];
@@ -116,7 +116,7 @@ async function attritionView(view: AttritionView, ctx: ViewCtx): Promise<ViewRes
   const mismatched = panels.filter((p) => (p.steps.length ? p.steps[p.steps.length - 1].n : p.base) !== cohorts[p.cohort].count);
   const multi = vStudies.length > 1;
   return {
-    kind: "attrition", cohorts: vNames, attrition: panels,
+    kind: "attrition", cohorts: vNames, attrition: panels, method: attritionMethod(panels),
     queries: queries.sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true })),
     participation: ctx.participationFor(vStudies, false),
     ...(multi ? { studies: vStudies } : {}),
@@ -257,6 +257,12 @@ async function genomeView(view: GenomeView, ctx: ViewCtx): Promise<ViewResult> {
   const multi = ctx.vStudies.length > 1;
   return {
     kind: "genome", cohorts: vNames,
+    method: genomeMethod({ build, binMb, threshold, includeX, bins: bins.length, pastEnd,
+      perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
+        .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+      cohorts: series.map((x) => ({ name: x.cohort, samples: x.samples, segmented: x.segmented })),
+      counts: series.flatMap((x) => bins.flatMap((b, i) => x.profiled[i]
+        ? [{ cohort: x.cohort, chrom: b.chrom, bin: i - offset[b.chrom], profiled: x.profiled[i], gain: x.gain[i], loss: x.loss[i] }] : [])) }),
     genome: { build, binMb, threshold, includeX, bins, series, ...(test ? { test } : {}), ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
@@ -380,6 +386,12 @@ async function pathwaysView(view: PathwaysView, ctx: ViewCtx): Promise<ViewResul
   const unprofiled = rows.reduce((n, r) => n + r.notProfiled.length, 0);
   return {
     kind: "pathways", cohorts: vNames, annotation: pin ? "OncoKB " + pin : undefined,
+    method: pathwaysMethod({ measure, oncokbPin: pin, cohorts: vNames,
+      perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
+        .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+      sets: drawn.map((p) => ({ name: p.name, source: p.source, genes: p.genes.map((g) => g.gene) })),
+      setCounts: vNames.flatMap((n) => drawn.map((p) => ({ cohort: n, set: p.name, ...(setTally.get(n + "|" + p.name) || { profiled: 0, altered: 0 }) }))),
+      geneCounts: vNames.flatMap((n) => allGenes.map((g) => ({ cohort: n, gene: g, ...(geneTally.get(n + "|" + g) || { profiled: 0, altered: 0 }) }))) }),
     pathways: { measure, rows, ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
@@ -591,6 +603,7 @@ async function pairedView(view: PairedView, ctx: ViewCtx): Promise<ViewResult> {
   if (!Object.keys(ok).length) return refuse("paired", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
   const panels: PairedPanel[] = [];
   const tallies = new Map<string, { pairs: number; both: number; aOnly: number; bOnly: number }>();
+  const pairedRows: PairedTrace["counts"] = [];
   for (const n of vNames) {
     const panel: PairedPanel = { cohort: n, patients: 0, aSamples: 0, bSamples: 0, genes: [] };
     await Promise.all(cohorts[n].studies.filter((st) => ok[st]).map(async (st) => {
@@ -605,6 +618,7 @@ async function pairedView(view: PairedView, ctx: ViewCtx): Promise<ViewResult> {
         const k = n + "|" + String(r.gene), cur = tallies.get(k) || { pairs: 0, both: 0, aOnly: 0, bOnly: 0 };
         cur.pairs += Number(r.pairs); cur.both += Number(r.both); cur.aOnly += Number(r.a_only); cur.bOnly += Number(r.b_only);
         tallies.set(k, cur);
+        pairedRows.push({ cohort: n, study: st, gene: String(r.gene), pairs: Number(r.pairs), both: Number(r.both), aOnly: Number(r.a_only), bOnly: Number(r.b_only) });
       }
     }));
     panel.genes = genes.map((g) => {
@@ -630,6 +644,12 @@ async function pairedView(view: PairedView, ctx: ViewCtx): Promise<ViewResult> {
   const aL = by.a.join("/"), bL = by.b.join("/");
   return {
     kind: "paired", cohorts: vNames,
+    method: pairedMethod({ pairBy: by, measure, oncokbPin: pin,
+      perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
+        .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+      panels: panels.map((pn) => ({ cohort: pn.cohort, patients: pn.patients })),
+      counts: pairedRows.sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.study < y.study ? -1 : x.study > y.study ? 1 : 0) ||
+        genes.indexOf(x.gene) - genes.indexOf(y.gene)) }),
     paired: { pairBy: by, measure, panels, ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),

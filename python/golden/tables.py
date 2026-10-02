@@ -23,7 +23,7 @@ import numpy as np
 import scipy
 import statsmodels
 from scipy.stats import chi2 as chi2_dist, chi2_contingency, fisher_exact
-from statsmodels.stats.contingency_tables import StratifiedTable
+from statsmodels.stats.contingency_tables import StratifiedTable, mcnemar
 from statsmodels.stats.multitest import multipletests
 
 OUT = pathlib.Path(__file__).resolve().parents[2] / "test" / "fixtures" / "golden" / "tables.json"
@@ -89,13 +89,17 @@ cmh_cases = [
 cmh_cases += [[[int(x) for x in rng.integers(1, 50, 4)] for _ in range(int(rng.integers(2, 6)))] for _ in range(5)]
 cmhs = [cmh(s) for s in cmh_cases]
 
+# discordant pairs (b changed one way, c the other); the concordant cells do not enter an exact test
+mcnemar_cases = [(0, 0), (3, 0), (5, 5), (12, 3), (1, 9), (40, 22), (200, 160), (0, 17), (7, 8)]
+mcnemars = [{"b": b, "c": c, "p": float(mcnemar([[10, b], [c, 10]], exact=True).pvalue)} for b, c in mcnemar_cases]
+
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(json.dumps({
     "generatedBy": "python/golden/tables.py",
     "libraries": {"statsmodels": statsmodels.__version__, "numpy": np.__version__, "scipy": scipy.__version__},
     "reference": {"fisher": "scipy.stats.fisher_exact (two-sided)", "chi2": "scipy.stats.chi2_contingency(correction=False)",
-                  "bh": "statsmodels multipletests(method='fdr_bh')",
+                  "bh": "statsmodels multipletests(method='fdr_bh')", "mcnemar": "statsmodels mcnemar(exact=True)",
                   "cmh": "statsmodels StratifiedTable.test_null_odds (continuity-corrected when |delta| >= 0.5, as R's mantelhaen.test), oddsratio_pooled"},
-    "fisher": fisher, "chi2": chisq, "bh": bh, "cmh": cmhs,
+    "fisher": fisher, "chi2": chisq, "bh": bh, "cmh": cmhs, "mcnemar": mcnemars,
 }, separators=(",", ":")) + "\n")
-print(f"wrote {OUT.relative_to(OUT.parents[3])}: {len(fisher)} Fisher, {len(chisq)} chi2, {len(bh)} BH, {len(cmhs)} CMH cases")
+print(f"wrote {OUT.relative_to(OUT.parents[3])}: {len(fisher)} Fisher, {len(chisq)} chi2, {len(bh)} BH, {len(cmhs)} CMH, {len(mcnemars)} McNemar cases")

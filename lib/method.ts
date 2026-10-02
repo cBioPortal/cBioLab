@@ -30,8 +30,9 @@ export interface MethodRecord {
   implementation: { functions: string[]; file: string; commit: string | null };
   /** the reference implementation this one is tested against, and the test that does it */
   verification?: string;
-  /** a script that refits the same model from the query's own output columns */
-  python: string;
+  /** a script that recomputes the view's numbers from what its queries returned; absent when the
+   *  queries' own counts are the numbers, with nothing computed from them */
+  python?: string;
 }
 
 /**
@@ -55,6 +56,7 @@ export const VERIFIED = {
   meta: { library: "statsmodels", version: "0.15.0", fn: "combine_effects (fixed effect)" },
   gsea: { library: "gseapy", version: "1.3.1", fn: "prerank" },
   cif: { library: "statsmodels", version: "0.15.0", fn: "CumIncidenceRight" },
+  mcnemar: { library: "statsmodels", version: "0.15.0", fn: "mcnemar(exact=True)" },
 } as const;
 const GOLDEN_TEST = "test/regression-golden.test.ts";
 
@@ -1045,5 +1047,182 @@ export function incidenceMethod(t: IncidenceTrace): MethodRecord {
     verification: "Cumulative incidence and its standard error match statsmodels " + VERIFIED.cif.version + " CumIncidenceRight to 1e-12, and with delayed entry lifelines' AalenJohansenFitter" +
       (t.gray ? "; the Gray-type statistic and permutation p match the script's port exactly" : "") + " (test/incidence-golden.test.ts).",
     python,
+  };
+}
+
+// ---- paired: concordance within patients, exact McNemar, BH --------------------------------------
+
+export interface PairedTrace {
+  pairBy: { attribute: string; a: string[]; b: string[] };
+  measure: "driver" | "any";
+  oncokbPin: string | null;
+  perSite: { cohort: string; study: string; cohortPatients: number }[];
+  panels: { cohort: string; patients: number }[];
+  counts: { cohort: string; study: string; gene: string; pairs: number; both: number; aOnly: number; bOnly: number }[];
+}
+
+export function pairedMethod(t: PairedTrace): MethodRecord {
+  const aL = t.pairBy.a.join("/"), bL = t.pairBy.b.join("/");
+  const what = t.measure === "driver" ? driverMeaning(t.oncokbPin).replace(/^driver: /, "") : ALTERED_MEANING.replace(/^altered: /, "");
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Count each gene's state in paired samples",
+    detail: "The paired:patients and paired:genes queries above. Patients with both a " + t.pairBy.attribute + " = " + aL + " sample and a " + bL +
+      " sample; per gene, among those profiled for it on both sides by each side's own panels: altered (" + what + ") on both sides, on the " + aL +
+      " side only, or the " + bL + " side only. A patient with several samples on one side counts as altered there if any is. Counts only.",
+    scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
+  }));
+  if (new Set(t.perSite.map((s) => s.cohort)).size < t.perSite.length) steps.push({ kind: "transform", title: "Add each cohort's counts across its studies", detail: "The counts add exactly." });
+  steps.push({ kind: "statistic", title: "Exact McNemar test per gene",
+    detail: "Only the discordant patients carry information about direction: of the " + aL + "-only and " + bL + "-only patients, each is a fair coin under the null, so p is twice the smaller binomial tail (capped at 1). Concordance is both ÷ altered anywhere.",
+    params: t.panels.map((p) => [p.cohort, p.patients.toLocaleString() + " patients with both kinds of sample"] as [string, string]) });
+  steps.push({ kind: "statistic", title: "Benjamini–Hochberg across genes, per cohort", detail: "q-values over the genes with at least one discordant patient, separately for each cohort." });
+  const python = [
+    "# Recompute with statsmodels " + VERIFIED.mcnemar.version + ", the version our code is tested against.",
+    "import io",
+    "import pandas as pd",
+    "from statsmodels.stats.contingency_tables import mcnemar",
+    "from statsmodels.stats.multitest import multipletests",
+    "",
+    ...pyTable("counts", "What the paired:genes queries returned per cohort and study: patients altered on both sides, on the " + aL + " side only, on the " + bL + " side only, of those profiled on both",
+      ["cohort", "study", "gene", "pairs", "both", "a_only", "b_only"], t.counts.map((r) => [r.cohort, r.study, r.gene, r.pairs, r.both, r.aOnly, r.bOnly]), "paired_counts.csv"),
+    "g = counts.groupby([\"cohort\", \"gene\"], sort=False)[[\"pairs\", \"both\", \"a_only\", \"b_only\"]].sum().reset_index()",
+    "g[\"concordance\"] = g[\"both\"] / (g[\"both\"] + g[\"a_only\"] + g[\"b_only\"])",
+    "g[\"p\"] = [mcnemar([[r.both, r.a_only], [r.b_only, 0]], exact=True).pvalue if r.a_only + r.b_only else 1.0 for r in g.itertuples()]",
+    "for cohort, c in g.groupby(\"cohort\", sort=False):",
+    "    tested = c[c[\"a_only\"] + c[\"b_only\"] > 0]",
+    "    g.loc[tested.index, \"q\"] = multipletests(tested[\"p\"], method=\"fdr_bh\")[1] if len(tested) else []",
+    "print(g.to_string(index=False))",
+  ].join("\n") + "\n";
+  return { steps, implementation: { functions: ["mcnemarExact", "benjaminiHochberg"], file: "lib/stats.ts", commit: BUILD_COMMIT },
+    verification: "The exact McNemar test matches statsmodels " + VERIFIED.mcnemar.version + " mcnemar(exact=True) and Benjamini–Hochberg multipletests, to a relative 1e-6 (test/tables-golden.test.ts).",
+    python };
+}
+
+// ---- genome: per-bin gain / loss frequency, Fisher per bin, BH ----------------------------------
+
+export interface GenomeTrace {
+  build: string; binMb: number; threshold: number; includeX: boolean;
+  perSite: { cohort: string; study: string; cohortPatients: number }[];
+  cohorts: { name: string; samples: number; segmented: number }[];
+  bins: number;
+  pastEnd: number;
+  /** per cohort, summed over its studies: each bin's samples covered, gained and lost (bins with coverage only) */
+  counts: { cohort: string; chrom: string; bin: number; profiled: number; gain: number; loss: number }[];
+}
+
+export function genomeMethod(t: GenomeTrace): MethodRecord {
+  const two = t.cohorts.length === 2;
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Count gained and lost samples per bin",
+    detail: "The genome:coverage and genome:bins queries above. Per " + t.binMb + " Mb bin on " + t.build + ": the cohort's SAMPLES (a patient with two segmented samples counts twice) whose segmentation covers the bin's midpoint, and of those the ones gained (log2 segment mean ≥ " +
+      t.threshold + ") or lost (≤ −" + t.threshold + ") there. Counts only.",
+    scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
+  }));
+  steps.push({ kind: "transform", title: "Place the bins on one axis",
+    detail: "Chromosomes 1–22" + (t.includeX ? " and X" : "") + " at " + t.build + " lengths, " + t.bins.toLocaleString() + " bins; counts add across studies (all on one build)." +
+      (t.pastEnd ? " " + plural(t.pastEnd, "bin row") + " lay past a chromosome's end and were dropped." : ""),
+    params: t.cohorts.map((c) => [c.name, c.segmented.toLocaleString() + " of " + c.samples.toLocaleString() + " samples segmented"] as [string, string]) });
+  if (two) {
+    steps.push({ kind: "statistic", title: "Fisher's exact test per bin",
+      detail: "Two-sided, on gained vs not (and separately lost vs not) among each cohort's covered samples, in every bin both cohorts cover." });
+    steps.push({ kind: "statistic", title: "Benjamini–Hochberg across bins",
+      detail: "Separately for gains and losses. Adjacent bins are not independent: a run of significant bins is one region, not many findings." });
+  }
+  const python = [
+    "# Recompute" + (two ? " with scipy " + VERIFIED.fisher.version + " and statsmodels " + VERIFIED.bh.version + ", the versions our code is tested against" : "") + ".",
+    "import io",
+    "import pandas as pd",
+    ...(two ? ["from scipy.stats import fisher_exact", "from statsmodels.stats.multitest import multipletests"] : []),
+    "",
+    ...pyTable("counts", "Per cohort (summed over its studies) and bin: samples covered, gained and lost", ["cohort", "chrom", "bin", "profiled", "gain", "loss"],
+      t.counts.map((r) => [r.cohort, r.chrom, r.bin, r.profiled, r.gain, r.loss]), "genome_bins.csv"),
+    "counts[\"chrom\"] = counts[\"chrom\"].astype(str)  # \"1\"…\"22\", \"X\": names, not numbers",
+    "counts[\"gain_pct\"] = 100 * counts[\"gain\"] / counts[\"profiled\"]",
+    "counts[\"loss_pct\"] = 100 * counts[\"loss\"] / counts[\"profiled\"]",
+    ...(two ? [
+      "a, b = [counts[counts[\"cohort\"] == c].set_index([\"chrom\", \"bin\"]) for c in " + JSON.stringify(t.cohorts.map((c) => c.name)) + "]",
+      "both = a.join(b, lsuffix=\"_a\", rsuffix=\"_b\", how=\"inner\")",
+      "both = both[(both[\"profiled_a\"] > 0) & (both[\"profiled_b\"] > 0)]",
+      "for kind in (\"gain\", \"loss\"):",
+      "    p = [fisher_exact([[r[f\"{kind}_a\"], r[\"profiled_a\"] - r[f\"{kind}_a\"]], [r[f\"{kind}_b\"], r[\"profiled_b\"] - r[f\"{kind}_b\"]]]).pvalue",
+      "         for _, r in both.iterrows()]",
+      "    both[f\"{kind}_q\"] = multipletests(p, method=\"fdr_bh\")[1]",
+      "    print(kind, \"bins with q < 0.05:\", int((both[f\"{kind}_q\"] < 0.05).sum()))",
+    ] : ["print(counts.head(30).to_string(index=False))"]),
+  ].join("\n") + "\n";
+  return { steps, implementation: { functions: two ? ["fisherExact", "benjaminiHochberg"] : [], file: "lib/stats.ts", commit: BUILD_COMMIT },
+    ...(two ? { verification: "Fisher's exact test matches scipy " + VERIFIED.fisher.version + " fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts)." } : {}),
+    python };
+}
+
+// ---- pathways: share altered per pathway and member gene, Fisher, BH -----------------------------
+
+export interface PathwaysTrace {
+  measure: "driver" | "any";
+  oncokbPin: string | null;
+  perSite: { cohort: string; study: string; cohortPatients: number }[];
+  sets: { name: string; source: string; genes: string[] }[];
+  cohorts: string[];
+  setCounts: { cohort: string; set: string; profiled: number; altered: number }[];
+  geneCounts: { cohort: string; gene: string; profiled: number; altered: number }[];
+}
+
+export function pathwaysMethod(t: PathwaysTrace): MethodRecord {
+  const two = t.cohorts.length === 2;
+  const what = t.measure === "driver" ? driverMeaning(t.oncokbPin).replace(/^driver: /, "") : ALTERED_MEANING.replace(/^altered: /, "");
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Count patients altered per pathway and per gene",
+    detail: "The geneCounts and pathways:sets queries above. Per pathway: patients profiled for at least one member gene (the denominator) and of those, patients with " + what +
+      " in at least one member. Per member gene: the same over the patients profiled for that gene. Counts only.",
+    scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
+    params: [["pathways / sets", t.sets.map((x) => x.name + " (" + x.genes.length + ")").join(", ")]],
+  }));
+  if (new Set(t.perSite.map((s) => s.cohort)).size < t.perSite.length) steps.push({ kind: "transform", title: "Add each cohort's counts across its studies", detail: "The counts add exactly." });
+  if (two) {
+    steps.push({ kind: "statistic", title: "Fisher's exact test per pathway and per member gene", detail: "Two-sided, altered vs not among the profiled, between the two cohorts." });
+    steps.push({ kind: "statistic", title: "Benjamini–Hochberg", detail: "Across the pathways drawn, and separately across every member gene tested, each gene once even when it sits in two pathways." });
+  }
+  const python = [
+    "# Recompute" + (two ? " with scipy " + VERIFIED.fisher.version + " and statsmodels " + VERIFIED.bh.version + ", the versions our code is tested against" : "") + ".",
+    "import io",
+    "import pandas as pd",
+    ...(two ? ["from scipy.stats import fisher_exact", "from statsmodels.stats.multitest import multipletests"] : []),
+    "",
+    ...pyTable("sets", "Per cohort and pathway: patients profiled for at least one member gene, and altered in at least one", ["cohort", "set", "profiled", "altered"],
+      t.setCounts.map((r) => [r.cohort, r.set, r.profiled, r.altered]), "pathway_counts.csv"),
+    ...pyTable("genes", "Per cohort and member gene: patients profiled for it, and altered in it", ["cohort", "gene", "profiled", "altered"],
+      t.geneCounts.map((r) => [r.cohort, r.gene, r.profiled, r.altered]), "gene_counts.csv"),
+    "cohorts = " + JSON.stringify(t.cohorts),
+    "for name, table in ((\"pathway\", sets.groupby([\"set\", \"cohort\"]).sum()), (\"gene\", genes.groupby([\"gene\", \"cohort\"]).sum())):",
+    "    table[\"pct\"] = 100 * table[\"altered\"] / table[\"profiled\"]",
+    ...(two ? [
+      "    rows = []",
+      "    for key in table.index.get_level_values(0).unique():",
+      "        t = table.loc[key].reindex(cohorts).fillna(0)",
+      "        if (t[\"profiled\"] > 0).all():",
+      "            (a, pa), (b, pb) = [(r.altered, r.profiled) for r in t.itertuples()]",
+      "            rows.append((key, fisher_exact([[a, pa - a], [b, pb - b]]).pvalue))",
+      "    res = pd.DataFrame(rows, columns=[name, \"p\"])",
+      "    res[\"q\"] = multipletests(res[\"p\"], method=\"fdr_bh\")[1]",
+      "    print(res.sort_values(\"p\").to_string(index=False))",
+    ] : ["    print(table.to_string())"]),
+  ].join("\n") + "\n";
+  return { steps, implementation: { functions: two ? ["fisherExact", "benjaminiHochberg"] : [], file: "lib/stats.ts", commit: BUILD_COMMIT },
+    ...(two ? { verification: "Fisher's exact test matches scipy " + VERIFIED.fisher.version + " fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts)." } : {}),
+    python };
+}
+
+// ---- attrition: sequential cohort counts ---------------------------------------------------------
+
+export function attritionMethod(panels: { cohort: string; base: number; steps: { label: string; n: number; excluded: number }[]; studies: string[] }[]): MethodRecord {
+  return {
+    steps: panels.map((p) => ({
+      kind: "fetch" as const, title: "Count the cohort clause by clause",
+      detail: "One attrition query per step above, per study: the patients left after ANDing that clause onto every clause before it, in the order the cohort lists them, summed across " +
+        (p.studies.length === 1 ? p.studies[0] : p.studies.length + " studies (overlap not deduplicated)") + ". Nothing is computed from these counts beyond the differences between steps.",
+      scope: p.cohort,
+      params: [["every patient", p.base.toLocaleString()], ...p.steps.map((s) => [s.label, s.n.toLocaleString() + " (−" + s.excluded.toLocaleString() + ")"] as [string, string])],
+    })),
+    implementation: { functions: [], file: "lib/views-more.ts", commit: BUILD_COMMIT },
   };
 }

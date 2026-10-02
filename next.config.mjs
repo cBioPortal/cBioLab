@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 
 // The commit being built, for the method records views carry (lib/build-info.ts). Vercel
 // provides VERCEL_GIT_COMMIT_SHA itself; elsewhere ask git, and mark a tree whose tracked files
@@ -12,9 +13,10 @@ function gitCommit() {
   } catch { return ""; }
 }
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  env: { GIT_COMMIT: process.env.VERCEL_GIT_COMMIT_SHA || gitCommit() },
+/** @type {(phase: string) => import('next').NextConfig} */
+const nextConfig = (phase) => ({
+  // `next dev` serves the working tree as it changes, so no commit stamped at startup describes it
+  env: { GIT_COMMIT: phase === PHASE_DEVELOPMENT_SERVER ? "dev" : process.env.VERCEL_GIT_COMMIT_SHA || gitCommit() },
   // Where the build output goes. Overridable so a production build can run in a
   // folder whose `next dev` server is live: dev owns `.next`, and a gate build
   // writes `.next-gate` beside it (see scripts/gate.sh). Sharing one directory
@@ -34,6 +36,6 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/api/[transport]": ["./assets/fonts/**"]
   }
-};
+});
 
 export default nextConfig;
