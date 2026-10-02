@@ -565,6 +565,15 @@ async function main() {
       ok("a lollipop view can be added from the UI", added.includes("hotspots") && dots > 0,
         added.length ? added.join(", ") + " · " + dots + " dots" : "view was not added");
 
+      // Every cohort card names the studies it was queried in, with all of them in its tooltip.
+      const studyLines = await page.$$eval(".cohortbox", bs => bs.map(b => {
+        const el = b.querySelector(".cohortbox-studies");
+        return el ? { text: el.textContent.trim(), title: el.title } : null;
+      }));
+      ok("each cohort card says which studies it queried",
+        studyLines.length > 0 && studyLines.every(s => s && s.text && s.title),
+        studyLines.map(s => s ? s.text : "missing").join(" | "));
+
       // A kind already in the document shows as a selected pill, and clicking it removes the view.
       let pillOn = false, pillOff = false, left = [];
       try {
