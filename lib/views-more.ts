@@ -15,10 +15,11 @@ import { genomeBinsSql, genomeCoverageSql, studyGenomeSql, geneSetCountsSql, pro
   clonalityGenesSql, facetsSummarySql, facetsHistogramSql, ascnStudiesSql, incidenceCountsSql,
   labCourseSql, labBestSql, labWaterfallSql, labTestsSql, LAB_PCT_BIN, LAB_PCT_MIN, LAB_PCT_BINS,
   CHROM_LENGTHS, GENOME_CHROMS } from "./federation-more.ts";
-import { fisherExact, benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea, mcnemarExact,
+import { fisherExact, benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea, mcnemarExact, Z_975,
   aalenJohansen, cifAt, grayPermutationTest, kaplanMeier, quantilesFromHistogram, type CrRecord } from "./stats.ts";
 import { geneSymbols } from "./gene-tracks.ts";
 import { viewToSvg } from "./view-svg.ts";
+import { diffexprMethod, incidenceMethod, pairedMethod, genomeMethod, pathwaysMethod, attritionMethod, type IncidenceTrace, type PairedTrace } from "./method.ts";
 
 export interface EvaluatedCohort {
   studies: string[];
@@ -115,7 +116,7 @@ async function attritionView(view: AttritionView, ctx: ViewCtx): Promise<ViewRes
   const mismatched = panels.filter((p) => (p.steps.length ? p.steps[p.steps.length - 1].n : p.base) !== cohorts[p.cohort].count);
   const multi = vStudies.length > 1;
   return {
-    kind: "attrition", cohorts: vNames, attrition: panels,
+    kind: "attrition", cohorts: vNames, attrition: panels, method: attritionMethod(panels),
     queries: queries.sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true })),
     participation: ctx.participationFor(vStudies, false),
     ...(multi ? { studies: vStudies } : {}),
@@ -256,6 +257,12 @@ async function genomeView(view: GenomeView, ctx: ViewCtx): Promise<ViewResult> {
   const multi = ctx.vStudies.length > 1;
   return {
     kind: "genome", cohorts: vNames,
+    method: genomeMethod({ build, binMb, threshold, includeX, bins: bins.length, pastEnd,
+      perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
+        .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+      cohorts: series.map((x) => ({ name: x.cohort, samples: x.samples, segmented: x.segmented })),
+      counts: series.flatMap((x) => bins.flatMap((b, i) => x.profiled[i]
+        ? [{ cohort: x.cohort, chrom: b.chrom, bin: i - offset[b.chrom], profiled: x.profiled[i], gain: x.gain[i], loss: x.loss[i] }] : [])) }),
     genome: { build, binMb, threshold, includeX, bins, series, ...(test ? { test } : {}), ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
@@ -379,6 +386,12 @@ async function pathwaysView(view: PathwaysView, ctx: ViewCtx): Promise<ViewResul
   const unprofiled = rows.reduce((n, r) => n + r.notProfiled.length, 0);
   return {
     kind: "pathways", cohorts: vNames, annotation: pin ? "OncoKB " + pin : undefined,
+    method: pathwaysMethod({ measure, oncokbPin: pin, cohorts: vNames,
+      perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
+        .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+      sets: drawn.map((p) => ({ name: p.name, source: p.source, genes: p.genes.map((g) => g.gene) })),
+      setCounts: vNames.flatMap((n) => drawn.map((p) => ({ cohort: n, set: p.name, ...(setTally.get(n + "|" + p.name) || { profiled: 0, altered: 0 }) }))),
+      geneCounts: vNames.flatMap((n) => allGenes.map((g) => ({ cohort: n, gene: g, ...(geneTally.get(n + "|" + g) || { profiled: 0, altered: 0 }) }))) }),
     pathways: { measure, rows, ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
@@ -512,10 +525,12 @@ async function diffexprView(view: DiffexprView, ctx: ViewCtx): Promise<ViewResul
 
   // enrichment: rank by t, best (higher in the first cohort) first
   let gsea: NonNullable<ViewResult["diffexpr"]>["gsea"];
+  let gseaSets: { name: string; genes: string[] }[] | undefined;
   if (!setNames || setNames.length) {
     const meta = ok[Object.keys(ok)[0]];
     const rows = await meta.moreMeta("diffexpr:genesets", (_s, d) => genesetMembersSql(setNames || [], setNames ? null : "HALLMARK_", d));
     const found = rows.map((r) => ({ name: String(r.set_name), genes: (r.genes as unknown as string[]).map(String) }));
+    gseaSets = found;
     const absent = (setNames || []).filter((x) => !found.some((f) => f.name === x));
     if (absent.length) return refuse("diffexpr", ctx, "no MSigDB set named " + absent.slice(0, 3).join(", ") + " in this warehouse" +
       " (it holds the collections as named in MSigDB, e.g. HALLMARK_E2F_TARGETS, KEGG_…, REACTOME_…)");
@@ -532,6 +547,14 @@ async function diffexprView(view: DiffexprView, ctx: ViewCtx): Promise<ViewResul
   const multi = ctx.vStudies.length > 1;
   return {
     kind: "diffexpr", cohorts: vNames,
+    method: diffexprMethod({
+      profileType, log2, groups: [A, B], minN: DE_MIN_N, tested: tested.length, skipped,
+      perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
+        .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+      moments: [...moments].map(([k, m]) => ({ cohort: k.slice(0, k.indexOf("|")), gene: k.slice(k.indexOf("|") + 1), n: m.n, sx: m.sx, sxx: m.sxx }))
+        .sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.gene < y.gene ? -1 : x.gene > y.gene ? 1 : 0)),
+      ...(gsea && gseaSets ? { gsea: { sets: gseaSets, tested: gsea.sets.length, skipped: gsea.skipped, permutations: DE_PERMUTATIONS, minSize: 10 } } : {}),
+    }),
     diffexpr: { profileType, log2, effectLabel, groups: [A, B], tested: tested.length, skipped, up, down,
       points, grid: { xMax, yMax, nx, ny, cells }, pooledSignificant: sig.length - points.filter((g) => g.q < 0.05).length,
       labels, ...(gsea ? { gsea } : {}), ...(excluded.length ? { excluded } : {}) },
@@ -580,6 +603,7 @@ async function pairedView(view: PairedView, ctx: ViewCtx): Promise<ViewResult> {
   if (!Object.keys(ok).length) return refuse("paired", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
   const panels: PairedPanel[] = [];
   const tallies = new Map<string, { pairs: number; both: number; aOnly: number; bOnly: number }>();
+  const pairedRows: PairedTrace["counts"] = [];
   for (const n of vNames) {
     const panel: PairedPanel = { cohort: n, patients: 0, aSamples: 0, bSamples: 0, genes: [] };
     await Promise.all(cohorts[n].studies.filter((st) => ok[st]).map(async (st) => {
@@ -594,6 +618,7 @@ async function pairedView(view: PairedView, ctx: ViewCtx): Promise<ViewResult> {
         const k = n + "|" + String(r.gene), cur = tallies.get(k) || { pairs: 0, both: 0, aOnly: 0, bOnly: 0 };
         cur.pairs += Number(r.pairs); cur.both += Number(r.both); cur.aOnly += Number(r.a_only); cur.bOnly += Number(r.b_only);
         tallies.set(k, cur);
+        pairedRows.push({ cohort: n, study: st, gene: String(r.gene), pairs: Number(r.pairs), both: Number(r.both), aOnly: Number(r.a_only), bOnly: Number(r.b_only) });
       }
     }));
     panel.genes = genes.map((g) => {
@@ -619,6 +644,12 @@ async function pairedView(view: PairedView, ctx: ViewCtx): Promise<ViewResult> {
   const aL = by.a.join("/"), bL = by.b.join("/");
   return {
     kind: "paired", cohorts: vNames,
+    method: pairedMethod({ pairBy: by, measure, oncokbPin: pin,
+      perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
+        .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+      panels: panels.map((pn) => ({ cohort: pn.cohort, patients: pn.patients })),
+      counts: pairedRows.sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.study < y.study ? -1 : x.study > y.study ? 1 : 0) ||
+        genes.indexOf(x.gene) - genes.indexOf(y.gene)) }),
     paired: { pairBy: by, measure, panels, ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
@@ -755,6 +786,7 @@ async function incidenceView(view: IncidenceView, ctx: ViewCtx): Promise<ViewRes
   if (!Object.keys(ok).length) return refuse("incidence", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
   const recsBy: Record<string, CrRecord[]> = {};
   const curves: IncidenceCurve[] = [];
+  const countRows: IncidenceTrace["counts"] = [];
   for (const n of vNames) {
     const recs: CrRecord[] = [];
     const ex = { prior: 0, unobserved: 0, noFollowup: 0, noAnchor: 0 };
@@ -771,9 +803,14 @@ async function incidenceView(view: IncidenceView, ctx: ViewCtx): Promise<ViewRes
         if (Number(r.late)) late += cnt;
         const entry = Number(r.entry), t = Number(r.t), cause = Number(r.cause) as 0 | 1 | 2;
         for (let i = 0; i < cnt; i++) recs.push(entry > 0 ? { t, cause, entry } : { t, cause });
+        countRows.push({ cohort: n, study: st, entry, t, cause, n: cnt });
       }
     }));
     ex.noAnchor = Math.max(0, cohortN - seen);
+    // a canonical order, independent of which study answered first or how the database ordered
+    // tied rows: the permutation test shuffles labels by position, so its seeded p depends on it
+    const entryKey = (r: CrRecord) => r.entry ?? -Infinity;
+    recs.sort((x, y) => x.t - y.t || x.cause - y.cause || (entryKey(x) < entryKey(y) ? -1 : entryKey(x) > entryKey(y) ? 1 : 0));
     recsBy[n] = recs;
     const c = aalenJohansen(recs);
     curves.push({ cohort: n, n: c.n, events: c.events, competing: c.competing, censored: c.censored,
@@ -793,7 +830,7 @@ async function incidenceView(view: IncidenceView, ctx: ViewCtx): Promise<ViewRes
     let s = 1;
     for (const pt of km.points) { if (pt.t > months) break; s = pt.s; }
     const atRisk = recs.filter((r) => (r.entry ?? -Infinity) < months && r.t >= months).length;
-    return { cohort: c.cohort, f1: at.f1, lo: Math.max(0, at.f1 - 1.96 * at.se1), hi: Math.min(1, at.f1 + 1.96 * at.se1), naive: 1 - s, atRisk };
+    return { cohort: c.cohort, f1: at.f1, lo: Math.max(0, at.f1 - Z_975 * at.se1), hi: Math.min(1, at.f1 + Z_975 * at.se1), naive: 1 - s, atRisk };
   }) }));
   let gray: ReturnType<typeof grayPermutationTest> | undefined;
   const live = curves.filter((c) => c.n);
@@ -804,6 +841,16 @@ async function incidenceView(view: IncidenceView, ctx: ViewCtx): Promise<ViewRes
   const exTotal = (k: keyof IncidenceCurve["excluded"]) => curves.reduce((a, c) => a + c.excluded[k], 0);
   return {
     kind: "incidence", cohorts: vNames,
+    method: incidenceMethod({
+      eventLabel, horizons,
+      ...(anchor ? { anchor: (anchor.occurrence === "LAST" ? "last " : "first ") + anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "") } : {}),
+      perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
+        .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+      cohorts: curves.map((c) => ({ name: c.cohort, n: c.n, events: c.events, competing: c.competing, censored: c.censored, late: c.late, excluded: c.excluded })),
+      counts: countRows.sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.study < y.study ? -1 : x.study > y.study ? 1 : 0) ||
+        x.t - y.t || x.cause - y.cause || x.entry - y.entry),
+      ...(gray ? { gray: { statistic: gray.statistic, p: gray.p, permutations: gray.permutations } } : {}),
+    }),
     incidence: { eventLabel, ...(anchor ? { anchoredTo: anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "") } : {}),
       curves, horizons: hz, ...(gray ? { gray } : {}), ...(excluded.length ? { excludedStudies: excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),

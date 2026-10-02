@@ -19,6 +19,14 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
     x === 0 ? "<1e-300" : x < 1e-4 ? x.toExponential(1) : x.toFixed(4);
   const caveatOf = (v: { caveat?: string }) =>
     v.caveat ? "\n  CAVEAT (tell the user): " + v.caveat : "";
+  // What was computed from the rows, step by step, so a model can say how a number was arrived at.
+  const methodOf = (v: ViewResult) => !v.method ? "" :
+    "\n  METHOD:" + v.method.steps.map((st) =>
+      "\n    - " + st.title + (st.scope ? " [" + st.scope + "]" : "") +
+      (st.rowsIn != null && st.rowsOut != null ? " (" + st.rowsIn.toLocaleString() + " → " + st.rowsOut.toLocaleString() + " rows)" : "") +
+      ": " + st.detail +
+      (st.params || []).map(([k, val]) => "\n        " + k + ": " + val).join("")).join("") +
+    (v.method.verification ? "\n    " + v.method.verification : "");
   // the AUTHOR's note is `annotationNote`; `note` is the engine's own.
   const noteOf = (v: { annotationNote?: string; note?: string }) =>
     (v.annotationNote ? "\n  NOTE (the author's, tell the user): " + v.annotationNote : "") +
@@ -254,6 +262,7 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
       out.push(`View "${v.kind}" ran but this tool has no text rendering for it yet — ` +
         `open the interactive editor link below to see it.`);
     }
+    if (v.method) out[out.length - 1] += methodOf(v);
   }
   return out;
 }

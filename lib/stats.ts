@@ -128,6 +128,9 @@ export interface CoxFit {
   loglik: number; n: number; events: number; iterations: number;
 }
 
+/** The 97.5% standard-normal quantile, for 95% Wald intervals (scipy.stats.norm.ppf(0.975)). */
+export const Z_975 = 1.959963984540054;
+
 function zeros(n: number): number[] { return new Array(n).fill(0); }
 function zerosMat(n: number): number[][] { return Array.from({ length: n }, () => zeros(n)); }
 function dot(a: number[], b: number[]): number { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
@@ -242,14 +245,18 @@ export function coxRegression(rows: CoxRow[]): CoxFit {
     const delta = solveLinear(s.hess.map((r) => [...r]), s.grad);
     // step-halve if the update overshoots into a worse likelihood — Newton-Raphson on a
     // partial likelihood is usually well-behaved, but a large first step from beta=0 with a
-    // small or separated sample can overshoot
+    // small or separated sample can overshoot. A drop no bigger than the rounding error in
+    // summing the likelihood is not an overshoot: near the optimum a real step changes it by
+    // less than that, and halving would stall the fit short of the optimum.
+    const noise = 1e-12 * Math.abs(s.ll);
     let step = 1, next = beta.map((b, a) => b + delta[a]);
     for (let tries = 0; tries < 10; tries++) {
       const llNext = coxScore(rows, next).ll;
-      if (llNext >= s.ll || tries === 9) { ll = llNext; break; }
+      if (llNext >= s.ll - noise || tries === 9) { ll = llNext; break; }
       step /= 2; next = beta.map((b, a) => b + step * delta[a]);
     }
-    const converged = Math.max(...delta.map((d) => Math.abs(d) * step)) < 1e-7;
+    // converged when the full Newton step is negligible, whatever fraction of it was taken
+    const converged = Math.max(...delta.map((d) => Math.abs(d))) < 1e-10;
     beta = next;
     if (converged) { iterations++; break; }
   }
@@ -257,8 +264,8 @@ export function coxRegression(rows: CoxRow[]): CoxFit {
   const variances = inverseDiagonal(finalHess);
   const se = variances.map((v) => Math.sqrt(Math.max(0, v)));
   const hr = beta.map((b) => Math.exp(b));
-  const ciLow = beta.map((b, a) => Math.exp(b - 1.96 * se[a]));
-  const ciHigh = beta.map((b, a) => Math.exp(b + 1.96 * se[a]));
+  const ciLow = beta.map((b, a) => Math.exp(b - Z_975 * se[a]));
+  const ciHigh = beta.map((b, a) => Math.exp(b + Z_975 * se[a]));
   const pvals = beta.map((b, a) => se[a] > 0 ? chiSquareP1df((b / se[a]) * (b / se[a])) : 1);
   return { beta, se, hr, ciLow, ciHigh, p: pvals, loglik: ll, n: rows.length, events, iterations };
 }
@@ -325,13 +332,15 @@ export function logisticRegression(rows: LogisticRow[]): LogisticFit {
   for (; iterations < 50; iterations++) {
     const s = logisticScore(aug, beta);
     const delta = solveLinear(s.info.map((r) => [...r]), s.grad);
+    // same step acceptance and convergence rule as coxRegression, for the same reasons
+    const noise = 1e-12 * Math.abs(s.ll);
     let step = 1, next = beta.map((b, a) => b + delta[a]);
     for (let tries = 0; tries < 10; tries++) {
       const llNext = logisticScore(aug, next).ll;
-      if (llNext >= s.ll || tries === 9) break;
+      if (llNext >= s.ll - noise || tries === 9) break;
       step /= 2; next = beta.map((b, a) => b + step * delta[a]);
     }
-    const converged = Math.max(...delta.map((d) => Math.abs(d) * step)) < 1e-7;
+    const converged = Math.max(...delta.map((d) => Math.abs(d))) < 1e-10;
     beta = next;
     if (converged) { iterations++; break; }
   }
@@ -342,8 +351,8 @@ export function logisticRegression(rows: LogisticRow[]): LogisticFit {
   // drop the intercept (index 0) from what's reported — a forest plot has no row for it
   const betaCov = beta.slice(1), seCov = se.slice(1);
   const or = betaCov.map((b) => Math.exp(b));
-  const ciLow = betaCov.map((b, a) => Math.exp(b - 1.96 * seCov[a]));
-  const ciHigh = betaCov.map((b, a) => Math.exp(b + 1.96 * seCov[a]));
+  const ciLow = betaCov.map((b, a) => Math.exp(b - Z_975 * seCov[a]));
+  const ciHigh = betaCov.map((b, a) => Math.exp(b + Z_975 * seCov[a]));
   const pvals = betaCov.map((b, a) => seCov[a] > 0 ? chiSquareP1df((b / seCov[a]) * (b / seCov[a])) : 1);
   return { intercept: beta[0], beta: betaCov, se: seCov, or, ciLow, ciHigh, p: pvals, loglik: finalLl, n: rows.length, events, iterations };
 }
@@ -574,7 +583,10 @@ export function cochranMantelHaenszel(tables: { a: number; b: number; c: number;
     den += (t.b * t.c) / n;
     used++;
   }
-  const corrected = Math.max(0, Math.abs(sumA - sumE) - 0.5);
+  // continuity correction as R's mantelhaen.test applies it: only when |Δ| >= 0.5, so it never
+  // overshoots past zero (subtracting it from a smaller |Δ| and squaring would inflate chi2)
+  const delta = Math.abs(sumA - sumE);
+  const corrected = delta >= 0.5 ? delta - 0.5 : delta;
   const chi2 = sumV > 0 ? (corrected * corrected) / sumV : 0;
   return {
     chi2: Math.round(chi2 * 1e4) / 1e4,
@@ -816,14 +828,19 @@ export function regressionFromMoments(m: Moments): Regression {
   return { slope, intercept: (sy - slope * sx) / n };
 }
 
-export function pearsonFromMoments(m: Moments): Correlation {
+/** Pearson's r from the six sums, unrounded — null where it is undefined (n < 3, or a constant series). */
+export function pearsonR(m: Moments): number | null {
   const { n, sx, sy, sxy, sxx, syy } = m;
-  if (n < 3) return { r: null, n, t: 0, df: 0, p: 1 };
-  const cov = n * sxy - sx * sy;
+  if (n < 3) return null;
   const vx = n * sxx - sx * sx, vy = n * syy - sy * sy;
-  if (vx <= 0 || vy <= 0) return { r: null, n, t: 0, df: 0, p: 1 };  // a constant series has no correlation
-  let r = cov / Math.sqrt(vx * vy);
-  r = Math.max(-1, Math.min(1, r));
+  if (vx <= 0 || vy <= 0) return null;  // a constant series has no correlation
+  return Math.max(-1, Math.min(1, (n * sxy - sx * sy) / Math.sqrt(vx * vy)));
+}
+
+export function pearsonFromMoments(m: Moments): Correlation {
+  const n = m.n;
+  const r = pearsonR(m);
+  if (r == null) return { r: null, n, t: 0, df: 0, p: 1 };
   const df = n - 2;
   const t = r === 1 || r === -1 ? Infinity : r * Math.sqrt(df / (1 - r * r));
   return {

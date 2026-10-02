@@ -4,6 +4,7 @@
 import { esc, SERIES, palette, num, fmt, pFmt, frame, caption, type SvgOpts } from "./svg-kit.ts";
 import type { ViewResult } from "./types.ts";
 import { STYLE } from "./oncoprint-style.ts";
+import { Z_975 } from "./stats.ts";
 
 /** gains and losses take the oncoprint's amplification and deep-deletion hues */
 const CN_GAIN = STYLE.glyph.cna.options.find((o) => o.bit === "AMP")!.color;
@@ -443,7 +444,7 @@ export function incidenceSvg(v: ViewResult, o: SvgOpts): string {
   const tLast = Math.max(12, ...curves.map((c) => c.points.length ? c.points[c.points.length - 1].t : 0));
   const tMax = Math.min(tLast, Math.max(...r.horizons.map((h) => h.months)) * 1.25);
   const step = tMax > 120 ? 24 : tMax > 60 ? 12 : 6;
-  const peak = Math.max(0.05, ...curves.flatMap((c) => c.points.filter((q) => q.t <= tMax).map((q) => Math.max(q.f1 + 1.96 * q.se1, q.f2))));
+  const peak = Math.max(0.05, ...curves.flatMap((c) => c.points.filter((q) => q.t <= tMax).map((q) => Math.max(q.f1 + Z_975 * q.se1, q.f2))));
   const tick = peak <= 0.2 ? 0.05 : peak <= 0.5 ? 0.1 : 0.2;
   const yTop = Math.min(1, Math.ceil(peak / tick - 1e-9) * tick);
   const x = (t: number) => L + (W - L - R) * Math.min(t, tMax) / tMax;
@@ -464,7 +465,7 @@ export function incidenceSvg(v: ViewResult, o: SvgOpts): string {
       let up = `M${num(x(0))} ${num(y(0))}`, lo = "";
       let pu = 0, pl = 0;
       for (const q of pts) {
-        const u = Math.min(1, q.f1 + 1.96 * q.se1), l = Math.max(0, q.f1 - 1.96 * q.se1);
+        const u = Math.min(1, q.f1 + Z_975 * q.se1), l = Math.max(0, q.f1 - Z_975 * q.se1);
         up += ` L${num(x(q.t))} ${num(y(pu))} L${num(x(q.t))} ${num(y(u))}`; pu = u;
         lo = ` L${num(x(q.t))} ${num(y(l))} L${num(x(q.t))} ${num(y(pl))}` + lo; pl = l;
       }
