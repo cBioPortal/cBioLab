@@ -3061,3 +3061,86 @@ Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a med
 }
 ```
 
+### Example 49: Custom data: a curated biopsy site on every sample
+
+luad_mskimpact_2021 is 93 EGFR-mutant lung adenocarcinomas with 186 primary and metastatic samples. The demo upload gives every sample a BIOPSY_SITE, grouped from the study's own SAMPLE_TYPE and free-text METASTATIC_SITE the way a reviewer would (scripts/gen-custom-demo.ts), standing in for a clinician-curated annotation. "CNS met" filters on it: 8 patients. Ordered by site, the oncoprint puts each patient's primary and metastases in their own groups. Fraction of the genome altered has a median of 0.47 in the 11 CNS samples and 0.36 in liver, against 0.21 in the 76 primaries. Split by site, TP53 is altered in 7 of 8 CNS-met patients (87.5%) against 65.6% of the patients with a primary sample. The split arms overlap, because a patient whose primary and metastasis were both sequenced belongs to both arms. With 8 to 61 patients per arm, these are illustrations, not findings.
+
+Runs on custom data: `luad-biopsy-site` (LUAD biopsy site (demo), 186 samples, columns BIOPSY_SITE), sent with the request as `customData`; without it the document is refused.
+
+```json
+{
+  "study": "luad_mskimpact_2021",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    },
+    "CNS met": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "custom:luad-biopsy-site/BIOPSY_SITE",
+          "values": [
+            "CNS met"
+          ],
+          "per": "sample"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "oncoprint",
+      "unit": "sample",
+      "cohorts": [
+        "all patients"
+      ],
+      "genes": [
+        "EGFR",
+        "KRAS",
+        "TP53",
+        "STK11",
+        "KEAP1",
+        "SMARCA4"
+      ],
+      "clinical": [
+        "custom:luad-biopsy-site/BIOPSY_SITE",
+        "SAMPLE_TYPE"
+      ],
+      "sort": [
+        "custom:luad-biopsy-site/BIOPSY_SITE"
+      ]
+    },
+    {
+      "kind": "plot",
+      "unit": "sample",
+      "cohorts": [
+        "all patients"
+      ],
+      "x": {
+        "source": "clinical",
+        "attribute": "custom:luad-biopsy-site/BIOPSY_SITE"
+      },
+      "y": {
+        "source": "clinical",
+        "attribute": "FRACTION_GENOME_ALTERED"
+      }
+    },
+    {
+      "kind": "compare",
+      "genes": [
+        "EGFR",
+        "KRAS",
+        "TP53",
+        "STK11",
+        "KEAP1",
+        "SMARCA4"
+      ],
+      "splitBy": {
+        "cohort": "all patients",
+        "attribute": "custom:luad-biopsy-site/BIOPSY_SITE"
+      }
+    }
+  ]
+}
+```
+

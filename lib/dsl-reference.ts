@@ -17,6 +17,8 @@
 // ============================================================================
 
 import type { AnalysisDoc, TemplateDoc } from "./types.ts";
+import type { CustomDataset } from "./custom-data-names.ts";
+import { LUAD_BIOPSY_SITE_DEMO } from "./custom-data-demo.ts";
 
 export const DSL_VERSION = "2.2";
 
@@ -31,6 +33,12 @@ export interface DslExample {
   demonstrates?: string;
   /** view kinds / themes exercised, for grouping in the app */
   tags?: string[];
+  /**
+   * Uploads the example runs on, as a reader would add them in Explore → Custom data. The
+   * Examples tab imports them into the browser before running, and docs:check sends them
+   * with the run, exactly as the page does.
+   */
+  customData?: CustomDataset[];
 }
 
 // ---- runnable examples (rendered into the doc AND executed by docs:check) --
@@ -844,11 +852,38 @@ export const EXAMPLES: DslExample[] = [
       },
       views: [{ kind: "labs", test: "PSA", anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Hormone" } }]
     }
+  },
+  {
+    title: "Custom data: a curated biopsy site on every sample",
+    demonstrates: "An uploaded, sample-level annotation (`custom:luad-biopsy-site/BIOPSY_SITE`) used like the study's own attributes: as a cohort filter, an oncoprint track that orders the columns, a plot axis, and a `splitBy` that compares gene frequencies across sites. Running this example adds the demo upload to your browser first; it then shows up in Explore → Custom data like one of your own.",
+    tags: ["custom data", "splitBy", "oncoprint", "plot"],
+    note: "luad_mskimpact_2021 is 93 EGFR-mutant lung adenocarcinomas with 186 primary and metastatic samples. The demo upload gives every sample a BIOPSY_SITE, grouped from the study's own SAMPLE_TYPE and free-text METASTATIC_SITE the way a reviewer would (scripts/gen-custom-demo.ts), standing in for a clinician-curated annotation. \"CNS met\" filters on it: 8 patients. Ordered by site, the oncoprint puts each patient's primary and metastases in their own groups. Fraction of the genome altered has a median of 0.47 in the 11 CNS samples and 0.36 in liver, against 0.21 in the 76 primaries. Split by site, TP53 is altered in 7 of 8 CNS-met patients (87.5%) against 65.6% of the patients with a primary sample. The split arms overlap, because a patient whose primary and metastasis were both sequenced belongs to both arms. With 8 to 61 patients per arm, these are illustrations, not findings.",
+    customData: [LUAD_BIOPSY_SITE_DEMO],
+    doc: {
+      study: "luad_mskimpact_2021",
+      cohorts: {
+        "all patients": { all: [] },
+        "CNS met": { all: [{ kind: "clinical", attribute: "custom:luad-biopsy-site/BIOPSY_SITE", values: ["CNS met"], per: "sample" }] }
+      },
+      views: [
+        { kind: "oncoprint", unit: "sample", cohorts: ["all patients"], genes: ["EGFR", "KRAS", "TP53", "STK11", "KEAP1", "SMARCA4"],
+          clinical: ["custom:luad-biopsy-site/BIOPSY_SITE", "SAMPLE_TYPE"], sort: ["custom:luad-biopsy-site/BIOPSY_SITE"] },
+        { kind: "plot", unit: "sample", cohorts: ["all patients"],
+          x: { source: "clinical", attribute: "custom:luad-biopsy-site/BIOPSY_SITE" },
+          y: { source: "clinical", attribute: "FRACTION_GENOME_ALTERED" } },
+        { kind: "compare", genes: ["EGFR", "KRAS", "TP53", "STK11", "KEAP1", "SMARCA4"],
+          splitBy: { cohort: "all patients", attribute: "custom:luad-biopsy-site/BIOPSY_SITE" } }
+      ]
+    }
   }
 ];
 
-const exampleBlock = (ex: { title: string; note: string; doc: unknown }, i: number) =>
-  `### Example ${i + 1}: ${ex.title}\n\n${ex.note}\n\n\`\`\`json\n${JSON.stringify(ex.doc, null, 2)}\n\`\`\`\n`;
+const exampleBlock = (ex: { title: string; note: string; doc: unknown; customData?: CustomDataset[] }, i: number) =>
+  `### Example ${i + 1}: ${ex.title}\n\n${ex.note}\n\n` +
+  (ex.customData?.length ? "Runs on custom data: " + ex.customData.map((d) => "`" + d.id + "` (" + d.name + ", " + d.rows.length +
+    " " + d.level + "s, columns " + d.columns.map((c) => c.name).join(", ") + ")").join("; ") +
+    ", sent with the request as `customData`; without it the document is refused.\n\n" : "") +
+  `\`\`\`json\n${JSON.stringify(ex.doc, null, 2)}\n\`\`\`\n`;
 
 // ---- the full reference (docs/dsl.md + MCP describe_dsl) -------------------
 export function renderDslMarkdown(): string {

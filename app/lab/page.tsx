@@ -2436,7 +2436,16 @@ function Latency({ v }: { v: any }) {
     setPicked((p) => p.includes(key) ? p.filter((x) => x !== key) : [...p, key]);
 
   /** Load a documented example into the Analysis tab and run it. */
-  const runDocExample = (ex: DslExample) => {
+  /** An example's demo uploads, added to this browser as a reader would add them (kept if already there). */
+  const importExampleData = async (datasets: NonNullable<DslExample["customData"]>) => {
+    for (const ds of datasets) {
+      if (customDatasets().some((d) => d.id === ds.id)) continue;
+      await saveCustomDataset({ ...ds, createdAt: new Date().toISOString(),
+        source: { rowsIn: ds.rows.length, unmatched: 0, duplicates: 0, multiStudy: 0, studies: [...new Set(ds.rows.map((r) => r.study))] } });
+    }
+  };
+  const runDocExample = async (ex: DslExample) => {
+    if (ex.customData?.length) await importExampleData(ex.customData);
     const d = JSON.parse(JSON.stringify(ex.doc)) as AnalysisDoc;   // never hand the shared object to the editor
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
     setStudy(d.study || study);
@@ -2675,6 +2684,8 @@ function Latency({ v }: { v: any }) {
         {tab === "analysis" && (() => {
           // a shared document can name an upload that lives only in its author's browser
           const missing = referencedDatasets(doc).filter((id) => !customList.some((d) => d.id === id));
+          // a gallery example's demo upload ships with the app, so it can be added in one click
+          const demos = DOC_EXAMPLES.flatMap((e) => e.customData || []).filter((d) => missing.includes(d.id));
           return missing.length > 0 && (
             <div className="card customwarn">
               This analysis uses custom data that is not in this browser:{" "}
@@ -2683,6 +2694,11 @@ function Latency({ v }: { v: any }) {
               and add it under <button className="linklike" onClick={() => { goTab("explore"); if (!explore) fetchExplore();
                 setChartTab("custom"); setTimeout(() => addChartDialog.current?.showModal(), 0); }}>Explore → Custom data</button>{" "}
               with the same name, so it gets the same id.
+              {demos.length > 0 && <div className="row" style={{ marginTop: "var(--s2)", alignItems: "center" }}>
+                <button className="primary" onClick={async () => { await importExampleData(demos); setError(null); run(doc); }}>
+                  Add the demo upload{demos.length > 1 ? "s" : ""} and run</button>
+                <span className="meta">{demos.map((d) => d.name).join(", ")} ships with the Examples gallery</span>
+              </div>}
             </div>
           );
         })()}
@@ -3730,6 +3746,10 @@ function Latency({ v }: { v: any }) {
                         {(ex.tags || []).filter(t => !viewKinds(ex).includes(t)).map(t => <span key={t} className="extag static">{t}</span>)}
                       </div>
                       {ex.demonstrates && <p className="exdem">{ex.demonstrates}</p>}
+                      {ex.customData?.length ? <p className="meta" style={{ margin: 0 }}>
+                        <span className="customtag">custom</span>
+                        Run adds the demo upload{ex.customData.length > 1 ? "s" : ""} {ex.customData.map((d) => d.name + " (" + d.rows.length + " " + d.level + "s)").join(", ")} to this browser.
+                      </p> : null}
                       <p className="exnote">{ex.note}</p>
                       <div className="exmeta">
                         <span title={studies.join(", ")}>
