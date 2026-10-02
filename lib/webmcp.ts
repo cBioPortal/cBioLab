@@ -67,16 +67,21 @@ export function exposeTools(page: string, pageTools: AgentTool[], api: Record<st
   w.cohortLab = global;
   const mc = (document as any).modelContext ?? (navigator as any).modelContext;
   const registered: string[] = [];
+  // Newer Chromium removes a registration by aborting the signal it was made with, and reports a
+  // failed registration as a rejected promise; older builds use unregisterTool and throw. Both are
+  // handled, so a remount never leaves an unhandled "Duplicate tool name" rejection behind.
+  const unregister = new AbortController();
   if (mc && typeof mc.registerTool === "function") {
     for (const t of tools) {
       try {
-        mc.registerTool({
+        const done = mc.registerTool({
           name: t.name, description: t.description, inputSchema: t.inputSchema,
           execute: async (args: any) => {
             try { return { content: [{ type: "text", text: asText(await t.run(args || {})) }] }; }
             catch (e) { return { content: [{ type: "text", text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true }; }
           }
-        });
+        }, { signal: unregister.signal });
+        if (done && typeof done.then === "function") done.then(undefined, () => { /* already registered — the existing registration serves */ });
         registered.push(t.name);
       } catch { /* already registered (a remount) — the existing registration serves */ }
     }
@@ -84,7 +89,15 @@ export function exposeTools(page: string, pageTools: AgentTool[], api: Record<st
   return {
     webmcp: !!mc && typeof mc.registerTool === "function",
     cleanup: () => {
-      for (const n of registered) try { mc.unregisterTool(n); } catch { /* gone already */ }
+      unregister.abort();
+      if (typeof mc?.unregisterTool === "function") {
+        for (const n of registered) {
+          try {
+            const done = mc.unregisterTool(n);
+            if (done && typeof done.then === "function") done.then(undefined, () => { /* gone already */ });
+          } catch { /* gone already */ }
+        }
+      }
       if (w.cohortLab === global) delete w.cohortLab;
     }
   };
