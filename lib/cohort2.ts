@@ -16,7 +16,8 @@
 import { DB, STUDY } from "./ch.ts";
 import { compileCohort, sq, LINE_TYPE } from "./compiler.ts";
 import { oqlLeafSql } from "./oql.ts";
-import { clinicalValueFoldSql, canonicalEventName } from "./event-names.ts";
+import { clinicalValueFoldSql, canonicalEventName, foldedEqualsSql } from "./event-names.ts";
+import { linesCtes, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
@@ -126,6 +127,8 @@ export interface DerivedMetricParams {
   eventType?: string;
   /** records within this many days of each other belong to the same line (metric "lines" only) */
   lineGap?: number;
+  /** which treatment records form lines (metric "lines" only): the systemic classes by default — lib/treatment-lines.ts */
+  lineClasses?: "systemic" | "all" | string[];
 }
 
 /** Per-patient value for a derived metric, as SQL yielding (pid, v). */
@@ -141,33 +144,20 @@ export function derivedMetricSql(metric: DerivedMetric, study: string, db: strin
   if (metric === "historyMonths")
     return "SELECT p.stable_id AS pid, greatest(0, -min(ce.start_date)) / 30.4375 AS v\n" + evJoin;
   if (metric === "lines" || metric === "treatmentSpan") {
-    const et = canonicalEventName(String(params?.eventType || ""));
-    if (!et) throw new Error("derived clause: metric '" + metric + "' needs an eventType");
-    // Same shape of records as a study's timeline in general: possibly several
-    // rows per decision (combination therapy), which is exactly what grouping
-    // into lines (below) is for — see lib/federation.ts's sequenceSql, the
-    // Sankey view this shares its line-grouping scheme with.
-    const tx = "tx AS (\n" +
-      "  SELECT ce.clinical_event_id AS eid, p.stable_id AS pid, ce.start_date AS s,\n" +
-      "         coalesce(ce.stop_date, ce.start_date) AS e\n" +
-      "  FROM " + db + ".clinical_event ce\n" +
-      "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
-      "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-      "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
-      "    AND " + eventTypeMatchSql("ce.event_type", et) + "\n" +
-      ")";
+    const eventType = String(params?.eventType || "").trim();
+    if (!eventType) throw new Error("derived clause: metric '" + metric + "' needs an eventType");
     if (metric === "treatmentSpan")
-      return "WITH " + tx + "\nSELECT pid, (max(e) - min(s)) / 30.4375 AS v FROM tx GROUP BY pid";
-    const gap = Math.max(1, Math.min(3650, Math.floor(Number(params?.lineGap) || 90)));
-    return "WITH " + tx + ",\n" +
-      // toNullable: over an empty frame max() on a non-nullable column returns 0,
-      // which corrupts first-row detection because day offsets are often <= 0
-      // (the same guard sequenceSql uses, for the same reason).
-      "flagged AS (\n  SELECT *, max(toNullable(e)) OVER (PARTITION BY pid\n" +
-      "    ORDER BY s, e, eid ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS pms\n  FROM tx\n),\n" +
-      "numbered AS (\n  SELECT *, sum(if(pms IS NULL OR s > pms + " + gap + ", 1, 0)) OVER (\n" +
-      "    PARTITION BY pid ORDER BY s, e, eid ROWS UNBOUNDED PRECEDING) AS line_no\n  FROM flagged\n)\n" +
-      "SELECT pid, max(line_no) AS v FROM numbered GROUP BY pid";
+      return "SELECT p.stable_id AS pid, (max(coalesce(ce.stop_date, ce.start_date)) - min(ce.start_date)) / 30.4375 AS v\n" +
+        "  FROM " + db + ".clinical_event ce\n" +
+        "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+        "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+        "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+        "    AND " + eventTypeMatchSql("ce.event_type", eventType) + "\n" +
+        "  GROUP BY pid";
+    // the one line definition every view and clause shares — see lib/treatment-lines.ts
+    return "WITH " + linesCtes({ db, study, patientFilter: "1",
+      spec: { gap: params?.lineGap ?? DEFAULT_LINE_GAP, eventType, ...(params?.lineClasses ? { classes: params.lineClasses } : {}) } }).join(",\n") + "\n" +
+      "SELECT pid, max(line_no) AS v FROM lines GROUP BY pid";
   }
   // alteredGenes — high-level CNA only, matching the rest of the engine
   return "SELECT " + PID("patient_unique_id", study) + " AS pid, uniqExact(hugo_gene_symbol) AS v\n" +
@@ -178,8 +168,15 @@ export function derivedMetricSql(metric: DerivedMetric, study: string, db: strin
 }
 
 /** Match an event type by CANONICAL name — see lib/event-names.ts for why case+trim is the whole rule. */
-export function eventTypeMatchSql(col: string, canonical: string): string {
-  return "lower(trim(" + col + ")) = " + sq(canonicalEventName(canonical));
+export function eventTypeMatchSql(col: string, name: string): string {
+  return foldedEqualsSql(col, name);
+}
+
+/** A document's lineClasses, validated: "systemic", "all", or up to 40 class names. */
+export function lineClassesParam(x: unknown): "systemic" | "all" | string[] {
+  if (x === "systemic" || x === "all") return x;
+  if (Array.isArray(x) && x.length && x.length <= 40 && x.every((c) => typeof c === "string" && c.trim() && c.length <= 120)) return x.map(String);
+  throw new Error("lineClasses is \"systemic\", \"all\", or a list of up to 40 treatment class names");
 }
 
 /** Validate a derived leaf and return its range predicate over `v`, plus any params it carries. */
@@ -192,7 +189,8 @@ function derivedConds(leaf: any): { metric: DerivedMetric; conds: string; params
   if (PARAMETERIZED_DERIVED_METRICS.has(metric as DerivedMetric)) {
     const eventType = String(leaf.eventType || "").trim();
     if (!eventType) throw new Error("derived clause: metric '" + metric + "' needs an eventType");
-    params = { eventType, ...(leaf.lineGap != null ? { lineGap: Number(leaf.lineGap) } : {}) };
+    params = { eventType, ...(leaf.lineGap != null ? { lineGap: Number(leaf.lineGap) } : {}),
+      ...(leaf.lineClasses != null ? { lineClasses: lineClassesParam(leaf.lineClasses) } : {}) };
   }
   const r = leaf.range || {};
   const conds: string[] = [];

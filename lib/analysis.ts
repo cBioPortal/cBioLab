@@ -8,7 +8,8 @@
 // Deliberately deferred: cross-study patient dedup and attribute harmonization.
 import { chQuery, DB, STUDY, PRIMARY } from "./ch.ts";
 import { sq } from "./compiler.ts";
-import { compileCohortDef, describeCohortDef } from "./cohort2.ts";
+import { compileCohortDef, describeCohortDef, lineClassesParam } from "./cohort2.ts";
+import { lineGapOf, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
 import { genomicEventsSql, coverageSql, buildContract, PIDS_SQL } from "./oncoprint.ts";
 import { geneSymbols } from "./gene-tracks.ts";
 import type { PlotView } from "./types.ts";
@@ -19,14 +20,14 @@ import { fisherExact, kaplanMeier, logRank, logRankK, benjaminiHochberg, cochran
   type Moments, type CoxRow, type LogisticRow } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
-import { viewToSvg } from "./view-svg.ts";
+import { viewToSvg, RISK_FLOOR as COURSE_RISK_FLOOR } from "./view-svg.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, LogRankK, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate, LogisticView, LogisticCoefficient, SplitBy } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
   type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments, type EndpointColumns,
-  type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, type FederatedPlotCapable, legendFor } from "./federation.ts";
+  type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, type FederatedPlotCapable, legendFor, SEQUENCE_ROW_LIMIT } from "./federation.ts";
 import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis, coverageNote, type PlotData, type PlotGroup, type AxisKind } from "./plot.ts";
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
@@ -1056,7 +1057,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       // without consulting any event NAME.
       const spans = new Map<string, TimelineSpan[]>();
       await Promise.all(vStudies.map(async (st) => {
-        spans.set(st, await resolvers[st].timelineSpan(doc.cohorts[vNames[0]]).catch(() => [] as TimelineSpan[]));
+        // a failed query fails the view: an empty answer would be reported as "no temporal information"
+        spans.set(st, await resolvers[st].timelineSpan(doc.cohorts[vNames[0]]));
       }));
       const allSpans = [...spans.values()].flat();
 
@@ -1101,7 +1103,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       await Promise.all(vNames.map(async (n) => {
         const useStudies = cohorts[n].studies.filter((st) => usable.includes(st));
         const parts = await Promise.all(useStudies.map((st) =>
-          resolvers[st].eventCourse(doc.cohorts[n], opts).catch(() => [] as CourseCount[])));
+          resolvers[st].eventCourse(doc.cohorts[n], opts)));
         per.set(n, parts.flat());
       }));
 
@@ -1160,6 +1162,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           " Follow-up ending at the last recorded event biases the tail upward — by construction a patient" +
           " has an event on their last observed day." +
           " Bins are half-open [t, t+" + binMonths + "mo)." +
+          " The figure stops each line where fewer than " + COURSE_RISK_FLOOR + " patients remain observable; the numbers past that point are in the result but not drawn." +
           (measured.some((et) => intervalOf.get(et))
             ? " Event types carrying real durations are drawn as a state the patient is IN during the bin;" +
               " the rest as an event that HAPPENED in it. That is read off the data, not the event's name."
@@ -1182,23 +1185,30 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       const sv = view as SequenceView;
       const labelKey = String(sv.labelKey || "SUBTYPE");
       const eventType = String(sv.eventType || "treatment");
-      const lineGap = Math.max(1, Math.min(3650, Math.floor(Number(sv.lineGap) || 90)));
+      const lineGap = lineGapOf({ gap: sv.lineGap ?? DEFAULT_LINE_GAP });
       const maxSteps = Math.max(2, Math.min(6, Math.floor(Number(sv.maxSteps) || 3)));
       const topN = Math.max(2, Math.min(14, Math.floor(Number(sv.topN) || 8)));
       // Two panels at most: a third Sankey shrinks every ribbon past reading.
-      const panelNames = vNames.slice(0, 2);
+      { const e = overLimit("a sequence view", 2, vNames.length); if (e) { views.push({ kind: "sequence", cohorts: vNames, error: e.replace("at most 2", "at most 2 cohorts") }); continue; } }
+      let lineClasses: "systemic" | "all" | string[] | undefined;
+      try { if (sv.lineClasses != null) lineClasses = lineClassesParam(sv.lineClasses); }
+      catch (e) { views.push({ kind: "sequence", cohorts: vNames, error: (e as Error).message }); continue; }
+      const panelNames = vNames;
       const allStudies = [...new Set(panelNames.flatMap((n) => cohorts[n].studies))];
-      const opts: SequenceOpts = { eventType, labelKey, exclude: (sv.exclude || []).map(String), lineGap, maxSteps };
+      const opts: SequenceOpts = { eventType, labelKey, exclude: (sv.exclude || []).map(String), lineGap, maxSteps,
+        ...(lineClasses ? { lineClasses } : {}) };
 
       // What ELSE could label a line here, and how granular is each? Fetched
       // alongside the data so the UI can offer the choice, and so a bad key can
       // be diagnosed rather than just returning nothing.
-      const [rawByCohort, keyRows] = await Promise.all([
-        Promise.all(panelNames.map(async (n) => (await Promise.all(cohorts[n].studies.map((st) =>
-          resolvers[st].treatmentSequence(doc.cohorts[n], opts).catch(() => [] as SequenceFlow[])))).flat())),
+      // a study whose query fails fails the view: an empty answer would read as "no therapy lines"
+      const [perStudyByCohort, keyRows] = await Promise.all([
+        Promise.all(panelNames.map((n) => Promise.all(cohorts[n].studies.map((st) =>
+          resolvers[st].treatmentSequence(doc.cohorts[n], opts))))),
         Promise.all(allStudies.map((st) =>
-          resolvers[st].sequenceKeys(doc.cohorts[panelNames[0]], eventType).catch(() => []))).then((r) => r.flat())
+          resolvers[st].sequenceKeys(doc.cohorts[panelNames[0]], eventType))).then((r) => r.flat())
       ]);
+      const rawByCohort = perStudyByCohort.map((rows) => rows.flat());
       const keyOptions = [...new Map(keyRows.map((k) => [k.key, k])).values()]
         .sort((a, b) => b.patients - a.patients);
       const chosen = keyOptions.find((k) => k.key === canonicalEventName(labelKey));
@@ -1206,7 +1216,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       if (!rawByCohort.some((r) => r.length)) {
         views.push({ kind: "sequence", cohorts: panelNames, studies: allStudies,
           error: keyOptions.length
-            ? "no therapy lines found: '" + eventType + "' events carry no attribute '" + labelKey +
+            ? "no therapy lines found: no '" + eventType + "' event here is both a " +
+              (lineClasses === "all" ? "treatment record" : "systemic-therapy record (lineClasses)") + " and labelled by '" + labelKey +
               "'. Keys available on those events: " +
               keyOptions.slice(0, 8).map((k) => k.label + " (" + k.patients.toLocaleString() + " patients, " + k.values + " values)").join(", ")
             : "no '" + eventType + "' events with attributes were found for this cohort, so there are no lines to sequence.",
@@ -1224,7 +1235,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               .map((k) => k.label + " (" + k.values + " values)").join(", ") });
         continue;
       }
-      const truncated = rawByCohort.some((r) => r.length >= 2000);
+      const truncated = perStudyByCohort.some((rows) => rows.some((r) => r.length >= SEQUENCE_ROW_LIMIT));
 
       // Merge per cohort, then rank labels ACROSS ALL PANELS so a regimen keeps
       // one identity and one colour in both — the comparison is the point.
@@ -1236,12 +1247,19 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         }
         return m;
       });
-      const weight = new Map<string, number>();
+      // a label's weight is what leaves it, or what arrives at a label nothing leaves (one seen only
+      // in the last column) — the same rule that sizes the nodes — so every label is ranked and counted
+      const outW = new Map<string, number>(), inW = new Map<string, number>();
       for (const m of mergedPer) for (const [k, n] of m) {
-        const from = k.split("\u0000")[1];
-        weight.set(from, (weight.get(from) || 0) + n);
+        const [, from, to, fate] = k.split("\u0000");
+        outW.set(from, (outW.get(from) || 0) + n);
+        if (fate === "0" && to) inW.set(to, (inW.get(to) || 0) + n);
       }
-      const keep = new Set([...weight.entries()].sort((a, b) => b[1] - a[1]).slice(0, topN).map(([l]) => l));
+      const weight = new Map<string, number>(outW);
+      for (const [l, n] of inW) if (!weight.has(l)) weight.set(l, n);
+      // ties broken by name, so which label is kept never depends on the order rows arrived in
+      const keep = new Set([...weight.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+        .slice(0, topN).map(([l]) => l));
       const foldedLabels = [...weight.keys()].filter((l) => !keep.has(l)).length;
       const fold = (l: string) => keep.has(l) ? l : "other";
       const kindOf = (fate: number): SequenceNodeKind =>
@@ -1291,8 +1309,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       const seqResult: ViewResult = { kind: "sequence", cohorts: panelNames, studies: allStudies, sequence,
         participation: participationFor(allStudies, false),
         caveat:
-          "Therapies are grouped into LINES before being sequenced: records less than " + lineGap +
-          " days apart belong to the same line, and a line is labelled by its whole combination" +
+          "Therapies are grouped into LINES before being sequenced, by the definition every line count here shares: " +
+          (lineClasses === "all" ? "every " + eventType + " record"
+            : Array.isArray(lineClasses) ? eventType + " records whose class (SUBTYPE, else TREATMENT_TYPE) is one of " + lineClasses.join(", ")
+            : "systemic-therapy " + eventType + " records (class, from SUBTYPE or else TREATMENT_TYPE, on the systemic list: chemotherapy, immunotherapy, targeted, hormone, biologic, investigational and their spellings; radiation, surgery, bone and ancillary treatment are not lines)") +
+          ". A record starting more than " + lineGap +
+          " days after every earlier one has stopped begins a new line; anything closer is the same line, and a line is labelled by its whole combination" +
           " (sorted, so 'A + B' and 'B + A' are one regimen). That grouping is the point \u2014 a patient" +
           " here has a median of 6 treatment records and 4 distinct agents, and combination therapy is" +
           " several records describing ONE decision, not several lines." +
@@ -1310,11 +1332,10 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             " folded into 'other', which is " + otherPct + "% of first-line patients in the first panel \u2014" +
             " combination regimens have a genuinely long tail, so 'other' is real diversity rather than a" +
             " rounding bucket. Raise topN to split it further." : "") +
-          (truncated ? " The aggregate hit its row cap, so the rarest regimens are incomplete." : "") +
+          (truncated ? " A study's answer hit the " + SEQUENCE_ROW_LIMIT + "-flow cap, so its rarest flows are missing." : "") +
           (allStudies.length > 1 ? " Regimen vocabularies are NOT harmonized across studies beyond case." : "") +
           (panels.length > 1
-            ? " Both panels share one scale and one colour per regimen, so their heights are directly comparable."
-            : vNames.length > 1 ? " Only cohort \u201c" + panelNames[0] + "\u201d is shown." : "") +
+            ? " Both panels share one scale and one colour per regimen, so their heights are directly comparable." : "") +
           " " + panels.map((x) => x.cohort + ": " + x.started.toLocaleString() + " with a first line").join("; ") + "." };
       const tSeq = Date.now();
       seqResult.svg = viewToSvg(seqResult) || undefined;

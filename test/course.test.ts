@@ -107,7 +107,7 @@ describe("the course query carries its honest parts", () => {
     // The database stores 'Treatment' and 'TREATMENT' as distinct literals; a
     // canonical name must therefore match at the column, not by equality.
     const sql = course({ eventTypes: ["TREATMENT"] });
-    assert.match(sql, /lower\(trim\(ce\.event_type\)\)/);
+    assert.match(sql, /lowerUTF8\(trimBoth\(ce\.event_type\)\)/);
     assert.match(sql, /'treatment'/, "the canonical form is what gets matched");
   });
 
@@ -123,8 +123,8 @@ describe("the course query carries its honest parts", () => {
 
   test("an anchor attribute narrows by key AND value", () => {
     const sql = course({ anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Chemo", occurrence: "FIRST" } });
-    assert.match(sql, /'subtype'/, "the key is folded like any other name");
-    assert.match(sql, /'Chemo'/, "the VALUE is not folded — only names are");
+    assert.match(sql, /lowerUTF8\(trimBoth\(key\)\) = lowerUTF8\(trimBoth\('SUBTYPE'\)\)/, "the key is folded like any other name");
+    assert.match(sql, /lowerUTF8\(trimBoth\(value\)\) = lowerUTF8\(trimBoth\('Chemo'\)\)/, "and so is the value, on both sides, in SQL");
   });
 });
 
@@ -141,7 +141,7 @@ describe("the course query refuses what it cannot answer", () => {
     // Anchor on something else so the count isolates the measured IN-list.
     const sql = course({ anchor: { eventType: "Surgery", occurrence: "FIRST" },
       eventTypes: ["Treatment", "TREATMENT", "treatment "] });
-    const inList = sql.slice(sql.indexOf("lower(trim(ce.event_type)) IN ("));
+    const inList = sql.slice(sql.indexOf("lowerUTF8(trimBoth(ce.event_type)) IN ("));
     assert.equal((inList.match(/'treatment'/g) || []).length, 1,
       "three spellings of one concept must not become three IN-list entries");
   });
@@ -174,7 +174,7 @@ describe("treatment sequences: lines, not records", () => {
   });
 
   test("a line is its sorted combination, so A+B and B+A are one regimen", () => {
-    assert.match(seq(), /arrayStringConcat\(arraySort\(groupUniqArray\(lbl\)\)/);
+    assert.match(seq(), /arrayStringConcat\(arraySort\(groupUniqArrayIf\(lbl, lbl != ''\)\), ' \+ '\)/);
   });
 
   test("patients who start no further line are kept as an explicit terminal", () => {
@@ -216,10 +216,10 @@ describe("treatment sequences: lines, not records", () => {
     assert.match(seq(), /ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING/);
   });
 
-  test("exclusions are applied, and are values rather than folded names", () => {
+  test("exclusions are applied, folded like every other name and value", () => {
     const sql = seq({ exclude: ["Prior Medications to MSK", "Bone Treatment"] });
-    assert.match(sql, /NOT IN \('Prior Medications to MSK', 'Bone Treatment'\)/,
-      "values keep their exact spelling — only NAMES are case-folded");
+    assert.match(sql, /NOT IN \(lowerUTF8\(trimBoth\('Prior Medications to MSK'\)\), lowerUTF8\(trimBoth\('Bone Treatment'\)\)\)/,
+      "'BONE TREATMENT' in another study is the same value, so it is excluded too");
   });
 
   test("no exclusions means no exclusion clause at all", () => {
@@ -227,22 +227,24 @@ describe("treatment sequences: lines, not records", () => {
   });
 
   test("the label key is folded like any other name, the event type too", () => {
-    const sql = seq({ labelKey: "SubType", eventType: "TREATMENT" });
-    assert.match(sql, /lower\(trim\(d\.key\)\) = 'subtype'/);
-    assert.match(sql, /lower\(trim\(ce\.event_type\)\) = 'treatment'/);
+    const sql = seq({ labelKey: "Agent", eventType: "TREATMENT" });
+    assert.match(sql, /lowerUTF8\(trimBoth\(d\.key\)\) = lowerUTF8\(trimBoth\('agent'\)\)/);
+    assert.match(sql, /lowerUTF8\(trimBoth\(ce\.event_type\)\) = lowerUTF8\(trimBoth\('TREATMENT'\)\)/);
   });
 
   test("a missing labelKey is refused rather than guessed", () => {
     assert.throws(() => seq({ labelKey: "" }), /needs a labelKey/);
   });
 
-  test("empty labels are dropped — a blank regimen is not a regimen", () => {
-    assert.match(seq(), /trim\(d\.value\) != ''/);
+  test("a blank label is not a regimen: a line with none is named for what is missing", () => {
+    const sql = seq({ labelKey: "Agent" });
+    assert.match(sql, /groupUniqArrayIf\(lbl, lbl != ''\)/);
+    assert.match(sql, /'\(no AGENT\)'/);
   });
 
   test("sequenceKeys reports what COULD label a line, for the error path", () => {
     const sql = sequenceKeysSql(cohortSql, "x", "db", "Treatment");
-    assert.match(sql, /uniqExact\(trim\(d\.value\)\) AS values/,
+    assert.match(sql, /uniqExact\(lowerUTF8\(trimBoth\(d\.value\)\)\) AS values/,
       "the value count is what tells a reader whether a key is a usable granularity");
   });
 });

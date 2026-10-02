@@ -52,7 +52,14 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   those views name as left out. Figures: **`lib/view-svg-more.ts`**; cards: `app/lab/more-views.tsx`.
 - **`lib/event-names.ts`** — **THE only place timeline event names are normalized.** Case-fold and
   trim, nothing else; measured to be complete for event types and attribute keys (zero residual
-  collisions). Folds are disclosed in the caveat, never silent. Do not fork it.
+  collisions). Folds are disclosed in the caveat, never silent. Do not fork it. Every timeline
+  match in SQL — event type, attribute key, attribute value — goes through its `foldedEqualsSql` /
+  `foldedInSql`, which fold column and literal with the same SQL function.
+- **`lib/treatment-lines.ts`** — **THE definition of a treatment line**, shared by the `sequence`
+  view, the DSL's "Treatment line (derived)" (and MCP `derive_treatment_lines`) and the `lines`
+  derived metric: systemic-therapy records (class = SUBTYPE, else TREATMENT_TYPE, on
+  `SYSTEMIC_LINE_CLASSES`) grouped by the gap rule. Never build lines anywhere else;
+  `test/treatment-lines.test.ts` asserts every caller's line-building SQL is identical.
 - **`lib/params.ts`** — template parameters. A value that is EXACTLY `"$name"` is replaced by
   `doc.params.name`; no interpolation, no expressions, no chaining, keys never substituted. The
   resolved document is an ordinary one, so everything downstream stays as strictly typed as
