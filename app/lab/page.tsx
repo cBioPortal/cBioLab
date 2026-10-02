@@ -3734,7 +3734,7 @@ function Latency({ v }: { v: any }) {
                         onEdit={() => openCohortEdit(n)} onRemove={() => removeCohort(n)}
                         menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
                       <div className="cohortbox-head">
-                        <span className="qchip"><span className="qletter" style={{ color: CAT_COLORS[i % CAT_COLORS.length] }}>■</span>{n}</span>
+                        <span className="cohortbox-name"><span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />{n}</span>
                         <strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span>
                       </div>
                       <CohortStudies ids={c.studies && c.studies.length ? c.studies : [doc.cohorts?.[n]?.study || doc.study || result.study].filter(Boolean) as string[]}
