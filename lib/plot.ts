@@ -30,6 +30,7 @@ export type PlotAxis =
   | { source: "alteration"; genes: string[]; by?: "mutated" }
   | { source: "none" };
 export type AlterationBy = "mutated" | "mutationType" | "cna";
+const AXIS_SOURCES: readonly string[] = ["clinical", "molecular", "alteration", "none"] satisfies PlotAxis["source"][];
 /** every gene named on an alteration axis, singular or set, uppercased */
 function alterationGenes(a: { gene?: string; genes?: string[] }): string[] {
   return (a.genes && a.genes.length ? a.genes : a.gene != null ? [a.gene] : []).map((g) => String(g).toUpperCase());
@@ -119,6 +120,8 @@ export function axisKind(a: PlotAxis, clinicalKind?: (attr: string) => "num" | "
 
 export function validateAxis(a: PlotAxis, which: string): void {
   if (!a || typeof a !== "object" || !("source" in a)) throw new Error(which + " axis needs a source");
+  if (!AXIS_SOURCES.includes(a.source))
+    throw new Error(which + " axis: unknown source '" + String(a.source).slice(0, 40) + "' — use one of " + AXIS_SOURCES.join(", "));
   if (a.source === "clinical" && !ATTR_RE.test(String(a.attribute || "")))
     throw new Error(which + " axis: '" + a.attribute + "' is not a clinical attribute name");
   if (a.source === "molecular") {
