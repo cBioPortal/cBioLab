@@ -10,6 +10,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { coxRegression, logisticRegression, type CoxRow, type LogisticRow } from "../lib/stats.ts";
+import { VERIFIED } from "../lib/method.ts";
 
 const golden = JSON.parse(readFileSync("test/fixtures/golden/regression.json", "utf8"));
 const TOL = 1e-6;
@@ -46,4 +47,9 @@ describe("logisticRegression matches statsmodels Logit — statsmodels " + golde
       closeAll(fit, c.expected, c.terms, ["beta", "se", "p", "ciLow", "ciHigh"]);
     });
   }
+});
+
+test("the method record's verification claim names the library versions this fixture was made with", () => {
+  assert.equal(VERIFIED.cox.version, golden.libraries.lifelines);
+  assert.equal(VERIFIED.logistic.version, golden.libraries.statsmodels);
 });

@@ -33,6 +33,7 @@ import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
+import { coxMethod, logisticMethod, type CoxTrace } from "./method.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -717,7 +718,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       type RawCoxRow = { t: number; event: number; values: (number | string)[]; study: string };
       type CoxFit = { error: string } | {
         coefficients: CoxCoefficient[]; n: number; events: number; termCount: number;
-        excludedRemote: { study: string; patients: number }[]; patientLevelTotal: number;
+        excludedRemote: { study: string; patients: number }[]; patientLevelTotal: number; trace: CoxTrace;
       };
       const fitCoxFor = async (names: string[]): Promise<CoxFit> => {
         const cohortTotal = names.reduce((n, cn) => n + cohorts[cn].count, 0);
@@ -728,6 +729,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         const rawRows: RawCoxRow[] = [];
         let kinds: AxisKind[] | null = null;
         let patientLevelTotal = 0;
+        const perStudy: CoxTrace["perStudy"] = [];
         for (const n of names) {
           for (const st of cohorts[n].studies) {
             const res = resolvers[st];
@@ -739,6 +741,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             const { rows, kinds: k } = await res.coxRows(doc.cohorts[n], endpoint, covariates, endpointColumns);
             if (!kinds) kinds = k;
             for (const r of rows) rawRows.push({ ...r, study: st });
+            perStudy.push({ study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0, rows: rows.length });
           }
         }
         if (!rawRows.length) {
@@ -766,6 +769,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         const coxInput: CoxRow[] = rowsCut
           .filter((r) => Number.isFinite(r.t) && r.t >= 0)
           .map((r) => ({ t: r.t, event: r.event, x: toX(r), ...(cx.stratifyByStudy ? { stratum: r.study } : {}) }));
+        const censoredAtCutoff = cutoffMonths != null ? rawRows.filter((r) => r.t > cutoffMonths!).length : 0;
 
         let fit;
         try { fit = coxRegression(coxInput); }
@@ -776,7 +780,22 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           axisIndex: col.axisIndex,
           beta: fit.beta[i], se: fit.se[i], hr: fit.hr[i], ciLow: fit.ciLow[i], ciHigh: fit.ciHigh[i], p: fit.p[i]
         }));
-        return { coefficients, n: fit.n, events: fit.events, termCount: columns.length, excludedRemote, patientLevelTotal };
+        const trace: CoxTrace = {
+          ...(names.length === 1 && cx.stratifyByCohort && vNames.length > 1 ? { scope: names[0] } : {}),
+          perStudy, covariates, kinds: kindsFinal, columns, x: coxInput.map((r) => r.x),
+          fit: { n: fit.n, events: fit.events, iterations: fit.iterations, loglik: fit.loglik },
+          censoredAtCutoff, droppedBadTime: rowsCut.length - coxInput.length,
+        };
+        return { coefficients, n: fit.n, events: fit.events, termCount: columns.length, excludedRemote, patientLevelTotal, trace };
+      };
+
+      const coxMethodOptions = {
+        endpoint,
+        monthsColumn: endpointColumns ? endpointColumns.months : endpoint + "_MONTHS",
+        statusColumn: endpointColumns ? endpointColumns.status : endpoint + "_STATUS",
+        ...(cutoffMonths != null ? { cutoffMonths } : {}),
+        stratifyByStudy: !!cx.stratifyByStudy,
+        queryLabel: "coxRows:" + endpoint,
       };
 
       // stratifyByCohort: N independent fits (own baseline hazard, own coefficients, own
@@ -805,36 +824,37 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             (failedNotes.length ? " " + failedNotes.join(" ") : "") +
             (cutoffMonths != null ? " Administratively censored at " + cutoffMonths + " months." : "") +
             " Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers, unlike KM/log-rank." };
+        coxResult.method = coxMethod(perCohort.flatMap(({ fit }) => "error" in fit ? [] : [fit.trace]), coxMethodOptions);
         coxResult.svg = viewToSvg(coxResult) || undefined;
         views.push(coxResult);
-        continue;
+      } else {
+        const fit0 = await fitCoxFor(vNames);
+        if ("error" in fit0) { views.push({ kind: "cox", endpoint, cohorts: vNames, error: fit0.error }); continue; }
+        const missing = fit0.patientLevelTotal - fit0.n;
+        const coxResult: ViewResult = { kind: "cox", cohorts: vNames, endpoint,
+          ...(cutoffMonths != null ? { cutoffMonths } : {}),
+          cox: { coefficients: fit0.coefficients, n: fit0.n, events: fit0.events, ...(fit0.excludedRemote.length ? { excludedRemote: fit0.excludedRemote } : {}) },
+          participation: participationFor(vStudies, false),
+          caveat: "Cox proportional-hazards regression (Efron ties) on " + fit0.n + " patients, " + fit0.events + " events, " +
+            fit0.termCount + " term" + (fit0.termCount === 1 ? "" : "s") + "." +
+            (missing > 0 ? " " + missing + " patient" + (missing === 1 ? "" : "s") + " from patient-level participants lacked the endpoint or a covariate and were excluded." : "") +
+            (cutoffMonths != null ? " Administratively censored at " + cutoffMonths + " months." : "") +
+            (cx.stratifyByStudy
+              ? " Stratified by study: each study fits its own baseline hazard, so a case-mix difference between studies cannot masquerade as a covariate effect."
+              : vStudies.length > 1 ? " Pooled across studies WITHOUT stratifying — a case-mix difference between studies could be absorbed into a covariate's estimated effect; consider stratifyByStudy." : "") +
+            (vStudies.length > 1 ? " Clinical-attribute vocabularies and declared types are NOT harmonized across studies." : "") +
+            (fit0.excludedRemote.length
+              ? " " + fit0.excludedRemote.map((e) => e.study + " (" + e.patients + " patients)").join(", ") +
+                " could not contribute: aggregate-only participants have no patient-level covariates to fit on."
+              : "") +
+            " Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers, unlike KM/log-rank." };
+        coxResult.method = coxMethod([fit0.trace], coxMethodOptions);
+        // Rendered here, by the SAME renderer MCP uses — the app draws the
+        // forest plot as this SVG rather than a second, hand-rolled chart (the pattern
+        // the clinical course and treatment-sequence views already follow).
+        coxResult.svg = viewToSvg(coxResult) || undefined;
+        views.push(coxResult);
       }
-
-      const fit0 = await fitCoxFor(vNames);
-      if ("error" in fit0) { views.push({ kind: "cox", endpoint, cohorts: vNames, error: fit0.error }); continue; }
-      const missing = fit0.patientLevelTotal - fit0.n;
-      const coxResult: ViewResult = { kind: "cox", cohorts: vNames, endpoint,
-        ...(cutoffMonths != null ? { cutoffMonths } : {}),
-        cox: { coefficients: fit0.coefficients, n: fit0.n, events: fit0.events, ...(fit0.excludedRemote.length ? { excludedRemote: fit0.excludedRemote } : {}) },
-        participation: participationFor(vStudies, false),
-        caveat: "Cox proportional-hazards regression (Efron ties) on " + fit0.n + " patients, " + fit0.events + " events, " +
-          fit0.termCount + " term" + (fit0.termCount === 1 ? "" : "s") + "." +
-          (missing > 0 ? " " + missing + " patient" + (missing === 1 ? "" : "s") + " from patient-level participants lacked the endpoint or a covariate and were excluded." : "") +
-          (cutoffMonths != null ? " Administratively censored at " + cutoffMonths + " months." : "") +
-          (cx.stratifyByStudy
-            ? " Stratified by study: each study fits its own baseline hazard, so a case-mix difference between studies cannot masquerade as a covariate effect."
-            : vStudies.length > 1 ? " Pooled across studies WITHOUT stratifying — a case-mix difference between studies could be absorbed into a covariate's estimated effect; consider stratifyByStudy." : "") +
-          (vStudies.length > 1 ? " Clinical-attribute vocabularies and declared types are NOT harmonized across studies." : "") +
-          (fit0.excludedRemote.length
-            ? " " + fit0.excludedRemote.map((e) => e.study + " (" + e.patients + " patients)").join(", ") +
-              " could not contribute: aggregate-only participants have no patient-level covariates to fit on."
-            : "") +
-          " Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers, unlike KM/log-rank." };
-      // Rendered here, by the SAME renderer MCP uses — the app draws the
-      // forest plot as this SVG rather than a second, hand-rolled chart (the pattern
-      // the clinical course and treatment-sequence views already follow).
-      coxResult.svg = viewToSvg(coxResult) || undefined;
-      views.push(coxResult);
 
     } else if (view.kind === "logistic") {
       // Multivariate logistic regression: same covariate/dummy-coding machinery as Cox
@@ -875,6 +895,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       let outcomeKind: AxisKind | null = null;
       let lKinds: AxisKind[] | null = null;
       let lPatientLevelTotal = 0;
+      const lPerStudy: CoxTrace["perStudy"] = [];
       for (const n of vNames) {
         for (const st of cohorts[n].studies) {
           const res = resolvers[st];
@@ -887,6 +908,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           if (!outcomeKind) outcomeKind = ok;
           if (!lKinds) lKinds = k;
           for (const r of rows) lRawRows.push({ ...r, study: st });
+          lPerStudy.push({ study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0, rows: rows.length });
         }
       }
       if (!lRawRows.length) {
@@ -970,6 +992,11 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               " could not contribute: aggregate-only participants have no patient-level covariates to fit on."
             : "") +
           " Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers." };
+      logisticResult.method = logisticMethod({
+        perStudy: lPerStudy, covariates: lCovariates, kinds: lKindsFinal, columns: lColumns, x: logisticInput.map((r) => r.x),
+        fit: { n: lFit.n, events: lFit.events, iterations: lFit.iterations, loglik: lFit.loglik },
+        outcomeKind: outcomeKindFinal, ...(lv.outcomeEvent != null ? { outcomeEvent: String(lv.outcomeEvent) } : {}), outcomeOther,
+      }, { outcomeLabel, queryLabel: "logisticRows" });
       logisticResult.svg = viewToSvg(logisticResult) || undefined;
       views.push(logisticResult);
 

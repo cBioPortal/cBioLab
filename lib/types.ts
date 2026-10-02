@@ -1075,6 +1075,8 @@ export interface ViewResult {
   spec?: OncoprintSpec;
   /** the aggregate queries that produced THIS view's numbers, in order */
   queries?: { study: string; label: string; sql: string; ms?: number; remote?: boolean }[];
+  /** what was computed from those queries' rows, built from the values the computation used (lib/method.ts) */
+  method?: import("./method.ts").MethodRecord;
   cohorts?: string[]; annotation?: string;
   /**
    * Present only when the view asked for `splitBy`: the synthetic arms it produced, with full

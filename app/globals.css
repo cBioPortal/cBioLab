@@ -561,6 +561,22 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .provsql { margin-top: 0.6rem; border-top: 1px solid var(--line); padding-top: 0.4rem; }
 .provsql > summary { cursor: pointer; font-size: var(--t-sm); }
 .provq { margin-top: 0.5rem; }
+.provmethod { margin-top: var(--s4); border-top: 1px dashed var(--line); padding-top: var(--s3); }
+.provsub { margin: 0 0 var(--s2); font-size: var(--t-sm); font-weight: 600; }
+.msteps { margin: 0; padding-left: var(--s5); }
+.mstep { margin-bottom: var(--s3); font-size: var(--t-sm); }
+.mdetail { margin: var(--s1) 0 0; font-size: var(--t-sm); color: var(--muted); max-width: 72ch; }
+.mkind {
+  font-size: var(--t-xs); padding: 0.05rem 0.4rem; border-radius: var(--r-pill); border: 1px solid var(--line);
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em;
+}
+.mkind-statistic { color: var(--accent-ink); background: var(--accent-soft); border-color: transparent; }
+.mparams { margin: var(--s2) 0 0; display: grid; grid-template-columns: max-content 1fr; gap: var(--s1) var(--s3); font-size: var(--t-xs); }
+.mparams > div { display: contents; }
+.mparams dt { font-weight: 600; }
+.mparams dd { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.mpy { margin-top: var(--s3); }
+.mpy > summary { cursor: pointer; }
 .provhead { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: var(--t-sm); }
 .provhead code { font-weight: 600; font-size: var(--t-sm); }
 .provq pre {

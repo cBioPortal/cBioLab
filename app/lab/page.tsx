@@ -12,6 +12,7 @@ import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, View, Oncopri
 import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
 import type { ViewParticipation } from "../../lib/types.ts";
 import { survivalAxis } from "../../lib/stats.ts";
+import { MethodPanel } from "./method-panel.tsx";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 import { installLabTools, LAB_TOOL_NAMES, type LabBridge } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
@@ -4621,6 +4622,7 @@ function Latency({ v }: { v: any }) {
                     <summary className="meta">
                       how these numbers were computed — {v.queries.length} {v.queries.length === 1 ? "query" : "queries"}
                       {v.ms != null && <> in {v.ms.toLocaleString()}ms</>}
+                      {v.method && <> · {v.method.steps.length} computation steps</>}
                       {v.queries.some(q => q.remote) && <> · <span className="prem">{v.queries.filter(q => q.remote).length} ran on a peer</span></>}
                     </summary>
                     {v.queries.map((q, qi) => (
@@ -4634,6 +4636,7 @@ function Latency({ v }: { v: any }) {
                         <pre>{q.sql}</pre>
                       </div>
                     ))}
+                    {v.method && <MethodPanel method={v.method} />}
                   </details>
                 )}
                 {v.error && !drawsOwnHead(v) && <ViewHead menuStore={menuOpenRef.current} v={v}

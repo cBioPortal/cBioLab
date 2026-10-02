@@ -19,6 +19,14 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
     x === 0 ? "<1e-300" : x < 1e-4 ? x.toExponential(1) : x.toFixed(4);
   const caveatOf = (v: { caveat?: string }) =>
     v.caveat ? "\n  CAVEAT (tell the user): " + v.caveat : "";
+  // What was computed from the rows, step by step, so a model can say how a number was arrived at.
+  const methodOf = (v: ViewResult) => !v.method ? "" :
+    "\n  METHOD:" + v.method.steps.map((st) =>
+      "\n    - " + st.title + (st.scope ? " [" + st.scope + "]" : "") +
+      (st.rowsIn != null && st.rowsOut != null ? " (" + st.rowsIn.toLocaleString() + " → " + st.rowsOut.toLocaleString() + " rows)" : "") +
+      ": " + st.detail +
+      (st.params || []).map(([k, val]) => "\n        " + k + ": " + val).join("")).join("") +
+    (v.method.verification ? "\n    " + v.method.verification : "");
   // the AUTHOR's note is `annotationNote`; `note` is the engine's own.
   const noteOf = (v: { annotationNote?: string; note?: string }) =>
     (v.annotationNote ? "\n  NOTE (the author's, tell the user): " + v.annotationNote : "") +
@@ -60,18 +68,18 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
               c.coefficients.map((cf) =>
                 `    ${cf.label}${cf.reference ? " vs " + cf.reference : ""}: HR ${cf.hr.toFixed(2)} ` +
                 `(95% CI ${cf.ciLow.toFixed(2)}-${cf.ciHigh.toFixed(2)}) p=${pFmt(cf.p)}`).join("\n")
-          ).join("\n") + caveatOf(v)
+          ).join("\n") + caveatOf(v) + methodOf(v)
         : `Cox regression (${v.endpoint || "OS"}, n=${v.cox!.n.toLocaleString()}, ${v.cox!.events.toLocaleString()} events):\n` +
           v.cox!.coefficients.map((c) =>
             `  ${c.label}${c.reference ? " vs " + c.reference : ""}: HR ${c.hr.toFixed(2)} ` +
             `(95% CI ${c.ciLow.toFixed(2)}-${c.ciHigh.toFixed(2)}) p=${pFmt(c.p)}`).join("\n") +
-          caveatOf(v));
+          caveatOf(v) + methodOf(v));
     } else if (v.kind === "logistic") {
       out.push(`Logistic regression (n=${v.logistic!.n.toLocaleString()}, ${v.logistic!.events.toLocaleString()} with the outcome):\n` +
         v.logistic!.coefficients.map((c) =>
           `  ${c.label}${c.reference ? " vs " + c.reference : ""}: OR ${c.or.toFixed(2)} ` +
           `(95% CI ${c.ciLow.toFixed(2)}-${c.ciHigh.toFixed(2)}) p=${pFmt(c.p)}`).join("\n") +
-        caveatOf(v));
+        caveatOf(v) + methodOf(v));
     } else if (v.kind === "cooccurrence") {
       out.push("Co-occurrence (2x2 per pair, among patients profiled for BOTH genes):\n" +
         (v.pairs || []).slice(0, 20).map((x) =>
