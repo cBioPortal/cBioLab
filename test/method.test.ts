@@ -3,7 +3,7 @@
 // codes each term the way the fit did.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
 import type { CoxCovariate } from "../lib/types.ts";
 
 const tp53: CoxCovariate = { source: "alteration", gene: "TP53", by: "mutated" };
@@ -245,5 +245,40 @@ describe("cooccurrenceMethod", () => {
     assert.match(m.python, /chi2_dist\.sf\(stat, 1\)/);
     assert.match(m.python, /p = result\["p_cmh"\]/);
     assert.ok(m.implementation.functions.includes("cochranMantelHaenszel"));
+  });
+});
+
+describe("clinicalMethod", () => {
+  const base = {
+    cohorts: ["A", "B"], singleStudy: true,
+    perSite: [{ cohort: "A", study: "s1", cohortPatients: 10 }, { cohort: "B", study: "s1", cohortPatients: 12 }],
+    attributes: [
+      { attribute: "AGE", per: "patient" as const, kind: "num" as const, test: "Welch t", statistic: -2.1, df: 19.5, p: 0.049, q: 0.098, rankStatistic: 30, rankP: 0.06 },
+      { attribute: "SEX", per: "patient" as const, kind: "cat" as const, test: "chi-squared", statistic: 0.4, df: 1, p: 0.52, q: 0.52, distinct: 2, minExpected: 4.5 },
+      { attribute: "BOGUS", per: "patient" as const, kind: "cat" as const, skipped: "not declared by s1" },
+    ],
+    categorical: [{ cohort: "A", study: "s1", attribute: "SEX", value: "Male", n: 6 }, { cohort: "B", study: "s1", attribute: "SEX", value: "Female", n: 7 }],
+    numeric: [{ cohort: "A", study: "s1", attribute: "AGE", n: 10, sum: 600, sumsq: 36500 }, { cohort: "B", study: "s1", attribute: "AGE", n: 12, sum: 780, sumsq: 51000 }],
+    histograms: [{ cohort: "A", attribute: "AGE", value: 60, n: 10 }, { cohort: "B", attribute: "AGE", value: 65, n: 12 }],
+  };
+
+  test("single study, two cohorts: chi-squared, Welch t, Mann-Whitney alongside, BH; skipped attributes named", () => {
+    const m = clinicalMethod(base);
+    assert.deepEqual(m.steps.map((s) => s.title).slice(2), ["Set aside attributes that cannot be tested", "Pearson χ² for each categorical attribute",
+      "Welch's t-test for each numeric attribute", "Mann–Whitney U alongside", "Benjamini–Hochberg across attributes"]);
+    assert.deepEqual(m.steps[2].params, [["BOGUS", "not declared by s1"]]);
+    assert.match(m.python, /from scipy\.stats import chi2_contingency, mannwhitneyu, ttest_ind_from_stats/);
+    assert.match(m.python, /m\["var"\] = \(m\["sumsq"\] - m\["sum"\] \*\* 2 \/ m\["n"\]\) \/ \(m\["n"\] - 1\)/);
+    assert.match(m.python, /np\.repeat\(h\["value"\]/);
+  });
+
+  test("several studies, three cohorts: moments summed, Welch's ANOVA, and no rank tests or medians", () => {
+    const m = clinicalMethod({ ...base, cohorts: ["A", "B", "C"], singleStudy: false, histograms: [],
+      attributes: [{ ...base.attributes[0], test: "Welch ANOVA", df: 2, df2: 30.2, rankStatistic: undefined, rankP: undefined }] });
+    assert.ok(m.steps.some((s) => s.title === "Add each cohort's counts and moments across its studies"));
+    assert.ok(!m.steps.some((s) => /alongside/.test(s.title)));
+    assert.match(m.python, /anova_generic\(/);
+    assert.doesNotMatch(m.python, /^from scipy\.stats import\s*$/m);
+    assert.doesNotMatch(m.python, /kruskal|mannwhitneyu/);
   });
 });

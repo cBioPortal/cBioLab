@@ -33,7 +33,7 @@ import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
-import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, type CoxTrace } from "./method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, type CoxTrace } from "./method.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -1646,16 +1646,17 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             }
             const variance = varianceFromMoments(n0, sum, sumsq);
             const [median, q1, q3] = valueCounts ? quantilesFromHistogram(valueCounts, [0.5, 0.25, 0.75]) : [null, null, null];
-            return { cohort: n, n: n0, mean: n0 ? Math.round((sum / n0) * 1e3) / 1e3 : null,
+            // the mean shown is rounded; the tests below use the exact one
+            return { cohort: n, n: n0, mean: n0 ? Math.round((sum / n0) * 1e3) / 1e3 : null, exactMean: n0 ? sum / n0 : 0,
               sd: Math.round(Math.sqrt(variance) * 1e3) / 1e3,
               min: Number.isFinite(mn) ? mn : null, max: Number.isFinite(mx) ? mx : null, variance,
               median, q1, q3, histogramTruncated, valueCounts };
           });
           const row: ClinicalRow = { attribute, per, kind, q: 1,
-            cells: cells.map(({ variance, valueCounts, ...c }) => c) };
+            cells: cells.map(({ variance, valueCounts, exactMean, ...c }) => c) };
           if (vNames.length === 2) {
             const [x, y] = cells;
-            const w = welchT(x.n, x.mean ?? 0, x.variance, y.n, y.mean ?? 0, y.variance);
+            const w = welchT(x.n, x.exactMean, x.variance, y.n, y.exactMean, y.variance);
             row.test = "Welch t"; row.statistic = w.t; row.df = w.df; row.p = w.p;
             if (x.valueCounts && y.valueCounts) {
               const rk = mannWhitneyU(x.valueCounts, y.valueCounts);
@@ -1665,7 +1666,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             // Welch's ANOVA needs nothing beyond the same (n, mean, variance) moments Welch's t
             // already uses, so — unlike the median/rank tests below — it works at any study
             // count, the same reason chi-squared and the survival view's k-group log-rank do.
-            const a = welchAnovaTest(cells.map((c) => ({ n: c.n, mean: c.mean ?? 0, variance: c.variance })));
+            const a = welchAnovaTest(cells.map((c) => ({ n: c.n, mean: c.exactMean, variance: c.variance })));
             row.test = "Welch ANOVA"; row.statistic = a.f; row.df = a.df1; row.df2 = a.df2; row.p = a.p;
             if (singleStudy && cells.every((c) => c.valueCounts)) {
               const kw = kruskalWallis(cells.map((c) => c.valueCounts!));
@@ -1678,7 +1679,27 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       const tested = rows.filter((r) => r.p != null);
       benjaminiHochberg(tested.map((r) => r.p!)).forEach((q, i) => { tested[i].q = q; });
       rows.sort((a, b) => (a.p ?? 2) - (b.p ?? 2));
+      const siteKeys = vNames.flatMap((n) => [...cohorts[n].studies].sort().map((st) => ({ cohort: n, study: st })));
+      const testedAttrs = new Set(rows.filter((r) => !r.skipped).map((r) => r.attribute));
+      const siteStats = siteKeys.flatMap(({ cohort, study }) =>
+        (stats.get(cohort + "|" + study) || []).filter((x) => testedAttrs.has(x.attribute)).map((x) => ({ cohort, study, x })));
       views.push({ kind: "clinical", cohorts: vNames, clinical: rows, studies: vStudies,
+        method: clinicalMethod({
+          cohorts: vNames, singleStudy,
+          perSite: siteKeys.map(({ cohort, study }) => ({ cohort, study, cohortPatients: cohorts[cohort].perStudy[study]?.count || 0 })),
+          attributes: attrs.map((a) => rows.find((r) => r.attribute === a)!).map((r) => ({
+            attribute: r.attribute, per: r.per, kind: r.kind, ...(r.skipped ? { skipped: r.skipped } : {}),
+            test: r.test, statistic: r.statistic, df: r.df, df2: r.df2, p: r.p, q: r.q, rankStatistic: r.rankStatistic, rankP: r.rankP,
+            distinct: r.distinct, minExpected: r.minExpected,
+            histogramTruncated: r.cells.some((c) => (c as { histogramTruncated?: boolean }).histogramTruncated),
+          })),
+          categorical: siteStats.filter(({ x }) => x.kind === "cat").flatMap(({ cohort, study, x }) =>
+            (x.values || []).map((v) => ({ cohort, study, attribute: x.attribute, value: v.v, n: v.n }))),
+          numeric: siteStats.filter(({ x }) => x.kind === "num" && x.n).map(({ cohort, study, x }) =>
+            ({ cohort, study, attribute: x.attribute, n: x.n!, sum: x.sum!, sumsq: x.sumsq! })),
+          histograms: singleStudy ? siteStats.filter(({ x }) => x.kind === "num" && x.valueCounts).flatMap(({ cohort, x }) =>
+            x.valueCounts!.map((h) => ({ cohort, attribute: x.attribute, value: h.v, n: h.n }))) : [],
+        }),
         participation: participationFor(vStudies, false),
         note: "Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary;" +
           " numeric ones with Welch's unequal-variance t-test (2 cohorts) or Welch's ANOVA (3+) computed from" +
