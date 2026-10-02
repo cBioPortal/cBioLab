@@ -287,7 +287,7 @@ function clinicalSvg(v: ViewResult, o: SvgOpts): string {
  * with the truncation stated rather than left to be inferred from a line that
  * simply gets noisy.
  */
-const RISK_FLOOR = 10;
+export const RISK_FLOOR = 10;
 function courseSvg(v: ViewResult, o: SvgOpts): string {
   const p = palette(o.theme), W = o.width || 720;
   const series = (v.course || []) as CourseSeries[];

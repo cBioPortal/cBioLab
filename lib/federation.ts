@@ -21,7 +21,8 @@
 // (document-level federation) behind the same interface.
 import { chQuery, DB, PRIMARY, connections, isAbortError, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
-import { canonicalEventName } from "./event-names.ts";
+import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
+import { linesCtes, lineGapOf, TREATMENT_EVENT } from "./treatment-lines.ts";
 import { compileCohortDef, eventTypeMatchSql } from "./cohort2.ts";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
@@ -708,7 +709,7 @@ export function anchoredSurvivalSql(
   const pick = anchor.occurrence === "LAST" ? "max" : "min";
   const attrCond = anchor.key
     ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data\n" +
-      "        WHERE key = " + sq(anchor.key) + " AND value = " + sq(String(anchor.value ?? "")) + ")\n"
+      "        WHERE " + foldedEqualsSql("key", anchor.key) + " AND " + foldedEqualsSql("value", String(anchor.value ?? "")) + ")\n"
     : "";
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
@@ -728,7 +729,7 @@ export function anchoredSurvivalSql(
     "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
-    "    AND ce.event_type = " + sq(anchor.eventType) + "\n" + attrCond +
+    "    AND " + foldedEqualsSql("ce.event_type", anchor.eventType) + "\n" + attrCond +
     "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
     "  GROUP BY pid\n" +
     ")\n" +
@@ -928,8 +929,8 @@ export function eventCourseSql(
       "    AND " + eventTypeMatchSql("ce.event_type", anchor.eventType) + "\n" +
       (anchor.key
         ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data\n" +
-          "        WHERE lower(trim(key)) = " + sq(canonicalEventName(anchor.key)) +
-          " AND value = " + sq(String(anchor.value ?? "")) + ")\n"
+          "        WHERE " + foldedEqualsSql("key", anchor.key) +
+          " AND " + foldedEqualsSql("value", String(anchor.value ?? "")) + ")\n"
         : "") +
       "  GROUP BY pid\n" +
       ")"
@@ -977,14 +978,14 @@ export function eventCourseSql(
     // state. Half-open bins via floor() — see the note above.
     "numer AS (\n" +
     "  SELECT arrayJoin(" + binsOf("ce.start_date", "coalesce(ce.stop_date, ce.start_date)") + ") AS bin,\n" +
-    "         " + pid + " AS pid, lower(trim(ce.event_type)) AS et\n" +
+    "         " + pid + " AS pid, " + nameFoldSql("ce.event_type") + " AS et\n" +
     "  FROM " + db + ".clinical_event ce\n" +
     "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "  JOIN anch a ON a.pid = " + pid + "\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
-    "    AND lower(trim(ce.event_type)) IN (" + types.map(sq).join(", ") + ")\n" +
+    "    AND " + nameFoldSql("ce.event_type") + " IN (" + types.map((t) => nameFoldSql(sq(t))).join(", ") + ")\n" +
     ")\n" +
     "SELECT bin, et, uniqExact(pid) AS n\n" +
     "FROM (SELECT bin, pid, et FROM denom UNION ALL SELECT bin, pid, et FROM numer)\n" +
@@ -1003,7 +1004,12 @@ export interface SequenceOpts {
   lineGap: number;
   /** how many lines to follow */
   maxSteps: number;
+  /** which treatment records form lines — lib/treatment-lines.ts (default: the systemic classes) */
+  lineClasses?: "systemic" | "all" | string[];
 }
+
+/** Flow rows one study may return; at the limit the view says its smallest flows were cut. */
+export const SEQUENCE_ROW_LIMIT = 2000;
 
 /**
  * One transition. `to: ''` means no further line — and `fate` says whether that
@@ -1037,43 +1043,16 @@ export interface SequenceFlow { step: number; from: string; to: string; n: numbe
 export function sequenceSql(
   cohortSql: string, study: string, db: string, opts: SequenceOpts
 ): string {
-  const gap = Math.max(1, Math.min(3650, Math.floor(Number(opts.lineGap) || 90)));
+  const gap = lineGapOf({ gap: opts.lineGap });
   const steps = Math.max(2, Math.min(8, Math.floor(Number(opts.maxSteps) || 3)));
-  const et = canonicalEventName(opts.eventType || "treatment");
-  const key = canonicalEventName(opts.labelKey || "");
-  if (!key) throw new Error("a sequence view needs a labelKey (e.g. SUBTYPE)");
-  const drop = [...new Set((opts.exclude || []).map((x) => String(x).trim()).filter(Boolean))].slice(0, 40);
+  if (!String(opts.labelKey || "").trim()) throw new Error("a sequence view needs a labelKey (e.g. SUBTYPE)");
   const pid = "p.stable_id";
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
-    "tx AS (\n" +
-    "  SELECT ce.clinical_event_id AS eid, " + pid + " AS pid, ce.start_date AS s,\n" +
-    "         coalesce(ce.stop_date, ce.start_date) AS e, trim(d.value) AS lbl\n" +
-    "  FROM " + db + ".clinical_event ce\n" +
-    "  JOIN " + db + ".clinical_event_data d ON d.clinical_event_id = ce.clinical_event_id\n" +
-    "    AND lower(trim(d.key)) = " + sq(key) + "\n" +
-    "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
-    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-    "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
-    "    AND " + eventTypeMatchSql("ce.event_type", et) + "\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
-    "    AND trim(d.value) != ''\n" +
-    (drop.length ? "    AND trim(d.value) NOT IN (" + drop.map(sq).join(", ") + ")\n" : "") +
-    "),\n" +
-    // toNullable: over an empty frame max() on a non-nullable column returns 0,
-    // which corrupts first-row detection because day offsets are often <= 0.
-    "flagged AS (\n  SELECT *, max(toNullable(e)) OVER (PARTITION BY pid\n" +
-    "    ORDER BY s, e, eid ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS pms\n  FROM tx\n),\n" +
-    "numbered AS (\n  SELECT *, sum(if(pms IS NULL OR s > pms + " + gap + ", 1, 0)) OVER (\n" +
-    "    PARTITION BY pid ORDER BY s, e, eid ROWS UNBOUNDED PRECEDING) AS line_no\n  FROM flagged\n),\n" +
-    // A line's identity is its COMBINATION, sorted so ordering cannot split one
-    // regimen into two apparent states.
-    // A line's identity is its COMBINATION, sorted so ordering cannot split one
-    // regimen into two apparent states. line_end is kept to judge the fate below.
-    "lines AS (\n  SELECT pid, line_no,\n" +
-    "         arrayStringConcat(arraySort(groupUniqArray(lbl)), ' + ') AS combo,\n" +
-    "         max(e) AS line_end\n" +
-    "  FROM numbered GROUP BY pid, line_no\n),\n" +
+    // the one line definition every view and clause shares — lib/treatment-lines.ts
+    linesCtes({ db, study, patientFilter: pid + " IN (SELECT pid FROM cohort)",
+      spec: { gap, eventType: opts.eventType || TREATMENT_EVENT, labelKey: opts.labelKey, exclude: opts.exclude,
+        ...(opts.lineClasses ? { classes: opts.lineClasses } : {}) } }).join(",\n") + ",\n" +
     // How long the study kept watching, from ANY event type plus OS follow-up.
     // This is what separates "we saw them not start another line" from "the
     // records simply stop" — see the fate expression below.
@@ -1099,7 +1078,7 @@ export function sequenceSql(
     "         greatest(toFloat64(sn.max_ev), coalesce(os.os_day, toFloat64(sn.max_ev))) AS last_seen\n" +
     "  FROM seen sn LEFT JOIN os ON os.pid = sn.pid\n" +
     "),\n" +
-    "seq AS (\n  SELECT pid, line_no, combo, line_end,\n" +
+    "seq AS (\n  SELECT pid, line_no, combo, le AS line_end,\n" +
     "         leadInFrame(combo) OVER (PARTITION BY pid ORDER BY line_no\n" +
     "           ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS nxt\n" +
     "  FROM lines\n),\n" +
@@ -1117,7 +1096,8 @@ export function sequenceSql(
     ")\n" +
     "SELECT line_no AS step, combo AS a, nxt AS b, fate, uniqExact(pid) AS n\n" +
     "FROM fated WHERE line_no <= " + steps + "\n" +
-    "GROUP BY step, a, b, fate ORDER BY n DESC LIMIT 2000"
+    // ties on n broken by the flow itself, so which rows the limit keeps never depends on row order
+    "GROUP BY step, a, b, fate ORDER BY n DESC, step, a, b, fate LIMIT " + SEQUENCE_ROW_LIMIT
   );
 }
 
@@ -1125,8 +1105,9 @@ export function sequenceSql(
 export function sequenceKeysSql(cohortSql: string, study: string, db: string, eventType: string): string {
   return (
     "WITH cohort AS (" + cohortSql + ")\n" +
-    "SELECT lower(trim(d.key)) AS k, any(trim(d.key)) AS label,\n" +
-    "       uniqExact(p.stable_id) AS pts, uniqExact(trim(d.value)) AS values\n" +
+    // the display spelling: the most frequent, ties alphabetical — not whichever row came first
+    "SELECT " + nameFoldSql("d.key") + " AS k, arraySort((x) -> (-x.2, x.1), arrayMap((v) -> (v, countEqual(groupArray(trimBoth(d.key)), v)), groupUniqArray(trimBoth(d.key))))[1].1 AS label,\n" +
+    "       uniqExact(p.stable_id) AS pts, uniqExact(" + nameFoldSql("d.value") + ") AS values\n" +
     "FROM " + db + ".clinical_event ce\n" +
     "JOIN " + db + ".clinical_event_data d ON d.clinical_event_id = ce.clinical_event_id\n" +
     "JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
@@ -1134,7 +1115,7 @@ export function sequenceKeysSql(cohortSql: string, study: string, db: string, ev
     "WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
     "  AND " + eventTypeMatchSql("ce.event_type", eventType) + "\n" +
     "  AND p.stable_id IN (SELECT pid FROM cohort)\n" +
-    "GROUP BY k ORDER BY pts DESC LIMIT 25"
+    "GROUP BY k ORDER BY pts DESC, k LIMIT 25"
   );
 }
 

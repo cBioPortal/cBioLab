@@ -4,7 +4,7 @@
 // participant, aggregate-only included, can answer.
 import { sq } from "./compiler.ts";
 import { ALTERED_COND, driverJoin } from "./federation.ts";
-import { clinicalValueFoldSql } from "./event-names.ts";
+import { clinicalValueFoldSql, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 
 /** bare patient id for a *_unique_id column of this study */
 const pidOf = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
@@ -400,9 +400,9 @@ function eventDaysSql(db: string, study: string, sel: EventSel, cohortRef: strin
     "  FROM " + db + ".clinical_event ce\n" +
     "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND ce.event_type = " + sq(sel.eventType) + "\n" +
-    attrs.map((a) => "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE key = " +
-      sq(a.key) + " AND value = " + sq(a.value) + ")\n").join("") +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", sel.eventType) + "\n" +
+    attrs.map((a) => "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE " +
+      foldedEqualsSql("key", a.key) + " AND " + foldedEqualsSql("value", a.value) + ")\n").join("") +
     "    AND p.stable_id IN (SELECT pid FROM " + cohortRef + ")";
 }
 
@@ -429,9 +429,9 @@ export function incidenceCountsSql(cohortSql: string, study: string, db: string,
       "  FROM " + db + ".clinical_event ce\n" +
       "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
       "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-      "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND ce.event_type = " + sq(anchor.eventType) + "\n" +
-      (anchor.key ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE key = " +
-        sq(anchor.key) + " AND value = " + sq(String(anchor.value ?? "")) + ")\n" : "") +
+      "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", anchor.eventType) + "\n" +
+      (anchor.key ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE " +
+        foldedEqualsSql("key", anchor.key) + " AND " + foldedEqualsSql("value", String(anchor.value ?? "")) + ")\n" : "") +
       "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
       "  GROUP BY pid\n" +
       "),\n"
@@ -510,9 +510,9 @@ function labCtes(cohortSql: string, study: string, db: string, lab: LabSpec, anc
     "  FROM " + db + ".clinical_event ce\n" +
     "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND ce.event_type = " + sq(anchor.eventType) + "\n" +
-    (anchor.key ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE key = " +
-      sq(anchor.key) + " AND value = " + sq(String(anchor.value ?? "")) + ")\n" : "") +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", anchor.eventType) + "\n" +
+    (anchor.key ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE " +
+      foldedEqualsSql("key", anchor.key) + " AND " + foldedEqualsSql("value", String(anchor.value ?? "")) + ")\n" : "") +
     "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
     "  GROUP BY pid\n" +
     "),\n" +
@@ -521,13 +521,17 @@ function labCtes(cohortSql: string, study: string, db: string, lab: LabSpec, anc
     "  FROM " + db + ".clinical_event ce\n" +
     "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-    "  JOIN " + db + ".clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND t.key = " + sq(lab.testKey) + " AND t.value = " + sq(lab.test) + "\n" +
-    "  JOIN " + db + ".clinical_event_data r ON r.clinical_event_id = ce.clinical_event_id AND r.key = " + sq(lab.resultKey) + "\n" +
-    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND ce.event_type = " + sq(lab.eventType) + "\n" +
+    "  JOIN " + db + ".clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("t.key", lab.testKey) + " AND " + foldedEqualsSql("t.value", lab.test) + "\n" +
+    "  JOIN " + db + ".clinical_event_data r ON r.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("r.key", lab.resultKey) + "\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", lab.eventType) + "\n" +
     "    AND p.stable_id IN (SELECT pid FROM anch) AND toFloat64OrNull(r.value) IS NOT NULL\n" +
     "),\n" +
     "base AS (\n" +
-    "  SELECT lab.pid AS pid, argMax(lab.v, lab.day) AS b, max(lab.day) AS bday FROM lab INNER JOIN anch ON anch.pid = lab.pid\n" +
+    // the baseline is the mean of the readings on the last day with any, so several readings that day
+    // give one answer rather than whichever row came first
+    "  SELECT lab.pid AS pid, max(lab.day) AS bday,\n" +
+    "         arrayAvg(arrayMap((x) -> assumeNotNull(x.1), arrayFilter((x) -> x.2 = bday, groupArray((lab.v, lab.day))))) AS b\n" +
+    "  FROM lab INNER JOIN anch ON anch.pid = lab.pid\n" +
     "  WHERE lab.day >= anch.day - " + Math.floor(o.baselineDays) + " AND lab.day <= anch.day GROUP BY lab.pid\n" +
     "),\n" +
     "chg AS (\n" +
@@ -593,12 +597,13 @@ export function labWaterfallSql(cohortSql: string, study: string, db: string, la
 export function labTestsSql(cohortSql: string, study: string, db: string, eventType: string, testKey: string): string {
   return (
     "WITH cohort AS (" + cohortSql + ")\n" +
-    "SELECT t.value AS test, uniqExact(ce.patient_id) AS patients, count() AS results\n" +
+    "SELECT " + nameFoldSql("t.value") + " AS tk, arraySort((x) -> (-x.2, x.1), arrayMap((v) -> (v, countEqual(groupArray(trimBoth(t.value)), v)), groupUniqArray(trimBoth(t.value))))[1].1 AS test,\n" +
+    "       uniqExact(ce.patient_id) AS patients, count() AS results\n" +
     "FROM " + db + ".clinical_event ce\n" +
     "JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-    "JOIN " + db + ".clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND t.key = " + sq(testKey) + "\n" +
-    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND ce.event_type = " + sq(eventType) + " AND p.stable_id IN (SELECT pid FROM cohort)\n" +
-    "GROUP BY test ORDER BY patients DESC LIMIT 40"
+    "JOIN " + db + ".clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("t.key", testKey) + "\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", eventType) + " AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+    "GROUP BY tk ORDER BY patients DESC, tk LIMIT 40"
   );
 }

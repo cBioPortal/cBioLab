@@ -19,6 +19,7 @@ import { fisherExact, benjaminiHochberg, varianceFromMoments, welchT, preRankedG
   aalenJohansen, cifAt, grayPermutationTest, kaplanMeier, quantilesFromHistogram, type CrRecord } from "./stats.ts";
 import { geneSymbols } from "./gene-tracks.ts";
 import { viewToSvg } from "./view-svg.ts";
+import { LAB_MIN_POINT_N } from "./view-svg-more.ts";
 import { diffexprMethod, incidenceMethod, pairedMethod, genomeMethod, pathwaysMethod, attritionMethod, type IncidenceTrace, type PairedTrace } from "./method.ts";
 
 export interface EvaluatedCohort {
@@ -905,7 +906,7 @@ async function labsView(view: LabsView, ctx: ViewCtx): Promise<ViewResult> {
     const panel: LabsPanel = { cohort: n, anchored: 0, baseline: 0, positiveBaseline: 0, evaluable: 0, course: [], best: new Array(nBins).fill(0), responders: 0 };
     const courseHist = new Map<number, Map<number, number>>();
     const bars: number[] = [];
-    let withheld = 0;
+    let withheld = 0, capped = 0;
     await Promise.all(cohorts[n].studies.filter((st) => ok[st]).map(async (st) => {
       const def = doc.cohorts[n], r = ok[st];
       const [course, best] = await Promise.all([
@@ -931,7 +932,8 @@ async function labsView(view: LabsView, ctx: ViewCtx): Promise<ViewResult> {
       if (isPatientLevel(r) && evaluable) {
         const rows = await r.moreRows("labs:waterfall:" + n, def, (c, s, d) => labWaterfallSql(c, s, d, lab, anchor, o, WATERFALL_CAP));
         for (const x of rows) bars.push(Number(x.best));
-        withheld += Math.max(0, evaluable - rows.length);
+        // the only reason a patient-level participant returns fewer bars than evaluable patients is the bar limit
+        capped += Math.max(0, evaluable - rows.length);
       } else withheld += evaluable;
     }));
     const mid = (pb: number) => LAB_PCT_MIN + pb * LAB_PCT_BIN;
@@ -942,6 +944,7 @@ async function labsView(view: LabsView, ctx: ViewCtx): Promise<ViewResult> {
     });
     if (bars.length) panel.waterfall = bars.sort((x, y) => x - y);
     if (withheld) panel.waterfallWithheld = withheld;
+    if (capped) panel.waterfallCapped = capped;
     panels.push(panel);
   }
   if (!panels.some((pn) => pn.anchored)) {
@@ -960,6 +963,7 @@ async function labsView(view: LabsView, ctx: ViewCtx): Promise<ViewResult> {
     responseP = fisherExact(panels[0].responders, panels[0].evaluable - panels[0].responders, panels[1].responders, panels[1].evaluable - panels[1].responders);
   const anchoredTo = anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "");
   const withheld = panels.reduce((s2, pn) => s2 + (pn.waterfallWithheld || 0), 0);
+  const capped = panels.reduce((s2, pn) => s2 + (pn.waterfallCapped || 0), 0);
   const multi = ctx.vStudies.length > 1;
   return {
     kind: "labs", cohorts: vNames,
@@ -967,15 +971,17 @@ async function labsView(view: LabsView, ctx: ViewCtx): Promise<ViewResult> {
     // the course and the rate are aggregates; a drawn waterfall is one patient's value per bar
     participation: ctx.participationFor(ctx.vStudies, panels.some((pn) => pn.waterfall && pn.waterfall.length)),
     ...(multi ? { studies: ctx.vStudies } : {}),
-    caveat: test + " as % change from each patient's baseline — the last value in the " + baselineDays + " days up to and including the " +
+    caveat: test + " as % change from each patient's baseline — the mean of their readings on the last day with any, in the " + baselineDays + " days up to and including the " +
       (anchor.occurrence === "LAST" ? "last " : "first ") + anchoredTo + " — over " + fromWeeks + " to " + toWeeks + " weeks around it, in " + binWeeks + "-week bins; " +
-      "a patient tested several times in a bin counts once, at their mean, and the baseline reading itself is not drawn. Median and interquartile band are read from 2-point histograms, so they are exact to within a point; " +
+      "a patient tested several times in a bin counts once, at their mean, and no reading from the baseline day is drawn. Median and interquartile band are read from 2-point histograms, so they are exact to within a point, and the figure draws only bins with at least " + LAB_MIN_POINT_N + " patients; " +
       "values above +300% share the top bin. Best response is each patient's lowest value after the anchor within the window; a responder fell by at least " + responseDrop + "%" +
       (responseDrop === 50 && /psa/i.test(test) ? " (PCWG3's PSA50)" : "") + ", counted exactly. " +
-      "Denominators: " + panels.map((pn) => pn.cohort + " — " + pn.anchored.toLocaleString("en-US") + " anchored, " + pn.baseline.toLocaleString("en-US") + " with a baseline, " +
+      "Denominators: " + panels.map((pn) => pn.cohort + " — " + pn.anchored.toLocaleString("en-US") + " anchored, " + pn.baseline.toLocaleString("en-US") + " with a baseline" +
+        (pn.baseline > pn.positiveBaseline ? " (" + (pn.baseline - pn.positiveBaseline).toLocaleString("en-US") + " of them left out: a baseline of 0 or below has no % change)" : "") + ", " +
         pn.evaluable.toLocaleString("en-US") + " with a value after").join("; ") + ". " +
       "Patients tested more often are over-represented in any bin they appear in, and testing itself is more frequent when a value is moving; the course is of those measured, not of everyone. " +
       (withheld ? withheld.toLocaleString("en-US") + " patients' bars are not drawn in the waterfall: an aggregate-only participant cannot disclose one patient's value (they are in the histogram and the rate). " : "") +
+      (capped ? capped.toLocaleString("en-US") + " patients' bars are past the waterfall's " + WATERFALL_CAP.toLocaleString("en-US") + "-bar limit and not drawn — the drawn bars are each study's lowest (they are all in the histogram and the rate). " : "") +
       (responseP != null ? "Response rates compared with a two-sided Fisher test. " : "") +
       (multi ? "Pooled across " + ctx.vStudies.length + " studies; units and assays are not harmonised. " : "") +
       (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")

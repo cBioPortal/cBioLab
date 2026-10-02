@@ -37,7 +37,9 @@
 //
 // This is a GROUPING AND DISPLAY concept, not a query rewrite. The database
 // stores the variants as distinct literals, so SQL matching a canonical name
-// must match every variant — see `eventTypeMatchSql` in lib/federation.ts.
+// must match every variant: every timeline match — event type, attribute key,
+// attribute value — goes through `foldedEqualsSql` / `foldedInSql` below, which
+// fold the column and the literal with the same SQL function.
 
 /** The grouping key for an event type or attribute key. Case + whitespace only. */
 export function canonicalEventName(raw: string): string {
@@ -132,4 +134,26 @@ export function foldNote(folded: FoldedName[]): string {
   return "Event names differing only in case were treated as one: " +
     merged.map((f) => f.variants.join(" = ")).join("; ") +
     ". No other spelling differences were merged.";
+}
+
+/**
+ * The SQL that folds a timeline name — an event type, an attribute key or an attribute value —
+ * to its grouping key. The same rule and the same function as clinicalValueFoldSql, for the same
+ * reason: both sides of a comparison must fold in SQL, or `lower` (ASCII) and JavaScript's
+ * `toLowerCase` (Unicode) disagree and the predicate silently matches nothing.
+ */
+export function nameFoldSql(expr: string): string {
+  return clinicalValueFoldSql(expr);
+}
+
+const sqLit = (s: string) => "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
+
+/** `col` matches `literal` up to case and surrounding whitespace, folded on both sides in SQL. */
+export function foldedEqualsSql(col: string, literal: string): string {
+  return nameFoldSql(col) + " = " + nameFoldSql(sqLit(literal));
+}
+
+/** `col` matches any of `literals` up to case and surrounding whitespace. */
+export function foldedInSql(col: string, literals: string[]): string {
+  return nameFoldSql(col) + " IN (" + literals.map((l) => nameFoldSql(sqLit(l))).join(", ") + ")";
 }

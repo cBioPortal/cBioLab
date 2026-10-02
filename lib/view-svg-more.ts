@@ -6,6 +6,9 @@ import type { ViewResult } from "./types.ts";
 import { STYLE } from "./oncoprint-style.ts";
 import { Z_975 } from "./stats.ts";
 
+/** The labs course draws a bin only from this many patients; the engine's caption says so. */
+export const LAB_MIN_POINT_N = 5;
+
 /** gains and losses take the oncoprint's amplification and deep-deletion hues */
 const CN_GAIN = STYLE.glyph.cna.options.find((o) => o.bit === "AMP")!.color;
 const CN_LOSS = STYLE.glyph.cna.options.find((o) => o.bit === "HOMDEL")!.color;
@@ -536,7 +539,7 @@ export function labsSvg(v: ViewResult, o: SvgOpts): string {
     out.push(`<text x="${num(x(w))}" y="${T + PH + 13}" font-size="9.5" fill="${p.muted}" text-anchor="middle">${w}w</text>`);
   r.panels.forEach((pn, i) => {
     const col = SERIES[i % SERIES.length];
-    const pts = pn.course.filter((c) => c.median != null && c.n >= 5);
+    const pts = pn.course.filter((c) => c.median != null && c.n >= LAB_MIN_POINT_N);
     if (!pts.length) return;
     const mid = (c: typeof pts[number]) => x(c.week + r.binWeeks / 2);
     const band = "M" + pts.map((c) => num(mid(c)) + " " + num(y(c.q3!))).join(" L") + " L" + [...pts].reverse().map((c) => num(mid(c)) + " " + num(y(c.q1!))).join(" L") + " Z";

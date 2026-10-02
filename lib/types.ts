@@ -584,8 +584,10 @@ export interface SequenceView {
   lineGap?: number;
   /** lines to follow (default 3) */
   maxSteps?: number;
-  /** distinct labels kept before the rest fold into "other" (default 6) */
+  /** distinct labels kept before the rest fold into "other" (default 8) */
   topN?: number;
+  /** which treatment records form lines: "systemic" (default), "all", or class names — lib/treatment-lines.ts */
+  lineClasses?: "systemic" | "all" | string[];
 }
 /**
  * Cohort attrition: for each cohort, the patients remaining after each successive clause of its
@@ -851,6 +853,8 @@ export interface LabsPanel {
   waterfall?: number[];
   /** patients whose best could not be drawn as a bar (an aggregate-only participant's) */
   waterfallWithheld?: number;
+  /** evaluable patients whose bars were cut by the waterfall's bar limit (drawn ones are the lowest) */
+  waterfallCapped?: number;
 }
 export interface LabsResult {
   test: string; anchoredTo: string; responseDrop: number;

@@ -13,6 +13,7 @@ import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-referen
 import type { ViewParticipation } from "../../lib/types.ts";
 import { survivalAxis } from "../../lib/stats.ts";
 import { MethodPanel } from "./method-panel.tsx";
+import { foldEventNames } from "../../lib/event-names.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 import { installLabTools, LAB_TOOL_NAMES, type LabBridge } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
@@ -812,15 +813,8 @@ export default function AnalysisPage() {
     // the catalog's own synthesis, not a recorded event type, so it isn't offered here.
     const raw: { type: string; n: number }[] = (explore && explore.events && explore.events.length) ? explore.events
       : ((cat && cat.types) || []).filter((t: any) => t.t !== "Treatment line (derived)").map((t: any) => ({ type: String(t.t), n: Number(t.n_pat) || 0 }));
-    const by = new Map<string, { canonical: string; label: string; n: number }>();
-    for (const e of raw) {
-      const c = String(e.type).trim().toLowerCase();
-      if (!c) continue;
-      const cur = by.get(c);
-      if (cur) { cur.n += e.n; if (e.n > 0 && e.type.length < cur.label.length) cur.label = e.type; }
-      else by.set(c, { canonical: c, label: e.type, n: e.n });
-    }
-    return [...by.values()].sort((a, b) => b.n - a.n);
+    return foldEventNames(raw.map((e) => ({ name: String(e.type), n: e.n })))
+      .map((f) => ({ canonical: f.canonical, label: f.label, n: f.n }));
   };
   /** a continuous profile for co-expression / heatmaps, if this study has one */
   /**
@@ -1195,15 +1189,8 @@ export default function AnalysisPage() {
   /** timeline event types this study's Explore facets actually have, folded by case */
   const exploreEventTypes = (): { canonical: string; label: string; n: number }[] => {
     const raw: { type: string; n: number }[] = (explore && explore.events) || [];
-    const by = new Map<string, { canonical: string; label: string; n: number }>();
-    for (const e of raw) {
-      const c = String(e.type).trim().toLowerCase();
-      if (!c) continue;
-      const cur = by.get(c);
-      if (cur) { cur.n += e.n; if (e.n > 0 && e.type.length < cur.label.length) cur.label = e.type; }
-      else by.set(c, { canonical: c, label: e.type, n: e.n });
-    }
-    return [...by.values()].sort((a, b) => b.n - a.n);
+    return foldEventNames(raw.map((e) => ({ name: String(e.type), n: e.n })))
+      .map((f) => ({ canonical: f.canonical, label: f.label, n: f.n }));
   };
   /** the study's own best guess at "a therapy" — the same heuristic addView's sequence default uses */
   const treatmentEventType = (): { canonical: string; label: string } | null =>
