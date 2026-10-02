@@ -20,7 +20,7 @@ import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import CustomDataPanel, { useCustomDatasets } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import type { OnCustomData } from "./pills";
-import { installCustomDataFetch, customDatasets, saveCustomDataset, referencedDatasets, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
+import { installCustomDataFetch, customDatasets, saveCustomDataset, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
@@ -334,6 +334,9 @@ export default function AnalysisPage() {
   const [exMsg, setExMsg] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [cdFocus, setCdFocus] = useState<CustomDataFocus | null>(null);
+  // Explore → Custom data lives in the add-chart dialog, which exists only once Explore has
+  // facets; asked for from elsewhere (a banner, the data dialog) it opens when they arrive
+  const [wantCustomManager, setWantCustomManager] = useState(false);
   /** the `custom` tag on a cohort's pill: that clause's upload, scoped to the clause */
   const showClauseData = (cohort?: string): OnCustomData => (attribute, leaf, negated) =>
     setCdFocus({ datasets: referencedDatasets({ a: attribute }), clause: { attribute, leaf, cohort, negated } });
@@ -401,6 +404,17 @@ export default function AnalysisPage() {
    */
   const docDialog = useRef<HTMLDialogElement | null>(null);
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
+  // Requests that carry a spec rather than the document (the oncoprint's own fetch) resolve pins
+  // from here. Set during render, not in an effect: a child's effects run before its parent's,
+  // so the figure's fetch would otherwise go out with the previous document's pins.
+  setActiveBindings(doc.uploads);
+  // an analysis refused for want of its custom data runs once that data arrives (an import, an unlock)
+  const unresolvedCount = unresolvedUploads(doc).length;
+  const wasUnresolved = useRef(0);
+  useEffect(() => {
+    if (wasUnresolved.current > 0 && unresolvedCount === 0 && Object.keys(doc.cohorts || {}).length) { setError(null); run(doc); }
+    wasUnresolved.current = unresolvedCount;
+  }, [unresolvedCount]); // eslint-disable-line
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
   const [result, setResult] = useState<AnalysisResult | null>(null);
   /**
@@ -578,7 +592,10 @@ export default function AnalysisPage() {
     setSaved(prev => { const nx = { ...prev }; delete nx[name]; return nx; });
   };
 
-  const run = async (d: AnalysisDoc = doc) => {
+  const run = async (d0: AnalysisDoc = doc) => {
+    // pin any server-stored custom data the document names, so a shared link reads the same version
+    const d = bindUploads(d0);
+    if (d !== d0) { setDoc(d); setDocText(JSON.stringify(d, null, 2)); }
     if (!Object.keys(d.cohorts || {}).length) { setBusy(false); setResult(null); return; }
     setBusy(true); setError(null);
     try {
@@ -793,6 +810,18 @@ export default function AnalysisPage() {
     }
     setTimeout(() => setExMsg(null), 3200);
   };
+
+  const openCustomManager = () => {
+    goTab("explore");
+    if (!explore) fetchExplore();
+    setChartTab("custom");
+    setWantCustomManager(true);
+  };
+  useEffect(() => {
+    if (!wantCustomManager || tab !== "explore" || !explore || !addChartDialog.current) return;
+    if (!addChartDialog.current.open) addChartDialog.current.showModal();
+    setWantCustomManager(false);
+  }, [wantCustomManager, tab, explore]);
 
   // ---- save as feature: a selection frozen into a yes/no custom attribute ----
   const featureSaved = (d: StoredDataset) => {
@@ -1078,7 +1107,7 @@ export default function AnalysisPage() {
       attrsOverride ?? attrsForBar(attrCoverage, studiesOverride),
       geneChartsRef.current,
       exExtraDerivedRef.current,
-      customDatasets().map((d) => d.id)
+      customDataKey()
     ]);
     if (exInflight.current === inflightKey) return;
     exInflight.current = inflightKey;
@@ -1375,7 +1404,7 @@ export default function AnalysisPage() {
     if (!result) return;
     const studies = result.involvedStudies && result.involvedStudies.length ? result.involvedStudies : [result.study];
     // an upload adds attributes to the same studies, so the datasets are part of what was asked
-    const key = studies.join(",") + "|" + customList.map((d) => d.id).join(",");
+    const key = studies.join(",") + "|" + customDataKey();
     if (trackAttrs.key === key || trackAttrsWant.current === key) return;
     trackAttrsWant.current = key;
     setTrackAttrsLoading(true);
@@ -2688,20 +2717,26 @@ function Latency({ v }: { v: any }) {
         </div>
         {error && <div className="error">{error}</div>}
         {tab === "analysis" && (() => {
-          // a shared document can name an upload that lives only in its author's browser
-          const missing = referencedDatasets(doc).filter((id) => !customList.some((d) => d.id === id));
+          // a shared document can name an upload that lives only in its author's browser, or a
+          // server one that is locked here or was deleted
+          const unresolved = unresolvedUploads(doc);
+          const missing = unresolved.filter((u) => u.why === "missing").map((u) => u.as);
+          const locked = unresolved.filter((u) => u.why === "locked").map((u) => u.as);
+          const deleted = unresolved.filter((u) => u.why === "deleted").map((u) => u.as);
           // a gallery example's demo upload ships with the app, so it can be added in one click
           const demos = DOC_EXAMPLES.flatMap((e) => e.customData || []).filter((d) => missing.includes(d.id));
-          return missing.length > 0 && (
+          const manage = <button className="linklike" onClick={openCustomManager}>Explore → Custom data</button>;
+          const names = (ids: string[]) => ids.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>);
+          return unresolved.length > 0 && (
             <div className="card customwarn">
-              This analysis uses custom data that is not in this browser:{" "}
-              {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}.
-              Uploads are kept in the browser they were made in. Ask for the file (Explore → Custom data → Export)
-              and add it under <button className="linklike" onClick={() => { goTab("explore"); if (!explore) fetchExplore();
-                setChartTab("custom"); setTimeout(() => addChartDialog.current?.showModal(), 0); }}>Explore → Custom data</button>{" "}
-              with the same name, so it gets the same id.
+              {locked.length > 0 && <p style={{ margin: 0 }}>This analysis uses server-stored custom data ({names(locked)}), which is locked in this browser.
+                Enter this deployment&apos;s access code under {manage}.</p>}
+              {deleted.length > 0 && <p style={{ margin: 0 }}>This analysis is pinned to server custom data that has since been deleted: {names(deleted)}.</p>}
+              {missing.length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data that is not in this browser: {names(missing)}.
+              Local uploads are kept in the browser they were made in. Ask for the file (Explore → Custom data → Export)
+              and add it under {manage} with the same name, so it gets the same id.</p>}
               {demos.length > 0 && <div className="row" style={{ marginTop: "var(--s2)", alignItems: "center" }}>
-                <button className="primary" onClick={async () => { await importExampleData(demos); setError(null); run(doc); }}>
+                <button className="primary" onClick={() => importExampleData(demos)}>
                   Add the demo upload{demos.length > 1 ? "s" : ""} and run</button>
                 <span className="meta">{demos.map((d) => d.name).join(", ")} ships with the Examples gallery</span>
               </div>}
@@ -4748,12 +4783,16 @@ function Latency({ v }: { v: any }) {
       </main>
       {toast && <div className="toast" role="status" onClick={() => setToast(null)}>{toast}</div>}
       <CustomDataDialog focus={cdFocus} onClose={() => setCdFocus(null)}
+        bindings={doc.uploads || []}
+        onRepin={(as, version) => {
+          const d = { ...doc, uploads: (doc.uploads || []).map((b) => b.as === as ? { ...b, version } : b) };
+          setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
+        }}
         demos={DOC_EXAMPLES.flatMap((e) => e.customData || [])}
         onImportDemos={async (ids) => {
           await importExampleData(DOC_EXAMPLES.flatMap((e) => e.customData || []).filter((d) => ids.includes(d.id)));
-          if (tabRef.current === "analysis") { setError(null); run(doc); }
         }}
-        onManage={() => { goTab("explore"); if (!explore) fetchExplore(); setChartTab("custom"); setTimeout(() => addChartDialog.current?.showModal(), 0); }} />
+        onManage={openCustomManager} />
     </>
   );
 }

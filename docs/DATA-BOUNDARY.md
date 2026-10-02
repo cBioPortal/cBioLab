@@ -142,6 +142,18 @@ suite fail. A test that cannot fail is decoration.
   `lib/next-cache.ts` and the Explore route), and they never enter a `?doc=`
   link: a document names `custom:<dataset>/<COLUMN>`, never a value. Covered by
   `test/boundary.test.ts` ("uploaded custom data") and `test/custom-data.test.ts`.
+  **Server-stored custom data** (`lib/custom-store.ts`, `db/migrations/0003`)
+  is the one place this app keeps patient-level values at rest, in the Supabase
+  Postgres beside the artifact tables but in its own tables, reached only through
+  that module. It exists only where `CUSTOM_DATA_ACCESS_CODE` is set; today that
+  code is the whole of access control (one shared principal, `lib/custom-access.ts`),
+  so **anyone holding a deployment's code can read every dataset stored there**.
+  Every row read and write is logged (`custom_data_access_log`), versions are
+  immutable (a trigger), and deletion is a soft delete that pinned analyses report.
+  A request names stored datasets by reference (`customRefs`); the server reads
+  them as the request's principal and then treats them exactly like uploaded rows,
+  so the routing rules above apply unchanged. Per-user and per-group access goes in
+  `canRead`/`canWrite` and the grant table, which exist and are empty.
   One edge, stated: a study flagged aggregate-only by `AGGREGATE_ONLY_STUDIES`
   on an otherwise patient-level connection cannot be given custom data, but
   rows uploaded for another study on that same connection still travel to it

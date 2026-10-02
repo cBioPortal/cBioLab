@@ -12,14 +12,14 @@ export const maxDuration = 120;
 // POST /api/oncoprint?format=bin -> contract as OPB1 binary (cells as typed arrays)
 export async function POST(req: Request) {
   try {
-    const { customData, ...spec } = await req.json();
+    const { customData, customRefs, ...spec } = await req.json();
     const t0 = Date.now();
     const sp = new URL(req.url).searchParams;
     const log: { label: string; sql: string; ms?: number; study?: string }[] = [];
     const provenance = sp.get("provenance") === "1";
     // a provenance request wants the queries this run issues, so it is never answered from the cache
     const contract = await withRequestCustomData(customData, () =>
-      provenance ? buildContract(spec, { log, provenance }) : cachedContract(spec));
+      provenance ? buildContract(spec, { log, provenance }) : cachedContract(spec), { refs: customRefs, req });
     const engineMs = Date.now() - t0;
     const fmt = sp.get("format");
     if (fmt === "svg" || fmt === "tsv") {

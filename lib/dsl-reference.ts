@@ -902,8 +902,14 @@ SQL each cohort compiled to.
 \`\`\`
 { "study":   "<default study id>",            // validated against cancer_study
   "cohorts": { "<name>": cohortDef, ... },    // max 16
-  "views":   [ view, ... ] }                  // max 6
+  "views":   [ view, ... ],                   // max 6
+  "uploads"?: [ { "as": "<name>", "dataset": "<id>", "version": n } ] }  // server-stored custom data, pinned
 \`\`\`
+
+\`uploads\` pins server-stored custom data: every \`custom:<as>/<COLUMN>\` attribute in the document reads that
+dataset at that version, which never changes, so whoever may read it gets the same rows. The web app adds the pin
+the first time an analysis uses a server dataset. A \`custom:\` name with no pin is a local upload, sent by the
+browser that holds it.
 
 Sent to \`POST /api/analysis\`, edited by the researcher's assistant through the page's WebMCP tools, and encoded in shareable
 \`/analysis?doc=<base64url>\` links.
@@ -1315,6 +1321,7 @@ export const AGENT_GRAMMAR = `Document shape:
   "params"?: { "<name>": <any JSON> },   // optional; a value that is EXACTLY "$name" is replaced by it
   "notes"?: "<the analyst's own prose about this workspace>",
   "title"?: "<name, when saved as a workspace>",
+  "uploads"?: [{ "as": "<name>", "dataset": "<id>", "version": n }],  // set by the page: pins server custom data; never write or edit it
   "cohorts": { "<name>": <cohortDef>, ... (max 16) },
   // compare/survival/cox/logistic/clinical/course/oncoprint (only) may carry "splitBy" instead of (or with)
   // "cohorts" — auto-splits one named cohort into several arms, scoped to THIS view only, never added to the

@@ -29,10 +29,10 @@ export async function POST(req: Request) {
 
 async function handle(req: Request) {
   try {
-    const { customData, ...body } = await req.json();
+    const { customData, customRefs, ...body } = await req.json();
     // facets over uploaded data are the uploader's alone: answered directly, never cached
-    if (Array.isArray(customData) && customData.length)
-      return Response.json(await withRequestCustomData(customData, () => ensureChContext(() => exploreFor(body))));
+    if ((Array.isArray(customData) && customData.length) || (Array.isArray(customRefs) && customRefs.length))
+      return Response.json(await withRequestCustomData(customData, () => ensureChContext(() => exploreFor(body)), { refs: customRefs, req }));
     return Response.json(await throughCache(async () => exploreEntry(body, await dataVersion()), () => ensureChContext(() => exploreFor(body))));
   } catch (e) {
     // The reader superseded this request: not a failure, and there is nobody left to tell.

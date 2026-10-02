@@ -2,7 +2,9 @@
 //
 // Kept apart from lib/custom-data.ts because it needs the federation routing, and
 // lib/custom-data.ts is imported by lib/ch.ts, which federation itself imports.
-import { validateCustomData, withCustomData, tsvField, type CustomCtx } from "./custom-data.ts";
+import { validateCustomData, withCustomData, tsvField, type CustomCtx, type CustomDataset } from "./custom-data.ts";
+import { requirePrincipal } from "./custom-access.ts";
+import { loadVersionForRequest } from "./custom-store.ts";
 import { chQueryRows, registerChExternal, withChContext, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { studyRouting, instanceForStudy, resolverFor, isPatientLevel } from "./federation.ts";
@@ -16,8 +18,11 @@ import { peerForStudy } from "./federation-remote.ts";
  * held by a patient-level instance of this deployment: the rows are patient-level data, so a
  * remote peer or an aggregate-only instance is refused outright rather than silently skipped.
  */
-export async function customContext(raw: unknown): Promise<Omit<CustomCtx, "enc">> {
-  const datasets = validateCustomData(raw);
+export async function customContext(raw: unknown, server?: ServerRefs): Promise<Omit<CustomCtx, "enc">> {
+  const fromServer = server ? await loadServerRefs(server) : [];
+  const local = Array.isArray(raw) ? raw : raw == null ? [] : raw;
+  // one validation over both, so the limits, the id rules and "appears twice" hold across them
+  const datasets = validateCustomData(Array.isArray(local) ? [...local, ...fromServer] : local);
   const allowedConns = new Set<string>(), allowedDbs = new Set<string>();
   if (!datasets.length) return { datasets, allowedConns, allowedDbs };
   const studies = new Set(datasets.flatMap((d) => d.rows.map((r) => r.study)));
@@ -36,8 +41,32 @@ export async function customContext(raw: unknown): Promise<Omit<CustomCtx, "enc"
 }
 
 /** Run `fn` with the request's custom data in effect (a no-op when it carries none). */
-export async function withRequestCustomData<T>(raw: unknown, fn: () => Promise<T>): Promise<T> {
-  return withCustomData(await customContext(raw), fn);
+export async function withRequestCustomData<T>(raw: unknown, fn: () => Promise<T>, server?: ServerRefs): Promise<T> {
+  return withCustomData(await customContext(raw, server), fn);
+}
+
+/**
+ * Server-stored datasets a request names instead of carrying: `customRefs` beside its body,
+ * each `{ as, dataset, version }` — the name the document uses, the stored dataset, and the
+ * version it is pinned to. Read as the request's principal (lib/custom-access.ts).
+ */
+export interface ServerRefs { refs: unknown; req: Request }
+export const MAX_REFS = 10;
+
+async function loadServerRefs({ refs, req }: ServerRefs): Promise<CustomDataset[]> {
+  if (refs == null) return [];
+  if (!Array.isArray(refs)) throw new Error("customRefs must be an array of { as, dataset, version }");
+  if (!refs.length) return [];
+  if (refs.length > MAX_REFS) throw new Error("a request names at most " + MAX_REFS + " server datasets; this one names " + refs.length);
+  const principal = requirePrincipal(req);
+  return Promise.all(refs.map(async (r) => {
+    const { as, dataset, version } = (r ?? {}) as { as?: unknown; dataset?: unknown; version?: unknown };
+    if (typeof as !== "string" || typeof dataset !== "string" || !Number.isInteger(version) || (version as number) < 1)
+      throw new Error("each customRefs entry is { as, dataset, version } with a whole-number version");
+    const { meta, rows } = await loadVersionForRequest(principal, dataset, version as number);
+    const v = meta.versions.find((x) => x.version === version)!;
+    return { id: as, name: meta.name, level: meta.level, columns: v.columns, rows };
+  }));
 }
 
 /** a frozen feature resolves every column of a figure, so this matches FEATURE_PATIENT_LIMIT */

@@ -7,7 +7,7 @@
 // whitespace the way the engine does, as a reading aid. The cohort's own count is the engine's.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCustomDatasets } from "./custom-data-panel.tsx";
-import { datasetStudies, datasetToTsv, type StoredDataset } from "./custom-data-client.ts";
+import { datasetStudies, datasetToTsv, fetchServerVersion, serverBySlug, serverState, type StoredDataset, type UploadBinding } from "./custom-data-client.ts";
 import { parseCustomAttr, type CustomDataset } from "../../lib/custom-data-names.ts";
 
 export interface CustomDataFocus {
@@ -68,7 +68,28 @@ function columnStats(d: CustomDataset) {
   });
 }
 
-function DatasetView({ d, clause }: { d: StoredDataset; clause?: CustomDataFocus["clause"] }) {
+/** Where one name the document uses resolves: a pinned server version, a local upload, or the server's latest. */
+function ServerDataset({ id, version, latest, clause, onRepin }: { id: string; version: number; latest: number; clause?: CustomDataFocus["clause"]; onRepin?: () => void }) {
+  const [d, setD] = useState<StoredDataset | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setD(null); setErr(null);
+    fetchServerVersion(id, version).then((x) => { if (alive) setD(x); }, (e) => { if (alive) setErr(String(e?.message || e)); });
+    return () => { alive = false; };
+  }, [id, version]);
+  const pinNote = (
+    <p className="meta" style={{ margin: "0 0 var(--s1)" }}>
+      <span className="customtag">server</span> version {version}{latest > version ? <> · <b>v{latest} is newer</b></> : latest ? " (latest)" : ""}
+      {latest > version && onRepin && <> <button className="linklike" onClick={onRepin}>use v{latest} in this analysis</button></>}
+    </p>
+  );
+  if (err) return <section className="cdview">{pinNote}<p className="error">{err}</p></section>;
+  if (!d) return <section className="cdview">{pinNote}<p className="meta"><span className="spinner" /> loading the stored rows…</p></section>;
+  return <DatasetView d={d} clause={clause} note={pinNote} />;
+}
+
+function DatasetView({ d, clause, note }: { d: StoredDataset; clause?: CustomDataFocus["clause"]; note?: React.ReactNode }) {
   const focusCol = clause ? parseCustomAttr(clause.attribute) : null;
   const colIdx = focusCol && focusCol.dataset === d.id ? d.columns.findIndex((c) => c.name === focusCol.column) : -1;
   const matcher = useMemo(() => colIdx >= 0 && clause ? leafMatcher(clause.leaf as Record<string, any>) : null, [colIdx, clause]);
@@ -97,6 +118,7 @@ function DatasetView({ d, clause }: { d: StoredDataset; clause?: CustomDataFocus
         <span className="spacer" />
         <button className="tbbtn" onClick={download} title="download as a tab-separated file you can upload again">Export</button>
       </div>
+      {note}
       <p className="meta" style={{ margin: "var(--s1) 0 var(--s3)" }}>
         {d.level} level · {d.rows.length.toLocaleString()} {d.level}s in {datasetStudies(d).join(", ")} ·
         added {new Date(d.createdAt).toLocaleDateString()} ·{" "}
@@ -167,9 +189,13 @@ function DatasetView({ d, clause }: { d: StoredDataset; clause?: CustomDataFocus
   );
 }
 
-export default function CustomDataDialog({ focus, onClose, demos, onImportDemos, onManage }: {
+export default function CustomDataDialog({ focus, onClose, demos, onImportDemos, onManage, bindings, onRepin }: {
   focus: CustomDataFocus | null;
   onClose: () => void;
+  /** the document's pins (`uploads`): a pinned name shows that server version */
+  bindings: UploadBinding[];
+  /** move a pin to the server's latest version */
+  onRepin: (as: string, version: number) => void;
   /** gallery demo uploads that ship with the app, offered when one is missing */
   demos: StoredDataset[] | CustomDataset[];
   onImportDemos: (ids: string[]) => void | Promise<void>;
@@ -185,8 +211,15 @@ export default function CustomDataDialog({ focus, onClose, demos, onImportDemos,
     if (!focus && el.open) el.close();
   }, [focus]);
   const ids = focus?.datasets ?? [];
-  const have = ids.map((id) => list.find((d) => d.id === id)).filter((d): d is StoredDataset => !!d);
-  const missing = ids.filter((id) => !list.some((d) => d.id === id));
+  // the same precedence the requests use (custom-data-client.ts attach): a pin, then a local upload, then the server's latest
+  const where = ids.map((id) => {
+    const pin = bindings.find((b) => b.as === id), local = list.find((d) => d.id === id), s = serverBySlug(id);
+    if (pin) return { id, server: { dataset: pin.dataset, version: pin.version, latest: serverState().datasets.find((d) => d.id === pin.dataset)?.latestVersion ?? 0 } };
+    if (local) return { id, local };
+    if (s) return { id, server: { dataset: s.id, version: s.latestVersion, latest: s.latestVersion } };
+    return { id };
+  });
+  const missing = where.filter((w) => !w.local && !w.server).map((w) => w.id);
   const demoMissing = missing.filter((id) => demos.some((d) => d.id === id));
 
   return (
@@ -201,8 +234,9 @@ export default function CustomDataDialog({ focus, onClose, demos, onImportDemos,
         <button className="primary" onClick={() => ref.current?.close()}>Done</button>
       </div>
       <p className="note" style={{ marginTop: "var(--s1)" }}>
-        Stored in this browser only, and sent with each request that names it. The document holds the
-        attribute names, never these values.
+        A local upload is stored in this browser only and sent with each request that names it; a
+        server one is pinned by version and read by the server. Either way the document holds the
+        attribute names (and, for server data, the version), never these values.
       </p>
       {missing.length > 0 && (
         <div className="card customwarn">
@@ -213,7 +247,10 @@ export default function CustomDataDialog({ focus, onClose, demos, onImportDemos,
           </div>}
         </div>
       )}
-      {have.map((d) => <DatasetView key={d.id} d={d} clause={focus?.clause} />)}
+      {where.map((w) => w.local ? <DatasetView key={w.id} d={w.local} clause={focus?.clause} />
+        : w.server ? <ServerDataset key={w.id} id={w.server.dataset} version={w.server.version} latest={w.server.latest} clause={focus?.clause}
+            onRepin={bindings.some((b) => b.as === w.id) ? () => onRepin(w.id, w.server!.latest) : undefined} />
+        : null)}
     </dialog>
   );
 }

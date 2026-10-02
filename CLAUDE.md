@@ -77,6 +77,11 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   ships nothing. `lib/custom-data-server.ts` is the request boundary (patient-level studies only,
   id matching, "save as feature" membership). Results that use uploads bypass the shared cache;
   a document naming an upload the request lacks is refused (`assertCustomDataPresent`).
+  **Server-stored custom data** (`lib/custom-store.ts`, the only module touching its tables;
+  `lib/custom-access.ts`): enabled only where `CUSTOM_DATA_ACCESS_CODE` is set, one shared
+  principal unlocked by that code. A document pins what it uses as `uploads: [{as, dataset,
+  version}]` (added by the page on run); requests send `customRefs` and the server loads the
+  pinned, immutable version. Access control beyond the shared code is not built yet.
 - **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Cohorts /
   Analysis / Examples. The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
   demo pages were retired once the Analysis app subsumed them; `/` now redirects to `/lab`.

@@ -1,16 +1,20 @@
 // Custom data in the browser: where uploads live, how a pasted table becomes a dataset, and how
 // datasets reach the engine.
 //
-// Uploads are kept in this browser's IndexedDB and nowhere else (see lib/custom-data.ts for why
-// the server holds none). They travel as `customData` beside the body of each POST to the
-// engine's routes, attached here by one fetch wrapper so every caller — including the shared
-// OncoprintFigure — sends them without knowing they exist:
+// Two homes. A local upload is kept in this browser's IndexedDB only and travels as rows
+// (`customData`) beside each request. A server upload (lib/custom-store.ts, where the
+// deployment enables it) travels as a reference (`customRefs`: { as, dataset, version }) that
+// the server resolves itself. One fetch wrapper attaches both, so every caller — including the
+// shared OncoprintFigure — sends them without knowing they exist:
 //
-//   /api/explore            every dataset with rows in the studies being explored
+//   /api/explore            every dataset with rows in the studies being explored (a local
+//                           upload shadows a server one of the same name)
 //   /api/analysis, /api/oncoprint, /api/custom-data/members
-//                           only datasets the document or spec actually names, so an analysis
-//                           that uses none stays on the shared result cache
+//                           only datasets the document or spec names, so an analysis that uses
+//                           none stays on the shared result cache. A name the document pins
+//                           (`uploads`, see bindUploads) resolves to that server version.
 import { CUSTOM_PREFIX, LIMITS, type CustomColumn, type CustomDataset, type CustomLevel } from "../../lib/custom-data-names.ts";
+import type { DatasetMeta } from "../../lib/custom-store.ts";
 
 export interface StoredDataset extends CustomDataset {
   createdAt: string;
@@ -45,11 +49,15 @@ async function tx<T>(mode: IDBTransactionMode, f: (s: IDBObjectStore) => IDBRequ
   });
 }
 
-/** Load once per page. A browser without IndexedDB (private mode in some) keeps uploads in memory only. */
+/**
+ * Load once per page: this browser's uploads, and what the server holds. A browser without
+ * IndexedDB (private mode in some) keeps uploads in memory only.
+ */
 export function loadCustomData(): Promise<void> {
   loaded ??= (async () => {
     try { mem = ((await tx("readonly", (s) => s.getAll())) as StoredDataset[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt)); }
     catch { mem = []; }
+    await loadServerData();
     emit();
   })();
   return loaded;
@@ -79,24 +87,158 @@ export function referencedDatasets(x: unknown): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// Server-stored datasets (where this deployment enables them)
+// ---------------------------------------------------------------------------
+
+/** A document's pin: the name it uses -> a stored dataset at one version. */
+export interface UploadBinding { as: string; dataset: string; version: number }
+export interface ServerState { enabled: boolean; unlocked: boolean; datasets: DatasetMeta[]; error?: string }
+
+let server: ServerState = { enabled: false, unlocked: false, datasets: [] };
+export function serverState(): ServerState { return server; }
+
+/** Ask the server what it holds; quietly "not enabled" where it has no such store. */
+export async function loadServerData(): Promise<void> {
+  try {
+    const st = await (await fetch("/api/custom-data/server")).json() as { enabled: boolean; unlocked: boolean };
+    let datasets: DatasetMeta[] = [];
+    if (st.unlocked) {
+      const j = await (await fetch("/api/custom-data/datasets")).json();
+      if (j.error) throw new Error(j.error);
+      datasets = j.datasets;
+    }
+    server = { enabled: !!st.enabled, unlocked: !!st.unlocked, datasets };
+  } catch (e) { server = { ...server, error: String((e as Error)?.message || e) }; }
+  emit();
+}
+
+export async function unlockServer(code: string): Promise<void> {
+  const res = await fetch("/api/custom-data/server", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+  const j = await res.json();
+  if (!res.ok) throw new Error(j.error || res.statusText);
+  await loadServerData();
+}
+export async function lockServer(): Promise<void> {
+  await fetch("/api/custom-data/server", { method: "DELETE" });
+  await loadServerData();
+}
+
+/** Changes whenever what this browser can attach changes: local uploads or server versions. */
+export function customDataKey(): string {
+  return mem.map((d) => d.id).join(",") + "|" + server.datasets.map((d) => d.slug + "@" + d.latestVersion).join(",");
+}
+
+export function serverBySlug(slug: string): DatasetMeta | undefined {
+  return server.datasets.find((d) => d.slug === slug);
+}
+
+async function gzip(text: string): Promise<Blob> {
+  return new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).blob();
+}
+
+/**
+ * Save an upload to the server: a new dataset, or the next version of one (`versionOf`, its
+ * id). A local copy of the same name is then removed, so the name means one thing here.
+ */
+export async function saveToServer(d: StoredDataset, versionOf?: string): Promise<DatasetMeta> {
+  const res = await fetch("/api/custom-data/datasets", { method: "POST", headers: { "Content-Type": "application/gzip" },
+    body: await gzip(JSON.stringify({ dataset: strip(d), source: d.source, versionOf })) });
+  const j = await res.json();
+  if (!res.ok || j.error) throw new Error(j.error || res.statusText);
+  if (mem.some((x) => x.id === d.id)) await deleteCustomDataset(d.id);
+  await loadServerData();
+  return j.dataset as DatasetMeta;
+}
+
+export async function deleteServerDataset(id: string): Promise<void> {
+  const res = await fetch("/api/custom-data/datasets/" + id, { method: "DELETE" });
+  const j = await res.json();
+  if (!res.ok || j.error) throw new Error(j.error || res.statusText);
+  await loadServerData();
+}
+
+const versionCache = new Map<string, StoredDataset>();
+/** One stored version with its rows, for inspecting or exporting (a logged read). */
+export async function fetchServerVersion(id: string, version: number): Promise<StoredDataset & { server: DatasetMeta; version: number }> {
+  const key = id + "@" + version;
+  const hit = versionCache.get(key);
+  if (hit) return hit as StoredDataset & { server: DatasetMeta; version: number };
+  const res = await fetch("/api/custom-data/datasets/" + id + "?version=" + version);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+  const meta = JSON.parse(decodeURIComponent(res.headers.get("X-Custom-Dataset") || "{}")) as DatasetMeta & { version: number };
+  const rows = JSON.parse(await new Response(res.body!.pipeThrough(new DecompressionStream("gzip"))).text());
+  const v = meta.versions.find((x) => x.version === version)!;
+  const out = { id: meta.slug, name: meta.name, level: meta.level, columns: v.columns, rows, createdAt: v.createdAt, source: v.source, server: meta, version };
+  versionCache.set(key, out);
+  return out;
+}
+
+/** The pins of the document on the page, for requests that carry a spec rather than the document. */
+let activeBindings: UploadBinding[] = [];
+export function setActiveBindings(b: UploadBinding[] | undefined): void { activeBindings = Array.isArray(b) ? b : []; }
+
+/**
+ * Pin every server dataset a document names: a name with no pin, no local upload of that name,
+ * and a server dataset of that name gets `{ as, dataset, version: latest }`. Pins the document no
+ * longer uses are dropped. Returns the same object when nothing changes.
+ */
+export function bindUploads<D extends { uploads?: UploadBinding[] }>(doc: D): D {
+  const names = referencedDatasets({ ...doc, uploads: undefined });
+  const kept = (doc.uploads || []).filter((b) => names.includes(b.as));
+  const added: UploadBinding[] = [];
+  for (const as of names) {
+    if (kept.some((b) => b.as === as) || mem.some((d) => d.id === as)) continue;
+    const s = serverBySlug(as);
+    if (s) added.push({ as, dataset: s.id, version: s.latestVersion });
+  }
+  if (!added.length && kept.length === (doc.uploads || []).length) return doc;
+  const uploads = [...kept, ...added];
+  const next = { ...doc } as D;
+  if (uploads.length) next.uploads = uploads; else delete next.uploads;
+  return next;
+}
+
+/** Names a document uses that cannot be resolved here, and why. */
+export function unresolvedUploads(doc: { uploads?: UploadBinding[] }): { as: string; why: "locked" | "missing" | "deleted" }[] {
+  const out: { as: string; why: "locked" | "missing" | "deleted" }[] = [];
+  for (const as of referencedDatasets({ ...doc, uploads: undefined })) {
+    const pin = (doc.uploads || []).find((b) => b.as === as);
+    if (pin) {
+      if (!server.unlocked) out.push({ as, why: "locked" });
+      else if (!server.datasets.some((d) => d.id === pin.dataset)) out.push({ as, why: "deleted" });
+    } else if (!mem.some((d) => d.id === as) && !serverBySlug(as)) out.push({ as, why: server.enabled && !server.unlocked ? "locked" : "missing" });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // The fetch wrapper
 // ---------------------------------------------------------------------------
 
 const strip = (d: StoredDataset): CustomDataset => ({ id: d.id, name: d.name, level: d.level, columns: d.columns, rows: d.rows });
 
 function attach(path: string, body: string): string | null {
-  if (!mem.length) return null;
-  let picked: StoredDataset[];
+  const j = JSON.parse(body) as { studies?: string[]; study?: string; uploads?: UploadBinding[] };
+  const local: StoredDataset[] = [], refs: UploadBinding[] = [];
   if (path === "/api/explore") {
-    const j = JSON.parse(body) as { studies?: string[]; study?: string };
     const studies = new Set([...(j.studies || []), ...(j.study ? [j.study] : [])]);
-    picked = mem.filter((d) => d.rows.some((r) => studies.has(r.study)));
+    local.push(...mem.filter((d) => d.rows.some((r) => studies.has(r.study))));
+    for (const s of server.datasets) {
+      const v = s.versions.find((x) => x.version === s.latestVersion);
+      if (!mem.some((d) => d.id === s.slug) && v && v.studies.some((st) => studies.has(st)))
+        refs.push({ as: s.slug, dataset: s.id, version: s.latestVersion });
+    }
   } else {
-    const ids = new Set(referencedDatasets(body));
-    picked = mem.filter((d) => ids.has(d.id));
+    const pins = Array.isArray(j.uploads) ? j.uploads : activeBindings;
+    for (const as of referencedDatasets({ ...j, uploads: undefined })) {
+      const pin = pins.find((b) => b.as === as), here = mem.find((d) => d.id === as), s = serverBySlug(as);
+      if (pin) refs.push(pin);
+      else if (here) local.push(here);
+      else if (s) refs.push({ as, dataset: s.id, version: s.latestVersion });
+    }
   }
-  if (!picked.length) return null;
-  return JSON.stringify({ ...JSON.parse(body), customData: picked.map(strip) });
+  if (!local.length && !refs.length) return null;
+  return JSON.stringify({ ...j, ...(local.length ? { customData: local.map(strip) } : {}), ...(refs.length ? { customRefs: refs } : {}) });
 }
 
 let installed = false;
