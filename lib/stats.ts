@@ -245,14 +245,18 @@ export function coxRegression(rows: CoxRow[]): CoxFit {
     const delta = solveLinear(s.hess.map((r) => [...r]), s.grad);
     // step-halve if the update overshoots into a worse likelihood — Newton-Raphson on a
     // partial likelihood is usually well-behaved, but a large first step from beta=0 with a
-    // small or separated sample can overshoot
+    // small or separated sample can overshoot. A drop no bigger than the rounding error in
+    // summing the likelihood is not an overshoot: near the optimum a real step changes it by
+    // less than that, and halving would stall the fit short of the optimum.
+    const noise = 1e-12 * Math.abs(s.ll);
     let step = 1, next = beta.map((b, a) => b + delta[a]);
     for (let tries = 0; tries < 10; tries++) {
       const llNext = coxScore(rows, next).ll;
-      if (llNext >= s.ll || tries === 9) { ll = llNext; break; }
+      if (llNext >= s.ll - noise || tries === 9) { ll = llNext; break; }
       step /= 2; next = beta.map((b, a) => b + step * delta[a]);
     }
-    const converged = Math.max(...delta.map((d) => Math.abs(d) * step)) < 1e-7;
+    // converged when the full Newton step is negligible, whatever fraction of it was taken
+    const converged = Math.max(...delta.map((d) => Math.abs(d))) < 1e-10;
     beta = next;
     if (converged) { iterations++; break; }
   }
@@ -328,13 +332,15 @@ export function logisticRegression(rows: LogisticRow[]): LogisticFit {
   for (; iterations < 50; iterations++) {
     const s = logisticScore(aug, beta);
     const delta = solveLinear(s.info.map((r) => [...r]), s.grad);
+    // same step acceptance and convergence rule as coxRegression, for the same reasons
+    const noise = 1e-12 * Math.abs(s.ll);
     let step = 1, next = beta.map((b, a) => b + delta[a]);
     for (let tries = 0; tries < 10; tries++) {
       const llNext = logisticScore(aug, next).ll;
-      if (llNext >= s.ll || tries === 9) break;
+      if (llNext >= s.ll - noise || tries === 9) break;
       step /= 2; next = beta.map((b, a) => b + step * delta[a]);
     }
-    const converged = Math.max(...delta.map((d) => Math.abs(d) * step)) < 1e-7;
+    const converged = Math.max(...delta.map((d) => Math.abs(d))) < 1e-10;
     beta = next;
     if (converged) { iterations++; break; }
   }
