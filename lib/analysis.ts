@@ -33,7 +33,7 @@ import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
-import { coxMethod, logisticMethod, type CoxTrace } from "./method.ts";
+import { coxMethod, logisticMethod, survivalMethod, type CoxTrace } from "./method.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -630,6 +630,29 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         participation: participationFor(vStudies, false),
         ...(logrank ? { logrank } : {}), ...(logrankPooled ? { logrankPooled } : {}),
         ...(logrankK ? { logrankK } : {}), ...(logrankKPooled ? { logrankKPooled } : {}),
+        method: survivalMethod({
+          endpoint, monthsColumn: columns ? columns.months : endpoint + "_MONTHS", statusColumn: columns ? columns.status : endpoint + "_STATUS",
+          queryLabel: "survivalCounts:" + endpoint + (anchor ? "@" + anchor.eventType : ""),
+          ...(anchor ? { anchor: anchor.occurrence!.toLowerCase() + " " + anchor.eventType + (anchor.key ? " where " + anchor.key + "=" + anchor.value : "") } : {}),
+          ...(cutoffMonths != null ? { cutoffMonths } : {}), beyondCutoff, display,
+          cohorts: curvesRaw.map((c) => ({
+            name: c.cohort, n: c.n, events: c.events, median: c.median,
+            perStudy: [...perSite.get(c.cohort)!.entries()].map(([st, rows]) => ({
+              study: st, cohortPatients: cohorts[c.cohort].perStudy[st]?.count || 0,
+              patients: rows.reduce((k, r) => k + r.n, 0), rows: rows.length })),
+          })),
+          counts: vNames.flatMap((n) => [...perSite.get(n)!.entries()].flatMap(([st, rows]) =>
+            rows.map((r) => ({ cohort: n, study: st, months: r.months, event: r.event, n: r.n, ...(r.entry != null ? { entry: r.entry } : {}) })))),
+          test: logrank
+            ? { kind: "logrank", stratified: !!logrankPooled, strata: logrank.strata, chi2: logrank.chi2, df: logrank.df, p: logrank.p,
+                ...(logrankPooled ? { pooled: { chi2: logrankPooled.chi2, p: logrankPooled.p } } : {}) }
+            : logrankK
+              ? { kind: "logrankK", stratified: !!logrankKPooled, strata: logrankK.strata, chi2: logrankK.chi2, df: logrankK.df, p: logrankK.p,
+                  ...(logrankKPooled ? { pooled: { chi2: logrankKPooled.chi2, p: logrankKPooled.p } } : {}) }
+              : { kind: "none", reason: thinArms.length
+                  ? "Refused: " + thinArms.join(", ") + (thinArms.length === 1 ? " has" : " have") + " fewer than " + MIN_ARM_N + " patients."
+                  : "A log-rank test needs at least two cohorts." },
+        }),
         caveat: (display === "incidence"
           ? "Cumulative incidence (1 - survival) shown, not survival. "
           : "") +

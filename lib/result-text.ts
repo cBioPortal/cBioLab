@@ -57,7 +57,7 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         `  ${c.cohort}: median ${c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n=${c.n}, ${c.events} events${c.missing ? ", " + c.missing + " missing OS" : ""})`).join("\n") +
         (v.logrank ? `\n  log-rank p=${pFmt(v.logrank.p)}${v.logrank.strata > 1 ? " (stratified by study)" : ""}`
           : v.logrankK ? `\n  k-group log-rank p=${pFmt(v.logrankK.p)}` : "") +
-        "\nCAVEAT (tell the user): " + v.caveat);
+        "\nCAVEAT (tell the user): " + v.caveat + methodOf(v));
     } else if (v.kind === "cox") {
       // stratifyByCohort: no pooled coefficients — one independent fit per cohort instead.
       out.push(v.cox!.byCohort

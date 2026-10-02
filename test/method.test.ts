@@ -3,7 +3,7 @@
 // codes each term the way the fit did.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { coxMethod, logisticMethod, type CoxTrace, type LogisticTrace } from "../lib/method.ts";
+import { coxMethod, logisticMethod, survivalMethod, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
 import type { CoxCovariate } from "../lib/types.ts";
 
 const tp53: CoxCovariate = { source: "alteration", gene: "TP53", by: "mutated" };
@@ -126,5 +126,66 @@ describe("logisticMethod", () => {
     assert.match(m.steps.find((s) => s.title === "Code the outcome")!.detail, /already coded 0\/1/);
     assert.match(m.python, /y = df\["y"\]\.astype\(int\)/);
     assert.match(m.python, /dtype=\{"c0": str\}/);
+  });
+});
+
+describe("survivalMethod", () => {
+  const trace = (over: Partial<SurvivalTrace> = {}): SurvivalTrace => ({
+    endpoint: "OS", monthsColumn: "OS_MONTHS", statusColumn: "OS_STATUS", queryLabel: "survivalCounts:OS",
+    beyondCutoff: 0, display: "survival",
+    cohorts: [
+      { name: "A, mutant", n: 3, events: 2, median: 5, perStudy: [{ study: "s1", cohortPatients: 4, patients: 3, rows: 2 }] },
+      { name: "B", n: 2, events: 1, median: null, perStudy: [{ study: "s1", cohortPatients: 2, patients: 2, rows: 2 }] },
+    ],
+    counts: [
+      { cohort: "A, mutant", study: "s1", months: 5, event: 1, n: 2 }, { cohort: "A, mutant", study: "s1", months: 9, event: 0, n: 1 },
+      { cohort: "B", study: "s1", months: 4, event: 1, n: 1 }, { cohort: "B", study: "s1", months: 12, event: 0, n: 1 },
+    ],
+    test: { kind: "logrank", stratified: false, strata: 1, chi2: 1.2345, df: 1, p: 0.27 },
+    ...over,
+  });
+
+  test("one fetch step per cohort and study, with patients in and out", () => {
+    const m = survivalMethod(trace());
+    const fetches = m.steps.filter((s) => s.kind === "fetch");
+    assert.deepEqual(fetches.map((s) => s.scope), ["A, mutant · s1", "B · s1"]);
+    assert.match(fetches[0].detail, /1 cohort patient had no OS_MONTHS value/);
+    assert.equal(fetches[0].rowsOut, 3);
+  });
+
+  test("the script carries the counts, quoting a cohort name with a comma, and expands them to patients", () => {
+    const m = survivalMethod(trace());
+    assert.match(m.python, /cohort,study,months,event,n\n"A, mutant",s1,5,1,2\n/);
+    assert.match(m.python, /counts\.index\.repeat\(counts\["n"\]\)/);
+    assert.match(m.python, /survdiff\(df\["months"\], df\["event"\], df\["cohort"\]\)/);
+    assert.match(m.python, /chi2_dist\.sf\(chi2, 1\)/);
+  });
+
+  test("a stratified test runs both the stratified and the pooled log-rank", () => {
+    const m = survivalMethod(trace({ test: { kind: "logrank", stratified: true, strata: 2, chi2: 3, df: 1, p: 0.08, pooled: { chi2: 5, p: 0.02 } } }));
+    assert.match(m.steps.at(-1)!.title, /stratified by study/);
+    assert.match(m.python, /strata=df\["study"\]/);
+    assert.match(m.python, /log-rank, pooled/);
+  });
+
+  test("a refused test says why, and the script fits only the curves", () => {
+    const m = survivalMethod(trace({ test: { kind: "none", reason: "Refused: B (n=2) has fewer than 10 patients." } }));
+    assert.equal(m.steps.at(-1)!.title, "No log-rank test");
+    assert.doesNotMatch(m.python, /survdiff\(/);
+  });
+
+  test("delayed entry reaches both the fit and the test", () => {
+    const m = survivalMethod(trace({ anchor: "first Treatment",
+      counts: trace().counts.map((r) => ({ ...r, entry: 1 })) }));
+    assert.match(m.steps.find((s) => s.title.startsWith("Estimate"))!.detail, /delayed entry: re-anchored to first Treatment/);
+    assert.match(m.python, /entry=g\["entry"\]/);
+    assert.match(m.python, /entry=df\["entry"\]/);
+  });
+
+  test("past the inline limit the script names a file to export instead of embedding the table", () => {
+    const big = Array.from({ length: INLINE_ROWS_MAX + 1 }, (_, i) => ({ cohort: "A, mutant", study: "s1", months: i, event: 0, n: 1 }));
+    const m = survivalMethod(trace({ counts: big }));
+    assert.match(m.python, /too many to include here: export them as survival_counts\.csv/);
+    assert.doesNotMatch(m.python, /io\.StringIO/);
   });
 });
