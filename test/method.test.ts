@@ -3,7 +3,7 @@
 // codes each term the way the fit did.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
 import type { CoxCovariate } from "../lib/types.ts";
 
 const tp53: CoxCovariate = { source: "alteration", gene: "TP53", by: "mutated" };
@@ -280,5 +280,24 @@ describe("clinicalMethod", () => {
     assert.match(m.python, /anova_generic\(/);
     assert.doesNotMatch(m.python, /^from scipy\.stats import\s*$/m);
     assert.doesNotMatch(m.python, /kruskal|mannwhitneyu/);
+  });
+});
+
+describe("coexpressionMethod", () => {
+  const sums = [{ study: "s1", a: "ERBB2", b: "GRB7", n: 50, sx: 1, sy: 2, sxy: 40, sxx: 49, syy: 52 },
+    { study: "s2", a: "ERBB2", b: "GRB7", n: 30, sx: -1, sy: 0, sxy: 20, sxx: 29, syy: 31 }];
+  test("one study: Pearson from the sums, then BH on its p", () => {
+    const m = coexpressionMethod({ cohort: "C", profileType: "mrna_z", cohortPatients: [{ study: "s1", patients: 60 }], sums: sums.slice(0, 1), pairs: 1, tested: 1 });
+    assert.deepEqual(m.steps.map((s) => s.title), ["Sum each gene pair's values", "Pearson correlation per pair", "Benjamini–Hochberg across pairs"]);
+    assert.doesNotMatch(m.python, /combine_effects/);
+    assert.match(m.python, /p = tested\["p"\]/);
+  });
+  test("several studies: summed for the pooled r, and a fixed-effect Fisher-z meta-analysis is the p that is corrected", () => {
+    const m = coexpressionMethod({ cohort: "C", profileType: "mrna_z", cohortPatients: [{ study: "s1", patients: 60 }, { study: "s2", patients: 40 }], sums, pairs: 1, tested: 1 });
+    assert.ok(m.steps.some((s) => s.title === "Add the six sums across studies"));
+    assert.match(m.steps.find((s) => s.title === "Fisher-z meta-analysis across studies")!.detail, /weighted by n − 3/);
+    assert.match(m.python, /combine_effects\(z, var/);
+    assert.match(m.python, /row\.update\(r_meta=None, p_meta=1\.0\)/);
+    assert.match(m.python, /p = tested\["p_meta"\]\.fillna\(tested\["p"\]\)/);
   });
 });

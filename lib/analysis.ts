@@ -14,7 +14,7 @@ import { geneSymbols } from "./gene-tracks.ts";
 import type { PlotView } from "./types.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
 import { fisherExact, kaplanMeier, logRank, logRankK, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
-  chiSquareTest, welchT, welchAnovaTest, varianceFromMoments, pearsonFromMoments, regressionFromMoments, fisherZMeta,
+  chiSquareTest, welchT, welchAnovaTest, varianceFromMoments, pearsonFromMoments, pearsonR, regressionFromMoments, fisherZMeta,
   applyCutoff, toIncidence, coxRegression, logisticRegression, mannWhitneyU, kruskalWallis, quantilesFromHistogram,
   type Moments, type CoxRow, type LogisticRow } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
@@ -33,7 +33,7 @@ import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
-import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, type CoxTrace } from "./method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, type CoxTrace } from "./method.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -1562,7 +1562,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         const row: CoexprRow = { a, b, r: pooled.r, n: pooled.n, p: pooled.p, q: 1 };
         if (parts.length > 1) {
           const per = parts.map(({ st, m }) => ({ study: st, ...pearsonFromMoments(m) }));
-          const meta = fisherZMeta(per.map((x) => ({ r: x.r, n: x.n })));
+          // the meta-analysis takes each study's exact r; the r shown per study is rounded
+          const meta = fisherZMeta(parts.map(({ m }) => ({ r: pearsonR(m), n: m.n })));
           row.perStudy = per.map((x) => ({ study: x.study, r: x.r, n: x.n }));
           row.rMeta = meta.r; row.pMeta = meta.p; row.sites = meta.sites;
         }
@@ -1572,6 +1573,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       benjaminiHochberg(tested.map((r) => r.pMeta ?? r.p)).forEach((q, i) => { tested[i].q = q; });
       rows.sort((x, y) => Math.abs(y.r ?? 0) - Math.abs(x.r ?? 0));
       views.push({ kind: "coexpression", cohorts: [cn], coexpression: rows, studies: cohorts[cn].studies,
+        method: coexpressionMethod({
+          cohort: cn, profileType, pairs: pairs.length, tested: tested.length,
+          cohortPatients: [...sites].sort().map((st) => ({ study: st, patients: cohorts[cn].perStudy[st]?.count || 0 })),
+          sums: [...sites].sort().flatMap((st) => (byStudy.get(st) || []).filter((m) => m.n > 0)
+            .map((m) => ({ study: st, a: m.a, b: m.b, n: m.n, sx: m.sx, sy: m.sy, sxy: m.sxy, sxx: m.sxx, syy: m.syy }))),
+        }),
         participation: participationFor(cohorts[cn].studies, false),
         note: "Pearson correlation on “" + profileType + "” within “" + cn + "”, over the patients with BOTH values" +
           " (values averaged per patient, matching the heatmap convention). Each site reports six sums — n, Σx, Σy," +

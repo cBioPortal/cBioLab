@@ -828,14 +828,19 @@ export function regressionFromMoments(m: Moments): Regression {
   return { slope, intercept: (sy - slope * sx) / n };
 }
 
-export function pearsonFromMoments(m: Moments): Correlation {
+/** Pearson's r from the six sums, unrounded — null where it is undefined (n < 3, or a constant series). */
+export function pearsonR(m: Moments): number | null {
   const { n, sx, sy, sxy, sxx, syy } = m;
-  if (n < 3) return { r: null, n, t: 0, df: 0, p: 1 };
-  const cov = n * sxy - sx * sy;
+  if (n < 3) return null;
   const vx = n * sxx - sx * sx, vy = n * syy - sy * sy;
-  if (vx <= 0 || vy <= 0) return { r: null, n, t: 0, df: 0, p: 1 };  // a constant series has no correlation
-  let r = cov / Math.sqrt(vx * vy);
-  r = Math.max(-1, Math.min(1, r));
+  if (vx <= 0 || vy <= 0) return null;  // a constant series has no correlation
+  return Math.max(-1, Math.min(1, (n * sxy - sx * sy) / Math.sqrt(vx * vy)));
+}
+
+export function pearsonFromMoments(m: Moments): Correlation {
+  const n = m.n;
+  const r = pearsonR(m);
+  if (r == null) return { r: null, n, t: 0, df: 0, p: 1 };
   const df = n - 2;
   const t = r === 1 || r === -1 ? Infinity : r * Math.sqrt(df / (1 - r * r));
   return {
