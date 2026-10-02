@@ -3,7 +3,7 @@
 // codes each term the way the fit did.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, diffexprMethod, GSEA_NULL_PY, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
 import type { CoxCovariate } from "../lib/types.ts";
 
 const tp53: CoxCovariate = { source: "alteration", gene: "TP53", by: "mutated" };
@@ -268,7 +268,7 @@ describe("clinicalMethod", () => {
       "Welch's t-test for each numeric attribute", "Mann–Whitney U alongside", "Benjamini–Hochberg across attributes"]);
     assert.deepEqual(m.steps[2].params, [["BOGUS", "not declared by s1"]]);
     assert.match(m.python, /from scipy\.stats import chi2_contingency, mannwhitneyu, ttest_ind_from_stats/);
-    assert.match(m.python, /m\["var"\] = \(m\["sumsq"\] - m\["sum"\] \*\* 2 \/ m\["n"\]\) \/ \(m\["n"\] - 1\)/);
+    assert.match(m.python, /m\["var"\] = \(\(m\["sumsq"\] - m\["sum"\] \*\* 2 \/ m\["n"\]\) \/ \(m\["n"\] - 1\)\)\.clip\(lower=0\)/);
     assert.match(m.python, /np\.repeat\(h\["value"\]/);
   });
 
@@ -299,5 +299,25 @@ describe("coexpressionMethod", () => {
     assert.match(m.python, /combine_effects\(z, var/);
     assert.match(m.python, /row\.update\(r_meta=None, p_meta=1\.0\)/);
     assert.match(m.python, /p = tested\["p_meta"\]\.fillna\(tested\["p"\]\)/);
+  });
+});
+
+describe("diffexprMethod", () => {
+  const base = { profileType: "mrna_z", log2: false, groups: ["A", "B"] as [string, string], minN: 3, tested: 2, skipped: 1,
+    perSite: [{ cohort: "A", study: "s1", cohortPatients: 10 }, { cohort: "B", study: "s1", cohortPatients: 12 }],
+    moments: [{ cohort: "A", gene: "ESR1", n: 10, sx: 5, sxx: 9 }, { cohort: "B", gene: "ESR1", n: 12, sx: 20, sxx: 40 }] };
+  test("Welch per gene with the same no-variance rule and a clamped variance, then BH", () => {
+    const m = diffexprMethod(base);
+    assert.deepEqual(m.steps.map((s) => s.title), ["Sum every gene's values", "Sum every gene's values", "Leave out genes that cannot be tested",
+      "Welch's t-test per gene", "Benjamini–Hochberg across genes"]);
+    assert.match(m.python, /1e-9 \* \(1 \+ g\["mean_a"\] \*\* 2 \+ g\["mean_b"\] \*\* 2\)/);
+    assert.match(m.python, /\.clip\(lower=0\)/);
+    assert.doesNotMatch(m.python, /preranked_gsea/);
+  });
+  test("with enrichment, the script carries the seeded-null port verbatim and the sets that were tested", () => {
+    const m = diffexprMethod({ ...base, gsea: { sets: [{ name: "HALLMARK_X", genes: ["ESR1", "PGR"] }], tested: 1, skipped: [], permutations: 1000, minSize: 10 } });
+    assert.ok(m.python.includes(GSEA_NULL_PY.trimEnd()));
+    assert.match(m.python, /HALLMARK_X/);
+    assert.match(m.python, /preranked_gsea\(ranked, sets, permutations=1000, min_size=10\)/);
   });
 });

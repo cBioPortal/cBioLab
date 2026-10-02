@@ -19,6 +19,7 @@ import { fisherExact, benjaminiHochberg, varianceFromMoments, welchT, preRankedG
   aalenJohansen, cifAt, grayPermutationTest, kaplanMeier, quantilesFromHistogram, type CrRecord } from "./stats.ts";
 import { geneSymbols } from "./gene-tracks.ts";
 import { viewToSvg } from "./view-svg.ts";
+import { diffexprMethod } from "./method.ts";
 
 export interface EvaluatedCohort {
   studies: string[];
@@ -512,10 +513,12 @@ async function diffexprView(view: DiffexprView, ctx: ViewCtx): Promise<ViewResul
 
   // enrichment: rank by t, best (higher in the first cohort) first
   let gsea: NonNullable<ViewResult["diffexpr"]>["gsea"];
+  let gseaSets: { name: string; genes: string[] }[] | undefined;
   if (!setNames || setNames.length) {
     const meta = ok[Object.keys(ok)[0]];
     const rows = await meta.moreMeta("diffexpr:genesets", (_s, d) => genesetMembersSql(setNames || [], setNames ? null : "HALLMARK_", d));
     const found = rows.map((r) => ({ name: String(r.set_name), genes: (r.genes as unknown as string[]).map(String) }));
+    gseaSets = found;
     const absent = (setNames || []).filter((x) => !found.some((f) => f.name === x));
     if (absent.length) return refuse("diffexpr", ctx, "no MSigDB set named " + absent.slice(0, 3).join(", ") + " in this warehouse" +
       " (it holds the collections as named in MSigDB, e.g. HALLMARK_E2F_TARGETS, KEGG_…, REACTOME_…)");
@@ -532,6 +535,14 @@ async function diffexprView(view: DiffexprView, ctx: ViewCtx): Promise<ViewResul
   const multi = ctx.vStudies.length > 1;
   return {
     kind: "diffexpr", cohorts: vNames,
+    method: diffexprMethod({
+      profileType, log2, groups: [A, B], minN: DE_MIN_N, tested: tested.length, skipped,
+      perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
+        .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+      moments: [...moments].map(([k, m]) => ({ cohort: k.slice(0, k.indexOf("|")), gene: k.slice(k.indexOf("|") + 1), n: m.n, sx: m.sx, sxx: m.sxx }))
+        .sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.gene < y.gene ? -1 : x.gene > y.gene ? 1 : 0)),
+      ...(gsea && gseaSets ? { gsea: { sets: gseaSets, tested: gsea.sets.length, skipped: gsea.skipped, permutations: DE_PERMUTATIONS, minSize: 10 } } : {}),
+    }),
     diffexpr: { profileType, log2, effectLabel, groups: [A, B], tested: tested.length, skipped, up, down,
       points, grid: { xMax, yMax, nx, ny, cells }, pooledSignificant: sig.length - points.filter((g) => g.q < 0.05).length,
       labels, ...(gsea ? { gsea } : {}), ...(excluded.length ? { excluded } : {}) },
