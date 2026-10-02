@@ -21,7 +21,7 @@ import CustomDataPanel, { useCustomDatasets } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import type { OnCustomData } from "./pills";
 import { installCustomDataFetch, customDatasets, saveCustomDataset, referencedDatasets, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
-import { isCustomAttr, attributeLabel } from "../../lib/custom-data-names.ts";
+import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -4778,15 +4778,19 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
   onHeatmap: (next: { profileType: string; genes?: string[] }[]) => void;
   onDerived: (next: string[]) => void;
 }) {
-  const [tab, setTab] = useState<"clinical" | "heatmap" | "cohorts">("clinical");
+  const [tab, setTab] = useState<"clinical" | "custom" | "heatmap" | "cohorts">("clinical");
   const [q, setQ] = useState("");
   const match = (s: string) => s.toLowerCase().includes(q.trim().toLowerCase());
   const heatOptions = ["VAF", ...profiles];
-  const chosen = tab === "clinical" ? clinical : tab === "heatmap" ? heatmap.map((h) => h.profileType) : derivedCohorts;
-  const shown = (tab === "clinical" ? attrs.map((a) => a.attribute) : tab === "heatmap" ? heatOptions : cohorts).filter(match);
-  const cap = tab === "clinical" ? 8 : tab === "heatmap" ? 4 : 3;
+  // uploads get their own tab, but they are clinical tracks to the engine: one list, one cap of 8
+  const studyAttrs = attrs.filter((a) => !isCustomAttr(a.attribute)), customAttrs = attrs.filter((a) => isCustomAttr(a.attribute));
+  const isClin = tab === "clinical" || tab === "custom";
+  const chosen = isClin ? clinical : tab === "heatmap" ? heatmap.map((h) => h.profileType) : derivedCohorts;
+  const shown = (tab === "clinical" ? studyAttrs.map((a) => a.attribute) : tab === "custom" ? customAttrs.map((a) => a.attribute)
+    : tab === "heatmap" ? heatOptions : cohorts).filter((n) => match(n) || match(attributeLabel(n)));
+  const cap = isClin ? 8 : tab === "heatmap" ? 4 : 3;
   const toggle = (name: string) => {
-    if (tab === "clinical") onClinical(clinical.includes(name) ? clinical.filter((x) => x !== name) : clinical.length < 8 ? [...clinical, name] : clinical);
+    if (isClin) onClinical(clinical.includes(name) ? clinical.filter((x) => x !== name) : clinical.length < 8 ? [...clinical, name] : clinical);
     else if (tab === "heatmap") onHeatmap(chosen.includes(name) ? heatmap.filter((h) => h.profileType !== name) : heatmap.length < 4 ? [...heatmap, { profileType: name }] : heatmap);
     else onDerived(derivedCohorts.includes(name) ? derivedCohorts.filter((x) => x !== name) : derivedCohorts.length < 3 ? [...derivedCohorts, name] : derivedCohorts);
   };
@@ -4799,7 +4803,9 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
       <summary className="tbbtn" title="add or remove tracks">tracks{chosen.length ? " (" + chosen.length + ")" : ""}</summary>
       <div className="gearmenu-items wide" style={{ minWidth: 340 }}>
         <div className="row" style={{ gap: "0.5rem", alignItems: "center" }}>
-          <button className="linklike" style={{ fontWeight: tab === "clinical" ? 600 : 400 }} onClick={() => setTab("clinical")}>Clinical {attrs.length ? "(" + attrs.length + ")" : ""}</button>
+          <button className="linklike" style={{ fontWeight: tab === "clinical" ? 600 : 400 }} onClick={() => setTab("clinical")}>Clinical {studyAttrs.length ? "(" + studyAttrs.length + ")" : ""}</button>
+          <button className="linklike" style={{ fontWeight: tab === "custom" ? 600 : 400 }} onClick={() => setTab("custom")}
+            title="attributes from your uploads (Explore → Custom data)">Custom ({customAttrs.length})</button>
           <button className="linklike" style={{ fontWeight: tab === "heatmap" ? 600 : 400 }} onClick={() => setTab("heatmap")}>Heatmap ({heatOptions.length})</button>
           <button className="linklike" style={{ fontWeight: tab === "cohorts" ? 600 : 400 }} onClick={() => setTab("cohorts")}>Cohort rows ({cohorts.length})</button>
           <span className="spacer" />
@@ -4807,20 +4813,23 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
         </div>
         <span className="meta">{chosen.length} of {cap} chosen{
           tab === "clinical" ? " · cases with data, most first"
+          : tab === "custom" ? " · your uploads, kept in this browser; they share the 8 clinical tracks"
           : tab === "heatmap" ? " · a profile draws one row per gene; leave the genes blank to follow the figure"
           : " · any cohort in this document can be a binary row (patients only, one study)"}</span>
         <div style={{ maxHeight: 260, overflowY: "auto", marginTop: "0.3rem" }}>
           {!shown.length && (loading && !attrs.length ? <Waiting what="tracks" />
-            : <span className="meta">{q.trim() ? "nothing matches" : "nothing to choose from"}</span>)}
+            : <span className="meta">{q.trim() ? "nothing matches"
+              : tab === "custom" ? "no uploads for this study in this browser: add one under Explore → Custom data" : "nothing to choose from"}</span>)}
           {shown.map((name) => {
             const on = chosen.includes(name);
-            const a = tab === "clinical" ? attrs.find((x) => x.attribute === name) : undefined;
+            const a = isClin ? attrs.find((x) => x.attribute === name) : undefined;
             const h = tab === "heatmap" && on ? heatmap.find((x) => x.profileType === name) : undefined;
             return (
               <div key={name}>
                 <label className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "baseline", padding: "0.1rem 0" }}>
                   <input type="checkbox" checked={on} disabled={busy || (!on && chosen.length >= cap)} onChange={() => toggle(name)} />
-                  <span style={{ flex: 1 }}>{name === "VAF" ? "VAF (mutation allele fraction)" : attributeLabel(name)}{a?.kind === "num" ? " (numeric)" : ""}</span>
+                  <span style={{ flex: 1 }} title={tab === "custom" ? name : undefined}>{name === "VAF" ? "VAF (mutation allele fraction)" : attributeLabel(name, tab === "custom" ? "short" : "long")}{a?.kind === "num" ? " (numeric)" : ""}
+                    {tab === "custom" && <span className="meta"> · {parseCustomAttr(name)?.dataset}</span>}</span>
                   {a && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
                 </label>
                 {h && <input defaultValue={(h.genes || []).join(" ")} placeholder="genes for this profile — blank follows the figure"
