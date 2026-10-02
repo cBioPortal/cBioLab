@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import CohortPills, { normalizeDef } from "./pills";
 import { MORE_KINDS, isMoreKind, moreSub, MoreControls, defaultMoreView } from "./more-views";
@@ -410,6 +410,7 @@ export default function AnalysisPage() {
   const [cDefText, setCDefText] = useState(JSON.stringify({ studies: [...DEFAULT_EXPLORE_STUDIES], all: [] }, null, 2));
   const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
   const [studies, setStudies] = useState<{ id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string }[]>([]);
+  const studyNames = useMemo(() => new Map(studies.map((s) => [s.id, s.name] as const)), [studies]);
   const [study, setStudy] = useState("msk_chord_2024");
   const [explore, setExplore] = useState<ExploreResult | null>(null);
   const [exploreBusy, setExploreBusy] = useState(false);
@@ -1983,6 +1984,24 @@ function PickMenu({ label, title, options, chosen, onChange, min, max, busy, loa
         })}
       </div>
     </details>
+  );
+}
+
+/**
+ * Which studies a cohort was evaluated in, on one line: the first study's name, and past one a
+ * count of the rest that stays visible however long that name is. The tooltip lists every
+ * study's id and name.
+ */
+function CohortStudies({ ids, names }: { ids: string[]; names: Map<string, string> }) {
+  if (!ids.length) return null;
+  const more = ids.length - 1;
+  const title = (more ? ids.length.toLocaleString() + " studies:\n" : "") +
+    ids.map((id) => names.get(id) ? id + " — " + names.get(id) : id).join("\n");
+  return (
+    <div className="cohortbox-studies meta" title={title}>
+      <span className="cohortbox-study">{names.get(ids[0]) || ids[0]}</span>
+      {more > 0 && <span className="cohortbox-more">+{more.toLocaleString()} more {more === 1 ? "study" : "studies"}</span>}
+    </div>
   );
 }
 
@@ -3718,6 +3737,8 @@ function Latency({ v }: { v: any }) {
                         <span className="qchip"><span className="qletter" style={{ color: CAT_COLORS[i % CAT_COLORS.length] }}>■</span>{n}</span>
                         <strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span>
                       </div>
+                      <CohortStudies ids={c.studies && c.studies.length ? c.studies : [doc.cohorts?.[n]?.study || doc.study || result.study].filter(Boolean) as string[]}
+                        names={studyNames} />
                       {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} />}
                       {/* A note only shows here — passively, read-only — once the
                           cohort is actually saved as a reusable artifact AND
