@@ -27,14 +27,14 @@ import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
   type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments, type EndpointColumns,
-  type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, type FederatedPlotCapable, legendFor, SEQUENCE_ROW_LIMIT } from "./federation.ts";
+  type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, type FederatedPlotCapable, legendFor, SEQUENCE_ROW_LIMIT, COURSE_ANCHORED, COURSE_OBSERVED } from "./federation.ts";
 import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis, coverageNote, type PlotData, type PlotGroup, type AxisKind } from "./plot.ts";
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
-import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, type CoxTrace } from "./method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, courseMethod, sequenceMethod, type CoxTrace } from "./method.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -1113,11 +1113,16 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       // Merge by summing per (bin, state) — each study contributes its own
       // observable patients and its own events, so sums are exact.
       const course: CourseSeries[] = [];
+      const counted = new Map<string, { anchored: number; observed: number }>();   // cohort -> patients
       for (const n of vNames) {
         const rows = per.get(n) || [];
         const risk = new Map<number, number>(), hit = new Map<string, number>();
+        const c = { anchored: 0, observed: 0 };
+        counted.set(n, c);
         for (const r of rows) {
-          if (r.eventType === "") risk.set(r.bin, (risk.get(r.bin) || 0) + r.n);
+          if (r.eventType === COURSE_ANCHORED) c.anchored += r.n;
+          else if (r.eventType === COURSE_OBSERVED) c.observed += r.n;
+          else if (r.eventType === "") risk.set(r.bin, (risk.get(r.bin) || 0) + r.n);
           else { const k = r.eventType + " " + r.bin; hit.set(k, (hit.get(k) || 0) + r.n); }
         }
         for (const et of measured) {
@@ -1147,6 +1152,26 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
                  hasDurations: !!intervalOf.get(f.canonical) };
       });
       const courseResult: ViewResult = { kind: "course", cohorts: vNames, studies: vStudies, course,
+        method: courseMethod({
+          ...(anchor ? { anchor: anchor.occurrence.toLowerCase() + " " + anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "") } : {}),
+          binMonths, fromBin: opts.from, toBin: opts.to, riskFloor: COURSE_RISK_FLOOR, dropped,
+          perSite: vNames.flatMap((n) => cohorts[n].studies.filter((st) => usable.includes(st)).sort()
+            .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+          events: measured.map((et) => { const f = folded.find((x) => x.canonical === et)!; return { canonical: et, label: f.label, variants: f.variants, isInterval: !!intervalOf.get(et) }; }),
+          cohorts: vNames.map((n) => ({ name: n, patients: cohorts[n].studies.filter((st) => usable.includes(st)).reduce((k, st) => k + (cohorts[n].perStudy[st]?.count || 0), 0),
+            ...counted.get(n)! })),
+          counts: vNames.flatMap((n) => {
+            const m = new Map<string, { cohort: string; bin: number; event: string; n: number }>();
+            for (const r of per.get(n) || []) {
+              if (r.eventType === COURSE_ANCHORED || r.eventType === COURSE_OBSERVED) continue;
+              const k = r.eventType + "\u0000" + r.bin, cur = m.get(k) || { cohort: n, bin: r.bin, event: r.eventType, n: 0 };
+              cur.n += r.n; m.set(k, cur);
+            }
+            return [...m.values()].sort((x, y) => x.bin - y.bin || (x.event < y.event ? -1 : x.event > y.event ? 1 : 0));
+          }),
+          results: course.flatMap((sr) => sr.points.map((pt) => ({ cohort: sr.cohort, event: sr.eventType, bin: Math.round(pt.t / binMonths),
+            atRisk: pt.atRisk, n: pt.n, pct: pt.pct }))),
+        }),
         courseAxis: { binMonths, from: opts.from * binMonths, to: opts.to * binMonths },
         eventOptions,
         participation: participationFor(vStudies, false),
@@ -1211,7 +1236,10 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         Promise.all(allStudies.map((st) =>
           resolvers[st].sequenceKeys(doc.cohorts[panelNames[0]], eventType))).then((r) => r.flat())
       ]);
-      const rawByCohort = perStudyByCohort.map((rows) => rows.flat());
+      // step-0 rows count the records set aside before lines were built; every other row is a flow
+      const setAside = perStudyByCohort.flatMap((rows, ci) => rows.flat().filter((f) => f.step === 0)
+        .map((f) => ({ cohort: panelNames[ci], cls: f.from, reason: f.to, records: f.n })));
+      const rawByCohort = perStudyByCohort.map((rows) => rows.flat().filter((f) => f.step > 0));
       const keyOptions = [...new Map(keyRows.map((k) => [k.key, k])).values()]
         .sort((a, b) => b.patients - a.patients);
       const chosen = keyOptions.find((k) => k.key === canonicalEventName(labelKey));
@@ -1238,7 +1266,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               .map((k) => k.label + " (" + k.values + " values)").join(", ") });
         continue;
       }
-      const truncated = perStudyByCohort.some((rows) => rows.some((r) => r.length >= SEQUENCE_ROW_LIMIT));
+      const truncated = perStudyByCohort.some((rows) => rows.some((r) => r.filter((f) => f.step > 0).length >= SEQUENCE_ROW_LIMIT));
 
       // Merge per cohort, then rank labels ACROSS ALL PANELS so a regimen keeps
       // one identity and one colour in both — the comparison is the point.
@@ -1310,6 +1338,17 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       const otherPct = p0.started ? Math.round((1000 * otherN) / p0.started) / 10 : 0;
       const sequence: SequenceResult = { labelKey, lineGap, steps: maxSteps, foldedLabels, truncated, keyOptions, panels };
       const seqResult: ViewResult = { kind: "sequence", cohorts: panelNames, studies: allStudies, sequence,
+        method: sequenceMethod({ eventType, labelKey, lineGap, maxSteps, topN, classes: lineClasses || "systemic",
+          exclude: (sv.exclude || []).map(String), truncated, rowLimit: SEQUENCE_ROW_LIMIT, foldedLabels,
+          perSite: panelNames.flatMap((n) => [...cohorts[n].studies].sort().map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+          setAside,
+          flows: mergedPer.flatMap((m, pi) => [...m.entries()].map(([k, n]) => {
+            const [step, from, to, fate] = k.split("\u0000");
+            return { cohort: panelNames[pi], step: Number(step), from, to, fate: Number(fate), n };
+          }).sort((x, y) => x.step - y.step || y.n - x.n || (x.from + "\u0000" + x.to < y.from + "\u0000" + y.to ? -1 : 1))),
+          results: panels.map((pn) => ({ cohort: pn.cohort, started: pn.started, censored: pn.censored,
+            nodes: pn.nodes.map((nd) => ({ column: nd.column, kind: nd.kind, label: nd.label, n: nd.n })) })),
+        }),
         participation: participationFor(allStudies, false),
         caveat:
           "Therapies are grouped into LINES before being sequenced, by the definition every line count here shares: " +
