@@ -25,6 +25,7 @@ PORT="${GATE_PORT:-3100}"
 echo "== $(git branch --show-current 2>/dev/null || echo detached) @ $(git rev-parse --short HEAD)$([ -n "$(git status --porcelain)" ] && echo ' + uncommitted changes') =="
 echo "== build (-> $NEXT_DIST_DIR) ==" && npm run build 2>&1 | tail -3
 echo "== unit =="                      && npm test 2>&1 | grep -E "^# (tests|pass|fail)"
+echo "== method scripts =="            && npm run check:methods 2>&1 | grep -E "^FAIL|method records present|FAILED"
 echo "== e2e =="
 fuser -k $PORT/tcp 2>/dev/null || true
 sleep 2

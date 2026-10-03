@@ -457,6 +457,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           oncokbPin: pin, cohorts: vNames, genes,
           perSite: perSite.map((p) => ({ cohort: p.cohort, study: p.study, cohortPatients: cohorts[p.cohort].perStudy[p.study]?.count || 0 })),
           counts: perSite.flatMap((p) => p.counts.map((c) => ({ cohort: p.cohort, study: p.study, gene: c.gene, profiled: c.profiled, altered: c.altered, driver: c.driver }))),
+          results: rows.map((r) => ({ gene: r.gene, pAny: r.pAny, pDriver: r.pDriver, qAny: r.qAny, qDriver: r.qDriver })),
         }),
         participation: participationFor(vStudies, false),
         ...(vStudies.length > 1 ? { studies: vStudies } : {}),
@@ -816,6 +817,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           perStudy, covariates, kinds: kindsFinal, columns, x: coxInput.map((r) => r.x),
           fit: { n: fit.n, events: fit.events, iterations: fit.iterations, loglik: fit.loglik },
           censoredAtCutoff, droppedBadTime: rowsCut.length - coxInput.length,
+          coefficients: columns.map((col, i) => ({ label: col.label, beta: fit.beta[i], se: fit.se[i], p: fit.p[i] })),
         };
         return { coefficients, n: fit.n, events: fit.events, termCount: columns.length, excludedRemote, patientLevelTotal, trace };
       };
@@ -1027,6 +1029,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         perStudy: lPerStudy, covariates: lCovariates, kinds: lKindsFinal, columns: lColumns, x: logisticInput.map((r) => r.x),
         fit: { n: lFit.n, events: lFit.events, iterations: lFit.iterations, loglik: lFit.loglik },
         outcomeKind: outcomeKindFinal, ...(lv.outcomeEvent != null ? { outcomeEvent: String(lv.outcomeEvent) } : {}), outcomeOther,
+        coefficients: lColumns.map((col, i) => ({ label: col.label, beta: lFit.beta[i], se: lFit.se[i], p: lFit.p[i] })),
       }, { outcomeLabel, queryLabel: "logisticRows" });
       logisticResult.svg = viewToSvg(logisticResult) || undefined;
       views.push(logisticResult);
@@ -1599,6 +1602,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           cohortPatients: [...sites].sort().map((st) => ({ study: st, patients: cohorts[cn].perStudy[st]?.count || 0 })),
           sums: [...sites].sort().flatMap((st) => (byStudy.get(st) || []).filter((m) => m.n > 0)
             .map((m) => ({ study: st, a: m.a, b: m.b, n: m.n, sx: m.sx, sy: m.sy, sxy: m.sxy, sxx: m.sxx, syy: m.syy }))),
+          results: rows.map((r) => ({ a: r.a, b: r.b, r: r.r, p: r.p, q: r.q, ...(r.pMeta != null ? { pMeta: r.pMeta } : {}) })),
         }),
         participation: participationFor(cohorts[cn].studies, false),
         note: "Pearson correlation on “" + profileType + "” within “" + cn + "”, over the patients with BOTH values" +
@@ -1727,6 +1731,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             ({ cohort, study, attribute: x.attribute, n: x.n!, sum: x.sum!, sumsq: x.sumsq! })),
           histograms: singleStudy ? siteStats.filter(({ x }) => x.kind === "num" && x.valueCounts).flatMap(({ cohort, x }) =>
             x.valueCounts!.map((h) => ({ cohort, attribute: x.attribute, value: h.v, n: h.n }))) : [],
+          medians: rows.filter((r) => r.kind === "num" && !r.skipped).flatMap((r) => r.cells
+            .filter((c: any) => c.median != null).map((c: any) => ({ attribute: r.attribute, cohort: c.cohort, median: c.median, q1: c.q1, q3: c.q3 }))),
         }),
         participation: participationFor(vStudies, false),
         note: "Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary;" +
@@ -1797,6 +1803,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           cohortPatients: [...sites].sort().map((st) => ({ study: st, patients: cohorts[cn].perStudy[st]?.count || 0 })),
           counts: [...sites].sort().flatMap((st) => pairs.map(([a, b]) => find(st, a, b)).filter((x): x is PairCounts => !!x)
             .map((x) => ({ study: st, a: x.a, b: x.b, both: x.both, onlyA: x.onlyA, onlyB: x.onlyB, neither: x.neither }))),
+          results: rows.map((r) => ({ a: r.a, b: r.b, p: r.p, q: r.q, ...(r.pStratified != null ? { pStratified: r.pStratified } : {}) })),
         }),
         participation: participationFor(cohorts[cn].studies, false),
         note: "Pairwise co-occurrence within “" + cn + "”" +
