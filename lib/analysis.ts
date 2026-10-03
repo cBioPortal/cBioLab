@@ -1544,10 +1544,11 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             }
           }
 
-          // each site counts its own cases and their axes; the sums are exact
-          const covs = await Promise.all(sites.map((s) => fr[s].plotCoverage(doc.cohorts[cn], spec, xk, yk).catch(() => null)));
-          if (covs.every(Boolean)) data.coverage = covs.reduce<{ total: number; nx: number; ny: number }>(
-            (a, c) => ({ total: a.total + c!.total, nx: a.nx + c!.nx, ny: a.ny + c!.ny }), { total: 0, nx: 0, ny: 0 });
+          // each site counts its own cases and their axes; the sums are exact. A failed count fails the
+          // view: dropping the coverage note would hide how many cases the figure leaves out
+          const covs = await Promise.all(sites.map((s) => fr[s].plotCoverage(doc.cohorts[cn], spec, xk, yk)));
+          data.coverage = covs.reduce<{ total: number; nx: number; ny: number }>(
+            (a, c) => ({ total: a.total + c.total, nx: a.nx + c.nx, ny: a.ny + c.ny }), { total: 0, nx: 0, ny: 0 });
           const pr: ViewResult = { kind: "plot", plot: data, cohorts: [cn], studies: sites,
             participation: participationFor(sites, false), note: [coverageNote(data, unit), data.note].filter(Boolean).join(" ") || undefined };
           const tPlot = Date.now();
@@ -1571,7 +1572,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       const cn = vNames[0];
       const byStudy = new Map<string, PairMoments[]>();
       await Promise.all(cohorts[cn].studies.map(async (st) => {
-        byStudy.set(st, await resolvers[st].pairMoments(doc.cohorts[cn], pairs, profileType).catch(() => []));
+        // a failed study fails the view, rather than leaving its patients silently out of every correlation
+        byStudy.set(st, await resolvers[st].pairMoments(doc.cohorts[cn], pairs, profileType));
       }));
       const sites = [...byStudy.keys()];
       const rows: CoexprRow[] = pairs.map(([a, b]) => {
@@ -1858,7 +1860,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         const hGenes = h.genes && h.genes.length ? geneSymbols(h.genes) : geneSymbols(genes);
         if (!hGenes.length) continue;
         const per = await Promise.all(vStudies.map(async (st) => ({
-          st, m: await resolvers[st].profileMoments(null, hGenes, h.profileType).catch(() => [] as ProfileMoments[])
+          // a failed study fails the view: a reference silently missing a study would shift every z-score
+          st, m: await resolvers[st].profileMoments(null, hGenes, h.profileType)
         })));
         for (const gene of hGenes) {
           let n = 0, sum = 0, sumsq = 0; const contributing: string[] = [];
