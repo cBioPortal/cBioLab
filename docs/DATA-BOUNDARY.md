@@ -146,9 +146,10 @@ suite fail. A test that cannot fail is decoration.
   **Server-stored custom data** (`lib/custom-store.ts`, `db/migrations/0003`)
   is the one place this app keeps patient-level values at rest, in the Supabase
   Postgres beside the artifact tables but in its own tables, reached only through
-  that module. It exists only where `CUSTOM_DATA_ACCESS_CODE` is set; today that
-  code is the whole of access control (one shared principal, `lib/custom-access.ts`),
-  so **anyone holding a deployment's code can read every dataset stored there**.
+  that module. It exists only where `LOGIN_PASSWORD` is set; today that
+  shared login is the whole of access control (one shared principal, `lib/auth.ts`),
+  so **anyone who can log in to a deployment can read every dataset stored there**.
+  Saved cohorts and analyses (`lib/artifacts.ts`) sit behind the same login.
   Every row read and write is logged (`custom_data_access_log`), versions are
   immutable (a trigger), and deletion is a soft delete that pinned analyses report.
   A request names stored datasets by reference (`customRefs`); the server reads

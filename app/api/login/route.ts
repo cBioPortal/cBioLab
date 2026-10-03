@@ -1,14 +1,14 @@
-import { serverDataEnabled, principalFor, unlockCookie, lockCookie } from "../../../../lib/custom-access.ts";
+import { loginEnabled, principalFor, unlockCookie, lockCookie } from "../../../lib/auth.ts";
 
 // Server-stored custom data on this deployment: whether it exists, and unlocking it with the
-// deployment's shared password (lib/custom-access.ts): POST logs in, DELETE logs out.
+// deployment's shared password (lib/auth.ts): POST logs in, DELETE logs out.
 
 export async function GET(req: Request) {
-  return Response.json({ enabled: serverDataEnabled(), unlocked: !!principalFor(req) });
+  return Response.json({ enabled: loginEnabled(), unlocked: !!principalFor(req) });
 }
 
 export async function POST(req: Request) {
-  if (!serverDataEnabled()) return Response.json({ error: "server-stored custom data is not enabled on this deployment" }, { status: 404 });
+  if (!loginEnabled()) return Response.json({ error: "server-stored custom data is not enabled on this deployment" }, { status: 404 });
   const { code } = await req.json().catch(() => ({}));
   const cookie = unlockCookie(code, new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https");
   if (!cookie) return Response.json({ error: "wrong password" }, { status: 403 });
@@ -16,5 +16,5 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE() {
-  return Response.json({ enabled: serverDataEnabled(), unlocked: false }, { headers: { "Set-Cookie": lockCookie() } });
+  return Response.json({ enabled: loginEnabled(), unlocked: false }, { headers: { "Set-Cookie": lockCookie() } });
 }

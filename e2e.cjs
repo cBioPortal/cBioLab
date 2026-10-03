@@ -10,8 +10,22 @@ async function main() {
   const ok = (name, cond, extra) =>
     results.push((cond ? "PASS " : "FAIL ") + name + (extra ? "  [" + extra + "]" : ""));
 
+  // Saved cohorts and analyses need the login (lib/auth.ts). scripts/gate.sh gives its server a
+  // throwaway password and passes it here; logged out, the store must refuse.
+  const LOGIN = process.env.E2E_LOGIN_PASSWORD || "";
+  {
+    const anon = await browser.newContext();
+    const r = await anon.request.get(BASE + "/api/artifacts?kind=cohort");
+    ok("saved cohorts are refused without the login", r.status() === 403 || r.status() === 404, "HTTP " + r.status());
+    await anon.close();
+  }
+
   for (const scheme of ["light", "dark"]) {
     const ctx = await browser.newContext({ colorScheme: scheme, viewport: { width: 1360, height: 900 } });
+    if (LOGIN) {
+      const r = await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
+      ok("logs in (" + scheme + ")", r.ok(), "HTTP " + r.status());
+    }
     const page = await ctx.newPage();
     const errors = [];
     page.on("pageerror", e => errors.push("pageerror: " + e.message));

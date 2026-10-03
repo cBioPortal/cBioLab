@@ -1,4 +1,4 @@
-import { requirePrincipal, AccessError } from "../../../../../lib/custom-access.ts";
+import { requirePrincipal, AccessError } from "../../../../../lib/auth.ts";
 import { readVersion, deleteDataset } from "../../../../../lib/custom-store.ts";
 
 export const maxDuration = 60;

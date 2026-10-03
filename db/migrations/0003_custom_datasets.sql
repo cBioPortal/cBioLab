@@ -6,7 +6,7 @@
 -- access on every read and write and logs every read; never query them from anywhere else.
 --
 -- Access today: one shared principal ('shared'), unlocked by a deployment's access code
--- (CUSTOM_DATA_ACCESS_CODE, see lib/custom-access.ts). The owner and grant columns exist now
+-- (LOGIN_PASSWORD, see lib/auth.ts). The owner and grant columns exist now
 -- so that per-user and per-group access is added by filling them in, not by reshaping data.
 --
 -- Run once, by hand, against the Supabase project, after 0001 and 0002.

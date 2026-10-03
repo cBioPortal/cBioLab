@@ -1,6 +1,6 @@
 "use client";
 // Top-right "Log in" / "Log out", like the portal's. There is one shared login for now: the
-// deployment's password (CUSTOM_DATA_ACCESS_CODE), which today unlocks custom data only. Shown
+// deployment's password (LOGIN_PASSWORD), which unlocks saved cohorts, analyses and custom data. Shown
 // only where the deployment has set one.
 import { useEffect, useRef, useState } from "react";
 import { logIn, logOut, onLoginRequest } from "./custom-data-client.ts";
@@ -32,7 +32,7 @@ export default function LoginButton() {
       <dialog ref={ref} className="namedialog logindialog" onClick={(e) => { if (e.target === ref.current) ref.current?.close(); }}>
         <form method="dialog" onSubmit={(e) => { e.preventDefault(); submit(); }}>
           <h3>Log in</h3>
-          <span className="meta">One shared login for now. It lets you see, add and use custom data; everyone who logs in sees the same datasets.</span>
+          <span className="meta">One shared login for now. It lets you save and open cohorts and analyses and use custom data; everyone who logs in sees the same things.</span>
           <input type="password" placeholder="password" value={password} autoFocus autoComplete="current-password"
             onChange={(e) => setPassword(e.target.value)} />
           {err && <p className="error" style={{ margin: "var(--s2) 0 0" }}>{err}</p>}

@@ -2,7 +2,7 @@
 // datasets reach the engine.
 //
 // Uploads live on the server only (lib/custom-store.ts), readable once logged in with the
-// deployment's shared password (lib/custom-access.ts); this browser keeps nothing. Requests name them by reference
+// deployment's shared password (lib/auth.ts); this browser keeps nothing. Requests name them by reference
 // (`customRefs`: { as, dataset, version }) and the server reads the rows itself. The one
 // exception is the gallery's demo data (`customData` on a lib/dsl-reference.ts example): public
 // data bundled with the code, sent as rows so the example runs anywhere, code or no code.
@@ -57,7 +57,7 @@ export function serverState(): ServerState { return server; }
 /** Ask the server what it holds; quietly "not enabled" where it has no such store. */
 export async function loadServerData(): Promise<void> {
   try {
-    const st = await (await fetch("/api/custom-data/server")).json() as { enabled: boolean; unlocked: boolean };
+    const st = await (await fetch("/api/login")).json() as { enabled: boolean; unlocked: boolean };
     let datasets: DatasetMeta[] = [];
     if (st.unlocked) {
       const j = await (await fetch("/api/custom-data/datasets")).json();
@@ -81,17 +81,17 @@ export function loadCustomData(): Promise<void> {
 }
 
 /**
- * Log in with the deployment's shared password (CUSTOM_DATA_ACCESS_CODE): the server sets an
+ * Log in with the deployment's shared password (LOGIN_PASSWORD): the server sets an
  * httpOnly cookie, and custom data becomes readable here. One shared login for now.
  */
 export async function logIn(password: string): Promise<void> {
-  const res = await fetch("/api/custom-data/server", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: password }) });
+  const res = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: password }) });
   const j = await res.json();
   if (!res.ok) throw new Error(j.error || res.statusText);
   await loadServerData();
 }
 export async function logOut(): Promise<void> {
-  await fetch("/api/custom-data/server", { method: "DELETE" });
+  await fetch("/api/login", { method: "DELETE" });
   versionCache.clear();
   await loadServerData();
 }

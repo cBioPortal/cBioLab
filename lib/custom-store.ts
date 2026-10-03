@@ -2,7 +2,7 @@
 // (db/migrations/0003_custom_datasets.sql). The ONLY module that touches those tables.
 //
 // - Every read and write passes canRead / canWrite, which decide by owner and grant. Today the
-//   one principal is "shared" (lib/custom-access.ts), so both say yes for every live dataset;
+//   one principal is "shared" (lib/auth.ts), so both say yes for every live dataset;
 //   per-user and per-group access means filling in the grant table, not changing callers.
 // - A version is immutable once written (enforced by a trigger too), so a document pinned to
 //   { dataset, version } always reads the same rows.
@@ -13,7 +13,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { dbQuery } from "./db.ts";
 import { validateCustomData, type CustomDataset, type CustomColumn, type CustomLevel } from "./custom-data.ts";
-import { AccessError } from "./custom-access.ts";
+import { AccessError } from "./auth.ts";
 
 export interface DatasetSource { rowsIn: number; unmatched: number; duplicates: number; multiStudy: number; studies: string[] }
 

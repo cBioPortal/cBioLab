@@ -1,16 +1,17 @@
-// Who is asking, for server-stored custom data (lib/custom-store.ts).
+// Who is asking: the login behind everything a reader stores — custom data
+// (lib/custom-store.ts) and saved cohorts and analyses (lib/artifacts.ts).
 //
 // Today there is one principal, "shared", and one shared login: the deployment's password,
-// CUSTOM_DATA_ACCESS_CODE. Server-stored custom data is enabled only where it is set; logging in
-// (the page's top-right button) sets an httpOnly cookie carrying a hash of it. Everything
-// else on the site, including the public demo and MCP, is unaffected.
+// LOGIN_PASSWORD. Stored things exist only where it is set; logging in (the page's top-right
+// button) sets an httpOnly cookie carrying a hash of it. Exploring, running analyses, the
+// examples, shared ?doc= links and MCP need no login.
 //
 // This is the seam per-user access replaces: principalFor() becomes "the signed-in user", and
-// lib/custom-store.ts's canRead/canWrite already decide by owner and grant.
+// both stores already decide by owner (and, for custom data, grant).
 import { createHash, timingSafeEqual } from "node:crypto";
 
 export const SHARED_PRINCIPAL = "shared";
-export const ACCESS_COOKIE = "cl_custom_access";
+export const ACCESS_COOKIE = "cl_login";
 const COOKIE_DAYS = 30;
 
 export class AccessError extends Error {
@@ -18,8 +19,8 @@ export class AccessError extends Error {
   constructor(message: string, status: 403 | 404 | 410) { super(message); this.status = status; }
 }
 
-export function serverDataEnabled(): boolean {
-  return !!process.env.CUSTOM_DATA_ACCESS_CODE;
+export function loginEnabled(): boolean {
+  return !!process.env.LOGIN_PASSWORD;
 }
 
 const tokenOf = (code: string) => createHash("sha256").update("cohort-lab custom data\n" + code).digest("hex");
@@ -39,23 +40,23 @@ function cookieValue(req: Request): string | null {
 
 /** The principal behind a request, or null when it has not been unlocked here. */
 export function principalFor(req: Request): string | null {
-  const code = process.env.CUSTOM_DATA_ACCESS_CODE;
+  const code = process.env.LOGIN_PASSWORD;
   if (!code) return null;
   const v = cookieValue(req);
   return v && same(v, tokenOf(code)) ? SHARED_PRINCIPAL : null;
 }
 
 export function requirePrincipal(req: Request): string {
-  if (!serverDataEnabled())
-    throw new AccessError("server-stored custom data is not enabled on this deployment (CUSTOM_DATA_ACCESS_CODE is not set)", 404);
+  if (!loginEnabled())
+    throw new AccessError("this deployment has no login (LOGIN_PASSWORD is not set), so nothing can be saved on it", 404);
   const p = principalFor(req);
-  if (!p) throw new AccessError("log in to use custom data", 403);
+  if (!p) throw new AccessError("log in to use saved cohorts, analyses and custom data", 403);
   return p;
 }
 
 /** The Set-Cookie header for a correct code, or null for a wrong one. */
 export function unlockCookie(code: unknown, secure: boolean): string | null {
-  const want = process.env.CUSTOM_DATA_ACCESS_CODE;
+  const want = process.env.LOGIN_PASSWORD;
   if (!want || typeof code !== "string" || !same(tokenOf(code), tokenOf(want))) return null;
   return ACCESS_COOKIE + "=" + tokenOf(want) + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=" + COOKIE_DAYS * 86400 + (secure ? "; Secure" : "");
 }

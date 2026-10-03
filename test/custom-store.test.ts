@@ -1,4 +1,4 @@
-// Server-stored custom data (lib/custom-store.ts, lib/custom-access.ts), on the in-memory
+// Server-stored custom data (lib/custom-store.ts, lib/auth.ts), on the in-memory
 // backend: versions are append-only, names do not collide, a deleted dataset says so, and the
 // access code is the only way in.
 import { test, describe } from "node:test";
@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 
 delete process.env.SUPABASE_DB_URL;
 const { listDatasets, saveDataset, readVersion, deleteDataset, unpackRows } = await import("../lib/custom-store.ts");
-const access = await import("../lib/custom-access.ts");
+const access = await import("../lib/auth.ts");
 
 const ds = (id: string, value = "Brain") => ({
   id, name: id + " (test)", level: "patient", columns: [{ name: "MET_SITE", datatype: "STRING" }],
@@ -70,22 +70,22 @@ describe("custom store", () => {
 describe("custom data access code", () => {
   const req = (cookie?: string) => new Request("https://x.test/api", { headers: cookie ? { cookie } : {} });
   test("disabled where no code is configured", () => {
-    delete process.env.CUSTOM_DATA_ACCESS_CODE;
-    assert.equal(access.serverDataEnabled(), false);
-    assert.throws(() => access.requirePrincipal(req()), /not enabled on this deployment/);
+    delete process.env.LOGIN_PASSWORD;
+    assert.equal(access.loginEnabled(), false);
+    assert.throws(() => access.requirePrincipal(req()), /has no login/);
   });
   test("only the right code unlocks, and only its cookie is accepted", () => {
-    process.env.CUSTOM_DATA_ACCESS_CODE = "correct horse";
+    process.env.LOGIN_PASSWORD = "correct horse";
     assert.equal(access.unlockCookie("wrong", true), null);
     const set = access.unlockCookie("correct horse", true)!;
     assert.match(set, /HttpOnly; SameSite=Lax; Max-Age=\d+; Secure$/);
     assert.ok(!set.includes("correct horse"), "the cookie holds a hash, never the code");
     const cookie = set.split(";")[0];
     assert.equal(access.requirePrincipal(req(cookie)), "shared");
-    assert.throws(() => access.requirePrincipal(req()), /log in to use custom data/);
+    assert.throws(() => access.requirePrincipal(req()), /log in to use saved cohorts, analyses and custom data/);
     assert.throws(() => access.requirePrincipal(req(access.ACCESS_COOKIE + "=deadbeef")), /log in/);
-    process.env.CUSTOM_DATA_ACCESS_CODE = "rotated";
+    process.env.LOGIN_PASSWORD = "rotated";
     assert.throws(() => access.requirePrincipal(req(cookie)), /log in/, "rotating the password logs every browser out");
-    delete process.env.CUSTOM_DATA_ACCESS_CODE;
+    delete process.env.LOGIN_PASSWORD;
   });
 });

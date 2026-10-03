@@ -3,7 +3,7 @@
 // Kept apart from lib/custom-data.ts because it needs the federation routing, and
 // lib/custom-data.ts is imported by lib/ch.ts, which federation itself imports.
 import { validateCustomData, withCustomData, tsvField, type CustomCtx, type CustomDataset } from "./custom-data.ts";
-import { requirePrincipal } from "./custom-access.ts";
+import { requirePrincipal } from "./auth.ts";
 import { loadVersionForRequest } from "./custom-store.ts";
 import { chQueryRows, registerChExternal, withChContext, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
@@ -48,7 +48,7 @@ export async function withRequestCustomData<T>(raw: unknown, fn: () => Promise<T
 /**
  * Server-stored datasets a request names instead of carrying: `customRefs` beside its body,
  * each `{ as, dataset, version }` — the name the document uses, the stored dataset, and the
- * version it is pinned to. Read as the request's principal (lib/custom-access.ts).
+ * version it is pinned to. Read as the request's principal (lib/auth.ts).
  */
 export interface ServerRefs { refs: unknown; req: Request }
 export const MAX_REFS = 10;

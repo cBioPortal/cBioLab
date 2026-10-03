@@ -1,5 +1,5 @@
 import { gunzipSync } from "node:zlib";
-import { requirePrincipal, AccessError } from "../../../../lib/custom-access.ts";
+import { requirePrincipal, AccessError } from "../../../../lib/auth.ts";
 import { listDatasets, saveDataset } from "../../../../lib/custom-store.ts";
 
 export const maxDuration = 60;

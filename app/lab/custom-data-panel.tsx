@@ -118,7 +118,7 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
         shared with anyone who can log in.
       </p>
       {!server.enabled && <p className="meta">
-        This deployment does not store custom data: it has no login (<code>CUSTOM_DATA_ACCESS_CODE</code> is not set).
+        This deployment does not store custom data: it has no login (<code>LOGIN_PASSWORD</code> is not set).
         The gallery&apos;s custom-data example still runs, on demo data bundled with the app.</p>}
 
       {server.enabled && <>

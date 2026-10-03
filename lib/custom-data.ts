@@ -279,7 +279,7 @@ export function assertCustomDataPresent(x: unknown): void {
   }
   if (missing.size)
     throw new Error("this analysis uses custom data that was not sent with it: " + [...missing].map((m) => "'" + m + "'").join(", ") +
-      ". It is stored on the server: unlock it with the deployment's access code, or check it was not deleted.");
+      ". It is stored on the server: log in, or check it was not deleted.");
   if (unknownCols.length)
     throw new Error("custom data has no column " + [...new Set(unknownCols)].join(", ") + "; its columns are " +
       [...have.entries()].map(([id, cols]) => [...cols].map((c) => "custom:" + id + "/" + c).join(", ")).join("; "));

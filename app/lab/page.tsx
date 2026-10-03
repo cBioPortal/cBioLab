@@ -669,8 +669,11 @@ export default function AnalysisPage() {
     }
   };
 
+  // Saved cohorts and analyses belong to the login (lib/auth.ts): read when it is in, cleared
+  // when it goes, so a logged-out page never shows someone's saved work.
+  const loggedIn = customState.unlocked;
   useEffect(() => {
-    installCustomDataFetch();
+    if (!loggedIn) { setSaved({}); setSpaces({}); return; }
     fetch("/api/artifacts?kind=cohort").then(r => r.json()).then(j => {
       const map: typeof saved = {};
       for (const a of j.artifacts || []) map[a.name] = { id: a.id, def: a.definition, savedAt: fmtDate(a.updatedAt), lastEval: null };
@@ -681,6 +684,17 @@ export default function AnalysisPage() {
       for (const a of j.artifacts || []) map[a.name] = { id: a.id, doc: a.definition, savedAt: fmtDate(a.updatedAt) };
       setSpaces(map);
     }).catch(() => {});
+  }, [loggedIn]);
+  /** Saving needs the login: logged out, ask for it rather than fail. Returns true when saving may go ahead. */
+  const canSave = (): boolean => {
+    if (loggedIn) return true;
+    if (customState.enabled) requestLogin();
+    else setError("this deployment has no login, so cohorts and analyses cannot be saved on it");
+    return false;
+  };
+
+  useEffect(() => {
+    installCustomDataFetch();
     fetch("/api/studies").then(r => r.json()).then(j => {
       const list = j.studies || [];
       setStudies(list);
@@ -789,6 +803,7 @@ export default function AnalysisPage() {
    */
   const openSaveDialog = () => {
     if (!barDef()) { setExMsg("select at least one study first"); return; }
+    if (!canSave()) return;
     setExMsg(null);
     setSaveName(cName.trim() || barDefaultName());
     setDraftFilled(!!(cName.trim() || barDefaultName()).trim()); setDraftGen((g) => g + 1);
@@ -1519,6 +1534,7 @@ export default function AnalysisPage() {
   };
   // ---- workspaces ----------------------------------------------------------
   const openWorkspaceSave = () => {
+    if (!canSave()) return;
     // Only ever prefills with the workspace's OWN name, if it already has
     // one — never a cohort name or a generic fallback standing in for a
     // real name, which read as though the app had already named it for you.
@@ -3638,7 +3654,13 @@ function Latency({ v }: { v: any }) {
         </div>}
 
         {/* ================= Saved tab ================= */}
-        {tab === "cohorts" && <div>
+        {tab === "cohorts" && !loggedIn && <div className="card">
+          <p style={{ margin: 0 }}>Saved cohorts and analyses belong to your login.{" "}
+            {customState.enabled
+              ? <><button className="primary" onClick={requestLogin}>Log in</button> to see and save them.</>
+              : "This deployment has no login, so nothing can be saved on it."}</p>
+        </div>}
+        {tab === "cohorts" && loggedIn && <div>
           {/* Saved cohorts and saved analyses used to be two top-level tabs
               ("Cohorts" and "Saved") with a cross-link between them ("manage
               on the Saved tab") — one tab, two sub-tabs instead. */}
@@ -3683,7 +3705,7 @@ function Latency({ v }: { v: any }) {
               );
             })}
             <h2 style={{ marginTop: "1.2rem" }}>
-              Saved cohorts <span className="plain">— shared with everyone using this app; no per-user ownership yet. Tick any to include above; delete here.</span>
+              Saved cohorts <span className="plain">— everyone who logs in sees these: one shared login, no per-user ownership yet. Tick any to include above; delete here.</span>
             </h2>
             {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, build one on the Explore page, or ask chat.</p>}
             {Object.entries(saved)
@@ -3707,7 +3729,7 @@ function Latency({ v }: { v: any }) {
           </div>}
           {cohortsSubTab === "analyses" && <div className="grid2">
             <div className="card">
-              <h2>Saved analyses <span className="plain">— shared with everyone using this app; no per-user ownership yet</span></h2>
+              <h2>Saved analyses <span className="plain">— everyone who logs in sees these: one shared login, no per-user ownership yet</span></h2>
               {Object.keys(spaces).length === 0 && <p className="note">Nothing saved yet — build an analysis with at least one view, then "Save workspace" on the Analysis tab.</p>}
               {Object.entries(spaces)
                 .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
