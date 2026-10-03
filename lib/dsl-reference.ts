@@ -902,6 +902,51 @@ export const EXAMPLES: DslExample[] = [
           splitBy: { cohort: "all patients", attribute: "custom:luad-biopsy-site/BIOPSY_SITE" } }
       ]
     }
+  },
+  {
+    title: "Cancer types summary: RAS genes across 50,000 tumours",
+    demonstrates: "A `cancertypes` view, cBioPortal's Cancer Types Summary: the share of samples altered in at least one of a gene list per cancer type, each bar split by mutation, amplification, deep deletion, structural variant or several at once, over the samples profiled for at least one of the genes. Small cancer types are pooled into one named bar, not dropped.",
+    tags: ["cancertypes", "frequency", "pan-cancer"],
+    note: "KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appendiceal and colorectal follow, and the bars show where RAS is amplified rather than mutated — germ cell tumours and esophagogastric cancer.",
+    doc: {
+      study: "msk_impact_50k_2026",
+      cohorts: { "all patients": { all: [] } },
+      views: [{ kind: "cancertypes", genes: ["KRAS", "NRAS", "HRAS"], minSamples: 200 }]
+    }
+  },
+  {
+    title: "Cohort overlap: how four groups share their patients",
+    demonstrates: "An `overlap` view, the portal's Overlap tab drawn as an UpSet plot: for every combination of cohorts, the patients in exactly those cohorts and no other. Each study answers with one count per combination, and every cohort's size here equals its own count.",
+    tags: ["overlap", "upset", "cohorts"],
+    note: "TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD. 5,314 TP53-mutant patients belong to none of the other three groups; 435 are in all four.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "TP53 mutant": { all: [{ kind: "oql", q: "TP53: MUT" }] },
+        "KRAS mutant": { all: [{ kind: "oql", q: "KRAS: MUT" }] },
+        "Immunotherapy": { all: [{ kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } }] },
+        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] }
+      },
+      views: [{ kind: "overlap" }]
+    }
+  },
+  {
+    title: "Alteration enrichment: what separates colorectal from pancreatic tumours",
+    demonstrates: "An `enrichment` view, the portal's Genomic Alterations tab: every gene's mutation frequency in two cohorts, counted in samples over the samples profiled for that gene, with a Fisher test per gene and Benjamini–Hochberg across all of them, drawn as a volcano beside a table. MSI-high tumours are excluded from both cohorts, because hypermutated tumours enrich almost every gene at once.",
+    tags: ["enrichment", "volcano", "compare"],
+    note: "Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TCF7L2, PIK3CA, FBXW7 and SOX9 mark colorectal cancer; KRAS and CDKN2A mark pancreatic cancer.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: {
+        "Colorectal, MSS": { all: [
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" },
+          { not: { kind: "clinical", attribute: "MSI_TYPE", values: ["Instable"], per: "sample" } }] },
+        "Pancreatic, MSS": { all: [
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" },
+          { not: { kind: "clinical", attribute: "MSI_TYPE", values: ["Instable"], per: "sample" } }] }
+      },
+      views: [{ kind: "enrichment" }]
+    }
   }
 ];
 
@@ -1113,6 +1158,9 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | \`clonality\` | \`genes:[≤12], measure?:"driver"\|"any", qc?:true, cohorts?:[names] (≤3)\` | **clonality from FACETS allele-specific copy number** (only studies that carry it — the refusal names them): per gene, the cohort's mutation CALLS (one mutation in one sample; OncoKB drivers by default) that FACETS called clonal, subclonal or indeterminate, LOH at the locus (minor copy number 0, of calls where it was estimated) and the cancer-cell fraction in ten bins; per cohort, FACETS's own whole-genome-doubling, purity and ploidy calls. \`qc\` (default true) uses only samples whose \`FACETS_QC\` is Pass, with the pass/fail counts reported. Only the study's current mutation profile is read (the table also holds rows orphaned by superseded loads). Two cohorts add Fisher tests on clonal vs subclonal per gene (BH across genes) and on WGD. Counts only; a remote peer cannot answer yet and is named |
 | \`incidence\` | \`event:{eventType, attrs?:[{key,value} ×≤3], label?}, anchor?:{eventType,key?,value?,occurrence?}, horizons?:[12,24,60], cohorts?:[names] (≤6)\` | **cumulative incidence with a competing risk**: time from the anchor (default the study's day 0) to the FIRST \`event\` after it, with death (\`OS_STATUS\`) as the competing event and \`OS_MONTHS\` as follow-up — Aalen–Johansen, with 95% intervals from its delta-method standard error (checked against R's cmprsk: estimates identical to five decimals, SEs within 3%). Not 1 − Kaplan–Meier, which censors the dead as if still at risk and overstates incidence wherever death is common; the view reports both at each of \`horizons\`, so the difference is on the page. Left truncation as in \`survival\`: a patient anchored before day 0 enters the risk set at day 0. Patients who cannot be at risk are counted by reason, never read as event-free: already had the event at or before the anchor, had it before observation began, no follow-up, no anchor event. Two or more cohorts: Gray's test (weight 1) by permutation of cohort labels over the pooled records — exact under the null, seeded, and computable from the (entry, time, cause) tallies each site sends, which are counts |
 | \`labs\` | \`test, anchor:{eventType,key?,value?,occurrence?}, eventType?:"Lab_Test", testKey?:"TEST", resultKey?:"RESULT", baselineDays?:90, fromWeeks?:-12, toWeeks?:52, binWeeks?:4, responseDrop?:50, cohorts?:[names] (≤4)\` | **a lab value's course from a treatment start**: each patient's \`test\` results (timeline events of \`eventType\` whose \`testKey\` names the test, value in \`resultKey\`) as % change from their own baseline — the last value in the \`baselineDays\` up to and including the anchor; a non-positive baseline is left out — per \`binWeeks\` bin from \`fromWeeks\` to \`toWeeks\`, drawn as median and interquartile band (from 2-point histograms, exact to within a point; a patient counts once per bin, at their mean; the baseline reading itself is not drawn). Best response is each patient's lowest value after the anchor; the share falling by at least \`responseDrop\`% is counted exactly (50 on PSA is PCWG3's PSA50), and two cohorts get a Fisher test on it. A **waterfall** of every patient's best change is drawn only from participants entitled to patient-level values (a method only PatientLevelResolver has, like a plot's points); an aggregate-only participant's patients stay in the histograms and the rate and are counted as withheld from the bars. With no evaluable patient, the refusal lists the tests the study records |
+| \`cancertypes\` | \`genes:[≤30], groupBy?:"CANCER_TYPE"\|<sample attribute>\|"study", measure?:"any"\|"driver", minSamples?:10, show?:"frequency"\|"count", cohorts?:[names] (≤2)\` | **Cancer Types Summary**, cBioPortal's results-view tab: per group of the cohort's SAMPLES — a sample attribute's value (folded on case and whitespace like every clinical predicate; samples with no value form their own group) or the study — the share altered in at least one of \`genes\`, split by kind: only mutations, only amplifications, only deep deletions, only structural variants, or more than one kind. A group's denominator is its samples profiled for at least one of the genes (the union of their panels, as an oncoprint's merged row counts it); its total sample count is shown beside it. \`measure:"driver"\` counts OncoKB drivers only. Groups with fewer than \`minSamples\` profiled samples are pooled into one bar, named and counted, never dropped. Counts only, so every local participant can answer; a remote peer cannot yet and is named |
+| \`overlap\` | \`cohorts?:[names] (2–6)\` | **how cohorts' patients intersect**, cBioPortal's group-comparison Overlap tab drawn as an UpSet plot: for every combination of the cohorts, the patients in exactly those cohorts and none of the others, with each cohort's own size beside it. Each study's database answers with one count per combination (a bitmask of membership) — counts only — and a cohort's size here must equal its own count, or the view says the definition gave two answers. Ids are study-qualified, so patients only ever overlap within a study |
+| \`enrichment\` | \`alteration?:"mutation"\|"cna"\|"amp"\|"homdel"\|"sv", measure?:"any"\|"driver", minAltered?:5, label?:12, cohorts:[2–6 names]\` | **genomic-alteration enrichment across every gene**, cBioPortal's group-comparison Genomic Alterations tab: each gene's frequency of one alteration type per cohort, counted in SAMPLES over the samples profiled for that gene — samples on a panel listing it (counted per panel, then joined to its genes, Explore's own construction) plus whole-exome samples, and a sample altered off-panel counts as measured. Uncalled mutations are excluded as the portal excludes them; copy number is high-level only. Two cohorts: a two-sided Fisher test and the log2 ratio of the altered shares, drawn as a volcano beside the table; three or more: a chi-squared test. q is Benjamini–Hochberg across every gene tested; genes altered in fewer than \`minAltered\` samples, or unprofiled in a cohort, are counted as not tested. The caption warns that hypermutated tumours enrich almost every gene. Counts only |
 | \`oncoprint\` | \`genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], unit?:"patient"\\|"sample", display?:{…}, overlays?:[≤2], derivedCohorts?:[≤3], cohorts?:[names]\` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 \`views[].note\` is the analyst's own one-line annotation, carried through to the result and
@@ -1410,6 +1458,12 @@ export const AGENT_GRAMMAR = `Document shape:
              {"kind":"labs","test":"PSA","anchor":{"eventType":"Treatment","key":"SUBTYPE","value":"Hormone"},
               "baselineDays":90,"fromWeeks":-12,"toWeeks":52,"binWeeks":4,"responseDrop":50,"cohorts":[names?(max 4)]},
                // % change from baseline over time (median/IQR), best response, responders (PSA50), waterfall
+             {"kind":"cancertypes","genes":[...(max 30)],"groupBy":"CANCER_TYPE|<sample attribute>|study","measure":"any|driver","minSamples":10,"show":"frequency|count"},
+               // the portal's Cancer Types Summary: % of samples altered per cancer type, split by mutation/amp/deep del/SV/multiple
+             {"kind":"overlap","cohorts":[names?(2-6)]},
+               // UpSet plot: patients in exactly each combination of cohorts
+             {"kind":"enrichment","alteration":"mutation|cna|amp|homdel|sv","measure":"any|driver","minAltered":5,"cohorts":[2-6 names]},
+               // every gene's alteration frequency compared between cohorts (Fisher/chi-squared, BH), volcano + table
                // the study base, then patients left after each clause of each cohort, in order (CONSORT-style)
              {"kind":"oncoprint","genes":[...(max 12)],"clinical":["<attribute>", ...(max 8)]?,
               "heatmap":[{"profileType":"<profile>","genes":[...]?}, ...(max 4)]?,

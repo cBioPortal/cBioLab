@@ -1725,3 +1725,106 @@ export function sequenceMethod(t: SequenceTrace): MethodRecord {
     }))),
   };
 }
+
+// ---- cancertypes: alteration frequency per cancer type ------------------------------------------
+
+export interface CancertypesTrace {
+  genes: string[]; groupBy: string; measure: "driver" | "any"; oncokbPin: string | null; minSamples: number;
+  perSite: { cohort: string; study: string; groups: number; profiled: number }[];
+  panels: { cohort: string; groups: number; pooled: number; profiled: number; altered: number }[];
+}
+
+export function cancertypesMethod(t: CancertypesTrace): MethodRecord {
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Count samples per " + t.groupBy + " group",
+    detail: "The cancertypes queries above. Per group: the samples profiled for at least one of the genes, and of those the samples with " +
+      (t.measure === "driver" ? "an OncoKB driver (" + t.oncokbPin + ")" : "any mutation, amplification, deep deletion or structural variant") +
+      " in at least one gene, split by kind (one kind only, or more than one). Counts only.",
+    scope: s.cohort + " · " + s.study, rowsOut: s.groups,
+    params: [["genes", t.genes.join(", ")], ["profiled samples", s.profiled.toLocaleString("en-US")]],
+  }));
+  if (new Set(t.perSite.map((s) => s.cohort)).size < t.perSite.length)
+    steps.push({ kind: "transform", title: "Add each group's counts across studies", detail: "Groups are matched by their folded value; the counts add exactly." });
+  for (const p of t.panels) steps.push({
+    kind: "transform", title: "Pool the small groups", scope: p.cohort,
+    detail: p.pooled ? p.pooled + " group" + (p.pooled === 1 ? "" : "s") + " with fewer than " + t.minSamples + " profiled samples drawn as one pooled bar; " + p.groups + " drawn on their own."
+      : "Every group has at least " + t.minSamples + " profiled samples; none pooled.",
+    params: [["profiled", p.profiled.toLocaleString("en-US")], ["altered", p.altered.toLocaleString("en-US")]],
+  });
+  return { steps, implementation: { functions: [], file: "lib/views-portal.ts", commit: BUILD_COMMIT } };
+}
+
+// ---- overlap: how cohorts intersect -------------------------------------------------------------
+
+export function overlapMethod(t: { cohorts: string[]; perSite: { study: string; cohorts: string[]; patients: number }[]; union: number; intersections: number }): MethodRecord {
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Count patients per combination of cohorts",
+    detail: "The overlap query above: every patient in any of " + s.cohorts.join(", ") + " gets a bitmask of the cohorts it is in, and the study returns one count per bitmask. Counts only.",
+    scope: s.study, rowsOut: s.patients,
+  }));
+  steps.push({ kind: "transform", title: "Add the counts across studies and name each combination",
+    detail: "Each study's bits are mapped back to the view's cohort order; combinations add exactly, and a patient can only overlap within one study.",
+    params: [["patients in any cohort", t.union.toLocaleString("en-US")], ["combinations with patients", String(t.intersections)]] });
+  return { steps, implementation: { functions: [], file: "lib/views-portal.ts", commit: BUILD_COMMIT } };
+}
+
+// ---- enrichment: every gene's alteration frequency between cohorts ------------------------------
+
+export interface EnrichmentTrace {
+  alteration: string; measure: "driver" | "any"; oncokbPin: string | null; cohorts: string[]; minAltered: number;
+  test: string; two: boolean;
+  perSite: { cohort: string; study: string; genes: number; wes: number }[];
+  tested: number; untested: number;
+  /** the rows the view shows, whose p and q the script must reproduce */
+  results: { gene: string; p: number; q: number }[];
+}
+
+export function enrichmentMethod(t: EnrichmentTrace): MethodRecord {
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Count altered and profiled samples per gene",
+    detail: "The enrichment queries above: per gene, samples with " + (t.measure === "driver" ? "an OncoKB driver (" + t.oncokbPin + ") " : "a ") + t.alteration +
+      "; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene.",
+    scope: s.cohort + " · " + s.study, rowsOut: s.genes, params: [["whole-exome samples", s.wes.toLocaleString("en-US")]],
+  }));
+  steps.push({ kind: "transform", title: "Profiled = panel samples + whole-exome samples, summed across studies",
+    detail: "A sample altered in a gene its panel does not list still counts as measured. Genes with fewer than " + t.minAltered +
+      " altered samples across the cohorts, or not profiled in one of them, are not tested.",
+    params: [["tested", t.tested.toLocaleString("en-US")], ["not tested", t.untested.toLocaleString("en-US")]] });
+  steps.push({ kind: "statistic", title: (t.two ? "Fisher's exact test" : "Chi-squared test") + " per gene, then Benjamini–Hochberg",
+    detail: "A " + t.test + " on altered vs not among the profiled, per gene; q across every gene tested." });
+  const python = [
+    "# Recompute with scipy " + VERIFIED.fisher.version + " and statsmodels " + VERIFIED.bh.version + ", the versions our code is tested against.",
+    "import pandas as pd",
+    t.two ? "from scipy.stats import fisher_exact" : "from scipy.stats import chi2_contingency",
+    "from statsmodels.stats.multitest import multipletests",
+    "",
+    RESULT_INIT,
+    "# Per cohort and gene: altered samples, and samples profiled for the gene (panel + whole-exome),",
+    "# summed across studies — export it from the enrichment queries above as enrichment_counts.csv",
+    "counts = pd.read_csv(\"enrichment_counts.csv\")",
+    "cohorts = " + JSON.stringify(t.cohorts),
+    "MIN_ALTERED = " + t.minAltered,
+    "rows = []",
+    "for gene, g in counts.groupby(\"gene\"):",
+    "    g = g.set_index(\"cohort\").reindex(cohorts).fillna(0)",
+    "    if g[\"altered\"].sum() < MIN_ALTERED or (g[\"profiled\"] == 0).any():",
+    "        continue",
+    t.two
+      ? "    (a, pa), (b, pb) = [(r.altered, r.profiled) for r in g.itertuples()]\n    p = fisher_exact([[a, pa - a], [b, pb - b]], alternative=\"two-sided\").pvalue"
+      : "    p = chi2_contingency([[r.altered, r.profiled - r.altered] for r in g.itertuples()], correction=False).pvalue",
+    "    rows.append((gene, p))",
+    "res = pd.DataFrame(rows, columns=[\"gene\", \"p\"])",
+    "res[\"q\"] = multipletests(res[\"p\"], method=\"fdr_bh\")[1]",
+    "res = res.sort_values([\"p\", \"gene\"])",
+    "print(len(res), \"genes tested\")",
+    "print(res.head(30).to_string(index=False))",
+    "for r in res.itertuples():",
+    "    RESULT[f\"enrichment:{r.gene}:p\"], RESULT[f\"enrichment:{r.gene}:q\"] = r.p, r.q",
+    "RESULT[\"enrichment:tested\"] = len(res)",
+  ].join("\n") + "\n";
+  return { steps, implementation: { functions: [t.two ? "fisherExact" : "chiSquareTest", "benjaminiHochberg"], file: "lib/stats.ts", commit: BUILD_COMMIT },
+    verification: (t.two ? "Fisher's exact test matches scipy " + VERIFIED.fisher.version + " fisher_exact" : "The chi-squared test matches scipy " + VERIFIED.chi2.version + " chi2_contingency") +
+      " and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts).",
+    python: withResult(python),
+    check: { "enrichment:tested": { v: t.tested }, ...checks("enrichment:", t.results.slice(0, 40), (r) => r.gene, [["p", "p"], ["q", "q"]]) } };
+}

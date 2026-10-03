@@ -84,6 +84,34 @@ async function materialize(v: View, dir: string): Promise<string | null> {
       }
     }
     writeFileSync(join(dir, "diffexpr_moments.csv"), toCsv([...sums.values()], ["cohort", "gene", "n", "sx", "sxx"]));
+  } else if (v.kind === "enrichment") {
+    // altered and panel-profiled samples per (cohort, gene), plus each cohort's whole-exome samples,
+    // assembled exactly as the view assembles them
+    const altered = new Map<string, number>(), panel = new Map<string, number>(), wes = new Map<string, number>();
+    const add = (m: Map<string, number>, k: string, n: number) => m.set(k, (m.get(k) || 0) + n);
+    for (const q of qs) {
+      const [, part, cohort] = /^enrichment:(altered|panels|wes):(.*)$/.exec(q.label) || [];
+      if (!part) continue;
+      for (const r of await runSql(q.study, q.sql)) {
+        if (part === "altered") add(altered, cohort + "\t" + r.gene, Number(r.altered));
+        else if (part === "panels") add(panel, cohort + "\t" + r.gene, Number(r.profiled));
+        else add(wes, cohort, Number(r.n));
+      }
+    }
+    const rows: Record<string, unknown>[] = [];
+    for (const k of new Set([...altered.keys()])) {
+      const [cohort, gene] = k.split("\t");
+      const alt = altered.get(k) || 0;
+      rows.push({ cohort, gene, altered: alt, profiled: Math.max(alt, (panel.get(k) || 0) + (wes.get(cohort) || 0)) });
+    }
+    // a cohort with no altered sample in a gene is still profiled for it
+    const cohortsSeen = [...new Set([...wes.keys(), ...rows.map((r) => String(r.cohort))])];
+    const genesSeen = new Set(rows.map((r) => String(r.gene)));
+    for (const gene of genesSeen) for (const cohort of cohortsSeen) {
+      const k = cohort + "\t" + gene;
+      if (!altered.has(k)) rows.push({ cohort, gene, altered: 0, profiled: (panel.get(k) || 0) + (wes.get(cohort) || 0) });
+    }
+    writeFileSync(join(dir, "enrichment_counts.csv"), toCsv(rows, ["cohort", "gene", "altered", "profiled"]));
   } else {
     return "reads " + wanted.join(", ") + ", which this check cannot build for a " + v.kind + " view";
   }

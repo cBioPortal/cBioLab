@@ -312,7 +312,19 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "labBestSql": () => federation.labBestSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS, 50),
     // one row per patient — its best % change — but no identifier; run only by PatientLevelResolver.moreRows
     "labWaterfallSql": () => federation.labWaterfallSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS, 5000),
-    "labTestsSql": () => federation.labTestsSql(cohortSql, "x", "db", "Lab_Test", "TEST")
+    "labTestsSql": () => federation.labTestsSql(cohortSql, "x", "db", "Lab_Test", "TEST"),
+    // cancertypes: `alt`/`per`/`covered` hold samples; the outer SELECT counts them per group
+    "cancerTypesSql": () => federation.cancerTypesSql(cohortSql, "x", "db", ["KRAS", "NRAS"], "CANCER_TYPE", "v7.5", "driver"),
+    "cancerTypesSql:by-study-any": () => federation.cancerTypesSql(cohortSql, "x", "db", ["KRAS"], null, null, "any"),
+    "cancerTypeSamplesSql": () => federation.cancerTypeSamplesSql(cohortSql, "x", "db", "CANCER_TYPE"),
+    "cancerTypeSamplesSql:by-study": () => federation.cancerTypeSamplesSql(cohortSql, "x", "db", null),
+    // overlap: per-patient membership bits stay inside; one count per bitmask leaves
+    "overlapCountsSql": () => federation.overlapCountsSql([cohortSql, cohortSql, cohortSql], "x", "db"),
+    // enrichment: per-gene sample counts, and panel-level sample counts joined to genes
+    "enrichAlteredSql": () => federation.enrichAlteredSql(cohortSql, "x", "db", "mutation", "v7.5", true),
+    "enrichAlteredSql:cna-any": () => federation.enrichAlteredSql(cohortSql, "x", "db", "cna", null, false),
+    "enrichPanelProfiledSql": () => federation.enrichPanelProfiledSql(cohortSql, "x", "db", "amp"),
+    "enrichWesSql": () => federation.enrichWesSql(cohortSql, "x", "db", "sv")
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

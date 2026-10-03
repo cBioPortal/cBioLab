@@ -1265,6 +1265,8 @@ export interface FederatedPlotCapable {
 export interface MoreAggregateCapable {
   moreAggregate(label: string, def: CohortDef | null | undefined,
     build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
+  moreAggregateMany(label: string, defs: (CohortDef | null | undefined)[],
+    build: (cohortSqls: string[], study: string, db: string) => string): Promise<ChRow[]>;
   moreMeta(label: string, build: (study: string, db: string) => string): Promise<ChRow[]>;
 }
 export function hasMoreAggregates(r: Resolver): r is Resolver & MoreAggregateCapable {
@@ -1704,6 +1706,13 @@ abstract class BaseResolver implements AggregateCapable {
   async moreAggregate(label: string, def: CohortDef | null | undefined,
     build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]> {
     const r = await this.runLogged<ChRow>(label, build(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
+    return r.data;
+  }
+  /** The same for an aggregate over SEVERAL cohorts at once (how they overlap): each definition is
+   *  compiled by this resolver, in order, exactly as moreAggregate compiles one. */
+  async moreAggregateMany(label: string, defs: (CohortDef | null | undefined)[],
+    build: (cohortSqls: string[], study: string, db: string) => string): Promise<ChRow[]> {
+    const r = await this.runLogged<ChRow>(label, build(defs.map((d) => this.cohortSql(d)), this.study, this.instance.conn.db), this.instance.conn);
     return r.data;
   }
   /** Study metadata for those views (no cohort involved), logged the same way. */

@@ -41,6 +41,11 @@ export const MORE_KINDS: Record<string, MoreKindUi> = {
   attrition: { label: "Cohort attrition (CONSORT)", title: "Cohort attrition", maxCohorts: 6 },
   genome: { label: "Genome-wide copy number", title: "Genome-wide copy number", maxCohorts: 4 },
   pathways: { label: "Oncogenic pathways", title: "Oncogenic signalling pathways", maxCohorts: 4 },
+  enrichment: { label: "Alteration enrichment (all genes)", title: "Alteration enrichment", maxCohorts: 6,
+    why: (k) => k.cohorts.length < 2 ? "compares two or more cohorts — this analysis has one" : null },
+  overlap: { label: "Cohort overlap (UpSet)", title: "Cohort overlap", maxCohorts: 6,
+    why: (k) => k.cohorts.length < 2 ? "intersects two or more cohorts — this analysis has one" : null },
+  cancertypes: { label: "Cancer types summary", title: "Cancer types summary", genes: true, maxCohorts: 2 },
   labs: { label: "Lab course and response (e.g. PSA50)", title: "Lab course", maxCohorts: 4,
     why: (k) => k.events.some((e) => /lab/i.test(e.canonical)) ? null : "this study records no lab-test timeline events" },
   incidence: { label: "Cumulative incidence (competing risks)", title: "Cumulative incidence", maxCohorts: 6,
@@ -73,6 +78,10 @@ export interface MoreCtx {
 /** A one-line subtitle for the card header. */
 export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "attrition") return "patients left after each clause, in order";
+  if (kind === "enrichment") return ({ mutation: "mutations", cna: "copy-number alterations", amp: "amplifications", homdel: "deep deletions", sv: "structural variants" } as Record<string, string>)[spec.alteration || "mutation"] +
+    (spec.measure === "driver" ? " (drivers)" : "") + " in every gene, per sample";
+  if (kind === "overlap") return "patients in exactly each combination of cohorts";
+  if (kind === "cancertypes") return "by " + (spec.groupBy || "CANCER_TYPE") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled samples";
   if (kind === "labs") {
     const an = spec.anchor || {};
     return (spec.test || "no test chosen") + " from first " + (an.eventType || "?") + (an.key ? " [" + an.key + "=" + an.value + "]" : "") +
@@ -141,6 +150,62 @@ export function MoreControls({ c }: { c: MoreCtx }) {
       </div>
     </div>
   );
+  if (spec.kind === "enrichment") return (
+    <div className="viewtb">
+      <div className="tbz"><span className="tbl">data</span>
+        <label className="tbfield" title="which alteration to compare across every gene">
+          alteration <select value={spec.alteration || "mutation"} disabled={busy} onChange={(e) => patch({ alteration: e.target.value === "mutation" ? undefined : e.target.value })}>
+            <option value="mutation">mutation</option><option value="cna">amp or deep deletion</option><option value="amp">amplification</option>
+            <option value="homdel">deep deletion</option><option value="sv">structural variant</option>
+          </select>
+        </label>
+        <label className="tbfield" title="count every alteration, or only OncoKB drivers">
+          count <select value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onChange={(e) => patch({ measure: e.target.value === "driver" ? "driver" : undefined })}>
+            <option value="any">any</option><option value="driver">drivers</option>
+          </select>
+        </label>
+        <label className="tbfield" title="genes altered in fewer samples than this across the cohorts are counted but not tested">
+          test genes altered in ≥ <select value={String(spec.minAltered ?? 5)} disabled={busy} onChange={(e) => patch({ minAltered: Number(e.target.value) })}>
+            {[1, 5, 10, 20, 50].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+  if (spec.kind === "cancertypes") {
+    const cats = c.attrs.filter((a) => a.kind !== "num").map((a) => a.attribute);
+    const by = spec.groupBy || "CANCER_TYPE";
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="a sample attribute to group samples by, or the study each comes from">
+            group by <select value={by} disabled={busy} onChange={(e) => patch({ groupBy: e.target.value === "CANCER_TYPE" ? undefined : e.target.value })}>
+              {!cats.includes(by) && by !== "study" && <option value={by}>{by}</option>}
+              {cats.map((a) => <option key={a} value={a}>{a}</option>)}
+              <option value="study">study</option>
+            </select>
+          </label>
+          <label className="tbfield" title="count every alteration, or only OncoKB drivers">
+            count <select value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onChange={(e) => patch({ measure: e.target.value === "driver" ? "driver" : undefined })}>
+              <option value="any">any alteration</option><option value="driver">drivers</option>
+            </select>
+          </label>
+          <label className="tbfield" title="groups with fewer profiled samples than this are pooled into one bar, never dropped">
+            min group <select value={String(spec.minSamples ?? 10)} disabled={busy} onChange={(e) => patch({ minSamples: Number(e.target.value) })}>
+              {[1, 10, 50, 100, 200, 500].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="tbz"><span className="tbl">view</span>
+          <label className="tbfield" title="draw each group's altered share, or its altered sample count">
+            show <select value={spec.show === "count" ? "count" : "frequency"} disabled={busy} onChange={(e) => patch({ show: e.target.value === "count" ? "count" : undefined })}>
+              <option value="frequency">frequency</option><option value="count">sample count</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "labs") {
     const an = spec.anchor || { eventType: "" };
     const types = c.events.map((x) => x.label);
@@ -298,6 +363,7 @@ export function MoreControls({ c }: { c: MoreCtx }) {
 
 /** The view a fresh "add view" click starts from, built from what the study is known to have. */
 export function defaultMoreView(kind: string, known: Known): Record<string, unknown> {
+  if (kind === "cancertypes") return { kind, genes: known.genes.length ? known.genes.slice(0, 5) : ["TP53", "KRAS"] };
   if (kind === "labs") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));
     return { kind, test: "PSA", anchor: { eventType: tx ? tx.label : "Treatment" } };
