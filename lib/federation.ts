@@ -22,7 +22,7 @@
 import { chQuery, DB, PRIMARY, connections, isAbortError, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
-import { linesCtes, lineGapOf, TREATMENT_EVENT } from "./treatment-lines.ts";
+import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
 import { compileCohortDef, eventTypeMatchSql } from "./cohort2.ts";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
@@ -904,6 +904,9 @@ export interface CourseOpts {
  *
  * Rows come back as (bin, et, n); `et = ''` carries the at-risk denominator.
  */
+/** Rows of eventCourseSql that are counts about the cohort rather than a (bin, state) cell. */
+export const COURSE_ANCHORED = "#anchored", COURSE_OBSERVED = "#observed";
+
 export function eventCourseSql(
   cohortSql: string, study: string, db: string, opts: CourseOpts
 ): string {
@@ -987,9 +990,15 @@ export function eventCourseSql(
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
     "    AND " + nameFoldSql("ce.event_type") + " IN (" + types.map((t) => nameFoldSql(sq(t))).join(", ") + ")\n" +
     ")\n" +
-    "SELECT bin, et, uniqExact(pid) AS n\n" +
-    "FROM (SELECT bin, pid, et FROM denom UNION ALL SELECT bin, pid, et FROM numer)\n" +
-    "GROUP BY bin, et ORDER BY bin, et"
+    // plus two counts the method record states: patients with an anchor, and those of them
+    // observable in at least one bin of the window
+    "SELECT bin, et, n FROM (\n" +
+    "  SELECT toInt32(bin) AS bin, et, uniqExact(pid) AS n\n" +
+    "  FROM (SELECT bin, pid, et FROM denom UNION ALL SELECT bin, pid, et FROM numer)\n" +
+    "  GROUP BY bin, et\n" +
+    "  UNION ALL SELECT toInt32(0) AS bin, " + sq(COURSE_ANCHORED) + " AS et, uniqExact(pid) AS n FROM anch\n" +
+    "  UNION ALL SELECT toInt32(0) AS bin, " + sq(COURSE_OBSERVED) + " AS et, uniqExact(pid) AS n FROM denom\n" +
+    ") ORDER BY bin, et"
   );
 }
 
@@ -1010,6 +1019,8 @@ export interface SequenceOpts {
 
 /** Flow rows one study may return; at the limit the view says its smallest flows were cut. */
 export const SEQUENCE_ROW_LIMIT = 2000;
+/** Why a treatment record was set aside before lines were built — the `to` of a step-0 row. */
+export const SEQUENCE_NOT_LINE_CLASS = "#not a line class", SEQUENCE_EXCLUDED = "#excluded by the document";
 
 /**
  * One transition. `to: ''` means no further line — and `fate` says whether that
@@ -1047,12 +1058,12 @@ export function sequenceSql(
   const steps = Math.max(2, Math.min(8, Math.floor(Number(opts.maxSteps) || 3)));
   if (!String(opts.labelKey || "").trim()) throw new Error("a sequence view needs a labelKey (e.g. SUBTYPE)");
   const pid = "p.stable_id";
+  const lineSpec = { gap, eventType: opts.eventType || TREATMENT_EVENT, labelKey: opts.labelKey, exclude: opts.exclude,
+    ...(opts.lineClasses ? { classes: opts.lineClasses } : {}) };
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
     // the one line definition every view and clause shares — lib/treatment-lines.ts
-    linesCtes({ db, study, patientFilter: pid + " IN (SELECT pid FROM cohort)",
-      spec: { gap, eventType: opts.eventType || TREATMENT_EVENT, labelKey: opts.labelKey, exclude: opts.exclude,
-        ...(opts.lineClasses ? { classes: opts.lineClasses } : {}) } }).join(",\n") + ",\n" +
+    linesCtes({ db, study, patientFilter: pid + " IN (SELECT pid FROM cohort)", spec: lineSpec }).join(",\n") + ",\n" +
     // How long the study kept watching, from ANY event type plus OS follow-up.
     // This is what separates "we saw them not start another line" from "the
     // records simply stop" — see the fate expression below.
@@ -1094,10 +1105,20 @@ export function sequenceSql(
     "            if(coalesce(o.last_seen, toFloat64(sq2.line_end)) - sq2.line_end >= " + gap + ", 1, 2)) AS fate\n" +
     "  FROM seq sq2 LEFT JOIN obs o ON o.pid = sq2.pid\n" +
     ")\n" +
-    "SELECT line_no AS step, combo AS a, nxt AS b, fate, uniqExact(pid) AS n\n" +
-    "FROM fated WHERE line_no <= " + steps + "\n" +
+    "SELECT step, a, b, fate, n FROM (\n" +
+    "  SELECT toUInt32(line_no) AS step, toString(combo) AS a, toString(nxt) AS b, toUInt8(fate) AS fate, toUInt64(uniqExact(pid)) AS n\n" +
+    "  FROM fated WHERE line_no <= " + steps + "\n" +
     // ties on n broken by the flow itself, so which rows the limit keeps never depends on row order
-    "GROUP BY step, a, b, fate ORDER BY n DESC, step, a, b, fate LIMIT " + SEQUENCE_ROW_LIMIT
+    "  GROUP BY step, a, b, fate ORDER BY n DESC, step, a, b, fate LIMIT " + SEQUENCE_ROW_LIMIT + "\n" +
+    ")\n" +
+    // step 0 rows are not flows: they count the treatment records set aside before lines were built,
+    // by class, and why — not a line class, or excluded by the document — for the method record
+    "UNION ALL\n" +
+    "SELECT toUInt32(0) AS step, toString(if(cls = '', '(no class)', any(cls_raw))) AS a,\n" +
+    "       toString(if(" + inLineClassesSql(lineSpec, "cls") + ", " + sq(SEQUENCE_EXCLUDED) + ", " + sq(SEQUENCE_NOT_LINE_CLASS) + ")) AS b,\n" +
+    "       toUInt8(0) AS fate, toUInt64(count()) AS n\n" +
+    "FROM txAll WHERE eid NOT IN (SELECT eid FROM txLabelled)\n" +
+    "GROUP BY cls, b"
   );
 }
 

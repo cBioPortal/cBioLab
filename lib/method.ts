@@ -13,6 +13,7 @@ import type { CoxCovariate } from "./types.ts";
 import type { AxisKind } from "./plot.ts";
 import { BUILD_COMMIT } from "./build-info.ts";
 import { COX_MAX_ITERATIONS, LOGISTIC_MAX_ITERATIONS } from "./stats.ts";
+import { SYSTEMIC_LINE_CLASSES, CLASS_KEYS } from "./treatment-lines.ts";
 
 export interface MethodStep {
   kind: "fetch" | "transform" | "statistic";
@@ -1387,5 +1388,326 @@ export function attritionMethod(panels: { cohort: string; base: number; steps: {
       params: [["every patient", p.base.toLocaleString()], ...p.steps.map((s) => [s.label, s.n.toLocaleString() + " (−" + s.excluded.toLocaleString() + ")"] as [string, string])],
     })),
     implementation: { functions: [], file: "lib/views-more.ts", commit: BUILD_COMMIT },
+  };
+}
+
+// ---- clonality: FACETS calls per gene, Fisher on clonal vs subclonal and on WGD, BH -----------
+
+export interface ClonalityTrace {
+  measure: "driver" | "any";
+  oncokbPin: string | null;
+  qc: boolean;
+  perSite: { cohort: string; study: string; cohortPatients: number }[];
+  panels: { cohort: string; samples: number; ascnSamples: number; qcPass: number; qcFail: number; wgdYes: number; wgdNo: number }[];
+  /** per cohort (summed over its studies) and gene: FACETS's calls */
+  genes: { cohort: string; gene: string; calls: number; clonal: number; subclonal: number; indeterminate: number; loh: number; lohKnown: number }[];
+  /** what the view reported (two cohorts only) — for the script check */
+  results: { genes: { gene: string; p: number; q: number }[]; wgdP?: number };
+}
+
+export function clonalityMethod(t: ClonalityTrace): MethodRecord {
+  const two = t.panels.length === 2;
+  const what = t.measure === "driver" ? "each " + driverMeaning(t.oncokbPin).replace(/^driver: /, "") : "each mutation";
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Count FACETS's calls per gene",
+    detail: "The clonality:summary, clonality:purity-ploidy and clonality:genes queries above. Per gene, " + what +
+      " in one sample is one call, which FACETS labels clonal, subclonal or indeterminate from its cancer-cell fraction (or leaves uncalled); loss of heterozygosity is a minor copy number of 0 where one was estimated. Per sample: whole-genome doubling, purity and ploidy as FACETS called them. Counts only.",
+    scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
+  }));
+  steps.push({ kind: "transform", title: t.qc ? "Keep samples that pass FACETS QC" : "Keep every sample",
+    detail: t.qc ? "Only samples whose FACETS_QC is Pass (matched ignoring case) contribute calls, WGD, purity and ploidy." : "qc: false — FACETS_QC failures are used too.",
+    params: t.panels.map((pn) => [pn.cohort, pn.qcPass.toLocaleString() + " pass, " + pn.qcFail.toLocaleString() + " fail, of " +
+      pn.ascnSamples.toLocaleString() + " samples with allele-specific copy number"] as [string, string]) });
+  if (new Set(t.perSite.map((s) => s.cohort)).size < t.perSite.length) steps.push({ kind: "transform", title: "Add each cohort's counts across its studies", detail: "The counts add exactly." });
+  if (two) {
+    steps.push({ kind: "statistic", title: "Fisher's exact test per gene, and on WGD",
+      detail: "Two-sided, on clonal against subclonal calls between the two cohorts, for each gene with at least one such call in both; indeterminate and uncalled calls do not enter. And on whole-genome doubled against not, per sample." });
+    steps.push({ kind: "statistic", title: "Benjamini–Hochberg across genes", detail: "q-values over the genes tested." });
+  }
+  const python = [
+    "# Recompute" + (two ? " with scipy " + VERIFIED.fisher.version + " and statsmodels " + VERIFIED.bh.version + ", the versions our code is tested against" : "") + ".",
+    "import io",
+    "import pandas as pd",
+    ...(two ? ["from scipy.stats import fisher_exact", "from statsmodels.stats.multitest import multipletests"] : []),
+    "",
+    RESULT_INIT,
+    ...pyTable("calls", "Per cohort (summed over its studies) and gene: FACETS's calls", ["cohort", "gene", "calls", "clonal", "subclonal", "indeterminate", "loh", "loh_known"],
+      t.genes.map((g) => [g.cohort, g.gene, g.calls, g.clonal, g.subclonal, g.indeterminate, g.loh, g.lohKnown]), "clonality_calls.csv"),
+    "wgd = " + JSON.stringify(Object.fromEntries(t.panels.map((pn) => [pn.cohort, [pn.wgdYes, pn.wgdNo]]))) + "  # cohort: [doubled, not], QC-passing samples",
+    "calls[\"uncalled\"] = calls[\"calls\"] - calls[\"clonal\"] - calls[\"subclonal\"] - calls[\"indeterminate\"]",
+    "print(calls.to_string(index=False))",
+    "for r in calls.itertuples():",
+    "    RESULT[f\"clonality:{r.cohort}:{r.gene}:clonal\"], RESULT[f\"clonality:{r.cohort}:{r.gene}:subclonal\"] = r.clonal, r.subclonal",
+    ...(two ? [
+      "a_name, b_name = " + JSON.stringify(t.panels.map((pn) => pn.cohort)).slice(1, -1),
+      "a, b = calls[calls[\"cohort\"] == a_name].set_index(\"gene\"), calls[calls[\"cohort\"] == b_name].set_index(\"gene\")",
+      "tested = [g for g in a.index if g in b.index and a.loc[g, \"clonal\"] + a.loc[g, \"subclonal\"] > 0 and b.loc[g, \"clonal\"] + b.loc[g, \"subclonal\"] > 0]",
+      "p = [fisher_exact([[a.loc[g, \"clonal\"], a.loc[g, \"subclonal\"]], [b.loc[g, \"clonal\"], b.loc[g, \"subclonal\"]]]).pvalue for g in tested]",
+      "q = multipletests(p, method=\"fdr_bh\")[1] if p else []",
+      "for g, pv, qv in zip(tested, p, q):",
+      "    print(f\"{g}: clonal vs subclonal p={pv:.4g}, q={qv:.4g}\")",
+      "    RESULT[f\"clonality:{g}:p\"], RESULT[f\"clonality:{g}:q\"] = pv, qv",
+      "if sum(wgd[a_name]) and sum(wgd[b_name]):",
+      "    RESULT[\"clonality:wgd:p\"] = fisher_exact([wgd[a_name], wgd[b_name]]).pvalue",
+      "    print(\"whole-genome doubling p =\", RESULT[\"clonality:wgd:p\"])",
+    ] : []),
+  ].join("\n") + "\n";
+  return {
+    steps,
+    implementation: { functions: two ? ["fisherExact", "benjaminiHochberg"] : [], file: "lib/stats.ts", commit: BUILD_COMMIT },
+    ...(two ? { verification: "Fisher's exact test matches scipy " + VERIFIED.fisher.version + " fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts)." } : {}),
+    python: withResult(python),
+    check: {
+      ...checks("clonality:", t.genes, (g) => g.cohort + ":" + g.gene, [["clonal", "clonal", { abs: 0 }], ["subclonal", "subclonal", { abs: 0 }]]),
+      ...checks("clonality:", t.results.genes, (g) => g.gene, [["p", "p"], ["q", "q"]]),
+      ...(t.results.wgdP != null ? { "clonality:wgd:p": { v: t.results.wgdP } } : {}),
+    },
+  };
+}
+
+// ---- labs: % change from baseline after an anchor, its course, best response -------------------
+
+export interface LabsTrace {
+  test: string;
+  anchoredTo: string;
+  occurrence: "FIRST" | "LAST";
+  baselineDays: number; fromWeeks: number; toWeeks: number; binWeeks: number; responseDrop: number;
+  pctMin: number; pctMax: number; pctBin: number;
+  minPointN: number;
+  waterfallCap: number;
+  perSite: { cohort: string; study: string; cohortPatients: number }[];
+  panels: { cohort: string; anchored: number; baseline: number; positiveBaseline: number; evaluable: number; responders: number;
+    waterfallWithheld: number; waterfallCapped: number }[];
+  /** per cohort, summed over its studies: patients per (week bin, % change bin midpoint) */
+  course: { cohort: string; week: number; v: number; n: number }[];
+  /** what the view reported — for the script check */
+  results: { course: { cohort: string; week: number; q1: number | null; median: number | null; q3: number | null }[]; responseP?: number };
+}
+
+export function labsMethod(t: LabsTrace): MethodRecord {
+  const two = t.panels.length === 2;
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Count patients' % change from baseline",
+    detail: "The labs:course and labs:best queries above (and labs:waterfall, one bar per patient, from a patient-level participant). Counts per bin and per rule, no individual value except the waterfall's bars.",
+    scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
+  }));
+  steps.push({ kind: "transform", title: "Anchor, baseline and change",
+    detail: "Day 0 is each patient's " + t.occurrence.toLowerCase() + " " + t.anchoredTo + " (event type, key and value matched ignoring case); a patient without one is not anchored. " +
+      t.test + " readings are those whose result parses as a number. The baseline is the mean of a patient's readings on the last day with any in the " + t.baselineDays +
+      " days up to and including day 0; a patient without one has no baseline, and one whose baseline is 0 or below is left out, since a % change from it means nothing. Every later reading becomes 100·(value − baseline)/baseline; readings on the baseline day itself are not used.",
+    params: t.panels.map((pn) => [pn.cohort, pn.anchored.toLocaleString() + " anchored → " + pn.baseline.toLocaleString() + " with a baseline → " +
+      pn.positiveBaseline.toLocaleString() + " with a positive one → " + pn.evaluable.toLocaleString() + " with a reading after day 0"] as [string, string]) });
+  steps.push({ kind: "transform", title: "Bin the course",
+    detail: "Weeks " + t.fromWeeks + " to " + t.toWeeks + " around day 0 in " + t.binWeeks + "-week bins; a patient tested several times in a bin counts once, at their mean. % change in " + t.pctBin + "-point bins from " +
+      t.pctMin + " to " + t.pctMax + ", values beyond either end in the end bin. The figure draws a bin only from " + t.minPointN + " patients." });
+  steps.push({ kind: "statistic", title: "Median and interquartile range per week",
+    detail: "From each bin's histogram, with the bin midpoints as values and linear interpolation between ranks — exact to within a " + t.pctBin + "-point bin." });
+  steps.push({ kind: "statistic", title: "Best response",
+    detail: "Each patient's lowest % change after day 0 within the window; a responder fell by at least " + t.responseDrop + "%, counted from the unbinned values." +
+      (two ? " The two cohorts' response rates are compared with a two-sided Fisher's exact test." : ""),
+    params: t.panels.map((pn) => [pn.cohort, pn.responders.toLocaleString() + " responders of " + pn.evaluable.toLocaleString() +
+      (pn.waterfallWithheld ? " · " + pn.waterfallWithheld + " bars withheld (aggregate-only participant)" : "") +
+      (pn.waterfallCapped ? " · " + pn.waterfallCapped + " bars past the " + t.waterfallCap.toLocaleString() + "-bar limit" : "")] as [string, string]) });
+  const python = [
+    "# Recompute the course's quartiles from the binned counts" + (two ? ", and the response test with scipy " + VERIFIED.fisher.version : "") + ".",
+    "import io",
+    "import numpy as np",
+    "import pandas as pd",
+    ...(two ? ["from scipy.stats import fisher_exact"] : []),
+    "",
+    RESULT_INIT,
+    ...pyTable("course", "Per cohort and week bin: patients whose mean % change fell in each " + t.pctBin + "-point bin (v is the bin's midpoint)",
+      ["cohort", "week", "v", "n"], t.course.map((r) => [r.cohort, r.week, r.v, r.n]), "labs_course.csv"),
+    "for (cohort, week), g in course.groupby([\"cohort\", \"week\"], sort=False):",
+    "    values = np.repeat(g[\"v\"].to_numpy(), g[\"n\"].to_numpy())",
+    "    q1, median, q3 = np.percentile(values, [25, 50, 75])",
+    "    print(f\"{cohort} week {week}: n={len(values)}, median {median:.1f}%, IQR {q1:.1f} to {q3:.1f}\")",
+    "    for name, x in ((\"q1\", q1), (\"median\", median), (\"q3\", q3)):",
+    "        RESULT[f\"labs:{cohort}:{week}:{name}\"] = x",
+    "responders = " + JSON.stringify(Object.fromEntries(t.panels.map((pn) => [pn.cohort, [pn.responders, pn.evaluable]]))) + "  # cohort: [responders, evaluable], as the query counted them",
+    ...(two ? [
+      "(ra, ea), (rb, eb) = responders.values()",
+      "RESULT[\"labs:response:p\"] = fisher_exact([[ra, ea - ra], [rb, eb - rb]]).pvalue",
+      "print(\"response rates\", {c: f\"{r}/{e}\" for c, (r, e) in responders.items()}, \"Fisher p =\", RESULT[\"labs:response:p\"])",
+    ] : []),
+  ].join("\n") + "\n";
+  return {
+    steps,
+    implementation: { functions: ["quantilesFromHistogram", ...(two ? ["fisherExact"] : [])], file: "lib/stats.ts", commit: BUILD_COMMIT },
+    verification: "Quantiles from histograms match numpy percentile on the expanded values" + (two ? ", and Fisher's exact test scipy " + VERIFIED.fisher.version + " fisher_exact" : "") +
+      ", to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts).",
+    python: withResult(python),
+    check: {
+      // quartiles are reported to 3 decimals
+      ...checks("labs:", t.results.course, (c) => c.cohort + ":" + c.week,
+        [["q1", "q1", { abs: 5e-4 + 1e-9 }], ["median", "median", { abs: 5e-4 + 1e-9 }], ["q3", "q3", { abs: 5e-4 + 1e-9 }]]),
+      ...(t.results.responseP != null ? { "labs:response:p": { v: t.results.responseP } } : {}),
+    },
+  };
+}
+
+// ---- course: the share of observable patients in each state, per time bin ------------------------
+
+export interface CourseTrace {
+  anchor?: string;
+  binMonths: number;
+  fromBin: number; toBin: number;
+  riskFloor: number;
+  perSite: { cohort: string; study: string; cohortPatients: number }[];
+  dropped: string[];
+  /** each measured event type: its label, the spellings folded into it, and whether it carries durations */
+  events: { canonical: string; label: string; variants: string[]; isInterval: boolean }[];
+  cohorts: { name: string; patients: number; anchored: number; observed: number }[];
+  /** per cohort, summed over its studies: patients observable in each bin (event ''), and in each state */
+  counts: { cohort: string; bin: number; event: string; n: number }[];
+  /** what the view reported — for the script check */
+  results: { cohort: string; event: string; bin: number; atRisk: number; n: number; pct: number | null }[];
+}
+
+export function courseMethod(t: CourseTrace): MethodRecord {
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Count patients per time bin",
+    detail: "The timelineSpan and eventCourse queries above. Per " + t.binMonths + "-month bin: the cohort's patients observable in it, and of those the ones in each event's state (or with the event in it). Counts only.",
+    scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
+  }));
+  if (t.dropped.length) steps.push({ kind: "transform", title: "Leave out studies with no timeline structure",
+    detail: "A study whose every event sits on one day cannot place anything in time: " + t.dropped.join(", ") + "." });
+  const folds = t.events.filter((e) => e.variants.length > 1);
+  steps.push({ kind: "transform", title: "Match event types",
+    detail: "Event types, keys and values match ignoring case and surrounding whitespace; nothing else is merged." +
+      (folds.length ? " Folded here: " + folds.map((e) => e.variants.join(" = ")).join("; ") + "." : ""),
+    params: t.events.map((e) => [e.label, e.isInterval ? "has durations: a state the patient is in during a bin" : "no durations: an event that happened in a bin"] as [string, string]) });
+  steps.push({ kind: "transform", title: t.anchor ? "Align on " + t.anchor : "Align on each study's day 0",
+    detail: (t.anchor ? "Day 0 is each patient's " + t.anchor + "; a patient without one is in no bin."
+      : "Day 0 is the study's own baseline, which is not comparable across studies.") +
+      " A patient is observable from their first recorded event to their last contact — the later of their last recorded event and their OS follow-up (OS_MONTHS × 30.4375 days, assuming it starts at the timeline's day 0).",
+    params: t.cohorts.map((c) => [c.name, c.patients.toLocaleString() + " in the cohort → " + c.anchored.toLocaleString() + (t.anchor ? " with the anchor event" : " aligned") +
+      " → " + c.observed.toLocaleString() + " observable in the window"] as [string, string]) });
+  steps.push({ kind: "statistic", title: "Share per bin",
+    detail: "For each bin from month " + t.fromBin * t.binMonths + " to " + (t.toBin + 1) * t.binMonths + " (half-open [t, t+" + t.binMonths + ")): patients in the state ÷ patients observable, as a percentage. The figure stops each line where fewer than " +
+      t.riskFloor + " patients remain observable." });
+  const python = [
+    "# Recompute each bin's percentage from the counts.",
+    "import io",
+    "import pandas as pd",
+    "",
+    RESULT_INIT,
+    ...pyTable("counts", "Per cohort (summed over its studies) and bin: patients observable (event \"\") and in each event's state", ["cohort", "bin", "event", "n"],
+      t.counts.map((r) => [r.cohort, r.bin, r.event, r.n]), "course_counts.csv"),
+    "counts[\"event\"] = counts[\"event\"].fillna(\"\")",
+    "n = counts.set_index([\"cohort\", \"event\", \"bin\"])[\"n\"]",
+    "events = " + JSON.stringify(Object.fromEntries(t.events.map((e) => [e.canonical, e.label]))) + "  # folded name: label",
+    "for cohort in " + JSON.stringify(t.cohorts.map((c) => c.name)) + ":",
+    "    for event, label in events.items():",
+    "        for b in range(" + t.fromBin + ", " + (t.toBin + 1) + "):",
+    "            at_risk, k = n.get((cohort, \"\", b), 0), n.get((cohort, event, b), 0)",
+    "            pct = 100 * k / at_risk if at_risk else None",
+    "            RESULT[f\"course:{cohort}:{label}:{b}:pct\"], RESULT[f\"course:{cohort}:{label}:{b}:at_risk\"] = pct, at_risk",
+    "        print(cohort, label, [round(RESULT[f'course:{cohort}:{label}:{b}:pct'], 1) if RESULT[f'course:{cohort}:{label}:{b}:pct'] is not None else None",
+    "                              for b in range(" + t.fromBin + ", " + (t.toBin + 1) + ")])",
+  ].join("\n") + "\n";
+  return {
+    steps,
+    implementation: { functions: [], file: "lib/analysis.ts", commit: BUILD_COMMIT },
+    python: withResult(python),
+    // percentages are reported to 1 decimal
+    check: checks("course:", t.results, (r) => r.cohort + ":" + r.event + ":" + r.bin,
+      [["pct", "pct", { abs: 0.05 + 1e-9 }], ["atRisk", "at_risk", { abs: 0 }]]),
+  };
+}
+
+// ---- sequence: treatment lines and what follows what ---------------------------------------------
+
+export interface SequenceTrace {
+  eventType: string;
+  labelKey: string;
+  lineGap: number;
+  maxSteps: number;
+  topN: number;
+  classes: "systemic" | "all" | string[];
+  exclude: string[];
+  truncated: boolean;
+  rowLimit: number;
+  perSite: { cohort: string; study: string; cohortPatients: number }[];
+  /** treatment records set aside before lines were built, by class and reason */
+  setAside: { cohort: string; cls: string; reason: string; records: number }[];
+  /** per cohort, summed over its studies: patients per (line, from, to, fate) */
+  flows: { cohort: string; step: number; from: string; to: string; fate: number; n: number }[];
+  foldedLabels: number;
+  /** what the view reported — for the script check */
+  results: { cohort: string; started: number; censored: number; nodes: { column: number; kind: string; label: string; n: number }[] }[];
+}
+
+export function sequenceMethod(t: SequenceTrace): MethodRecord {
+  const classText = t.classes === "all" ? "every " + t.eventType + " record"
+    : Array.isArray(t.classes) ? t.eventType + " records whose class is one of " + t.classes.join(", ")
+    : t.eventType + " records whose class is systemic therapy (" + SYSTEMIC_LINE_CLASSES.join(", ") + ")";
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Build lines and count what follows what",
+    detail: "The treatmentSequence query above builds every patient's lines in the database and returns, per line number, how many patients went from one regimen to the next, stopped, or were lost to follow-up — counts only — plus how many records it set aside.",
+    scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
+  }));
+  const byReason = (reason: string) => {
+    const m = new Map<string, number>();
+    for (const r of t.setAside.filter((x) => x.reason === reason)) m.set(r.cls, (m.get(r.cls) || 0) + r.records);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  };
+  const notLine = byReason("#not a line class"), excluded = byReason("#excluded by the document");
+  steps.push({ kind: "transform", title: "Choose the records that form lines",
+    detail: "The one definition every line count shares (lib/treatment-lines.ts): " + classText + ". A record's class is its SUBTYPE, or its TREATMENT_TYPE where it has none; names and values match ignoring case." +
+      (t.exclude.length ? " Records labelled " + t.exclude.join(", ") + " are left out by this document." : ""),
+    params: [
+      ...notLine.slice(0, 12).map(([c, n]) => [c, n.toLocaleString() + " records set aside: not a line class"] as [string, string]),
+      ...(notLine.length > 12 ? [["…", (notLine.length - 12) + " more classes, " + notLine.slice(12).reduce((k, [, n]) => k + n, 0).toLocaleString() + " records"] as [string, string]] : []),
+      ...excluded.map(([c, n]) => [c, n.toLocaleString() + " records excluded by the document"] as [string, string]),
+    ] });
+  steps.push({ kind: "transform", title: "Group records into lines",
+    detail: "Per patient, by start date: a record starting more than " + t.lineGap + " days after every earlier one has stopped begins a new line; anything closer — overlapping, or a switch within the gap — is the same line. A line is named by its sorted combination of " +
+      (CLASS_KEYS.includes(t.labelKey.toLowerCase() as never) ? "classes" : t.labelKey + " values") + " ('A + B'); the label never decides which records form a line." });
+  steps.push({ kind: "transform", title: "Decide how each path ends",
+    detail: "A patient's last line ends in 'no further line' only if they were observed for at least " + t.lineGap + " days after it — their last contact being the later of their last recorded event of any type and their OS follow-up (OS_MONTHS × 30.4375 days) — and in 'record ends here' otherwise. Lines are followed up to line " + t.maxSteps + "." });
+  steps.push({ kind: "transform", title: "Keep the " + t.topN + " most common regimens",
+    detail: "Flows are summed across studies, then regimens ranked by the patients leaving them (or, for one seen only as a destination, arriving), ties by name, across every panel so a regimen keeps one identity; the rest are drawn as 'other'." +
+      (t.truncated ? " A study's answer reached the " + t.rowLimit + "-flow limit, so its rarest flows are missing." : ""),
+    params: [["regimens folded into 'other'", String(t.foldedLabels)]] });
+  const python = [
+    "# Recompute the diagram from the flows: the top-" + t.topN + " folding, node sizes, and who started and was censored.",
+    "import io",
+    "import pandas as pd",
+    "",
+    RESULT_INIT,
+    ...pyTable("flows", "Per cohort (summed over its studies): patients per (line, from, to, fate); fate 0 another line, 1 no further line, 2 record ends",
+      ["cohort", "step", "from_", "to", "fate", "n"], t.flows.map((f) => [f.cohort, f.step, f.from, f.to, f.fate, f.n]), "sequence_flows.csv"),
+    "flows[\"to\"] = flows[\"to\"].fillna(\"\")",
+    "out_w = flows.groupby(\"from_\")[\"n\"].sum()",
+    "in_w = flows[(flows[\"fate\"] == 0) & (flows[\"to\"] != \"\")].groupby(\"to\")[\"n\"].sum()",
+    "weight = {**{k: v for k, v in in_w.items() if k not in out_w}, **out_w.to_dict()}",
+    "keep = {label for label, _ in sorted(weight.items(), key=lambda x: (-x[1], x[0]))[:" + t.topN + "]}",
+    "fold = lambda label: label if label in keep else \"other\"",
+    "kind = {0: \"regimen\", 1: \"stopped\", 2: \"censored\"}",
+    "print(len(weight) - len(keep), \"regimens folded into 'other'\")",
+    "for cohort, g in flows.groupby(\"cohort\", sort=False):",
+    "    out_n, in_n, started, censored = {}, {}, 0, 0",
+    "    for r in g.itertuples():",
+    "        k = kind[r.fate]",
+    "        src, dst = (r.step, \"regimen\", fold(r.from_)), (r.step + 1, k, fold(r.to) if k == \"regimen\" else \"\")",
+    "        out_n[src] = out_n.get(src, 0) + r.n",
+    "        in_n[dst] = in_n.get(dst, 0) + r.n",
+    "        started += r.n if r.step == 1 else 0",
+    "        censored += r.n if k == \"censored\" else 0",
+    "    print(f\"{cohort}: {started} with a first line, {censored} paths end censored\")",
+    "    RESULT[f\"sequence:{cohort}:started\"], RESULT[f\"sequence:{cohort}:censored\"] = started, censored",
+    "    for node in set(out_n) | set(in_n):",
+    "        RESULT[f\"sequence:{cohort}:{node[0]}:{node[1]}:{node[2]}:n\"] = out_n.get(node, in_n.get(node))",
+  ].join("\n") + "\n";
+  return {
+    steps,
+    implementation: { functions: [], file: "lib/treatment-lines.ts, lib/analysis.ts", commit: BUILD_COMMIT },
+    python: withResult(python),
+    check: Object.assign({}, ...t.results.map((p) => ({
+      ["sequence:" + p.cohort + ":started"]: { v: p.started, abs: 0 },
+      ["sequence:" + p.cohort + ":censored"]: { v: p.censored, abs: 0 },
+      ...checks("sequence:" + p.cohort + ":", p.nodes, (nd) => nd.column + ":" + nd.kind + ":" + nd.label, [["n", "n", { abs: 0 }]]),
+    }))),
   };
 }

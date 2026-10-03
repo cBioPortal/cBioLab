@@ -3,7 +3,7 @@
 // codes each term the way the fit did.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, diffexprMethod, incidenceMethod, pairedMethod, genomeMethod, pathwaysMethod, attritionMethod, GSEA_NULL_PY, GRAY_NULL_PY, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, diffexprMethod, incidenceMethod, pairedMethod, genomeMethod, pathwaysMethod, attritionMethod, clonalityMethod, labsMethod, courseMethod, sequenceMethod, GSEA_NULL_PY, GRAY_NULL_PY, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
 import type { CoxCovariate } from "../lib/types.ts";
 
 const tp53: CoxCovariate = { source: "alteration", gene: "TP53", by: "mutated" };
@@ -391,5 +391,43 @@ describe("the count-based views", () => {
     const m = attritionMethod([{ cohort: "C", base: 100, studies: ["s1"], steps: [{ label: "TP53 mutated", n: 40, excluded: 60 }] }]);
     assert.equal(m.python, undefined);
     assert.deepEqual(m.steps[0].params, [["every patient", "100"], ["TP53 mutated", "40 (−60)"]]);
+  });
+});
+
+describe("the timeline views and clonality", () => {
+  const site = (cohort: string) => ({ cohort, study: "s1", cohortPatients: 50 });
+  test("clonality: QC counts stated; Fisher and BH only with two cohorts; every record has a script and a check", () => {
+    const panels = ["A", "B"].map((cohort) => ({ cohort, samples: 10, ascnSamples: 9, qcPass: 8, qcFail: 1, wgdYes: 3, wgdNo: 5 }));
+    const m = clonalityMethod({ measure: "any", oncokbPin: null, qc: true, perSite: [site("A"), site("B")], panels,
+      genes: [{ cohort: "A", gene: "TP53", calls: 5, clonal: 4, subclonal: 1, indeterminate: 0, loh: 2, lohKnown: 5 }],
+      results: { genes: [{ gene: "TP53", p: 0.5, q: 0.5 }], wgdP: 1 } });
+    assert.match(m.steps.find((s) => /QC/.test(s.title))!.params![0][1], /8 pass, 1 fail/);
+    assert.ok(m.steps.some((s) => s.title === "Fisher's exact test per gene, and on WGD"));
+    assert.ok(m.python && m.check && m.check["clonality:wgd:p"]);
+  });
+  test("labs: the patient funnel is stated step by step", () => {
+    const m = labsMethod({ test: "PSA", anchoredTo: "Treatment", occurrence: "FIRST", baselineDays: 90, fromWeeks: -12, toWeeks: 52, binWeeks: 4, responseDrop: 50,
+      pctMin: -100, pctMax: 300, pctBin: 2, minPointN: 5, waterfallCap: 5000, perSite: [site("A")],
+      panels: [{ cohort: "A", anchored: 100, baseline: 80, positiveBaseline: 78, evaluable: 70, responders: 30, waterfallWithheld: 0, waterfallCapped: 0 }],
+      course: [{ cohort: "A", week: 4, v: -10, n: 7 }], results: { course: [{ cohort: "A", week: 4, q1: -10, median: -10, q3: -10 }] } });
+    assert.equal(m.steps[1].params![0][1], "100 anchored → 80 with a baseline → 78 with a positive one → 70 with a reading after day 0");
+    assert.match(m.python!, /np\.percentile\(values, \[25, 50, 75\]\)/);
+  });
+  test("course: anchoring and observability counts, and the at-risk floor", () => {
+    const m = courseMethod({ anchor: "first Treatment", binMonths: 3, fromBin: -4, toBin: 20, riskFloor: 10, perSite: [site("A")], dropped: ["s9"],
+      events: [{ canonical: "treatment", label: "Treatment", variants: ["Treatment", "TREATMENT"], isInterval: true }],
+      cohorts: [{ name: "A", patients: 50, anchored: 40, observed: 38 }], counts: [], results: [] });
+    assert.match(m.steps.find((s) => /^Align/.test(s.title))!.params![0][1], /50 in the cohort → 40 with the anchor event → 38 observable/);
+    assert.match(m.steps.find((s) => s.title === "Match event types")!.detail, /Treatment = TREATMENT/);
+    assert.match(m.steps.at(-1)!.detail, /fewer than 10 patients/);
+  });
+  test("sequence: records set aside are counted by class and reason", () => {
+    const m = sequenceMethod({ eventType: "Treatment", labelKey: "SUBTYPE", lineGap: 90, maxSteps: 3, topN: 8, classes: "systemic", exclude: [],
+      truncated: false, rowLimit: 2000, perSite: [site("A")], foldedLabels: 2,
+      setAside: [{ cohort: "A", cls: "Radiation Therapy", reason: "#not a line class", records: 12 }],
+      flows: [{ cohort: "A", step: 1, from: "Chemo", to: "", fate: 1, n: 5 }],
+      results: [{ cohort: "A", started: 5, censored: 0, nodes: [{ column: 1, kind: "regimen", label: "Chemo", n: 5 }] }] });
+    assert.deepEqual(m.steps.find((s) => s.title === "Choose the records that form lines")!.params, [["Radiation Therapy", "12 records set aside: not a line class"]]);
+    assert.equal(m.check!["sequence:A:1:regimen:Chemo:n"].v, 5);
   });
 });

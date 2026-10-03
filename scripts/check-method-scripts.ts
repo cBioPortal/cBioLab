@@ -24,10 +24,6 @@ const EXEMPT: Record<string, string> = {
   oncoprint: "a picture of alterations per patient: nothing is computed beyond the counts its own provenance page shows",
   hotspots: "a lollipop of mutation counts per position: no statistic",
   plot: "a scatter/density plot of two axes: no statistic",
-  course: "record not built yet (timeline views)",
-  sequence: "record not built yet (timeline views)",
-  labs: "record not built yet (timeline views)",
-  clonality: "record not built yet",
 };
 
 /** The Python environment the scripts are checked in — the versions the golden fixtures pin. */

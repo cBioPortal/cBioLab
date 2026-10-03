@@ -116,7 +116,7 @@ export function linesCtes({ db, study, patientFilter, spec }: LinesSqlArgs): str
       : "         " + fold("d.value") + " AS lk, trimBoth(d.value) AS lraw\n" +
         "  FROM txAll t\n" +
         "  LEFT JOIN " + db + ".clinical_event_data d ON d.clinical_event_id = t.eid AND " + foldedEqualsSql("d.key", labelKey) + "\n") +
-    "  WHERE 1" + (classes ? " AND t.cls IN (" + classes.map((c) => fold(sq(c))).join(", ") + ")" : "") + "\n" +
+    "  WHERE " + inLineClassesSql(spec, "t.cls") + "\n" +
     (exclude.length ? "    AND " + (labelIsClass ? "t.cls" : fold("d.value")) + " NOT IN (" + exclude.map((x) => fold(sq(x))).join(", ") + ")\n" : "") +
     ")",
     // display labels: for each folded label the most frequent original spelling in these records,
@@ -149,4 +149,10 @@ export function linesCtes({ db, study, patientFilter, spec }: LinesSqlArgs): str
 /** A line's combination as a COMPOSITION clause compares it: folded, and blind to order and to spacing around '+'. */
 export function compositionKeySql(expr: string): string {
   return "arrayStringConcat(arraySort(arrayMap((x) -> lowerUTF8(trimBoth(x)), splitByChar('+', " + expr + "))), '+')";
+}
+
+/** SQL true when a folded class `col` is one the spec builds lines from (always true for "all"). */
+export function inLineClassesSql(spec: LineSpec, col: string): string {
+  const classes = lineClassesOf(spec);
+  return classes ? col + " IN (" + classes.map((c) => nameFoldSql(sq(c))).join(", ") + ")" : "1";
 }
