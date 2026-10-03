@@ -797,6 +797,11 @@ details.gearmenu.inline[open] > summary {
 }
 .customdata { max-width: 60rem; }
 .customwarn { border-color: var(--accent); font-size: var(--t-md); }
+/* the upload's target studies and what it drops: stated before anything is saved */
+.customtarget { border: 1px solid var(--accent); border-radius: var(--r-md); background: var(--accent-soft);
+  padding: var(--s3) var(--s4); font-size: var(--t-md); display: flex; flex-direction: column; gap: var(--s2); }
+.customtarget .qchip { margin-left: var(--s1); }
+.customdrop { font-size: var(--t-md); border-left: 3px solid var(--accent); padding-left: var(--s3); margin: var(--s2) 0; }
 button.customtag { border: none; cursor: pointer; line-height: inherit; }
 button.customtag:hover { text-decoration: underline; }
 .customdatadialog .cdview { border-top: 1px solid var(--line); padding-top: var(--s3); margin-top: var(--s4); }

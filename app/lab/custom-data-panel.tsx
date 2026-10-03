@@ -32,8 +32,10 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [confirmLow, setConfirmLow] = useState(false);
+  /** the studies the preview was matched against: what the dataset is added to */
+  const [matchedStudies, setMatchedStudies] = useState<string[]>([]);
 
-  const reset = () => { setText(""); setName(""); setParsed(null); setResolved(null); setTypes({}); setErr(null); setConfirmLow(false); };
+  const reset = () => { setText(""); setName(""); setParsed(null); setResolved(null); setTypes({}); setErr(null); setConfirmLow(false); setMatchedStudies([]); };
 
   const preview = async () => {
     setErr(null); setResolved(null); setConfirmLow(false);
@@ -49,6 +51,7 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
       const j = await res.json();
       if (j.error) throw new Error(j.error);
       setResolved(j);
+      setMatchedStudies([...studies]);
     } catch (e) { setErr(String((e as Error).message || e)); }
     finally { setBusy(false); }
   };
@@ -69,8 +72,9 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
   /** a new dataset, or the next version of the server one of that name */
   const save = async () => {
     if (!parsed || !resolved) return;
-    const d = buildDataset(name || "Custom data", parsed, resolved, studies, types);
-    if (!d.rows.length) { setErr("no row matched a " + parsed.level + " of " + studies.join(", ") + ": nothing to save"); return; }
+    if (stale) { setErr("the studies being explored changed since the preview: preview again"); return; }
+    const d = buildDataset(name || "Custom data", parsed, resolved, matchedStudies, types);
+    if (!d.rows.length) { setErr("no row matched a " + parsed.level + " of " + matchedStudies.join(", ") + ": nothing to save"); return; }
     if (d.rows.length * d.columns.length > LIMITS.cells) {
       setErr("this upload has " + (d.rows.length * d.columns.length).toLocaleString() + " values; the limit is " + LIMITS.cells.toLocaleString()); return;
     }
@@ -92,6 +96,16 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
   // the name a save would use, so a clash with a server dataset reads as "a new version of it"
   const slugPreview = (name || "Custom data").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "custom";
   const rate = parsed && parsed.rows.length ? matchedRows / parsed.rows.length : 0;
+  const stale = !!resolved && matchedStudies.join(",") !== studies.join(",");
+  const target = matchedStudies.length === 1 ? matchedStudies[0] : matchedStudies.length + " studies";
+  const downloadDropped = () => {
+    if (!parsed || !resolved) return;
+    const lines = [[parsed.idColumn, ...parsed.columns.map((c) => c.header)].join("\t"),
+      ...parsed.rows.filter((_, i) => !resolved.matches[i]?.length).map((r) => r.join("\t"))];
+    const url = URL.createObjectURL(new Blob([lines.join("\n") + "\n"], { type: "text/tab-separated-values" }));
+    const a = document.createElement("a"); a.href = url; a.download = "dropped-rows.tsv"; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
   const unmatchedExamples = resolved && parsed
     ? parsed.rows.filter((_, i) => !resolved.matches[i]?.length).slice(0, 5).map((r) => r[0]) : [];
 
@@ -154,11 +168,19 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
 
       {server.unlocked && <>
       <h4>Add custom data</h4>
+      <div className="customtarget">
+        {studies.length ? <>
+          <div>This upload will be added to {studies.length === 1 ? "the current study" : "the " + studies.length + " current studies"}:{" "}
+            {studies.map((st) => <span key={st} className="qchip">{st}</span>)}</div>
+          <div className="meta">Its ids are matched against {studies.length === 1 ? "this study" : "these studies"} only, and{" "}
+            <b>any row whose id matches no {studies.length === 1 ? "patient or sample in it" : "patient or sample in them"} is dropped</b>.
+            To add data to a different study, change the studies being explored first.</div>
+        </> : <div className="error" style={{ margin: 0 }}>Select the study this data belongs to (top of Explore) before uploading.</div>}
+      </div>
       <p className="note">
         A header row, then one row per case, tab- or comma-separated. The first column is the case id:
-        name it <code>PATIENT_ID</code> or <code>SAMPLE_ID</code>. Ids are matched against{" "}
-        {studies.length ? <b>{studies.join(", ")}</b> : "the selected studies"}; prefix one as{" "}
-        <code>study:id</code> to pin it to one study. Every other column becomes an attribute.
+        name it <code>PATIENT_ID</code> or <code>SAMPLE_ID</code>{studies.length > 1 && <>; prefix one as <code>study:id</code> to pin it to one of the studies</>}.
+        Every other column becomes an attribute.
       </p>
       <div className="row" style={{ alignItems: "center" }}>
         <input type="file" accept=".tsv,.txt,.csv,text/plain,text/csv,text/tab-separated-values"
@@ -210,20 +232,24 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
       </>}
 
       {parsed && resolved && <div style={{ marginTop: "0.6rem" }}>
-        <p className={rate < LOW_MATCH ? "error" : "meta"}>
-          <b>{matchedRows.toLocaleString()} of {parsed.rows.length.toLocaleString()}</b> rows matched a {parsed.level} of {studies.join(", ")}
-          {resolved.unmatched > 0 && <> — {resolved.unmatched.toLocaleString()} matched nothing and will be left out
-            (e.g. {unmatchedExamples.map((x) => <code key={x}>{x}</code>).reduce((a: React.ReactNode[], x, i) => i ? [...a, ", ", x] : [x], [])})</>}
+        <p className="meta">
+          <b>{matchedRows.toLocaleString()} of {parsed.rows.length.toLocaleString()}</b> rows matched a {parsed.level} of {matchedStudies.join(", ")}
           {resolved.multiStudy > 0 && <> · {resolved.multiStudy} ids exist in more than one study and apply to each</>}
           {resolved.refused.length > 0 && <> · not matched against {resolved.refused.map((r) => r.study + " (" + r.reason + ")").join(", ")}</>}
-          {rate < LOW_MATCH && <> — are these {parsed.level === "patient" ? "sample" : "patient"} ids, or ids from another study?</>}
         </p>
+        {resolved.unmatched > 0 && <p className={rate < LOW_MATCH ? "error" : "customdrop"}>
+          <b>{resolved.unmatched.toLocaleString()} row{resolved.unmatched === 1 ? "" : "s"} will be dropped</b>: {resolved.unmatched === 1 ? "its id matches" : "their ids match"} no {parsed.level} in {matchedStudies.join(", ")}
+          {" "}(e.g. {unmatchedExamples.map((x) => <code key={x}>{x}</code>).reduce((a: React.ReactNode[], x, i) => i ? [...a, ", ", x] : [x], [])}).{" "}
+          <button className="linklike" onClick={downloadDropped}>download them</button>
+          {rate < LOW_MATCH && <> — are these {parsed.level === "patient" ? "sample" : "patient"} ids, or ids from another study?</>}
+        </p>}
+        {stale && <p className="error">The studies being explored changed since this preview. Preview again to match the ids against {studies.join(", ") || "the new selection"}.</p>}
         <div className="row" style={{ alignItems: "center" }}>
           {rate < LOW_MATCH && !confirmLow
-            ? <button className="tbbtn" disabled={!matchedRows} onClick={() => setConfirmLow(true)}>Save anyway…</button>
-            : <button className="primary" disabled={!matchedRows || busy} onClick={save}
-                title="anyone who logs in can read it, and analyses that use it can be shared">
-                Save {matchedRows.toLocaleString()} {parsed.level}s to the server{serverBySlug(slugPreview) ? " as v" + (serverBySlug(slugPreview)!.latestVersion + 1) + " of " + slugPreview : ""}</button>}
+            ? <button className="tbbtn" disabled={!matchedRows || stale} onClick={() => setConfirmLow(true)}>Save anyway…</button>
+            : <button className="primary" disabled={!matchedRows || busy || stale} onClick={save}
+                title="stored on the server: anyone who logs in can read it, and analyses that use it can be shared">
+                Add {matchedRows.toLocaleString()} {parsed.level}s to {target}{serverBySlug(slugPreview) ? " (as v" + (serverBySlug(slugPreview)!.latestVersion + 1) + " of " + slugPreview + ")" : ""}</button>}
         </div>
       </div>}
       </>}
