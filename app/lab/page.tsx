@@ -721,7 +721,13 @@ export default function AnalysisPage() {
         setDoc(d); setDocText(JSON.stringify(d, null, 2));
         if (tabRef.current === "explore") fetchExplore();
         run(d);
-      } else if (tabRef.current === "explore") fetchExplore();
+      } else {
+        // ?study=a,b opens Explore scoped to those studies (the data sets page links here)
+        const only = (new URLSearchParams(window.location.search).get("study") || "")
+          .split(",").map((x) => x.trim().replace(/[^A-Za-z0-9._-]/g, "")).filter(Boolean);
+        if (only.length) { setStudy(only[0]); setExStudies(only); exSel.current = only; }
+        if (tabRef.current === "explore") fetchExplore();
+      }
     } catch (e) { setBusy(false); setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
   }, []); // eslint-disable-line
 
@@ -2585,6 +2591,7 @@ function Latency({ v }: { v: any }) {
         <h1>cbio-lab</h1>
         <span className="sub">analysis documents — cohorts and views over one declarative object</span>
         <span className="spacer" />
+        <a href="/datasets" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>data sets</a>
         <a href="/reproductions" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>paper reproductions</a>
         <a href="/campaign" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>hypothesis campaigns</a>
         <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>rationale</a>

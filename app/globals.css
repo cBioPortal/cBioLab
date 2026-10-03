@@ -1228,3 +1228,19 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .loginstate { display: inline-flex; align-items: center; gap: var(--s2); }
 .logindialog .meta { display: block; margin-bottom: var(--s3); }
 .logindialog input { width: 100%; box-sizing: border-box; }
+
+/* /datasets — the data sets table */
+.ds-page { max-width: 1400px; }
+.ds-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); margin: var(--s5) 0 var(--s3); }
+.ds-controls input[type="search"] { min-width: 18rem; height: var(--ctl-h); }
+.ds-chips { display: flex; flex-wrap: wrap; gap: var(--s1); }
+.ds-scroll { overflow-x: auto; }
+.ds-table table { border-collapse: collapse; width: 100%; font-size: var(--t-sm); }
+.ds-table th { text-align: left; padding: var(--s2) var(--s2); border-bottom: 1px solid var(--line); cursor: pointer; white-space: nowrap; user-select: none; }
+.ds-table td { padding: var(--s2) var(--s2); border-bottom: 1px solid var(--line); vertical-align: top; }
+.ds-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.ds-table .ds-study { min-width: 22rem; }
+.ds-table .ds-study a { color: var(--accent-ink); text-decoration: none; font-weight: 600; }
+.ds-table .ds-also { max-width: 16rem; color: var(--muted); }
+.ds-table .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.ds-table td:last-child { white-space: nowrap; }
