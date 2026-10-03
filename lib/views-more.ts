@@ -263,7 +263,8 @@ async function genomeView(view: GenomeView, ctx: ViewCtx): Promise<ViewResult> {
         .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
       cohorts: series.map((x) => ({ name: x.cohort, samples: x.samples, segmented: x.segmented })),
       counts: series.flatMap((x) => bins.flatMap((b, i) => x.profiled[i]
-        ? [{ cohort: x.cohort, chrom: b.chrom, bin: i - offset[b.chrom], profiled: x.profiled[i], gain: x.gain[i], loss: x.loss[i] }] : [])) }),
+        ? [{ cohort: x.cohort, chrom: b.chrom, bin: i - offset[b.chrom], profiled: x.profiled[i], gain: x.gain[i], loss: x.loss[i] }] : [])),
+      results: test ? bins.flatMap((b, i) => test!.gainQ[i] != null ? [{ chrom: b.chrom, bin: i - offset[b.chrom], gainQ: test!.gainQ[i], lossQ: test!.lossQ[i] }] : []) : [] }),
     genome: { build, binMb, threshold, includeX, bins, series, ...(test ? { test } : {}), ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
@@ -392,7 +393,9 @@ async function pathwaysView(view: PathwaysView, ctx: ViewCtx): Promise<ViewResul
         .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
       sets: drawn.map((p) => ({ name: p.name, source: p.source, genes: p.genes.map((g) => g.gene) })),
       setCounts: vNames.flatMap((n) => drawn.map((p) => ({ cohort: n, set: p.name, ...(setTally.get(n + "|" + p.name) || { profiled: 0, altered: 0 }) }))),
-      geneCounts: vNames.flatMap((n) => allGenes.map((g) => ({ cohort: n, gene: g, ...(geneTally.get(n + "|" + g) || { profiled: 0, altered: 0 }) }))) }),
+      geneCounts: vNames.flatMap((n) => allGenes.map((g) => ({ cohort: n, gene: g, ...(geneTally.get(n + "|" + g) || { profiled: 0, altered: 0 }) }))),
+      results: { pathways: rows.map((r) => ({ name: r.name, ...(r.p != null ? { p: r.p, q: r.q } : {}) })),
+        genes: [...new Map(rows.flatMap((r) => r.top.filter((t) => t.q != null).map((t) => [t.gene, { gene: t.gene, q: t.q! }] as const))).values()] } }),
     pathways: { measure, rows, ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
@@ -555,6 +558,8 @@ async function diffexprView(view: DiffexprView, ctx: ViewCtx): Promise<ViewResul
       moments: [...moments].map(([k, m]) => ({ cohort: k.slice(0, k.indexOf("|")), gene: k.slice(k.indexOf("|") + 1), n: m.n, sx: m.sx, sxx: m.sxx }))
         .sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.gene < y.gene ? -1 : x.gene > y.gene ? 1 : 0)),
       ...(gsea && gseaSets ? { gsea: { sets: gseaSets, tested: gsea.sets.length, skipped: gsea.skipped, permutations: DE_PERMUTATIONS, minSize: 10 } } : {}),
+      results: { genes: points.map((g) => ({ gene: g.gene, p: g.p, q: g.q })),
+        sets: (gsea?.sets || []).map((x) => ({ name: x.name, es: x.es, nes: x.nes, p: x.p })) },
     }),
     diffexpr: { profileType, log2, effectLabel, groups: [A, B], tested: tested.length, skipped, up, down,
       points, grid: { xMax, yMax, nx, ny, cells }, pooledSignificant: sig.length - points.filter((g) => g.q < 0.05).length,
@@ -650,7 +655,8 @@ async function pairedView(view: PairedView, ctx: ViewCtx): Promise<ViewResult> {
         .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
       panels: panels.map((pn) => ({ cohort: pn.cohort, patients: pn.patients })),
       counts: pairedRows.sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.study < y.study ? -1 : x.study > y.study ? 1 : 0) ||
-        genes.indexOf(x.gene) - genes.indexOf(y.gene)) }),
+        genes.indexOf(x.gene) - genes.indexOf(y.gene)),
+      results: panels.flatMap((pn) => pn.genes.map((g) => ({ cohort: pn.cohort, gene: g.gene, p: g.p, ...(g.aOnly + g.bOnly > 0 ? { q: g.q } : {}) }))) }),
     paired: { pairBy: by, measure, panels, ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
@@ -851,6 +857,8 @@ async function incidenceView(view: IncidenceView, ctx: ViewCtx): Promise<ViewRes
       counts: countRows.sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.study < y.study ? -1 : x.study > y.study ? 1 : 0) ||
         x.t - y.t || x.cause - y.cause || x.entry - y.entry),
       ...(gray ? { gray: { statistic: gray.statistic, p: gray.p, permutations: gray.permutations } } : {}),
+      horizonResults: hz.flatMap((h) => h.cells.filter((c) => curves.find((x) => x.cohort === c.cohort)!.n > 0)
+        .map((c) => ({ cohort: c.cohort, months: h.months, f1: c.f1, lo: c.lo, hi: c.hi }))),
     }),
     incidence: { eventLabel, ...(anchor ? { anchoredTo: anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "") } : {}),
       curves, horizons: hz, ...(gray ? { gray } : {}), ...(excluded.length ? { excludedStudies: excluded } : {}) },

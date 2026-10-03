@@ -23,6 +23,7 @@ function coxTrace(over: Partial<CoxTrace> = {}): CoxTrace {
     x: [[1, 0, 60], [1, 1, 61], [0, 1, 62], [0, 0, 63], [1, 0, 64], [0, 0, 65], [0, 1, 66], [0, 0, 67]],
     fit: { n: 8, events: 5, iterations: 5, loglik: -9.87654 },
     censoredAtCutoff: 0, droppedBadTime: 0,
+    coefficients: [{ label: "TP53 mutation status: Mutated", beta: 0.5, se: 0.1, p: 0.001 }],
     ...over,
   };
 }
@@ -109,6 +110,7 @@ describe("logisticMethod", () => {
     x: [[1], [0], [1], [0], [0]],
     fit: { n: 5, events: 2, iterations: 6, loglik: -3.2 },
     outcomeKind: "cat", outcomeEvent: "Yes", outcomeOther: ["No", "Unknown"],
+    coefficients: [{ label: "TP53 mutation status: Mutated", beta: 0.7, se: 0.3, p: 0.02 }],
     ...over,
   });
 
@@ -196,7 +198,7 @@ describe("compareMethod", () => {
     { cohort: "A", study: "s2", gene: "TP53", profiled: 5, altered: 1, driver: 1 },
     { cohort: "B", study: "s1", gene: "TP53", profiled: 8, altered: 1, driver: 0 },
   ];
-  const base = { oncokbPin: "v4.20", genes: ["TP53"], counts,
+  const base = { oncokbPin: "v4.20", genes: ["TP53"], counts, results: [{ gene: "TP53", pAny: 0.01, pDriver: 0.02, qAny: 0.01, qDriver: 0.02 }],
     perSite: [{ cohort: "A", study: "s1", cohortPatients: 12 }, { cohort: "A", study: "s2", cohortPatients: 6 }, { cohort: "B", study: "s1", cohortPatients: 9 }] };
 
   test("two cohorts: Fisher per gene, then BH, and the pooling across studies is stated", () => {
@@ -231,7 +233,8 @@ describe("cooccurrenceMethod", () => {
     { study: "s2", a: "TP53", b: "KRAS", both: 1, onlyA: 2, onlyB: 6, neither: 9 },
   ];
   test("one study: Fisher, then BH over the assessable pairs; pairs no panel covers are named as set aside", () => {
-    const m = cooccurrenceMethod({ cohort: "C", cohortPatients: [{ study: "s1", patients: 40 }], counts: counts.slice(0, 1), pairs: 3, assessable: 1 });
+    const m = cooccurrenceMethod({ cohort: "C", cohortPatients: [{ study: "s1", patients: 40 }], counts: counts.slice(0, 1), pairs: 3, assessable: 1,
+      results: [{ a: "TP53", b: "KRAS", p: 0.2, q: 0.2 }] });
     assert.deepEqual(m.steps.map((s) => s.title), ["Count each gene pair's 2×2 table", "Set aside pairs no panel covers",
       "Log₂ odds ratio per pair", "Fisher's exact test per pair", "Benjamini–Hochberg across pairs"]);
     assert.match(m.steps[0].detail, /mutation panel covering both genes/);
@@ -239,7 +242,8 @@ describe("cooccurrenceMethod", () => {
     assert.match(m.python!, /p = result\["p_fisher"\]/);
   });
   test("several studies: CMH stratified by study ranks the pairs, with R's continuity rule and the p from the chi-squared tail", () => {
-    const m = cooccurrenceMethod({ cohort: "C", cohortPatients: [{ study: "s1", patients: 40 }, { study: "s2", patients: 20 }], counts, pairs: 1, assessable: 1 });
+    const m = cooccurrenceMethod({ cohort: "C", cohortPatients: [{ study: "s1", patients: 40 }, { study: "s2", patients: 20 }], counts, pairs: 1, assessable: 1,
+      results: [{ a: "TP53", b: "KRAS", p: 0.2, q: 0.2, pStratified: 0.3 }] });
     assert.match(m.steps.find((s) => s.kind === "statistic" && /Mantel/.test(s.title))!.detail, /\|Σa − ΣE\[a\]\| ≥ 0\.5/);
     assert.match(m.python!, /correction=bool\(delta >= 0\.5\)/);
     assert.match(m.python!, /chi2_dist\.sf\(stat, 1\)/);
@@ -260,6 +264,7 @@ describe("clinicalMethod", () => {
     categorical: [{ cohort: "A", study: "s1", attribute: "SEX", value: "Male", n: 6 }, { cohort: "B", study: "s1", attribute: "SEX", value: "Female", n: 7 }],
     numeric: [{ cohort: "A", study: "s1", attribute: "AGE", n: 10, sum: 600, sumsq: 36500 }, { cohort: "B", study: "s1", attribute: "AGE", n: 12, sum: 780, sumsq: 51000 }],
     histograms: [{ cohort: "A", attribute: "AGE", value: 60, n: 10 }, { cohort: "B", attribute: "AGE", value: 65, n: 12 }],
+    medians: [{ attribute: "AGE", cohort: "A", median: 60, q1: 60, q3: 60 }],
   };
 
   test("single study, two cohorts: chi-squared, Welch t, Mann-Whitney alongside, BH; skipped attributes named", () => {
@@ -287,13 +292,15 @@ describe("coexpressionMethod", () => {
   const sums = [{ study: "s1", a: "ERBB2", b: "GRB7", n: 50, sx: 1, sy: 2, sxy: 40, sxx: 49, syy: 52 },
     { study: "s2", a: "ERBB2", b: "GRB7", n: 30, sx: -1, sy: 0, sxy: 20, sxx: 29, syy: 31 }];
   test("one study: Pearson from the sums, then BH on its p", () => {
-    const m = coexpressionMethod({ cohort: "C", profileType: "mrna_z", cohortPatients: [{ study: "s1", patients: 60 }], sums: sums.slice(0, 1), pairs: 1, tested: 1 });
+    const m = coexpressionMethod({ cohort: "C", profileType: "mrna_z", cohortPatients: [{ study: "s1", patients: 60 }], sums: sums.slice(0, 1), pairs: 1, tested: 1,
+      results: [{ a: "ERBB2", b: "GRB7", r: 0.5, p: 0.01, q: 0.01 }] });
     assert.deepEqual(m.steps.map((s) => s.title), ["Sum each gene pair's values", "Pearson correlation per pair", "Benjamini–Hochberg across pairs"]);
     assert.doesNotMatch(m.python!, /combine_effects/);
     assert.match(m.python!, /p = tested\["p"\]/);
   });
   test("several studies: summed for the pooled r, and a fixed-effect Fisher-z meta-analysis is the p that is corrected", () => {
-    const m = coexpressionMethod({ cohort: "C", profileType: "mrna_z", cohortPatients: [{ study: "s1", patients: 60 }, { study: "s2", patients: 40 }], sums, pairs: 1, tested: 1 });
+    const m = coexpressionMethod({ cohort: "C", profileType: "mrna_z", cohortPatients: [{ study: "s1", patients: 60 }, { study: "s2", patients: 40 }], sums, pairs: 1, tested: 1,
+      results: [{ a: "ERBB2", b: "GRB7", r: 0.5, p: 0.01, q: 0.01, pMeta: 0.02 }] });
     assert.ok(m.steps.some((s) => s.title === "Add the six sums across studies"));
     assert.match(m.steps.find((s) => s.title === "Fisher-z meta-analysis across studies")!.detail, /weighted by n − 3/);
     assert.match(m.python!, /combine_effects\(z, var/);
@@ -305,7 +312,8 @@ describe("coexpressionMethod", () => {
 describe("diffexprMethod", () => {
   const base = { profileType: "mrna_z", log2: false, groups: ["A", "B"] as [string, string], minN: 3, tested: 2, skipped: 1,
     perSite: [{ cohort: "A", study: "s1", cohortPatients: 10 }, { cohort: "B", study: "s1", cohortPatients: 12 }],
-    moments: [{ cohort: "A", gene: "ESR1", n: 10, sx: 5, sxx: 9 }, { cohort: "B", gene: "ESR1", n: 12, sx: 20, sxx: 40 }] };
+    moments: [{ cohort: "A", gene: "ESR1", n: 10, sx: 5, sxx: 9 }, { cohort: "B", gene: "ESR1", n: 12, sx: 20, sxx: 40 }],
+    results: { genes: [{ gene: "ESR1", p: 0.01, q: 0.01 }], sets: [] } };
   test("Welch per gene with the same no-variance rule and a clamped variance, then BH", () => {
     const m = diffexprMethod(base);
     assert.deepEqual(m.steps.map((s) => s.title), ["Sum every gene's values", "Sum every gene's values", "Leave out genes that cannot be tested",
@@ -328,7 +336,8 @@ describe("incidenceMethod", () => {
     perSite: [{ cohort: "A", study: "s1", cohortPatients: 20 }, { cohort: "B", study: "s1", cohortPatients: 25 }],
     cohorts: [{ name: "A", n: 15, events: 4, competing: 3, censored: 8, late: 0, excluded: ex }, { name: "B", n: 23, events: 2, competing: 5, censored: 16, late: 1, excluded: ex }],
     counts: [{ cohort: "A", study: "s1", entry: 0, t: 5, cause: 1, n: 2 }, { cohort: "B", study: "s1", entry: 0, t: 7, cause: 2, n: 1 }],
-    gray: { statistic: 1.5, p: 0.2, permutations: 2000 } };
+    gray: { statistic: 1.5, p: 0.2, permutations: 2000 },
+    horizonResults: [{ cohort: "A", months: 12, f1: 0.1, lo: 0.05, hi: 0.15 }] };
   test("no delayed entry: statsmodels for the curves, the seeded Gray port for the test, records in the test's order", () => {
     const m = incidenceMethod(base);
     assert.match(m.python!, /CumIncidenceRight\(/);
@@ -351,7 +360,8 @@ describe("the count-based views", () => {
   test("paired: exact McNemar on the discordant patients, BH per cohort, statsmodels in the script", () => {
     const m = pairedMethod({ pairBy: { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }, measure: "driver", oncokbPin: "v5",
       perSite: [site("all")], panels: [{ cohort: "all", patients: 40 }],
-      counts: [{ cohort: "all", study: "s1", gene: "TP53", pairs: 40, both: 20, aOnly: 2, bOnly: 6 }] });
+      counts: [{ cohort: "all", study: "s1", gene: "TP53", pairs: 40, both: 20, aOnly: 2, bOnly: 6 }],
+      results: [{ cohort: "all", gene: "TP53", p: 0.29, q: 0.29 }] });
     assert.match(m.steps[0].detail, /OncoKB release pinned for this run \(v5\)/);
     assert.match(m.python!, /mcnemar\(\[\[r\.both, r\.a_only\], \[r\.b_only, 0\]\], exact=True\)/);
     assert.deepEqual(m.implementation.functions, ["mcnemarExact", "benjaminiHochberg"]);
@@ -359,11 +369,12 @@ describe("the count-based views", () => {
   test("genome: Fisher per bin and BH only for two cohorts; chromosome names read as text", () => {
     const counts = [{ cohort: "A", chrom: "1", bin: 0, profiled: 10, gain: 2, loss: 1 }, { cohort: "B", chrom: "1", bin: 0, profiled: 12, gain: 1, loss: 4 }];
     const two = genomeMethod({ build: "hg19", binMb: 2, threshold: 0.2, includeX: false, bins: 1500, pastEnd: 0,
-      perSite: [site("A"), site("B")], cohorts: [{ name: "A", samples: 10, segmented: 10 }, { name: "B", samples: 12, segmented: 12 }], counts });
+      perSite: [site("A"), site("B")], cohorts: [{ name: "A", samples: 10, segmented: 10 }, { name: "B", samples: 12, segmented: 12 }], counts,
+      results: [{ chrom: "1", bin: 0, gainQ: 0.5, lossQ: 0.2 }] });
     assert.ok(two.steps.some((s) => s.title === "Fisher's exact test per bin"));
     assert.match(two.python!, /counts\["chrom"\]\.astype\(str\)/);
     const three = genomeMethod({ build: "hg19", binMb: 2, threshold: 0.2, includeX: false, bins: 1500, pastEnd: 0,
-      perSite: [site("A"), site("B"), site("C")], cohorts: ["A", "B", "C"].map((name) => ({ name, samples: 1, segmented: 1 })), counts });
+      perSite: [site("A"), site("B"), site("C")], cohorts: ["A", "B", "C"].map((name) => ({ name, samples: 1, segmented: 1 })), counts, results: [] });
     assert.ok(!three.steps.some((s) => s.kind === "statistic"));
     assert.equal(three.verification, undefined);
   });
@@ -371,7 +382,8 @@ describe("the count-based views", () => {
     const m = pathwaysMethod({ measure: "any", oncokbPin: null, cohorts: ["A", "B"], perSite: [site("A"), site("B")],
       sets: [{ name: "RTK-RAS", source: "Sanchez-Vega 2018", genes: ["KRAS", "EGFR"] }],
       setCounts: [{ cohort: "A", set: "RTK-RAS", profiled: 10, altered: 4 }, { cohort: "B", set: "RTK-RAS", profiled: 10, altered: 1 }],
-      geneCounts: [{ cohort: "A", gene: "KRAS", profiled: 10, altered: 3 }, { cohort: "B", gene: "KRAS", profiled: 10, altered: 1 }] });
+      geneCounts: [{ cohort: "A", gene: "KRAS", profiled: 10, altered: 3 }, { cohort: "B", gene: "KRAS", profiled: 10, altered: 1 }],
+      results: { pathways: [{ name: "RTK-RAS", p: 0.1, q: 0.1 }], genes: [{ gene: "KRAS", q: 0.3 }] } });
     assert.match(m.steps[0].params![0][1], /RTK-RAS \(2\)/);
     assert.match(m.steps.at(-1)!.detail, /each gene once even when it sits in two pathways/);
   });

@@ -12,6 +12,7 @@
 import type { CoxCovariate } from "./types.ts";
 import type { AxisKind } from "./plot.ts";
 import { BUILD_COMMIT } from "./build-info.ts";
+import { COX_MAX_ITERATIONS, LOGISTIC_MAX_ITERATIONS } from "./stats.ts";
 
 export interface MethodStep {
   kind: "fetch" | "transform" | "statistic";
@@ -33,6 +34,45 @@ export interface MethodRecord {
   /** a script that recomputes the view's numbers from what its queries returned; absent when the
    *  queries' own counts are the numbers, with nothing computed from them */
   python?: string;
+  /** the view's own numbers that the script must reproduce, by the name the script reports them
+   *  under — scripts/check-method-scripts.ts runs every gallery example's script and compares */
+  check?: Record<string, CheckValue>;
+}
+
+/** One number a script must reproduce: within `abs` of it (default 1e-300, so a p-value below that
+ *  counts as zero), or within `rel` of it (default 1e-6), whichever is looser. */
+export interface CheckValue { v: number | null; rel?: number; abs?: number }
+
+/** The line a script's last output starts with, followed by its RESULT as JSON. */
+export const RESULT_MARKER = "METHOD_RESULT ";
+
+const RESULT_INIT = "RESULT = {}  # the numbers the automated check compares with the view's (printed at the end)";
+
+/** The end of every script: RESULT as one machine-readable line, NaN and infinities as null. */
+function withResult(python: string): string {
+  return python.trimEnd() + "\n\n" + [
+    "# for the check that this script reproduces the view (scripts/check-method-scripts.ts)",
+    "import json as _json, math as _math",
+    "def _num(x):",
+    "    try:",
+    "        x = float(x)",
+    "    except (TypeError, ValueError):",
+    "        return None",
+    "    return None if _math.isnan(x) or _math.isinf(x) else x",
+    "print(" + JSON.stringify(RESULT_MARKER) + " + _json.dumps({k: _num(v) for k, v in RESULT.items()}))",
+  ].join("\n") + "\n";
+}
+
+/** check entries for a list of named results, each field with its own tolerance */
+function checks(prefix: string, rows: Record<string, unknown>[], keyOf: (r: any) => string,
+  fields: [string, string, { rel?: number; abs?: number }?][]): Record<string, CheckValue> {
+  const out: Record<string, CheckValue> = {};
+  for (const r of rows) for (const [field, name, tol] of fields) {
+    const v = (r as any)[field];
+    if (v === undefined) continue;
+    out[prefix + keyOf(r) + ":" + name] = { v: v == null || !Number.isFinite(Number(v)) ? null : Number(v), ...(tol || {}) };
+  }
+  return out;
 }
 
 /**
@@ -80,12 +120,16 @@ export interface FitTrace {
 export interface CoxTrace extends FitTrace {
   censoredAtCutoff: number;
   droppedBadTime: number;
+  /** what the fit reported, per term — for the script check */
+  coefficients: { label: string; beta: number; se: number; p: number }[];
 }
 
 export interface LogisticTrace extends FitTrace {
   outcomeKind: AxisKind;
   outcomeEvent?: string;
   outcomeOther: string[];
+  /** what the fit reported, per term — for the script check */
+  coefficients: { label: string; beta: number; se: number; p: number }[];
 }
 
 const plural = (n: number, one: string, many = one + "s") => n.toLocaleString() + " " + (n === 1 ? one : many);
@@ -188,7 +232,8 @@ export function coxMethod(traces: CoxTrace[], o: CoxMethodOptions): MethodRecord
         ["standard errors", "from the observed information at the estimate"],
         ["95% interval", "exp(β ± 1.959964·SE), Wald"],
         ["p-value", "Wald χ² on 1 df, (β/SE)²"],
-        ["fit", t.fit.iterations < 25 ? "converged in " + plural(t.fit.iterations, "iteration") : "stopped at the 25-iteration limit without converging"],
+        ["fit", t.fit.iterations < COX_MAX_ITERATIONS ? "converged in " + plural(t.fit.iterations, "iteration")
+          : "stopped at the " + COX_MAX_ITERATIONS + "-iteration limit without converging"],
         ["log partial likelihood", t.fit.loglik.toFixed(4)],
       ],
     });
@@ -198,7 +243,10 @@ export function coxMethod(traces: CoxTrace[], o: CoxMethodOptions): MethodRecord
     implementation: { functions: ["coxRegression"], file: "lib/stats.ts", commit: BUILD_COMMIT },
     verification: "Matches " + VERIFIED.cox.library + " " + VERIFIED.cox.version + " " + VERIFIED.cox.fn +
       " (" + VERIFIED.cox.ties + " ties) to a relative 1e-6 on coefficients, SEs, p-values and intervals (" + GOLDEN_TEST + ").",
-    python: coxPython(traces, o),
+    python: withResult(coxPython(traces, o)),
+    // lifelines can stop ~1e-5 short of the optimum on a term with only a handful of patients
+    check: Object.assign({}, ...traces.map((t) => checks("cox:" + (t.scope || "") + ":", t.coefficients, (c) => c.label,
+      [["beta", "beta", { rel: 1e-4, abs: 1e-6 }], ["se", "se", { rel: 1e-4 }], ["p", "p", { rel: 1e-3, abs: 1e-12 }]]))),
   };
 }
 
@@ -213,6 +261,7 @@ function coxPython(traces: CoxTrace[], o: CoxMethodOptions): string {
     "import pandas as pd",
     "from lifelines import CoxPHFitter",
     "",
+    RESULT_INIT,
     ...(traces.some((t) => t.scope) ? ["fits = {}  # one independent model per cohort", ""] : []),
   ];
   for (const t of traces) {
@@ -234,6 +283,9 @@ function coxPython(traces: CoxTrace[], o: CoxMethodOptions): string {
         ", fit_options={\"precision\": 1e-10})",
       "cph.print_summary()  # coef, se(coef), p and the exp(coef) 95% bounds are the forest plot's numbers",
       ...(t.scope ? ["fits[" + py(t.scope) + "] = cph"] : []),
+      "for term, row in cph.summary.iterrows():",
+      "    k = " + py("cox:" + (t.scope || "") + ":") + " + term",
+      "    RESULT[k + \":beta\"], RESULT[k + \":se\"], RESULT[k + \":p\"] = row[\"coef\"], row[\"se(coef)\"], row[\"p\"]",
       "");
   }
   return lines.join("\n").trimEnd() + "\n";
@@ -261,7 +313,8 @@ export function logisticMethod(t: LogisticTrace, o: { outcomeLabel: string; quer
       ["standard errors", "from the Fisher information at the estimate"],
       ["95% interval", "exp(β ± 1.959964·SE), Wald"],
       ["p-value", "Wald χ² on 1 df, (β/SE)²"],
-      ["fit", t.fit.iterations < 50 ? "converged in " + plural(t.fit.iterations, "iteration") : "stopped at the 50-iteration limit without converging"],
+      ["fit", t.fit.iterations < LOGISTIC_MAX_ITERATIONS ? "converged in " + plural(t.fit.iterations, "iteration")
+        : "stopped at the " + LOGISTIC_MAX_ITERATIONS + "-iteration limit without converging"],
       ["log likelihood", t.fit.loglik.toFixed(4)],
     ],
   });
@@ -274,6 +327,7 @@ export function logisticMethod(t: LogisticTrace, o: { outcomeLabel: string; quer
     "import pandas as pd",
     "import statsmodels.api as sm",
     "",
+    RESULT_INIT,
     "df = pd.read_csv(\"logistic_rows.csv\"" + pyCategoricalDtypes(t, t.outcomeKind === "num" ? [] : ["y"]) + ")",
     "y = " + y + "  # the outcome: " + (t.outcomeKind === "num" ? "already 0/1" : "event = " + t.outcomeEvent),
     "X = pd.DataFrame({",
@@ -282,13 +336,16 @@ export function logisticMethod(t: LogisticTrace, o: { outcomeLabel: string; quer
     "fit = sm.Logit(y, sm.add_constant(X)).fit(method=\"newton\")",
     "print(fit.summary())  # coefficients, SEs and p-values",
     "print(np.exp(fit.conf_int()))  # the odds-ratio 95% intervals drawn in the forest plot",
+    "for term in X.columns:",
+    "    RESULT[\"logistic:\" + term + \":beta\"], RESULT[\"logistic:\" + term + \":se\"], RESULT[\"logistic:\" + term + \":p\"] = fit.params[term], fit.bse[term], fit.pvalues[term]",
   ].join("\n") + "\n";
   return {
     steps,
     implementation: { functions: ["logisticRegression"], file: "lib/stats.ts", commit: BUILD_COMMIT },
     verification: "Matches " + VERIFIED.logistic.library + " " + VERIFIED.logistic.version + " " + VERIFIED.logistic.fn +
       " to a relative 1e-6 on coefficients, SEs, p-values and intervals (" + GOLDEN_TEST + ").",
-    python,
+    python: withResult(python),
+    check: checks("logistic:", t.coefficients, (c) => c.label, [["beta", "beta"], ["se", "se"], ["p", "p", { rel: 1e-5, abs: 1e-14 }]]),
   };
 }
 
@@ -398,6 +455,7 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
     "from scipy.stats import chi2 as chi2_dist",
     "from statsmodels.duration.survfunc import survdiff",
     "",
+    RESULT_INIT,
     ...pyTable("counts", "What the " + t.queryLabel + " query returned for each cohort and study: n patients per (months, event" +
       (hasEntry ? ", entry" : "") + ")", cols, t.counts.map((r) => [r.cohort, r.study, r.months, r.event, r.n, ...(hasEntry ? [r.entry] : [])]),
       "survival_counts.csv"),
@@ -411,17 +469,21 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
     "for cohort, g in df.groupby(\"cohort\", sort=False):",
     "    km = KaplanMeierFitter().fit(g[\"months\"], g[\"event\"]" + (hasEntry ? ", entry=g[\"entry\"]" : "") + ", label=cohort)",
     "    print(f\"{cohort}: n={len(g)}, events={g['event'].sum()}, median={km.median_survival_time_}\")",
+    "    RESULT[f\"km:{cohort}:n\"], RESULT[f\"km:{cohort}:events\"], RESULT[f\"km:{cohort}:median\"] = len(g), g[\"event\"].sum(), km.median_survival_time_",
     ...(t.test.kind === "none" ? [] : [
       "",
       "# p from the chi-squared tail directly: survdiff's own p rounds to 0 below about 1e-16",
       ...(t.test.stratified ? [
         "chi2, p = survdiff(df[\"months\"], df[\"event\"], df[\"cohort\"], strata=df[\"study\"]" + (hasEntry ? ", entry=df[\"entry\"]" : "") + ")",
         "print(f\"log-rank, stratified by study: chi2={chi2:.4f}, p={chi2_dist.sf(chi2, " + t.test.df + "):.4g}\")",
+        "RESULT[\"logrank:chi2\"], RESULT[\"logrank:p\"] = chi2, chi2_dist.sf(chi2, " + t.test.df + ")",
         "chi2, p = survdiff(df[\"months\"], df[\"event\"], df[\"cohort\"]" + (hasEntry ? ", entry=df[\"entry\"]" : "") + ")",
         "print(f\"log-rank, pooled: chi2={chi2:.4f}, p={chi2_dist.sf(chi2, " + t.test.df + "):.4g}\")",
+        "RESULT[\"logrank:pooled:chi2\"], RESULT[\"logrank:pooled:p\"] = chi2, chi2_dist.sf(chi2, " + t.test.df + ")",
       ] : [
         "chi2, p = survdiff(df[\"months\"], df[\"event\"], df[\"cohort\"]" + (hasEntry ? ", entry=df[\"entry\"]" : "") + ")",
         "print(f\"log-rank: chi2={chi2:.4f}, p={chi2_dist.sf(chi2, " + t.test.df + "):.4g}\")",
+        "RESULT[\"logrank:chi2\"], RESULT[\"logrank:p\"] = chi2, chi2_dist.sf(chi2, " + t.test.df + ")",
       ]),
     ]),
   ].join("\n") + "\n";
@@ -432,7 +494,14 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
     verification: "Kaplan–Meier matches " + VERIFIED.km.library + " " + VERIFIED.km.version + " " + VERIFIED.km.fn +
       " (curves are reported to 4 decimals); the log-rank matches " + VERIFIED.logrank.library + " " + VERIFIED.logrank.version + " " +
       VERIFIED.logrank.fn + " to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).",
-    python,
+    python: withResult(python),
+    check: {
+      ...checks("km:", t.cohorts, (c) => c.name, [["n", "n", { abs: 0 }], ["events", "events", { abs: 0 }], ["median", "median", { abs: 1e-9 }]]),
+      ...(t.test.kind === "none" ? {} : {
+        "logrank:chi2": { v: t.test.chi2, abs: 5e-5 }, "logrank:p": { v: t.test.p, rel: 1e-5, abs: 1e-300 },
+        ...(t.test.pooled ? { "logrank:pooled:chi2": { v: t.test.pooled.chi2, abs: 5e-5 }, "logrank:pooled:p": { v: t.test.pooled.p, rel: 1e-5, abs: 1e-300 } } : {}),
+      }),
+    },
   };
 }
 
@@ -451,6 +520,8 @@ export interface CompareTrace {
   /** the combined ("any") row each study returned per gene */
   counts: { cohort: string; study: string; gene: string; profiled: number; altered: number; driver: number }[];
   genes: string[];
+  /** what the view reported per gene — for the script check */
+  results: { gene: string; pAny?: number; pDriver?: number; qAny?: number; qDriver?: number }[];
 }
 
 export function compareMethod(t: CompareTrace): MethodRecord {
@@ -490,11 +561,15 @@ export function compareMethod(t: CompareTrace): MethodRecord {
     k > 2 ? "from scipy.stats import chi2_contingency" : "from scipy.stats import fisher_exact",
     "from statsmodels.stats.multitest import multipletests",
     "",
+    RESULT_INIT,
     ...pyTable("counts", "What the geneCounts query returned for each cohort and study: patients profiled for, altered in, and with a driver in each gene",
       ["cohort", "study", "gene", "profiled", "altered", "driver"],
       t.counts.map((r) => [r.cohort, r.study, r.gene, r.profiled, r.altered, r.driver]), "gene_counts.csv"),
     "cohorts = " + JSON.stringify(t.cohorts),
     "per_cohort = counts.groupby([\"gene\", \"cohort\"])[[\"profiled\", \"altered\", \"driver\"]].sum()",
+    "for (gene, cohort), r in per_cohort.iterrows():",
+    "    for f in (\"profiled\", \"altered\", \"driver\"):",
+    "        RESULT[f\"compare:{gene}:{cohort}:{f}\"] = r[f]",
     "",
     ...(k < 2 ? ["print(per_cohort)"] : [
       "def test(gene, col):",
@@ -517,6 +592,9 @@ export function compareMethod(t: CompareTrace): MethodRecord {
       "result[\"q_any\"] = multipletests(result[\"p_any\"], method=\"fdr_bh\")[1]",
       "result[\"q_driver\"] = multipletests(result[\"p_driver\"], method=\"fdr_bh\")[1]",
       "print(result.sort_values(\"p_any\").to_string(index=False))",
+      "for r in result.itertuples():",
+      "    for f in (\"p_any\", \"p_driver\", \"q_any\", \"q_driver\"):",
+      "        RESULT[f\"compare:{r.gene}:{f}\"] = getattr(r, f)",
     ]),
   ].join("\n") + "\n";
   return {
@@ -526,7 +604,16 @@ export function compareMethod(t: CompareTrace): MethodRecord {
     ...(k >= 2 ? { verification: (k === 2 ? "Fisher's exact test matches scipy " + VERIFIED.fisher.version + " fisher_exact"
       : "The χ² test matches scipy " + VERIFIED.chi2.version + " chi2_contingency(correction=False)") +
       " and Benjamini–Hochberg matches statsmodels " + VERIFIED.bh.version + " " + VERIFIED.bh.fn + ", to a relative 1e-6 (test/tables-golden.test.ts)." } : {}),
-    python,
+    python: withResult(python),
+    check: {
+      ...checks("compare:", t.results, (r) => r.gene, [["pAny", "p_any"], ["pDriver", "p_driver"], ["qAny", "q_any"], ["qDriver", "q_driver"]]),
+      // the summed counts behind every cell, exact
+      ...checks("compare:", [...t.counts.reduce((m, r) => {
+        const k = r.gene + ":" + r.cohort, cur = m.get(k) || { key: k, profiled: 0, altered: 0, driver: 0 };
+        cur.profiled += r.profiled; cur.altered += r.altered; cur.driver += r.driver; return m.set(k, cur);
+      }, new Map<string, { key: string; profiled: number; altered: number; driver: number }>()).values()], (r) => r.key,
+        [["profiled", "profiled", { abs: 0 }], ["altered", "altered", { abs: 0 }], ["driver", "driver", { abs: 0 }]]),
+    },
   };
 }
 
@@ -539,6 +626,8 @@ export interface CooccurrenceTrace {
   counts: { study: string; a: string; b: string; both: number; onlyA: number; onlyB: number; neither: number }[];
   pairs: number;
   assessable: number;
+  /** what the view reported per assessable pair — for the script check */
+  results: { a: string; b: string; p: number; q: number; pStratified?: number }[];
 }
 
 export function cooccurrenceMethod(t: CooccurrenceTrace): MethodRecord {
@@ -574,6 +663,7 @@ export function cooccurrenceMethod(t: CooccurrenceTrace): MethodRecord {
     ...(stratified ? ["from scipy.stats import chi2 as chi2_dist", "from statsmodels.stats.contingency_tables import StratifiedTable"] : []),
     "from statsmodels.stats.multitest import multipletests",
     "",
+    RESULT_INIT,
     ...pyTable("counts", "What the pairCounts query returned for each study, cohort " + JSON.stringify(t.cohort),
       ["study", "a", "b", "both", "only_a", "only_b", "neither"],
       t.counts.map((r) => [r.study, r.a, r.b, r.both, r.onlyA, r.onlyB, r.neither]), "pair_counts.csv"),
@@ -609,6 +699,9 @@ export function cooccurrenceMethod(t: CooccurrenceTrace): MethodRecord {
     "p = result[\"" + (stratified ? "p_cmh" : "p_fisher") + "\"]",
     "result[\"q\"] = multipletests(p, method=\"fdr_bh\")[1]",
     "print(result.sort_values(\"" + (stratified ? "p_cmh" : "p_fisher") + "\").to_string(index=False))",
+    "for r in result.itertuples():",
+    "    RESULT[f\"cooccurrence:{r.a}/{r.b}:p\"], RESULT[f\"cooccurrence:{r.a}/{r.b}:q\"] = r.p_fisher, r.q",
+    ...(stratified ? ["    RESULT[f\"cooccurrence:{r.a}/{r.b}:p_cmh\"] = r.p_cmh"] : []),
   ].join("\n") + "\n";
   return {
     steps,
@@ -617,7 +710,8 @@ export function cooccurrenceMethod(t: CooccurrenceTrace): MethodRecord {
     verification: "Fisher's exact test matches scipy " + VERIFIED.fisher.version + " fisher_exact" +
       (stratified ? ", the CMH test and Mantel–Haenszel odds ratio statsmodels " + VERIFIED.cmh.version + " " + VERIFIED.cmh.fn : "") +
       " and Benjamini–Hochberg statsmodels " + VERIFIED.bh.version + " " + VERIFIED.bh.fn + ", to a relative 1e-6 (test/tables-golden.test.ts).",
-    python,
+    python: withResult(python),
+    check: checks("cooccurrence:", t.results, (r) => r.a + "/" + r.b, [["p", "p"], ["q", "q"], ["pStratified", "p_cmh"]]),
   };
 }
 
@@ -636,6 +730,8 @@ export interface ClinicalTrace {
   numeric: { cohort: string; study: string; attribute: string; n: number; sum: number; sumsq: number }[];
   /** single-study only: each numeric attribute's complete (value, count) distribution per cohort */
   histograms: { cohort: string; attribute: string; value: number; n: number }[];
+  /** the medians and quartiles the view reported — for the script check */
+  medians: { attribute: string; cohort: string; median: number | null; q1: number | null; q3: number | null }[];
 }
 
 export function clinicalMethod(t: ClinicalTrace): MethodRecord {
@@ -701,6 +797,7 @@ export function clinicalMethod(t: ClinicalTrace): MethodRecord {
     "from statsmodels.stats.multitest import multipletests",
     "",
     "cohorts = " + JSON.stringify(t.cohorts),
+    RESULT_INIT,
     "p_values = {}",
     ...(hasCat ? [
       "",
@@ -744,13 +841,18 @@ export function clinicalMethod(t: ClinicalTrace): MethodRecord {
       "        continue  # a cohort's distribution was too large to send whole: no rank test, as in the view",
       "    for c, v in zip(g[\"cohort\"].unique(), values):",
       "        print(f\"{attr} {c}: median={np.percentile(v, 50):.3f}, IQR={np.percentile(v, 25):.3f}-{np.percentile(v, 75):.3f}\")",
+      "        for name, q in ((\"median\", 50), (\"q1\", 25), (\"q3\", 75)):",
+      "            RESULT[f\"clinical:{attr}:{c}:{name}\"] = np.percentile(v, q)",
       k === 2
-        ? "    print(f\"{attr}: Mann-Whitney p={mannwhitneyu(*values, alternative='two-sided', use_continuity=True, method='asymptotic').pvalue:.4g}\")"
-        : "    print(f\"{attr}: Kruskal-Wallis p={kruskal(*values).pvalue:.4g}\")",
+        ? "    RESULT[f\"clinical:{attr}:rank_p\"] = mannwhitneyu(*values, alternative='two-sided', use_continuity=True, method='asymptotic').pvalue"
+        : "    RESULT[f\"clinical:{attr}:rank_p\"] = kruskal(*values).pvalue",
+      "    print(f\"{attr}: " + (k === 2 ? "Mann-Whitney" : "Kruskal-Wallis") + " p={RESULT[f'clinical:{attr}:rank_p']:.4g}\")",
     ] : []),
     "",
     "q = multipletests(list(p_values.values()), method=\"fdr_bh\")[1]",
     "print(pd.DataFrame({\"attribute\": list(p_values), \"p\": list(p_values.values()), \"q\": q}).sort_values(\"p\").to_string(index=False))",
+    "for (attr, p), qv in zip(p_values.items(), q):",
+    "    RESULT[f\"clinical:{attr}:p\"], RESULT[f\"clinical:{attr}:q\"] = p, qv",
   ].join("\n") + "\n";
   return {
     steps,
@@ -760,7 +862,13 @@ export function clinicalMethod(t: ClinicalTrace): MethodRecord {
     verification: "χ² matches scipy " + VERIFIED.chi2.version + " chi2_contingency; Welch's t scipy ttest_ind(equal_var=False) and Welch's ANOVA statsmodels " +
       VERIFIED.anova.version + " anova_generic from the same moments; Mann–Whitney, Kruskal–Wallis and quantiles scipy/numpy on the expanded distribution; " +
       "Benjamini–Hochberg statsmodels multipletests — all to a relative 1e-6 (test/tables-golden.test.ts, test/moments-golden.test.ts).",
-    python,
+    python: withResult(python),
+    check: {
+      ...checks("clinical:", t.attributes.filter((a) => !a.skipped), (a) => a.attribute, [["p", "p"], ["q", "q"], ["rankP", "rank_p"]]),
+      // medians and quartiles are reported to 3 decimals
+      ...checks("clinical:", t.medians, (m) => m.attribute + ":" + m.cohort,
+        [["median", "median", { abs: 5e-4 + 1e-9 }], ["q1", "q1", { abs: 5e-4 + 1e-9 }], ["q3", "q3", { abs: 5e-4 + 1e-9 }]]),
+    },
   };
 }
 
@@ -773,6 +881,8 @@ export interface CoexpressionTrace {
   sums: { study: string; a: string; b: string; n: number; sx: number; sy: number; sxy: number; sxx: number; syy: number }[];
   pairs: number;
   tested: number;
+  /** what the view reported per pair — for the script check */
+  results: { a: string; b: string; r: number | null; p: number; q: number; pMeta?: number }[];
 }
 
 export function coexpressionMethod(t: CoexpressionTrace): MethodRecord {
@@ -800,6 +910,7 @@ export function coexpressionMethod(t: CoexpressionTrace): MethodRecord {
     ...(multi ? ["from statsmodels.stats.meta_analysis import combine_effects"] : []),
     "from statsmodels.stats.multitest import multipletests",
     "",
+    RESULT_INIT,
     ...pyTable("sums", "What the pairMoments query returned for each study, cohort " + JSON.stringify(t.cohort) + ", profile " + t.profileType,
       ["study", "a", "b", "n", "sx", "sy", "sxy", "sxx", "syy"], t.sums.map((r) => [r.study, r.a, r.b, r.n, r.sx, r.sy, r.sxy, r.sxx, r.syy]), "pair_sums.csv"),
     "",
@@ -837,6 +948,9 @@ export function coexpressionMethod(t: CoexpressionTrace): MethodRecord {
     "p = " + (multi ? "tested[\"p_meta\"].fillna(tested[\"p\"])" : "tested[\"p\"]"),
     "result.loc[tested.index, \"q\"] = multipletests(p, method=\"fdr_bh\")[1]",
     "print(result.reindex(result[\"r\"].abs().sort_values(ascending=False).index).to_string(index=False))",
+    "for r in result.itertuples():",
+    "    for f in (\"r\", \"p\", \"q\"" + (multi ? ", \"p_meta\"" : "") + "):",
+    "        RESULT[f\"coexpression:{r.a}/{r.b}:{f}\"] = getattr(r, f)",
   ].join("\n") + "\n";
   return {
     steps,
@@ -844,7 +958,10 @@ export function coexpressionMethod(t: CoexpressionTrace): MethodRecord {
     verification: "Pearson's r and p from the six sums match scipy " + VERIFIED.pearson.version + " pearsonr on the underlying values" +
       (multi ? ", and the Fisher-z meta-analysis statsmodels " + VERIFIED.meta.version + " " + VERIFIED.meta.fn : "") +
       ", to a relative 1e-6 (test/moments-golden.test.ts).",
-    python,
+    python: withResult(python),
+    // r is reported to 4 decimals
+    check: checks("coexpression:", t.results.filter((x) => x.r != null), (x) => x.a + "/" + x.b,
+      [["r", "r", { abs: 5e-5 + 1e-12 }], ["p", "p"], ["q", "q"], ["pMeta", "p_meta"]]),
   };
 }
 
@@ -865,6 +982,8 @@ export interface DiffexprTrace {
   tested: number;
   skipped: number;
   gsea?: { sets: { name: string; genes: string[] }[]; tested: number; skipped: string[]; permutations: number; minSize: number };
+  /** what the view reported — genes drawn as points, and each set tested — for the script check */
+  results: { genes: { gene: string; p: number; q: number }[]; sets: { name: string; es: number; nes: number; p: number }[] };
 }
 
 export function diffexprMethod(t: DiffexprTrace): MethodRecord {
@@ -899,6 +1018,7 @@ export function diffexprMethod(t: DiffexprTrace): MethodRecord {
     "from scipy.stats import ttest_ind_from_stats",
     "from statsmodels.stats.multitest import multipletests",
     "",
+    RESULT_INIT,
     ...pyTable("moments", "Each gene's n, sum and sum of squares per cohort (" + (t.log2 ? "log2(v + 1)" : "as stored") + "), from the diffexpr:moments queries, summed over each cohort's studies",
       ["cohort", "gene", "n", "sx", "sxx"], t.moments.map((r) => [r.cohort, r.gene, r.n, r.sx, r.sxx]), "diffexpr_moments.csv"),
     "",
@@ -915,6 +1035,9 @@ export function diffexprMethod(t: DiffexprTrace): MethodRecord {
     "g[\"q\"] = multipletests(g[\"p\"], method=\"fdr_bh\")[1]",
     "print(len(g), \"genes tested\")",
     "print(g.sort_values(\"p\")[[\"effect\", \"t\", \"p\", \"q\"]].head(20))",
+    "RESULT[\"diffexpr:tested\"] = len(g)",
+    "for gene, r in g.iterrows():",
+    "    RESULT[f\"diffexpr:{gene}:p\"], RESULT[f\"diffexpr:{gene}:q\"] = r[\"p\"], r[\"q\"]",
     ...(t.gsea ? [
       "",
       "# ---- the port of our seeded GSEA null (python/golden/gsea_null.py) ----",
@@ -927,6 +1050,8 @@ export function diffexprMethod(t: DiffexprTrace): MethodRecord {
       "out = pd.DataFrame([(k, *v) for k, v in res.items()], columns=[\"set\", \"size\", \"es\", \"nes\", \"p\"])",
       "out[\"q\"] = multipletests(out[\"p\"], method=\"fdr_bh\")[1]",
       "print(out.sort_values([\"q\", \"nes\"], key=lambda c: c if c.name == \"q\" else -c.abs()).to_string(index=False))",
+      "for r in out.itertuples():",
+      "    RESULT[f\"gsea:{r.set}:es\"], RESULT[f\"gsea:{r.set}:nes\"], RESULT[f\"gsea:{r.set}:p\"] = r.es, r.nes, r.p",
     ] : []),
   ].join("\n") + "\n";
   return {
@@ -934,7 +1059,13 @@ export function diffexprMethod(t: DiffexprTrace): MethodRecord {
     implementation: { functions: ["welchT", "benjaminiHochberg", ...(t.gsea ? ["preRankedGsea"] : [])], file: "lib/stats.ts", commit: BUILD_COMMIT },
     verification: "Welch's t from moments matches scipy " + VERIFIED.welch.version + " ttest_ind(equal_var=False) and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts)" +
       (t.gsea ? "; enrichment scores match gseapy " + VERIFIED.gsea.version + " prerank, and NES and p match the script's port of our seeded null exactly (test/gsea-golden.test.ts)" : "") + ".",
-    python,
+    python: withResult(python),
+    check: {
+      "diffexpr:tested": { v: t.tested, abs: 0 },
+      ...checks("diffexpr:", t.results.genes, (g) => g.gene, [["p", "p", { rel: 1e-6, abs: 1e-300 }], ["q", "q", { rel: 1e-6, abs: 1e-300 }]]),
+      // ES and NES are reported to 4 and 3 decimals; the permutation p is a ratio of counts
+      ...checks("gsea:", t.results.sets, (x) => x.name, [["es", "es", { abs: 5e-5 + 1e-12 }], ["nes", "nes", { abs: 5e-4 + 1e-12 }], ["p", "p", { abs: 0 }]]),
+    },
   };
 }
 
@@ -954,6 +1085,8 @@ export interface IncidenceTrace {
   /** every (entry, t, cause) count the queries returned for patients who enter the risk set */
   counts: { cohort: string; study: string; entry: number; t: number; cause: number; n: number }[];
   gray?: { statistic: number; p: number; permutations: number };
+  /** the view's estimate and interval at each horizon — for the script check */
+  horizonResults: { cohort: string; months: number; f1: number; lo: number; hi: number }[];
 }
 
 export function incidenceMethod(t: IncidenceTrace): MethodRecord {
@@ -994,6 +1127,7 @@ export function incidenceMethod(t: IncidenceTrace): MethodRecord {
       ["cohort", "study", "entry", "t", "cause", "n"], t.counts.map((r) => [r.cohort, r.study, r.entry, r.t, r.cause, r.n]), "incidence_counts.csv"),
     "df = counts.loc[counts.index.repeat(counts[\"n\"])].reset_index(drop=True)  # one row per patient",
     "horizons = " + JSON.stringify(t.horizons),
+    RESULT_INIT,
     "",
     ...(hasEntry ? [
       "def aalen_johansen(t, cause, entry):",
@@ -1026,7 +1160,9 @@ export function incidenceMethod(t: IncidenceTrace): MethodRecord {
     "    for h in horizons:",
     "        at = cif[cif[\"t\"] <= h].tail(1)",
     "        f1, se = (float(at[\"f1\"].iloc[0]), float(at[\"se1\"].iloc[0])) if len(at) else (0.0, 0.0)",
-    "        print(f\"{cohort} at {h} months: {f1:.4f} (95% CI {max(0, f1 - 1.959964 * se):.4f}-{min(1, f1 + 1.959964 * se):.4f})\")",
+    "        lo, hi = max(0, f1 - 1.959963984540054 * se), min(1, f1 + 1.959963984540054 * se)  # 95%: the exact normal quantile",
+    "        print(f\"{cohort} at {h} months: {f1:.4f} (95% CI {lo:.4f}-{hi:.4f})\")",
+    "        RESULT[f\"incidence:{cohort}:{h}:f1\"], RESULT[f\"incidence:{cohort}:{h}:lo\"], RESULT[f\"incidence:{cohort}:{h}:hi\"] = f1, lo, hi",
     ...(t.gray ? [
       "",
       "# ---- the port of our seeded Gray-type permutation test (python/golden/gray_null.py) ----",
@@ -1039,6 +1175,7 @@ export function incidenceMethod(t: IncidenceTrace): MethodRecord {
       "           for r in df[df[\"cohort\"] == c].sort_values([\"t\", \"cause\", \"entry\"], kind=\"stable\").itertuples()] for c in cohorts]",
       "stat, p = gray_permutation_test(groups, permutations=" + t.gray.permutations + ", seed=1)  # pure Python: minutes for a large cohort",
       "print(f\"Gray-type statistic {stat:.4f}, permutation p {p:.4g}\")",
+      "RESULT[\"gray:statistic\"], RESULT[\"gray:p\"] = stat, p",
     ] : []),
   ].join("\n") + "\n";
   return {
@@ -1046,7 +1183,12 @@ export function incidenceMethod(t: IncidenceTrace): MethodRecord {
     implementation: { functions: ["aalenJohansen", "cifAt", "kaplanMeier", ...(t.gray ? ["grayPermutationTest"] : [])], file: "lib/stats.ts", commit: BUILD_COMMIT },
     verification: "Cumulative incidence and its standard error match statsmodels " + VERIFIED.cif.version + " CumIncidenceRight to 1e-12, and with delayed entry lifelines' AalenJohansenFitter" +
       (t.gray ? "; the Gray-type statistic and permutation p match the script's port exactly" : "") + " (test/incidence-golden.test.ts).",
-    python,
+    python: withResult(python),
+    check: {
+      ...checks("incidence:", t.horizonResults, (h) => h.cohort + ":" + h.months, [["f1", "f1", { abs: 1e-9 }], ["lo", "lo", { abs: 1e-9 }], ["hi", "hi", { abs: 1e-9 }]]),
+      // the port reproduces the permutation test exactly
+      ...(t.gray ? { "gray:statistic": { v: t.gray.statistic, rel: 1e-12 }, "gray:p": { v: t.gray.p, abs: 0 } } : {}),
+    },
   };
 }
 
@@ -1059,6 +1201,8 @@ export interface PairedTrace {
   perSite: { cohort: string; study: string; cohortPatients: number }[];
   panels: { cohort: string; patients: number }[];
   counts: { cohort: string; study: string; gene: string; pairs: number; both: number; aOnly: number; bOnly: number }[];
+  /** what the view reported per cohort and gene — for the script check */
+  results: { cohort: string; gene: string; p: number; q?: number }[];
 }
 
 export function pairedMethod(t: PairedTrace): MethodRecord {
@@ -1083,6 +1227,7 @@ export function pairedMethod(t: PairedTrace): MethodRecord {
     "from statsmodels.stats.contingency_tables import mcnemar",
     "from statsmodels.stats.multitest import multipletests",
     "",
+    RESULT_INIT,
     ...pyTable("counts", "What the paired:genes queries returned per cohort and study: patients altered on both sides, on the " + aL + " side only, on the " + bL + " side only, of those profiled on both",
       ["cohort", "study", "gene", "pairs", "both", "a_only", "b_only"], t.counts.map((r) => [r.cohort, r.study, r.gene, r.pairs, r.both, r.aOnly, r.bOnly]), "paired_counts.csv"),
     "g = counts.groupby([\"cohort\", \"gene\"], sort=False)[[\"pairs\", \"both\", \"a_only\", \"b_only\"]].sum().reset_index()",
@@ -1092,10 +1237,15 @@ export function pairedMethod(t: PairedTrace): MethodRecord {
     "    tested = c[c[\"a_only\"] + c[\"b_only\"] > 0]",
     "    g.loc[tested.index, \"q\"] = multipletests(tested[\"p\"], method=\"fdr_bh\")[1] if len(tested) else []",
     "print(g.to_string(index=False))",
+    "for r in g.itertuples():",
+    "    RESULT[f\"paired:{r.cohort}:{r.gene}:p\"] = r.p",
+    "    if r.a_only + r.b_only:",
+    "        RESULT[f\"paired:{r.cohort}:{r.gene}:q\"] = r.q",
   ].join("\n") + "\n";
   return { steps, implementation: { functions: ["mcnemarExact", "benjaminiHochberg"], file: "lib/stats.ts", commit: BUILD_COMMIT },
     verification: "The exact McNemar test matches statsmodels " + VERIFIED.mcnemar.version + " mcnemar(exact=True) and Benjamini–Hochberg multipletests, to a relative 1e-6 (test/tables-golden.test.ts).",
-    python };
+    python: withResult(python),
+    check: checks("paired:", t.results, (r) => r.cohort + ":" + r.gene, [["p", "p"], ["q", "q"]]) };
 }
 
 // ---- genome: per-bin gain / loss frequency, Fisher per bin, BH ----------------------------------
@@ -1108,6 +1258,8 @@ export interface GenomeTrace {
   pastEnd: number;
   /** per cohort, summed over its studies: each bin's samples covered, gained and lost (bins with coverage only) */
   counts: { cohort: string; chrom: string; bin: number; profiled: number; gain: number; loss: number }[];
+  /** the view's q-value per bin tested (two cohorts only) — for the script check */
+  results: { chrom: string; bin: number; gainQ: number | null; lossQ: number | null }[];
 }
 
 export function genomeMethod(t: GenomeTrace): MethodRecord {
@@ -1134,6 +1286,7 @@ export function genomeMethod(t: GenomeTrace): MethodRecord {
     "import pandas as pd",
     ...(two ? ["from scipy.stats import fisher_exact", "from statsmodels.stats.multitest import multipletests"] : []),
     "",
+    RESULT_INIT,
     ...pyTable("counts", "Per cohort (summed over its studies) and bin: samples covered, gained and lost", ["cohort", "chrom", "bin", "profiled", "gain", "loss"],
       t.counts.map((r) => [r.cohort, r.chrom, r.bin, r.profiled, r.gain, r.loss]), "genome_bins.csv"),
     "counts[\"chrom\"] = counts[\"chrom\"].astype(str)  # \"1\"…\"22\", \"X\": names, not numbers",
@@ -1148,11 +1301,14 @@ export function genomeMethod(t: GenomeTrace): MethodRecord {
       "         for _, r in both.iterrows()]",
       "    both[f\"{kind}_q\"] = multipletests(p, method=\"fdr_bh\")[1]",
       "    print(kind, \"bins with q < 0.05:\", int((both[f\"{kind}_q\"] < 0.05).sum()))",
+      "    for (chrom, b), q in both[f\"{kind}_q\"].items():",
+      "        RESULT[f\"genome:{chrom}:{b}:{kind}_q\"] = q",
     ] : ["print(counts.head(30).to_string(index=False))"]),
   ].join("\n") + "\n";
   return { steps, implementation: { functions: two ? ["fisherExact", "benjaminiHochberg"] : [], file: "lib/stats.ts", commit: BUILD_COMMIT },
     ...(two ? { verification: "Fisher's exact test matches scipy " + VERIFIED.fisher.version + " fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts)." } : {}),
-    python };
+    python: withResult(python),
+    check: checks("genome:", t.results.filter((r) => r.gainQ != null), (r) => r.chrom + ":" + r.bin, [["gainQ", "gain_q"], ["lossQ", "loss_q"]]) };
 }
 
 // ---- pathways: share altered per pathway and member gene, Fisher, BH -----------------------------
@@ -1165,6 +1321,8 @@ export interface PathwaysTrace {
   cohorts: string[];
   setCounts: { cohort: string; set: string; profiled: number; altered: number }[];
   geneCounts: { cohort: string; gene: string; profiled: number; altered: number }[];
+  /** what the view reported (two cohorts only): each pathway's p and q, and the q of each top gene — for the script check */
+  results: { pathways: { name: string; p?: number; q?: number }[]; genes: { gene: string; q: number }[] };
 }
 
 export function pathwaysMethod(t: PathwaysTrace): MethodRecord {
@@ -1188,6 +1346,7 @@ export function pathwaysMethod(t: PathwaysTrace): MethodRecord {
     "import pandas as pd",
     ...(two ? ["from scipy.stats import fisher_exact", "from statsmodels.stats.multitest import multipletests"] : []),
     "",
+    RESULT_INIT,
     ...pyTable("sets", "Per cohort and pathway: patients profiled for at least one member gene, and altered in at least one", ["cohort", "set", "profiled", "altered"],
       t.setCounts.map((r) => [r.cohort, r.set, r.profiled, r.altered]), "pathway_counts.csv"),
     ...pyTable("genes", "Per cohort and member gene: patients profiled for it, and altered in it", ["cohort", "gene", "profiled", "altered"],
@@ -1205,11 +1364,15 @@ export function pathwaysMethod(t: PathwaysTrace): MethodRecord {
       "    res = pd.DataFrame(rows, columns=[name, \"p\"])",
       "    res[\"q\"] = multipletests(res[\"p\"], method=\"fdr_bh\")[1]",
       "    print(res.sort_values(\"p\").to_string(index=False))",
+      "    for r in res.itertuples():",
+      "        RESULT[f\"pathways:{name}:{getattr(r, name)}:p\"], RESULT[f\"pathways:{name}:{getattr(r, name)}:q\"] = r.p, r.q",
     ] : ["    print(table.to_string())"]),
   ].join("\n") + "\n";
   return { steps, implementation: { functions: two ? ["fisherExact", "benjaminiHochberg"] : [], file: "lib/stats.ts", commit: BUILD_COMMIT },
     ...(two ? { verification: "Fisher's exact test matches scipy " + VERIFIED.fisher.version + " fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts)." } : {}),
-    python };
+    python: withResult(python),
+    check: { ...checks("pathways:pathway:", t.results.pathways, (r) => r.name, [["p", "p"], ["q", "q"]]),
+      ...checks("pathways:gene:", t.results.genes, (r) => r.gene, [["q", "q"]]) } };
 }
 
 // ---- attrition: sequential cohort counts ---------------------------------------------------------
