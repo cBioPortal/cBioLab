@@ -961,6 +961,17 @@ export const EXAMPLES: DslExample[] = [
       },
       views: [{ kind: "assays", profileType: "mutational_signatures_contribution_v2" }]
     }
+  },
+  {
+    title: "Co-expression: the genes that rise and fall with ESR1",
+    demonstrates: "A `correlates` view, the portal's Co-expression tab: one gene's mRNA against every gene's across a cohort, Spearman's ρ and Pearson's r computed from sums each database returns — n, Σx, Σy, Σxy, Σx², Σy² on the values and on their ranks — so no expression value leaves it, ranked by ρ with Benjamini–Hochberg across all genes.",
+    tags: ["correlates", "co-expression", "expression"],
+    note: "TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up behind ESR1 — CCDC170 (its neighbour on 6q25, often co-amplified), THSD4, FOXA1, TBC1D9 — and the genes of basal-like tumours fall away from it.",
+    doc: {
+      study: "brca_tcga_pan_can_atlas_2018",
+      cohorts: { "all patients": { all: [] } },
+      views: [{ kind: "correlates", gene: "ESR1", profileType: "rna_seq_v2_mrna" }]
+    }
   }
 ];
 
@@ -1176,6 +1187,7 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | \`overlap\` | \`cohorts?:[names] (2–6)\` | **how cohorts' patients intersect**, cBioPortal's group-comparison Overlap tab drawn as an UpSet plot: for every combination of the cohorts, the patients in exactly those cohorts and none of the others, with each cohort's own size beside it. Each study's database answers with one count per combination (a bitmask of membership) — counts only — and a cohort's size here must equal its own count, or the view says the definition gave two answers. Ids are study-qualified, so patients only ever overlap within a study |
 | \`enrichment\` | \`alteration?:"mutation"\|"cna"\|"amp"\|"homdel"\|"sv", measure?:"any"\|"driver", minAltered?:5, label?:12, cohorts:[2–6 names]\` | **genomic-alteration enrichment across every gene**, cBioPortal's group-comparison Genomic Alterations tab: each gene's frequency of one alteration type per cohort, counted in SAMPLES over the samples profiled for that gene — samples on a panel listing it (counted per panel, then joined to its genes, Explore's own construction) plus whole-exome samples, and a sample altered off-panel counts as measured. Uncalled mutations are excluded as the portal excludes them; copy number is high-level only. Two cohorts: a two-sided Fisher test and the log2 ratio of the altered shares, drawn as a volcano beside the table; three or more: a chi-squared test. q is Benjamini–Hochberg across every gene tested; genes altered in fewer than \`minAltered\` samples, or unprofiled in a cohort, are counted as not tested. The caption warns that hypermutated tumours enrich almost every gene. Counts only |
 | \`assays\` | \`profileType:"<generic-assay profile>", minN?:3, label?:12, cohorts:[2–6 names]\` | **every entity of one generic-assay profile compared between cohorts**, cBioPortal's group-comparison tabs for generic assays (mutational signatures, arm-level copy number, treatment response, …): one value per sample (every sample of each cohort's patients) or per patient for a patient-level profile. A numeric profile: each entity's n, Σv and Σv² per cohort — values that are not numbers, such as a limit \`">8"\` or NA, are counted and left out — then Welch's t for two cohorts (drawn as a volcano of the difference in means) or Welch's ANOVA for more. A categorical one: each entity's count per value per cohort — NA and blank are not called and are counted apart — then a chi-squared test on cohort × value. q is Benjamini–Hochberg across every entity tested; an entity with fewer than \`minN\` values in a cohort, or with no spread, is counted as not tested. Per-probe methylation is refused (hundreds of thousands of probes), as is any profile past 20,000 entities. Counts and moments only |
+| \`correlates\` | \`gene:"<symbol>", profileType:"<continuous profile>", otherProfile?:"<profile>", show?:25, minN?:10, cohorts:[one name]\` | **genome-wide co-expression with one gene**, cBioPortal's Co-expression tab: \`gene\` on \`profileType\` against every gene on \`otherProfile\` (the same profile unless given — e.g. protein against mRNA), over one cohort's patients with both values (a patient's samples averaged). Each study's database returns six sums per gene on the values and six on their average ranks among those patients — nothing else — from which Pearson's r and Spearman's ρ follow exactly, each p from t on n − 2 df as scipy computes it. Ranked by ρ, as the portal ranks; q is Benjamini–Hochberg over ρ's p. Across studies r pools the sums; ρ, which does not add, is each study's combined by Fisher z. Lists the \`show\` most positive and most negative genes, with every tested gene's ρ as a histogram. Sums only |
 | \`oncoprint\` | \`genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], unit?:"patient"\\|"sample", display?:{…}, overlays?:[≤2], derivedCohorts?:[≤3], cohorts?:[names]\` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 \`views[].note\` is the analyst's own one-line annotation, carried through to the result and
@@ -1481,6 +1493,8 @@ export const AGENT_GRAMMAR = `Document shape:
                // every gene's alteration frequency compared between cohorts (Fisher/chi-squared, BH), volcano + table
              {"kind":"assays","profileType":"<generic-assay profile>","minN":3,"cohorts":[2-6 names]},
                // every entity of a generic-assay profile (signatures, arm-level CNA, …) between cohorts (Welch t/ANOVA or chi-squared, BH)
+             {"kind":"correlates","gene":"ESR1","profileType":"<continuous profile>","otherProfile":"<profile>"?,"show":25,"cohorts":[one name]},
+               // every gene's expression against one gene's (Spearman + Pearson, BH), the portal's Co-expression tab
                // the study base, then patients left after each clause of each cohort, in order (CONSORT-style)
              {"kind":"oncoprint","genes":[...(max 12)],"clinical":["<attribute>", ...(max 8)]?,
               "heatmap":[{"profileType":"<profile>","genes":[...]?}, ...(max 4)]?,

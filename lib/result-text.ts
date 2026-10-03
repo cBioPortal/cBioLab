@@ -2,7 +2,7 @@
 // the author's notes, the way a model should read it. One renderer for every agent-facing
 // surface — the MCP run_analysis tool, the analysis page's WebMCP tools — so they cannot
 // describe the same result differently. Pure and browser-safe.
-import type { AnalysisDoc, AnalysisResult, ViewResult, AssaysEntity } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, ViewResult, AssaysEntity, CorrelatesGene } from "./types.ts";
 
 export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[] {
   const out: string[] = [];
@@ -268,6 +268,13 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         as.rows.slice(0, 40).map((g) => `  ${g.name}: ` + g.cells.map(cell).join(" | ") +
           (g.diff != null ? `, difference ${g.diff.toPrecision(3)}` : "") + `, q=${pFmt(g.q)}, higher in ${g.higherIn}${g.value ? " (" + g.value + ")" : ""}`).join("\n") +
         (as.rows.length > 40 ? `\n  … ${as.tested - 40} more entities tested` : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "correlates") {
+      const co = v.correlates!;
+      const line = (g: CorrelatesGene) => `  ${g.gene}: ρ ${g.rho} (q=${pFmt(g.q)}), r ${g.r}, n=${g.n}`;
+      out.push(`Genes co-expressed with ${co.gene} (${co.profileType}${co.otherProfile !== co.profileType ? " against " + co.otherProfile : ""}) in ${co.cohort}; ` +
+        `Spearman ρ${co.rhoFrom === "meta" ? " combined across studies by Fisher z" : ""}, BH q over ${co.tested.toLocaleString()} genes; ${co.significant.toLocaleString()} at q<0.05:\n` +
+        ` most positively correlated:\n` + co.positive.map(line).join("\n") +
+        `\n most negatively correlated:\n` + co.negative.map(line).join("\n") + caveatOf(v) + noteOf(v));
     } else if (v.kind === "overlap") {
       const ov = v.overlap!;
       out.push(`Cohort overlap (patients in exactly these cohorts and no other):\n` +

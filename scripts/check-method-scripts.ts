@@ -133,6 +133,10 @@ async function materialize(v: View, dir: string): Promise<string | null> {
     }
     if (wanted.includes("assays_moments.csv")) writeFileSync(join(dir, "assays_moments.csv"), toCsv([...numeric.values()], ["cohort", "entity", "n", "sx", "sxx"]));
     if (wanted.includes("assays_counts.csv")) writeFileSync(join(dir, "assays_counts.csv"), toCsv([...counts.values()], ["cohort", "entity", "value", "n"]));
+  } else if (v.kind === "correlates") {
+    const rows: Record<string, unknown>[] = [];
+    for (const q of qs.filter((q) => q.label === "correlates:moments")) rows.push(...(await runSql(q.study, q.sql)).map((r) => ({ study: q.study, ...r })));
+    writeFileSync(join(dir, "correlates_sums.csv"), toCsv(rows, ["study", "gene", "n", "sx", "sy", "sxy", "sxx", "syy", "rsx", "rsy", "rsxy", "rsxx", "rsyy"]));
   } else {
     return "reads " + wanted.join(", ") + ", which this check cannot build for a " + v.kind + " view";
   }

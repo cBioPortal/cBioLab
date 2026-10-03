@@ -329,7 +329,9 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "assayMomentsSql": () => federation.assayMomentsSql(cohortSql, "x", "db", "mutational_signatures_contribution_v2"),
     "assayValueCountsSql": () => federation.assayValueCountsSql(cohortSql, "x", "db", "armlevel_cna"),
     "assayProfileSql": () => federation.assayProfileSql("x", "db", "armlevel_cna"),
-    "assayEntityNamesSql": () => federation.assayEntityNamesSql("x", "db", "armlevel_cna")
+    "assayEntityNamesSql": () => federation.assayEntityNamesSql("x", "db", "armlevel_cna"),
+    // correlates: per-patient values and their ranks stay in CTEs; twelve sums per gene leave
+    "correlatesMomentsSql": () => federation.correlatesMomentsSql(cohortSql, "x", "db", "ESR1", "rna_seq_v2_mrna", "rppa")
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

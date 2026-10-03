@@ -102,3 +102,18 @@ describe("assays", () => {
     assert.equal(viewTitle(cat), "Generic assays — Signatures — A vs B");
   });
 });
+
+describe("correlates", () => {
+  const g = (gene: string, rho: number) => ({ gene, n: 100, rho, rhoP: 1e-10, q: 1e-9, r: rho * 0.9, p: 1e-9 });
+  const histogram = Array.from({ length: 40 }, (_, b) => [Math.round((-1 + b * 0.05) * 100) / 100, b === 20 ? 50 : 3] as [number, number]);
+  const v: ViewResult = { kind: "correlates", cohorts: ["all"], caveat: "not a regulatory link",
+    correlates: { gene: "ESR1", profileType: "mrna", otherProfile: "mrna", cohort: "all", tested: 200, untested: 1, significant: 30, minN: 10, rhoFrom: "rank",
+      positive: [g("<FOXA1>", 0.75), g("GATA3", 0.7)], negative: [g("PSAT1", -0.67)], histogram } };
+  test("draws the histogram and both lists, escapes names and keeps the caveat", () => {
+    const svg = viewToSvg(v)!;
+    assert.ok(svg.includes("Spearman ρ with ESR1") && svg.includes("rise with ESR1") && svg.includes("fall as ESR1 rises"));
+    assert.ok(!svg.includes("<FOXA1>") && svg.includes("&lt;FOXA1&gt;") && svg.includes("PSAT1"));
+    assert.ok(svg.includes("not a regulatory link") && svg.includes("every one of the 200 genes is in the histogram"));
+    assert.equal(viewTitle(v), "Co-expression — ESR1 against every gene — all");
+  });
+});

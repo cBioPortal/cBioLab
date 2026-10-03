@@ -48,6 +48,8 @@ export const MORE_KINDS: Record<string, MoreKindUi> = {
   assays: { label: "Generic assays (signatures, arm-level CNA, …)", title: "Generic assays", maxCohorts: 6,
     why: (k) => k.cohorts.length < 2 ? "compares two or more cohorts — this analysis has one"
       : !k.assays.length ? "this study has no generic-assay profiles (mutational signatures, arm-level copy number, …)" : null },
+  correlates: { label: "Co-expression with one gene (genome-wide)", title: "Co-expression", maxCohorts: 1,
+    why: (k) => !k.profiles.filter((p) => p !== "cna").length ? "this study has no continuous molecular profile (mRNA, protein, …) to correlate on" : null },
   overlap: { label: "Cohort overlap (UpSet)", title: "Cohort overlap", maxCohorts: 6,
     why: (k) => k.cohorts.length < 2 ? "intersects two or more cohorts — this analysis has one" : null },
   cancertypes: { label: "Cancer types summary", title: "Cancer types summary", genes: true, maxCohorts: 2 },
@@ -87,6 +89,7 @@ export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "enrichment") return ({ mutation: "mutations", cna: "copy-number alterations", amp: "amplifications", homdel: "deep deletions", sv: "structural variants" } as Record<string, string>)[spec.alteration || "mutation"] +
     (spec.measure === "driver" ? " (drivers)" : "") + " in every gene, per sample";
   if (kind === "overlap") return "patients in exactly each combination of cohorts";
+  if (kind === "correlates") return (spec.gene || "no gene") + " on " + (spec.profileType || "no profile") + (spec.otherProfile && spec.otherProfile !== spec.profileType ? " against " + spec.otherProfile : "") + " · Spearman ρ, every gene";
   if (kind === "assays") return (v.assays ? v.assays.profileName + " · " + v.assays.test : spec.profileType || "no profile chosen") + ", per " + (v.assays ? v.assays.unit.replace(/s$/, "") : "sample");
   if (kind === "cancertypes") return "by " + (spec.groupBy || "CANCER_TYPE") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled samples";
   if (kind === "labs") {
@@ -157,6 +160,33 @@ export function MoreControls({ c }: { c: MoreCtx }) {
       </div>
     </div>
   );
+  if (spec.kind === "correlates") {
+    const profs = c.profiles.filter((p) => p !== "cna");
+    const pick = (value: string, set: (v: string) => void, title: string, label: string) => (
+      <label className="tbfield" title={title}>
+        {label} <select value={value} disabled={busy} onChange={(e) => set(e.target.value)}>
+          {!profs.includes(value) && <option value={value}>{value || "choose…"}</option>}
+          {profs.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
+        </select>
+      </label>
+    );
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="the gene every other gene is correlated with">
+            gene <DraftInput value={spec.gene || ""} disabled={busy} width="6rem" placeholder="ESR1" onCommit={(t) => patch({ gene: t.trim().toUpperCase() })} />
+          </label>
+          {pick(spec.profileType || "", (v) => patch({ profileType: v }), "the query gene's profile", "on")}
+          {pick(spec.otherProfile || spec.profileType || "", (v) => patch({ otherProfile: v === spec.profileType ? undefined : v }), "the profile every other gene is read from", "against")}
+          <label className="tbfield" title="genes listed in each direction; every tested gene is in the histogram">
+            list <select value={String(spec.show ?? 25)} disabled={busy} onChange={(e) => patch({ show: Number(e.target.value) === 25 ? undefined : Number(e.target.value) })}>
+              {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select> each way
+          </label>
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "assays") return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
@@ -398,6 +428,11 @@ export function defaultMoreView(kind: string, known: Known): Record<string, unkn
   }
   if (kind === "clonality") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "APC", "PIK3CA", "SMAD4", "CDH1"] };
   if (kind === "paired") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : PAIRED_DEFAULT_GENES };
+  if (kind === "correlates") {
+    const profs = known.profiles.filter((p) => p !== "cna");
+    const profile = profs.find((p) => /mrna|rna_seq/i.test(p) && !/zscore/i.test(p)) || profs.find((p) => /mrna|rna_seq/i.test(p)) || profs[0] || "";
+    return { kind, gene: known.genes[0] || "TP53", profileType: profile, ...(known.cohorts.length > 1 ? { cohorts: known.cohorts.slice(0, 1) } : {}) };
+  }
   if (kind === "assays") {
     const profile = known.assays.find((p) => /signature/i.test(p) && /contribution/i.test(p)) || known.assays.find((p) => !/methylation/i.test(p)) || known.assays[0] || "";
     return { kind, profileType: profile };
