@@ -1268,3 +1268,14 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .xc-tick { font-size: 9px; fill: var(--muted); }
 .xc-tickline { stroke: var(--muted); }
 .xc-axis { font-size: 10px; fill: var(--muted); }
+
+/* the portal pages (app/portal): cBioPortal's Results and Comparison layouts */
+.portal-main { max-width: 1400px; margin: 0 auto; padding: var(--s4); }
+.portal-head h1 { font-size: var(--t-xl); margin: var(--s2) 0; }
+.portal-head a { color: var(--accent-ink); text-decoration: none; font-weight: 600; }
+.portal-cohorts { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.portal-view { margin-top: var(--s3); }
+.portal-view .vtitle { font-size: var(--t-md); margin: 0 0 var(--s2); }
+.doctabs { display: flex; gap: var(--s1); flex-wrap: wrap; border-bottom: 1px solid var(--line); margin: var(--s3) 0; }
+.doctabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: var(--s2) var(--s3); font-size: var(--t-sm); color: var(--muted); cursor: pointer; display: inline-flex; gap: var(--s1); align-items: center; }
+.doctabs button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }

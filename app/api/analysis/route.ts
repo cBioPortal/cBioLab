@@ -1,5 +1,6 @@
 import { cachedAnalysis } from "../../../lib/next-cache.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
+import { viewToSvg } from "../../../lib/view-svg.ts";
 
 export const maxDuration = 60;
 
@@ -8,9 +9,14 @@ export async function POST(req: Request) {
     // `customData` rides beside the document, never inside it: a shared ?doc= link must not
     // carry patient-level values (lib/custom-data.ts)
     const { customData, customRefs, ...doc } = await req.json();
+    const url = new URL(req.url);
     // the web app draws its own oncoprints; ?oncoprint=spec skips rendering them here
-    const mode = new URL(req.url).searchParams.get("oncoprint") === "spec" ? "spec" as const : "svg" as const;
-    return Response.json(await withRequestCustomData(customData, () => cachedAnalysis(doc, { oncoprint: mode }), { refs: customRefs, req }));
+    const mode = url.searchParams.get("oncoprint") === "spec" ? "spec" as const : "svg" as const;
+    const result = await withRequestCustomData(customData, () => cachedAnalysis(doc, { oncoprint: mode }), { refs: customRefs, req });
+    // ?figures=svg: every view drawn by the shared server renderer (the portal pages show these)
+    if (url.searchParams.get("figures") === "svg")
+      return Response.json({ ...result, views: result.views.map((v) => v.svg || v.error ? v : { ...v, svg: viewToSvg(v) || undefined }) });
+    return Response.json(result);
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
   }

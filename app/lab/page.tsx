@@ -3963,6 +3963,19 @@ function Latency({ v }: { v: any }) {
                     title="open the document's raw JSON — edit it, run it, or view generated SQL">
                     show document json
                   </button>
+                  {(() => {
+                    // cBioPortal's own page layouts over this analysis's study, genes or cohorts (app/portal)
+                    const n = Object.keys(doc.cohorts || {}).length, g = viewGenes();
+                    const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify({ study: doc.study || study, cohorts: doc.cohorts }))))
+                      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+                    return <span className="meta">portal layout:{" "}
+                      <a href={"/portal/results?study=" + encodeURIComponent(doc.study || study) + "&genes=" + encodeURIComponent(g.join(","))} target="_blank" rel="noreferrer"
+                        title={"cBioPortal's Results page for " + g.join(", ")}>Results page</a>{" · "}
+                      {n >= 2 && n <= 6
+                        ? <a href={"/portal/comparison?doc=" + b64} target="_blank" rel="noreferrer" title="cBioPortal's Comparison page for these cohorts">Comparison page</a>
+                        : <span title={"compares 2 to 6 cohorts; this analysis has " + n}>Comparison page</span>}
+                    </span>;
+                  })()}
                 </div>
               </div>
             )}
