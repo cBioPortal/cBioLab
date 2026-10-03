@@ -8,6 +8,30 @@ import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc, AnalysisResult, CohortDef, View } from "../../lib/types";
 import { SERIES } from "../../lib/svg-kit";
 import { MoreBody } from "../lab/more-views";
+import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
+
+/**
+ * The interactive oncoprint, as the lab draws it: zoom, sort, the viewing options and a drag to
+ * count columns. How it is viewed is this page's (browser state); a setting that changes the
+ * numbers — patients or samples as columns, drivers only — re-runs the tab.
+ */
+function PortalOncoprint({ spec, view, busy, patch }: { spec: unknown; view: Record<string, unknown>; busy: boolean; patch: (p: Record<string, unknown>) => void }) {
+  const [display, setDisplay] = useState<FigureDisplay>(DEFAULT_FIGURE_DISPLAY);
+  const [sortKeys, setSortKeys] = useState<string[]>([]);
+  const d = (view.display || {}) as { hideVUS?: boolean };
+  return (
+    <OncoprintFigure spec={spec} display={display} onDisplay={setDisplay} sortKeys={sortKeys} onSortKeys={setSortKeys} busy={busy}
+      controls={<>
+        <label className="tbfield" title="a cohort selects patients; sample mode draws every sample of those patients">columns <select
+          value={view.unit === "sample" ? "sample" : "patient"} disabled={busy} onChange={(e) => patch({ unit: e.target.value === "sample" ? "sample" : undefined })}>
+          <option value="patient">patients</option><option value="sample">samples</option>
+        </select></label>
+        <label className="chk tbchk" title="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
+          <input type="checkbox" checked={!!d.hideVUS} disabled={busy}
+            onChange={(e) => patch({ display: { ...(view.display as object || {}), hideVUS: e.target.checked || undefined } })} /> drivers only</label>
+      </>} />
+  );
+}
 
 export interface PortalTab { title: string; views?: { title: string; view: View }[]; sub?: { title: string; views: { title: string; view: View }[] }[] }
 
@@ -35,7 +59,8 @@ export function PortalTabs({ study, cohorts, tabs, left, onCounts }: {
     const g = (gen.current[k] || 0) + 1;
     gen.current[k] = g;
     setState((s) => ({ ...s, [k]: { ...s[k], views, loading: true, error: undefined } }));
-    fetch("/api/analysis?figures=svg", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(docFor(views)) })
+    // the oncoprint comes back as a spec the interactive figure draws; every other view as a figure
+    fetch("/api/analysis?oncoprint=spec&figures=svg", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(docFor(views)) })
       .then((r) => r.json())
       .then((j) => {
         if (gen.current[k] !== g) return;
@@ -79,7 +104,10 @@ export function PortalTabs({ study, cohorts, tabs, left, onCounts }: {
       {entries.map((entry, i) => {
         const v = st?.result?.views[i];
         const spec = st?.views[i] || entry.view;
-        const body = v && !v.error ? MoreBody({ c: { vi: i, spec, v, busy: !!st?.loading, attrs: [], profiles: [], assays: [], events: [],
+        const patchView = (p: Record<string, unknown>) => load(key, (st?.views || entries.map((x) => x.view)).map((x, j) => j === i ? { ...x, ...p } as View : x));
+        const body = v && !v.error && v.kind === "oncoprint" && v.spec
+          ? <PortalOncoprint spec={v.spec} view={spec as unknown as Record<string, unknown>} busy={!!st?.loading} patch={patchView} />
+          : v && !v.error ? MoreBody({ c: { vi: i, spec, v, busy: !!st?.loading, attrs: [], profiles: [], assays: [], events: [],
           patch: (p) => load(key, (st?.views || entries.map((x) => x.view)).map((x, j) => j === i ? { ...x, ...p } as View : x)),
           docJson: () => JSON.stringify(docFor(st?.views || entries.map((x) => x.view))) } }) : null;
         return (
