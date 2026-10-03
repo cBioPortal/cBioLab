@@ -95,8 +95,8 @@ export function plotShape(x: AxisKind, y: AxisKind): PlotShape {
 
 /** what an axis is called on the figure */
 export function axisLabel(a: PlotAxis): string {
-  if (a.source === "clinical") return a.attribute;
-  if (a.source === "molecular") return a.gene + " " + a.profileType;
+  if (a.source === "clinical") return a.log ? "log10(" + a.attribute + " + 1)" : a.attribute;
+  if (a.source === "molecular") return a.log ? "log10(" + a.gene + " " + a.profileType + " + 1)" : a.gene + " " + a.profileType;
   if (a.source === "alteration") {
     const genes = alterationGenes(a);
     const name = genes.length > 1 ? (genes.length <= 4 ? genes.join("/") + " (any)" : genes.length + " genes (any)") : genes[0];
@@ -154,6 +154,16 @@ const strip = (col: string, study: string) => "replaceOne(" + col + ", " + sq(st
  * SELECT id, v — one value per case. A case with no value simply has no row, which is how a
  * pair becomes an inner join and only cases measured on BOTH axes are plotted.
  */
+/**
+ * A numeric axis with `log: true` reads log10(v + 1): a count of zero stays on the axis, and a
+ * value below zero has no such log, so it is left out — NULL, which every caller already treats as
+ * "no value" and the plot's coverage line counts.
+ */
+function logOf(a: PlotAxis, expr: string): string {
+  if (!("log" in a && a.log)) return expr;
+  return "if(" + expr + " >= 0, log10(" + expr + " + 1), NULL)";
+}
+
 export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): string {
   const db = ctx.db || DB, study = ctx.study, sample = ctx.unit === "sample";
   const inCohort = (col: string) => strip(col, study) + " IN (SELECT pid FROM cohort)";
@@ -162,8 +172,8 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     // patient rows and sample rows both exist; in sample mode a patient's value repeats across
     // that patient's samples, in patient mode a sample's value stands in for the patient.
     // Only the study knows whether the attribute is a number, so the caller says which.
-    const val = kind === "num" ? "toFloat64OrNull(attribute_value)" : "attribute_value";
-    const valCd = kind === "num" ? "toFloat64OrNull(cd.attribute_value)" : "cd.attribute_value";
+    const val = kind === "num" ? logOf(a, "toFloat64OrNull(attribute_value)") : "attribute_value";
+    const valCd = kind === "num" ? logOf(a, "toFloat64OrNull(cd.attribute_value)") : "cd.attribute_value";
     const defined = (e: string) => kind === "num" ? " AND " + e + " IS NOT NULL" : "";
     const own = "SELECT " + strip(sample ? "sample_unique_id" : "patient_unique_id", study) + " AS id, " + val + " AS v, " +
       (sample ? "1" : "1") + " AS pref\n" +
@@ -185,15 +195,17 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
 
   if (a.source === "molecular") {
     const gene = String(a.gene).toUpperCase();
-    // patient mode averages a patient's samples, the same rule the oncoprint's heatmap uses
-    return "SELECT " + strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study) + " AS id,\n" +
-      "       " + (sample ? "argMax(toFloat64OrNull(ga.alteration_value), 1)" : "avg(toFloat64OrNull(ga.alteration_value))") + " AS v\n" +
+    // patient mode averages a patient's samples, the same rule the oncoprint's heatmap uses; a
+    // value the log leaves undefined drops the case, so coverage counts it as having none
+    const q = "SELECT " + strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study) + " AS id,\n" +
+      "       " + logOf(a, sample ? "argMax(toFloat64OrNull(ga.alteration_value), 1)" : "avg(toFloat64OrNull(ga.alteration_value))") + " AS v\n" +
       "FROM " + db + ".genetic_alteration_derived ga\n" +
       "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
       "WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(a.profileType) +
       " AND ga.hugo_gene_symbol = " + sq(gene) + "\n" +
       "  AND toFloat64OrNull(ga.alteration_value) IS NOT NULL AND " + inCohort("sd.patient_unique_id") + "\n" +
       "GROUP BY id";
+    return a.log ? "SELECT id, v FROM (" + q + ") WHERE v IS NOT NULL" : q;
   }
 
   if (a.source === "alteration") {

@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import CohortPills, { normalizeDef } from "./pills";
 import { MORE_KINDS, isMoreKind, moreSub, MoreControls, MoreBody, defaultMoreView } from "./more-views";
+import { ExploreCharts } from "./explore-charts";
 import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
 import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
@@ -3277,6 +3278,15 @@ function Latency({ v }: { v: any }) {
           )}
           {explore && <>
             <div className="facetgrid">
+              <ExploreCharts studies={explore.studies && explore.studies.length ? explore.studies : [explore.study]} draft={parseDraft()}
+                attrs={explore.clinical || []}
+                endpoints={(() => {
+                  // an endpoint is a <X>_MONTHS with its <X>_STATUS, the survival view's own convention
+                  const names = new Set((explore.clinical || []).map((c: any) => c.attribute));
+                  const eps = [...names].filter((a) => /_MONTHS$/.test(a) && names.has(a.replace(/_MONTHS$/, "_STATUS"))).map((a) => a.replace(/_MONTHS$/, ""));
+                  return eps.sort((a, b) => (a === "OS" ? -1 : b === "OS" ? 1 : a.localeCompare(b)));
+                })()}
+                addClauses={addClauses} km={(curves) => <KMChart curves={curves as any} />} />
               {(visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical)
                 .map(c => (
                 /* data-attr / data-shape make the facet identifiable from outside

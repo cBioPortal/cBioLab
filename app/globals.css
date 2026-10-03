@@ -1254,3 +1254,17 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .tv td { padding: var(--s1) var(--s2); border-bottom: 1px solid var(--line); white-space: nowrap; max-width: 22rem; overflow: hidden; text-overflow: ellipsis; }
 .tv .num { text-align: right; font-variant-numeric: tabular-nums; }
 .tv .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+/* Explore's survival and density charts */
+.xc-card { grid-column: span 2; }
+.xc-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s2); }
+.xc-title { font-size: var(--t-md); font-weight: 600; }
+.xc-body { position: relative; min-height: 12rem; }
+.xc-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: var(--s2); background: color-mix(in srgb, var(--card) 70%, transparent); color: var(--muted); font-size: var(--t-sm); }
+.xc-density { width: 100%; max-width: 26rem; display: block; touch-action: none; cursor: crosshair; user-select: none; }
+.xc-frame { fill: none; stroke: var(--line); }
+.xc-cell { fill: var(--accent); }
+.xc-brush { fill: color-mix(in srgb, var(--accent) 15%, transparent); stroke: var(--accent); stroke-dasharray: 3 2; }
+.xc-tick { font-size: 9px; fill: var(--muted); }
+.xc-tickline { stroke: var(--muted); }
+.xc-axis { font-size: 10px; fill: var(--muted); }
