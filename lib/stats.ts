@@ -235,12 +235,16 @@ export function coxPartialLogLik(rows: CoxRow[], beta: number[]): number { retur
  * likelihood. Every `x` must be the same length (dummy-code categoricals before calling this —
  * this function only ever sees numbers, so it doesn't need to know which covariate was which).
  */
+/** Newton-Raphson iteration limits; a fit that reaches one is reported as not converged. */
+export const COX_MAX_ITERATIONS = 25;
+export const LOGISTIC_MAX_ITERATIONS = 50;
+
 export function coxRegression(rows: CoxRow[]): CoxFit {
   const p = rows[0]?.x.length ?? 0;
   const events = rows.reduce((n, r) => n + (r.event ? 1 : 0), 0);
   if (!rows.length || p === 0) return { beta: [], se: [], hr: [], ciLow: [], ciHigh: [], p: [], loglik: 0, n: rows.length, events, iterations: 0 };
   let beta = zeros(p), ll = -Infinity, iterations = 0;
-  for (; iterations < 25; iterations++) {
+  for (; iterations < COX_MAX_ITERATIONS; iterations++) {
     const s = coxScore(rows, beta);
     const delta = solveLinear(s.hess.map((r) => [...r]), s.grad);
     // step-halve if the update overshoots into a worse likelihood — Newton-Raphson on a
@@ -329,7 +333,7 @@ export function logisticRegression(rows: LogisticRow[]): LogisticFit {
   const aug = rows.map((r) => ({ y: r.y, x: [1, ...r.x] }));
   const p = p0 + 1;
   let beta = zeros(p), iterations = 0;
-  for (; iterations < 50; iterations++) {
+  for (; iterations < LOGISTIC_MAX_ITERATIONS; iterations++) {
     const s = logisticScore(aug, beta);
     const delta = solveLinear(s.info.map((r) => [...r]), s.grad);
     // same step acceptance and convergence rule as coxRegression, for the same reasons

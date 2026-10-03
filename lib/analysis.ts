@@ -27,14 +27,14 @@ import type { PidsCarrier } from "./oncoprint.ts";
 import {
   resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
   type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments, type EndpointColumns,
-  type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, type FederatedPlotCapable, legendFor, SEQUENCE_ROW_LIMIT } from "./federation.ts";
+  type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, type FederatedPlotCapable, legendFor, SEQUENCE_ROW_LIMIT, COURSE_ANCHORED, COURSE_OBSERVED } from "./federation.ts";
 import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis, coverageNote, type PlotData, type PlotGroup, type AxisKind } from "./plot.ts";
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
-import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, type CoxTrace } from "./method.ts";
+import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, courseMethod, sequenceMethod, type CoxTrace } from "./method.ts";
 import { ATTR_NAME_RE, assertCustomDataPresent } from "./custom-data.ts";
 
 async function oncokbPin(): Promise<string | null> {
@@ -459,6 +459,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           oncokbPin: pin, cohorts: vNames, genes,
           perSite: perSite.map((p) => ({ cohort: p.cohort, study: p.study, cohortPatients: cohorts[p.cohort].perStudy[p.study]?.count || 0 })),
           counts: perSite.flatMap((p) => p.counts.map((c) => ({ cohort: p.cohort, study: p.study, gene: c.gene, profiled: c.profiled, altered: c.altered, driver: c.driver }))),
+          results: rows.map((r) => ({ gene: r.gene, pAny: r.pAny, pDriver: r.pDriver, qAny: r.qAny, qDriver: r.qDriver })),
         }),
         participation: participationFor(vStudies, false),
         ...(vStudies.length > 1 ? { studies: vStudies } : {}),
@@ -818,6 +819,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           perStudy, covariates, kinds: kindsFinal, columns, x: coxInput.map((r) => r.x),
           fit: { n: fit.n, events: fit.events, iterations: fit.iterations, loglik: fit.loglik },
           censoredAtCutoff, droppedBadTime: rowsCut.length - coxInput.length,
+          coefficients: columns.map((col, i) => ({ label: col.label, beta: fit.beta[i], se: fit.se[i], p: fit.p[i] })),
         };
         return { coefficients, n: fit.n, events: fit.events, termCount: columns.length, excludedRemote, patientLevelTotal, trace };
       };
@@ -1029,6 +1031,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         perStudy: lPerStudy, covariates: lCovariates, kinds: lKindsFinal, columns: lColumns, x: logisticInput.map((r) => r.x),
         fit: { n: lFit.n, events: lFit.events, iterations: lFit.iterations, loglik: lFit.loglik },
         outcomeKind: outcomeKindFinal, ...(lv.outcomeEvent != null ? { outcomeEvent: String(lv.outcomeEvent) } : {}), outcomeOther,
+        coefficients: lColumns.map((col, i) => ({ label: col.label, beta: lFit.beta[i], se: lFit.se[i], p: lFit.p[i] })),
       }, { outcomeLabel, queryLabel: "logisticRows" });
       logisticResult.svg = viewToSvg(logisticResult) || undefined;
       views.push(logisticResult);
@@ -1112,11 +1115,16 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       // Merge by summing per (bin, state) — each study contributes its own
       // observable patients and its own events, so sums are exact.
       const course: CourseSeries[] = [];
+      const counted = new Map<string, { anchored: number; observed: number }>();   // cohort -> patients
       for (const n of vNames) {
         const rows = per.get(n) || [];
         const risk = new Map<number, number>(), hit = new Map<string, number>();
+        const c = { anchored: 0, observed: 0 };
+        counted.set(n, c);
         for (const r of rows) {
-          if (r.eventType === "") risk.set(r.bin, (risk.get(r.bin) || 0) + r.n);
+          if (r.eventType === COURSE_ANCHORED) c.anchored += r.n;
+          else if (r.eventType === COURSE_OBSERVED) c.observed += r.n;
+          else if (r.eventType === "") risk.set(r.bin, (risk.get(r.bin) || 0) + r.n);
           else { const k = r.eventType + " " + r.bin; hit.set(k, (hit.get(k) || 0) + r.n); }
         }
         for (const et of measured) {
@@ -1146,6 +1154,26 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
                  hasDurations: !!intervalOf.get(f.canonical) };
       });
       const courseResult: ViewResult = { kind: "course", cohorts: vNames, studies: vStudies, course,
+        method: courseMethod({
+          ...(anchor ? { anchor: anchor.occurrence.toLowerCase() + " " + anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "") } : {}),
+          binMonths, fromBin: opts.from, toBin: opts.to, riskFloor: COURSE_RISK_FLOOR, dropped,
+          perSite: vNames.flatMap((n) => cohorts[n].studies.filter((st) => usable.includes(st)).sort()
+            .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+          events: measured.map((et) => { const f = folded.find((x) => x.canonical === et)!; return { canonical: et, label: f.label, variants: f.variants, isInterval: !!intervalOf.get(et) }; }),
+          cohorts: vNames.map((n) => ({ name: n, patients: cohorts[n].studies.filter((st) => usable.includes(st)).reduce((k, st) => k + (cohorts[n].perStudy[st]?.count || 0), 0),
+            ...counted.get(n)! })),
+          counts: vNames.flatMap((n) => {
+            const m = new Map<string, { cohort: string; bin: number; event: string; n: number }>();
+            for (const r of per.get(n) || []) {
+              if (r.eventType === COURSE_ANCHORED || r.eventType === COURSE_OBSERVED) continue;
+              const k = r.eventType + "\u0000" + r.bin, cur = m.get(k) || { cohort: n, bin: r.bin, event: r.eventType, n: 0 };
+              cur.n += r.n; m.set(k, cur);
+            }
+            return [...m.values()].sort((x, y) => x.bin - y.bin || (x.event < y.event ? -1 : x.event > y.event ? 1 : 0));
+          }),
+          results: course.flatMap((sr) => sr.points.map((pt) => ({ cohort: sr.cohort, event: sr.eventType, bin: Math.round(pt.t / binMonths),
+            atRisk: pt.atRisk, n: pt.n, pct: pt.pct }))),
+        }),
         courseAxis: { binMonths, from: opts.from * binMonths, to: opts.to * binMonths },
         eventOptions,
         participation: participationFor(vStudies, false),
@@ -1210,7 +1238,10 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         Promise.all(allStudies.map((st) =>
           resolvers[st].sequenceKeys(doc.cohorts[panelNames[0]], eventType))).then((r) => r.flat())
       ]);
-      const rawByCohort = perStudyByCohort.map((rows) => rows.flat());
+      // step-0 rows count the records set aside before lines were built; every other row is a flow
+      const setAside = perStudyByCohort.flatMap((rows, ci) => rows.flat().filter((f) => f.step === 0)
+        .map((f) => ({ cohort: panelNames[ci], cls: f.from, reason: f.to, records: f.n })));
+      const rawByCohort = perStudyByCohort.map((rows) => rows.flat().filter((f) => f.step > 0));
       const keyOptions = [...new Map(keyRows.map((k) => [k.key, k])).values()]
         .sort((a, b) => b.patients - a.patients);
       const chosen = keyOptions.find((k) => k.key === canonicalEventName(labelKey));
@@ -1237,7 +1268,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
               .map((k) => k.label + " (" + k.values + " values)").join(", ") });
         continue;
       }
-      const truncated = perStudyByCohort.some((rows) => rows.some((r) => r.length >= SEQUENCE_ROW_LIMIT));
+      const truncated = perStudyByCohort.some((rows) => rows.some((r) => r.filter((f) => f.step > 0).length >= SEQUENCE_ROW_LIMIT));
 
       // Merge per cohort, then rank labels ACROSS ALL PANELS so a regimen keeps
       // one identity and one colour in both — the comparison is the point.
@@ -1309,6 +1340,17 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       const otherPct = p0.started ? Math.round((1000 * otherN) / p0.started) / 10 : 0;
       const sequence: SequenceResult = { labelKey, lineGap, steps: maxSteps, foldedLabels, truncated, keyOptions, panels };
       const seqResult: ViewResult = { kind: "sequence", cohorts: panelNames, studies: allStudies, sequence,
+        method: sequenceMethod({ eventType, labelKey, lineGap, maxSteps, topN, classes: lineClasses || "systemic",
+          exclude: (sv.exclude || []).map(String), truncated, rowLimit: SEQUENCE_ROW_LIMIT, foldedLabels,
+          perSite: panelNames.flatMap((n) => [...cohorts[n].studies].sort().map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+          setAside,
+          flows: mergedPer.flatMap((m, pi) => [...m.entries()].map(([k, n]) => {
+            const [step, from, to, fate] = k.split("\u0000");
+            return { cohort: panelNames[pi], step: Number(step), from, to, fate: Number(fate), n };
+          }).sort((x, y) => x.step - y.step || y.n - x.n || (x.from + "\u0000" + x.to < y.from + "\u0000" + y.to ? -1 : 1))),
+          results: panels.map((pn) => ({ cohort: pn.cohort, started: pn.started, censored: pn.censored,
+            nodes: pn.nodes.map((nd) => ({ column: nd.column, kind: nd.kind, label: nd.label, n: nd.n })) })),
+        }),
         participation: participationFor(allStudies, false),
         caveat:
           "Therapies are grouped into LINES before being sequenced, by the definition every line count here shares: " +
@@ -1543,10 +1585,11 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             }
           }
 
-          // each site counts its own cases and their axes; the sums are exact
-          const covs = await Promise.all(sites.map((s) => fr[s].plotCoverage(doc.cohorts[cn], spec, xk, yk).catch(() => null)));
-          if (covs.every(Boolean)) data.coverage = covs.reduce<{ total: number; nx: number; ny: number }>(
-            (a, c) => ({ total: a.total + c!.total, nx: a.nx + c!.nx, ny: a.ny + c!.ny }), { total: 0, nx: 0, ny: 0 });
+          // each site counts its own cases and their axes; the sums are exact. A failed count fails the
+          // view: dropping the coverage note would hide how many cases the figure leaves out
+          const covs = await Promise.all(sites.map((s) => fr[s].plotCoverage(doc.cohorts[cn], spec, xk, yk)));
+          data.coverage = covs.reduce<{ total: number; nx: number; ny: number }>(
+            (a, c) => ({ total: a.total + c.total, nx: a.nx + c.nx, ny: a.ny + c.ny }), { total: 0, nx: 0, ny: 0 });
           const pr: ViewResult = { kind: "plot", plot: data, cohorts: [cn], studies: sites,
             participation: participationFor(sites, false), note: [coverageNote(data, unit), data.note].filter(Boolean).join(" ") || undefined };
           const tPlot = Date.now();
@@ -1570,7 +1613,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       const cn = vNames[0];
       const byStudy = new Map<string, PairMoments[]>();
       await Promise.all(cohorts[cn].studies.map(async (st) => {
-        byStudy.set(st, await resolvers[st].pairMoments(doc.cohorts[cn], pairs, profileType).catch(() => []));
+        // a failed study fails the view, rather than leaving its patients silently out of every correlation
+        byStudy.set(st, await resolvers[st].pairMoments(doc.cohorts[cn], pairs, profileType));
       }));
       const sites = [...byStudy.keys()];
       const rows: CoexprRow[] = pairs.map(([a, b]) => {
@@ -1601,6 +1645,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           cohortPatients: [...sites].sort().map((st) => ({ study: st, patients: cohorts[cn].perStudy[st]?.count || 0 })),
           sums: [...sites].sort().flatMap((st) => (byStudy.get(st) || []).filter((m) => m.n > 0)
             .map((m) => ({ study: st, a: m.a, b: m.b, n: m.n, sx: m.sx, sy: m.sy, sxy: m.sxy, sxx: m.sxx, syy: m.syy }))),
+          results: rows.map((r) => ({ a: r.a, b: r.b, r: r.r, p: r.p, q: r.q, ...(r.pMeta != null ? { pMeta: r.pMeta } : {}) })),
         }),
         participation: participationFor(cohorts[cn].studies, false),
         note: "Pearson correlation on “" + profileType + "” within “" + cn + "”, over the patients with BOTH values" +
@@ -1729,6 +1774,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             ({ cohort, study, attribute: x.attribute, n: x.n!, sum: x.sum!, sumsq: x.sumsq! })),
           histograms: singleStudy ? siteStats.filter(({ x }) => x.kind === "num" && x.valueCounts).flatMap(({ cohort, x }) =>
             x.valueCounts!.map((h) => ({ cohort, attribute: x.attribute, value: h.v, n: h.n }))) : [],
+          medians: rows.filter((r) => r.kind === "num" && !r.skipped).flatMap((r) => r.cells
+            .filter((c: any) => c.median != null).map((c: any) => ({ attribute: r.attribute, cohort: c.cohort, median: c.median, q1: c.q1, q3: c.q3 }))),
         }),
         participation: participationFor(vStudies, false),
         note: "Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary;" +
@@ -1799,6 +1846,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           cohortPatients: [...sites].sort().map((st) => ({ study: st, patients: cohorts[cn].perStudy[st]?.count || 0 })),
           counts: [...sites].sort().flatMap((st) => pairs.map(([a, b]) => find(st, a, b)).filter((x): x is PairCounts => !!x)
             .map((x) => ({ study: st, a: x.a, b: x.b, both: x.both, onlyA: x.onlyA, onlyB: x.onlyB, neither: x.neither }))),
+          results: rows.map((r) => ({ a: r.a, b: r.b, p: r.p, q: r.q, ...(r.pStratified != null ? { pStratified: r.pStratified } : {}) })),
         }),
         participation: participationFor(cohorts[cn].studies, false),
         note: "Pairwise co-occurrence within “" + cn + "”" +
@@ -1853,7 +1901,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         const hGenes = h.genes && h.genes.length ? geneSymbols(h.genes) : geneSymbols(genes);
         if (!hGenes.length) continue;
         const per = await Promise.all(vStudies.map(async (st) => ({
-          st, m: await resolvers[st].profileMoments(null, hGenes, h.profileType).catch(() => [] as ProfileMoments[])
+          // a failed study fails the view: a reference silently missing a study would shift every z-score
+          st, m: await resolvers[st].profileMoments(null, hGenes, h.profileType)
         })));
         for (const gene of hGenes) {
           let n = 0, sum = 0, sumsq = 0; const contributing: string[] = [];

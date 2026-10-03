@@ -181,7 +181,7 @@ describe("treatment sequences: lines, not records", () => {
     // Attrition is usually the LARGEST flow; a diagram that drops it lies.
     const sql = seq();
     assert.match(sql, /leadInFrame\(combo\)/);
-    assert.match(sql, /nxt AS b/);
+    assert.match(sql, /toString\(nxt\) AS b/);
   });
 
   test("a path that ends is classified as observed-stop vs censored", () => {
@@ -223,7 +223,13 @@ describe("treatment sequences: lines, not records", () => {
   });
 
   test("no exclusions means no exclusion clause at all", () => {
-    assert.equal(/NOT IN \(/.test(seq({ exclude: [] })), false);
+    assert.equal(/NOT IN \(lowerUTF8/.test(seq({ exclude: [] })), false);
+  });
+
+  test("records set aside before lines are built come back counted, as step-0 rows outside the flow limit", () => {
+    const sql = seq();
+    assert.match(sql, /SELECT toUInt32\(0\) AS step[\s\S]*FROM txAll WHERE eid NOT IN \(SELECT eid FROM txLabelled\)/);
+    assert.ok(sql.indexOf("LIMIT ") < sql.indexOf("UNION ALL\nSELECT toUInt32(0)"), "the flow limit cannot cut the set-aside counts");
   });
 
   test("the label key is folded like any other name, the event type too", () => {

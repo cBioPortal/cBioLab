@@ -189,6 +189,17 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
      and has handed typed arrays back corrupted.
    - `next/cache` exists only under Next, so the stdio MCP server, CLI and tests run the engine
      uncached; `registerTools` takes the engine to use.
+12. **Every view states how its numbers were computed, and that statement is checked.** A view's
+   result carries a method record (`lib/method.ts`): each step from its queries' rows to its numbers,
+   built from the values that computation used, plus a Python script that recomputes the numbers
+   with standard libraries. **A change to how a view computes must update its method builder in the
+   same commit** — the steps, the script and the `check` values the script must reproduce.
+   `npm run check:methods` (a stage of `scripts/gate.sh`) runs every gallery example's script and
+   fails on any number the script does not reproduce, and on any view without a record that is not on
+   its named exempt list; it was mutation-checked to catch a real drift. Numbers and settings in a
+   record's text come from variables or named constants, never typed in. The statistics themselves
+   are pinned against lifelines/statsmodels/scipy/gseapy by `test/*-golden.test.ts`
+   (fixtures from `python/golden/`, regenerated with `uv run`).
 
 ## UI conventions — the layout system
 
