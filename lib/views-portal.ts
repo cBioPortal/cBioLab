@@ -1,18 +1,20 @@
 // View kinds that close cBioPortal's gaps — the portal's tabs and panels this app did not have,
 // rebuilt on its engine: cancertypes (Cancer Types Summary), overlap (the Overlap tab), enrichment
 // (Genomic Alterations), assays (the generic-assay tabs: signatures, arm-level CNA, …), correlates
-// (Co-expression). Dispatched from lib/views-more.ts's
+// (Co-expression), table (Clinical Data). Dispatched from lib/views-more.ts's
 // runMoreView, so they evaluate cohorts, federate and disclose exactly as the other added views do.
-import type { ViewResult, CancertypesView, CancertypesGroup, CancertypesPanel, OverlapView, EnrichmentView, EnrichmentGene, AssaysView, AssaysEntity, AssaysResult, CorrelatesView, CorrelatesGene } from "./types.ts";
+import type { ViewResult, CancertypesView, CancertypesGroup, CancertypesPanel, OverlapView, EnrichmentView, EnrichmentGene, AssaysView, AssaysEntity, AssaysResult, CorrelatesView, CorrelatesGene, TableView } from "./types.ts";
 import { cancerTypesSql, cancerTypeSamplesSql, overlapCountsSql, enrichAlteredSql, enrichPanelProfiledSql, enrichWesSql, type EnrichAlteration,
   assayProfileSql, assayMomentsSql, assayValueCountsSql, assayEntityNamesSql, correlatesMomentsSql } from "./federation-more.ts";
 import { fisherExact, chiSquareTest, benjaminiHochberg, welchT, welchAnovaTest, varianceFromMoments, pearsonFromMoments, pearsonR, fisherZMeta } from "./stats.ts";
 import { niceCeil } from "./views-more.ts";
 import { geneSymbols } from "./gene-tracks.ts";
-import { answering, refuse, plural, type ViewCtx } from "./views-more.ts";
-import { cancertypesMethod, overlapMethod, enrichmentMethod, assaysMethod, correlatesMethod } from "./method.ts";
+import { answering, refuse, plural, type ViewCtx, type MoreResolver } from "./views-more.ts";
+import { isPatientLevel, type PatientLevelCapable } from "./federation.ts";
+import { tableAttributesSql, compareRows, TABLE_COLUMNS_MAX, type TableColumn } from "./clinical-table.ts";
+import { cancertypesMethod, overlapMethod, enrichmentMethod, assaysMethod, correlatesMethod, tableMethod } from "./method.ts";
 
-export const PORTAL_VIEW_KINDS = ["cancertypes", "overlap", "enrichment", "assays", "correlates"] as const;
+export const PORTAL_VIEW_KINDS = ["cancertypes", "overlap", "enrichment", "assays", "correlates", "table"] as const;
 
 export function isPortalViewKind(kind: unknown): boolean {
   return (PORTAL_VIEW_KINDS as readonly string[]).includes(String(kind));
@@ -24,6 +26,7 @@ export async function runPortalView(view: { kind: string }, ctx: ViewCtx): Promi
   if (view.kind === "enrichment") return enrichmentView(view as EnrichmentView, ctx);
   if (view.kind === "assays") return assaysView(view as AssaysView, ctx);
   if (view.kind === "correlates") return correlatesView(view as CorrelatesView, ctx);
+  if (view.kind === "table") return tableView(view as TableView, ctx);
   return { kind: view.kind, error: "unknown view kind" };
 }
 
@@ -514,5 +517,89 @@ async function correlatesView(view: CorrelatesView, ctx: ViewCtx): Promise<ViewR
       "A correlation is not a regulatory link: genes that rise together across a cohort often both track a third thing — a subtype, the tumour's purity, proliferation. " +
       untested.toLocaleString("en-US") + " genes were not tested: fewer than " + minN + " patients with both values, or no spread." +
       (excluded.length ? " Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
+  };
+}
+
+// ---------------------------------------------------------------------------
+// table: the clinical data table, a page on screen and every row as a download
+
+const TABLE_ROWS_MAX = 1000;
+
+async function tableView(view: TableView, ctx: ViewCtx): Promise<ViewResult> {
+  const { doc, cohorts, vNames } = ctx;
+  { const e = ctx.overLimit("a table view", 6, vNames.length); if (e) return refuse("table", ctx, e.replace("at most 6", "at most 6 cohorts")); }
+  const unit: "sample" | "patient" = view.unit === "patient" ? "patient" : "sample";
+  const show = view.rows == null ? 100 : Math.floor(Number(view.rows));
+  if (!(show >= 1 && show <= TABLE_ROWS_MAX)) return refuse("table", ctx, "rows is 1 to " + TABLE_ROWS_MAX + " (the download holds every row)");
+  if (view.attributes != null && (!Array.isArray(view.attributes) || view.attributes.some((a) => !ATTR_NAME.test(String(a)))))
+    return refuse("table", ctx, "attributes is a list of clinical attribute ids, e.g. [\"CANCER_TYPE\", \"AGE\"]");
+
+  // only a patient-level participant may hand over rows; the rest are named with their patients
+  const holders = ctx.vStudies.filter((st) => isPatientLevel(ctx.resolvers[st]));
+  const excluded = ctx.vStudies.filter((st) => !holders.includes(st)).map((st) => ({
+    study: st, reason: ctx.resolvers[st].instance.id === "peer" ? "a remote peer, which does not disclose patients" : "aggregate-only: it does not disclose patients",
+    patients: vNames.reduce((n, c) => n + (cohorts[c].perStudy[st]?.count || 0), 0) }));
+  if (!holders.length) return refuse("table", ctx, "no study here may disclose patients' rows (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
+
+  const all: TableColumn[] = [];
+  for (const st of holders) {
+    for (const m of await (ctx.resolvers[st] as MoreResolver).moreMeta("table:attributes", tableAttributesSql)) {
+      if (all.some((c) => c.id === m.id)) continue;
+      all.push({ id: String(m.id), name: String(m.name || m.id), per: Number(m.patient) === 1 ? "patient" : "sample", numeric: String(m.datatype).toUpperCase() === "NUMBER" });
+    }
+  }
+  const usable = unit === "patient" ? all.filter((c) => c.per === "patient") : all;
+  let columns: TableColumn[];
+  if (view.attributes) {
+    const missing = view.attributes.filter((a) => !usable.some((c) => c.id === a));
+    if (missing.length) return refuse("table", ctx, (unit === "patient" && missing.every((a) => all.some((c) => c.id === a))
+      ? missing.join(", ") + " " + (missing.length === 1 ? "is a sample attribute" : "are sample attributes") + "; a per-patient table holds patient attributes only"
+      : "unknown attribute " + missing.join(", ")) + " — available: " + usable.map((c) => c.id).join(", "));
+    columns = view.attributes.map((a) => usable.find((c) => c.id === a)!);
+  } else columns = usable;
+  if (columns.length > TABLE_COLUMNS_MAX) return refuse("table", ctx, "a table view shows at most " + TABLE_COLUMNS_MAX + " attributes; these studies record " + columns.length + " — name the ones you want in attributes");
+  const sort = view.sort && view.sort.attribute ? { attribute: String(view.sort.attribute), ...(view.sort.desc ? { desc: true } : {}) } : null;
+  if (sort && !columns.some((c) => c.id === sort.attribute)) return refuse("table", ctx, "sort.attribute " + sort.attribute + " is not one of the table's columns");
+
+  const toRow = (cohort: string, study: string) => (r: { patient: string; sample: string; samples: number; values: Record<string, string> }) =>
+    ({ cohort, study, patient: r.patient, sample: r.sample, samples: r.samples, values: columns.map((c) => r.values[c.id] ?? ""), raw: r.values });
+  const pl = (st: string) => ctx.resolvers[st] as unknown as { tableRows: PatientLevelCapable["tableRows"] };
+
+  if (ctx.tableChunk) {
+    const { cohort, study, offset, limit } = ctx.tableChunk;
+    if (!vNames.includes(cohort) || !holders.includes(study) || !cohorts[cohort].studies.includes(study))
+      return refuse("table", ctx, "no rows of cohort “" + cohort + "” in " + study + " to download");
+    const page = await pl(study).tableRows("table:rows:" + cohort, doc.cohorts[cohort], unit, columns, sort, limit, offset);
+    return { kind: "table", cohorts: vNames,
+      table: { unit, columns, sort, rows: page.rows.map(toRow(cohort, study)).map(({ raw, ...r }) => { void raw; return r; }), lists: [{ cohort, study, total: page.total }], total: page.total },
+      participation: ctx.participationFor(ctx.vStudies, true) };
+  }
+
+  const lists: { cohort: string; study: string; total: number }[] = [];
+  const pages = await Promise.all(vNames.flatMap((cn) => cohorts[cn].studies.filter((st) => holders.includes(st)).map(async (st) => {
+    const page = await pl(st).tableRows("table:rows:" + cn, doc.cohorts[cn], unit, columns, sort, show, 0);
+    lists.push({ cohort: cn, study: st, total: page.total });
+    return page.rows.map(toRow(cn, st));
+  })));
+  // each page is in sort order already; merge them, ties in document order of cohort, then study
+  const order = (r: { cohort: string; study: string }) => vNames.indexOf(r.cohort) * 1000 + ctx.vStudies.indexOf(r.study);
+  const merged = pages.flat().sort((a, b) =>
+    compareRows(sort, columns, { patient: a.patient, sample: a.sample, values: a.raw }, { patient: b.patient, sample: b.sample, values: b.raw }) || order(a) - order(b));
+  const rows = merged.slice(0, show).map(({ raw, ...r }) => { void raw; return r; });
+  lists.sort((a, b) => order(a) - order(b));
+  const total = lists.reduce((n, l) => n + l.total, 0);
+  const one = unit === "sample" ? "sample" : "patient";
+  return {
+    kind: "table", cohorts: vNames,
+    table: { unit, columns, sort, rows, lists, total, ...(excluded.length ? { excluded } : {}) },
+    method: tableMethod({ unit, cohorts: vNames, columns: columns.length, sort, shown: rows.length, lists, excluded }),
+    participation: ctx.participationFor(ctx.vStudies, true),
+    ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
+    caveat: "One row per " + one + (unit === "sample" ? " of each cohort's patients, carrying its patient's attributes too" : "") +
+      ", with " + plural(columns.length, "attribute") + " as each study recorded them — vocabularies are not harmonized across studies. " +
+      (vNames.length > 1 ? "A patient in two cohorts is listed under each. " : "") +
+      "Showing the first " + rows.length.toLocaleString("en-US") + " of " + plural(total, one) + (sort ? ", sorted by " + sort.attribute + (sort.desc ? " (highest first)" : "") + ", missing values last" : ", by patient and sample id") +
+      "; the download holds every row, cohort by cohort and study by study, in the same order. " +
+      (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + "; " + plural(e.patients, "patient") + " in these cohorts)").join(", ") + "." : "")
   };
 }

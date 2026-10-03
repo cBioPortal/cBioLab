@@ -2015,3 +2015,21 @@ export function correlatesMethod(t: CorrelatesTrace): MethodRecord {
       ...checks("correlates:", t.results.slice(0, 80), (r) => r.gene, [["rho", "rho", { abs: 5e-5 + 1e-12 }], ["rhoP", "rho_p", pTol], ["q", "q", pTol], ["r", "r", { abs: 5e-5 + 1e-12 }], ["p", "p", pTol]]) },
   };
 }
+
+// ---- table: a listing, nothing computed ---------------------------------------------------------
+
+export function tableMethod(t: { unit: "sample" | "patient"; cohorts: string[]; columns: number; sort: { attribute: string; desc?: boolean } | null; shown: number;
+  lists: { cohort: string; study: string; total: number }[]; excluded: { study: string; reason: string; patients: number }[] }): MethodRecord {
+  const steps: MethodStep[] = t.lists.map((l) => ({
+    kind: "fetch" as const, title: "List the " + t.unit + "s and their attributes",
+    detail: "The table:rows query above: every " + t.unit + " of the cohort's patients" + (t.unit === "sample" ? " (from the study's sample list, so a sample with no sample attribute still has a row)" : "") +
+      ", with the value of each of the " + t.columns + " attributes as recorded — blank where none was. A page at a time, " +
+      (t.sort ? "by " + t.sort.attribute + (t.sort.desc ? " descending" : "") + " with missing values last, then " : "by ") + "patient and sample id.",
+    scope: l.cohort + " · " + l.study, rowsOut: l.total,
+  }));
+  steps.push({ kind: "transform", title: "Merge the studies' pages",
+    detail: "Each study's first page, in the same order, merged and cut to the first " + t.shown + " rows shown; the download holds every row." +
+      (t.excluded.length ? " Studies that do not disclose patients contribute no rows and are named: " + t.excluded.map((e) => e.study).join(", ") + "." : "") });
+  return { steps, implementation: { functions: ["tableRowsSql", "compareRows"], file: "lib/clinical-table.ts", commit: BUILD_COMMIT },
+    verification: "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
+}

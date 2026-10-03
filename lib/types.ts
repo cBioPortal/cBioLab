@@ -1065,11 +1065,40 @@ export interface CorrelatesResult {
   histogram: [number, number][];
   excluded?: { study: string; reason: string }[];
 }
+/**
+ * The clinical data table (cBioPortal's Clinical Data tab): one row per sample — or per patient —
+ * of each cohort, with every clinical attribute the study records, sortable, and downloadable
+ * whole as TSV. Its rows are patients, so only a patient-level participant contributes them; the
+ * rest are named with how many patients they hold.
+ */
+export interface TableView {
+  note?: string;
+  kind: "table"; cohorts?: string[];
+  /** a row per sample (default, with its patient's attributes too) or per patient */
+  unit?: "sample" | "patient";
+  /** the attribute columns, by id (default: every attribute the study records, highest priority first; at most 200) */
+  attributes?: string[];
+  sort?: { attribute: string; desc?: boolean };
+  /** rows shown on the page (default 100, at most 1000); the download is every row */
+  rows?: number;
+}
+export interface TableResult {
+  unit: "sample" | "patient";
+  columns: { id: string; name: string; per: "patient" | "sample"; numeric: boolean }[];
+  sort: { attribute: string; desc?: boolean } | null;
+  /** the first rows in sort order, each with its cohort and study; values align with `columns` */
+  rows: { cohort: string; study: string; patient: string; sample: string; samples: number; values: string[] }[];
+  /** rows the patient-level studies hold, per cohort and study — what the download pages through */
+  lists: { cohort: string; study: string; total: number }[];
+  total: number;
+  /** studies that may not disclose patients, with how many of each cohort's patients they hold */
+  excluded?: { study: string; reason: string; patients: number }[];
+}
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView
-  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CorrelatesView;
+  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CorrelatesView | TableView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -1360,6 +1389,7 @@ export interface ViewResult {
   enrichment?: EnrichmentResult;            // genome-wide alteration enrichment
   assays?: AssaysResult;                    // generic-assay comparison
   correlates?: CorrelatesResult;            // genome-wide co-expression with one gene
+  table?: TableResult;                      // the clinical data table
 }
 /**
  * Therapy transitions, ready to draw: nodes in columns, flows between them.

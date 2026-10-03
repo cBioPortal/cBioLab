@@ -48,6 +48,7 @@ export const MORE_KINDS: Record<string, MoreKindUi> = {
   assays: { label: "Generic assays (signatures, arm-level CNA, …)", title: "Generic assays", maxCohorts: 6,
     why: (k) => k.cohorts.length < 2 ? "compares two or more cohorts — this analysis has one"
       : !k.assays.length ? "this study has no generic-assay profiles (mutational signatures, arm-level copy number, …)" : null },
+  table: { label: "Clinical data table (download)", title: "Clinical data", maxCohorts: 6 },
   correlates: { label: "Co-expression with one gene (genome-wide)", title: "Co-expression", maxCohorts: 1,
     why: (k) => !k.profiles.filter((p) => p !== "cna").length ? "this study has no continuous molecular profile (mRNA, protein, …) to correlate on" : null },
   overlap: { label: "Cohort overlap (UpSet)", title: "Cohort overlap", maxCohorts: 6,
@@ -81,6 +82,8 @@ export interface MoreCtx {
   profiles: string[];
   assays: string[];
   events: { canonical: string; label: string; n: number }[];
+  /** the document as it stands, for a table's download */
+  docJson?: () => string;
 }
 
 /** A one-line subtitle for the card header. */
@@ -89,6 +92,7 @@ export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "enrichment") return ({ mutation: "mutations", cna: "copy-number alterations", amp: "amplifications", homdel: "deep deletions", sv: "structural variants" } as Record<string, string>)[spec.alteration || "mutation"] +
     (spec.measure === "driver" ? " (drivers)" : "") + " in every gene, per sample";
   if (kind === "overlap") return "patients in exactly each combination of cohorts";
+  if (kind === "table") return "one row per " + (spec.unit === "patient" ? "patient" : "sample") + (v.table ? " · " + v.table.total.toLocaleString() + " rows, " + v.table.columns.length + " attributes" : "");
   if (kind === "correlates") return (spec.gene || "no gene") + " on " + (spec.profileType || "no profile") + (spec.otherProfile && spec.otherProfile !== spec.profileType ? " against " + spec.otherProfile : "") + " · Spearman ρ, every gene";
   if (kind === "assays") return (v.assays ? v.assays.profileName + " · " + v.assays.test : spec.profileType || "no profile chosen") + ", per " + (v.assays ? v.assays.unit.replace(/s$/, "") : "sample");
   if (kind === "cancertypes") return "by " + (spec.groupBy || "CANCER_TYPE") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled samples";
@@ -160,6 +164,36 @@ export function MoreControls({ c }: { c: MoreCtx }) {
       </div>
     </div>
   );
+  if (spec.kind === "table") {
+    const cols: { id: string; name: string }[] = c.v.table ? c.v.table.columns : [];
+    const sort = spec.sort || null;
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="a row per sample, carrying its patient's attributes too, or a row per patient with patient attributes only">
+            rows per <select value={spec.unit === "patient" ? "patient" : "sample"} disabled={busy} onChange={(e) => patch({ unit: e.target.value === "patient" ? "patient" : undefined, sort: undefined })}>
+              <option value="sample">sample</option><option value="patient">patient</option>
+            </select>
+          </label>
+          <label className="tbfield" title="the attribute the table is sorted by; missing values always last">
+            sort <select value={sort ? sort.attribute : ""} disabled={busy || !cols.length} onChange={(e) => patch({ sort: e.target.value ? { attribute: e.target.value, ...(sort && sort.desc ? { desc: true } : {}) } : undefined })}>
+              <option value="">patient id</option>
+              {sort && !cols.some((x) => x.id === sort.attribute) && <option value={sort.attribute}>{sort.attribute}</option>}
+              {cols.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+          </label>
+          <label className="chk" title="highest or last first">
+            <input type="checkbox" checked={!!(sort && sort.desc)} disabled={busy || !sort} onChange={(e) => patch({ sort: { attribute: sort.attribute, ...(e.target.checked ? { desc: true } : {}) } })} /> descending
+          </label>
+          <label className="tbfield" title="rows shown here; the download holds every row">
+            show <select value={String(spec.rows ?? 100)} disabled={busy} onChange={(e) => patch({ rows: Number(e.target.value) === 100 ? undefined : Number(e.target.value) })}>
+              {[25, 100, 500, 1000].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "correlates") {
     const profs = c.profiles.filter((p) => p !== "cna");
     const pick = (value: string, set: (v: string) => void, title: string, label: string) => (
@@ -428,6 +462,7 @@ export function defaultMoreView(kind: string, known: Known): Record<string, unkn
   }
   if (kind === "clonality") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "APC", "PIK3CA", "SMAD4", "CDH1"] };
   if (kind === "paired") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : PAIRED_DEFAULT_GENES };
+  if (kind === "table") return { kind, ...(known.cohorts.length > 6 ? { cohorts: known.cohorts.slice(0, 6) } : {}) };
   if (kind === "correlates") {
     const profs = known.profiles.filter((p) => p !== "cna");
     const profile = profs.find((p) => /mrna|rna_seq/i.test(p) && !/zscore/i.test(p)) || profs.find((p) => /mrna|rna_seq/i.test(p)) || profs[0] || "";
@@ -443,4 +478,55 @@ export function defaultMoreView(kind: string, known: Known): Record<string, unkn
     return { kind, profileType: profile, ...(known.cohorts.length > 2 ? { cohorts: known.cohorts.slice(0, 2) } : {}) };
   }
   return { kind };
+}
+
+/** A body of the kind's own in place of the server figure, or null to draw the figure. */
+export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
+  if (c.spec.kind === "table" && c.v.table) {
+    const t = c.v.table as import("../../lib/types").TableResult;
+    const multi = t.lists.length > 1;
+    // on screen the sorted column sits beside the ids; the download keeps the document's order
+    const si = t.sort ? t.columns.findIndex((x) => x.id === t.sort!.attribute) : -1;
+    const order = si > 0 ? [si, ...t.columns.map((_, j) => j).filter((j) => j !== si)] : t.columns.map((_, j) => j);
+    return (
+      <div className="tv">
+        <div className="tv-bar">
+          <span className="meta">{t.rows.length.toLocaleString()} of {t.total.toLocaleString()} {t.unit}s shown{t.sort ? ", sorted by " + t.sort.attribute + (t.sort.desc ? " ↓" : " ↑") : ""}</span>
+          <form method="post" action="/api/table" target="_blank" onSubmit={(e) => {
+            const f = e.currentTarget; (f.elements.namedItem("doc") as HTMLInputElement).value = c.docJson ? c.docJson() : "";
+          }}>
+            <input type="hidden" name="doc" /><input type="hidden" name="view" value={String(c.vi)} />
+            <button className="tbbtn" type="submit" disabled={c.busy || !c.docJson} title={"every row as tab-separated text: " + t.total.toLocaleString() + " " + t.unit + "s × " + t.columns.length + " attributes"}>
+              download all {t.total.toLocaleString()} rows (TSV)
+            </button>
+          </form>
+        </div>
+        <div className="tv-scroll">
+          <table>
+            <thead><tr>
+              {multi && <th>cohort</th>}
+              <th>patient</th>{t.unit === "sample" ? <th>sample</th> : <th className="num">samples</th>}
+              {order.map((j) => t.columns[j]).map((col) => (
+                <th key={col.id} title={col.id + " · recorded per " + col.per} className={col.numeric ? "num" : undefined}
+                  aria-sort={t.sort && t.sort.attribute === col.id ? (t.sort.desc ? "descending" : "ascending") : "none"}
+                  onClick={() => { if (!c.busy) c.patch({ sort: { attribute: col.id, ...(t.sort && t.sort.attribute === col.id && !t.sort.desc ? { desc: true } : {}) } }); }}>
+                  {col.name}{t.sort && t.sort.attribute === col.id ? (t.sort.desc ? " ↓" : " ↑") : ""}
+                </th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {t.rows.map((r, i) => (
+                <tr key={i}>
+                  {multi && <td className="meta">{r.cohort}</td>}
+                  <td className="mono">{r.patient}</td>{t.unit === "sample" ? <td className="mono">{r.sample}</td> : <td className="num">{r.samples}</td>}
+                  {order.map((j) => <td key={j} className={t.columns[j].numeric ? "num" : undefined} title={r.values[j].length > 40 ? r.values[j] : undefined}>{r.values[j]}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+  return null;
 }

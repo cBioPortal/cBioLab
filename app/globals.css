@@ -1244,3 +1244,13 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .ds-table .ds-also { max-width: 16rem; color: var(--muted); }
 .ds-table .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
 .ds-table td:last-child { white-space: nowrap; }
+
+/* the clinical data table view */
+.tv-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin: var(--s2) 0; flex-wrap: wrap; }
+.tv-bar form { margin: 0; }
+.tv-scroll { overflow: auto; max-height: 34rem; border: 1px solid var(--line); border-radius: var(--r-sm); }
+.tv table { border-collapse: collapse; font-size: var(--t-xs); }
+.tv th { position: sticky; top: 0; background: var(--card); text-align: left; padding: var(--s1) var(--s2); border-bottom: 1px solid var(--line); cursor: pointer; white-space: nowrap; user-select: none; }
+.tv td { padding: var(--s1) var(--s2); border-bottom: 1px solid var(--line); white-space: nowrap; max-width: 22rem; overflow: hidden; text-overflow: ellipsis; }
+.tv .num { text-align: right; font-variant-numeric: tabular-nums; }
+.tv .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }

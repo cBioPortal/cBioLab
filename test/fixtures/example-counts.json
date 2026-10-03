@@ -212,6 +212,9 @@
     },
     "Co-expression: the genes that rise and fall with ESR1": {
       "all patients": 1084
+    },
+    "Clinical data: every pancreatic cancer sample, oldest patients first": {
+      "Pancreatic": 3109
     }
   }
 }

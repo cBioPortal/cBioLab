@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import CohortPills, { normalizeDef } from "./pills";
-import { MORE_KINDS, isMoreKind, moreSub, MoreControls, defaultMoreView } from "./more-views";
+import { MORE_KINDS, isMoreKind, moreSub, MoreControls, MoreBody, defaultMoreView } from "./more-views";
 import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
 import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
@@ -4390,12 +4390,19 @@ function Latency({ v }: { v: any }) {
                     actions={MORE_KINDS[v.kind].genes
                       ? <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
                       : undefined} />
-                  <MoreControls c={{ vi, spec: docView(vi), v, busy, patch: (p) => patchView(vi, p),
-                    attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents() }} />
-                  {v.note && <p className="note">{v.note}</p>}
-                  {v.svg
-                    ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
-                    : !v.error && <p className="note">nothing to draw</p>}
+                  {(() => {
+                    const mc = { vi, spec: docView(vi), v, busy, patch: (p: Record<string, unknown>) => patchView(vi, p),
+                      attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), docJson: () => JSON.stringify(doc) };
+                    const body = MoreBody({ c: mc });
+                    return <>
+                      <MoreControls c={mc} />
+                      {v.note && <p className="note">{v.note}</p>}
+                      {body || (v.svg
+                        ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
+                        : !v.error && <p className="note">nothing to draw</p>)}
+                      {body && v.caveat && <p className="note vfoot">{v.caveat}</p>}
+                    </>;
+                  })()}
                 </>}
                 {v.kind === "logistic" && <>
                   <ViewHead menuStore={menuOpenRef.current} v={v} title="Logistic regression" cohorts={cohortChoice(vi, docView(vi))} splitBy={splitByChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}

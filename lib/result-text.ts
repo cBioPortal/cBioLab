@@ -275,6 +275,15 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         `Spearman ρ${co.rhoFrom === "meta" ? " combined across studies by Fisher z" : ""}, BH q over ${co.tested.toLocaleString()} genes; ${co.significant.toLocaleString()} at q<0.05:\n` +
         ` most positively correlated:\n` + co.positive.map(line).join("\n") +
         `\n most negatively correlated:\n` + co.negative.map(line).join("\n") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "table") {
+      const tb = v.table!;
+      const head = ["cohort", "patient", tb.unit === "sample" ? "sample" : "samples", ...tb.columns.map((c) => c.id)];
+      const shown = tb.rows.slice(0, 50);
+      out.push(`Clinical data table: ${tb.total.toLocaleString()} ${tb.unit}s × ${tb.columns.length} attributes` +
+        (tb.sort ? `, sorted by ${tb.sort.attribute}${tb.sort.desc ? " (highest first)" : ""}` : "") + `; the first ${shown.length} rows, tab-separated` +
+        ` (the web app's table view downloads every row):\n` + [head, ...shown.map((r) => [r.cohort, r.patient, tb.unit === "sample" ? r.sample : r.samples, ...r.values])]
+          .map((xs) => "  " + xs.map((x) => String(x).replace(/[\t\n]+/g, " ")).join("\t")).join("\n") +
+        (tb.total > shown.length ? `\n  … ${(tb.total - shown.length).toLocaleString()} more rows` : "") + caveatOf(v) + noteOf(v));
     } else if (v.kind === "overlap") {
       const ov = v.overlap!;
       out.push(`Cohort overlap (patients in exactly these cohorts and no other):\n` +

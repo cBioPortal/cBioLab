@@ -87,6 +87,10 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
     title: "What is this?",
     text: "Compares two or more groups on every measurement in one kind of extra lab data the study recorded — such as which mutational signatures (like sun damage or smoking) shaped each tumour, or which chromosome arms were gained or lost. The measurements at the top differ most clearly between the groups; each one shows its average, or its mix of results, in every group, so a difference that is clear but small reads as small."
   },
+  table: {
+    title: "What is this?",
+    text: "Lists every sample (or every patient) in your groups with everything the study recorded about them — cancer type, age, stage, survival and the rest — one row each. Click a column's name to sort by it; the download button saves every row as a file a spreadsheet can open. Studies that only share counts, never individual patients, are named rather than listed."
+  },
   correlates: {
     title: "What is this?",
     text: "Takes one gene and checks every other gene for whether its activity rises and falls along with it across these patients. The genes at the top go up when it goes up; those at the bottom go down when it goes up. The chart on the left shows how all genes fall: most barely move with it, and the ones far out on either side are the ones listed. Moving together is a clue, not proof that one gene controls the other."

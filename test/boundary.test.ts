@@ -30,6 +30,7 @@ import {
 } from "../lib/federation.ts";
 import * as federation from "../lib/federation.ts";
 import { axisSelect, plotPointsSql } from "../lib/plot.ts";
+import { tableRowsSql } from "../lib/clinical-table.ts";
 import { RemoteAggregateResolver } from "../lib/federation-remote.ts";
 import type { Instance } from "../lib/federation.ts";
 import { PRIMARY } from "../lib/ch.ts";
@@ -170,6 +171,19 @@ describe("remote peers: nothing identifying leaves before the network is touched
     } finally {
       globalThis.fetch = original;
     }
+  });
+
+  test("the clinical table's rows are the entitlement, and live only where it lives", () => {
+    // its row query returns patient and sample ids, so it sits outside the aggregate builders
+    assert.equal("tableRowsSql" in (federation as Record<string, unknown>), false,
+      "tableRowsSql returns ids and must not sit among the aggregate builders");
+    assert.match(tableRowsSql("SELECT '' AS pid", "x", "db", "sample", [{ id: "AGE", name: "Age", per: "patient", numeric: true }], null, 10, 0),
+      /AS patient, replaceOne\(u\.suid/);
+    assert.equal(typeof (AggregateResolver.prototype as unknown as Record<string, unknown>).tableRows, "undefined",
+      "AggregateResolver must not be able to return the clinical table's rows");
+    assert.equal(typeof (RemoteAggregateResolver.prototype as unknown as Record<string, unknown>).tableRows, "undefined",
+      "a remote peer must not be able to return the clinical table's rows");
+    assert.equal(typeof (PatientLevelResolver.prototype as unknown as Record<string, unknown>).tableRows, "function");
   });
 
   test("a box plot's points are the entitlement, and live only where it lives", () => {
