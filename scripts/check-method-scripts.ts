@@ -18,6 +18,7 @@ import { runAnalysis } from "../lib/analysis.ts";
 import { chQuery, PRIMARY } from "../lib/ch.ts";
 import { studyRouting } from "../lib/federation.ts";
 import { RESULT_MARKER, type MethodRecord } from "../lib/method.ts";
+import { withRequestCustomData } from "../lib/custom-data-server.ts";
 
 /** View kinds without a method record yet, and why. Shrink this list; never grow it quietly. */
 const EXEMPT: Record<string, string> = {
@@ -121,7 +122,8 @@ const jobs: Job[] = [];
 const only = process.env.METHOD_CHECK_ONLY;
 for (const ex of EXAMPLES.filter((e) => !only || e.title.includes(only))) {
   let result;
-  try { result = await runAnalysis(ex.doc); }
+  // an example's bundled demo data travels with it, exactly as the page sends it
+  try { result = await withRequestCustomData(ex.customData, () => runAnalysis(ex.doc)); }
   catch (e) { report(false, "example “" + ex.title + "” runs", String((e as Error).message).slice(0, 200)); continue; }
   (result.views as View[]).forEach((v, i) => {
     const label = "“" + ex.title + "” view " + (i + 1) + " (" + v.kind + ")";
