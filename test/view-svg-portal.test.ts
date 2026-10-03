@@ -2,6 +2,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg, viewTitle } from "../lib/view-svg.ts";
+import { cancertypesPanelSvg } from "../lib/view-svg-portal.ts";
 import type { ViewResult, CancertypesGroup } from "../lib/types.ts";
 
 const grp = (key: string, label: string, profiled: number, mutation: number, amp = 0, samples = profiled): CancertypesGroup =>
@@ -9,14 +10,26 @@ const grp = (key: string, label: string, profiled: number, mutation: number, amp
 
 describe("cancertypes", () => {
   const v: ViewResult = { kind: "cancertypes", cohorts: ["all"], caveat: "samples, not patients",
-    cancertypes: { groupBy: "CANCER_TYPE", measure: "any", genes: ["KRAS"], minSamples: 10, show: "frequency",
+    cancertypes: { groupBy: "CANCER_TYPE", measure: "any", genes: ["KRAS"], minSamples: 10, show: "frequency", unit: "sample",
       panels: [{ cohort: "all", samples: 300, profiled: 290, altered: 120,
         groups: [grp("pancreatic", "Pancreatic <Cancer>", 100, 80, 2), grp("lung", "Lung", 150, 30, 0, 160)],
         pooled: { ...grp("__pooled__", "3 smaller groups", 40, 8), count: 3 } }] } };
   test("each group shows its altered share over its profiled samples, and its unprofiled total when larger", () => {
     const svg = viewToSvg(v)!;
-    assert.ok(svg.includes("82.0%") && svg.includes("82 / 100"));
-    assert.ok(svg.includes("30 / 150 of 160"), "a group with unprofiled samples says so");
+    assert.ok(svg.includes("82.0% (82 / 100 samples)"));
+    assert.ok(svg.includes("30 / 150 samples, 160 in the group"), "a group with unprofiled samples says so");
+    assert.ok(svg.includes("Alteration Frequency"));
+  });
+  test("a '+' per data type a group was profiled for, and one gene's bars on request", () => {
+    const g = (k: string, label: string, n: number, m: number, sv: number) => ({ ...grp(k, label, n, m), profiledFor: { mutation: n, cna: 0, sv } });
+    const two: ViewResult = { ...v, cancertypes: { ...v.cancertypes!, genes: ["KRAS", "NRAS"], panels: [{ ...v.cancertypes!.panels[0],
+      groups: [g("a", "A", 100, 50, 100), g("b", "B", 100, 10, 0)], pooled: undefined,
+      perGene: [{ gene: "KRAS", groups: [g("a", "A", 100, 40, 100)] }, { gene: "NRAS", groups: [g("b", "B", 100, 7, 0)] }] }] } };
+    const all = cancertypesPanelSvg(two.cancertypes!, 0);
+    assert.ok(all.body.includes("Mutation data") && all.body.includes("Structural variant data") && !all.body.includes("CNA data"));
+    assert.equal((all.body.match(/>\+</g) || []).length, 3, "two groups profiled for mutations, one for SVs");
+    const nras = cancertypesPanelSvg(two.cancertypes!, 0, { gene: "NRAS" });
+    assert.ok(nras.body.includes("B: 7.0% (7 / 100 samples)") && !nras.body.includes("A: "));
   });
   test("pooled small groups are drawn and named, not dropped", () => {
     assert.ok(viewToSvg(v)!.includes("3 smaller groups"));
@@ -64,7 +77,9 @@ describe("enrichment", () => {
       grid: { xMax: 5, yMax: 25, nx: 80, ny: 50, cells: [[40, 1, 25]] }, labels: ["<APC>", "KRAS"] } };
   test("draws the volcano and the table, escapes gene names and keeps the caveat", () => {
     const svg = viewToSvg(v)!;
-    assert.ok(svg.includes("log2 ratio (A / B)") && svg.includes("70.0%") && svg.includes("80.0%"));
+    assert.ok(svg.includes("Log2 Ratio") && svg.includes("70 (70.00%)") && svg.includes("80 (80.00%)"));
+    assert.ok(svg.includes("A →") && svg.includes("← B"), "the volcano says which side is which group");
+    assert.ok(svg.includes("Genes with highest frequency in any group") && svg.includes("Altered frequency in A (%)"));
     assert.ok(!svg.includes("<APC>") && svg.includes("&lt;APC&gt;"));
     assert.ok(svg.includes("hypermutated tumours"));
   });
@@ -73,7 +88,8 @@ describe("enrichment", () => {
   });
   test("three cohorts: the table alone, no volcano", () => {
     const three: ViewResult = { ...v, enrichment: { ...v.enrichment!, groups: ["A", "B", "C"], grid: undefined } };
-    assert.ok(!viewToSvg(three)!.includes("log2 ratio"));
+    const svg3 = viewToSvg(three)!;
+    assert.ok(!svg3.includes("Log2 Ratio") && svg3.includes("Genes with highest frequency in any group"));
   });
 });
 

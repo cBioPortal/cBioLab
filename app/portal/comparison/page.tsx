@@ -21,8 +21,11 @@ export default function ComparisonPage() {
   const study = (doc?.study || "").replace(/[^A-Za-z0-9._-]/g, "");
   const names = Object.keys(doc?.cohorts || {});
   const { known, error } = useStudyKnown(study);
-  const head = <header className="portal-head"><a href="/lab">cbio-lab</a> <span className="meta">· Comparison page</span>
-    <h1>{names.join(" vs ") || "Comparison"} {study && <span className="meta">in {study}</span>}</h1></header>;
+  const head = <header className="portal-head"><a href="/lab">cbio-lab</a> <span className="meta">· Group comparison</span>
+    <div className="portal-summary"><div>
+      <h1>{known ? known.name : study || "Comparison"}</h1>
+      {known && <span>{names.length} groups: {names.join(", ")}</span>}
+    </div></div></header>;
   if (!doc || !study) return <main className="portal-main">{head}<p className="note">Open this page from an analysis in the lab (&ldquo;Comparison page&rdquo;), which hands it the cohorts.</p></main>;
   if (names.length < 2 || names.length > 6) return <main className="portal-main">{head}<p className="note">a comparison page compares 2 to 6 cohorts; this analysis has {names.length}</p></main>;
   if (error) return <main className="portal-main">{head}<p className="note">{error}</p></main>;

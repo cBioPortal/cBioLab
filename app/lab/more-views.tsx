@@ -3,6 +3,7 @@
 // ViewHead, then this kind's controls, then the server-rendered figure — so all that differs
 // per kind lives here: its title, whether it takes a gene list, and its own settings.
 import React, { useEffect, useState } from "react";
+import { CancertypesBody, EnrichmentBody, CorrelatesBody, AssaysBody } from "./portal-bodies";
 
 /**
  * A text field that keeps what is being typed to itself and hands the page the value only on
@@ -213,8 +214,8 @@ export function MoreControls({ c }: { c: MoreCtx }) {
           {pick(spec.profileType || "", (v) => patch({ profileType: v }), "the query gene's profile", "on")}
           {pick(spec.otherProfile || spec.profileType || "", (v) => patch({ otherProfile: v === spec.profileType ? undefined : v }), "the profile every other gene is read from", "against")}
           <label className="tbfield" title="genes listed in each direction; every tested gene is in the histogram">
-            list <select value={String(spec.show ?? 25)} disabled={busy} onChange={(e) => patch({ show: Number(e.target.value) === 25 ? undefined : Number(e.target.value) })}>
-              {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+            list <select value={String(spec.show ?? 100)} disabled={busy} onChange={(e) => patch({ show: Number(e.target.value) === 100 ? undefined : Number(e.target.value) })}>
+              {[25, 100, 250].map((n) => <option key={n} value={n}>{n}</option>)}
             </select> each way
           </label>
         </div>
@@ -266,11 +267,18 @@ export function MoreControls({ c }: { c: MoreCtx }) {
     return (
       <div className="viewtb">
         <div className="tbz"><span className="tbl">data</span>
-          <label className="tbfield" title="a sample attribute to group samples by, or the study each comes from">
-            group by <select value={by} disabled={busy} onChange={(e) => patch({ groupBy: e.target.value === "CANCER_TYPE" ? undefined : e.target.value })}>
-              {!cats.includes(by) && by !== "study" && <option value={by}>{by}</option>}
-              {cats.map((a) => <option key={a} value={a}>{a}</option>)}
-              <option value="study">study</option>
+          <label className="tbfield" title="the portal's category type: the study, the cancer type or the detailed cancer type — or any other sample attribute">
+            category <select value={by} disabled={busy} onChange={(e) => patch({ groupBy: e.target.value === "CANCER_TYPE" ? undefined : e.target.value })}>
+              <option value="study">Cancer Study</option>
+              <option value="CANCER_TYPE">Cancer Type</option>
+              <option value="CANCER_TYPE_DETAILED">Cancer Type Detailed</option>
+              {!cats.includes(by) && !["study", "CANCER_TYPE", "CANCER_TYPE_DETAILED"].includes(by) && <option value={by}>{by}</option>}
+              {cats.filter((a) => a !== "CANCER_TYPE" && a !== "CANCER_TYPE_DETAILED").map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </label>
+          <label className="tbfield" title="count patients (as the portal does by default — a patient counts in each group one of their samples is in) or samples">
+            count by <select value={spec.unit === "sample" ? "sample" : "patient"} disabled={busy} onChange={(e) => patch({ unit: e.target.value === "sample" ? "sample" : undefined })}>
+              <option value="patient">patients</option><option value="sample">samples</option>
             </select>
           </label>
           <label className="tbfield" title="count every alteration, or only OncoKB drivers">
@@ -278,16 +286,16 @@ export function MoreControls({ c }: { c: MoreCtx }) {
               <option value="any">any alteration</option><option value="driver">drivers</option>
             </select>
           </label>
-          <label className="tbfield" title="groups with fewer profiled samples than this are pooled into one bar, never dropped">
+          <label className="tbfield" title="groups with fewer profiled patients (or samples) than this are pooled into one bar, never dropped">
             min group <select value={String(spec.minSamples ?? 10)} disabled={busy} onChange={(e) => patch({ minSamples: Number(e.target.value) })}>
               {[1, 10, 50, 100, 200, 500].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
         </div>
         <div className="tbz"><span className="tbl">view</span>
-          <label className="tbfield" title="draw each group's altered share, or its altered sample count">
-            show <select value={spec.show === "count" ? "count" : "frequency"} disabled={busy} onChange={(e) => patch({ show: e.target.value === "count" ? "count" : undefined })}>
-              <option value="frequency">frequency</option><option value="count">sample count</option>
+          <label className="tbfield" title="the y axis: each group's altered share, or its altered count">
+            y-axis <select value={spec.show === "count" ? "count" : "frequency"} disabled={busy} onChange={(e) => patch({ show: e.target.value === "count" ? "count" : undefined })}>
+              <option value="frequency">Alteration Frequency</option><option value="count">Absolute Counts</option>
             </select>
           </label>
         </div>
@@ -482,6 +490,10 @@ export function defaultMoreView(kind: string, known: Known): Record<string, unkn
 
 /** A body of the kind's own in place of the server figure, or null to draw the figure. */
 export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
+  if (c.spec.kind === "cancertypes" && c.v.cancertypes) return <CancertypesBody v={c.v} />;
+  if (c.spec.kind === "enrichment" && c.v.enrichment) return <EnrichmentBody v={c.v} />;
+  if (c.spec.kind === "correlates" && c.v.correlates) return <CorrelatesBody v={c.v} docJson={c.docJson} />;
+  if (c.spec.kind === "assays" && c.v.assays) return <AssaysBody v={c.v} />;
   if (c.spec.kind === "table" && c.v.table) {
     const t = c.v.table as import("../../lib/types").TableResult;
     const multi = t.lists.length > 1;

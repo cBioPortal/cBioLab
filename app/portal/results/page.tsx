@@ -1,6 +1,7 @@
 "use client";
 // cBioPortal's Results page for a gene query, laid out as the portal lays it out: patients altered
 // in any of the genes against the rest, one tab per portal tab. ?study=<id>&genes=KRAS,NRAS
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { CohortDef, View } from "../../../lib/types";
 import { PortalTabs, type PortalTab } from "../PortalTabs";
@@ -13,8 +14,16 @@ export default function ResultsPage() {
   const study = (q.get("study") || "").replace(/[^A-Za-z0-9._-]/g, "");
   const genes = [...new Set((q.get("genes") || "").split(/[\s,;]+/).map((g) => g.trim().toUpperCase()).filter((g) => /^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(g)))];
   const { known, error } = useStudyKnown(study);
-  const head = <header className="portal-head"><a href="/lab">cbio-lab</a> <span className="meta">· Results page</span>
-    <h1>{genes.join(", ") || "Results"} {study && <span className="meta">in {study}</span>}</h1></header>;
+  const [counts, setCounts] = useState<Record<string, number> | null>(null);
+  const altered = counts?.Altered;
+  const head = <header className="portal-head"><a href="/lab">cbio-lab</a> <span className="meta">· Results</span>
+    <div className="portal-summary">
+      <div>
+        <h1>{known ? known.name : study || "Results"}</h1>
+        {known && <span>All samples ({known.samples.toLocaleString()} samples / {known.patients.toLocaleString()} patients) — {genes.join(", ")}</span>}
+      </div>
+      {known && altered != null && <strong>Queried genes are altered in {altered.toLocaleString()} ({Math.round(100 * altered / (known.patients || 1))}%) of queried patients</strong>}
+    </div></header>;
   if (!study || !genes.length) return (
     <main className="portal-main">{head}
       <form className="card" method="get">
@@ -43,14 +52,15 @@ export default function ResultsPage() {
     ...(expr ? [{ title: "Plots", views: [v(genes[0] + " copy number vs mRNA", { kind: "plot", x: { source: "alteration", gene: genes[0], by: "cna" }, y: { source: "molecular", profileType: expr, gene: genes[0] }, cohorts: both })] }] : []),
     { title: "Mutations", views: [v("Mutations", { kind: "hotspots", genes: genes.slice(0, 6), cohorts: ["Altered"] })] },
     ...(expr ? [{ title: "Co-expression", views: [v("Co-expression with " + genes[0], { kind: "correlates", gene: genes[0], profileType: expr, cohorts: ["All patients"] })] }] : []),
-    { title: "Comparison/Survival", views: [
-      v("Survival", { kind: "survival", cohorts: both }),
-      ...(known.clinical.length ? [v("Clinical", { kind: "clinical", attributes: known.clinical.slice(0, CLINICAL_SHOWN), cohorts: both })] : []),
-      v("Mutations enriched", { kind: "enrichment", alteration: "mutation", cohorts: both }),
-      v("Copy-number alterations enriched", { kind: "enrichment", alteration: "cna", cohorts: both })
+    { title: "Comparison/Survival", sub: [
+      { title: "Overlap", views: [v("Overlap", { kind: "overlap", cohorts: both })] },
+      { title: "Survival", views: [v("Survival", { kind: "survival", cohorts: both })] },
+      ...(known.clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", attributes: known.clinical.slice(0, CLINICAL_SHOWN), cohorts: both })] }] : []),
+      { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", cohorts: both }),
+        v("Copy-number alterations", { kind: "enrichment", alteration: "cna", cohorts: both })] }
     ] },
     { title: "CN Segments", views: [v("Genome-wide copy number", { kind: "genome", cohorts: both })] }
   ];
   const left = [!expr && "Plots and Co-expression (no mRNA profile)", genes.length < 2 && "Mutual Exclusivity (one gene)"].filter(Boolean) as string[];
-  return <main className="portal-main">{head}<PortalTabs study={study} cohorts={cohorts} tabs={tabs} left={left} /></main>;
+  return <main className="portal-main">{head}<PortalTabs study={study} cohorts={cohorts} tabs={tabs} left={left} onCounts={(c) => setCounts((o) => o || c)} /></main>;
 }

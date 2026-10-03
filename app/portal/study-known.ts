@@ -3,7 +3,11 @@
 // molecular profiles, generic-assay profiles and clinical attributes (most covered first).
 import { useEffect, useState } from "react";
 
-export interface StudyKnown { profiles: string[]; gaProfiles: string[]; clinical: string[] }
+export interface StudyKnown {
+  profiles: string[]; gaProfiles: string[]; clinical: string[];
+  /** the study's display name and size, for the page header */
+  name: string; patients: number; samples: number;
+}
 
 export function useStudyKnown(study: string): { known: StudyKnown | null; error: string | null } {
   const [known, setKnown] = useState<StudyKnown | null>(null);
@@ -11,13 +15,17 @@ export function useStudyKnown(study: string): { known: StudyKnown | null; error:
   useEffect(() => {
     if (!study) return;
     setKnown(null); setError(null);
-    fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ study }) })
-      .then((r) => r.json())
-      .then((j) => {
+    Promise.all([
+      fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ study }) }).then((r) => r.json()),
+      fetch("/api/studies").then((r) => r.json()).catch(() => ({ studies: [] }))
+    ])
+      .then(([j, st]) => {
         if (j.error) { setError(j.error); return; }
         const clinical = ((j.clinical || []) as { attribute: string; patients?: number }[])
           .slice().sort((a, b) => (b.patients || 0) - (a.patients || 0)).map((c) => c.attribute);
-        setKnown({ profiles: (j.profiles || []).filter((p: string) => p !== "cna"), gaProfiles: j.gaProfiles || [], clinical });
+        const meta = ((st.studies || []) as { id: string; name: string }[]).find((x) => x.id === study);
+        setKnown({ profiles: (j.profiles || []).filter((p: string) => p !== "cna"), gaProfiles: j.gaProfiles || [], clinical,
+          name: meta?.name || study, patients: j.totals?.patients || 0, samples: j.totals?.samples || 0 });
       })
       .catch((e) => setError(String(e)));
   }, [study]);

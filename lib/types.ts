@@ -907,24 +907,31 @@ export interface CancertypesView {
   measure?: "driver" | "any";
   /** groups with fewer profiled samples than this are pooled into one "other" bar (default 10) */
   minSamples?: number;
-  /** draw percentages (default) or sample counts */
+  /** draw percentages (default) or counts */
   show?: "frequency" | "count";
+  /** count patients (default, as the portal does — a patient counts in each group a sample of theirs is in) or samples */
+  unit?: "patient" | "sample";
 }
 export interface CancertypesGroup {
   key: string; label: string;
-  /** the group's samples, profiled or not */
+  /** the group's units (patients or samples), profiled or not */
   samples: number;
   profiled: number; altered: number;
   mutation: number; amp: number; homdel: number; sv: number; multiple: number;
+  /** units profiled for each data type at all (any gene) — the portal's "+" rows */
+  profiledFor?: { mutation: number; cna: number; sv: number };
 }
 export interface CancertypesPanel {
   cohort: string; samples: number; profiled: number; altered: number;
   groups: CancertypesGroup[];
   /** groups under the size floor, pooled into one — counted, never dropped */
   pooled?: CancertypesGroup & { count: number };
+  /** the same, one gene at a time (the portal's per-gene tabs) */
+  perGene?: { gene: string; groups: CancertypesGroup[]; pooled?: CancertypesGroup & { count: number } }[];
 }
 export interface CancertypesResult {
   groupBy: string; measure: "driver" | "any"; genes: string[]; minSamples: number; show: "frequency" | "count";
+  unit: "patient" | "sample";
   panels: CancertypesPanel[];
   excluded?: { study: string; reason: string }[];
 }
@@ -937,10 +944,10 @@ export interface OverlapView {
   kind: "overlap"; cohorts?: string[];
 }
 export interface OverlapResult {
-  /** the cohorts, in bit order, with each one's own size */
-  sets: { name: string; size: number }[];
-  /** patients in exactly the named cohorts and no other, largest first */
-  intersections: { members: string[]; n: number }[];
+  /** the cohorts, in bit order, with each one's own size in patients and in their samples */
+  sets: { name: string; size: number; samples?: number }[];
+  /** patients (and their samples) in exactly the named cohorts and no other, largest first */
+  intersections: { members: string[]; n: number; samples?: number }[];
   /** patients in at least one cohort */
   union: number;
   excluded?: { study: string; reason: string }[];
@@ -964,6 +971,8 @@ export interface EnrichmentView {
 }
 export interface EnrichmentGene {
   gene: string;
+  /** in the study's reference genome, when known */
+  cytoband?: string;
   cells: { cohort: string; altered: number; profiled: number; pct: number | null }[];
   /** two cohorts: log2 of the first cohort's altered share over the second's; null when either is zero */
   log2Ratio?: number | null;
@@ -1042,13 +1051,15 @@ export interface CorrelatesView {
   profileType: string;
   /** the profile every other gene is read from (default: the same one) — e.g. protein against mRNA */
   otherProfile?: string;
-  /** genes listed in each direction (default 25, at most 100) */
+  /** genes listed in each direction (default 100, at most 250) */
   show?: number;
   /** a gene with fewer patients having both values is not tested (default 10) */
   minN?: number;
 }
 export interface CorrelatesGene {
   gene: string; n: number;
+  /** in the study's reference genome, when known */
+  cytoband?: string;
   /** Spearman's ρ with its p (the t approximation scipy uses, or the Fisher-z meta p across studies) and BH q */
   rho: number | null; rhoP: number; q: number;
   /** Pearson's r and its p, from the pooled sums */

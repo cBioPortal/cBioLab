@@ -32,20 +32,11 @@ export default async function DatasetsPage() {
       </div>
       <PageTools kind="datasets" spec={rows} />
       <div className="repro-intro">
-        <h1>Data sets</h1>
+        <h1>Datasets</h1>
         <p className="lede">
-          Every study this deployment can query, and how many of its samples carry each kind of data. The
-          counts are the warehouse's own, so they are what every view in the app works from. Click a study to
-          explore it; a study's download links to the public cBioPortal datahub, where its files come from.
-        </p>
-        <div className="repro-tiles">
-          <div className="repro-tile"><span className="n">{rows.length.toLocaleString()}</span><span className="l">studies</span></div>
-          <div className="repro-tile"><span className="n">{sum("patients").toLocaleString()}</span><span className="l">patients</span></div>
-          <div className="repro-tile"><span className="n">{sum("samples").toLocaleString()}</span><span className="l">samples</span></div>
-          <div className="repro-tile"><span className="n">{rows.filter((r) => r.timeline).length.toLocaleString()}</span><span className="l">with a timeline</span></div>
-        </div>
-        <p className="meta" style={{ marginTop: "var(--s3)" }}>
-          Patients and samples are summed across studies, and a patient in two studies counts twice.
+          The table below lists the number of available samples per cancer study and data type, from the
+          warehouse every view in the app works from — {rows.length.toLocaleString()} studies, {sum("samples").toLocaleString()} samples.
+          A study&apos;s name opens it in Explore; its download links to the public cBioPortal datahub, where its files come from.
           {unreachable.length > 0 && <> Not shown: {unreachable.join(", ")} did not answer, so its studies are missing from this list.</>}
         </p>
       </div>

@@ -5,7 +5,7 @@
 // runMoreView, so they evaluate cohorts, federate and disclose exactly as the other added views do.
 import type { ViewResult, CancertypesView, CancertypesGroup, CancertypesPanel, OverlapView, EnrichmentView, EnrichmentGene, AssaysView, AssaysEntity, AssaysResult, CorrelatesView, CorrelatesGene, TableView } from "./types.ts";
 import { cancerTypesSql, cancerTypeSamplesSql, overlapCountsSql, enrichAlteredSql, enrichPanelProfiledSql, enrichWesSql, type EnrichAlteration,
-  assayProfileSql, assayMomentsSql, assayValueCountsSql, assayEntityNamesSql, correlatesMomentsSql } from "./federation-more.ts";
+  assayProfileSql, assayMomentsSql, assayValueCountsSql, assayEntityNamesSql, correlatesMomentsSql, geneCytobandsSql } from "./federation-more.ts";
 import { fisherExact, chiSquareTest, benjaminiHochberg, welchT, welchAnovaTest, varianceFromMoments, pearsonFromMoments, pearsonR, fisherZMeta } from "./stats.ts";
 import { niceCeil } from "./views-more.ts";
 import { geneSymbols } from "./gene-tracks.ts";
@@ -34,6 +34,15 @@ const ATTR_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
 const zeroGroup = (key: string, label: string): CancertypesGroup =>
   ({ key, label, samples: 0, profiled: 0, altered: 0, mutation: 0, amp: 0, homdel: 0, sv: 0, multiple: 0 });
 
+/** Cytobands for the genes a table lists, from the first participant that can answer; a gene it
+ *  does not know (or no answer at all) is left without one rather than failing the view. */
+async function cytobands(ok: Record<string, MoreResolver>, genes: string[]): Promise<Map<string, string>> {
+  const first = Object.values(ok)[0];
+  if (!first || !genes.length) return new Map();
+  const rows = await first.moreMeta("cytobands", (s, d) => geneCytobandsSql(genes, s, d)).catch(() => []);
+  return new Map(rows.map((r) => [String(r.gene), String(r.cytoband || "")]));
+}
+
 // ---------------------------------------------------------------------------
 // cancertypes: a gene list's alteration frequency per cancer type
 
@@ -51,59 +60,96 @@ async function cancertypesView(view: CancertypesView, ctx: ViewCtx): Promise<Vie
   const minSamples = view.minSamples == null ? 10 : Math.floor(Number(view.minSamples));
   if (!(minSamples >= 1 && minSamples <= 1000)) return refuse("cancertypes", ctx, "minSamples is 1 to 1000");
   const show: "frequency" | "count" = view.show === "count" ? "count" : "frequency";
+  const unit: "patient" | "sample" = view.unit === "sample" ? "sample" : "patient";
   const attribute = groupBy === "study" ? null : groupBy;
 
   const { ok, excluded } = answering(ctx);
   if (!Object.keys(ok).length) return refuse("cancertypes", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
   const perSite: { cohort: string; study: string; groups: number; profiled: number }[] = [];
   const panels: CancertypesPanel[] = [];
-  for (const n of vNames) {
-    const byKey = new Map<string, CancertypesGroup>();
-    const get = (k: string, label: string) => { let g = byKey.get(k); if (!g) { g = zeroGroup(k, label); byKey.set(k, g); } else if (!g.label && label) g.label = label; return g; };
-    await Promise.all(cohorts[n].studies.filter((st) => ok[st]).map(async (st) => {
-      const def = doc.cohorts[n];
-      const [rows, totals] = await Promise.all([
-        ok[st].moreAggregate("cancertypes:" + n, def, (c, s, d) => cancerTypesSql(c, s, d, genes, attribute, pin, measure)),
-        ok[st].moreAggregate("cancertypes:samples:" + n, def, (c, s, d) => cancerTypeSamplesSql(c, s, d, attribute))
-      ]);
-      let profiled = 0;
-      for (const r of rows) {
-        const g = get(String(r.grp), String(r.label || r.grp));
-        g.profiled += Number(r.profiled); g.altered += Number(r.altered); profiled += Number(r.profiled);
-        g.mutation += Number(r.mutation); g.amp += Number(r.amp); g.homdel += Number(r.homdel); g.sv += Number(r.sv); g.multiple += Number(r.multiple);
-      }
-      for (const r of totals) get(String(r.grp), String(r.grp)).samples += Number(r.samples);
-      perSite.push({ cohort: n, study: st, groups: rows.length, profiled });
-    }));
-    const all = [...byKey.values()].map((g) => ({ ...g, label: g.key === "" ? "(no " + (attribute || "study") + " value)" : g.label }));
-    const keep = all.filter((g) => g.profiled >= minSamples).sort((a, b) => b.altered / b.profiled - a.altered / a.profiled || b.profiled - a.profiled);
-    const small = all.filter((g) => g.profiled < minSamples);
+  const COUNTS = ["samples", "profiled", "altered", "mutation", "amp", "homdel", "sv", "multiple"] as const;
+  const ALL_KEY = "\x01all";
+  const cohortTotal = new Map<string, { profiled: number; altered: number; samples: number }>();
+  // groups at or over the floor, most altered first; the rest pooled into one, counted
+  const arrange = (all: CancertypesGroup[]) => {
+    const named = all.map((g) => ({ ...g, label: g.key === "" ? "(no " + (attribute || "study") + " value)" : g.label }));
+    const keep = named.filter((g) => g.profiled >= minSamples).sort((a, b) => b.altered / b.profiled - a.altered / a.profiled || b.profiled - a.profiled);
+    const small = named.filter((g) => g.profiled < minSamples);
     let pooled: CancertypesPanel["pooled"];
     if (small.length) {
       const p = zeroGroup("__pooled__", small.length + " smaller group" + (small.length === 1 ? "" : "s"));
-      for (const g of small) for (const k of ["samples", "profiled", "altered", "mutation", "amp", "homdel", "sv", "multiple"] as const) p[k] += g[k];
+      p.profiledFor = { mutation: 0, cna: 0, sv: 0 };
+      for (const g of small) {
+        for (const k of COUNTS) p[k] += g[k];
+        for (const k of ["mutation", "cna", "sv"] as const) p.profiledFor[k] += g.profiledFor?.[k] || 0;
+      }
       pooled = { ...p, count: small.length };
     }
-    const sum = (k: "samples" | "profiled" | "altered") => all.reduce((a, g) => a + g[k], 0);
-    panels.push({ cohort: n, samples: sum("samples"), profiled: sum("profiled"), altered: sum("altered"), groups: keep, ...(pooled ? { pooled } : {}) });
+    return { groups: keep, ...(pooled ? { pooled } : {}) };
+  };
+  for (const n of vNames) {
+    // gene "*" is the genes together; every other key one gene
+    const byGene = new Map<string, Map<string, CancertypesGroup>>();
+    const totals = new Map<string, { samples: number; profiledFor: { mutation: number; cna: number; sv: number }; label: string }>();
+    const get = (gene: string, k: string, label: string) => {
+      let m = byGene.get(gene); if (!m) { m = new Map(); byGene.set(gene, m); }
+      let g = m.get(k); if (!g) { g = zeroGroup(k, label); m.set(k, g); } else if (!g.label && label) g.label = label;
+      return g;
+    };
+    await Promise.all(cohorts[n].studies.filter((st) => ok[st]).map(async (st) => {
+      const def = doc.cohorts[n];
+      const [rows, tot] = await Promise.all([
+        ok[st].moreAggregate("cancertypes:" + n, def, (c, s, d) => cancerTypesSql(c, s, d, genes, attribute, pin, measure, unit)),
+        ok[st].moreAggregate("cancertypes:samples:" + n, def, (c, s, d) => cancerTypeSamplesSql(c, s, d, attribute, unit))
+      ]);
+      let profiled = 0;
+      for (const r of rows) {
+        if (r.grp === ALL_KEY) {
+          if (r.gene === "*") { const t = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 }; t.profiled += Number(r.profiled); t.altered += Number(r.altered); cohortTotal.set(n, t); }
+          continue;
+        }
+        const g = get(String(r.gene), String(r.grp), String(r.label || r.grp));
+        g.profiled += Number(r.profiled); g.altered += Number(r.altered); if (r.gene === "*") profiled += Number(r.profiled);
+        g.mutation += Number(r.mutation); g.amp += Number(r.amp); g.homdel += Number(r.homdel); g.sv += Number(r.sv); g.multiple += Number(r.multiple);
+      }
+      for (const r of tot) {
+        if (r.grp === ALL_KEY) { const t = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 }; t.samples += Number(r.samples); cohortTotal.set(n, t); continue; }
+        const t = totals.get(String(r.grp)) || { samples: 0, profiledFor: { mutation: 0, cna: 0, sv: 0 }, label: String(r.grp) };
+        t.samples += Number(r.samples); t.profiledFor.mutation += Number(r.mut); t.profiledFor.cna += Number(r.cna); t.profiledFor.sv += Number(r.sv);
+        totals.set(String(r.grp), t);
+      }
+      perSite.push({ cohort: n, study: st, groups: rows.filter((r) => r.gene === "*").length, profiled });
+    }));
+    // every group with units appears, profiled or not; each carries its totals
+    for (const [k, t] of totals) get("*", k, t.label);
+    for (const m of byGene.values()) for (const g of m.values()) {
+      const t = totals.get(g.key);
+      if (t) { g.samples = t.samples; g.profiledFor = { ...t.profiledFor }; }
+    }
+    const all = [...(byGene.get("*") || new Map()).values()];
+    // the cohort's own totals count each unit once, though a patient can sit in two groups
+    const ct = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 };
+    panels.push({ cohort: n, samples: ct.samples, profiled: ct.profiled, altered: ct.altered, ...arrange(all),
+      ...(genes.length > 1 ? { perGene: genes.map((gene) => ({ gene, ...arrange([...(byGene.get(gene) || new Map()).values()]) })) } : {}) });
   }
-  if (!panels.some((p) => p.profiled)) return refuse("cancertypes", ctx, "no sample in " + (vNames.length === 1 ? "this cohort" : "these cohorts") +
+  if (!panels.some((p) => p.profiled)) return refuse("cancertypes", ctx, "no " + unit + " in " + (vNames.length === 1 ? "this cohort" : "these cohorts") +
     " was profiled for " + (genes.length === 1 ? genes[0] : "any of " + genes.join(", ")));
   const multi = ctx.vStudies.length > 1;
   const groupWord = attribute ? attribute : "study";
   return {
     kind: "cancertypes", cohorts: vNames,
-    cancertypes: { groupBy: groupWord, measure, genes, minSamples, show, panels, ...(excluded.length ? { excluded } : {}) },
-    method: cancertypesMethod({ genes, groupBy: groupWord, measure, oncokbPin: pin, minSamples, perSite,
+    cancertypes: { groupBy: groupWord, measure, genes, minSamples, show, unit, panels, ...(excluded.length ? { excluded } : {}) },
+    method: cancertypesMethod({ genes, groupBy: groupWord, measure, oncokbPin: pin, minSamples, unit, perSite,
       panels: panels.map((p) => ({ cohort: p.cohort, groups: p.groups.length, pooled: p.pooled ? p.pooled.count : 0, profiled: p.profiled, altered: p.altered })) }),
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
-    caveat: "Samples altered in at least one of " + (genes.length === 1 ? genes[0] : genes.length + " genes") + " per " + groupWord + " group, over the samples profiled for at least one of them" +
+    caveat: (unit === "patient" ? "Patients" : "Samples") + " altered in at least one of " + (genes.length === 1 ? genes[0] : genes.length + " genes") + " per " + groupWord + " group, over the " + unit + "s profiled for at least one of them" +
       " (the union of their panels, as an oncoprint's merged row counts it). " +
       (measure === "driver" ? "Only OncoKB drivers (" + pin + ") count. " : "Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. ") +
-      "A sample with more than one kind of alteration across the genes counts once, under \"multiple\". Samples are counted, not patients: a patient with two samples counts twice. " +
+      "A " + unit + " with more than one kind of alteration across the genes counts once, under \"multiple\". " +
+      (unit === "patient" ? "A patient counts in every group one of their samples falls in, profiled if any of those samples is, altered if any is. " : "Samples are counted, not patients: a patient with two samples counts twice. ") +
       (attribute ? attribute + " is read per sample and folded on case and whitespace; samples with no value form their own group. " : "") +
-      "Groups with fewer than " + plural(minSamples, "profiled sample") + " are pooled into one bar rather than dropped. " +
+      "Groups with fewer than " + plural(minSamples, "profiled " + unit) + " are pooled into one bar rather than dropped. " +
       (multi ? "Counts are summed across " + ctx.vStudies.length + " studies; values are matched by name, not harmonized. " : "") +
       (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
   };
@@ -121,7 +167,7 @@ async function overlapView(_view: OverlapView, ctx: ViewCtx): Promise<ViewResult
   const { ok, excluded } = answering(ctx);
   if (!Object.keys(ok).length) return refuse("overlap", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
   // per study, only the cohorts that reach it can hold its patients; their bits are mapped back
-  const byMask = new Map<number, number>();
+  const byMask = new Map<number, number>(), samplesByMask = new Map<number, number>();
   const perSite: { study: string; cohorts: string[]; patients: number }[] = [];
   await Promise.all(Object.keys(ok).map(async (st) => {
     const here = vNames.filter((n) => cohorts[n].studies.includes(st));
@@ -133,15 +179,19 @@ async function overlapView(_view: OverlapView, ctx: ViewCtx): Promise<ViewResult
       let global = 0;
       here.forEach((name, i) => { if (local & (1 << i)) global |= 1 << vNames.indexOf(name); });
       byMask.set(global, (byMask.get(global) || 0) + n);
+      samplesByMask.set(global, (samplesByMask.get(global) || 0) + Number(r.samples || 0));
       patients += n;
     }
     perSite.push({ study: st, cohorts: here, patients });
   }));
   const intersections = [...byMask].filter(([m]) => m > 0)
-    .map(([m, n]) => ({ members: vNames.filter((_, i) => m & (1 << i)), n }))
+    .map(([m, n]) => ({ members: vNames.filter((_, i) => m & (1 << i)), n, samples: samplesByMask.get(m) || 0 }))
     .sort((a, b) => b.n - a.n || a.members.length - b.members.length);
   const union = intersections.reduce((a, x) => a + x.n, 0);
-  const sets = vNames.map((n) => ({ name: n, size: intersections.filter((x) => x.members.includes(n)).reduce((a, x) => a + x.n, 0) }));
+  const sets = vNames.map((n) => {
+    const mine = intersections.filter((x) => x.members.includes(n));
+    return { name: n, size: mine.reduce((a, x) => a + x.n, 0), samples: mine.reduce((a, x) => a + x.samples, 0) };
+  });
   const mismatch = sets.filter((s) => s.size !== cohorts[s.name].count && !excluded.some((e) => cohorts[s.name].studies.includes(e.study)));
   const multi = ctx.vStudies.length > 1;
   return {
@@ -151,6 +201,7 @@ async function overlapView(_view: OverlapView, ctx: ViewCtx): Promise<ViewResult
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
     caveat: "Patients in exactly the marked cohorts and none of the others, for every combination that has any — computed inside each study's database, which returns one count per combination. " +
+      (vNames.length <= 3 ? "A cohort is a set of patients, so each patient's samples go wherever the patient does: the samples diagram counts the same patterns in samples. " : "") +
       plural(union, "patient") + " are in at least one of the " + vNames.length + " cohorts. " +
       (multi ? "A patient in two studies is two patients here: ids are study-qualified, so overlap is only ever found within a study. " : "") +
       (mismatch.length ? "WARNING: " + mismatch.map((s) => s.name).join(", ") + " counted differently here than as a cohort — the definition was evaluated twice and gave two answers. " : "") +
@@ -224,6 +275,8 @@ async function enrichmentView(view: EnrichmentView, ctx: ViewCtx): Promise<ViewR
   benjaminiHochberg(tested.map((g) => g.p)).forEach((q, i) => { tested[i].q = q; });
   tested.sort((a, b) => a.p - b.p || a.gene.localeCompare(b.gene));
   const rows = tested.slice(0, ENRICH_ROWS);
+  const bands = await cytobands(ok, rows.map((g) => g.gene));
+  for (const g of rows) { const b = bands.get(g.gene); if (b) g.cytoband = b; }
   const labels = rows.slice(0, label).map((g) => g.gene);
   let grid: NonNullable<ViewResult["enrichment"]>["grid"];
   if (two) {
@@ -436,7 +489,7 @@ async function assaysView(view: AssaysView, ctx: ViewCtx): Promise<ViewResult> {
 // ---------------------------------------------------------------------------
 // correlates: one gene's expression against every gene's
 
-const CORR_SHOW_MAX = 100;
+const CORR_SHOW_MAX = 250;
 
 async function correlatesView(view: CorrelatesView, ctx: ViewCtx): Promise<ViewResult> {
   const { doc, cohorts, vNames } = ctx;
@@ -446,7 +499,7 @@ async function correlatesView(view: CorrelatesView, ctx: ViewCtx): Promise<ViewR
   if (!gene) return refuse("correlates", ctx, "gene names the query gene, e.g. ESR1");
   const pt = String(view.profileType || ""), other = String(view.otherProfile || pt);
   if (!PROFILE_NAME.test(pt) || !PROFILE_NAME.test(other)) return refuse("correlates", ctx, "profileType names a continuous molecular profile, e.g. rna_seq_v2_mrna");
-  const show = view.show == null ? 25 : Math.floor(Number(view.show));
+  const show = view.show == null ? 100 : Math.floor(Number(view.show));
   if (!(show >= 1 && show <= CORR_SHOW_MAX)) return refuse("correlates", ctx, "show is 1 to " + CORR_SHOW_MAX + " genes in each direction");
   const minN = view.minN == null ? 10 : Math.floor(Number(view.minN));
   if (!(minN >= 4 && minN <= 100000)) return refuse("correlates", ctx, "minN is 4 to 100000");
@@ -496,6 +549,8 @@ async function correlatesView(view: CorrelatesView, ctx: ViewCtx): Promise<ViewR
   tested.sort((a, b) => b.rho! - a.rho! || a.gene.localeCompare(b.gene));
   const positive = tested.filter((g) => g.rho! > 0).slice(0, show);
   const negative = tested.filter((g) => g.rho! < 0).reverse().slice(0, show);
+  const bands = await cytobands(ok, [...positive, ...negative].map((g) => g.gene));
+  for (const g of [...positive, ...negative]) { const b = bands.get(g.gene); if (b) g.cytoband = b; }
   const bins = new Map<number, number>();
   for (const g of tested) { const b = Math.min(39, Math.floor((g.rho! + 1) / 0.05)); bins.set(b, (bins.get(b) || 0) + 1); }
   const histogram = Array.from({ length: 40 }, (_, b) => [Math.round((-1 + b * 0.05) * 100) / 100, bins.get(b) || 0] as [number, number]);

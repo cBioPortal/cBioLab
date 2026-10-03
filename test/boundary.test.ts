@@ -345,6 +345,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "assayProfileSql": () => federation.assayProfileSql("x", "db", "armlevel_cna"),
     "assayEntityNamesSql": () => federation.assayEntityNamesSql("x", "db", "armlevel_cna"),
     // correlates: per-patient values and their ranks stay in CTEs; twelve sums per gene leave
+    "geneCytobandsSql": () => federation.geneCytobandsSql(["KRAS", "APC"], "x", "db"),
     "correlatesMomentsSql": () => federation.correlatesMomentsSql(cohortSql, "x", "db", "ESR1", "rna_seq_v2_mrna", "rppa")
   };
 

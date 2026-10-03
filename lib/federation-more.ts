@@ -621,23 +621,22 @@ export function labTestsSql(cohortSql: string, study: string, db: string, eventT
 // cancertypes: a gene list's alteration frequency per group of samples
 
 /**
- * Per group of the cohort's SAMPLES — a sample attribute's value (folded on case and whitespace,
- * the one clinical fold; the label is its most frequent spelling) or, with attribute null, the
- * study — how many samples were profiled for at least one of the genes (any alteration type, the
- * union of their panels, as an oncoprint's merged row counts it), and of those how many carry each
- * kind of alteration in any of the genes: only mutations, only amplifications, only deep deletions,
- * only structural variants, or more than one kind. A sample with no value for the attribute groups
- * under ''. Counts only.
+ * Per group of the cohort's samples (a sample attribute's value, or the study) and per gene — plus
+ * the row "*" for the genes together — the units profiled for that gene and how many are altered,
+ * split by kind: only mutations, only amplifications, only deep deletions, only structural variants,
+ * or more than one kind. A unit is a SAMPLE, or a PATIENT counted in each group one of their
+ * samples falls in (the portal's default); a patient is profiled when any of their samples is, and
+ * carries the union of their samples' alterations. Counts only.
  */
 export function cancerTypesSql(cohortSql: string, study: string, db: string, genes: string[], attribute: string | null,
-  pin: string | null, measure: "driver" | "any"): string {
+  pin: string | null, measure: "driver" | "any", unit: "sample" | "patient" = "sample"): string {
   const geneList = genes.map(sq).join(",");
   const drv = measure === "driver" && pin;
   const fold = clinicalValueFoldSql("attribute_value");
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
     "samp AS (\n" +
-    "  SELECT sample_unique_id AS suid FROM " + db + ".sample_derived\n" +
+    "  SELECT sample_unique_id AS suid, patient_unique_id AS puid FROM " + db + ".sample_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
     "),\n" +
     (attribute
@@ -648,52 +647,78 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
         "),\n"
       : "grp AS (SELECT suid, " + sq(study) + " AS g, " + sq(study) + " AS label FROM samp),\n") +
     "alt AS (\n" +
-    "  SELECT g.sample_unique_id AS suid,\n" +
+    "  SELECT g.sample_unique_id AS suid, g.hugo_gene_symbol AS gene,\n" +
     "         multiIf(g.variant_type = 'mutation', 'mutation', g.variant_type = 'cna' AND g.cna_alteration >= 2, 'amp',\n" +
     "                 g.variant_type = 'cna', 'homdel', 'sv') AS t\n" +
     "  FROM " + db + ".genomic_event_derived g\n" +
     (drv ? driverJoin(pin) : "") +
     "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
     "    AND g.sample_unique_id IN (SELECT suid FROM samp)" + (drv ? " AND ann.is_driver" : "") + "\n" +
-    "  GROUP BY suid, t\n" +
+    "  GROUP BY suid, gene, t\n" +
     "),\n" +
-    "per AS (SELECT suid, groupUniqArray(t) AS types FROM alt GROUP BY suid),\n" +
-    "covered AS (\n" +
-    "  SELECT DISTINCT sp.sample_unique_id AS suid FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    // a sample is profiled for a gene its panel lists, and for one it is altered in (an off-panel call is a measurement)
+    "cov AS (\n" +
+    "  SELECT DISTINCT sp.sample_unique_id AS suid, pg.gene AS gene FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + geneList + ")\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.sample_unique_id IN (SELECT suid FROM samp)\n" +
     "    AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')\n" +
-    "  UNION DISTINCT SELECT suid FROM per\n" +
-    ")\n" +
-    "SELECT ifNull(grp.g, '') AS grp, any(ifNull(grp.label, '')) AS label, count() AS profiled,\n" +
-    "       countIf(length(per.types) > 0) AS altered,\n" +
-    "       countIf(per.types = ['mutation']) AS mutation, countIf(per.types = ['amp']) AS amp,\n" +
-    "       countIf(per.types = ['homdel']) AS homdel, countIf(per.types = ['sv']) AS sv,\n" +
-    "       countIf(length(per.types) > 1) AS multiple\n" +
-    "FROM covered\n" +
-    "LEFT JOIN grp ON grp.suid = covered.suid\n" +
-    "LEFT JOIN per ON per.suid = covered.suid\n" +
-    "GROUP BY grp"
+    "  UNION DISTINCT SELECT DISTINCT suid, gene FROM alt\n" +
+    "),\n" +
+    "sg AS (\n" +
+    "  SELECT cov.suid AS suid, cov.gene AS gene, groupUniqArrayIf(alt.t, alt.t != '') AS types\n" +
+    "  FROM cov LEFT JOIN alt ON alt.suid = cov.suid AND alt.gene = cov.gene GROUP BY suid, gene\n" +
+    "),\n" +
+    "sg2 AS (SELECT suid, gene, types FROM sg UNION ALL SELECT suid, '*' AS gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types FROM sg GROUP BY suid),\n" +
+    "u AS (\n" +
+    "  SELECT " + (unit === "patient" ? "samp.puid" : "sg2.suid") + " AS k, ifNull(grp.g, '') AS g, any(ifNull(grp.label, '')) AS label, sg2.gene AS gene,\n" +
+    "         arrayDistinct(arrayFlatten(groupArray(sg2.types))) AS types\n" +
+    "  FROM sg2 JOIN samp ON samp.suid = sg2.suid LEFT JOIN grp ON grp.suid = sg2.suid\n" +
+    "  GROUP BY k, g, gene\n" +
+    "),\n" +
+    // the whole cohort, each unit once however many groups it is in: grp '' is reserved for it below
+    "uall AS (SELECT k, '\\x01all' AS g, '' AS label, gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types FROM u GROUP BY k, gene),\n" +
+    "uu AS (SELECT k, g, label, gene, types FROM u UNION ALL SELECT k, g, label, gene, types FROM uall)\n" +
+    "SELECT g AS grp, gene, any(label) AS label, count() AS profiled,\n" +
+    "       countIf(length(types) > 0) AS altered,\n" +
+    "       countIf(types = ['mutation']) AS mutation, countIf(types = ['amp']) AS amp,\n" +
+    "       countIf(types = ['homdel']) AS homdel, countIf(types = ['sv']) AS sv,\n" +
+    "       countIf(length(types) > 1) AS multiple\n" +
+    "FROM uu GROUP BY grp, gene"
   );
 }
 
-/** How many of the cohort's samples there are per group, profiled or not — the denominator a
- *  reader compares the profiled count against. Counts only. */
-export function cancerTypeSamplesSql(cohortSql: string, study: string, db: string, attribute: string | null): string {
+/** Each group's units (samples, or patients with a sample in the group), profiled or not, and how many
+ *  were profiled for mutations, copy number and structural variants at all — the portal's "+" rows. */
+export function cancerTypeSamplesSql(cohortSql: string, study: string, db: string, attribute: string | null, unit: "sample" | "patient" = "sample"): string {
   const fold = clinicalValueFoldSql("attribute_value");
+  const k = unit === "patient" ? "samp.puid" : "samp.suid";
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
     "samp AS (\n" +
-    "  SELECT sample_unique_id AS suid FROM " + db + ".sample_derived\n" +
+    "  SELECT sample_unique_id AS suid, patient_unique_id AS puid FROM " + db + ".sample_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "),\n" +
+    "prof AS (\n" +
+    "  SELECT sample_unique_id AS suid, groupUniqArray(alteration_type) AS types FROM " + db + ".sample_to_gene_panel_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid\n" +
     ")\n" +
+    "SELECT " + (attribute ? "ifNull(grp.g, '')" : sq(study)) + " AS grp, uniqExact(" + k + ") AS samples,\n" +
+    "       uniqExactIf(" + k + ", has(prof.types, 'MUTATION_EXTENDED')) AS mut,\n" +
+    "       uniqExactIf(" + k + ", has(prof.types, 'COPY_NUMBER_ALTERATION')) AS cna,\n" +
+    "       uniqExactIf(" + k + ", has(prof.types, 'STRUCTURAL_VARIANT')) AS sv\n" +
+    "FROM samp LEFT JOIN prof ON prof.suid = samp.suid\n" +
     (attribute
-      ? "SELECT ifNull(grp.g, '') AS grp, count() AS samples FROM samp LEFT JOIN (\n" +
+      ? "LEFT JOIN (\n" +
         "  SELECT sample_unique_id AS suid, any(" + fold + ") AS g FROM " + db + ".clinical_data_derived\n" +
         "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(attribute) + "\n" +
         "    AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid\n" +
-        ") grp ON grp.suid = samp.suid GROUP BY grp"
-      : "SELECT " + sq(study) + " AS grp, count() AS samples FROM samp")
+        ") grp ON grp.suid = samp.suid\n"
+      : "") +
+    "GROUP BY grp\n" +
+    // the whole cohort, each unit once
+    "UNION ALL SELECT '\\x01all' AS grp, uniqExact(" + k + "), uniqExactIf(" + k + ", has(prof.types, 'MUTATION_EXTENDED')),\n" +
+    "       uniqExactIf(" + k + ", has(prof.types, 'COPY_NUMBER_ALTERATION')), uniqExactIf(" + k + ", has(prof.types, 'STRUCTURAL_VARIANT'))\n" +
+    "FROM samp LEFT JOIN prof ON prof.suid = samp.suid"
   );
 }
 
@@ -706,13 +731,15 @@ export function cancerTypeSamplesSql(cohortSql: string, study: string, db: strin
  * nothing else; the caller names each bit.
  */
 export function overlapCountsSql(cohortSqls: string[], study: string, db: string): string {
-  void study; void db;
   if (!cohortSqls.length) throw new Error("overlapCountsSql needs at least one cohort");
   const ctes = cohortSqls.map((c, i) => "c" + i + " AS (" + c + ")").join(",\n");
   const union = cohortSqls.map((_, i) => "SELECT pid FROM c" + i).join(" UNION DISTINCT ");
   const mask = cohortSqls.map((_, i) => "(pid IN (SELECT pid FROM c" + i + ")) * " + (1 << i)).join(" + ");
-  return "WITH " + ctes + ",\nu AS (" + union + "),\nm AS (SELECT " + mask + " AS mask FROM u)\n" +
-    "SELECT mask, count() AS n FROM m GROUP BY mask ORDER BY n DESC";
+  // each patient's samples ride along, so the same patterns are counted in samples too
+  return "WITH " + ctes + ",\nu AS (" + union + "),\nm AS (SELECT pid, " + mask + " AS mask FROM u),\n" +
+    "s AS (SELECT " + pidOf("patient_unique_id", study) + " AS pid, count() AS ns FROM " + db + ".sample_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM u) GROUP BY pid)\n" +
+    "SELECT mask, count() AS n, sum(s.ns) AS samples FROM m LEFT JOIN s ON s.pid = m.pid GROUP BY mask ORDER BY n DESC";
 }
 
 // ---------------------------------------------------------------------------
@@ -867,4 +894,13 @@ export function correlatesMomentsSql(cohortSql: string, study: string, db: strin
     "       sum(rx) AS rsx, sum(ry) AS rsy, sum(rx * ry) AS rsxy, sum(rx * rx) AS rsxx, sum(ry * ry) AS rsyy\n" +
     "FROM ranked GROUP BY gene"
   );
+}
+
+/** Each gene's cytoband in the study's own reference genome (the portal's Cytoband column). Metadata only. */
+export function geneCytobandsSql(genes: string[], study: string, db: string): string {
+  return "SELECT g.hugo_gene_symbol AS gene, any(rgg.cytoband) AS cytoband FROM " + db + ".gene g\n" +
+    "JOIN " + db + ".reference_genome_gene rgg ON rgg.entrez_gene_id = g.entrez_gene_id\n" +
+    "WHERE rgg.reference_genome_id = (SELECT reference_genome_id FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(study) + ")\n" +
+    "  AND g.hugo_gene_symbol IN (" + (genes.length ? genes.map(sq).join(",") : "''") + ")\n" +
+    "GROUP BY gene";
 }
