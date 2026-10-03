@@ -48,7 +48,7 @@ describe("overlap", () => {
   test("names are escaped and the title lists the cohorts", () => {
     const svg = viewToSvg(v)!;
     assert.ok(!svg.includes("<B>") && svg.includes("&lt;B&gt;"));
-    assert.match(viewTitle(v), /Cohort overlap — A, <B>, C/);
+    assert.equal(viewTitle(v), "Cohort overlap — A vs <B> vs C");
   });
   test("no patients, no figure", () => {
     assert.equal(viewToSvg({ ...v, overlap: { ...v.overlap!, union: 0 } }), null);
@@ -74,5 +74,31 @@ describe("enrichment", () => {
   test("three cohorts: the table alone, no volcano", () => {
     const three: ViewResult = { ...v, enrichment: { ...v.enrichment!, groups: ["A", "B", "C"], grid: undefined } };
     assert.ok(!viewToSvg(three)!.includes("log2 ratio"));
+  });
+});
+
+describe("assays", () => {
+  const ent = (e: string, a: number, b: number, q: number) => ({ entity: e, name: e + " (named)", p: q / 2, q, statistic: 3, diff: a - b, higherIn: a > b ? "A" : "B",
+    cells: [{ cohort: "A", n: 50, mean: a, sd: 0.1 }, { cohort: "B", n: 60, mean: b, sd: 0.1 }] });
+  const base = { profileType: "sig", profileName: "Signatures", assayType: "MUTATIONAL_SIGNATURE", unit: "samples" as const, groups: ["A", "B"],
+    untested: 0, significant: 1, minN: 3, missing: 4 };
+  const numeric: ViewResult = { kind: "assays", cohorts: ["A", "B"], caveat: "read the means too",
+    assays: { ...base, datatype: "numeric", tested: 25, test: "Welch's t-test", rows: [ent("<UV>", 0.5, 0.02, 1e-30), ent("Smoking", 0.01, 0.17, 1e-20)],
+      grid: { xMax: 0.5, yMax: 50, nx: 80, ny: 50, cells: [] }, labels: ["<UV>"] } };
+  test("numeric, two cohorts: a volcano of the difference in means, names escaped, the caveat kept", () => {
+    const svg = viewToSvg(numeric)!;
+    assert.ok(svg.includes("difference in mean (A − B)") && svg.includes("0.500") && svg.includes("0.170"));
+    assert.ok(!svg.includes("<UV>") && svg.includes("&lt;UV&gt; (named)"));
+    assert.ok(svg.includes("read the means too") && svg.includes("+23 more entities tested"));
+  });
+  test("categorical: one 100% bar of values per cohort, with a legend, and no volcano", () => {
+    const cell = (cohort: string, gain: number, loss: number) => ({ cohort, n: gain + loss, values: { Gain: gain, Loss: loss } });
+    const cat: ViewResult = { kind: "assays", cohorts: ["A", "B"], caveat: "NA left out",
+      assays: { ...base, datatype: "categorical", tested: 1, test: "Pearson chi-squared test (cohort × value)", values: ["Gain", "Loss"],
+        rows: [{ entity: "13q", name: "13q", p: 1e-9, q: 1e-9, statistic: 40, higherIn: "A", value: "Gain", cells: [cell("A", 30, 10), cell("B", 5, 35)] }], labels: [] } };
+    const svg = viewToSvg(cat)!;
+    assert.ok(!svg.includes("difference in mean"));
+    assert.ok(svg.includes(">Gain<") && svg.includes(">Loss<") && svg.includes("A: Gain 30/40"));
+    assert.equal(viewTitle(cat), "Generic assays — Signatures — A vs B");
   });
 });

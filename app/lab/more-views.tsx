@@ -34,6 +34,8 @@ export interface MoreKindUi {
 /** What the page knows about the study before a view is added. */
 export interface Known {
   genes: string[]; attrs: { attribute: string; kind: string }[]; profiles: string[];
+  /** generic-assay profiles (mutational signatures, arm-level CNA, …) */
+  assays: string[];
   events: { canonical: string; label: string; n: number }[]; cohorts: string[];
 }
 
@@ -43,6 +45,9 @@ export const MORE_KINDS: Record<string, MoreKindUi> = {
   pathways: { label: "Oncogenic pathways", title: "Oncogenic signalling pathways", maxCohorts: 4 },
   enrichment: { label: "Alteration enrichment (all genes)", title: "Alteration enrichment", maxCohorts: 6,
     why: (k) => k.cohorts.length < 2 ? "compares two or more cohorts — this analysis has one" : null },
+  assays: { label: "Generic assays (signatures, arm-level CNA, …)", title: "Generic assays", maxCohorts: 6,
+    why: (k) => k.cohorts.length < 2 ? "compares two or more cohorts — this analysis has one"
+      : !k.assays.length ? "this study has no generic-assay profiles (mutational signatures, arm-level copy number, …)" : null },
   overlap: { label: "Cohort overlap (UpSet)", title: "Cohort overlap", maxCohorts: 6,
     why: (k) => k.cohorts.length < 2 ? "intersects two or more cohorts — this analysis has one" : null },
   cancertypes: { label: "Cancer types summary", title: "Cancer types summary", genes: true, maxCohorts: 2 },
@@ -72,6 +77,7 @@ export interface MoreCtx {
   patch: (p: Record<string, unknown>) => void;
   attrs: { attribute: string; kind: string }[];
   profiles: string[];
+  assays: string[];
   events: { canonical: string; label: string; n: number }[];
 }
 
@@ -81,6 +87,7 @@ export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "enrichment") return ({ mutation: "mutations", cna: "copy-number alterations", amp: "amplifications", homdel: "deep deletions", sv: "structural variants" } as Record<string, string>)[spec.alteration || "mutation"] +
     (spec.measure === "driver" ? " (drivers)" : "") + " in every gene, per sample";
   if (kind === "overlap") return "patients in exactly each combination of cohorts";
+  if (kind === "assays") return (v.assays ? v.assays.profileName + " · " + v.assays.test : spec.profileType || "no profile chosen") + ", per " + (v.assays ? v.assays.unit.replace(/s$/, "") : "sample");
   if (kind === "cancertypes") return "by " + (spec.groupBy || "CANCER_TYPE") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled samples";
   if (kind === "labs") {
     const an = spec.anchor || {};
@@ -146,6 +153,23 @@ export function MoreControls({ c }: { c: MoreCtx }) {
         <label className="chk" title="preranked GSEA against the 50 MSigDB Hallmark sets; untick to draw the volcano alone">
           <input type="checkbox" checked={!(Array.isArray(spec.geneSets) && spec.geneSets.length === 0)} disabled={busy}
             onChange={(e) => patch({ geneSets: e.target.checked ? undefined : [] })} /> enrichment
+        </label>
+      </div>
+    </div>
+  );
+  if (spec.kind === "assays") return (
+    <div className="viewtb">
+      <div className="tbz"><span className="tbl">data</span>
+        <label className="tbfield" title="the generic-assay profile whose every entity is compared">
+          profile <select value={spec.profileType || ""} disabled={busy} onChange={(e) => patch({ profileType: e.target.value })}>
+            {!c.assays.includes(spec.profileType) && <option value={spec.profileType || ""}>{spec.profileType || "choose…"}</option>}
+            {c.assays.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
+          </select>
+        </label>
+        <label className="tbfield" title="an entity with fewer values than this in any cohort is counted but not tested">
+          test with ≥ <select value={String(spec.minN ?? 3)} disabled={busy} onChange={(e) => patch({ minN: Number(e.target.value) === 3 ? undefined : Number(e.target.value) })}>
+            {[2, 3, 5, 10, 20, 50].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select> per cohort
         </label>
       </div>
     </div>
@@ -374,6 +398,10 @@ export function defaultMoreView(kind: string, known: Known): Record<string, unkn
   }
   if (kind === "clonality") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "APC", "PIK3CA", "SMAD4", "CDH1"] };
   if (kind === "paired") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : PAIRED_DEFAULT_GENES };
+  if (kind === "assays") {
+    const profile = known.assays.find((p) => /signature/i.test(p) && /contribution/i.test(p)) || known.assays.find((p) => !/methylation/i.test(p)) || known.assays[0] || "";
+    return { kind, profileType: profile };
+  }
   if (kind === "diffexpr") {
     const profile = known.profiles.find((p) => /zscore/i.test(p) && /mrna|rna_seq/i.test(p))
       || known.profiles.find((p) => /mrna|rna_seq/i.test(p)) || known.profiles[0] || "";

@@ -112,52 +112,66 @@ export function overlapSvg(v: ViewResult, o: SvgOpts): string {
 
 // ---------------------------------------------------------------------------
 
+type Grid = { xMax: number; yMax: number; nx: number; ny: number; cells: [number, number, number][] };
+
+/** A volcano: every other tested item as a density grid, the reported ones as dots, the first
+ *  `labels` named. x is clamped to ±xMax (an infinite ratio sits on the edge). */
+function volcano(p: ReturnType<typeof palette>, g: Grid, pts: { key: string; x: number; p: number; color: string; label?: string }[],
+  labels: string[], xTitle: string): { svg: string; bottom: number } {
+  const out: string[] = [];
+  const VL = 50, VT = 30, VW = 400, VH = 300;
+  const lp = (x: number) => -Math.log10(Math.max(1e-300, x));
+  const X = (x: number) => VL + VW * (Math.max(-g.xMax, Math.min(g.xMax, x)) + g.xMax) / (2 * g.xMax);
+  const Y = (y: number) => VT + VH * (1 - Math.min(y, g.yMax) / g.yMax);
+  for (const f of [0, 0.25, 0.5, 0.75, 1]) {
+    out.push(`<line x1="${VL}" y1="${num(VT + VH * (1 - f))}" x2="${VL + VW}" y2="${num(VT + VH * (1 - f))}" stroke="${p.line}" stroke-width="0.6"/>` +
+      `<text x="${VL - 4}" y="${num(VT + VH * (1 - f) + 3)}" font-size="9" fill="${p.muted}" text-anchor="end">${num(g.yMax * f)}</text>`);
+  }
+  for (const f of [-1, -0.5, 0, 0.5, 1]) {
+    const xx = X(f * g.xMax);
+    out.push(`<line x1="${num(xx)}" y1="${VT}" x2="${num(xx)}" y2="${VT + VH}" stroke="${p.line}" stroke-width="${f === 0 ? 1 : 0.6}"/>` +
+      `<text x="${num(xx)}" y="${VT + VH + 12}" font-size="9" fill="${p.muted}" text-anchor="middle">${num(f * g.xMax)}</text>`);
+  }
+  out.push(`<text x="${VL + VW / 2}" y="${VT + VH + 26}" font-size="10" fill="${p.muted}" text-anchor="middle">${esc(xTitle)}</text>`);
+  out.push(`<text x="12" y="${VT + VH / 2}" font-size="10" fill="${p.muted}" text-anchor="middle" transform="rotate(-90 12 ${VT + VH / 2})">−log10 p</text>`);
+  const cw = VW / g.nx, ch = VH / g.ny, maxC = Math.max(1, ...g.cells.map((c) => c[2]));
+  let dens = "";
+  for (const [bx, by, c] of g.cells) dens += `<rect x="${num(VL + bx * cw)}" y="${num(VT + VH - (by + 1) * ch)}" width="${num(cw + 0.3)}" height="${num(ch + 0.3)}" fill="${p.muted}" opacity="${num(0.15 + 0.6 * Math.log1p(c) / Math.log1p(maxC))}"/>`;
+  out.push(dens);
+  out.push(pts.map((d) => `<circle cx="${num(X(d.x))}" cy="${num(Y(lp(d.p)))}" r="2.4" fill="${d.color}" opacity="0.8"/>`).join(""));
+  const placed: { x: number; y: number }[] = [];
+  for (const key of labels) {
+    const d = pts.find((x) => x.key === key);
+    if (!d) continue;
+    const px = X(d.x), py = Y(lp(d.p));
+    // a free line at most two above or below the point, inside the plot; a label with no room nearby is left
+    // to the table beside the plot rather than drawn over the axis
+    const free = (y: number) => y > VT + 8 && y < VT + VH - 2 && !placed.some((q) => Math.abs(q.y - y) < 10 && Math.abs(q.x - px) < 70);
+    let ly: number | null = null;
+    for (let k = 0; k < 3 && ly == null; k++) for (const s of [-1, 1]) { const y = py - 4 + s * 10 * k; if (ly == null && free(y)) ly = y; }
+    if (ly == null) continue;
+    placed.push({ x: px, y: ly });
+    const right = px < VL + VW * 0.7;
+    out.push(`<text x="${num(px + (right ? 5 : -5))}" y="${num(ly)}" font-size="9.5" fill="${p.ink}" text-anchor="${right ? "start" : "end"}">${esc(d.label || key)}</text>`);
+  }
+  return { svg: out.join(""), bottom: VT + VH + 34 };
+}
+
 export function enrichmentSvg(v: ViewResult, o: SvgOpts): string {
   const p = palette(o.theme), r = v.enrichment!;
   const W = o.width || 960, two = r.groups.length === 2 && !!r.grid;
   const out: string[] = [];
-  const lp = (x: number) => -Math.log10(Math.max(1e-300, x));
   out.push(`<text x="10" y="14" font-size="10.5" fill="${p.muted}">${fmt(r.tested)} genes tested for ${esc(r.alteration)} · ${fmt(r.significant)} at q &lt; 0.05</text>`);
   let bottom = 30;
   const TX = two ? 470 : 10;
   if (two) {
-    const g = r.grid!, VL = 50, VT = 30, VW = 400, VH = 300;
-    const X = (x: number) => VL + VW * (Math.max(-g.xMax, Math.min(g.xMax, x)) + g.xMax) / (2 * g.xMax);
-    const Y = (y: number) => VT + VH * (1 - Math.min(y, g.yMax) / g.yMax);
-    for (const f of [0, 0.25, 0.5, 0.75, 1]) {
-      out.push(`<line x1="${VL}" y1="${num(VT + VH * (1 - f))}" x2="${VL + VW}" y2="${num(VT + VH * (1 - f))}" stroke="${p.line}" stroke-width="0.6"/>` +
-        `<text x="${VL - 4}" y="${num(VT + VH * (1 - f) + 3)}" font-size="9" fill="${p.muted}" text-anchor="end">${num(g.yMax * f)}</text>`);
-    }
-    for (const f of [-1, -0.5, 0, 0.5, 1]) {
-      const xx = X(f * g.xMax);
-      out.push(`<line x1="${num(xx)}" y1="${VT}" x2="${num(xx)}" y2="${VT + VH}" stroke="${p.line}" stroke-width="${f === 0 ? 1 : 0.6}"/>` +
-        `<text x="${num(xx)}" y="${VT + VH + 12}" font-size="9" fill="${p.muted}" text-anchor="middle">${num(f * g.xMax)}</text>`);
-    }
-    out.push(`<text x="${VL + VW / 2}" y="${VT + VH + 26}" font-size="10" fill="${p.muted}" text-anchor="middle">log2 ratio (${esc(r.groups[0])} / ${esc(r.groups[1])})</text>`);
-    out.push(`<text x="12" y="${VT + VH / 2}" font-size="10" fill="${p.muted}" text-anchor="middle" transform="rotate(-90 12 ${VT + VH / 2})">−log10 p</text>`);
-    const cw = VW / g.nx, ch = VH / g.ny, maxC = Math.max(1, ...g.cells.map((c) => c[2]));
-    let dens = "";
-    for (const [bx, by, c] of g.cells) dens += `<rect x="${num(VL + bx * cw)}" y="${num(VT + VH - (by + 1) * ch)}" width="${num(cw + 0.3)}" height="${num(ch + 0.3)}" fill="${p.muted}" opacity="${num(0.15 + 0.6 * Math.log1p(c) / Math.log1p(maxC))}"/>`;
-    out.push(dens);
-    let dots = "";
-    for (const row of r.rows) {
-      const x = row.log2Ratio == null ? (row.cells[0].altered ? g.xMax : -g.xMax) : row.log2Ratio;
-      const col = row.q < 0.05 ? (row.enrichedIn === r.groups[0] ? SERIES[0] : SERIES[1]) : p.muted;
-      dots += `<circle cx="${num(X(x))}" cy="${num(Y(lp(row.p)))}" r="2.4" fill="${col}" opacity="0.8"/>`;
-    }
-    out.push(dots);
-    const placed: { x: number; y: number }[] = [];
-    for (const name of r.labels) {
-      const row = r.rows.find((x) => x.gene === name);
-      if (!row) continue;
-      const px = X(row.log2Ratio == null ? (row.cells[0].altered ? g.xMax : -g.xMax) : row.log2Ratio), py = Y(lp(row.p));
-      let ly = py - 4;
-      while (placed.some((q) => Math.abs(q.y - ly) < 10 && Math.abs(q.x - px) < 55)) ly += 10;
-      placed.push({ x: px, y: ly });
-      const right = px < VL + VW * 0.7;
-      out.push(`<text x="${num(px + (right ? 5 : -5))}" y="${num(ly)}" font-size="9.5" fill="${p.ink}" text-anchor="${right ? "start" : "end"}">${esc(name)}</text>`);
-    }
-    bottom = VT + VH + 34;
+    const g = r.grid!;
+    const xOf = (row: (typeof r.rows)[number]) => row.log2Ratio == null ? (row.cells[0].altered ? g.xMax : -g.xMax) : row.log2Ratio;
+    const v2 = volcano(p, g, r.rows.map((row) => ({ key: row.gene, x: xOf(row), p: row.p,
+      color: row.q < 0.05 ? (row.enrichedIn === r.groups[0] ? SERIES[0] : SERIES[1]) : p.muted })), r.labels,
+      "log2 ratio (" + r.groups[0] + " / " + r.groups[1] + ")");
+    out.push(v2.svg);
+    bottom = v2.bottom;
   }
   // the table of the most significant genes, with a bar per cohort
   const shown = r.rows.slice(0, 18), TW = W - TX - 10, BAR = Math.max(60, TW - 260) / r.groups.length;
@@ -183,18 +197,97 @@ export function enrichmentSvg(v: ViewResult, o: SvgOpts): string {
   return frame(W, bottom + cap.height + 10, out.join("") + cap.svg, p.bg);
 }
 
+// ---------------------------------------------------------------------------
+
+/** A categorical assay's value colours: copy-number words take the oncoprint's, the rest the series. */
+function valueColor(v: string, i: number, p: ReturnType<typeof palette>): string {
+  if (/^(gain|amp)/i.test(v)) return AMP;
+  if (/^(loss|del|homdel)/i.test(v)) return DEL;
+  if (/^(unchanged|neutral|normal|wt|no)$/i.test(v)) return p.line;
+  return SERIES[i % SERIES.length];
+}
+
+export function assaysSvg(v: ViewResult, o: SvgOpts): string {
+  const p = palette(o.theme), r = v.assays!;
+  const W = o.width || 960, cat = r.datatype === "categorical";
+  const two = r.groups.length === 2 && !!r.grid;
+  const out: string[] = [];
+  out.push(`<text x="10" y="14" font-size="10.5" fill="${p.muted}">${fmt(r.tested)} ${esc(r.profileName)} entities tested (${esc(r.test)}) · ${fmt(r.significant)} at q &lt; 0.05</text>`);
+  let bottom = 30;
+  if (two) {
+    const v2 = volcano(p, r.grid!, r.rows.map((row) => ({ key: row.entity, label: row.name, x: row.diff ?? 0, p: row.p,
+      color: row.q < 0.05 ? (row.higherIn === r.groups[0] ? SERIES[0] : SERIES[1]) : p.muted })), r.labels,
+      "difference in mean (" + r.groups[0] + " − " + r.groups[1] + ")");
+    out.push(v2.svg);
+    bottom = v2.bottom;
+  }
+  const TX = two ? 470 : 10, TW = W - TX - 10;
+  const shown = r.rows.slice(0, cat ? 24 : 18);
+  const NAME = Math.min(190, Math.max(90, 6.2 * Math.max(...shown.map((g) => g.name.length)))), Q = 52;
+  const BAR = (TW - NAME - Q) / r.groups.length;
+  let ty = 40;
+  if (cat && r.values) {
+    // legend of the values, in order of frequency
+    let lx = TX;
+    r.values.forEach((val, i) => {
+      out.push(`<rect x="${num(lx)}" y="${ty - 8}" width="9" height="9" fill="${valueColor(val, i, p)}"/>` +
+        `<text x="${num(lx + 12)}" y="${ty}" font-size="9.5" fill="${p.ink}">${esc(val)}</text>`);
+      lx += 22 + 6 * val.length;
+    });
+    ty += 14;
+  }
+  out.push(`<text x="${TX}" y="${ty}" font-size="10" fill="${p.muted}">${cat ? "entity" : "entity · mean"}</text>` +
+    r.groups.map((n, i) => `<text x="${num(TX + NAME + i * BAR)}" y="${ty}" font-size="10" fill="${SERIES[i % SERIES.length]}">${esc(n.length > 18 ? n.slice(0, 17) + "…" : n)}</text>`).join("") +
+    `<text x="${num(TX + NAME + r.groups.length * BAR + 6)}" y="${ty}" font-size="10" fill="${p.muted}">q</text>`);
+  const top = ty + 10;
+  const means = shown.flatMap((g) => g.cells.map((c) => c.mean ?? 0));
+  const nonNeg = means.every((m) => m >= 0), maxMean = Math.max(1e-12, ...means.map(Math.abs));
+  shown.forEach((g, i) => {
+    const y = top + i * 17;
+    out.push(`<text x="${TX}" y="${y + 9}" font-size="10.5" font-weight="600" fill="${p.ink}">${esc(g.name.length > 30 ? g.name.slice(0, 29) + "…" : g.name)}</text>`);
+    g.cells.forEach((c, ci) => {
+      const bx = TX + NAME + ci * BAR;
+      if (cat) {
+        // the cohort's mix of values as one 100% bar
+        let x = bx;
+        const w = BAR - 8;
+        (r.values || []).forEach((val, vi) => {
+          const n = c.values?.[val] || 0;
+          if (!n || !c.n) return;
+          const ww = w * n / c.n;
+          out.push(`<rect x="${num(x)}" y="${y + 1}" width="${num(ww)}" height="10" fill="${valueColor(val, vi, p)}"><title>${esc(c.cohort + ": " + val + " " + n + "/" + c.n)}</title></rect>`);
+          x += ww;
+        });
+      } else {
+        const m = c.mean, w = nonNeg && m != null ? (BAR - 50) * m / maxMean : 0;
+        if (nonNeg) out.push(`<rect x="${num(bx)}" y="${y + 1}" width="${num(Math.max(0.5, w))}" height="10" fill="${SERIES[ci % SERIES.length]}" opacity="0.85"/>`);
+        out.push(`<text x="${num(bx + w + 3)}" y="${y + 9}" font-size="9" fill="${p.muted}">${m == null ? "—" : esc(m.toPrecision(3))}</text>`);
+      }
+    });
+    out.push(`<text x="${num(TX + NAME + r.groups.length * BAR + 6)}" y="${y + 9}" font-size="9.5" fill="${g.q < 0.05 ? p.ink : p.muted}">${esc(g.q === 0 ? "<1e-300" : g.q < 1e-4 ? g.q.toExponential(0) : g.q.toFixed(3))}</text>`);
+  });
+  bottom = Math.max(bottom, top + shown.length * 17 + 6);
+  if (r.tested > shown.length)
+    out.push(`<text x="${TX}" y="${bottom + 4}" font-size="9" fill="${p.muted}">+${fmt(r.tested - shown.length)} more entities tested (the full table is in the result and the MCP text)</text>`);
+  bottom += 14;
+  const cap = caption(v.caveat || "", W, bottom, p.muted, Math.floor(W / 7.2));
+  return frame(W, bottom + cap.height + 10, out.join("") + cap.svg, p.bg);
+}
+
 void pFmt;
 
 export function portalViewToSvg(v: ViewResult, o: SvgOpts): string | null {
   if (v.kind === "cancertypes" && v.cancertypes && v.cancertypes.panels.some((pn) => pn.profiled)) return cancertypesSvg(v, o);
   if (v.kind === "overlap" && v.overlap && v.overlap.union > 0) return overlapSvg(v, o);
   if (v.kind === "enrichment" && v.enrichment && v.enrichment.tested > 0) return enrichmentSvg(v, o);
+  if (v.kind === "assays" && v.assays && v.assays.tested > 0) return assaysSvg(v, o);
   return null;
 }
 
 export function portalViewTitle(v: ViewResult): string | null {
-  if (v.kind === "enrichment") return "Alteration enrichment" + (v.enrichment ? " — " + v.enrichment.alteration + ", " + v.enrichment.groups.join(" vs ") : "");
-  if (v.kind === "overlap") return "Cohort overlap" + (v.overlap ? " — " + v.overlap.sets.map((x) => x.name).join(", ") : "");
+  if (v.kind === "assays") return "Generic assays" + (v.assays ? " — " + v.assays.profileName : "");
+  if (v.kind === "enrichment") return "Alteration enrichment" + (v.enrichment ? " — " + v.enrichment.alteration : "");
+  if (v.kind === "overlap") return "Cohort overlap";
   if (v.kind === "cancertypes") return "Cancer types summary" + (v.cancertypes ? " — " + v.cancertypes.genes.join(", ") + " by " + v.cancertypes.groupBy : "");
   return null;
 }

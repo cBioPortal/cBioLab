@@ -200,6 +200,7 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | `cancertypes` | `genes:[≤30], groupBy?:"CANCER_TYPE"|<sample attribute>|"study", measure?:"any"|"driver", minSamples?:10, show?:"frequency"|"count", cohorts?:[names] (≤2)` | **Cancer Types Summary**, cBioPortal's results-view tab: per group of the cohort's SAMPLES — a sample attribute's value (folded on case and whitespace like every clinical predicate; samples with no value form their own group) or the study — the share altered in at least one of `genes`, split by kind: only mutations, only amplifications, only deep deletions, only structural variants, or more than one kind. A group's denominator is its samples profiled for at least one of the genes (the union of their panels, as an oncoprint's merged row counts it); its total sample count is shown beside it. `measure:"driver"` counts OncoKB drivers only. Groups with fewer than `minSamples` profiled samples are pooled into one bar, named and counted, never dropped. Counts only, so every local participant can answer; a remote peer cannot yet and is named |
 | `overlap` | `cohorts?:[names] (2–6)` | **how cohorts' patients intersect**, cBioPortal's group-comparison Overlap tab drawn as an UpSet plot: for every combination of the cohorts, the patients in exactly those cohorts and none of the others, with each cohort's own size beside it. Each study's database answers with one count per combination (a bitmask of membership) — counts only — and a cohort's size here must equal its own count, or the view says the definition gave two answers. Ids are study-qualified, so patients only ever overlap within a study |
 | `enrichment` | `alteration?:"mutation"|"cna"|"amp"|"homdel"|"sv", measure?:"any"|"driver", minAltered?:5, label?:12, cohorts:[2–6 names]` | **genomic-alteration enrichment across every gene**, cBioPortal's group-comparison Genomic Alterations tab: each gene's frequency of one alteration type per cohort, counted in SAMPLES over the samples profiled for that gene — samples on a panel listing it (counted per panel, then joined to its genes, Explore's own construction) plus whole-exome samples, and a sample altered off-panel counts as measured. Uncalled mutations are excluded as the portal excludes them; copy number is high-level only. Two cohorts: a two-sided Fisher test and the log2 ratio of the altered shares, drawn as a volcano beside the table; three or more: a chi-squared test. q is Benjamini–Hochberg across every gene tested; genes altered in fewer than `minAltered` samples, or unprofiled in a cohort, are counted as not tested. The caption warns that hypermutated tumours enrich almost every gene. Counts only |
+| `assays` | `profileType:"<generic-assay profile>", minN?:3, label?:12, cohorts:[2–6 names]` | **every entity of one generic-assay profile compared between cohorts**, cBioPortal's group-comparison tabs for generic assays (mutational signatures, arm-level copy number, treatment response, …): one value per sample (every sample of each cohort's patients) or per patient for a patient-level profile. A numeric profile: each entity's n, Σv and Σv² per cohort — values that are not numbers, such as a limit `">8"` or NA, are counted and left out — then Welch's t for two cohorts (drawn as a volcano of the difference in means) or Welch's ANOVA for more. A categorical one: each entity's count per value per cohort — NA and blank are not called and are counted apart — then a chi-squared test on cohort × value. q is Benjamini–Hochberg across every entity tested; an entity with fewer than `minN` values in a cohort, or with no spread, is counted as not tested. Per-probe methylation is refused (hundreds of thousands of probes), as is any profile past 20,000 entities. Counts and moments only |
 | `oncoprint` | `genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], unit?:"patient"\|"sample", display?:{…}, overlays?:[≤2], derivedCohorts?:[≤3], cohorts?:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 `views[].note` is the analyst's own one-line annotation, carried through to the result and
@@ -3381,6 +3382,48 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
   "views": [
     {
       "kind": "enrichment"
+    }
+  ]
+}
+```
+
+### Example 52: Mutational signatures: what UV light and tobacco leave behind
+
+Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature (7) makes up about half of a melanoma's mutations and almost none of a lung cancer's; the smoking signature (4) is the reverse.
+
+```json
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "Melanoma": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Melanoma"
+          ],
+          "per": "sample"
+        }
+      ]
+    },
+    "Non-small cell lung": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ],
+          "per": "sample"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "assays",
+      "profileType": "mutational_signatures_contribution_v2"
     }
   ]
 }

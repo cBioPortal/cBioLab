@@ -442,7 +442,7 @@ export default function AnalysisPage() {
   const [study, setStudy] = useState("msk_chord_2024");
   const [explore, setExplore] = useState<ExploreResult | null>(null);
   const [exploreBusy, setExploreBusy] = useState(false);
-  const [trackAttrs, setTrackAttrs] = useState<{ key: string; attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[] }>({ key: "", attrs: [], profiles: [] }); // track picker options
+  const [trackAttrs, setTrackAttrs] = useState<{ key: string; attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[]; gaProfiles: string[] }>({ key: "", attrs: [], profiles: [], gaProfiles: [] }); // track picker options
   /** the clinical-attribute catalog above is being fetched — a picker shows a loader, not "none" */
   const [trackAttrsLoading, setTrackAttrsLoading] = useState(false);
   /** the study catalog (`cat`: endpoints, event types) is being fetched */
@@ -922,6 +922,7 @@ export default function AnalysisPage() {
   const attrsLoading = (): boolean => !catalogAttrs().length && (trackAttrsLoading || exploreBusy);
   /** continuous molecular profiles for an axis picker: Explore's if loaded, else the shared catalog's */
   const profileOptions = (): string[] => (explore && explore.profiles && explore.profiles.length ? explore.profiles : trackAttrs.profiles);
+  const assayOptions = (): string[] => (explore && explore.gaProfiles && explore.gaProfiles.length ? explore.gaProfiles : trackAttrs.gaProfiles);
 
   const contProfile = (): string | null => {
     const ps = profileOptions();
@@ -967,7 +968,7 @@ export default function AnalysisPage() {
       why: () => viewEvents().some(e => /treat|therap|regimen|drug|medicat/.test(e.canonical)) ? null
         : "this study records no treatment events, so there are no lines of therapy to sequence" },
     ...Object.entries(MORE_KINDS).map(([kind, k]) => ({ kind, label: k.label,
-      ...(k.why ? { why: () => k.why!({ genes: [], attrs: catalogAttrs(), profiles: profileOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) }),
+      ...(k.why ? { why: () => k.why!({ genes: [], attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) }),
                     loading: () => !profileOptions().length && (trackAttrsLoading || exploreBusy) } : {}) }))
   ];
 
@@ -1066,7 +1067,7 @@ export default function AnalysisPage() {
       : kind === "cooccurrence" ? { kind, genes: genes.slice(0, 6) }
       : kind === "oncoprint" ? { kind, genes: genes.slice(0, 5) }
       : kind === "cox" ? { kind, covariates: [{ source: "alteration", gene: genes[0] || "TP53", by: "mutated" }] }
-      : isMoreKind(kind) ? defaultMoreView(kind, { genes, attrs: catalogAttrs(), profiles: profileOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) })
+      : isMoreKind(kind) ? defaultMoreView(kind, { genes, attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) })
       : kind === "logistic" ? { kind,
           outcome: { source: "alteration", gene: genes[0] || "TP53", by: "mutated" }, outcomeEvent: "Mutated",
           covariates: [{ source: "clinical", attribute: viewAttrs()[0] || "SEX" }] }
@@ -1436,18 +1437,20 @@ export default function AnalysisPage() {
       .then(js => {
         const seen = new Map<string, { kind: string; patients: number }>(); // attribute -> kind + how many carry it
         const profs = new Set<string>(); // continuous molecular profiles (for heatmap tracks)
+        const gas = new Set<string>(); // generic-assay profiles (for the assays view)
         for (const j of js) if (j) {
           if (j.clinical) for (const a of j.clinical) {
             const prev = seen.get(a.attribute);
             seen.set(a.attribute, { kind: prev?.kind || a.kind, patients: (prev?.patients || 0) + (a.patients || 0) });
           }
           for (const p of j.profiles || []) if (p !== "cna") profs.add(p); // discrete cna isn't a heatmap
+          for (const p of j.gaProfiles || []) gas.add(p);
         }
         // the reader's own uploads first, then most-covered first, the way the portal orders its picker
         if (trackAttrsWant.current !== key) return; // a newer study set was asked for meanwhile
         setTrackAttrs({ key, attrs: [...seen.entries()].map(([attribute, v]) => ({ attribute, ...v }))
           .sort((x, y) => Number(isCustomAttr(y.attribute)) - Number(isCustomAttr(x.attribute)) ||
-            y.patients - x.patients || (x.attribute < y.attribute ? -1 : 1)), profiles: [...profs].sort() });
+            y.patients - x.patients || (x.attribute < y.attribute ? -1 : 1)), profiles: [...profs].sort(), gaProfiles: [...gas].sort() });
       })
       .finally(() => { if (trackAttrsWant.current === key) setTrackAttrsLoading(false); });
   }, [result, customState]); // eslint-disable-line
@@ -4388,7 +4391,7 @@ function Latency({ v }: { v: any }) {
                       ? <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
                       : undefined} />
                   <MoreControls c={{ vi, spec: docView(vi), v, busy, patch: (p) => patchView(vi, p),
-                    attrs: catalogAttrs(), profiles: profileOptions(), events: viewEvents() }} />
+                    attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents() }} />
                   {v.note && <p className="note">{v.note}</p>}
                   {v.svg
                     ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />

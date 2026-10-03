@@ -205,6 +205,10 @@
     "Alteration enrichment: what separates colorectal from pancreatic tumours": {
       "Colorectal, MSS": 4957,
       "Pancreatic, MSS": 3095
+    },
+    "Mutational signatures: what UV light and tobacco leave behind": {
+      "Melanoma": 1706,
+      "Non-small cell lung": 6633
     }
   }
 }

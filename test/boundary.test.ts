@@ -324,7 +324,12 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "enrichAlteredSql": () => federation.enrichAlteredSql(cohortSql, "x", "db", "mutation", "v7.5", true),
     "enrichAlteredSql:cna-any": () => federation.enrichAlteredSql(cohortSql, "x", "db", "cna", null, false),
     "enrichPanelProfiledSql": () => federation.enrichPanelProfiledSql(cohortSql, "x", "db", "amp"),
-    "enrichWesSql": () => federation.enrichWesSql(cohortSql, "x", "db", "sv")
+    "enrichWesSql": () => federation.enrichWesSql(cohortSql, "x", "db", "sv"),
+    // assays: per-entity moments or value counts; the rows CTE holds values, never ids, and stays inside
+    "assayMomentsSql": () => federation.assayMomentsSql(cohortSql, "x", "db", "mutational_signatures_contribution_v2"),
+    "assayValueCountsSql": () => federation.assayValueCountsSql(cohortSql, "x", "db", "armlevel_cna"),
+    "assayProfileSql": () => federation.assayProfileSql("x", "db", "armlevel_cna"),
+    "assayEntityNamesSql": () => federation.assayEntityNamesSql("x", "db", "armlevel_cna")
   };
 
   test("every exported *Sql builder is covered by this suite", () => {

@@ -2,7 +2,7 @@
 // the author's notes, the way a model should read it. One renderer for every agent-facing
 // surface — the MCP run_analysis tool, the analysis page's WebMCP tools — so they cannot
 // describe the same result differently. Pure and browser-safe.
-import type { AnalysisDoc, AnalysisResult, ViewResult } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, ViewResult, AssaysEntity } from "./types.ts";
 
 export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[] {
   const out: string[] = [];
@@ -259,6 +259,15 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         en.rows.slice(0, 40).map((g) => `  ${g.gene}: ` + g.cells.map((c) => `${c.cohort} ${c.pct == null ? "—" : c.pct + "%"} (${c.altered}/${c.profiled})`).join(" | ") +
           (g.log2Ratio != null && g.log2Ratio !== undefined ? `, log2 ratio ${g.log2Ratio.toFixed(2)}` : "") + `, q=${pFmt(g.q)}, enriched in ${g.enrichedIn}`).join("\n") +
         (en.rows.length > 40 ? `\n  … ${en.tested - 40} more genes tested` : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "assays") {
+      const as = v.assays!;
+      const cell = (c: AssaysEntity["cells"][number]) => as.datatype === "numeric"
+        ? `${c.cohort} mean ${c.mean == null ? "—" : c.mean.toPrecision(3)} (n=${c.n})`
+        : `${c.cohort} ` + Object.entries(c.values || {}).map(([k, n]) => `${k} ${c.n ? (100 * n / c.n).toFixed(1) : "—"}%`).join(", ") + ` (n=${c.n})`;
+      out.push(`Generic-assay comparison, ${as.profileName} (${as.profileType}; ${as.datatype}, per ${as.unit.replace(/s$/, "")}; ${as.test}, BH q over ${as.tested.toLocaleString()} entities; ${as.significant} at q<0.05):\n` +
+        as.rows.slice(0, 40).map((g) => `  ${g.name}: ` + g.cells.map(cell).join(" | ") +
+          (g.diff != null ? `, difference ${g.diff.toPrecision(3)}` : "") + `, q=${pFmt(g.q)}, higher in ${g.higherIn}${g.value ? " (" + g.value + ")" : ""}`).join("\n") +
+        (as.rows.length > 40 ? `\n  … ${as.tested - 40} more entities tested` : "") + caveatOf(v) + noteOf(v));
     } else if (v.kind === "overlap") {
       const ov = v.overlap!;
       out.push(`Cohort overlap (patients in exactly these cohorts and no other):\n` +
