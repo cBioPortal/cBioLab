@@ -19,8 +19,9 @@ import { installLabTools, LAB_TOOL_NAMES, type LabBridge } from "./agent-tools.t
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import CustomDataPanel, { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
+import LoginButton from "./login-button.tsx";
 import type { OnCustomData } from "./pills";
-import { installCustomDataFetch, saveToServer, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
+import { installCustomDataFetch, saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
@@ -2573,6 +2574,7 @@ function Latency({ v }: { v: any }) {
         <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>rationale</a>
         <AgentToolsMenu page="analysis" tools={LAB_TOOL_NAMES} webmcp={webmcp}
           intro="Your AI assistant — Claude in the Chrome sidebar — can read and edit this analysis with these tools. Every edit is run by the engine first and reaches the page only if it is accepted; analysis_undo reverts the assistant's edits." />
+        <LoginButton />
       </header>
       <main className="analysis-main">
         {/* Suggestions for every view's gene editor: the most-altered genes this
@@ -2715,8 +2717,8 @@ function Latency({ v }: { v: any }) {
           const names = (ids: string[]) => ids.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>);
           return unresolved.length > 0 && (
             <div className="card customwarn">
-              {of("locked").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data ({names(of("locked"))}) that is locked in this browser.
-                Enter this deployment&apos;s access code under {manage}.</p>}
+              {of("locked").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data ({names(of("locked"))}).{" "}
+                <button className="linklike" onClick={requestLogin}>Log in</button> to run it.</p>}
               {of("deleted").length > 0 && <p style={{ margin: 0 }}>This analysis is pinned to custom data that has since been deleted: {names(of("deleted"))}.</p>}
               {of("missing").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data that is not on the server: {names(of("missing"))}.</p>}
               {of("unavailable").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data ({names(of("unavailable"))}), which this deployment does not store.</p>}

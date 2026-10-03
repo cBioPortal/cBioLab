@@ -82,10 +82,10 @@ describe("custom data access code", () => {
     assert.ok(!set.includes("correct horse"), "the cookie holds a hash, never the code");
     const cookie = set.split(";")[0];
     assert.equal(access.requirePrincipal(req(cookie)), "shared");
-    assert.throws(() => access.requirePrincipal(req()), /locked: enter this deployment's access code/);
-    assert.throws(() => access.requirePrincipal(req(access.ACCESS_COOKIE + "=deadbeef")), /locked/);
+    assert.throws(() => access.requirePrincipal(req()), /log in to use custom data/);
+    assert.throws(() => access.requirePrincipal(req(access.ACCESS_COOKIE + "=deadbeef")), /log in/);
     process.env.CUSTOM_DATA_ACCESS_CODE = "rotated";
-    assert.throws(() => access.requirePrincipal(req(cookie)), /locked/, "rotating the code retires every cookie");
+    assert.throws(() => access.requirePrincipal(req(cookie)), /log in/, "rotating the password logs every browser out");
     delete process.env.CUSTOM_DATA_ACCESS_CODE;
   });
 });

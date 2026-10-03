@@ -1,8 +1,8 @@
 // Who is asking, for server-stored custom data (lib/custom-store.ts).
 //
-// Today there is one principal, "shared", and a deployment's access code stands in for signing
-// in: server-stored custom data is enabled only where CUSTOM_DATA_ACCESS_CODE is set, and a
-// browser holds it once entered, as an httpOnly cookie carrying a hash of the code. Everything
+// Today there is one principal, "shared", and one shared login: the deployment's password,
+// CUSTOM_DATA_ACCESS_CODE. Server-stored custom data is enabled only where it is set; logging in
+// (the page's top-right button) sets an httpOnly cookie carrying a hash of it. Everything
 // else on the site, including the public demo and MCP, is unaffected.
 //
 // This is the seam per-user access replaces: principalFor() becomes "the signed-in user", and
@@ -49,7 +49,7 @@ export function requirePrincipal(req: Request): string {
   if (!serverDataEnabled())
     throw new AccessError("server-stored custom data is not enabled on this deployment (CUSTOM_DATA_ACCESS_CODE is not set)", 404);
   const p = principalFor(req);
-  if (!p) throw new AccessError("server-stored custom data is locked: enter this deployment's access code", 403);
+  if (!p) throw new AccessError("log in to use custom data", 403);
   return p;
 }
 

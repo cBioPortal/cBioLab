@@ -5,7 +5,7 @@
 // field" in CLAUDE.md).
 import { useEffect, useState } from "react";
 import {
-  onCustomDataChange, parseUpload, buildDataset, datasetToTsv, serverState, unlockServer, lockServer, saveToServer,
+  onCustomDataChange, parseUpload, buildDataset, datasetToTsv, serverState, requestLogin, saveToServer,
   deleteServerDataset, serverBySlug, fetchServerVersion, type ParsedUpload, type ResolveResponse, type ServerState, type StoredDataset
 } from "./custom-data-client.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
@@ -53,7 +53,6 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
     finally { setBusy(false); }
   };
 
-  const [code, setCode] = useState("");
   const [serverBusy, setServerBusy] = useState<string | null>(null);
   const [serverErr, setServerErr] = useState<string | null>(null);
   const serverAct = async (label: string, f: () => Promise<unknown>) => {
@@ -102,27 +101,25 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
         Add your own annotations (a curated metastasis site, a field extracted from the record) and use
         them like any clinical attribute: as a chart and filter here, as an oncoprint track or split, and
         in comparisons and survival. Uploads are stored on the server, so an analysis that uses one can be
-        shared with anyone who has this deployment&apos;s access code.
+        shared with anyone who can log in.
       </p>
       {!server.enabled && <p className="meta">
-        This deployment does not store custom data: its access code (<code>CUSTOM_DATA_ACCESS_CODE</code>) is not set.
+        This deployment does not store custom data: it has no login (<code>CUSTOM_DATA_ACCESS_CODE</code> is not set).
         The gallery&apos;s custom-data example still runs, on demo data bundled with the app.</p>}
 
       {server.enabled && <>
         <h4>On the server</h4>
         {!server.unlocked ? (
-          <form className="row" style={{ alignItems: "center" }}
-            onSubmit={(e) => { e.preventDefault(); serverAct("unlocking…", () => unlockServer(code)).then(() => setCode("")); }}>
-            <span className="meta">Custom data is stored on the server. Enter this deployment&apos;s access code to see, add and use it:</span>
-            <input type="password" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" style={{ minWidth: "12rem" }} />
-            <button className="tbbtn" disabled={!code || !!serverBusy}>Unlock</button>
-          </form>
+          <p className="row" style={{ alignItems: "center" }}>
+            <span className="meta">Custom data is stored on the server.</span>
+            <button className="primary" onClick={requestLogin}>Log in</button>
+            <span className="meta">to see, add and use it.</span>
+          </p>
         ) : (
           <>
             <p className="meta" style={{ margin: "0 0 var(--s2)" }}>
-              Shared by everyone with this deployment&apos;s access code: there are no per-user permissions yet.
-              A version, once saved, never changes; an analysis that uses one is pinned to it.{" "}
-              <button className="linklike" onClick={() => serverAct("locking…", lockServer)}>lock this browser</button>
+              Everyone who logs in sees these: there is one shared login and no per-user permissions yet.
+              A version, once saved, never changes; an analysis that uses one is pinned to it.
             </p>
             {server.datasets.length ? (
               <div className="attrtablewrap" style={{ maxHeight: "30vh" }}>
@@ -225,7 +222,7 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
           {rate < LOW_MATCH && !confirmLow
             ? <button className="tbbtn" disabled={!matchedRows} onClick={() => setConfirmLow(true)}>Save anyway…</button>
             : <button className="primary" disabled={!matchedRows || busy} onClick={save}
-                title="anyone with this deployment's access code can read it, and analyses that use it can be shared">
+                title="anyone who logs in can read it, and analyses that use it can be shared">
                 Save {matchedRows.toLocaleString()} {parsed.level}s to the server{serverBySlug(slugPreview) ? " as v" + (serverBySlug(slugPreview)!.latestVersion + 1) + " of " + slugPreview : ""}</button>}
         </div>
       </div>}

@@ -1,8 +1,8 @@
 // Custom data in the browser: how a pasted table becomes a dataset, how it is saved, and how
 // datasets reach the engine.
 //
-// Uploads live on the server only (lib/custom-store.ts), behind the deployment's access code
-// (lib/custom-access.ts); this browser keeps nothing. Requests name them by reference
+// Uploads live on the server only (lib/custom-store.ts), readable once logged in with the
+// deployment's shared password (lib/custom-access.ts); this browser keeps nothing. Requests name them by reference
 // (`customRefs`: { as, dataset, version }) and the server reads the rows itself. The one
 // exception is the gallery's demo data (`customData` on a lib/dsl-reference.ts example): public
 // data bundled with the code, sent as rows so the example runs anywhere, code or no code.
@@ -80,16 +80,26 @@ export function loadCustomData(): Promise<void> {
   return loaded;
 }
 
-export async function unlockServer(code: string): Promise<void> {
-  const res = await fetch("/api/custom-data/server", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+/**
+ * Log in with the deployment's shared password (CUSTOM_DATA_ACCESS_CODE): the server sets an
+ * httpOnly cookie, and custom data becomes readable here. One shared login for now.
+ */
+export async function logIn(password: string): Promise<void> {
+  const res = await fetch("/api/custom-data/server", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: password }) });
   const j = await res.json();
   if (!res.ok) throw new Error(j.error || res.statusText);
   await loadServerData();
 }
-export async function lockServer(): Promise<void> {
+export async function logOut(): Promise<void> {
   await fetch("/api/custom-data/server", { method: "DELETE" });
+  versionCache.clear();
   await loadServerData();
 }
+
+/** Ask the header's login button to open its dialog (from a banner, the custom-data panel). */
+const loginRequests = new Set<() => void>();
+export function onLoginRequest(f: () => void): () => void { loginRequests.add(f); return () => { loginRequests.delete(f); }; }
+export function requestLogin(): void { for (const f of loginRequests) f(); }
 
 /** Changes whenever what this browser can attach changes. */
 export function customDataKey(): string {
@@ -108,7 +118,7 @@ const strip = (d: CustomDataset): CustomDataset => ({ id: d.id, name: d.name, le
 
 /** Save a dataset to the server: a new one, or the next version of one (`versionOf`, its id). */
 export async function saveToServer(d: StoredDataset, versionOf?: string): Promise<DatasetMeta> {
-  if (!server.unlocked) throw new Error("custom data is stored on the server: enter this deployment's access code under Explore → Custom data first");
+  if (!server.unlocked) throw new Error("log in (top right) to save custom data");
   const res = await fetch("/api/custom-data/datasets", { method: "POST", headers: { "Content-Type": "application/gzip" },
     body: await gzip(JSON.stringify({ dataset: strip(d), source: d.source, versionOf })) });
   const j = await res.json();

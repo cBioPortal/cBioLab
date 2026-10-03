@@ -7,7 +7,7 @@
 // whitespace the way the engine does, as a reading aid. The cohort's own count is the engine's.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCustomDataState } from "./custom-data-panel.tsx";
-import { builtinDataset, datasetStudies, datasetToTsv, fetchServerVersion, serverBySlug, type StoredDataset, type UploadBinding } from "./custom-data-client.ts";
+import { builtinDataset, requestLogin, datasetStudies, datasetToTsv, fetchServerVersion, serverBySlug, type StoredDataset, type UploadBinding } from "./custom-data-client.ts";
 import { parseCustomAttr, type CustomDataset } from "../../lib/custom-data-names.ts";
 
 export interface CustomDataFocus {
@@ -236,7 +236,7 @@ export default function CustomDataDialog({ focus, onClose, onManage, bindings, o
       {missing.length > 0 && (
         <div className="card customwarn">
           {!server.enabled ? <>This deployment does not store custom data, so {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)} cannot be read here.</>
-            : !server.unlocked ? <>Locked in this browser: {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}. Enter this deployment&apos;s access code under Explore → Custom data.</>
+            : !server.unlocked ? <><button className="linklike" onClick={requestLogin}>Log in</button> to read {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}.</>
             : <>Not on the server: {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}.</>}
         </div>
       )}
