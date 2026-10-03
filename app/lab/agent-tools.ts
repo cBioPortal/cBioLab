@@ -287,7 +287,7 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
     { name: "explore_get_state", description: "Explore's current state: the studies ticked, the draft cohort built from facet filters (each with its index), and how many patients it holds.",
       inputSchema: { type: "object", properties: {} },
       run: async () => exploreState(get()) },
-    { name: "explore_get_facets", description: "What the selected studies contain, counted against the current draft: clinical attributes with their top values (those named custom:<dataset>/<COLUMN> are the user's own uploads, kept in this browser), the most-altered genes (panel-aware), timeline event types, derived-metric buckets and case lists.",
+    { name: "explore_get_facets", description: "What the selected studies contain, counted against the current draft: clinical attributes with their top values (those named custom:<dataset>/<COLUMN> are uploaded custom data, stored on the server behind an access code), the most-altered genes (panel-aware), timeline event types, derived-metric buckets and case lists.",
       inputSchema: { type: "object", properties: { section: { type: "string", enum: ["all", "clinical", "genes", "events", "derived", "caseLists"] }, limit: { type: "integer", description: "rows per list, default 25" } } },
       run: async ({ section, limit }) => facetSummary(get().explore, section || "all", Math.max(1, Math.min(200, Number(limit) || 25))) },
     { name: "explore_select_studies", description: "Tick exactly these studies in Explore (ids from list_studies); the facets and the draft recount over them.",

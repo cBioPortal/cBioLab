@@ -67,9 +67,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   Also `parameterize()`, the one-click lift of study + a shared gene list.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
 - **Custom data** — a researcher's uploaded annotations, named `custom:<dataset>/<COLUMN>` and
-  usable anywhere a clinical attribute is. **`lib/custom-data.ts`**: the rows live in the browser
-  (IndexedDB, `app/lab/custom-data-client.ts`) and ride beside each request as `customData`; for
-  that request `clinicalTable(db, attrs)` / `clinicalMetaTable(db)` merge them into the clinical
+  usable anywhere a clinical attribute is, stored on the server only (below; the browser keeps
+  nothing — `app/lab/custom-data-client.ts` attaches references). **`lib/custom-data.ts`**: for
+  each request `clinicalTable(db, attrs)` / `clinicalMetaTable(db)` merge the named datasets into the clinical
   tables as ClickHouse external tables. **Every read of `clinical_data_derived` or
   `clinical_attribute_meta` goes through those two functions** — a new reader that names the
   table directly silently ignores uploads. `attrs` is what the statement reads ("all" only when it

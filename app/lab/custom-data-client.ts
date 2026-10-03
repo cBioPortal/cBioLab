@@ -1,81 +1,38 @@
-// Custom data in the browser: where uploads live, how a pasted table becomes a dataset, and how
+// Custom data in the browser: how a pasted table becomes a dataset, how it is saved, and how
 // datasets reach the engine.
 //
-// Two homes. A local upload is kept in this browser's IndexedDB only and travels as rows
-// (`customData`) beside each request. A server upload (lib/custom-store.ts, where the
-// deployment enables it) travels as a reference (`customRefs`: { as, dataset, version }) that
-// the server resolves itself. One fetch wrapper attaches both, so every caller — including the
-// shared OncoprintFigure — sends them without knowing they exist:
+// Uploads live on the server only (lib/custom-store.ts), behind the deployment's access code
+// (lib/custom-access.ts); this browser keeps nothing. Requests name them by reference
+// (`customRefs`: { as, dataset, version }) and the server reads the rows itself. The one
+// exception is the gallery's demo data (`customData` on a lib/dsl-reference.ts example): public
+// data bundled with the code, sent as rows so the example runs anywhere, code or no code.
 //
-//   /api/explore            every dataset with rows in the studies being explored (a local
-//                           upload shadows a server one of the same name)
+// One fetch wrapper attaches both, so every caller — including the shared OncoprintFigure —
+// sends them without knowing they exist:
+//
+//   /api/explore            every server dataset with rows in the studies being explored
 //   /api/analysis, /api/oncoprint, /api/custom-data/members
 //                           only datasets the document or spec names, so an analysis that uses
 //                           none stays on the shared result cache. A name the document pins
-//                           (`uploads`, see bindUploads) resolves to that server version.
+//                           (`uploads`, see bindUploads) resolves to that version.
 import { CUSTOM_PREFIX, LIMITS, type CustomColumn, type CustomDataset, type CustomLevel } from "../../lib/custom-data-names.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
+import { EXAMPLES } from "../../lib/dsl-reference.ts";
 
+/** A dataset with the record of how its upload matched, as saved and as read back. */
 export interface StoredDataset extends CustomDataset {
   createdAt: string;
-  /** what the upload looked like, for the list: rows read, rows matched, and what was left out */
+  /** what the upload looked like: rows read, rows matched, and what was left out */
   source: { rowsIn: number; unmatched: number; duplicates: number; multiStudy: number; studies: string[] };
 }
 
-// ---------------------------------------------------------------------------
-// Store: IndexedDB, mirrored in memory so the fetch wrapper can attach synchronously
-// ---------------------------------------------------------------------------
-
-const DB_NAME = "cohort-lab-custom-data", STORE = "datasets";
-let mem: StoredDataset[] = [];
-let loaded: Promise<void> | null = null;
 const listeners = new Set<() => void>();
-
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((res, rej) => {
-    const r = indexedDB.open(DB_NAME, 1);
-    r.onupgradeneeded = () => { r.result.createObjectStore(STORE, { keyPath: "id" }); };
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  });
-}
-async function tx<T>(mode: IDBTransactionMode, f: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  const db = await openDb();
-  return new Promise((res, rej) => {
-    const t = db.transaction(STORE, mode);
-    const req = f(t.objectStore(STORE));
-    t.oncomplete = () => { db.close(); res(req.result); };
-    t.onerror = () => { db.close(); rej(t.error); };
-  });
-}
-
-/**
- * Load once per page: this browser's uploads, and what the server holds. A browser without
- * IndexedDB (private mode in some) keeps uploads in memory only.
- */
-export function loadCustomData(): Promise<void> {
-  loaded ??= (async () => {
-    try { mem = ((await tx("readonly", (s) => s.getAll())) as StoredDataset[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt)); }
-    catch { mem = []; }
-    await loadServerData();
-    emit();
-  })();
-  return loaded;
-}
-export function customDatasets(): StoredDataset[] { return mem; }
 export function onCustomDataChange(f: () => void): () => void { listeners.add(f); return () => { listeners.delete(f); }; }
 function emit() { for (const f of listeners) f(); }
 
-export async function saveCustomDataset(d: StoredDataset): Promise<void> {
-  mem = [...mem.filter((x) => x.id !== d.id), d];
-  emit();
-  try { await tx("readwrite", (s) => s.put(d)); } catch { /* kept in memory for this page */ }
-}
-export async function deleteCustomDataset(id: string): Promise<void> {
-  mem = mem.filter((x) => x.id !== id);
-  emit();
-  try { await tx("readwrite", (s) => s.delete(id)); } catch { /* already gone from memory */ }
-}
+/** The gallery's bundled demo datasets: code, not uploads, so they need no server and no code. */
+const BUILTIN: CustomDataset[] = EXAMPLES.flatMap((e) => e.customData || []);
+export function builtinDataset(id: string): CustomDataset | undefined { return BUILTIN.find((d) => d.id === id); }
 
 export function datasetStudies(d: CustomDataset): string[] { return [...new Set(d.rows.map((r) => r.study))]; }
 
@@ -87,7 +44,7 @@ export function referencedDatasets(x: unknown): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Server-stored datasets (where this deployment enables them)
+// The server's datasets
 // ---------------------------------------------------------------------------
 
 /** A document's pin: the name it uses -> a stored dataset at one version. */
@@ -112,6 +69,17 @@ export async function loadServerData(): Promise<void> {
   emit();
 }
 
+let loaded: Promise<void> | null = null;
+/** Once per page, before the first engine request (the fetch wrapper waits on it). */
+export function loadCustomData(): Promise<void> {
+  loaded ??= (async () => {
+    // uploads were once kept in this browser too; nothing reads that store any more
+    try { indexedDB.deleteDatabase("cohort-lab-custom-data"); } catch { /* no IndexedDB here */ }
+    await loadServerData();
+  })();
+  return loaded;
+}
+
 export async function unlockServer(code: string): Promise<void> {
   const res = await fetch("/api/custom-data/server", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
   const j = await res.json();
@@ -123,9 +91,9 @@ export async function lockServer(): Promise<void> {
   await loadServerData();
 }
 
-/** Changes whenever what this browser can attach changes: local uploads or server versions. */
+/** Changes whenever what this browser can attach changes. */
 export function customDataKey(): string {
-  return mem.map((d) => d.id).join(",") + "|" + server.datasets.map((d) => d.slug + "@" + d.latestVersion).join(",");
+  return server.datasets.map((d) => d.slug + "@" + d.latestVersion).join(",");
 }
 
 export function serverBySlug(slug: string): DatasetMeta | undefined {
@@ -136,16 +104,15 @@ async function gzip(text: string): Promise<Blob> {
   return new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).blob();
 }
 
-/**
- * Save an upload to the server: a new dataset, or the next version of one (`versionOf`, its
- * id). A local copy of the same name is then removed, so the name means one thing here.
- */
+const strip = (d: CustomDataset): CustomDataset => ({ id: d.id, name: d.name, level: d.level, columns: d.columns, rows: d.rows });
+
+/** Save a dataset to the server: a new one, or the next version of one (`versionOf`, its id). */
 export async function saveToServer(d: StoredDataset, versionOf?: string): Promise<DatasetMeta> {
+  if (!server.unlocked) throw new Error("custom data is stored on the server: enter this deployment's access code under Explore → Custom data first");
   const res = await fetch("/api/custom-data/datasets", { method: "POST", headers: { "Content-Type": "application/gzip" },
     body: await gzip(JSON.stringify({ dataset: strip(d), source: d.source, versionOf })) });
   const j = await res.json();
   if (!res.ok || j.error) throw new Error(j.error || res.statusText);
-  if (mem.some((x) => x.id === d.id)) await deleteCustomDataset(d.id);
   await loadServerData();
   return j.dataset as DatasetMeta;
 }
@@ -157,12 +124,12 @@ export async function deleteServerDataset(id: string): Promise<void> {
   await loadServerData();
 }
 
-const versionCache = new Map<string, StoredDataset>();
+const versionCache = new Map<string, StoredDataset & { server: DatasetMeta; version: number }>();
 /** One stored version with its rows, for inspecting or exporting (a logged read). */
 export async function fetchServerVersion(id: string, version: number): Promise<StoredDataset & { server: DatasetMeta; version: number }> {
   const key = id + "@" + version;
   const hit = versionCache.get(key);
-  if (hit) return hit as StoredDataset & { server: DatasetMeta; version: number };
+  if (hit) return hit;
   const res = await fetch("/api/custom-data/datasets/" + id + "?version=" + version);
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
   const meta = JSON.parse(decodeURIComponent(res.headers.get("X-Custom-Dataset") || "{}")) as DatasetMeta & { version: number };
@@ -178,16 +145,16 @@ let activeBindings: UploadBinding[] = [];
 export function setActiveBindings(b: UploadBinding[] | undefined): void { activeBindings = Array.isArray(b) ? b : []; }
 
 /**
- * Pin every server dataset a document names: a name with no pin, no local upload of that name,
- * and a server dataset of that name gets `{ as, dataset, version: latest }`. Pins the document no
- * longer uses are dropped. Returns the same object when nothing changes.
+ * Pin every server dataset a document names: a name with no pin that the server holds gets
+ * `{ as, dataset, version: latest }`; pins the document no longer uses are dropped. Returns the
+ * same object when nothing changes.
  */
 export function bindUploads<D extends { uploads?: UploadBinding[] }>(doc: D): D {
   const names = referencedDatasets({ ...doc, uploads: undefined });
   const kept = (doc.uploads || []).filter((b) => names.includes(b.as));
   const added: UploadBinding[] = [];
   for (const as of names) {
-    if (kept.some((b) => b.as === as) || mem.some((d) => d.id === as)) continue;
+    if (kept.some((b) => b.as === as) || builtinDataset(as)) continue;
     const s = serverBySlug(as);
     if (s) added.push({ as, dataset: s.id, version: s.latestVersion });
   }
@@ -199,14 +166,14 @@ export function bindUploads<D extends { uploads?: UploadBinding[] }>(doc: D): D 
 }
 
 /** Names a document uses that cannot be resolved here, and why. */
-export function unresolvedUploads(doc: { uploads?: UploadBinding[] }): { as: string; why: "locked" | "missing" | "deleted" }[] {
-  const out: { as: string; why: "locked" | "missing" | "deleted" }[] = [];
+export function unresolvedUploads(doc: { uploads?: UploadBinding[] }): { as: string; why: "locked" | "missing" | "deleted" | "unavailable" }[] {
+  const out: { as: string; why: "locked" | "missing" | "deleted" | "unavailable" }[] = [];
   for (const as of referencedDatasets({ ...doc, uploads: undefined })) {
+    if (builtinDataset(as)) continue;
     const pin = (doc.uploads || []).find((b) => b.as === as);
-    if (pin) {
-      if (!server.unlocked) out.push({ as, why: "locked" });
-      else if (!server.datasets.some((d) => d.id === pin.dataset)) out.push({ as, why: "deleted" });
-    } else if (!mem.some((d) => d.id === as) && !serverBySlug(as)) out.push({ as, why: server.enabled && !server.unlocked ? "locked" : "missing" });
+    if (!server.enabled) out.push({ as, why: "unavailable" });
+    else if (!server.unlocked) out.push({ as, why: "locked" });
+    else if (pin ? !server.datasets.some((d) => d.id === pin.dataset) : !serverBySlug(as)) out.push({ as, why: pin ? "deleted" : "missing" });
   }
   return out;
 }
@@ -215,30 +182,28 @@ export function unresolvedUploads(doc: { uploads?: UploadBinding[] }): { as: str
 // The fetch wrapper
 // ---------------------------------------------------------------------------
 
-const strip = (d: StoredDataset): CustomDataset => ({ id: d.id, name: d.name, level: d.level, columns: d.columns, rows: d.rows });
-
 function attach(path: string, body: string): string | null {
   const j = JSON.parse(body) as { studies?: string[]; study?: string; uploads?: UploadBinding[] };
-  const local: StoredDataset[] = [], refs: UploadBinding[] = [];
+  const rows: CustomDataset[] = [], refs: UploadBinding[] = [];
+  const named = referencedDatasets({ ...j, uploads: undefined });
+  for (const as of named) { const b = builtinDataset(as); if (b) rows.push(b); }
   if (path === "/api/explore") {
     const studies = new Set([...(j.studies || []), ...(j.study ? [j.study] : [])]);
-    local.push(...mem.filter((d) => d.rows.some((r) => studies.has(r.study))));
     for (const s of server.datasets) {
       const v = s.versions.find((x) => x.version === s.latestVersion);
-      if (!mem.some((d) => d.id === s.slug) && v && v.studies.some((st) => studies.has(st)))
-        refs.push({ as: s.slug, dataset: s.id, version: s.latestVersion });
+      if (v && v.studies.some((st) => studies.has(st))) refs.push({ as: s.slug, dataset: s.id, version: s.latestVersion });
     }
   } else {
     const pins = Array.isArray(j.uploads) ? j.uploads : activeBindings;
-    for (const as of referencedDatasets({ ...j, uploads: undefined })) {
-      const pin = pins.find((b) => b.as === as), here = mem.find((d) => d.id === as), s = serverBySlug(as);
+    for (const as of named) {
+      if (builtinDataset(as)) continue;
+      const pin = pins.find((b) => b.as === as), s = serverBySlug(as);
       if (pin) refs.push(pin);
-      else if (here) local.push(here);
       else if (s) refs.push({ as, dataset: s.id, version: s.latestVersion });
     }
   }
-  if (!local.length && !refs.length) return null;
-  return JSON.stringify({ ...j, ...(local.length ? { customData: local.map(strip) } : {}), ...(refs.length ? { customRefs: refs } : {}) });
+  if (!rows.length && !refs.length) return null;
+  return JSON.stringify({ ...j, ...(rows.length ? { customData: rows.map(strip) } : {}), ...(refs.length ? { customRefs: refs } : {}) });
 }
 
 let installed = false;
@@ -253,8 +218,8 @@ export function installCustomDataFetch(): void {
         const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
         const path = new URL(href, window.location.href).pathname;
         if (path === "/api/explore" || path === "/api/analysis" || path === "/api/oncoprint" || path === "/api/custom-data/members") {
-          // the page's first requests go out on mount, before IndexedDB has answered; a shared
-          // ?doc= link that names a dataset must not race it
+          // the page's first requests go out on mount, before the server has said what it holds;
+          // a shared ?doc= link that names a dataset must not race it
           await loadCustomData();
           const body = attach(path, init.body);
           if (body) init = { ...init, body };
@@ -324,10 +289,11 @@ export function parseUpload(text: string): ParsedUpload {
 export function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "custom";
 }
+/** A name no server dataset uses yet, so a feature never lands as a new version of something else. */
 export function uniqueSlug(name: string): string {
   const base = slugify(name);
   let id = base;
-  for (let k = 2; mem.some((d) => d.id === id); k++) id = (base.slice(0, 36) + "-" + k).replace(/^-+/, "");
+  for (let k = 2; serverBySlug(id) || builtinDataset(id); k++) id = (base.slice(0, 36) + "-" + k).replace(/^-+/, "");
   return id;
 }
 
@@ -349,7 +315,7 @@ export function buildDataset(name: string, parsed: ParsedUpload, resolved: Resol
   });
   const columns = parsed.columns.map((c) => ({ name: c.name, datatype: datatypes[c.name] ?? c.datatype }));
   return {
-    id: uniqueSlug(name), name: name.trim() || "Custom data", level: parsed.level, columns, rows,
+    id: slugify(name), name: name.trim() || "Custom data", level: parsed.level, columns, rows,
     createdAt: new Date().toISOString(),
     source: { rowsIn: parsed.rows.length, unmatched: resolved.unmatched, duplicates, multiStudy: resolved.multiStudy, studies }
   };

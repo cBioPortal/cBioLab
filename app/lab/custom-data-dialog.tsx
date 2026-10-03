@@ -1,13 +1,13 @@
 "use client";
 // "What is this built on?" for custom data: the uploads a cohort clause or a whole document
-// names, shown as they are stored in this browser. Opened from the `custom` tag on a cohort's
+// names, shown as the server stores them. Opened from the `custom` tag on a cohort's
 // pill (scoped to that clause) or from the analysis header (every upload the document names).
 //
 // The rows a clause matches are re-derived here from the stored values, folding case and
 // whitespace the way the engine does, as a reading aid. The cohort's own count is the engine's.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useCustomDatasets } from "./custom-data-panel.tsx";
-import { datasetStudies, datasetToTsv, fetchServerVersion, serverBySlug, serverState, type StoredDataset, type UploadBinding } from "./custom-data-client.ts";
+import { useCustomDataState } from "./custom-data-panel.tsx";
+import { builtinDataset, datasetStudies, datasetToTsv, fetchServerVersion, serverBySlug, type StoredDataset, type UploadBinding } from "./custom-data-client.ts";
 import { parseCustomAttr, type CustomDataset } from "../../lib/custom-data-names.ts";
 
 export interface CustomDataFocus {
@@ -121,7 +121,7 @@ function DatasetView({ d, clause, note }: { d: StoredDataset; clause?: CustomDat
       {note}
       <p className="meta" style={{ margin: "var(--s1) 0 var(--s3)" }}>
         {d.level} level · {d.rows.length.toLocaleString()} {d.level}s in {datasetStudies(d).join(", ")} ·
-        added {new Date(d.createdAt).toLocaleDateString()} ·{" "}
+        {d.createdAt ? <>saved {new Date(d.createdAt).toLocaleDateString()} ·{" "}</> : null}
         {d.source.unmatched
           ? d.source.rowsIn.toLocaleString() + " rows uploaded, " + d.source.unmatched.toLocaleString() + " matched no " + d.level + " and were left out"
           : "every uploaded row matched"}
@@ -189,21 +189,18 @@ function DatasetView({ d, clause, note }: { d: StoredDataset; clause?: CustomDat
   );
 }
 
-export default function CustomDataDialog({ focus, onClose, demos, onImportDemos, onManage, bindings, onRepin }: {
+export default function CustomDataDialog({ focus, onClose, onManage, bindings, onRepin }: {
   focus: CustomDataFocus | null;
   onClose: () => void;
   /** the document's pins (`uploads`): a pinned name shows that server version */
   bindings: UploadBinding[];
   /** move a pin to the server's latest version */
   onRepin: (as: string, version: number) => void;
-  /** gallery demo uploads that ship with the app, offered when one is missing */
-  demos: StoredDataset[] | CustomDataset[];
-  onImportDemos: (ids: string[]) => void | Promise<void>;
   /** open Explore → Custom data */
   onManage: () => void;
 }) {
   const ref = useRef<HTMLDialogElement | null>(null);
-  const list = useCustomDatasets();
+  const server = useCustomDataState();
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -211,16 +208,15 @@ export default function CustomDataDialog({ focus, onClose, demos, onImportDemos,
     if (!focus && el.open) el.close();
   }, [focus]);
   const ids = focus?.datasets ?? [];
-  // the same precedence the requests use (custom-data-client.ts attach): a pin, then a local upload, then the server's latest
+  // the same precedence the requests use (custom-data-client.ts attach): bundled demo data, a pin, the server's latest
   const where = ids.map((id) => {
-    const pin = bindings.find((b) => b.as === id), local = list.find((d) => d.id === id), s = serverBySlug(id);
-    if (pin) return { id, server: { dataset: pin.dataset, version: pin.version, latest: serverState().datasets.find((d) => d.id === pin.dataset)?.latestVersion ?? 0 } };
-    if (local) return { id, local };
+    const demo = builtinDataset(id), pin = bindings.find((b) => b.as === id), s = serverBySlug(id);
+    if (demo) return { id, demo: { ...demo, createdAt: "", source: { rowsIn: demo.rows.length, unmatched: 0, duplicates: 0, multiStudy: 0, studies: datasetStudies(demo) } } };
+    if (pin) return { id, server: { dataset: pin.dataset, version: pin.version, latest: server.datasets.find((d) => d.id === pin.dataset)?.latestVersion ?? 0 } };
     if (s) return { id, server: { dataset: s.id, version: s.latestVersion, latest: s.latestVersion } };
     return { id };
   });
-  const missing = where.filter((w) => !w.local && !w.server).map((w) => w.id);
-  const demoMissing = missing.filter((id) => demos.some((d) => d.id === id));
+  const missing = where.filter((w) => !w.demo && !w.server).map((w) => w.id);
 
   return (
     <dialog ref={ref} className="addchartdialog customdatadialog" onClose={onClose}
@@ -234,20 +230,18 @@ export default function CustomDataDialog({ focus, onClose, demos, onImportDemos,
         <button className="primary" onClick={() => ref.current?.close()}>Done</button>
       </div>
       <p className="note" style={{ marginTop: "var(--s1)" }}>
-        A local upload is stored in this browser only and sent with each request that names it; a
-        server one is pinned by version and read by the server. Either way the document holds the
-        attribute names (and, for server data, the version), never these values.
+        Stored on the server and pinned by version: the document holds the attribute names and the
+        version, never these values.
       </p>
       {missing.length > 0 && (
         <div className="card customwarn">
-          Not in this browser: {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}.
-          The analysis cannot run until it is added under Explore → Custom data with the same name.
-          {demoMissing.length > 0 && <div className="row" style={{ marginTop: "var(--s2)" }}>
-            <button className="primary" onClick={() => onImportDemos(demoMissing)}>Add the demo upload{demoMissing.length > 1 ? "s" : ""}</button>
-          </div>}
+          {!server.enabled ? <>This deployment does not store custom data, so {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)} cannot be read here.</>
+            : !server.unlocked ? <>Locked in this browser: {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}. Enter this deployment&apos;s access code under Explore → Custom data.</>
+            : <>Not on the server: {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}.</>}
         </div>
       )}
-      {where.map((w) => w.local ? <DatasetView key={w.id} d={w.local} clause={focus?.clause} />
+      {where.map((w) => w.demo ? <DatasetView key={w.id} d={w.demo} clause={focus?.clause}
+          note={<p className="meta" style={{ margin: "0 0 var(--s1)" }}><span className="customtag">demo</span> bundled with the app for the Examples gallery</p>} />
         : w.server ? <ServerDataset key={w.id} id={w.server.dataset} version={w.server.version} latest={w.server.latest} clause={focus?.clause}
             onRepin={bindings.some((b) => b.as === w.id) ? () => onRepin(w.id, w.server!.latest) : undefined} />
         : null)}

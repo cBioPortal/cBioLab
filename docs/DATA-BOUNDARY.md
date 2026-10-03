@@ -131,8 +131,9 @@ suite fail. A test that cannot fail is decoration.
   acceptable, or skip caching for patient-level answers.
 
 - **Uploaded custom data is patient-level, and goes only where the request
-  boundary sends it.** A researcher's upload (`lib/custom-data.ts`) lives in
-  their browser and arrives as `customData` beside a request. The route checks
+  boundary sends it.** A researcher's upload (`lib/custom-data.ts`) is stored on
+  the server (below) and named by a request as `customRefs`; the gallery's bundled
+  demo data arrives as rows (`customData`). Either way the route checks
   every study it names (`customContext` in `lib/custom-data-server.ts`): a study
   held by a remote peer or an aggregate-only instance is refused outright. The
   rows are then merged into the clinical tables of the allowed connections'

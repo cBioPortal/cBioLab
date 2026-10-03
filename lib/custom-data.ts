@@ -1,9 +1,11 @@
 // Custom data: annotations a researcher uploads (a curated "metastasis site", an AI-extracted
 // field), used exactly like the study's own clinical attributes.
 //
-// An uploaded column is addressed as `custom:<dataset>/<COLUMN>` and lives nowhere on the
-// server. The browser keeps the dataset and sends it with each request; for the length of that
-// request it is merged into the clinical tables at query time:
+// An uploaded column is addressed as `custom:<dataset>/<COLUMN>`. Uploads are stored on the
+// server (lib/custom-store.ts) and named by a request as `customRefs`; the request boundary
+// (lib/custom-data-server.ts) reads them, or takes rows sent inline (the gallery's bundled demo
+// data, tests, scripts), and for the length of that request merges them into the clinical
+// tables at query time:
 //
 //   clinicalTable(db, attrs) = db.clinical_data_derived    UNION ALL  _custom_clinical[_<subset>]
 //   clinicalMetaTable(db)    = db.clinical_attribute_meta  UNION ALL  _custom_meta
@@ -277,7 +279,7 @@ export function assertCustomDataPresent(x: unknown): void {
   }
   if (missing.size)
     throw new Error("this analysis uses custom data that was not sent with it: " + [...missing].map((m) => "'" + m + "'").join(", ") +
-      ". Custom data stays in the browser it was uploaded in; import the dataset there to run this.");
+      ". It is stored on the server: unlock it with the deployment's access code, or check it was not deleted.");
   if (unknownCols.length)
     throw new Error("custom data has no column " + [...new Set(unknownCols)].join(", ") + "; its columns are " +
       [...have.entries()].map(([id, cols]) => [...cols].map((c) => "custom:" + id + "/" + c).join(", ")).join("; "));
