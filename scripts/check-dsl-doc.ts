@@ -42,9 +42,11 @@ let runPin: string | null = null;
 
 // 2 + 3. every documented example runs, and gives the same answer as last time
 const { runAnalysis } = await import("../lib/analysis.ts");
+const { withRequestCustomData } = await import("../lib/custom-data-server.ts");
 for (const ex of EXAMPLES) {
   try {
-    const r = await runAnalysis(ex.doc);
+    // an example's uploads travel with it, exactly as the page sends them
+    const r = await withRequestCustomData(ex.customData, () => runAnalysis(ex.doc));
     runPin = r.oncokbPin;
     const bad = Object.entries(r.cohorts).filter(([, c]) => !c.count).map(([nm]) => nm);
     const viewErr = r.views.find(v => v.error);

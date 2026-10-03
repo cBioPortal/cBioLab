@@ -18,6 +18,7 @@ import { compileCohort, sq, LINE_TYPE } from "./compiler.ts";
 import { oqlLeafSql } from "./oql.ts";
 import { clinicalValueFoldSql, canonicalEventName, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
+import { clinicalTable } from "./custom-data.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
@@ -88,7 +89,7 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
   }
   if (!conds.length) throw new Error("clinical clause needs op/value, values[], or range{gt,gte,lt,lte}");
   return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
-    "  FROM " + dbOf(ctx) + ".clinical_data_derived\n" +
+    "  FROM " + clinicalTable(dbOf(ctx), [attr]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(ctx.study) + " AND type = " + sq(per) + "\n" +
     "    AND attribute_name = " + sq(attr) + " AND " + conds.join(" AND ");
 }

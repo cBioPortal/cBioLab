@@ -12,6 +12,7 @@
 // work with, with nothing left to resolve.
 import type { CohortDef, ClinicalLeaf, OqlLeaf, SplitBy } from "./types.ts";
 import { parseOql } from "./oql.ts";
+import { ATTR_NAME_RE, attributeLabel } from "./custom-data-names.ts";
 
 export const SPLIT_BY_DEFAULT_MAX_ARMS = 8;
 export const SPLIT_BY_DEFAULT_MIN_COUNT = 10;
@@ -58,7 +59,7 @@ export interface SplitByResolved {
   overlapCheckDef?: CohortDef;
 }
 
-const ATTR_RE = /^[A-Za-z0-9_]{1,64}$/;
+const ATTR_RE = ATTR_NAME_RE;
 const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
 
 function checkCollision(splitBy: SplitBy, existingCohortNames: string[], arms: SplitByArm[]): void {
@@ -174,7 +175,7 @@ export async function resolveSplitBy(
 
   const clause = (v: string): ClinicalLeaf => ({ kind: "clinical", attribute, per: dist.per, op: "=", value: v });
   const baseAll = baseDef.all || [];
-  const nameFor = (label: string) => splitBy.cohort + " — " + attribute + ": " + label;
+  const nameFor = (label: string) => splitBy.cohort + " — " + attributeLabel(attribute, "short") + ": " + label;
   const arms: SplitByArm[] = ownValues.map((x) => ({ name: nameFor(x.v), def: { ...baseDef, all: [...baseAll, clause(x.v)] } }));
   if (otherValues.length) {
     arms.push({

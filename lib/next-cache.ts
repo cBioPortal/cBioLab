@@ -35,6 +35,7 @@ import { chQuery, connections } from "./ch.ts";
 import { oncokbPin } from "./annotation.ts";
 import { runAnalysis } from "./analysis.ts";
 import { buildContract } from "./oncoprint.ts";
+import { hasCustomData } from "./custom-data.ts";
 import type { AnalysisDoc, AnalysisResult, Contract, OncoprintSpec } from "./types.ts";
 
 type Json = unknown;
@@ -87,6 +88,8 @@ async function analysisEntry(doc: AnalysisDoc, oncoprint: "svg" | "spec", _versi
 }
 export async function cachedAnalysis(doc: AnalysisDoc, opts: { oncoprint?: "svg" | "spec" } = {}): Promise<AnalysisResult> {
   const oncoprint = opts.oncoprint ?? "svg";
+  // an answer that depends on uploaded data belongs to its uploader, never to the shared cache
+  if (hasCustomData()) return runAnalysis(doc, { oncoprint });
   return throughCache(async () => analysisEntry(doc, oncoprint, await dataVersion()), () => runAnalysis(doc, { oncoprint }));
 }
 
@@ -96,5 +99,6 @@ async function contractEntry(spec: OncoprintSpec, _version: string): Promise<str
   return pack(await buildContract(spec));
 }
 export async function cachedContract(spec: OncoprintSpec): Promise<Contract> {
+  if (hasCustomData()) return buildContract(spec);
   return throughCache(async () => contractEntry(spec, await dataVersion()), () => buildContract(spec));
 }

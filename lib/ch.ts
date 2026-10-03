@@ -12,6 +12,7 @@
 // take a `db` argument rather than closing over a module constant.
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { ChResult, ChRow } from "./types.ts";
+import { customExternalsFor } from "./custom-data.ts";
 
 export interface ChConn {
   id: string;
@@ -156,7 +157,9 @@ async function post(sql: string, conn: ChConn, format: string): Promise<string> 
     throw new Error("ClickHouse instance '" + conn.id + "' is missing configuration (url/password/db)");
   const ctx = ctxStore.getStore();
   const query = sql + "\nFORMAT " + format;
-  const externals = externalsFor(query);
+  // uploaded custom data rides along only with a statement that names it (lib/custom-data.ts)
+  const externals = [...externalsFor(query),
+    ...customExternalsFor(query, conn.id).map((e) => ({ name: e.name, structure: e.structure, blob: new Blob([e.data]) }))];
   // Tell ClickHouse to stop a query whose client has gone away. Without it an abandoned
   // request keeps its share of the database until it finishes, which is most of what an
   // abandoned request costs.

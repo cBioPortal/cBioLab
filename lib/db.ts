@@ -4,8 +4,10 @@
 // Deliberately separate from lib/ch.ts: ClickHouse is the read-only analytics
 // warehouse and must never gain a write path (see docs/DATA-BOUNDARY.md); this
 // is the "small writable artifact store, never the read-only analytics
-// database" RATIONALE.md calls for. Nothing here ever stores a patient or
-// sample identifier — only DSL definitions.
+// database" RATIONALE.md calls for. The artifact tables never store a patient or
+// sample identifier — only DSL definitions. The one exception is server-stored
+// custom data (db/migrations/0003_custom_datasets.sql), which holds uploaded
+// patient-level values and is reached only through lib/custom-store.ts.
 import { Pool } from "pg";
 
 let pool: Pool | null = null;

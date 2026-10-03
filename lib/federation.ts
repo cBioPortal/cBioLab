@@ -45,6 +45,7 @@ export function legendFor(values: string[], ring = false): { label: string; colo
 const num = (v: unknown): number | null => { const x = Number(v); return Number.isFinite(x) ? x : null; };
 import { genomicEventsSql, coverageSql } from "./oncoprint.ts";
 import type { CohortDef, CompileCtx, ChRow, ChResult } from "./types.ts";
+import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -554,7 +555,7 @@ export function clinicalCountsSql(cohortSql: string, attrs: string[], study: str
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT attribute_name AS a, type AS per, attribute_value AS v,\n" +
     "       uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
-    "FROM " + db + ".clinical_data_derived\n" +
+    "FROM " + clinicalTable(db, attrs) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + "\n" +
     "  AND attribute_name IN (" + attrs.map(sq).join(",") + ")\n" +
     "  AND attribute_value != ''\n" +
@@ -579,7 +580,7 @@ export function clinicalMomentsSql(cohortSql: string, attrs: string[], study: st
     "SELECT a, per, count() AS n, sum(x) AS sx, sum(x * x) AS sxx, min(x) AS mn, max(x) AS mx\n" +
     "FROM (\n" +
     "  SELECT attribute_name AS a, type AS per, toFloat64OrNull(attribute_value) AS x\n" +
-    "  FROM " + db + ".clinical_data_derived\n" +
+    "  FROM " + clinicalTable(db, attrs) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
     "    AND attribute_name IN (" + attrs.map(sq).join(",") + ")\n" +
     "    AND attribute_value != ''\n" +
@@ -610,7 +611,7 @@ export function clinicalHistogramSql(cohortSql: string, attrs: string[], study: 
     "WITH cohort AS (" + cohortSql + "),\n" +
     "     raw AS (\n" +
     "       SELECT attribute_name AS a, type AS per, toFloat64OrNull(attribute_value) AS x\n" +
-    "       FROM " + db + ".clinical_data_derived\n" +
+    "       FROM " + clinicalTable(db, attrs) + "\n" +
     "       WHERE cancer_study_identifier = " + sq(study) + "\n" +
     "         AND attribute_name IN (" + attrs.map(sq).join(",") + ")\n" +
     "         AND attribute_value != ''\n" +
@@ -638,7 +639,7 @@ export function attributeQuantileSql(cohortSql: string, attribute: string, per: 
   return (
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT quantileExact(" + p + ")(toFloat64OrNull(attribute_value)) AS q\n" +
-    "FROM " + db + ".clinical_data_derived\n" +
+    "FROM " + clinicalTable(db, [attribute]) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attribute) + "\n" +
     "  AND type = " + sq(per) + " AND attribute_value != ''\n" +
     "  AND " + pid + " IN (SELECT pid FROM cohort)"
@@ -672,7 +673,7 @@ export function survivalCountsSql(cohortSql: string, study: string, db: string =
     "  SELECT " + pid + " AS pid,\n" +
     "         anyIf(attribute_value, attribute_name=" + sq(months) + ") AS months,\n" +
     "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
-    "  FROM " + db + ".clinical_data_derived\n" +
+    "  FROM " + clinicalTable(db, [months, status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
     "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
@@ -717,7 +718,7 @@ export function anchoredSurvivalSql(
     "  SELECT " + pid + " AS pid,\n" +
     "         toFloat64OrNull(anyIf(attribute_value, attribute_name=" + sq(months) + ")) AS months,\n" +
     "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
-    "  FROM " + db + ".clinical_data_derived\n" +
+    "  FROM " + clinicalTable(db, [months, status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
     "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
@@ -769,7 +770,7 @@ export function coxRowsSql(
     "  SELECT " + pid + " AS pid,\n" +
     "         toFloat64OrNull(anyIf(attribute_value, attribute_name=" + sq(months) + ")) AS months,\n" +
     "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
-    "  FROM " + db + ".clinical_data_derived\n" +
+    "  FROM " + clinicalTable(db, [months, status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
     "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
@@ -806,11 +807,11 @@ export function logisticRowsSql(
 export function survivalEndpointsSql(study: string, db: string = DB): string {
   return (
     "SELECT replaceOne(cam.attr_id, '_MONTHS', '') AS endpoint\n" +
-    "FROM " + db + ".clinical_attribute_meta cam\n" +
+    "FROM " + clinicalMetaTable(db) + " cam\n" +
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + " AND cam.attr_id LIKE '%\\_MONTHS'\n" +
     "  AND replaceOne(cam.attr_id, '_MONTHS', '_STATUS') IN (\n" +
-    "    SELECT cam2.attr_id FROM " + db + ".clinical_attribute_meta cam2\n" +
+    "    SELECT cam2.attr_id FROM " + clinicalMetaTable(db) + " cam2\n" +
     "    JOIN " + db + ".cancer_study cs2 ON cs2.cancer_study_id = cam2.cancer_study_id\n" +
     "    WHERE cs2.cancer_study_identifier = " + sq(study) + ")\n" +
     "ORDER BY endpoint"
@@ -955,7 +956,7 @@ export function eventCourseSql(
     "os AS (\n" +
     "  SELECT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid,\n" +
     "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) * " + DAYS_PER_MONTH + " AS os_day\n" +
-    "  FROM " + db + ".clinical_data_derived\n" +
+    "  FROM " + clinicalTable(db, ["OS_MONTHS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient'\n" +
     "    AND attribute_name = 'OS_MONTHS'\n" +
     "  GROUP BY pid\n" +
@@ -1070,7 +1071,7 @@ export function sequenceSql(
     "os AS (\n" +
     "  SELECT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid,\n" +
     "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) * " + DAYS_PER_MONTH + " AS os_day\n" +
-    "  FROM " + db + ".clinical_data_derived\n" +
+    "  FROM " + clinicalTable(db, ["OS_MONTHS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient'\n" +
     "    AND attribute_name = 'OS_MONTHS'\n" +
     "  GROUP BY pid\n" +
@@ -1428,13 +1429,13 @@ abstract class BaseResolver implements AggregateCapable {
    * than sniffed from the data and silently mis-typed.
    */
   async attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean }): Promise<AttrStats[]> {
-    const attrs = [...new Set(attributes)].filter((a) => /^[A-Za-z0-9_]{1,64}$/.test(a)).slice(0, 20);
+    const attrs = [...new Set(attributes)].filter((a) => ATTR_NAME_RE.test(a)).slice(0, 20);
     if (!attrs.length) return [];
     const db = this.instance.conn.db, conn = this.instance.conn;
     const list = attrs.map(sq).join(",");
     const meta = await chQuery<ChRow>(
       "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt\n" +
-      "FROM " + db + ".clinical_attribute_meta cam\n" +
+      "FROM " + clinicalMetaTable(db) + " cam\n" +
       "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
       "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + list + ")", conn)
       .catch(() => ({ data: [] as ChRow[] }));
@@ -1504,7 +1505,7 @@ abstract class BaseResolver implements AggregateCapable {
     if (!attrs.length) return kinds;
     const meta = await chQuery<ChRow>(
       "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt\n" +
-      "FROM " + db + ".clinical_attribute_meta cam\n" +
+      "FROM " + clinicalMetaTable(db) + " cam\n" +
       "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
       "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ")", conn)
       .catch(() => ({ data: [] as ChRow[] }));

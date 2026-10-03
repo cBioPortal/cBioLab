@@ -17,6 +17,12 @@ import { foldEventNames } from "../../lib/event-names.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 import { installLabTools, LAB_TOOL_NAMES, type LabBridge } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
+import CustomDataPanel, { useCustomDataState } from "./custom-data-panel.tsx";
+import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
+import LoginButton from "./login-button.tsx";
+import type { OnCustomData } from "./pills";
+import { installCustomDataFetch, saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
+import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -327,6 +333,14 @@ export default function AnalysisPage() {
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   const [copied, setCopied] = useState<string | null>(null);
   const [exMsg, setExMsg] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [cdFocus, setCdFocus] = useState<CustomDataFocus | null>(null);
+  // Explore → Custom data lives in the add-chart dialog, which exists only once Explore has
+  // facets; asked for from elsewhere (a banner, the data dialog) it opens when they arrive
+  const [wantCustomManager, setWantCustomManager] = useState(false);
+  /** the `custom` tag on a cohort's pill: that clause's upload, scoped to the clause */
+  const showClauseData = (cohort?: string): OnCustomData => (attribute, leaf, negated) =>
+    setCdFocus({ datasets: referencedDatasets({ a: attribute }), clause: { attribute, leaf, cohort, negated } });
   const [saveName, setSaveName] = useState("");
   const [genesFor, setGenesFor] = useState<number | null>(null);
   const genesDialog = useRef<HTMLDialogElement | null>(null);
@@ -334,7 +348,8 @@ export default function AnalysisPage() {
   /** Explore's "+ Add chart": clinical/gene/derived-timeline filter builders live
    *  here instead of as three permanent cards above the facet grid. */
   const addChartDialog = useRef<HTMLDialogElement | null>(null);
-  const [chartTab, setChartTab] = useState<"clinical" | "gene" | "derived">("clinical");
+  const [chartTab, setChartTab] = useState<"clinical" | "gene" | "derived" | "custom">("clinical");
+  const customState = useCustomDataState();
   const tabRef = useRef<string>(tabFromParams(sp));            // the tab syncUrl should record
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
   const exAbort = useRef<AbortController | null>(null);      // cancel a facet request the reader has moved past
@@ -390,6 +405,17 @@ export default function AnalysisPage() {
    */
   const docDialog = useRef<HTMLDialogElement | null>(null);
   const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
+  // Requests that carry a spec rather than the document (the oncoprint's own fetch) resolve pins
+  // from here. Set during render, not in an effect: a child's effects run before its parent's,
+  // so the figure's fetch would otherwise go out with the previous document's pins.
+  setActiveBindings(doc.uploads);
+  // an analysis refused for want of its custom data runs once that data arrives (an import, an unlock)
+  const unresolvedCount = unresolvedUploads(doc).length;
+  const wasUnresolved = useRef(0);
+  useEffect(() => {
+    if (wasUnresolved.current > 0 && unresolvedCount === 0 && Object.keys(doc.cohorts || {}).length) { setError(null); run(doc); }
+    wasUnresolved.current = unresolvedCount;
+  }, [unresolvedCount]); // eslint-disable-line
   const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
   const [result, setResult] = useState<AnalysisResult | null>(null);
   /**
@@ -567,7 +593,10 @@ export default function AnalysisPage() {
     setSaved(prev => { const nx = { ...prev }; delete nx[name]; return nx; });
   };
 
-  const run = async (d: AnalysisDoc = doc) => {
+  const run = async (d0: AnalysisDoc = doc) => {
+    // pin any server-stored custom data the document names, so a shared link reads the same version
+    const d = bindUploads(d0);
+    if (d !== d0) { setDoc(d); setDocText(JSON.stringify(d, null, 2)); }
     if (!Object.keys(d.cohorts || {}).length) { setBusy(false); setResult(null); return; }
     setBusy(true); setError(null);
     try {
@@ -640,7 +669,11 @@ export default function AnalysisPage() {
     }
   };
 
+  // Saved cohorts and analyses belong to the login (lib/auth.ts): read when it is in, cleared
+  // when it goes, so a logged-out page never shows someone's saved work.
+  const loggedIn = customState.unlocked;
   useEffect(() => {
+    if (!loggedIn) { setSaved({}); setSpaces({}); return; }
     fetch("/api/artifacts?kind=cohort").then(r => r.json()).then(j => {
       const map: typeof saved = {};
       for (const a of j.artifacts || []) map[a.name] = { id: a.id, def: a.definition, savedAt: fmtDate(a.updatedAt), lastEval: null };
@@ -651,6 +684,17 @@ export default function AnalysisPage() {
       for (const a of j.artifacts || []) map[a.name] = { id: a.id, doc: a.definition, savedAt: fmtDate(a.updatedAt) };
       setSpaces(map);
     }).catch(() => {});
+  }, [loggedIn]);
+  /** Saving needs the login: logged out, ask for it rather than fail. Returns true when saving may go ahead. */
+  const canSave = (): boolean => {
+    if (loggedIn) return true;
+    if (customState.enabled) requestLogin();
+    else setError("this deployment has no login, so cohorts and analyses cannot be saved on it");
+    return false;
+  };
+
+  useEffect(() => {
+    installCustomDataFetch();
     fetch("/api/studies").then(r => r.json()).then(j => {
       const list = j.studies || [];
       setStudies(list);
@@ -759,6 +803,7 @@ export default function AnalysisPage() {
    */
   const openSaveDialog = () => {
     if (!barDef()) { setExMsg("select at least one study first"); return; }
+    if (!canSave()) return;
     setExMsg(null);
     setSaveName(cName.trim() || barDefaultName());
     setDraftFilled(!!(cName.trim() || barDefaultName()).trim()); setDraftGen((g) => g + 1);
@@ -780,6 +825,45 @@ export default function AnalysisPage() {
       setExMsg("could not save: " + String((e as Error)?.message || e));
     }
     setTimeout(() => setExMsg(null), 3200);
+  };
+
+  const openCustomManager = () => {
+    goTab("explore");
+    if (!explore) fetchExplore();
+    setChartTab("custom");
+    setWantCustomManager(true);
+  };
+  useEffect(() => {
+    if (!wantCustomManager || tab !== "explore" || !explore || !addChartDialog.current) return;
+    if (!addChartDialog.current.open) addChartDialog.current.showModal();
+    setWantCustomManager(false);
+  }, [wantCustomManager, tab, explore]);
+
+  // ---- save as feature: a selection frozen into a yes/no custom attribute ----
+  const featureSaved = (d: StoredDataset) => {
+    const yes = d.rows.filter((r) => r.values[0] === "Yes").length;
+    return "saved feature \u201c" + d.name + "\u201d (custom:" + d.id + "/" + d.columns[0].name + "): " +
+      yes.toLocaleString() + " " + d.level + "s Yes, " + (d.rows.length - yes).toLocaleString() + " No";
+  };
+  const saveDraftAsFeature = async () => {
+    const def = barDef();
+    if (!def) { setExMsg("select at least one study first"); return; }
+    const name = window.prompt("Name this feature. Patients matching the current filters are Yes, every other patient of the selected studies No.",
+      parseDraft() ? "explored cohort" : "selected studies");
+    if (!name || !name.trim()) return;
+    setExMsg("saving feature\u2026");
+    try {
+      const d = await featureFromCohort(name.trim(), def, exSel.current);
+      await saveToServer(d);
+      setExMsg(featureSaved(d) + " \u2014 charted below");
+      fetchExplore();
+    } catch (e) { setExMsg("could not save the feature: " + String((e as Error)?.message || e)); }
+  };
+  const featureFromSelection = async (sel: ColumnSelection, all: string[], studies: string[]) => {
+    const d = await featureFromColumns(sel.name || "selection", sel.unit, sel.ids, all, studies);
+    await saveToServer(d);
+    setToast(featureSaved(d) + " \u2014 add it as a track, a split or a filter like any attribute");
+    setTimeout(() => setToast(null), 6000);
   };
 
   // ---- composing views without editing JSON --------------------------------
@@ -1038,7 +1122,8 @@ export default function AnalysisPage() {
       draftOverride !== undefined ? draftOverride : parseDraft(),
       attrsOverride ?? attrsForBar(attrCoverage, studiesOverride),
       geneChartsRef.current,
-      exExtraDerivedRef.current
+      exExtraDerivedRef.current,
+      customDataKey()
     ]);
     if (exInflight.current === inflightKey) return;
     exInflight.current = inflightKey;
@@ -1334,7 +1419,8 @@ export default function AnalysisPage() {
   useEffect(() => {
     if (!result) return;
     const studies = result.involvedStudies && result.involvedStudies.length ? result.involvedStudies : [result.study];
-    const key = studies.join(",");
+    // an upload adds attributes to the same studies, so the datasets are part of what was asked
+    const key = studies.join(",") + "|" + customDataKey();
     if (trackAttrs.key === key || trackAttrsWant.current === key) return;
     trackAttrsWant.current = key;
     setTrackAttrsLoading(true);
@@ -1351,13 +1437,14 @@ export default function AnalysisPage() {
           }
           for (const p of j.profiles || []) if (p !== "cna") profs.add(p); // discrete cna isn't a heatmap
         }
-        // most-covered first, the way the portal orders its picker
+        // the reader's own uploads first, then most-covered first, the way the portal orders its picker
         if (trackAttrsWant.current !== key) return; // a newer study set was asked for meanwhile
         setTrackAttrs({ key, attrs: [...seen.entries()].map(([attribute, v]) => ({ attribute, ...v }))
-          .sort((x, y) => y.patients - x.patients || (x.attribute < y.attribute ? -1 : 1)), profiles: [...profs].sort() });
+          .sort((x, y) => Number(isCustomAttr(y.attribute)) - Number(isCustomAttr(x.attribute)) ||
+            y.patients - x.patients || (x.attribute < y.attribute ? -1 : 1)), profiles: [...profs].sort() });
       })
       .finally(() => { if (trackAttrsWant.current === key) setTrackAttrsLoading(false); });
-  }, [result]); // eslint-disable-line
+  }, [result, customState]); // eslint-disable-line
 
   // the survival "measured from" control needs this study's event types,
   // their attributes, and the endpoints it declares
@@ -1447,6 +1534,7 @@ export default function AnalysisPage() {
   };
   // ---- workspaces ----------------------------------------------------------
   const openWorkspaceSave = () => {
+    if (!canSave()) return;
     // Only ever prefills with the workspace's OWN name, if it already has
     // one — never a cohort name or a generic fallback standing in for a
     // real name, which read as though the app had already named it for you.
@@ -1659,7 +1747,7 @@ function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChange, allo
         <select value={a.attribute || ""} disabled={busy} title="which clinical attribute"
           onChange={(e) => set({ ...a, attribute: e.target.value })}>
           {!attrs.some((x) => x.attribute === a.attribute) && <option value={a.attribute || ""}>{a.attribute || "(none)"}</option>}
-          {attrs.map((x) => <option key={x.attribute} value={x.attribute}>{x.attribute}{x.kind === "num" ? "" : " (categorical)"}</option>)}
+          {attrs.map((x) => <option key={x.attribute} value={x.attribute}>{attributeLabel(x.attribute)}{x.kind === "num" ? "" : " (categorical)"}</option>)}
         </select>
       )}
       {src === "molecular" && <>
@@ -1825,7 +1913,7 @@ function SplitByControl({ current, cohort, attrs, busy, menuId, menuStore, onCha
   const [mode, setMode] = useState<"attribute" | "gene" | "oql">(current?.gene ? "gene" : current?.oql ? "oql" : "attribute");
   const [geneDraft, setGeneDraft] = useState(current?.gene || "");
   const [oqlDraft, setOqlDraft] = useState((current?.oql || []).join("\n"));
-  const label = current ? "split: " + (current.gene || current.attribute || (current.oql && current.oql.length + " OQL quer" + (current.oql.length === 1 ? "y" : "ies"))) : "+ split by";
+  const label = current ? "split: " + (current.gene || (current.attribute && attributeLabel(current.attribute, "short")) || (current.oql && current.oql.length + " OQL quer" + (current.oql.length === 1 ? "y" : "ies"))) : "+ split by";
   if (!cohort) {
     return (
       <button type="button" className="tbbtn" disabled
@@ -1897,7 +1985,7 @@ function SplitByControl({ current, cohort, attrs, busy, menuId, menuStore, onCha
                 ? onChange({ maxArms: current?.maxArms, minCount: current?.minCount, cohort, attribute: e.target.value })
                 : onChange(undefined)}>
               <option value="">(none — not split)</option>
-              {catAttrs.map((a) => <option key={a.attribute} value={a.attribute}>{a.attribute}</option>)}
+              {catAttrs.map((a) => <option key={a.attribute} value={a.attribute}>{attributeLabel(a.attribute)}</option>)}
             </select>
           </div>
         ) : <p className="note">this study declares no clinical attributes to split by</p>}
@@ -2502,6 +2590,7 @@ function Latency({ v }: { v: any }) {
         <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>rationale</a>
         <AgentToolsMenu page="analysis" tools={LAB_TOOL_NAMES} webmcp={webmcp}
           intro="Your AI assistant — Claude in the Chrome sidebar — can read and edit this analysis with these tools. Every edit is run by the engine first and reaches the page only if it is accepted; analysis_undo reverts the assistant's edits." />
+        <LoginButton />
       </header>
       <main className="analysis-main">
         {/* Suggestions for every view's gene editor: the most-altered genes this
@@ -2636,6 +2725,22 @@ function Latency({ v }: { v: any }) {
           <button className={tab === "examples" ? "active" : ""} onClick={() => goTab("examples")}>Examples</button>
         </div>
         {error && <div className="error">{error}</div>}
+        {tab === "analysis" && (() => {
+          // a shared document can name server custom data that is locked here, deleted, or absent
+          const unresolved = unresolvedUploads(doc);
+          const of = (why: string) => unresolved.filter((u) => u.why === why).map((u) => u.as);
+          const manage = <button className="linklike" onClick={openCustomManager}>Explore → Custom data</button>;
+          const names = (ids: string[]) => ids.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>);
+          return unresolved.length > 0 && (
+            <div className="card customwarn">
+              {of("locked").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data ({names(of("locked"))}).{" "}
+                <button className="linklike" onClick={requestLogin}>Log in</button> to run it.</p>}
+              {of("deleted").length > 0 && <p style={{ margin: 0 }}>This analysis is pinned to custom data that has since been deleted: {names(of("deleted"))}.</p>}
+              {of("missing").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data that is not on the server: {names(of("missing"))}.</p>}
+              {of("unavailable").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data ({names(of("unavailable"))}), which this deployment does not store.</p>}
+            </div>
+          );
+        })()}
 
         {/* ================= Explore tab ================= */}
         {tab === "explore" && <div>
@@ -2814,10 +2919,14 @@ function Latency({ v }: { v: any }) {
                     title={ready ? "keep this definition on the Saved tab without running anything" : "select a study first"}>
                     Save as a Cohort
                   </button>
+                  <button onClick={saveDraftAsFeature} disabled={!ready}
+                    title={ready ? "freeze who matches these filters into a yes/no custom attribute you can chart, split and filter on" : "select a study first"}>
+                    Save as feature
+                  </button>
                   <button className="linklike" onClick={clearDraft}>clear</button>
                 </div>
                 <div className="row" style={{ marginTop: "0.4rem" }}>
-                  {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} />; })()}
+                  {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} onCustomData={showClauseData()} />; })()}
                 </div>
                 {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
                 {/* A native <dialog> so Esc, focus trapping and the backdrop come
@@ -2852,6 +2961,9 @@ function Latency({ v }: { v: any }) {
           {explore && (
             <div className="row" style={{ marginBottom: "1rem" }}>
               <button className="tbbtn" onClick={() => addChartDialog.current?.showModal()}>+ Add chart</button>
+              <button className="tbbtn" title="upload your own annotations and chart, filter and analyse them like clinical attributes"
+                onClick={() => { setChartTab("custom"); addChartDialog.current?.showModal(); }}>
+                Custom data{customState.datasets.length ? " (" + customState.datasets.length + ")" : ""}</button>
               {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
             </div>
           )}
@@ -2863,7 +2975,9 @@ function Latency({ v }: { v: any }) {
                 <button className={chartTab === "clinical" ? "active" : ""} onClick={() => setChartTab("clinical")}>Clinical</button>
                 <button className={chartTab === "gene" ? "active" : ""} onClick={() => setChartTab("gene")}>Gene status</button>
                 <button className={chartTab === "derived" ? "active" : ""} onClick={() => setChartTab("derived")}>Derived timeline filters</button>
+                <button className={chartTab === "custom" ? "active" : ""} onClick={() => setChartTab("custom")}>Custom data</button>
               </div>
+              {chartTab === "custom" && <CustomDataPanel studies={exStudies} onChanged={() => fetchExplore()} />}
               {chartTab === "clinical" && (() => {
                 const q = clinFilter.trim().toLowerCase();
                 const rows = !q ? explore.clinical : explore.clinical.filter((c) =>
@@ -2924,6 +3038,7 @@ function Latency({ v }: { v: any }) {
                               <tr key={attrKey(c)} onClick={(e) => { if ((e.target as HTMLElement).tagName !== "INPUT") toggle(); }}>
                                 <td><input type="checkbox" checked={!hiddenAttrs.has(attrKey(c))} onChange={toggle} /></td>
                                 <td>
+                                  {isCustomAttr(c.attribute) && <span className="customtag" title={c.description}>custom</span>}
                                   {c.displayName || c.attribute}
                                   {partial && (
                                     <span className="meta" title={"carried by " + (c.studyCount ?? 1) + " of " + exStudies.length + " selected studies, not all of them"}> *</span>
@@ -3174,6 +3289,7 @@ function Latency({ v }: { v: any }) {
                         <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}
                           title={[c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
                             .filter(Boolean).join(" — ") || undefined}>
+                          {isCustomAttr(c.attribute) && <span className="customtag" title={c.description}>custom</span>}
                           {c.displayName || c.attribute}{" "}
                           <span className="meta">
                             {(c.per === "sample" ? "· sample-level · " : "· ") + shown.toLocaleString() + unit}
@@ -3538,7 +3654,13 @@ function Latency({ v }: { v: any }) {
         </div>}
 
         {/* ================= Saved tab ================= */}
-        {tab === "cohorts" && <div>
+        {tab === "cohorts" && !loggedIn && <div className="card">
+          <p style={{ margin: 0 }}>Saved cohorts and analyses belong to your login.{" "}
+            {customState.enabled
+              ? <><button className="primary" onClick={requestLogin}>Log in</button> to see and save them.</>
+              : "This deployment has no login, so nothing can be saved on it."}</p>
+        </div>}
+        {tab === "cohorts" && loggedIn && <div>
           {/* Saved cohorts and saved analyses used to be two top-level tabs
               ("Cohorts" and "Saved") with a cross-link between them ("manage
               on the Saved tab") — one tab, two sub-tabs instead. */}
@@ -3583,7 +3705,7 @@ function Latency({ v }: { v: any }) {
               );
             })}
             <h2 style={{ marginTop: "1.2rem" }}>
-              Saved cohorts <span className="plain">— shared with everyone using this app; no per-user ownership yet. Tick any to include above; delete here.</span>
+              Saved cohorts <span className="plain">— everyone who logs in sees these: one shared login, no per-user ownership yet. Tick any to include above; delete here.</span>
             </h2>
             {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, build one on the Explore page, or ask chat.</p>}
             {Object.entries(saved)
@@ -3600,14 +3722,14 @@ function Latency({ v }: { v: any }) {
                   <span className="spacer" />
                   <button className="linklike" onClick={() => removeSaved(n)}>delete</button>
                 </div>
-                <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} /></div>
+                <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} onCustomData={showClauseData(n)} /></div>
               </div>
             ))}
           </div>
           </div>}
           {cohortsSubTab === "analyses" && <div className="grid2">
             <div className="card">
-              <h2>Saved analyses <span className="plain">— shared with everyone using this app; no per-user ownership yet</span></h2>
+              <h2>Saved analyses <span className="plain">— everyone who logs in sees these: one shared login, no per-user ownership yet</span></h2>
               {Object.keys(spaces).length === 0 && <p className="note">Nothing saved yet — build an analysis with at least one view, then "Save workspace" on the Analysis tab.</p>}
               {Object.entries(spaces)
                 .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
@@ -3669,6 +3791,10 @@ function Latency({ v }: { v: any }) {
                         {(ex.tags || []).filter(t => !viewKinds(ex).includes(t)).map(t => <span key={t} className="extag static">{t}</span>)}
                       </div>
                       {ex.demonstrates && <p className="exdem">{ex.demonstrates}</p>}
+                      {ex.customData?.length ? <p className="meta" style={{ margin: 0 }}>
+                        <span className="customtag">custom</span>
+                        Runs on demo data bundled with the app: {ex.customData.map((d) => d.name + " (" + d.rows.length + " " + d.level + "s)").join(", ")}.
+                      </p> : null}
                       <p className="exnote">{ex.note}</p>
                       <div className="exmeta">
                         <span title={studies.join(", ")}>
@@ -3727,7 +3853,7 @@ function Latency({ v }: { v: any }) {
                       </div>
                       <CohortStudies ids={c.studies && c.studies.length ? c.studies : [doc.cohorts?.[n]?.study || doc.study || result.study].filter(Boolean) as string[]}
                         names={studyNames} />
-                      {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} />}
+                      {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} onCustomData={showClauseData(n)} />}
                       {/* A note only shows here — passively, read-only — once the
                           cohort is actually saved as a reusable artifact AND
                           someone bothered to write one; an ad-hoc cohort that
@@ -3804,6 +3930,15 @@ function Latency({ v }: { v: any }) {
                       Save analysis
                     </button>
                   )}
+                  {(() => {
+                    const used = referencedDatasets(doc);
+                    return used.length > 0 && (
+                      <button className="linklike" onClick={() => setCdFocus({ datasets: used })}
+                        title="the uploads this analysis names, as stored in this browser">
+                        custom data ({used.length})
+                      </button>
+                    );
+                  })()}
                   <button className="linklike" onClick={() => docDialog.current?.showModal()}
                     title="open the document's raw JSON — edit it, run it, or view generated SQL">
                     show document json
@@ -4554,6 +4689,7 @@ function Latency({ v }: { v: any }) {
                       onExpandTrack={(label) => splitGeneTrack(vi, label)}
                       onContract={(ct) => { const k = JSON.stringify(v.spec); setContracts((m) => m[k] === ct ? m : { ...m, [k]: ct }); }}
                       onCreateCohort={(sel) => cohortFromSelection(sel, (c ? c.studies : vStudies) || vStudies)}
+                      onSaveFeature={(sel, all) => featureFromSelection(sel, all, (c ? c.studies : vStudies) || vStudies)}
                       busy={busy}
                       controls={<>
                         <button className="tbbtn genesbtn" disabled={busy}
@@ -4649,6 +4785,14 @@ function Latency({ v }: { v: any }) {
           </div>
         </div>}
       </main>
+      {toast && <div className="toast" role="status" onClick={() => setToast(null)}>{toast}</div>}
+      <CustomDataDialog focus={cdFocus} onClose={() => setCdFocus(null)}
+        bindings={doc.uploads || []}
+        onRepin={(as, version) => {
+          const d = { ...doc, uploads: (doc.uploads || []).map((b) => b.as === as ? { ...b, version } : b) };
+          setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
+        }}
+        onManage={openCustomManager} />
     </>
   );
 }
@@ -4673,15 +4817,19 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
   onHeatmap: (next: { profileType: string; genes?: string[] }[]) => void;
   onDerived: (next: string[]) => void;
 }) {
-  const [tab, setTab] = useState<"clinical" | "heatmap" | "cohorts">("clinical");
+  const [tab, setTab] = useState<"clinical" | "custom" | "heatmap" | "cohorts">("clinical");
   const [q, setQ] = useState("");
   const match = (s: string) => s.toLowerCase().includes(q.trim().toLowerCase());
   const heatOptions = ["VAF", ...profiles];
-  const chosen = tab === "clinical" ? clinical : tab === "heatmap" ? heatmap.map((h) => h.profileType) : derivedCohorts;
-  const shown = (tab === "clinical" ? attrs.map((a) => a.attribute) : tab === "heatmap" ? heatOptions : cohorts).filter(match);
-  const cap = tab === "clinical" ? 8 : tab === "heatmap" ? 4 : 3;
+  // uploads get their own tab, but they are clinical tracks to the engine: one list, one cap of 8
+  const studyAttrs = attrs.filter((a) => !isCustomAttr(a.attribute)), customAttrs = attrs.filter((a) => isCustomAttr(a.attribute));
+  const isClin = tab === "clinical" || tab === "custom";
+  const chosen = isClin ? clinical : tab === "heatmap" ? heatmap.map((h) => h.profileType) : derivedCohorts;
+  const shown = (tab === "clinical" ? studyAttrs.map((a) => a.attribute) : tab === "custom" ? customAttrs.map((a) => a.attribute)
+    : tab === "heatmap" ? heatOptions : cohorts).filter((n) => match(n) || match(attributeLabel(n)));
+  const cap = isClin ? 8 : tab === "heatmap" ? 4 : 3;
   const toggle = (name: string) => {
-    if (tab === "clinical") onClinical(clinical.includes(name) ? clinical.filter((x) => x !== name) : clinical.length < 8 ? [...clinical, name] : clinical);
+    if (isClin) onClinical(clinical.includes(name) ? clinical.filter((x) => x !== name) : clinical.length < 8 ? [...clinical, name] : clinical);
     else if (tab === "heatmap") onHeatmap(chosen.includes(name) ? heatmap.filter((h) => h.profileType !== name) : heatmap.length < 4 ? [...heatmap, { profileType: name }] : heatmap);
     else onDerived(derivedCohorts.includes(name) ? derivedCohorts.filter((x) => x !== name) : derivedCohorts.length < 3 ? [...derivedCohorts, name] : derivedCohorts);
   };
@@ -4694,7 +4842,9 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
       <summary className="tbbtn" title="add or remove tracks">tracks{chosen.length ? " (" + chosen.length + ")" : ""}</summary>
       <div className="gearmenu-items wide" style={{ minWidth: 340 }}>
         <div className="row" style={{ gap: "0.5rem", alignItems: "center" }}>
-          <button className="linklike" style={{ fontWeight: tab === "clinical" ? 600 : 400 }} onClick={() => setTab("clinical")}>Clinical {attrs.length ? "(" + attrs.length + ")" : ""}</button>
+          <button className="linklike" style={{ fontWeight: tab === "clinical" ? 600 : 400 }} onClick={() => setTab("clinical")}>Clinical {studyAttrs.length ? "(" + studyAttrs.length + ")" : ""}</button>
+          <button className="linklike" style={{ fontWeight: tab === "custom" ? 600 : 400 }} onClick={() => setTab("custom")}
+            title="attributes from your uploads (Explore → Custom data)">Custom ({customAttrs.length})</button>
           <button className="linklike" style={{ fontWeight: tab === "heatmap" ? 600 : 400 }} onClick={() => setTab("heatmap")}>Heatmap ({heatOptions.length})</button>
           <button className="linklike" style={{ fontWeight: tab === "cohorts" ? 600 : 400 }} onClick={() => setTab("cohorts")}>Cohort rows ({cohorts.length})</button>
           <span className="spacer" />
@@ -4702,20 +4852,23 @@ function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohort
         </div>
         <span className="meta">{chosen.length} of {cap} chosen{
           tab === "clinical" ? " · cases with data, most first"
+          : tab === "custom" ? " · your uploads, kept in this browser; they share the 8 clinical tracks"
           : tab === "heatmap" ? " · a profile draws one row per gene; leave the genes blank to follow the figure"
           : " · any cohort in this document can be a binary row (patients only, one study)"}</span>
         <div style={{ maxHeight: 260, overflowY: "auto", marginTop: "0.3rem" }}>
           {!shown.length && (loading && !attrs.length ? <Waiting what="tracks" />
-            : <span className="meta">{q.trim() ? "nothing matches" : "nothing to choose from"}</span>)}
+            : <span className="meta">{q.trim() ? "nothing matches"
+              : tab === "custom" ? "no uploads for this study in this browser: add one under Explore → Custom data" : "nothing to choose from"}</span>)}
           {shown.map((name) => {
             const on = chosen.includes(name);
-            const a = tab === "clinical" ? attrs.find((x) => x.attribute === name) : undefined;
+            const a = isClin ? attrs.find((x) => x.attribute === name) : undefined;
             const h = tab === "heatmap" && on ? heatmap.find((x) => x.profileType === name) : undefined;
             return (
               <div key={name}>
                 <label className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "baseline", padding: "0.1rem 0" }}>
                   <input type="checkbox" checked={on} disabled={busy || (!on && chosen.length >= cap)} onChange={() => toggle(name)} />
-                  <span style={{ flex: 1 }}>{name === "VAF" ? "VAF (mutation allele fraction)" : name}{a?.kind === "num" ? " (numeric)" : ""}</span>
+                  <span style={{ flex: 1 }} title={tab === "custom" ? name : undefined}>{name === "VAF" ? "VAF (mutation allele fraction)" : attributeLabel(name, tab === "custom" ? "short" : "long")}{a?.kind === "num" ? " (numeric)" : ""}
+                    {tab === "custom" && <span className="meta"> · {parseCustomAttr(name)?.dataset}</span>}</span>
                   {a && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
                 </label>
                 {h && <input defaultValue={(h.genes || []).join(" ")} placeholder="genes for this profile — blank follows the figure"

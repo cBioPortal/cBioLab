@@ -376,3 +376,27 @@ describe("explore engine issues aggregate-only queries", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Custom data (lib/custom-data.ts) is patient-level: uploaded rows travel only with statements
+// sent to a connection the request boundary entitled to them.
+// ---------------------------------------------------------------------------
+describe("boundary: uploaded custom data", () => {
+  test("rows are refused by any connection the request did not entitle", async () => {
+    const { withCustomData, clinicalTable, customExternalsFor } = await import("../lib/custom-data.ts");
+    const datasets = [{ id: "d", name: "d", level: "patient" as const, columns: [{ name: "X", datatype: "STRING" as const }],
+      rows: [{ study: "s1", patient: "P-1", values: ["y"] }] }];
+    await withCustomData({ datasets, allowedConns: new Set(["a"]), allowedDbs: new Set(["db1"]) }, async () => {
+      const sql = "SELECT 1 FROM " + clinicalTable("db1", "all");
+      assert.equal(customExternalsFor(sql, "a").length, 1);
+      for (const other of ["b", "peer"]) assert.throws(() => customExternalsFor(sql, other), /cannot be sent/);
+      // a database of another connection never even names the table
+      assert.ok(!clinicalTable("db2", "all").includes("_custom_"));
+    });
+  });
+  test("a remote or aggregate-only study cannot be given custom data", async () => {
+    const src = readFileSync(new URL("../lib/custom-data-server.ts", import.meta.url), "utf8");
+    assert.match(src, /peerForStudy\(study\)\)\s*\n\s*throw/);
+    assert.match(src, /inst\.mode !== "patient-level"\)\s*\n\s*throw/);
+  });
+});

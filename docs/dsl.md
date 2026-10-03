@@ -13,8 +13,14 @@ SQL each cohort compiled to.
 ```
 { "study":   "<default study id>",            // validated against cancer_study
   "cohorts": { "<name>": cohortDef, ... },    // max 16
-  "views":   [ view, ... ] }                  // max 6
+  "views":   [ view, ... ],                   // max 6
+  "uploads"?: [ { "as": "<name>", "dataset": "<id>", "version": n } ] }  // server-stored custom data, pinned
 ```
+
+`uploads` pins server-stored custom data: every `custom:<as>/<COLUMN>` attribute in the document reads that
+dataset at that version, which never changes, so whoever may read it gets the same rows. The web app adds the pin
+the first time an analysis uses a server dataset. A `custom:` name with no pin is a local upload, sent by the
+browser that holds it.
 
 Sent to `POST /api/analysis`, edited by the researcher's assistant through the page's WebMCP tools, and encoded in shareable
 `/analysis?doc=<base64url>` links.
@@ -50,7 +56,7 @@ provenance — sees the fully flattened `all` list, exactly as if it had been wr
 | kind | shape | meaning |
 |---|---|---|
 | `oql` | `{"kind":"oql","q":"STK11: DRIVER"}` | genomic status in cBioPortal OQL (see below) |
-| `clinical` | `{"kind":"clinical","attribute":A, ...predicate, "per"?:"sample"}` | clinical attribute; predicate is `values:[≤50]` (OR), `range:{gt,gte,lt,lte}` (numeric via toFloat64OrNull), or `op`(`= != > >= < <=`)+`value`; `per:"sample"` = patient matches if ANY sample matches. `op`+`percentile` (0-1) resolves `value` LIVE from a percentile of the attribute's distribution instead of a literal number — e.g. `{"op":">=","percentile":0.8}` = "at or above the 80th percentile" ("top 20%"). `percentileOf`:"<cohort name>" scopes the reference population to another cohort in this document (e.g. "top 20% TMB **within NSCLC**", not the whole study); both the leaf's own cohort and, if given, `percentileOf`'s cohort must resolve to a single study, and `percentileOf` may not itself use `percentile` (no chaining). Resolved once, live, before compilation — the readback shows the resolved number and what it was a percentile of |
+| `clinical` | `{"kind":"clinical","attribute":A, ...predicate, "per"?:"sample"}` | clinical attribute; predicate is `values:[≤50]` (OR), `range:{gt,gte,lt,lte}` (numeric via toFloat64OrNull), or `op`(`= != > >= < <=`)+`value`; `per:"sample"` = patient matches if ANY sample matches. `op`+`percentile` (0-1) resolves `value` LIVE from a percentile of the attribute's distribution instead of a literal number — e.g. `{"op":">=","percentile":0.8}` = "at or above the 80th percentile" ("top 20%"). `percentileOf`:"<cohort name>" scopes the reference population to another cohort in this document (e.g. "top 20% TMB **within NSCLC**", not the whole study); both the leaf's own cohort and, if given, `percentileOf`'s cohort must resolve to a single study, and `percentileOf` may not itself use `percentile` (no chaining). Resolved once, live, before compilation — the readback shows the resolved number and what it was a percentile of. **Custom data:** an attribute the reader uploaded is named `custom:<dataset>/<COLUMN>` (e.g. `custom:brain-mets/MET_SITE`) and works here and in every view exactly like the study's own — oncoprint `clinical` tracks, `splitBy.attribute`, `clinical` views, plot axes. Uploads are stored on the server, readable once logged in, and pinned by version in the document's `uploads`; a document naming a dataset the request cannot read is refused, never answered as if no patient had a value. Patient-level studies only |
 | `derived` | `{"kind":"derived","metric":"followupMonths"|"historyMonths"|"alteredGenes"|"lines"|"treatmentSpan","range":{gte?,gt?,lte?,lt?},"eventType"?,"lineGap"?:90,"lineClasses"?}` | filters on a value computed from the **shape** of the data rather than a study's vocabulary. Event-type names and attribute keys are study-specific — this database spells one concept `Treatment` in 87 studies and `TREATMENT` in 10, and the key MSK-CHORD calls `SUBTYPE` exists in only 27 of 131 timeline studies — so these read dates and gene symbols instead and mean the same thing everywhere. `followupMonths`: how far the timeline runs past its own day 0. `historyMonths`: how much predates it. `alteredGenes`: distinct genes altered (panel size bounds it, so not comparable across studies with different panels). `lines` and `treatmentSpan` are the deliberate exception — they need `eventType` (which timeline event stands for "a therapy" here; Explore proposes one from the study's own catalog), because there is no vocabulary-free way to ask "how many lines of treatment". `lines`: the number of treatment lines, by the one line definition the `sequence` view and "Treatment line (derived)" share (systemic-therapy records of that event type, a `lineGap`-day gap; `lineClasses` `"all"` or a class list widens it). `treatmentSpan`: months from the first to the last record of that event type |
 | `event` | `{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}` | timeline sub-DSL (below) |
 | `sampleList` | `{"kind":"sampleList","ids":["<study>:<id>", ...]}` | explicit, cross-study list of sample ids — up to ~22,000 total (measured ClickHouse query-size ceiling; not enforced as a hard cap yet) |
@@ -3055,6 +3061,89 @@ Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a med
         "eventType": "Treatment",
         "key": "SUBTYPE",
         "value": "Hormone"
+      }
+    }
+  ]
+}
+```
+
+### Example 49: Custom data: a curated biopsy site on every sample
+
+luad_mskimpact_2021 is 93 EGFR-mutant lung adenocarcinomas with 186 primary and metastatic samples. The demo upload gives every sample a BIOPSY_SITE, grouped from the study's own SAMPLE_TYPE and free-text METASTATIC_SITE the way a reviewer would (scripts/gen-custom-demo.ts), standing in for a clinician-curated annotation. "CNS met" filters on it: 8 patients. Ordered by site, the oncoprint puts each patient's primary and metastases in their own groups. Fraction of the genome altered has a median of 0.47 in the 11 CNS samples and 0.36 in liver, against 0.21 in the 76 primaries. Split by site, TP53 is altered in 7 of 8 CNS-met patients (87.5%) against 65.6% of the patients with a primary sample. The split arms overlap, because a patient whose primary and metastasis were both sequenced belongs to both arms. With 8 to 61 patients per arm, these are illustrations, not findings.
+
+Runs on custom data: `luad-biopsy-site` (LUAD biopsy site (demo), 186 samples, columns BIOPSY_SITE), sent with the request as `customData`; without it the document is refused.
+
+```json
+{
+  "study": "luad_mskimpact_2021",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    },
+    "CNS met": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "custom:luad-biopsy-site/BIOPSY_SITE",
+          "values": [
+            "CNS met"
+          ],
+          "per": "sample"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "oncoprint",
+      "unit": "sample",
+      "cohorts": [
+        "all patients"
+      ],
+      "genes": [
+        "EGFR",
+        "KRAS",
+        "TP53",
+        "STK11",
+        "KEAP1",
+        "SMARCA4"
+      ],
+      "clinical": [
+        "custom:luad-biopsy-site/BIOPSY_SITE",
+        "SAMPLE_TYPE"
+      ],
+      "sort": [
+        "custom:luad-biopsy-site/BIOPSY_SITE"
+      ]
+    },
+    {
+      "kind": "plot",
+      "unit": "sample",
+      "cohorts": [
+        "all patients"
+      ],
+      "x": {
+        "source": "clinical",
+        "attribute": "custom:luad-biopsy-site/BIOPSY_SITE"
+      },
+      "y": {
+        "source": "clinical",
+        "attribute": "FRACTION_GENOME_ALTERED"
+      }
+    },
+    {
+      "kind": "compare",
+      "genes": [
+        "EGFR",
+        "KRAS",
+        "TP53",
+        "STK11",
+        "KEAP1",
+        "SMARCA4"
+      ],
+      "splitBy": {
+        "cohort": "all patients",
+        "attribute": "custom:luad-biopsy-site/BIOPSY_SITE"
       }
     }
   ]

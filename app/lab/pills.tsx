@@ -3,6 +3,10 @@
 // visualization of what the JSON says. Read-only by default; pass onRemoveClause to
 // get an × on each top-level clause (creator mode).
 import { Fragment } from "react";
+import { isCustomAttr, attributeLabel } from "../../lib/custom-data-names.ts";
+
+/** opens the uploaded data behind a clause (see custom-data-dialog.tsx) */
+export type OnCustomData = (attribute: string, leaf: any, negated: boolean) => void;
 
 const KIND_META: Record<string, { label: string; color: string }> = {
   alteration: { label: "gene", color: "#CC79A7" },
@@ -66,7 +70,7 @@ function leafText(leaf: any) {
       // percentile request itself.
       ? `${leaf.op} ${Math.round(leaf.percentile * 100)}th percentile${leaf.percentileOf ? " of " + leaf.percentileOf : ""}`
       : `${leaf.op} ${leaf.value}`);
-    return `${leaf.attribute} ${bits.join(" ")}` + (leaf.per === "sample" ? " ·any sample" : "");
+    return `${attributeLabel(String(leaf.attribute ?? ""), "short")} ${bits.join(" ")}` + (leaf.per === "sample" ? " ·any sample" : "");
   }
   if (k === "derived") {
     // Without this a derived leaf fell through to the clinical branch, which
@@ -106,12 +110,17 @@ function leafText(leaf: any) {
   return t;
 }
 
-function Pill({ leaf, negated, onRemove }: { leaf: any; negated?: boolean; onRemove?: () => void }) {
+function Pill({ leaf, negated, onRemove, onCustomData }: { leaf: any; negated?: boolean; onRemove?: () => void; onCustomData?: OnCustomData }) {
   const meta = KIND_META[leafKind(leaf)] || KIND_META.clinical;
   const text = leafText(leaf);
+  const custom = leafKind(leaf) === "clinical" && isCustomAttr(leaf.attribute);
   return (
     <span className="fpill" style={{ borderLeftColor: meta.color }}>
       <span className="fkind">{meta.label}</span>
+      {custom && (onCustomData
+        ? <button className="customtag" title={"show the uploaded data behind this clause (" + leaf.attribute + ")"}
+            onClick={() => onCustomData(leaf.attribute, leaf, !!negated)}>custom</button>
+        : <span className="customtag" title={leaf.attribute}>custom</span>)}
       {negated && <span className="fnot">NOT</span>}
       <span className="fval" title={text}>{text}</span>
       {onRemove && <button className="fx" aria-label="remove clause" onClick={onRemove}>×</button>}
@@ -125,7 +134,7 @@ export function normalizeDef(def: any) {
   return def;
 }
 
-export default function CohortPills({ def, onRemoveClause }: { def: any; onRemoveClause?: (i: number) => void }) {
+export default function CohortPills({ def, onRemoveClause, onCustomData }: { def: any; onRemoveClause?: (i: number) => void; onCustomData?: OnCustomData }) {
   const d = normalizeDef(def);
   if (!d || !Array.isArray(d.all) || !d.all.length) return <span className="meta">no clauses</span>;
   return (
@@ -138,15 +147,15 @@ export default function CohortPills({ def, onRemoveClause }: { def: any; onRemov
               {c.any.map((l: any, j: any) => (
                 <Fragment key={j}>
                   {j > 0 && <span className="fconn">OR</span>}
-                  <Pill leaf={l} />
+                  <Pill leaf={l} onCustomData={onCustomData} />
                 </Fragment>
               ))}
               {onRemoveClause && <button className="fx" aria-label="remove group" onClick={() => onRemoveClause(i)}>×</button>}
             </span>
           ) : c.not ? (
-            <Pill leaf={c.not} negated onRemove={onRemoveClause ? () => onRemoveClause(i) : undefined} />
+            <Pill leaf={c.not} negated onRemove={onRemoveClause ? () => onRemoveClause(i) : undefined} onCustomData={onCustomData} />
           ) : (
-            <Pill leaf={c} onRemove={onRemoveClause ? () => onRemoveClause(i) : undefined} />
+            <Pill leaf={c} onRemove={onRemoveClause ? () => onRemoveClause(i) : undefined} onCustomData={onCustomData} />
           )}
         </Fragment>
       ))}

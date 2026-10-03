@@ -2,6 +2,10 @@
 // db/migrations/0001_saved_artifacts.sql). Definitions only — never a frozen
 // evaluation or a patient/sample id; see lib/db.ts and RATIONALE.md.
 //
+// Every call is made as a principal (lib/auth.ts): a row is visible to, and changed by, its
+// owner only. Rows saved before there was a login have no owner and belong to the shared
+// principal — today's only one — so nothing saved earlier disappears.
+//
 // Schema-versioned like the DSL documents themselves: CURRENT_SCHEMA_VERSION
 // is stamped on every write, and `migrate()` is the one place a stored
 // definition is brought forward to the shape the rest of the app expects,
@@ -12,6 +16,7 @@
 // retrofitted under pressure the day the DSL makes a breaking change.
 import { randomUUID } from "node:crypto";
 import { dbQuery } from "./db.ts";
+import { SHARED_PRINCIPAL } from "./auth.ts";
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
@@ -39,7 +44,10 @@ function migrate(kind: ArtifactKind, definition: unknown, fromVersion: number): 
   return definition;
 }
 
-interface Row { id: string; kind: ArtifactKind; name: string; schema_version: number; definition: unknown; created_at: string; updated_at: string }
+interface Row { id: string; kind: ArtifactKind; name: string; schema_version: number; definition: unknown; owner?: string | null; created_at: string; updated_at: string }
+
+/** An owner column of null predates the login and is read as the shared principal's. */
+const ownerOf = (r: Row) => r.owner ?? SHARED_PRINCIPAL;
 
 function fromRow(r: Row): SavedArtifact {
   return {
@@ -73,7 +81,7 @@ function validateName(name: unknown): string {
 interface Backend {
   list(kind?: ArtifactKind): Promise<Row[]>;
   get(id: string): Promise<Row | null>;
-  insert(kind: ArtifactKind, name: string, definition: unknown): Promise<Row>;
+  insert(kind: ArtifactKind, name: string, definition: unknown, owner: string): Promise<Row>;
   update(id: string, name: string, definition: unknown): Promise<Row | null>;
   remove(id: string): Promise<boolean>;
 }
@@ -87,9 +95,9 @@ const memoryBackend: Backend = {
       .slice(0, 500);
   },
   async get(id) { return memoryRows.get(id) ?? null; },
-  async insert(kind, name, definition) {
+  async insert(kind, name, definition, owner) {
     const now = new Date().toISOString();
-    const row: Row = { id: randomUUID(), kind, name, schema_version: CURRENT_SCHEMA_VERSION, definition, created_at: now, updated_at: now };
+    const row: Row = { id: randomUUID(), kind, name, schema_version: CURRENT_SCHEMA_VERSION, definition, owner, created_at: now, updated_at: now };
     memoryRows.set(row.id, row);
     return row;
   },
@@ -113,10 +121,10 @@ const pgBackend: Backend = {
     const rows = await dbQuery<Row>("select * from saved_artifacts where id = $1", [id]);
     return rows[0] ?? null;
   },
-  async insert(kind, name, definition) {
+  async insert(kind, name, definition, owner) {
     const rows = await dbQuery<Row>(
-      "insert into saved_artifacts (kind, name, schema_version, definition) values ($1, $2, $3, $4) returning *",
-      [kind, name, CURRENT_SCHEMA_VERSION, JSON.stringify(definition)]
+      "insert into saved_artifacts (kind, name, schema_version, definition, owner) values ($1, $2, $3, $4, $5) returning *",
+      [kind, name, CURRENT_SCHEMA_VERSION, JSON.stringify(definition), owner]
     );
     return rows[0];
   },
@@ -145,27 +153,33 @@ function backend(): Backend {
   return memoryBackend;
 }
 
-export async function listArtifacts(kind?: ArtifactKind): Promise<SavedArtifact[]> {
+export async function listArtifacts(principal: string, kind?: ArtifactKind): Promise<SavedArtifact[]> {
   const rows = await backend().list(kind);
-  return rows.map(fromRow);
+  return rows.filter((r) => ownerOf(r) === principal).map(fromRow);
 }
 
-export async function getArtifact(id: string): Promise<SavedArtifact | null> {
+/** The row, if it exists and this principal owns it: someone else's reads as absent. */
+async function owned(principal: string, id: string): Promise<Row | null> {
   const row = await backend().get(id);
+  return row && ownerOf(row) === principal ? row : null;
+}
+
+export async function getArtifact(principal: string, id: string): Promise<SavedArtifact | null> {
+  const row = await owned(principal, id);
   return row ? fromRow(row) : null;
 }
 
-export async function createArtifact(kind: ArtifactKind, name: unknown, definition: unknown): Promise<SavedArtifact> {
+export async function createArtifact(principal: string, kind: ArtifactKind, name: unknown, definition: unknown): Promise<SavedArtifact> {
   if (!isArtifactKind(kind)) throw new Error("kind must be 'cohort' or 'workspace'");
   const n = validateName(name);
   if (!definition || typeof definition !== "object") throw new Error("definition must be an object");
-  const row = await backend().insert(kind, n, definition);
+  const row = await backend().insert(kind, n, definition, principal);
   return fromRow(row);
 }
 
 /** Rename and/or replace the definition. Either field may be omitted to leave it as-is. */
-export async function updateArtifact(id: string, patch: { name?: unknown; definition?: unknown }): Promise<SavedArtifact | null> {
-  const existing = await getArtifact(id);
+export async function updateArtifact(principal: string, id: string, patch: { name?: unknown; definition?: unknown }): Promise<SavedArtifact | null> {
+  const existing = await getArtifact(principal, id);
   if (!existing) return null;
   const name = patch.name === undefined ? existing.name : validateName(patch.name);
   if (patch.definition !== undefined && (!patch.definition || typeof patch.definition !== "object"))
@@ -175,6 +189,7 @@ export async function updateArtifact(id: string, patch: { name?: unknown; defini
   return row ? fromRow(row) : null;
 }
 
-export async function deleteArtifact(id: string): Promise<boolean> {
+export async function deleteArtifact(principal: string, id: string): Promise<boolean> {
+  if (!(await owned(principal, id))) return false;
   return backend().remove(id);
 }

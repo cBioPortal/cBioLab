@@ -26,6 +26,7 @@ import { wardOrder, CLUSTER_LIMIT } from "./oncoprint-cluster.ts";
 
 import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
+import { clinicalTable, assertCustomDataPresent } from "./custom-data.ts";
 export { normalizeDisplay, normalizeSort } from "./oncoprint-assemble.ts";
 
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
@@ -126,7 +127,7 @@ export function clinicalSql(attrs: string[], study: string = STUDY, db: string =
     // samples (a patient's stage is the stage of every sample of theirs)
     return "SELECT replaceOne(sd.sample_unique_id, " + sq(puidPrefix) + ", '') AS pid,\n" +
       "       cd.attribute_name AS k, argMax(cd.attribute_value, cd.type = 'sample') AS v\n" +
-      "FROM " + db + ".clinical_data_derived cd\n" +
+      "FROM " + clinicalTable(db, attrs) + " cd\n" +
       "JOIN " + db + ".sample_derived sd ON sd.patient_unique_id = cd.patient_unique_id\n" +
       "  AND (cd.type = 'patient' OR cd.sample_unique_id = sd.sample_unique_id)\n" +
       "WHERE cd.cancer_study_identifier = " + sq(study) + " AND cd." + inAttrs + "\n" +
@@ -135,7 +136,7 @@ export function clinicalSql(attrs: string[], study: string = STUDY, db: string =
   // fall back to one of the patient's sample values via argMax
   return "SELECT replaceOne(patient_unique_id, " + sq(puidPrefix) + ", '') AS pid,\n" +
     "       attribute_name AS k, argMax(attribute_value, type = 'patient') AS v\n" +
-    "FROM " + db + ".clinical_data_derived\n" +
+    "FROM " + clinicalTable(db, attrs) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + "\n" +
     "  AND " + inAttrs + "\n" +
     "GROUP BY pid, k";
@@ -250,6 +251,7 @@ export interface ContractOpts {
 
 export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}): Promise<Contract> {
   const t0 = Date.now();
+  assertCustomDataPresent(spec);
   // Record a query the same way the resolvers do: pushed before the await and
   // stamped after, so concurrent fetches each update their own entry.
   // the four hot fetches read columns by index: no object per row, ~45% fewer bytes

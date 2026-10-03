@@ -29,8 +29,13 @@ echo "== method scripts =="            && npm run check:methods 2>&1 | grep -E "
 echo "== e2e =="
 fuser -k $PORT/tcp 2>/dev/null || true
 sleep 2
-(npm start -- -p $PORT >/tmp/gate-server.log 2>&1 &)
+# a throwaway login for this run: saved cohorts and analyses need one (lib/auth.ts)
+export LOGIN_PASSWORD="gate-$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+# and no Postgres: saved cohorts and custom data go to the server's in-memory store, so a gate run
+# never writes to the real Supabase tables. An empty value is kept by Next (it does not
+# overwrite a variable that is already set from .env.local), and the stores treat it as unset.
+(SUPABASE_DB_URL= npm start -- -p $PORT >/tmp/gate-server.log 2>&1 &)
 for _ in $(seq 1 40); do curl -sf -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/analysis" && break; sleep 3; done
-set +e; E2E_PORT=$PORT node e2e.cjs; RC=$?; set -e
+set +e; E2E_PORT=$PORT E2E_LOGIN_PASSWORD=$LOGIN_PASSWORD node e2e.cjs; RC=$?; set -e
 fuser -k $PORT/tcp 2>/dev/null || true
 exit $RC

@@ -15,6 +15,7 @@
 import { sq } from "./compiler.ts";
 import { DB } from "./ch.ts";
 import { STYLE } from "./oncoprint-style.ts";
+import { clinicalTable, ATTR_NAME_RE } from "./custom-data.ts";
 
 /** what goes on one axis */
 export type PlotAxis =
@@ -76,7 +77,7 @@ export function categoryColor(label: string, i = 0): string {
 export interface AxisCtx { study: string; db?: string; unit: "patient" | "sample"; cohortSql: string }
 
 const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
-const ATTR_RE = /^[A-Za-z0-9_]{1,64}$/;
+const ATTR_RE = ATTR_NAME_RE;
 const PROFILE_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 
 /** categories that mean "this case has none of that", which draw as neutral and never as a ring */
@@ -166,17 +167,17 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     const defined = (e: string) => kind === "num" ? " AND " + e + " IS NOT NULL" : "";
     const own = "SELECT " + strip(sample ? "sample_unique_id" : "patient_unique_id", study) + " AS id, " + val + " AS v, " +
       (sample ? "1" : "1") + " AS pref\n" +
-      "  FROM " + db + ".clinical_data_derived\n" +
+      "  FROM " + clinicalTable(db, [a.attribute]) + "\n" +
       "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(a.attribute) +
       " AND attribute_value != ''" + defined(val) + "\n    AND type = " + (sample ? "'sample'" : "'patient'") + " AND " + inCohort("patient_unique_id");
     const other = sample
       ? "SELECT " + strip("sd.sample_unique_id", study) + " AS id, " + valCd + " AS v, 0 AS pref\n" +
-        "  FROM " + db + ".clinical_data_derived cd\n" +
+        "  FROM " + clinicalTable(db, [a.attribute]) + " cd\n" +
         "  JOIN " + db + ".sample_derived sd ON sd.patient_unique_id = cd.patient_unique_id\n" +
         "  WHERE cd.cancer_study_identifier = " + sq(study) + " AND cd.attribute_name = " + sq(a.attribute) +
         " AND cd.attribute_value != ''" + defined(valCd) + "\n    AND cd.type = 'patient' AND " + inCohort("cd.patient_unique_id")
       : "SELECT " + strip("patient_unique_id", study) + " AS id, " + val + " AS v, 0 AS pref\n" +
-        "  FROM " + db + ".clinical_data_derived\n" +
+        "  FROM " + clinicalTable(db, [a.attribute]) + "\n" +
         "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(a.attribute) +
         " AND attribute_value != ''" + defined(val) + "\n    AND type = 'sample' AND " + inCohort("patient_unique_id");
     return "SELECT id, argMax(v, pref) AS v FROM (\n" + own + "\n  UNION ALL\n" + other + "\n) GROUP BY id";

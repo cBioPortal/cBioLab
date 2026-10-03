@@ -897,6 +897,13 @@ export interface AnalysisDoc {
   notes?: string;
   /** a name, when this document has been saved as a workspace */
   title?: string;
+  /**
+   * Server-stored custom data this document pins: the name its attributes use
+   * (`custom:<as>/<COLUMN>`) -> a stored dataset at one version (lib/custom-store.ts). A pinned
+   * version never changes, so whoever may read it gets the same rows. A name with no pin is a
+   * local upload, sent by the browser that holds it.
+   */
+  uploads?: { as: string; dataset: string; version: number }[];
 }
 
 // ---------- results ---------------------------------------------------------

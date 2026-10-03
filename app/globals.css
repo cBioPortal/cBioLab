@@ -789,6 +789,34 @@ details.gearmenu.inline[open] > summary {
 .attrtable tbody tr:hover { background: var(--code-bg); }
 .attrtable td { padding: 0.3rem 0.6rem; }
 .attrtable td.meta { white-space: nowrap; }
+/* Custom data: the reader's own uploads, marked wherever an attribute name is shown */
+.customtag {
+  font-family: "IBM Plex Mono", monospace; font-size: var(--t-xs); font-weight: 500;
+  color: var(--accent-ink); background: var(--accent-soft);
+  padding: 0.05rem 0.4rem; border-radius: var(--r-sm); margin-right: var(--s1);
+}
+.customdata { max-width: 60rem; }
+.customwarn { border-color: var(--accent); font-size: var(--t-md); }
+/* the upload's target studies and what it drops: stated before anything is saved */
+.customtarget { border: 1px solid var(--accent); border-radius: var(--r-md); background: var(--accent-soft);
+  padding: var(--s3) var(--s4); font-size: var(--t-md); display: flex; flex-direction: column; gap: var(--s2); }
+.customtarget .qchip { margin-left: var(--s1); }
+.customdrop { font-size: var(--t-md); border-left: 3px solid var(--accent); padding-left: var(--s3); margin: var(--s2) 0; }
+button.customtag { border: none; cursor: pointer; line-height: inherit; }
+button.customtag:hover { text-decoration: underline; }
+.customdatadialog .cdview { border-top: 1px solid var(--line); padding-top: var(--s3); margin-top: var(--s4); }
+.customdatadialog .cdview h4 { font-size: var(--t-base); }
+.customdatadialog .focus { background: var(--accent-soft); }
+.customdatadialog .cdcols td.meta { white-space: normal; }
+.toast {
+  position: fixed; left: 50%; bottom: var(--s5); transform: translateX(-50%); z-index: 50; max-width: min(46rem, 92vw);
+  background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: var(--s3) var(--s4); font-size: var(--t-md); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22); cursor: pointer;
+}
+.customdata h4 { margin: var(--s4) 0 var(--s1); font-size: var(--t-md); font-weight: 600; }
+.customdata-text { width: 100%; box-sizing: border-box; font-family: "IBM Plex Mono", monospace; font-size: var(--t-sm); margin: var(--s2) 0; }
+.customlist td { vertical-align: top; }
+.customlist td.meta { white-space: normal; }
 .namedialog .meta { display: block; margin-bottom: 0.6rem; }
 .namedialog input { width: 100%; box-sizing: border-box; }
 .genedialog { min-width: 24rem; max-width: 30rem; }
@@ -1196,3 +1224,7 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .agent-pop th { text-align: left; font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: var(--s1); border-bottom: 1px solid var(--line); }
 .agent-pop td { padding: var(--s0) var(--s1); border-bottom: 1px solid var(--line); }
 .agent-pop code { font-family: "IBM Plex Mono", monospace; font-size: var(--t-xs); }
+/* the header's shared login (app/lab/login-button.tsx) */
+.loginstate { display: inline-flex; align-items: center; gap: var(--s2); }
+.logindialog .meta { display: block; margin-bottom: var(--s3); }
+.logindialog input { width: 100%; box-sizing: border-box; }
