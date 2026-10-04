@@ -275,6 +275,13 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         `Spearman ρ${co.rhoFrom === "meta" ? " combined across studies by Fisher z" : ""}, BH q over ${co.tested.toLocaleString()} genes; ${co.significant.toLocaleString()} at q<0.05:\n` +
         ` most positively correlated:\n` + co.positive.map(line).join("\n") +
         `\n most negatively correlated:\n` + co.negative.map(line).join("\n") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "mutations") {
+      const mt = v.mutations!;
+      const shown = mt.rows.slice(0, 50);
+      out.push(`${mt.gene} mutations: ${mt.total.toLocaleString()} calls; the first ${shown.length}, tab-separated (the web app's view downloads every row):\n` +
+        [["cohort", "patient", ...mt.columns.map((c) => c.id)], ...shown.map((r) => [r.cohort, r.patient, ...r.values])]
+          .map((xs) => "  " + xs.map((x) => String(x ?? "").replace(/[\t\n]+/g, " ")).join("\t")).join("\n") +
+        (mt.total > shown.length ? `\n  … ${(mt.total - shown.length).toLocaleString()} more rows` : "") + caveatOf(v) + noteOf(v));
     } else if (v.kind === "table") {
       const tb = v.table!;
       const head = ["cohort", "patient", tb.unit === "sample" ? "sample" : "samples", ...tb.columns.map((c) => c.id)];

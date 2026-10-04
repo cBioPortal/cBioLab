@@ -275,3 +275,52 @@ export function AssaysBody({ v }: { v: ViewResult }) {
     </div>
   );
 }
+
+// ---- Mutations: one gene's mutation table, sorted by the server, every row downloadable ----------
+
+export function MutationsBody({ v, vi, busy, docJson, onSort }: { v: ViewResult; vi: number; busy: boolean; docJson?: () => string;
+  onSort: (sort: { column: string; desc?: boolean } | undefined) => void }) {
+  const t = v.mutations!;
+  const [page, setPage] = useState(0);
+  const size = 25, pages = Math.max(1, Math.ceil(t.rows.length / size)), pg = Math.min(page, pages - 1);
+  const multi = t.lists.length > 1;
+  const fmt = (x: string | number | null, id: string) => x == null || x === "" ? "" : id === "vaf" ? Number(x).toFixed(2) : typeof x === "number" ? x.toLocaleString() : x;
+  const ann = t.columns.findIndex((c) => c.id === "annotation");
+  return (
+    <div className="pb">
+      <div className="tv-bar">
+        <span className="meta">{t.rows.length.toLocaleString()} of {t.total.toLocaleString()} {t.gene} mutations shown{t.sort ? ", sorted by " + (t.columns.find((c) => c.id === t.sort!.column)?.name || t.sort.column) + (t.sort.desc ? " ↓" : " ↑") : ", drivers first, then by codon"}</span>
+        <form method="post" action="/api/table" target="_blank" onSubmit={(e) => { (e.currentTarget.elements.namedItem("doc") as HTMLInputElement).value = docJson ? docJson() : ""; }}>
+          <input type="hidden" name="doc" /><input type="hidden" name="view" value={String(vi)} />
+          <button className="tbbtn" type="submit" disabled={busy || !docJson} title={"every row as tab-separated text: " + t.total.toLocaleString() + " mutations"}>download all {t.total.toLocaleString()} rows (TSV)</button>
+        </form>
+      </div>
+      <div className="tv-scroll">
+        <table className="pb-table">
+          <thead><tr>
+            {multi && <th>cohort</th>}
+            {t.columns.map((c) => (
+              <th key={c.id} className={c.numeric ? "num" : undefined} aria-sort={t.sort && t.sort.column === c.id ? (t.sort.desc ? "descending" : "ascending") : "none"}
+                title="sort by this column (re-runs: the whole table is sorted, not just this page)"
+                onClick={() => { if (!busy) onSort({ column: c.id, ...(t.sort && t.sort.column === c.id && !t.sort.desc ? { desc: true } : c.numeric && !(t.sort && t.sort.column === c.id) ? { desc: true } : {}) }); }}>
+                {c.name}{t.sort && t.sort.column === c.id ? (t.sort.desc ? " ▾" : " ▴") : ""}
+              </th>))}
+          </tr></thead>
+          <tbody>{t.rows.slice(pg * size, (pg + 1) * size).map((r, i) => (
+            <tr key={i}>
+              {multi && <td className="meta">{r.cohort}</td>}
+              {r.values.map((x, j) => <td key={j} className={t.columns[j].numeric ? "num" : undefined}>
+                {j === ann && x ? <Badge text={String(x)} color={/oncogenic/i.test(String(x)) && !/likely neutral|inconclusive/i.test(String(x)) ? SERIES[4] : null} />
+                  : j === 0 ? <span className="mono">{fmt(x, t.columns[j].id)}</span> : fmt(x, t.columns[j].id)}
+              </td>)}
+            </tr>))}</tbody>
+        </table>
+      </div>
+      <div className="pb-pager">
+        <button type="button" className="tbbtn" disabled={pg === 0} onClick={() => setPage(pg - 1)}>‹</button>
+        <span>Showing {t.rows.length ? pg * size + 1 : 0}–{Math.min(t.rows.length, (pg + 1) * size)} of {t.rows.length.toLocaleString()} fetched ({t.total.toLocaleString()} in all)</span>
+        <button type="button" className="tbbtn" disabled={pg >= pages - 1} onClick={() => setPage(pg + 1)}>›</button>
+      </div>
+    </div>
+  );
+}

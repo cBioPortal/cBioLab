@@ -35,6 +35,7 @@ export type { PlotData, PlotRequest, PlotGroup, PlotPoint } from "./plot.ts";
 import type { Moments } from "./stats.ts";
 // the clinical table's row query returns ids: imported for PatientLevelResolver.tableRows, never re-exported
 import { tableRowsSql, type TableColumn, type TableSort } from "./clinical-table.ts";
+import { mutationRowsSql, type MutationSort } from "./mutation-table.ts";
 
 /** the colour key: the commonest categories, capped, each with the colour every renderer uses */
 export function legendFor(values: string[], ring = false): { label: string; color: string; ring?: boolean }[] {
@@ -1232,6 +1233,9 @@ export interface PatientLevelCapable extends AggregateCapable {
   /** the clinical data table's rows, with their ids — see PatientLevelResolver.tableRows */
   tableRows(label: string, def: CohortDef | null | undefined, unit: "sample" | "patient", columns: TableColumn[], sort: TableSort | null, limit: number, offset: number):
     Promise<{ rows: { patient: string; sample: string; samples: number; values: Record<string, string> }[]; total: number }>;
+  /** one gene's mutation rows, with their sample ids — see PatientLevelResolver.mutationRows */
+  mutationRows(label: string, def: CohortDef | null | undefined, gene: string, pin: string | null, sort: MutationSort | null, limit: number, offset: number):
+    Promise<{ rows: Record<string, unknown>[]; total: number }>;
 }
 
 export type Resolver = AggregateCapable | PatientLevelCapable;
@@ -1834,6 +1838,18 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
       rows: r.data.map((x) => ({ patient: String(x.patient), sample: String(x.sample || ""), samples: Number(x.samples) || 0, values: (x.m || {}) as Record<string, string> })),
       total: r.data.length ? Number(r.data[0].total) : 0
     };
+  }
+
+  /**
+   * One gene's mutations, a row per call with its sample — the Mutations tab's table. The rows
+   * name samples, so like tableRows this lives on the patient-level resolver alone, and its query
+   * (lib/mutation-table.ts) sits outside the aggregate builders a peer may be sent.
+   */
+  async mutationRows(label: string, def: CohortDef | null | undefined, gene: string, pin: string | null, sort: MutationSort | null,
+    limit: number, offset: number): Promise<{ rows: Record<string, unknown>[]; total: number }> {
+    const r = await this.runLogged<ChRow>(label,
+      mutationRowsSql(this.cohortSql(def), this.study, this.instance.conn.db, gene, pin, sort, limit, offset), this.instance.conn);
+    return { rows: r.data as Record<string, unknown>[], total: r.data.length ? Number(r.data[0].total) : 0 };
   }
 
   /**

@@ -3,7 +3,7 @@
 // (Genomic Alterations), assays (the generic-assay tabs: signatures, arm-level CNA, …), correlates
 // (Co-expression), table (Clinical Data). Dispatched from lib/views-more.ts's
 // runMoreView, so they evaluate cohorts, federate and disclose exactly as the other added views do.
-import type { ViewResult, CancertypesView, CancertypesGroup, CancertypesPanel, OverlapView, EnrichmentView, EnrichmentGene, AssaysView, AssaysEntity, AssaysResult, CorrelatesView, CorrelatesGene, TableView } from "./types.ts";
+import type { ViewResult, CancertypesView, CancertypesGroup, CancertypesPanel, OverlapView, EnrichmentView, EnrichmentGene, AssaysView, AssaysEntity, AssaysResult, CorrelatesView, CorrelatesGene, TableView, MutationsView } from "./types.ts";
 import { cancerTypesSql, cancerTypeSamplesSql, overlapCountsSql, enrichAlteredSql, enrichPanelProfiledSql, enrichWesSql, type EnrichAlteration,
   assayProfileSql, assayMomentsSql, assayValueCountsSql, assayEntityNamesSql, correlatesMomentsSql, geneCytobandsSql } from "./federation-more.ts";
 import { fisherExact, chiSquareTest, benjaminiHochberg, welchT, welchAnovaTest, varianceFromMoments, pearsonFromMoments, pearsonR, fisherZMeta } from "./stats.ts";
@@ -12,9 +12,10 @@ import { geneSymbols } from "./gene-tracks.ts";
 import { answering, refuse, plural, type ViewCtx, type MoreResolver } from "./views-more.ts";
 import { isPatientLevel, type PatientLevelCapable } from "./federation.ts";
 import { tableAttributesSql, compareRows, TABLE_COLUMNS_MAX, type TableColumn } from "./clinical-table.ts";
-import { cancertypesMethod, overlapMethod, enrichmentMethod, assaysMethod, correlatesMethod, tableMethod } from "./method.ts";
+import { MUTATION_COLUMNS } from "./mutation-table.ts";
+import { cancertypesMethod, overlapMethod, enrichmentMethod, assaysMethod, correlatesMethod, tableMethod, mutationsMethod } from "./method.ts";
 
-export const PORTAL_VIEW_KINDS = ["cancertypes", "overlap", "enrichment", "assays", "correlates", "table"] as const;
+export const PORTAL_VIEW_KINDS = ["cancertypes", "overlap", "enrichment", "assays", "correlates", "table", "mutations"] as const;
 
 export function isPortalViewKind(kind: unknown): boolean {
   return (PORTAL_VIEW_KINDS as readonly string[]).includes(String(kind));
@@ -27,6 +28,7 @@ export async function runPortalView(view: { kind: string }, ctx: ViewCtx): Promi
   if (view.kind === "assays") return assaysView(view as AssaysView, ctx);
   if (view.kind === "correlates") return correlatesView(view as CorrelatesView, ctx);
   if (view.kind === "table") return tableView(view as TableView, ctx);
+  if (view.kind === "mutations") return mutationsView(view as MutationsView, ctx);
   return { kind: view.kind, error: "unknown view kind" };
 }
 
@@ -655,6 +657,103 @@ async function tableView(view: TableView, ctx: ViewCtx): Promise<ViewResult> {
       (vNames.length > 1 ? "A patient in two cohorts is listed under each. " : "") +
       "Showing the first " + rows.length.toLocaleString("en-US") + " of " + plural(total, one) + (sort ? ", sorted by " + sort.attribute + (sort.desc ? " (highest first)" : "") + ", missing values last" : ", by patient and sample id") +
       "; the download holds every row, cohort by cohort and study by study, in the same order. " +
+      (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + "; " + plural(e.patients, "patient") + " in these cohorts)").join(", ") + "." : "")
+  };
+}
+
+// ---------------------------------------------------------------------------
+// mutations: one gene's mutation table, a page on screen and every row as a download
+
+const MUT_ROWS_MAX = 1000;
+
+/** A row's value in a column, from the query's row (numbers as numbers, the annotation spelled out). */
+function mutationValue(r: Record<string, unknown>, id: string): string | number | null {
+  const num = (x: unknown) => x == null || x === "" ? null : Number(x);
+  switch (id) {
+    case "sample": return String(r.sid ?? "");
+    case "annotation": {
+      const o = String(r.oncogenicity || ""), lv = String(r.level || "");
+      return o ? o + (lv ? " · " + lv.replace(/^LEVEL_/, "Level ") : "") : "";
+    }
+    case "vaf": return r.vaf == null ? null : Math.round(Number(r.vaf) * 1000) / 1000;
+    case "altCount": case "refCount": case "mutCount": case "start": case "end": return num(r[id]);
+    default: return r[id] == null ? "" : String(r[id]);
+  }
+}
+
+async function mutationsView(view: MutationsView, ctx: ViewCtx): Promise<ViewResult> {
+  const { doc, cohorts, vNames, pin } = ctx;
+  { const e = ctx.overLimit("a mutations view", 6, vNames.length); if (e) return refuse("mutations", ctx, e.replace("at most 6", "at most 6 cohorts")); }
+  let gene: string;
+  try { [gene] = geneSymbols([view.gene]); } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
+  if (!gene) return refuse("mutations", ctx, "a mutations view needs a gene, e.g. KRAS");
+  const show = view.rows == null ? 100 : Math.floor(Number(view.rows));
+  if (!(show >= 1 && show <= MUT_ROWS_MAX)) return refuse("mutations", ctx, "rows is 1 to " + MUT_ROWS_MAX + " (the download holds every row)");
+  const sort = view.sort && view.sort.column ? { column: String(view.sort.column), ...(view.sort.desc ? { desc: true } : {}) } : null;
+  if (sort && !MUTATION_COLUMNS.some((c) => c.id === sort.column)) return refuse("mutations", ctx, "sort.column is one of " + MUTATION_COLUMNS.map((c) => c.id).join(", "));
+
+  const holders = ctx.vStudies.filter((st) => isPatientLevel(ctx.resolvers[st]));
+  const excluded = ctx.vStudies.filter((st) => !holders.includes(st)).map((st) => ({
+    study: st, reason: ctx.resolvers[st].instance.id === "peer" ? "a remote peer, which does not disclose patients" : "aggregate-only: it does not disclose patients",
+    patients: vNames.reduce((n, c) => n + (cohorts[c].perStudy[st]?.count || 0), 0) }));
+  if (!holders.length) return refuse("mutations", ctx, "no study here may disclose patients' mutations (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
+  const pl = (st: string) => ctx.resolvers[st] as unknown as { mutationRows: PatientLevelCapable["mutationRows"] };
+  const toRow = (cohort: string, study: string) => (r: Record<string, unknown>) => ({ cohort, study, patient: String(r.patient ?? ""), sample: String(r.sid ?? ""),
+    values: MUTATION_COLUMNS.map((c) => mutationValue(r, c.id)), raw: r });
+  const strip = <T extends { raw: unknown }>({ raw, ...r }: T) => { void raw; return r; };
+  const columns = MUTATION_COLUMNS;
+
+  if (ctx.tableChunk) {
+    const { cohort, study, offset, limit } = ctx.tableChunk;
+    if (!vNames.includes(cohort) || !holders.includes(study) || !cohorts[cohort].studies.includes(study))
+      return refuse("mutations", ctx, "no rows of cohort “" + cohort + "” in " + study + " to download");
+    const page = await pl(study).mutationRows("mutations:rows:" + cohort, doc.cohorts[cohort], gene, pin, sort, limit, offset);
+    return { kind: "mutations", cohorts: vNames,
+      mutations: { gene, columns, sort, rows: page.rows.map(toRow(cohort, study)).map(strip), lists: [{ cohort, study, total: page.total }], total: page.total, oncokbPin: pin },
+      participation: ctx.participationFor(ctx.vStudies, true) };
+  }
+
+  const lists: { cohort: string; study: string; total: number }[] = [];
+  const pages = await Promise.all(vNames.flatMap((cn) => cohorts[cn].studies.filter((st) => holders.includes(st)).map(async (st) => {
+    const page = await pl(st).mutationRows("mutations:rows:" + cn, doc.cohorts[cn], gene, pin, sort, show, 0);
+    lists.push({ cohort: cn, study: st, total: page.total });
+    return page.rows.map(toRow(cn, st));
+  })));
+  // each page is in sort order already; merge them the way the SQL orders, ties in document order
+  const key = (r: Record<string, unknown>): (string | number | null)[] => {
+    if (!sort) return [-(Number(r.drv) || 0), r.pos == null ? null : Number(r.pos)];
+    const v = mutationValue(r, sort.column);
+    return [typeof v === "number" ? (sort.desc ? -v : v) : v];
+  };
+  const order = (r: { cohort: string; study: string }) => vNames.indexOf(r.cohort) * 1000 + ctx.vStudies.indexOf(r.study);
+  const cmp = (a: (string | number | null)[], b: (string | number | null)[], desc: boolean) => {
+    for (let i = 0; i < a.length; i++) {
+      const x = a[i], y = b[i];
+      if (x === y) continue;
+      if (x == null || x === "") return 1;
+      if (y == null || y === "") return -1;
+      if (typeof x === "number" && typeof y === "number") return x - y;
+      return (String(x) < String(y) ? -1 : 1) * (desc ? -1 : 1);
+    }
+    return 0;
+  };
+  const merged = pages.flat().sort((a, b) => cmp(key(a.raw), key(b.raw), !!(sort && sort.desc)) || (a.sample < b.sample ? -1 : a.sample > b.sample ? 1 : 0) || order(a) - order(b));
+  const rows = merged.slice(0, show).map(strip);
+  lists.sort((a, b) => order(a) - order(b));
+  const total = lists.reduce((n, l) => n + l.total, 0);
+  return {
+    kind: "mutations", cohorts: vNames,
+    mutations: { gene, columns, sort, rows, lists, total, oncokbPin: pin, ...(excluded.length ? { excluded } : {}) },
+    method: mutationsMethod({ gene, cohorts: vNames, oncokbPin: pin, sort, shown: rows.length, lists, excluded }),
+    participation: ctx.participationFor(ctx.vStudies, true),
+    ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
+    caveat: "Every " + gene + " mutation call in " + (vNames.length > 1 ? "each cohort's" : "the cohort's") + " samples, one row per call; uncalled mutations are left out, as the portal leaves them out. " +
+      (pin ? "Annotation is OncoKB " + pin + " (oncogenicity and its highest sensitivity level for the gene). " : "No OncoKB version is pinned here, so the annotation column is empty. ") +
+      "Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. " +
+      "Showing the first " + rows.length.toLocaleString("en-US") + " of " + plural(total, "mutation") +
+      (sort ? ", sorted by " + (MUTATION_COLUMNS.find((c) => c.id === sort.column)?.name || sort.column) + (sort.desc ? " (highest first)" : "") : ", drivers first, then by codon") +
+      "; the download holds every row. " +
+      (vNames.length > 1 ? "A patient in two cohorts is listed under each. " : "") +
       (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + "; " + plural(e.patients, "patient") + " in these cohorts)").join(", ") + "." : "")
   };
 }

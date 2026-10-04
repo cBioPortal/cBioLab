@@ -3,7 +3,7 @@
 // ViewHead, then this kind's controls, then the server-rendered figure — so all that differs
 // per kind lives here: its title, whether it takes a gene list, and its own settings.
 import React, { useEffect, useState } from "react";
-import { CancertypesBody, EnrichmentBody, CorrelatesBody, AssaysBody } from "./portal-bodies";
+import { CancertypesBody, EnrichmentBody, CorrelatesBody, AssaysBody, MutationsBody } from "./portal-bodies";
 
 /**
  * A text field that keeps what is being typed to itself and hands the page the value only on
@@ -50,6 +50,7 @@ export const MORE_KINDS: Record<string, MoreKindUi> = {
     why: (k) => k.cohorts.length < 2 ? "compares two or more cohorts — this analysis has one"
       : !k.assays.length ? "this study has no generic-assay profiles (mutational signatures, arm-level copy number, …)" : null },
   table: { label: "Clinical data table (download)", title: "Clinical data", maxCohorts: 6 },
+  mutations: { label: "Mutation table (one gene)", title: "Mutations", maxCohorts: 6 },
   correlates: { label: "Co-expression with one gene (genome-wide)", title: "Co-expression", maxCohorts: 1,
     why: (k) => !k.profiles.filter((p) => p !== "cna").length ? "this study has no continuous molecular profile (mRNA, protein, …) to correlate on" : null },
   overlap: { label: "Cohort overlap (UpSet)", title: "Cohort overlap", maxCohorts: 6,
@@ -93,6 +94,7 @@ export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "enrichment") return ({ mutation: "mutations", cna: "copy-number alterations", amp: "amplifications", homdel: "deep deletions", sv: "structural variants" } as Record<string, string>)[spec.alteration || "mutation"] +
     (spec.measure === "driver" ? " (drivers)" : "") + " in every gene, per sample";
   if (kind === "overlap") return "patients in exactly each combination of cohorts";
+  if (kind === "mutations") return (spec.gene || "no gene") + " · every mutation call" + (v.mutations ? " · " + v.mutations.total.toLocaleString() + " rows" : "");
   if (kind === "table") return "one row per " + (spec.unit === "patient" ? "patient" : "sample") + (v.table ? " · " + v.table.total.toLocaleString() + " rows, " + v.table.columns.length + " attributes" : "");
   if (kind === "correlates") return (spec.gene || "no gene") + " on " + (spec.profileType || "no profile") + (spec.otherProfile && spec.otherProfile !== spec.profileType ? " against " + spec.otherProfile : "") + " · Spearman ρ, every gene";
   if (kind === "assays") return (v.assays ? v.assays.profileName + " · " + v.assays.test : spec.profileType || "no profile chosen") + ", per " + (v.assays ? v.assays.unit.replace(/s$/, "") : "sample");
@@ -161,6 +163,20 @@ export function MoreControls({ c }: { c: MoreCtx }) {
         <label className="chk" title="preranked GSEA against the 50 MSigDB Hallmark sets; untick to draw the volcano alone">
           <input type="checkbox" checked={!(Array.isArray(spec.geneSets) && spec.geneSets.length === 0)} disabled={busy}
             onChange={(e) => patch({ geneSets: e.target.checked ? undefined : [] })} /> enrichment
+        </label>
+      </div>
+    </div>
+  );
+  if (spec.kind === "mutations") return (
+    <div className="viewtb">
+      <div className="tbz"><span className="tbl">data</span>
+        <label className="tbfield" title="the gene whose mutations are listed">
+          gene <DraftInput value={spec.gene || ""} disabled={busy} width="6rem" placeholder="KRAS" onCommit={(t) => patch({ gene: t.trim().toUpperCase() })} />
+        </label>
+        <label className="tbfield" title="rows fetched for the page; the download holds every row">
+          fetch <select value={String(spec.rows ?? 100)} disabled={busy} onChange={(e) => patch({ rows: Number(e.target.value) === 100 ? undefined : Number(e.target.value) })}>
+            {[100, 500, 1000].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select> rows
         </label>
       </div>
     </div>
@@ -470,6 +486,7 @@ export function defaultMoreView(kind: string, known: Known): Record<string, unkn
   }
   if (kind === "clonality") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "APC", "PIK3CA", "SMAD4", "CDH1"] };
   if (kind === "paired") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : PAIRED_DEFAULT_GENES };
+  if (kind === "mutations") return { kind, gene: known.genes[0] || "TP53", ...(known.cohorts.length > 6 ? { cohorts: known.cohorts.slice(0, 6) } : {}) };
   if (kind === "table") return { kind, ...(known.cohorts.length > 6 ? { cohorts: known.cohorts.slice(0, 6) } : {}) };
   if (kind === "correlates") {
     const profs = known.profiles.filter((p) => p !== "cna");
@@ -494,6 +511,7 @@ export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
   if (c.spec.kind === "enrichment" && c.v.enrichment) return <EnrichmentBody v={c.v} />;
   if (c.spec.kind === "correlates" && c.v.correlates) return <CorrelatesBody v={c.v} docJson={c.docJson} />;
   if (c.spec.kind === "assays" && c.v.assays) return <AssaysBody v={c.v} />;
+  if (c.spec.kind === "mutations" && c.v.mutations) return <MutationsBody v={c.v} vi={c.vi} busy={c.busy} docJson={c.docJson} onSort={(sort) => c.patch({ sort })} />;
   if (c.spec.kind === "table" && c.v.table) {
     const t = c.v.table as import("../../lib/types").TableResult;
     const multi = t.lists.length > 1;

@@ -8,7 +8,14 @@
 import { useEffect, useState } from "react";
 import type { AnalysisDoc, View } from "../../lib/types";
 
-export interface PageTab { title: string; views?: number[]; sub?: { title: string; views: number[] }[] }
+/**
+ * A control over a whole tab — the portal's gene chips over its Mutations tab: one choice that
+ * every view in the tab follows. It reads the current choice from the tab's own views and writes a
+ * new one into them, so the choice is part of the document (and the link) like any setting.
+ */
+export interface TabChooser { label: string; options: string[]; value: (views: View[]) => string; apply: (views: View[], value: string) => View[] }
+
+export interface PageTab { title: string; views?: number[]; sub?: { title: string; views: number[] }[]; chooser?: TabChooser }
 export interface PageLayout {
   doc: AnalysisDoc;
   tabs: PageTab[];
@@ -52,7 +59,7 @@ export function syncUrl(params: Record<string, string | null>) {
 }
 
 /** A page as written: its tabs, each with titled views (or sub-tabs of them). */
-export type TabSpec = { title: string; views?: { title: string; view: View }[]; sub?: { title: string; views: { title: string; view: View }[] }[] };
+export type TabSpec = { title: string; views?: { title: string; view: View }[]; sub?: { title: string; views: { title: string; view: View }[] }[]; chooser?: TabChooser };
 
 /** The page's one document and the tabs' index maps, from the tabs as written. */
 export function arrange(base: Omit<AnalysisDoc, "views">, spec: TabSpec[], left: string[]): PageLayout {
@@ -60,7 +67,7 @@ export function arrange(base: Omit<AnalysisDoc, "views">, spec: TabSpec[], left:
   const place = (vs: { title: string; view: View }[]) => vs.map((x) => { titles.push(x.title); return views.push(x.view) - 1; });
   const tabs: PageTab[] = spec.map((t) => t.sub
     ? { title: t.title, sub: t.sub.map((s) => ({ title: s.title, views: place(s.views) })) }
-    : { title: t.title, views: place(t.views || []) });
+    : { title: t.title, views: place(t.views || []), ...(t.chooser ? { chooser: t.chooser } : {}) });
   return { doc: { ...base, views }, tabs, titles, left };
 }
 

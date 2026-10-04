@@ -1105,11 +1105,37 @@ export interface TableResult {
   /** studies that may not disclose patients, with how many of each cohort's patients they hold */
   excluded?: { study: string; reason: string; patients: number }[];
 }
+/**
+ * The mutation table (cBioPortal's Mutations tab, under the lollipop): one gene's mutations in each
+ * cohort, a row per call with the portal's columns, sortable, the first rows shown and every row
+ * downloadable. Its rows name samples, so only a patient-level participant contributes them.
+ */
+export interface MutationsView {
+  note?: string;
+  kind: "mutations"; cohorts?: string[];
+  gene: string;
+  /** a column id (see lib/mutation-table.ts); default drivers first, then by codon */
+  sort?: { column: string; desc?: boolean };
+  /** rows shown on the page (default 100, at most 1000); the download is every row */
+  rows?: number;
+}
+export interface MutationsResult {
+  gene: string;
+  columns: { id: string; name: string; numeric: boolean }[];
+  sort: { column: string; desc?: boolean } | null;
+  /** the first rows in sort order; values align with `columns` */
+  rows: { cohort: string; study: string; patient: string; sample: string; values: (string | number | null)[] }[];
+  lists: { cohort: string; study: string; total: number }[];
+  total: number;
+  /** the OncoKB version the annotation column reads, or null when none is pinned */
+  oncokbPin: string | null;
+  excluded?: { study: string; reason: string; patients: number }[];
+}
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView
-  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CorrelatesView | TableView;
+  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CorrelatesView | TableView | MutationsView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -1401,6 +1427,7 @@ export interface ViewResult {
   assays?: AssaysResult;                    // generic-assay comparison
   correlates?: CorrelatesResult;            // genome-wide co-expression with one gene
   table?: TableResult;                      // the clinical data table
+  mutations?: MutationsResult;              // one gene's mutation table
 }
 /**
  * Therapy transitions, ready to draw: nodes in columns, flows between them.

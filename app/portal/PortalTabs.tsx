@@ -87,6 +87,18 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
           ))}
         </div>
       )}
+      {tab && !sub && tab.chooser && (() => {
+        const ch = tab.chooser, mine = idx.map((i) => views[i]), on = ch.value(mine);
+        return (
+          <div className="portal-chooser">
+            <span className="meta">{ch.label}</span>
+            <div className="pb-pills" role="tablist">
+              {ch.options.map((o) => <button key={o} type="button" role="tab" aria-selected={o === on} className={o === on ? "on" : undefined}
+                onClick={() => { if (o === on) return; const next = ch.apply(mine, o); onDoc({ ...doc, views: views.map((v, j) => { const k = idx.indexOf(j); return k >= 0 ? next[k] : v; }) }); }}>{o}</button>)}
+            </div>
+          </div>
+        );
+      })()}
       {idx.map((vi, i) => {
         const spec = views[vi] as unknown as Record<string, unknown>;
         // a result belongs to the request that produced it; while a newer one runs, the cover says so

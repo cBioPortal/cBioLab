@@ -2036,3 +2036,21 @@ export function tableMethod(t: { unit: "sample" | "patient"; cohorts: string[]; 
   return { steps, implementation: { functions: ["tableRowsSql", "compareRows"], file: "lib/clinical-table.ts", commit: BUILD_COMMIT },
     verification: "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
 }
+
+// ---- mutations: a listing, nothing computed ------------------------------------------------------
+
+export function mutationsMethod(t: { gene: string; cohorts: string[]; oncokbPin: string | null; sort: { column: string; desc?: boolean } | null; shown: number;
+  lists: { cohort: string; study: string; total: number }[]; excluded: { study: string; reason: string; patients: number }[] }): MethodRecord {
+  const steps: MethodStep[] = t.lists.map((l) => ({
+    kind: "fetch" as const, title: "List " + t.gene + "'s mutation calls",
+    detail: "The mutations:rows query above: every called " + t.gene + " mutation in the cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded" +
+      (t.oncokbPin ? " and the OncoKB " + t.oncokbPin + " call for its protein change" : "") + "; allele frequency = variant / (variant + reference) reads. A page at a time, " +
+      (t.sort ? "by " + t.sort.column + (t.sort.desc ? " descending" : "") + ", missing last, then " : "drivers first, then by codon, then ") + "sample.",
+    scope: l.cohort + " · " + l.study, rowsOut: l.total,
+  }));
+  steps.push({ kind: "transform", title: "Merge the studies' pages",
+    detail: "Each study's first page, in the same order, merged and cut to the first " + t.shown + " rows shown; the download holds every row." +
+      (t.excluded.length ? " Studies that do not disclose patients contribute no rows and are named: " + t.excluded.map((e) => e.study).join(", ") + "." : "") });
+  return { steps, implementation: { functions: ["mutationRowsSql"], file: "lib/mutation-table.ts", commit: BUILD_COMMIT },
+    verification: "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
+}

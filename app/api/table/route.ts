@@ -1,11 +1,12 @@
 import { runAnalysis } from "../../../lib/analysis.ts";
 import { TABLE_CHUNK } from "../../../lib/clinical-table.ts";
-import type { AnalysisDoc, TableResult } from "../../../lib/types.ts";
+import type { AnalysisDoc, TableResult, MutationsResult } from "../../../lib/types.ts";
 
 export const maxDuration = 300;
 
 /**
- * A table view's every row, as TSV — the Clinical Data tab's download.
+ * A table view's every row, as TSV — the Clinical Data tab's download, and the Mutations tab's
+ * (a mutations view pages the same way).
  *
  * The rows come from the table view itself, a page at a time (`tableChunk`), so this route adds no
  * data path of its own: a study that may not disclose patients contributes no rows here exactly as
@@ -23,33 +24,43 @@ export async function POST(req: Request) {
     doc = typeof body.doc === "string" ? JSON.parse(body.doc) : body.doc;
     vi = Number(body.view);
     const view = doc && Array.isArray(doc.views) ? doc.views[vi] : null;
-    if (!view || view.kind !== "table") throw new Error("view " + body.view + " is not a table view");
+    if (!view || (view.kind !== "table" && view.kind !== "mutations")) throw new Error("view " + body.view + " is not a table or mutations view");
     doc = { ...doc, views: [view] };
   } catch (e) {
     return new Response("cannot download: " + String((e as Error)?.message || e) + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
   }
   const first = await runAnalysis(doc).catch((e) => ({ views: [{ kind: "table", error: String((e as Error)?.message || e) }] }));
-  const v = first.views[0] as { error?: string; table?: TableResult };
-  if (!v.table) return new Response("cannot download: " + (v.error || "the table view returned nothing") + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
-  const t = v.table;
+  const v = first.views[0] as { error?: string; table?: TableResult; mutations?: MutationsResult };
+  const t = v.table || v.mutations;
+  if (!t) return new Response("cannot download: " + (v.error || "the view returned nothing") + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
+  const isTable = !!v.table;
   const cell = (s: unknown) => String(s ?? "").replace(/[\t\r\n]+/g, " ");
   const line = (xs: unknown[]) => xs.map(cell).join("\t") + "\n";
   const enc = new TextEncoder();
   const studies = [...new Set(t.lists.map((l) => l.study))];
-  const name = "cohort-lab_" + (studies.length === 1 ? studies[0] : studies.length + "-studies") + "_clinical_" + t.unit + "s.tsv";
+  const name = "cohort-lab_" + (studies.length === 1 ? studies[0] : studies.length + "-studies") + "_" +
+    (isTable ? "clinical_" + v.table!.unit + "s" : v.mutations!.gene + "_mutations") + ".tsv";
+  const head = isTable
+    ? ["cohort", "study", "patient_id", v.table!.unit === "sample" ? "sample_id" : "samples", ...v.table!.columns.map((c) => c.id)]
+    : ["cohort", "study", "patient_id", ...v.mutations!.columns.map((c) => c.id)];
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
         if (t.excluded && t.excluded.length)
           controller.enqueue(enc.encode("# left out (do not disclose patients): " + t.excluded.map((e) => e.study + " — " + e.patients + " patients").join("; ") + "\n"));
-        controller.enqueue(enc.encode(line(["cohort", "study", "patient_id", t.unit === "sample" ? "sample_id" : "samples", ...t.columns.map((c) => c.id)])));
+        controller.enqueue(enc.encode(line(head)));
         for (const l of t.lists) {
           for (let offset = 0; offset < l.total; offset += TABLE_CHUNK) {
             const r = await runAnalysis(doc, { tableChunk: { cohort: l.cohort, study: l.study, offset, limit: TABLE_CHUNK } });
-            const page = (r.views[0] as { error?: string; table?: TableResult });
-            if (!page.table) throw new Error(page.error || "a page of " + l.cohort + " in " + l.study + " returned nothing");
-            controller.enqueue(enc.encode(page.table.rows.map((row) =>
-              line([row.cohort, row.study, row.patient, t.unit === "sample" ? row.sample : row.samples, ...row.values])).join("")));
+            const page = r.views[0] as { error?: string; table?: TableResult; mutations?: MutationsResult };
+            if (isTable) {
+              if (!page.table) throw new Error(page.error || "a page of " + l.cohort + " in " + l.study + " returned nothing");
+              controller.enqueue(enc.encode(page.table.rows.map((row) =>
+                line([row.cohort, row.study, row.patient, v.table!.unit === "sample" ? row.sample : row.samples, ...row.values])).join("")));
+            } else {
+              if (!page.mutations) throw new Error(page.error || "a page of " + l.cohort + " in " + l.study + " returned nothing");
+              controller.enqueue(enc.encode(page.mutations.rows.map((row) => line([row.cohort, row.study, row.patient, ...row.values])).join("")));
+            }
           }
         }
         controller.close();
