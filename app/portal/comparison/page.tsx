@@ -26,7 +26,7 @@ export default function ComparisonPage() {
       <h1>{known ? known.name : study || "Comparison"}</h1>
       {known && <span>{names.length} groups: {names.join(", ")}</span>}
     </div></div></header>;
-  if (!doc || !study) return <main className="portal-main">{head}<p className="note">Open this page from an analysis in the lab (&ldquo;Comparison page&rdquo;), which hands it the cohorts.</p></main>;
+  if (!doc || !study) return <main className="portal-main">{head}<p className="note">This page compares the cohorts of an analysis document passed as <code>?doc=</code> (the lab&apos;s own link encoding); none was given.</p></main>;
   if (names.length < 2 || names.length > 6) return <main className="portal-main">{head}<p className="note">a comparison page compares 2 to 6 cohorts; this analysis has {names.length}</p></main>;
   if (error) return <main className="portal-main">{head}<p className="note">{error}</p></main>;
   if (!known) return <main className="portal-main">{head}<div className="loading-block"><span className="spinner" /> loading {study}…</div></main>;
