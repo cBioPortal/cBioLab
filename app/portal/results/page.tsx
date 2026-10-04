@@ -74,6 +74,7 @@ export default function ResultsPage() {
   return <main className="portal-main">{head}
     {page.note && <p className="note">{page.note}</p>}
     <PortalTabs doc={page.doc} tabs={fresh.tabs} titles={fresh.titles} left={fresh.left} open={page.open} onOpen={page.openTab} onDoc={page.update}
+      catalog={{ attrs: known!.attrs, profiles: known!.profiles, loading: false }}
       onCounts={(c) => setCounts((o) => o || c)} />
   </main>;
 }

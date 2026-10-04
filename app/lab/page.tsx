@@ -4,8 +4,8 @@ import { useSearchParams } from "next/navigation";
 import CohortPills, { normalizeDef } from "./pills";
 import { MORE_KINDS, isMoreKind, moreSub, MoreControls, MoreBody, defaultMoreView } from "./more-views";
 import { ExploreCharts } from "./explore-charts";
-import OncoprintFigure, { type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
-import { figureDisplayOf, withFigureDisplay, sortKeyText as sortKeyTextOf, withSortKeys } from "../_oncoprint/view-display.ts";
+import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
+import { OncoprintCard, Waiting, GeneListEditor, pruneSort } from "../_oncoprint/OncoprintCard.tsx";
 import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { heatmapTrackLabel } from "../../lib/profile-names.ts";
@@ -83,14 +83,6 @@ const fmtP = (p: number): string =>
  * producing it. "aggregate-only" means no participant returned an identifier —
  * the chart was built from counts computed inside each owning database.
  */
-/**
- * A control whose options are still being fetched. It stands where the select will be, so the
- * toolbar doesn't jump when the options arrive, and it says what it is waiting for — an empty
- * select would read as "this study has none".
- */
-function Waiting({ what }: { what: string }) {
-  return <span className="waiting" role="status"><span className="spinner" /> loading {what}…</span>;
-}
 
 /**
  * Over a view whose answer is being recomputed. Its header and controls stay visible and usable
@@ -1623,95 +1615,10 @@ export default function AnalysisPage() {
   const setViewGenes = (vi: number, genes: GeneTrackSpec[]) =>
     updateView(vi, v => pruneSort({ ...v, genes }));
 
-  /** replace a merged row with its members, in place — the figure's "expand", written to the document */
-  const splitGeneTrack = (vi: number, label: string) => {
-    const list = (((doc.views || [])[vi] || {}) as any).genes || [];
-    const out: GeneTrackSpec[] = [];
-    for (const e of list) {
-      const members = e && typeof e === "object" ? (e.genes || []).map((g: string) => String(g).toUpperCase()) : null;
-      if (members && geneRowLabel(e) === label) out.push(...members); else out.push(e);
-    }
-    // the same gene may already be drawn on its own; expanding must not create two rows with one name
-    setViewGenes(vi, out.filter((e, i) => typeof e !== "string" || out.indexOf(e) === i));
-  };
 
   function GeneEditor({ vi }: { vi: number }) {
-    const [add, setAdd] = useState("");
-    const [text, setText] = useState<string | null>(null);
-    const [textErr, setTextErr] = useState<string | null>(null);
-    // Read the DOCUMENT's view, never the result. A ViewResult also has a
-    // `genes` field, but it holds {gene, driverPct, anyPct} objects for the
-    // oncoprint and nothing at all for compare — reading it left the editor
-    // empty and made "add" replace the real list rather than extend it.
-    const spec: any = (doc.views || [])[vi] || {};
-    const list: GeneTrackSpec[] = spec.genes || [];
-    // a list that cannot be read is still editable as text, which is how it gets fixed
-    let rows: { label: string; members: string[] }[] = [];
-    let listErr: string | null = null;
-    try { rows = normalizeGeneTracks(list).tracks; } catch (e) { listErr = String((e as Error).message || e); }
-    const symbols = geneSymbols(list);
-    // Co-occurrence and co-expression are pairwise: one gene yields no pairs, so
-    // the last two cannot be removed without the view becoming an error.
-    const floor = (spec.kind === "cooccurrence" || spec.kind === "coexpression") ? 2 : 1;
-    // merged rows are an oncoprint idea; every other view flattens them to their members
-    const merges = spec.kind === "oncoprint";
-    const drop = (label: string) => setViewGenes(vi, list.filter((e) =>
-      (typeof e === "string" ? e.toUpperCase() : (e.label || (e.genes || []).join(" / "))) !== label));
-    const commit = () => {
-      const g = add.trim().toUpperCase();
-      if (!g || symbols.includes(g)) { setAdd(""); return; }
-      setViewGenes(vi, [...list, g]);
-      setAdd("");
-    };
-    const applyText = () => {
-      try { setViewGenes(vi, parseGeneList(text || "")); setTextErr(null); setText(null); }
-      catch (e) { setTextErr(String((e as Error).message || e)); }
-    };
-    return (
-      <div className="setcol">
-        <span className="meta">{rows.length} of 12 rows{merges && symbols.length !== rows.length ? " · " + symbols.length + " genes" : ""} — click one to remove it</span>
-        {listErr && <span className="mark">{listErr}</span>}
-        <div className="pillwrap">
-          {rows.map(r => (
-            <span key={r.label} className={r.members.length > 1 ? "pill-merged" : undefined}>
-              <button type="button" className="pill" disabled={busy || rows.length <= floor}
-                title={rows.length <= floor
-                  ? (floor === 2 ? "this view compares pairs, so it needs at least two genes" : "a view needs at least one gene")
-                  : r.members.length > 1 ? "remove this merged row (" + r.members.join(", ") + ")" : "remove " + r.label}
-                onClick={() => drop(r.label)}>
-                {r.label} <span aria-hidden="true">×</span>
-              </button>
-              {merges && r.members.length > 1 && (
-                <button type="button" className="linklike" disabled={busy} style={{ fontSize: "var(--t-sm)", marginLeft: "0.2rem" }}
-                  title="draw each of these genes as its own row" onClick={() => splitGeneTrack(vi, r.label)}>split</button>
-              )}
-            </span>
-          ))}
-        </div>
-        <div className="setrow">
-          <input list="view-genes" placeholder="add a gene…" value={add} disabled={busy || rows.length >= 12}
-            onChange={e => setAdd(e.target.value.toUpperCase())}
-            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); } }} />
-          <button type="button" className="facet" disabled={busy || !add.trim() || rows.length >= 12}
-            onClick={commit}>add</button>
-        </div>
-        {merges && (
-          <details onToggle={(e) => { if ((e.target as HTMLDetailsElement).open && text === null) setText(formatGeneList(list)); }}>
-            <summary className="meta">edit as text — cBioPortal&apos;s gene list, where <code>[TP53 MDM2]</code> is one merged row</summary>
-            <div className="setcol" style={{ marginTop: "0.3rem" }}>
-              <textarea value={text ?? formatGeneList(list)} spellCheck={false} rows={3} disabled={busy}
-                onChange={(e) => setText(e.target.value)} style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: "var(--t-md)" }} />
-              <div className="setrow">
-                <button type="button" className="facet" disabled={busy} onClick={applyText}>apply</button>
-                <button type="button" className="linklike" onClick={() => { setText(formatGeneList(list)); setTextErr(null); }}>reset</button>
-                <span className="meta">a label is optional: <code>[&quot;TP53 pathway&quot; TP53 MDM2]</code></span>
-              </div>
-              {textErr && <span className="mark">{textErr}</span>}
-            </div>
-          </details>
-        )}
-      </div>
-    );
+    // the DOCUMENT's view, never the result (a result's genes are {gene, driverPct, …})
+    return <GeneListEditor view={(doc.views || [])[vi] || {}} busy={busy} onGenes={(g) => setViewGenes(vi, g)} />;
   }
 
   /**
@@ -2240,87 +2147,6 @@ function Latency({ v }: { v: any }) {
 
   /** the view at index vi, read as an oncoprint view (its editor only renders there) */
   const ocView = (vi: number): OncoprintView => ((doc.views || [])[vi] || {}) as OncoprintView;
-
-  const heatmapLabels = (v: any): string[] => (v.heatmap || []).flatMap((h: any) =>
-    (h.genes && h.genes.length ? h.genes : v.genes || []).map((g: any) => heatmapTrackLabel(String(g).toUpperCase(), h.profileType)));
-
-  // a sort key as the <select> spells it: "label" / "-label" / "genomic"
-  const sortKeyText = sortKeyTextOf;
-  const pruneSort = (v: any) => {
-    // drop sort keys whose track no longer exists
-    const keep = new Set(["genomic", "id", "Study", ...(v.clinical || []), ...heatmapLabels(v)]);
-    const sort = (v.sort || []).filter((s: any) => keep.has(sortKeyText(s).replace(/^-/, "")));
-    if (sort.length) v.sort = sort; else delete v.sort;
-    return v;
-  };
-
-  const setViewClinical = (vi: number, attrs: string[]) => updateView(vi, v => pruneSort({ ...v, clinical: attrs }));
-
-  const setViewHeatmap = (vi: number, entries: any[]) => updateView(vi, v => {
-    const next = { ...v };
-    if (entries.length) next.heatmap = entries; else delete next.heatmap;
-    return pruneSort(next);
-  });
-
-  /** the figure sorts in the browser, so this records the choice without re-running */
-  const setViewSort = (vi: number, keys: string[]) => updateViewLocal(vi, v => withSortKeys(v, keys));
-
-  /** how many rows a view's gene list draws, for the button that opens the editor */
-  const geneRowCount = (v: any): number => { try { return normalizeGeneTracks(v.genes || []).tracks.length; } catch { return (v.genes || []).length; } };
-
-  /** the row a gene-list entry draws, which is the label the figure sends back */
-  const geneRowLabel = (e: GeneTrackSpec): string => typeof e === "string" ? e.toUpperCase()
-    : (e.label || (e.genes || []).map((g) => String(g).toUpperCase()).join(" / "));
-
-  /**
-   * A track's label back to the thing that produced it. Gene tracks are the view's genes,
-   * heatmap tracks belong to a profile, everything else is a clinical attribute.
-   */
-  const trackOwner = (v: any, label: string): "genes" | "clinical" | "heatmap" | null => {
-    if ((v.genes || []).some((g: GeneTrackSpec) => geneRowLabel(g) === label)) return "genes";
-    if ((v.clinical || []).includes(label)) return "clinical";
-    if (heatmapLabels(v).includes(label)) return "heatmap";
-    return null;
-  };
-  const moveTrack = (vi: number, label: string, dir: -1 | 1) => updateView(vi, (v: any) => {
-    const owner = trackOwner(v, label);
-    if (!owner) return v;
-    const list = owner === "genes" ? (v.genes || []).map((g: string) => String(g)) : owner === "clinical" ? [...(v.clinical || [])] : null;
-    if (!list) return v;   // heatmap tracks follow their profile's gene list
-    const i = list.findIndex((x: string) => (owner === "genes" ? geneRowLabel(x) : x) === label);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= list.length) return v;
-    [list[i], list[j]] = [list[j], list[i]];
-    return owner === "genes" ? { ...v, genes: list } : { ...v, clinical: list };
-  });
-  const removeTrack = (vi: number, label: string) => updateView(vi, (v: any) => {
-    const owner = trackOwner(v, label);
-    if (owner === "genes") {
-      const genes = (v.genes || []).filter((g: GeneTrackSpec) => geneRowLabel(g) !== label);
-      return genes.length ? pruneSort({ ...v, genes }) : v;   // a figure needs at least one gene
-    }
-    if (owner === "clinical") return pruneSort({ ...v, clinical: (v.clinical || []).filter((a: string) => a !== label) });
-    if (owner === "heatmap") {
-      const heatmap = (v.heatmap || []).filter((h: any) => !heatmapLabels({ ...v, heatmap: [h] }).includes(label));
-      const next = { ...v }; if (heatmap.length) next.heatmap = heatmap; else delete next.heatmap;
-      return pruneSort(next);
-    }
-    return v;
-  });
-
-  /** set or clear one display option on a view, keeping the document free of defaults */
-  const setDisplayKey = (v: any, key: string, value: unknown) => {
-    const display: any = { ...(v.display || {}) };
-    if (value === undefined) delete display[key]; else display[key] = value;
-    const next = { ...v };
-    if (Object.keys(display).length) next.display = display; else delete next.display;
-    return next;
-  };
-
-  /** viewing options as the figure wants them, defaulted from the document */
-  const figureDisplay = (v: any): FigureDisplay => figureDisplayOf(v);
-  /** the figure's display options are written to the view (only those off their default), no re-run */
-  const setViewDisplay = (vi: number, d: FigureDisplay) => updateViewLocal(vi, v => withFigureDisplay(v, d));
 
   /**
    * A drag across an oncoprint becomes a cohort of exactly those patients — an explicit list,
@@ -4691,65 +4517,19 @@ function Latency({ v }: { v: any }) {
                     <ViewHead menuStore={menuOpenRef.current} v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                       cohorts={cohortChoice(vi, docView(vi), 4)}
                       sub={c ? <>{c.stats.nColumns.toLocaleString()} {c.unit}s · {c.conventions.annotation}</> : "loading…"} />
-                    <OncoprintFigure
+                    <OncoprintCard
+                      view={ocView(vi) as any}
                       spec={v.spec}
-                      display={figureDisplay(ocView(vi))}
-                      sortKeys={(ocView(vi).sort || []).map(sortKeyText)}
-                      onDisplay={(d) => setViewDisplay(vi, d)}
-                      onSortKeys={(keys) => setViewSort(vi, keys)}
-                      onMoveTrack={(label, dir) => moveTrack(vi, label, dir)}
-                      onRemoveTrack={(label) => removeTrack(vi, label)}
-                      onExpandTrack={(label) => splitGeneTrack(vi, label)}
-                      onContract={(ct) => { const k = JSON.stringify(v.spec); setContracts((m) => m[k] === ct ? m : { ...m, [k]: ct }); }}
-                      onCreateCohort={(sel) => cohortFromSelection(sel, (c ? c.studies : vStudies) || vStudies)}
                       onSaveFeature={(sel, all) => featureFromSelection(sel, all, (c ? c.studies : vStudies) || vStudies)}
                       busy={busy}
-                      controls={<>
-                        <button className="tbbtn genesbtn" disabled={busy}
-                          title="choose the genes this oncoprint draws" onClick={() => openGenes(vi)}>genes ({geneRowCount(ocView(vi))})</button>
-                        <label className="tbfield" title="a cohort selects patients; sample mode draws every sample of those patients">columns <select
-                          value={ocView(vi).unit || "patient"} disabled={busy}
-                          onChange={(e) => updateView(vi, (vv: any) => { const n = { ...vv }; if (e.target.value === "sample") n.unit = "sample"; else delete n.unit; return n; })}>
-                          <option value="patient">patients</option><option value="sample">samples</option>
-                        </select></label>
-                        <label className="tbfield" title="driver calls come from the version-pinned OncoKB store">annotate <select
-                          value={(ocView(vi).display as any)?.annotate || "oncokb"} disabled={busy}
-                          onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "annotate", e.target.value === "none" ? "none" : undefined))}>
-                          <option value="oncokb">OncoKB</option><option value="none">none</option>
-                        </select></label>
-                        <label className="chk tbchk" title="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
-                          <input type="checkbox" checked={!!(ocView(vi).display as any)?.hideVUS} disabled={busy}
-                            onChange={(e) => updateView(vi, (vv: any) => setDisplayKey(vv, "hideVUS", e.target.checked || undefined))} /> drivers only</label>
-                      </>}
-                      tracksMenu={<TracksMenu
-                        attrs={trackAttrs.attrs} profiles={trackAttrs.profiles} loading={trackAttrsLoading}
-                        clinical={ocView(vi).clinical || []} heatmap={ocView(vi).heatmap || []}
-                        cohorts={Object.keys(result.cohorts)} derivedCohorts={ocView(vi).derivedCohorts || []}
-                        busy={busy}
-                        onClinical={(next) => setViewClinical(vi, next)}
-                        onHeatmap={(next) => setViewHeatmap(vi, next)}
-                        onDerived={(next) => updateView(vi, (vv: any) => { const n = { ...vv }; if (next.length) n.derivedCohorts = next; else delete n.derivedCohorts; return n; })} />}
-                      footer={<>
-                        {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
-                          style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
-                        {c && c.queries && c.queries.length > 0 && (
-                          <details className="provsql">
-                            <summary className="meta">
-                              how these numbers were computed — {c.queries.length} {c.queries.length === 1 ? "query" : "queries"} in {(c.stats.ms || 0).toLocaleString()}ms
-                            </summary>
-                            {c.queries.map((q: { label: string; sql: string; ms?: number; study?: string }, qi: number) => (
-                              <div className="provq" key={qi}>
-                                <div className="provhead">
-                                  <code>{q.label}</code>
-                                  <span className="meta">{q.study}</span>
-                                  {q.ms != null && <span className="meta">{q.ms.toLocaleString()}ms</span>}
-                                </div>
-                                <pre>{q.sql}</pre>
-                              </div>
-                            ))}
-                          </details>
-                        )}
-                      </>}
+                      cohortNames={Object.keys(result.cohorts)}
+                      catalog={{ attrs: trackAttrs.attrs, profiles: trackAttrs.profiles, loading: trackAttrsLoading }}
+                      onView={(next, rerun) => rerun ? updateView(vi, () => next) : updateViewLocal(vi, () => next)}
+                      onGenes={() => openGenes(vi)}
+                      onCreateCohort={(sel) => cohortFromSelection(sel, (c ? c.studies : vStudies) || vStudies)}
+                      onContract={(ct) => { const k = JSON.stringify(v.spec); setContracts((m) => m[k] === ct ? m : { ...m, [k]: ct }); }}
+                      contract={c || null}
+                      note={v.note} studies={v.studies}
                     />
                   </>;
                 })()}
@@ -4810,88 +4590,3 @@ function Latency({ v }: { v: any }) {
   );
 }
 
-/**
- * What a figure can draw, chosen from what the involved studies actually hold. Two tabs
- * because clinical attributes and molecular profiles are picked differently; a search box
- * because a study can declare sixty attributes; the count of cases carrying each one, most
- * first, because that is what decides whether a track is worth a row.
- */
-function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohorts, busy, loading, onClinical, onHeatmap, onDerived }: {
-  attrs: { attribute: string; kind: string; patients: number }[];
-  /** the attribute/profile catalog is still being fetched */
-  loading?: boolean;
-  profiles: string[];
-  clinical: string[];
-  heatmap: { profileType: string; genes?: string[] }[];
-  cohorts: string[];
-  derivedCohorts: string[];
-  busy: boolean;
-  onClinical: (next: string[]) => void;
-  onHeatmap: (next: { profileType: string; genes?: string[] }[]) => void;
-  onDerived: (next: string[]) => void;
-}) {
-  const [tab, setTab] = useState<"clinical" | "custom" | "heatmap" | "cohorts">("clinical");
-  const [q, setQ] = useState("");
-  const match = (s: string) => s.toLowerCase().includes(q.trim().toLowerCase());
-  const heatOptions = ["VAF", ...profiles];
-  // uploads get their own tab, but they are clinical tracks to the engine: one list, one cap of 8
-  const studyAttrs = attrs.filter((a) => !isCustomAttr(a.attribute)), customAttrs = attrs.filter((a) => isCustomAttr(a.attribute));
-  const isClin = tab === "clinical" || tab === "custom";
-  const chosen = isClin ? clinical : tab === "heatmap" ? heatmap.map((h) => h.profileType) : derivedCohorts;
-  const shown = (tab === "clinical" ? studyAttrs.map((a) => a.attribute) : tab === "custom" ? customAttrs.map((a) => a.attribute)
-    : tab === "heatmap" ? heatOptions : cohorts).filter((n) => match(n) || match(attributeLabel(n)));
-  const cap = isClin ? 8 : tab === "heatmap" ? 4 : 3;
-  const toggle = (name: string) => {
-    if (isClin) onClinical(clinical.includes(name) ? clinical.filter((x) => x !== name) : clinical.length < 8 ? [...clinical, name] : clinical);
-    else if (tab === "heatmap") onHeatmap(chosen.includes(name) ? heatmap.filter((h) => h.profileType !== name) : heatmap.length < 4 ? [...heatmap, { profileType: name }] : heatmap);
-    else onDerived(derivedCohorts.includes(name) ? derivedCohorts.filter((x) => x !== name) : derivedCohorts.length < 3 ? [...derivedCohorts, name] : derivedCohorts);
-  };
-  const setHeatGenes = (profileType: string, text: string) => {
-    const genes = text.split(/[\s,]+/).map((g) => g.trim().toUpperCase()).filter(Boolean).slice(0, 12);
-    onHeatmap(heatmap.map((h) => h.profileType === profileType ? (genes.length ? { ...h, genes } : { profileType }) : h));
-  };
-  return (
-    <details className="gearmenu">
-      <summary className="tbbtn" title="add or remove tracks">tracks{chosen.length ? " (" + chosen.length + ")" : ""}</summary>
-      <div className="gearmenu-items wide" style={{ minWidth: 340 }}>
-        <div className="row" style={{ gap: "0.5rem", alignItems: "center" }}>
-          <button className="linklike" style={{ fontWeight: tab === "clinical" ? 600 : 400 }} onClick={() => setTab("clinical")}>Clinical {studyAttrs.length ? "(" + studyAttrs.length + ")" : ""}</button>
-          <button className="linklike" style={{ fontWeight: tab === "custom" ? 600 : 400 }} onClick={() => setTab("custom")}
-            title="attributes from your uploads (Explore → Custom data)">Custom ({customAttrs.length})</button>
-          <button className="linklike" style={{ fontWeight: tab === "heatmap" ? 600 : 400 }} onClick={() => setTab("heatmap")}>Heatmap ({heatOptions.length})</button>
-          <button className="linklike" style={{ fontWeight: tab === "cohorts" ? 600 : 400 }} onClick={() => setTab("cohorts")}>Cohort rows ({cohorts.length})</button>
-          <span className="spacer" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search…" style={{ fontSize: "var(--t-md)", width: 120 }} />
-        </div>
-        <span className="meta">{chosen.length} of {cap} chosen{
-          tab === "clinical" ? " · cases with data, most first"
-          : tab === "custom" ? " · your uploads, kept in this browser; they share the 8 clinical tracks"
-          : tab === "heatmap" ? " · a profile draws one row per gene; leave the genes blank to follow the figure"
-          : " · any cohort in this document can be a binary row (patients only, one study)"}</span>
-        <div style={{ maxHeight: 260, overflowY: "auto", marginTop: "0.3rem" }}>
-          {!shown.length && (loading && !attrs.length ? <Waiting what="tracks" />
-            : <span className="meta">{q.trim() ? "nothing matches"
-              : tab === "custom" ? "no uploads for this study in this browser: add one under Explore → Custom data" : "nothing to choose from"}</span>)}
-          {shown.map((name) => {
-            const on = chosen.includes(name);
-            const a = isClin ? attrs.find((x) => x.attribute === name) : undefined;
-            const h = tab === "heatmap" && on ? heatmap.find((x) => x.profileType === name) : undefined;
-            return (
-              <div key={name}>
-                <label className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "baseline", padding: "0.1rem 0" }}>
-                  <input type="checkbox" checked={on} disabled={busy || (!on && chosen.length >= cap)} onChange={() => toggle(name)} />
-                  <span style={{ flex: 1 }} title={tab === "custom" ? name : undefined}>{name === "VAF" ? "VAF (mutation allele fraction)" : attributeLabel(name, tab === "custom" ? "short" : "long")}{a?.kind === "num" ? " (numeric)" : ""}
-                    {tab === "custom" && <span className="meta"> · {parseCustomAttr(name)?.dataset}</span>}</span>
-                  {a && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
-                </label>
-                {h && <input defaultValue={(h.genes || []).join(" ")} placeholder="genes for this profile — blank follows the figure"
-                  disabled={busy} onBlur={(e) => setHeatGenes(name, e.target.value)}
-                  style={{ fontSize: "var(--t-sm)", width: "100%", margin: "0 0 0.3rem 1.4rem" }} />}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </details>
-  );
-}

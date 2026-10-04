@@ -50,6 +50,7 @@ export default function ComparisonPage() {
   if (!fresh || !page.doc) return <main className="portal-main">{head}<div className="loading-block"><span className="spinner" /> loading {study}…</div></main>;
   return <main className="portal-main">{head}
     {page.note && <p className="note">{page.note}</p>}
-    <PortalTabs doc={page.doc} tabs={fresh.tabs} titles={fresh.titles} left={fresh.left} open={page.open} onOpen={page.openTab} onDoc={page.update} />
+    <PortalTabs doc={page.doc} tabs={fresh.tabs} titles={fresh.titles} left={fresh.left} open={page.open} onOpen={page.openTab} onDoc={page.update}
+      catalog={{ attrs: known!.attrs, profiles: known!.profiles, loading: false }} />
   </main>;
 }

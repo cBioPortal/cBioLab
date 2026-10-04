@@ -8,36 +8,19 @@ import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc, AnalysisResult, View } from "../../lib/types";
 import { SERIES } from "../../lib/svg-kit";
 import { MoreBody, MoreControls, isMoreKind } from "../lab/more-views";
-import OncoprintFigure from "../_oncoprint/OncoprintFigure.tsx";
-import { figureDisplayOf, withFigureDisplay, sortKeysOf, withSortKeys, dataPart } from "../_oncoprint/view-display.ts";
+import { dataPart } from "../_oncoprint/view-display.ts";
+import { OncoprintCard, type TrackCatalog } from "../_oncoprint/OncoprintCard.tsx";
 import type { PageTab } from "./page-doc";
 
 type Patch = Record<string, unknown>;
 
-/** The interactive oncoprint, as the lab draws it, reading and writing its view. */
-function PortalOncoprint({ spec, view, busy, edit }: { spec: unknown; view: Record<string, unknown>; busy: boolean; edit: (next: Record<string, unknown>) => void }) {
-  const d = (view.display || {}) as { hideVUS?: boolean };
-  return (
-    <OncoprintFigure spec={spec} display={figureDisplayOf(view)} onDisplay={(fd) => edit(withFigureDisplay(view, fd))}
-      sortKeys={sortKeysOf(view as { sort?: unknown[] })} onSortKeys={(keys) => edit(withSortKeys(view, keys))} busy={busy}
-      controls={<>
-        <label className="tbfield" title="a cohort selects patients; sample mode draws every sample of those patients">columns <select
-          value={view.unit === "sample" ? "sample" : "patient"} disabled={busy}
-          onChange={(e) => { const n = { ...view }; if (e.target.value === "sample") n.unit = "sample"; else delete n.unit; edit(n); }}>
-          <option value="patient">patients</option><option value="sample">samples</option>
-        </select></label>
-        <label className="chk tbchk" title="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
-          <input type="checkbox" checked={!!d.hideVUS} disabled={busy}
-            onChange={(e) => { const disp = { ...d } as Patch; if (e.target.checked) disp.hideVUS = true; else delete disp.hideVUS;
-              const n = { ...view }; if (Object.keys(disp).length) n.display = disp; else delete n.display; edit(n); }} /> drivers only</label>
-      </>} />
-  );
-}
 
 type TabState = { sent: string; result?: AnalysisResult; error?: string; loading: boolean };
 
-export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCounts }: {
+export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCounts, catalog }: {
   doc: AnalysisDoc; tabs: PageTab[]; titles: string[]; left: string[];
+  /** what the oncoprint's Tracks menu can offer: the study's attributes and profiles */
+  catalog: TrackCatalog;
   /** the open tab, "Title" or "Title › Sub" */
   open: string;
   onOpen: (key: string) => void;
@@ -112,7 +95,9 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
         const mc = { vi: i, spec, v: v || {}, busy, attrs: [], profiles: [], assays: [], events: [],
           patch: (p: Patch) => edit(vi, { ...spec, ...p } as unknown as View), docJson: () => JSON.stringify(slice) };
         const body = v && !v.error && v.kind === "oncoprint" && v.spec
-          ? <PortalOncoprint spec={v.spec} view={spec} busy={busy} edit={(n) => edit(vi, n as unknown as View)} />
+          // the lab's own oncoprint card; the page's cohorts are its own, so a drag counts but makes no cohort
+          ? <OncoprintCard view={spec} spec={v.spec} busy={busy} cohortNames={Object.keys(doc.cohorts || {})} catalog={catalog}
+              onView={(n) => edit(vi, n as unknown as View)} note={v.note} studies={v.studies} />
           : v && !v.error ? MoreBody({ c: { ...mc, v } }) : null;
         return (
           <section key={key + vi} className="card viewcard portal-view">
