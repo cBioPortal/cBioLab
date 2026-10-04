@@ -567,6 +567,24 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "partitions: split a cohort into arms that add up to it",
+    demonstrates: "A `partitions` entry splits one cohort into child cohorts that are disjoint and together exactly the parent: arms are tested in order and the first match wins, patients matching none go to a remainder, and patients an arm cannot be decided for (here, not profiled for KRAS) get their own child instead of being counted as wild-type. The result checks that the children add up to the parent; a view naming the partition compares its arms.",
+    tags: ["cohort-structure", "partitions", "compare", "survival"],
+    note: "Non-small cell lung cancer split by KRAS allele: G12C first, then any other KRAS mutation, then wild-type. Because G12C is tested first, \"other KRAS\" needs no hand-written \"and not G12C\". 916 + 1,278 + 5,615 = 7,809, the whole cohort, with nobody unprofiled for KRAS in this study. STK11 and KEAP1 are enriched in both KRAS-mutant arms and TP53 in wild-type — the known co-mutation pattern — while overall survival does not differ significantly across the three arms (k-group log-rank p≈0.1).",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: { "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] } },
+      partitions: { "KRAS allele": { of: "NSCLC", other: "KRAS wild-type", arms: [
+        { name: "G12C", where: { kind: "oql", q: "KRAS: G12C" } },
+        { name: "other KRAS", where: { kind: "oql", q: "KRAS: MUT" } }
+      ] } },
+      views: [
+        { kind: "compare", genes: ["STK11", "KEAP1", "TP53"], cohorts: ["KRAS allele"] },
+        { kind: "survival", cohorts: ["KRAS allele"] }
+      ]
+    }
+  },
+  {
     title: "Median/IQR and a rank-sum test, single-study only",
     demonstrates: "Why a second test earns its place: MSI_SCORE is right-skewed here, so Welch's t (which compares means) calls it significant while the Mann-Whitney rank-sum (which compares typical values) does not — the mean is being pulled by a few high-MSI outliers, not by a real shift in the bulk of each group. Both are shown; neither is hidden in favour of the other.",
     tags: ["clinical", "median", "rank-sum", "single-study"],
@@ -1010,6 +1028,7 @@ SQL each cohort compiled to.
 \`\`\`
 { "study":   "<default study id>",            // validated against cancer_study
   "cohorts": { "<name>": cohortDef, ... },    // max 16
+  "partitions"?: { "<name>": partitionDef },  // split a cohort into disjoint children that add up to it
   "views":   [ view, ... ],                   // max 6
   "uploads"?: [ { "as": "<name>", "dataset": "<id>", "version": n } ] }  // server-stored custom data, pinned
 \`\`\`
@@ -1031,6 +1050,10 @@ cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient 
                "studies"?: ["<id>", ...],     // union across studies (federated, no count limit)
                "lineGap"?: 90,                // derived-treatment-line gap, days
                "notes"?:   "<prose>" }        // the analyst's own note on this cohort; never compiled
+partitionDef := { "of": "<cohort name>",       // the cohort to split: a named cohort, or another partition's child
+                  "arms": [ { "name": "<label>", "where": clause } × 1-8 ],  // tested in order; the first match wins
+                  "other"?: "<label>",          // the remainder's name, default "Other"
+                  "notes"?: "<prose>" }
 clause    := leaf | { "any": [leaf × 1-8] }   // OR (UNION DISTINCT)
                   | { "not": leaf | { "any": [leaf × 1-8] } }  // study base EXCEPT leaf, or EXCEPT the OR of several (De Morgan's, in one clause instead of one "not" per leaf)
 \`\`\`
@@ -1047,6 +1070,27 @@ drifting apart when one gets edited. Only \`all\` is inherited — \`study\`/\`s
 \`notes\` are always the child's own. Resolved (and a cycle, direct or through a chain, rejected by
 name) before compilation, so every downstream reader — compiled SQL, the plain-language readback,
 provenance — sees the fully flattened \`all\` list, exactly as if it had been written out by hand.
+
+**Partitions.** \`"partitions": {"<name>": partitionDef}\` splits a cohort into child cohorts that
+are **disjoint and together exactly the parent** — the grouping a comparison needs, rather than a
+set of filters that may overlap or quietly lose patients. Arms are tested in order and the first
+match wins, so a patient matching two arms is in the earlier one, and reordering arms changes who
+goes where. Before testing an arm, the engine requires every condition needed to decide the earlier
+arms to be knowable: an \`oql\` arm needs the patient profiled for that gene and alteration type
+(the panel-aware rule — a patient whose panel omits the gene is not wild-type for it; a bare-gene
+query needs mutation, copy-number and structural-variant profiling), a \`clinical\` arm needs a
+recorded value. Patients failing that go to a child named \`"Not profiled: <GENE> <type>"\` or
+\`"No <ATTRIBUTE> recorded"\`; patients matching no arm go to \`"Other"\` (or the \`other\` name).
+
+Each child is an ordinary cohort named \`"<partition> / <arm>"\`, usable anywhere a cohort name is
+(including as another partition's \`of\`, to nest), with its own readback and SQL. A view whose
+\`cohorts\` names the partition compares its arms and remainder, not the not-evaluable children;
+name a child to include it. A view with no \`cohorts\` shows only the authored cohorts. The result's
+\`partitions\` gives every child's count and checks the sum against the parent's (\`conserved\`).
+Conditions the engine cannot check evaluability for (expression, assay values, timeline events,
+derived metrics) are listed in \`unchecked\`: their patients with no data count as not matching.
+Up to 16 authored cohorts and 48 cohorts in all, children included. Expanded before \`extends\`, so
+each child \`extends\` its parent and runs in the parent's studies.
 
 ### Leaf kinds
 
@@ -1438,6 +1482,13 @@ export const AGENT_GRAMMAR = `Document shape:
   "title"?: "<name, when saved as a workspace>",
   "uploads"?: [{ "as": "<name>", "dataset": "<id>", "version": n }],  // set by the page: pins server custom data; never write or edit it
   "cohorts": { "<name>": <cohortDef>, ... (max 16) },
+  "partitions"?: { "<name>": { "of": "<cohort>", "arms": [{ "name": "<label>", "where": <clause> }, ...(max 8)], "other"?: "<label>" } },
+  // A partition splits a cohort into children that are disjoint and add up to it: arms are tested in order,
+  // first match wins (put the most specific first: G12C before KRAS: MUT). Patients not profiled for an
+  // OQL arm's gene, or with no value for a clinical arm's attribute, get their own "Not profiled: …" /
+  // "No … recorded" child; the rest go to "Other". Each child is the cohort "<partition> / <arm>" — name a
+  // child in "of" to nest. A view whose "cohorts" lists the partition name compares its arms and Other.
+  // Prefer a partition to hand-written mutually exclusive cohorts, and to splitBy when the arms must not overlap.
   // compare/survival/cox/logistic/clinical/course/oncoprint (only) may carry "splitBy" instead of (or with)
   // "cohorts" — auto-splits one named cohort into several arms, scoped to THIS view only, never added to the
   // document's own cohort list. Exactly one of three shapes:

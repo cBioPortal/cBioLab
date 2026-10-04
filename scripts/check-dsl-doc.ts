@@ -48,7 +48,12 @@ for (const ex of EXAMPLES) {
     // an example's uploads travel with it, exactly as the page sends them
     const r = await withRequestCustomData(ex.customData, () => runAnalysis(ex.doc));
     runPin = r.oncokbPin;
-    const bad = Object.entries(r.cohorts).filter(([, c]) => !c.count).map(([nm]) => nm);
+    // A partition's child may honestly be empty (nobody unprofiled for the gene); an authored
+    // cohort may not. Every partition must add up to its parent.
+    const children = new Set(Object.values(r.partitions || {}).flatMap((p) => p.children.map((c) => c.name)));
+    const bad = Object.entries(r.cohorts).filter(([nm, c]) => !c.count && !children.has(nm)).map(([nm]) => nm);
+    const leaky = Object.entries(r.partitions || {}).filter(([, p]) => !p.conserved)
+      .map(([nm, p]) => nm + " (" + n(p.sum) + " of " + n(p.parentCount) + ")");
     const viewErr = r.views.find(v => v.error);
     const actual: Record<string, number> = {};
     for (const [nm, c] of Object.entries(r.cohorts)) actual[nm] = c.count;
@@ -57,6 +62,7 @@ for (const ex of EXAMPLES) {
 
     if (bad.length) { failed++; report(false, "example “" + ex.title + "”: empty cohort(s) " + bad.join(", ")); continue; }
     if (viewErr) { failed++; report(false, "example “" + ex.title + "”: view error: " + viewErr.error); continue; }
+    if (leaky.length) { failed++; report(false, "example “" + ex.title + "”: partition children do not add up: " + leaky.join(", ")); continue; }
     if (UPDATE) { report(true, "example “" + ex.title + "” pinned", shown); continue; }
 
     const want = pins.examples[ex.title];

@@ -123,8 +123,10 @@ export interface PairMoments {
 /** One clinical attribute's distribution in one cohort/study — counts or moments. */
 export interface AttrStats {
   attribute: string; per: "patient" | "sample"; kind: "cat" | "num";
-  /** categorical: the complete value distribution */
+  /** categorical: the complete value distribution — or, with the `topValues` option, its most
+   *  frequent values only, and `distinct` says how many there were in all */
   values?: { v: string; n: number }[];
+  distinct?: number;
   /** numeric: additive moments, from which mean and variance are exact */
   n?: number; sum?: number; sumsq?: number; min?: number; max?: number;
   /**
@@ -1194,7 +1196,7 @@ export interface AggregateCapable {
   pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
   /** a plot's aggregated contract: bins, groups or cells — never points */
   plot(def: CohortDef | null | undefined, spec: PlotRequest): Promise<PlotData>;
-  attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean }): Promise<AttrStats[]>;
+  attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean; topValues?: number }): Promise<AttrStats[]>;
   /** the p-th quantile of a numeric clinical attribute in this cohort — the reference population
    *  for a percentile-based cohort cutoff. null when the attribute has no values here. */
   attributeQuantile(def: CohortDef | null | undefined, attribute: string, per: "patient" | "sample", p: number): Promise<number | null>;
@@ -1441,7 +1443,7 @@ abstract class BaseResolver implements AggregateCapable {
    * declared. An attribute it does not declare is reported as skipped rather
    * than sniffed from the data and silently mis-typed.
    */
-  async attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean }): Promise<AttrStats[]> {
+  async attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean; topValues?: number }): Promise<AttrStats[]> {
     const attrs = [...new Set(attributes)].filter((a) => ATTR_NAME_RE.test(a)).slice(0, 20);
     if (!attrs.length) return [];
     const db = this.instance.conn.db, conn = this.instance.conn;
@@ -1474,6 +1476,14 @@ abstract class BaseResolver implements AggregateCapable {
     for (const a of catAttrs) {
       const g = grouped.get(a);
       if (!g) { out.push({ attribute: a, per: "patient", kind: "cat", values: [] }); continue; }
+      // a caller choosing which values deserve a group of its own asks for the most frequent
+      // ones only; it runs no test over the table, so nothing is wrong about a partial one
+      const top = opts?.topValues != null ? Math.max(1, Math.min(500, Math.floor(opts.topValues))) : null;
+      if (top != null) {
+        out.push({ attribute: a, per: g.per as "patient" | "sample", kind: "cat",
+          values: [...g.values].sort((x, y) => y.n - x.n || (x.v < y.v ? -1 : 1)).slice(0, top), distinct: g.values.length });
+        continue;
+      }
       out.push(g.values.length > ATTR_VALUE_CAP
         // refused, not truncated: a chi-squared on a partial table is wrong
         ? { attribute: a, per: g.per as "patient" | "sample", kind: "cat",

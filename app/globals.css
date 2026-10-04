@@ -867,6 +867,45 @@ button.customtag:hover { text-decoration: underline; }
 .cohortbox-studies { display: flex; width: fit-content; max-width: 100%; gap: 0.35rem; margin: -0.15rem 0 0.35rem; white-space: nowrap; min-width: 0; cursor: help; }
 .cohortbox-study { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .cohortbox-more { flex: none; }
+/* ---- partitions: a cohort split into children that add up to it ----------- */
+.partbox {
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card);
+  padding: var(--s2) var(--s3); flex: 1 1 100%; max-width: 44rem;
+}
+.partbox.nested { border: none; border-left: 2px solid var(--accent-soft); border-radius: 0; padding: var(--s1) 0 var(--s1) var(--s3); margin: var(--s1) 0 var(--s2) var(--s4); }
+.parthead { display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap; margin-bottom: var(--s1); }
+.partname { font-weight: 600; }
+.parthead .partrm { margin-left: auto; height: var(--ctl-h); }
+/* five cells in every row, declared here: a cell added without a column wraps every row */
+.partrow {
+  display: grid; grid-template-columns: 1rem minmax(0, 1fr) 4.5rem 5rem 9.5rem;
+  align-items: center; gap: var(--s2); min-height: var(--ctl-h); font-size: var(--t-md);
+  border-top: 1px solid var(--line); padding: var(--s0) 0;
+}
+.partrow.notEvaluable, .partrow.other { color: var(--muted); }
+.partmark { color: var(--muted); text-align: center; }
+.partlabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.partcount { text-align: right; font-variant-numeric: tabular-nums; }
+.partbar { height: 0.55rem; background: var(--code-bg); border-radius: var(--r-sm); overflow: hidden; }
+.partbar > span { display: block; height: 100%; background: var(--accent); }
+.partrow.other .partbar > span { background: var(--muted); }
+.partrow.notEvaluable .partbar > span { background: var(--mark); }
+.partacts { display: flex; gap: var(--s0); justify-content: flex-end; }
+.partacts .tbbtn { height: 1.45rem; padding: 0 var(--s1); font-size: var(--t-sm); }
+.partacts details.gearmenu { margin: 0; }
+.partacts details.gearmenu > summary.tbbtn { height: 1.45rem; padding: 0 var(--s1); font-size: var(--t-sm); }
+.partacts .gearmenu-items { right: 0; left: auto; }
+.partsum { margin: var(--s1) 0 0; font-size: var(--t-sm); border-top: 1px solid var(--line); padding-top: var(--s1); }
+.partsum.ok { color: var(--ok); }
+.partsum.bad { color: var(--err); font-weight: 600; }
+.partadd { display: flex; gap: var(--s1); margin-top: var(--s2); }
+.partadd input { flex: 1; min-width: 0; height: var(--ctl-h); font-size: var(--t-md); }
+.partadd .tbbtn { height: var(--ctl-h); }
+details.splitmenu { margin: 0; }
+.facetsplit { font-size: var(--t-xs); padding: 0 var(--s2); font-weight: 400; vertical-align: middle; }
+.cohortbox details.splitmenu { margin-top: var(--s2); }
+.cohortbox details.splitmenu > summary.tbbtn { height: var(--ctl-h); }
+textarea.splitoql { width: 100%; box-sizing: border-box; height: 4.5rem; font: var(--t-md) 'IBM Plex Mono', monospace; background: var(--code-bg); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--s1); }
 .cohortdialog textarea {
   width: 100%; box-sizing: border-box; margin-top: 0.3rem;
   height: 4rem; padding: 0.45rem;
