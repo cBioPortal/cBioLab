@@ -31,7 +31,7 @@ function resultsLayout(study: string, genes: string[], known: StudyKnown): PageL
     // the portal's Mutations tab: one gene at a time, its lollipop over its mutation table
     { title: "Mutations", views: [v("Mutation diagram", { kind: "hotspots", genes: [genes[0]], cohorts: ["Altered"] }),
         v("Mutation table", { kind: "mutations", gene: genes[0], cohorts: ["Altered"] })],
-      chooser: { label: "gene", options: genes,
+      chooser: { label: "gene", options: genes, locks: ["gene", "genes"],
         value: (vs) => String(((vs[1] as unknown as { gene?: string }).gene) || genes[0]),
         apply: (vs, g) => [{ ...vs[0], genes: [g] } as View, { ...vs[1], gene: g, sort: undefined } as View] } },
     ...(expr ? [{ title: "Co-expression", views: [v("Co-expression with " + genes[0], { kind: "correlates", gene: genes[0], profileType: expr, cohorts: ["All patients"] })] }] : []),

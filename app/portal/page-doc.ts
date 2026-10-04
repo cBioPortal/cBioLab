@@ -13,7 +13,11 @@ import type { AnalysisDoc, View } from "../../lib/types";
  * every view in the tab follows. It reads the current choice from the tab's own views and writes a
  * new one into them, so the choice is part of the document (and the link) like any setting.
  */
-export interface TabChooser { label: string; options: string[]; value: (views: View[]) => string; apply: (views: View[], value: string) => View[] }
+export interface TabChooser {
+  label: string; options: string[]; value: (views: View[]) => string; apply: (views: View[], value: string) => View[];
+  /** the view settings the chooser sets, which the views' own settings bars therefore leave out */
+  locks: string[];
+}
 
 export interface PageTab { title: string; views?: number[]; sub?: { title: string; views: number[] }[]; chooser?: TabChooser }
 export interface PageLayout {

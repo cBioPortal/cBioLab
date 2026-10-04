@@ -86,6 +86,8 @@ export interface MoreCtx {
   events: { canonical: string; label: string; n: number }[];
   /** the document as it stands, for a table's download */
   docJson?: () => string;
+  /** settings the surrounding page controls for every view at once (a portal tab's gene chips), so not offered here */
+  locked?: string[];
 }
 
 /** A one-line subtitle for the card header. */
@@ -170,9 +172,9 @@ export function MoreControls({ c }: { c: MoreCtx }) {
   if (spec.kind === "mutations") return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="the gene whose mutations are listed">
+        {!(c.locked || []).includes("gene") && <label className="tbfield" title="the gene whose mutations are listed">
           gene <DraftInput value={spec.gene || ""} disabled={busy} width="6rem" placeholder="KRAS" onCommit={(t) => patch({ gene: t.trim().toUpperCase() })} />
-        </label>
+        </label>}
         <label className="tbfield" title="rows fetched for the page; the download holds every row">
           fetch <select value={String(spec.rows ?? 100)} disabled={busy} onChange={(e) => patch({ rows: Number(e.target.value) === 100 ? undefined : Number(e.target.value) })}>
             {[100, 500, 1000].map((n) => <option key={n} value={n}>{n}</option>)}

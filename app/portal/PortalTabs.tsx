@@ -104,7 +104,7 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
         // a result belongs to the request that produced it; while a newer one runs, the cover says so
         const v = st?.result?.views[i];
         const busy = !!st?.loading;
-        const mc = { vi: i, spec, v: v || {}, busy, attrs: [], profiles: [], assays: [], events: [],
+        const mc = { vi: i, spec, v: v || {}, busy, attrs: [], profiles: [], assays: [], events: [], locked: tab?.chooser?.locks || [],
           patch: (p: Patch) => edit(vi, { ...spec, ...p } as unknown as View), docJson: () => JSON.stringify(slice) };
         const body = v && !v.error && v.kind === "oncoprint" && v.spec
           // the lab's own oncoprint card; the page's cohorts are its own, so a drag counts but makes no cohort
