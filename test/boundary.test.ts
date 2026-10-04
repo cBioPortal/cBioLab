@@ -294,6 +294,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // paired: `ps`/`per` hold samples and patients; the outer SELECT counts them per gene
     "pairedCountsSql": () => federation.pairedCountsSql(cohortSql, "x", "db", ["TP53", "ESR1"], { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }, "v7.5", "driver"),
     "pairedCountsSql:any": () => federation.pairedCountsSql(cohortSql, "x", "db", ["TP53"], { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis", "Recurrence"] }, null, "any"),
+    "pairedCountsSql:scan": () => federation.pairedCountsSql(cohortSql, "x", "db", null, { attribute: "IMPACT_PRE_POST", a: ["PRE-TX"], b: ["POST-TX"] }, "v7.5", "driver"),
+    "pairedCountsSql:scan:any": () => federation.pairedCountsSql(cohortSql, "x", "db", null, { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }, null, "any"),
     "pairedPatientsSql": () => federation.pairedPatientsSql(cohortSql, "x", "db", { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }),
     "sampleAttributeValuesSql": () => federation.sampleAttributeValuesSql(cohortSql, "x", "db", "SAMPLE_TYPE"),
     // clonality: `calls` is per (gene, sample); only per-gene counts and CCF bins leave
