@@ -4,7 +4,8 @@ import { useSearchParams } from "next/navigation";
 import CohortPills, { normalizeDef } from "./pills";
 import { MORE_KINDS, isMoreKind, moreSub, MoreControls, MoreBody, defaultMoreView } from "./more-views";
 import { ExploreCharts } from "./explore-charts";
-import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
+import OncoprintFigure, { type ColumnSelection, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
+import { figureDisplayOf, withFigureDisplay, sortKeyText as sortKeyTextOf, withSortKeys } from "../_oncoprint/view-display.ts";
 import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { heatmapTrackLabel } from "../../lib/profile-names.ts";
@@ -2244,8 +2245,7 @@ function Latency({ v }: { v: any }) {
     (h.genes && h.genes.length ? h.genes : v.genes || []).map((g: any) => heatmapTrackLabel(String(g).toUpperCase(), h.profileType)));
 
   // a sort key as the <select> spells it: "label" / "-label" / "genomic"
-  const sortKeyText = (k: any): string =>
-    k == null ? "genomic" : typeof k === "string" ? k : (k.dir === "desc" ? "-" : "") + String(k.track || "genomic");
+  const sortKeyText = sortKeyTextOf;
   const pruneSort = (v: any) => {
     // drop sort keys whose track no longer exists
     const keep = new Set(["genomic", "id", "Study", ...(v.clinical || []), ...heatmapLabels(v)]);
@@ -2263,10 +2263,7 @@ function Latency({ v }: { v: any }) {
   });
 
   /** the figure sorts in the browser, so this records the choice without re-running */
-  const setViewSort = (vi: number, keys: string[]) => updateViewLocal(vi, v => {
-    if (!keys.length) { const { sort, ...rest } = v; return rest; }
-    return { ...v, sort: keys.slice(0, 4) };
-  });
+  const setViewSort = (vi: number, keys: string[]) => updateViewLocal(vi, v => withSortKeys(v, keys));
 
   /** how many rows a view's gene list draws, for the button that opens the editor */
   const geneRowCount = (v: any): number => { try { return normalizeGeneTracks(v.genes || []).tracks.length; } catch { return (v.genes || []).length; } };
@@ -2321,20 +2318,9 @@ function Latency({ v }: { v: any }) {
   };
 
   /** viewing options as the figure wants them, defaulted from the document */
-  const figureDisplay = (v: any): FigureDisplay => ({ ...DEFAULT_FIGURE_DISPLAY, ...(v.display || {}) });
-  /** which display keys the figure owns, and therefore writes back without a re-run */
-  const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colors", "whiteBackground"]);
-  const setViewDisplay = (vi: number, d: FigureDisplay) => updateViewLocal(vi, v => {
-    // keep the document tidy: only options that differ from the default are written down
-    const display: any = { ...(v.display || {}) };
-    for (const k of FIGURE_KEYS) {
-      const val = (d as any)[k], dflt = (DEFAULT_FIGURE_DISPLAY as any)[k];
-      if (val === undefined || val === dflt) delete display[k]; else display[k] = val;
-    }
-    const next = { ...v };
-    if (Object.keys(display).length) next.display = display; else delete next.display;
-    return next;
-  });
+  const figureDisplay = (v: any): FigureDisplay => figureDisplayOf(v);
+  /** the figure's display options are written to the view (only those off their default), no re-run */
+  const setViewDisplay = (vi: number, d: FigureDisplay) => updateViewLocal(vi, v => withFigureDisplay(v, d));
 
   /**
    * A drag across an oncoprint becomes a cohort of exactly those patients — an explicit list,

@@ -1,78 +1,81 @@
 "use client";
-// A cBioPortal-style page: tabs (and a tab's sub-tabs), each a handful of views over cohorts the
-// PAGE owns. A tab is one ordinary analysis request — {study, cohorts, views: that tab's} — sent the
-// first time the tab is opened, and drawn by the shared server renderer (?figures=svg) or, for the
-// views that reproduce a portal tab, by its portal-style body. The analysis engine knows nothing
-// about pages or tabs; this component is the whole of the layout.
+// A cBioPortal-style page over ONE analysis document (app/portal/page-doc.ts): tabs (and a tab's
+// sub-tabs) list the indices of the views they show; opening a tab sends that slice —
+// {study, cohorts, views: the tab's} — as an ordinary analysis request, kept until one of its views
+// changes. A setting changed here is an edit to the document (onDoc), which the page writes to the
+// URL; the oncoprint's display and sort are applied in the browser and never re-run anything.
 import { useEffect, useRef, useState } from "react";
-import type { AnalysisDoc, AnalysisResult, CohortDef, View } from "../../lib/types";
+import type { AnalysisDoc, AnalysisResult, View } from "../../lib/types";
 import { SERIES } from "../../lib/svg-kit";
-import { MoreBody } from "../lab/more-views";
-import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type FigureDisplay } from "../_oncoprint/OncoprintFigure.tsx";
+import { MoreBody, MoreControls, isMoreKind } from "../lab/more-views";
+import OncoprintFigure from "../_oncoprint/OncoprintFigure.tsx";
+import { figureDisplayOf, withFigureDisplay, sortKeysOf, withSortKeys, dataPart } from "../_oncoprint/view-display.ts";
+import type { PageTab } from "./page-doc";
 
-/**
- * The interactive oncoprint, as the lab draws it: zoom, sort, the viewing options and a drag to
- * count columns. How it is viewed is this page's (browser state); a setting that changes the
- * numbers — patients or samples as columns, drivers only — re-runs the tab.
- */
-function PortalOncoprint({ spec, view, busy, patch }: { spec: unknown; view: Record<string, unknown>; busy: boolean; patch: (p: Record<string, unknown>) => void }) {
-  const [display, setDisplay] = useState<FigureDisplay>(DEFAULT_FIGURE_DISPLAY);
-  const [sortKeys, setSortKeys] = useState<string[]>([]);
+type Patch = Record<string, unknown>;
+
+/** The interactive oncoprint, as the lab draws it, reading and writing its view. */
+function PortalOncoprint({ spec, view, busy, edit }: { spec: unknown; view: Record<string, unknown>; busy: boolean; edit: (next: Record<string, unknown>) => void }) {
   const d = (view.display || {}) as { hideVUS?: boolean };
   return (
-    <OncoprintFigure spec={spec} display={display} onDisplay={setDisplay} sortKeys={sortKeys} onSortKeys={setSortKeys} busy={busy}
+    <OncoprintFigure spec={spec} display={figureDisplayOf(view)} onDisplay={(fd) => edit(withFigureDisplay(view, fd))}
+      sortKeys={sortKeysOf(view as { sort?: unknown[] })} onSortKeys={(keys) => edit(withSortKeys(view, keys))} busy={busy}
       controls={<>
         <label className="tbfield" title="a cohort selects patients; sample mode draws every sample of those patients">columns <select
-          value={view.unit === "sample" ? "sample" : "patient"} disabled={busy} onChange={(e) => patch({ unit: e.target.value === "sample" ? "sample" : undefined })}>
+          value={view.unit === "sample" ? "sample" : "patient"} disabled={busy}
+          onChange={(e) => { const n = { ...view }; if (e.target.value === "sample") n.unit = "sample"; else delete n.unit; edit(n); }}>
           <option value="patient">patients</option><option value="sample">samples</option>
         </select></label>
         <label className="chk tbchk" title="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
           <input type="checkbox" checked={!!d.hideVUS} disabled={busy}
-            onChange={(e) => patch({ display: { ...(view.display as object || {}), hideVUS: e.target.checked || undefined } })} /> drivers only</label>
+            onChange={(e) => { const disp = { ...d } as Patch; if (e.target.checked) disp.hideVUS = true; else delete disp.hideVUS;
+              const n = { ...view }; if (Object.keys(disp).length) n.display = disp; else delete n.display; edit(n); }} /> drivers only</label>
       </>} />
   );
 }
 
-export interface PortalTab { title: string; views?: { title: string; view: View }[]; sub?: { title: string; views: { title: string; view: View }[] }[] }
+type TabState = { sent: string; result?: AnalysisResult; error?: string; loading: boolean };
 
-type TabState = { views: View[]; result?: AnalysisResult; error?: string; loading: boolean };
-
-export function PortalTabs({ study, cohorts, tabs, left, onCounts }: {
-  study: string; cohorts: Record<string, CohortDef>; tabs: PortalTab[];
-  /** tabs the page left out, and why */
-  left: string[];
+export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCounts }: {
+  doc: AnalysisDoc; tabs: PageTab[]; titles: string[]; left: string[];
+  /** the open tab, "Title" or "Title › Sub" */
+  open: string;
+  onOpen: (key: string) => void;
+  /** the document after a setting changed on the page */
+  onDoc: (d: AnalysisDoc) => void;
   /** the cohorts' sizes, once any tab has answered (the page header reports them) */
   onCounts?: (c: Record<string, number>) => void;
 }) {
-  const [open, setOpen] = useState(tabs[0]?.title || "");
-  const [subOpen, setSubOpen] = useState<Record<string, string>>({});
   const [state, setState] = useState<Record<string, TabState>>({});
   const gen = useRef<Record<string, number>>({});
-  const docFor = (views: View[]): AnalysisDoc => ({ study, cohorts, views });
+  const views = doc.views || [];
 
-  const tab = tabs.find((x) => x.title === open);
-  const sub = tab?.sub ? tab.sub.find((x) => x.title === subOpen[open]) || tab.sub[0] : null;
-  const key = sub ? open + " › " + sub.title : open;
-  const entries = (sub ? sub.views : tab?.views) || [];
+  const [mainTitle, subTitle] = open.split(" › ");
+  const tab = tabs.find((x) => x.title === mainTitle) || tabs[0];
+  const sub = tab?.sub ? tab.sub.find((x) => x.title === subTitle) || tab.sub[0] : null;
+  const key = tab ? (sub ? tab.title + " › " + sub.title : tab.title) : "";
+  const idx = (sub ? sub.views : tab?.views) || [];
+  const slice: AnalysisDoc = { study: doc.study, cohorts: doc.cohorts, views: idx.map((i) => views[i]) };
+  // what decides a re-run: the slice without what the oncoprint applies in the browser
+  const sent = JSON.stringify({ ...slice, views: (slice.views || []).map((v) => dataPart(v as unknown as Record<string, unknown>)) });
 
-  const load = (k: string, views: View[]) => {
-    const g = (gen.current[k] || 0) + 1;
-    gen.current[k] = g;
-    setState((s) => ({ ...s, [k]: { ...s[k], views, loading: true, error: undefined } }));
+  useEffect(() => {
+    if (!idx.length || state[key]?.sent === sent) return;
+    const g = (gen.current[key] || 0) + 1;
+    gen.current[key] = g;
+    setState((s) => ({ ...s, [key]: { ...s[key], sent, loading: true, error: undefined } }));
     // the oncoprint comes back as a spec the interactive figure draws; every other view as a figure
-    fetch("/api/analysis?oncoprint=spec&figures=svg", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(docFor(views)) })
+    fetch("/api/analysis?oncoprint=spec&figures=svg", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(slice) })
       .then((r) => r.json())
       .then((j) => {
-        if (gen.current[k] !== g) return;
-        setState((s) => ({ ...s, [k]: j.error ? { views, loading: false, error: j.error } : { views, loading: false, result: j } }));
+        if (gen.current[key] !== g) return;
+        setState((s) => ({ ...s, [key]: j.error ? { sent, loading: false, error: j.error } : { sent, loading: false, result: j } }));
         if (!j.error && onCounts) onCounts(Object.fromEntries(Object.entries(j.cohorts || {}).map(([n, c]) => [n, (c as { count: number }).count])));
       })
-      .catch((e) => { if (gen.current[k] === g) setState((s) => ({ ...s, [k]: { views, loading: false, error: String(e) } })); });
-  };
+      .catch((e) => { if (gen.current[key] === g) setState((s) => ({ ...s, [key]: { sent, loading: false, error: String(e) } })); });
+  }, [key, sent]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  // a tab is computed the first time it is opened, then kept
-  useEffect(() => { if (entries.length && !state[key]) load(key, entries.map((v) => v.view)); }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
-
+  const edit = (i: number, next: View) => onDoc({ ...doc, views: views.map((v, j) => j === i ? next : v) });
   const counts = Object.values(state).find((s) => s.result)?.result?.cohorts;
   const st = state[key];
   const spinning = (k: string) => Object.entries(state).some(([x, s]) => (x === k || x.startsWith(k + " › ")) && s.loading);
@@ -80,14 +83,14 @@ export function PortalTabs({ study, cohorts, tabs, left, onCounts }: {
     <div className="portal">
       <div className="portal-cohorts">
         <strong className="meta">Groups:</strong>
-        {Object.keys(cohorts).map((n, i) => (
+        {Object.keys(doc.cohorts || {}).map((n, i) => (
           <span key={n} className="portal-group" style={{ background: SERIES[i % SERIES.length] }}>{n}{counts && counts[n] ? " (" + counts[n].count.toLocaleString() + ")" : ""}</span>
         ))}
         {left.length > 0 && <span className="meta">left out: {left.join("; ")}</span>}
       </div>
       <div className="doctabs" role="tablist">
         {tabs.map((t) => (
-          <button key={t.title} role="tab" aria-selected={t.title === open} className={t.title === open ? "on" : undefined} onClick={() => setOpen(t.title)}>
+          <button key={t.title} role="tab" aria-selected={t === tab} className={t === tab ? "on" : undefined} onClick={() => onOpen(t.title)}>
             {t.title}{spinning(t.title) && <span className="spinner" />}
           </button>
         ))}
@@ -95,28 +98,31 @@ export function PortalTabs({ study, cohorts, tabs, left, onCounts }: {
       {tab?.sub && (
         <div className="doctabs doctabs-sub" role="tablist">
           {tab.sub.map((t) => (
-            <button key={t.title} role="tab" aria-selected={t === sub} className={t === sub ? "on" : undefined} onClick={() => setSubOpen((s) => ({ ...s, [open]: t.title }))}>
-              {t.title}{spinning(open + " › " + t.title) && <span className="spinner" />}
+            <button key={t.title} role="tab" aria-selected={t === sub} className={t === sub ? "on" : undefined} onClick={() => onOpen(tab.title + " › " + t.title)}>
+              {t.title}{spinning(tab.title + " › " + t.title) && <span className="spinner" />}
             </button>
           ))}
         </div>
       )}
-      {entries.map((entry, i) => {
+      {idx.map((vi, i) => {
+        const spec = views[vi] as unknown as Record<string, unknown>;
+        // a result belongs to the request that produced it; while a newer one runs, the cover says so
         const v = st?.result?.views[i];
-        const spec = st?.views[i] || entry.view;
-        const patchView = (p: Record<string, unknown>) => load(key, (st?.views || entries.map((x) => x.view)).map((x, j) => j === i ? { ...x, ...p } as View : x));
+        const busy = !!st?.loading;
+        const mc = { vi: i, spec, v: v || {}, busy, attrs: [], profiles: [], assays: [], events: [],
+          patch: (p: Patch) => edit(vi, { ...spec, ...p } as unknown as View), docJson: () => JSON.stringify(slice) };
         const body = v && !v.error && v.kind === "oncoprint" && v.spec
-          ? <PortalOncoprint spec={v.spec} view={spec as unknown as Record<string, unknown>} busy={!!st?.loading} patch={patchView} />
-          : v && !v.error ? MoreBody({ c: { vi: i, spec, v, busy: !!st?.loading, attrs: [], profiles: [], assays: [], events: [],
-          patch: (p) => load(key, (st?.views || entries.map((x) => x.view)).map((x, j) => j === i ? { ...x, ...p } as View : x)),
-          docJson: () => JSON.stringify(docFor(st?.views || entries.map((x) => x.view))) } }) : null;
+          ? <PortalOncoprint spec={v.spec} view={spec} busy={busy} edit={(n) => edit(vi, n as unknown as View)} />
+          : v && !v.error ? MoreBody({ c: { ...mc, v } }) : null;
         return (
-          <section key={key + entry.title} className="card viewcard portal-view">
-            {entries.length > 1 && <h3 className="vtitle">{entry.title}</h3>}
-            {st?.loading && <div className="skeleton skeleton-view" />}
-            {!st?.loading && st?.error && <p className="note">{st.error}</p>}
-            {!st?.loading && v && v.error && <p className="note">{v.error}</p>}
-            {!st?.loading && v && !v.error && (body
+          <section key={key + vi} className="card viewcard portal-view">
+            {idx.length > 1 && <h3 className="vtitle">{titles[vi]}</h3>}
+            {isMoreKind(spec.kind) && <MoreControls c={mc} />}
+            {busy && !v && <div className="skeleton skeleton-view" />}
+            {busy && v && <div className="view-updating"><span className="spinner" /> updating…</div>}
+            {!busy && st?.error && <p className="note">{st.error}</p>}
+            {v && v.error && <p className="note">{v.error}</p>}
+            {v && !v.error && (body
               ? <>{body}{v.caveat && <p className="note vfoot">{v.caveat}</p>}</>
               : v.svg ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} /> : <p className="note">nothing to draw</p>)}
           </section>
