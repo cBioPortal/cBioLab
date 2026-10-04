@@ -218,9 +218,12 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
           d.gsea.sets.slice(0, 12).map((x) => `    ${x.name}: NES ${x.nes.toFixed(2)}, q=${pFmt(x.q)}, ${x.size} genes, leading edge ${x.leadingEdge.slice(0, 8).join(" ")}${x.leadingEdge.length > 8 ? " …" : ""}`).join("\n") : "") +
         caveatOf(v) + noteOf(v));
     } else if (v.kind === "paired") {
-      const pr = v.paired!, aL = pr.pairBy.a.join("/"), bL = pr.pairBy.b.join("/");
-      out.push(`Paired samples, ${pr.pairBy.attribute} ${aL} vs ${bL} (${pr.measure === "driver" ? "drivers" : "any alteration"}; profiled on both sides):\n` +
-        pr.panels.map((pn) => `  ${pn.cohort} (${pn.patients.toLocaleString()} patients with both):\n` +
+      const pr = v.paired!, aL = pr.labels.a, bL = pr.labels.b;
+      const sides = pr.perStudy ? Object.entries(pr.perStudy).map(([st, sp]) => `${st}: ${sp.attribute} ${sp.a.join("/")} vs ${sp.b.join("/")}`).join("; ")
+        : `${pr.pairBy.attribute} ${pr.pairBy.a.join("/")} vs ${pr.pairBy.b.join("/")}`;
+      out.push(`Paired samples, ${aL} vs ${bL} (${sides}; ${pr.measure === "driver" ? "drivers" : "any alteration"}; profiled on both sides):\n` +
+        pr.panels.map((pn) => `  ${pn.cohort} (${pn.patients.toLocaleString()} patients with both` +
+          (pn.tested != null ? `; scanned ${pn.tested.toLocaleString()} genes with a discordant patient, the ${pn.genes.length} most one-sided listed` : "") + `):\n` +
           pn.genes.map((g) => `    ${g.gene}: both ${g.both}, ${aL}-only ${g.aOnly}, ${bL}-only ${g.bOnly} of ${g.pairs} pairs` +
             (g.concordance != null ? `, ${Math.round(100 * g.concordance)}% concordant` : "") +
             (g.aOnly + g.bOnly ? `, McNemar q=${pFmt(g.q)}` : "")).join("\n")).join("\n") +

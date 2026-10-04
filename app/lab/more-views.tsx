@@ -46,11 +46,13 @@ export const MORE_KINDS: Record<string, MoreKindUi> = {
   incidence: { label: "Cumulative incidence (competing risks)", title: "Cumulative incidence", maxCohorts: 6,
     why: (k) => k.events.length ? null : "this study records no timeline events to estimate the incidence of" },
   clonality: { label: "Clonality (FACETS)", title: "Clonality", genes: true, maxCohorts: 3 },
-  paired: { label: "Paired samples (primary vs metastasis)", title: "Paired samples", genes: true, maxCohorts: 3 },
+  paired: { label: "Paired samples (primary vs metastasis, before vs after)", title: "Paired samples", genes: true, maxCohorts: 3 },
   diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2,
     why: (k) => k.cohorts.length < 2 ? "compares exactly two cohorts — this analysis has one"
       : !k.profiles.length ? "this study has no molecular profile to compare expression on" : null }
 };
+
+const PAIRED_DEFAULT_GENES = ["TP53", "KRAS", "PIK3CA", "ESR1", "AR", "CDKN2A", "MYC", "TERT"];
 
 export const isMoreKind = (k: unknown): boolean => Object.prototype.hasOwnProperty.call(MORE_KINDS, String(k));
 
@@ -86,7 +88,9 @@ export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "paired") {
     const pb = spec.pairBy || { attribute: "SAMPLE_TYPE", a: "Primary", b: "Metastasis" };
     const j = (x: any) => Array.isArray(x) ? x.join("/") : String(x ?? "");
-    return pb.attribute + ": " + j(pb.a) + " vs " + j(pb.b) + (spec.measure === "any" ? ", any alteration" : ", drivers");
+    const sides = v.paired ? v.paired.labels.a + " vs " + v.paired.labels.b
+      : pb.studies ? "sides set per study" : pb.attribute + ": " + j(pb.a) + " vs " + j(pb.b);
+    return sides + (spec.measure === "any" ? ", any alteration" : ", drivers") + (spec.genes && spec.genes.length ? "" : ", every gene scanned");
   }
   if (kind === "diffexpr") return (spec.profileType || "no profile") + (v.diffexpr ? (v.diffexpr.log2 ? ", log2(v+1)" : "") + " · volcano and GSEA" : "");
   if (kind === "pathways") return (spec.measure === "any" ? "any alteration" : "OncoKB drivers") + ", Sanchez-Vega et al. 2018";
@@ -231,18 +235,39 @@ export function MoreControls({ c }: { c: MoreCtx }) {
     const csv = (x: any) => (Array.isArray(x) ? x : [x]).filter((y: any) => y != null && y !== "").join(", ");
     const parse = (t: string) => { const xs = t.split(",").map((y) => y.trim()).filter(Boolean); return xs.length === 1 ? xs[0] : xs; };
     const setBy = (k: "attribute" | "a" | "b", t: string) => patch({ pairBy: { ...pb, [k]: k === "attribute" ? t.trim() : parse(t) } });
+    const scanning = !(spec.genes && spec.genes.length);
+    const perStudy = pb.studies ? Object.keys(pb.studies).length : 0;
     return (
       <div className="viewtb">
         <div className="tbz"><span className="tbl">data</span>
-          <label className="tbfield" title="a SAMPLE-level attribute that says which kind each sample is">
-            pair by <DraftInput value={pb.attribute} disabled={busy} width="9rem" onCommit={(t) => setBy("attribute", t)} />
+          {perStudy ? (
+            <span className="meta" title={Object.entries(pb.studies).map(([st, sp]: [string, any]) => st + ": " + sp.attribute + " " + csv(sp.a) + " vs " + csv(sp.b)).join("\n")}>
+              sides set per study in the document ({perStudy} {perStudy === 1 ? "study" : "studies"})
+            </span>
+          ) : <>
+            <label className="tbfield" title="a SAMPLE-level attribute that says which kind each sample is">
+              pair by <DraftInput value={pb.attribute} disabled={busy} width="9rem" onCommit={(t) => setBy("attribute", t)} />
+            </label>
+            <label className="tbfield" title="the value(s) of that attribute on the first side; comma-separated for several">
+              <DraftInput value={csv(pb.a)} disabled={busy} onCommit={(t) => setBy("a", t)} />
+            </label>
+            <label className="tbfield" title="the value(s) on the second side">
+              vs <DraftInput value={csv(pb.b)} disabled={busy} onCommit={(t) => setBy("b", t)} />
+            </label>
+          </>}
+          <label className="tbfield" title="test the genes you chose, or scan every gene altered in a paired patient and draw the most one-sided">
+            genes <select value={scanning ? "scan" : "chosen"} disabled={busy}
+              onChange={(e) => patch(e.target.value === "scan" ? { genes: undefined } : { genes: PAIRED_DEFAULT_GENES, top: undefined })}>
+              <option value="chosen">chosen</option><option value="scan">scan all</option>
+            </select>
           </label>
-          <label className="tbfield" title="the value(s) of that attribute on the first side; comma-separated for several">
-            <DraftInput value={csv(pb.a)} disabled={busy} onCommit={(t) => setBy("a", t)} />
-          </label>
-          <label className="tbfield" title="the value(s) on the second side">
-            vs <DraftInput value={csv(pb.b)} disabled={busy} onCommit={(t) => setBy("b", t)} />
-          </label>
+          {scanning && (
+            <label className="tbfield" title="how many of the most one-sided genes to draw; q is still taken across every gene tested">
+              drawn <select value={String(spec.top ?? 20)} disabled={busy} onChange={(e) => patch({ top: Number(e.target.value) === 20 ? undefined : Number(e.target.value) })}>
+                {[...new Set([10, 20, 30, 40, Number(spec.top ?? 20)])].sort((x, y) => x - y).map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+          )}
           <label className="tbfield" title="count only OncoKB drivers, or every alteration">
             count <select value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onChange={(e) => patch({ measure: e.target.value === "any" ? "any" : undefined })}>
               <option value="driver">drivers</option><option value="any">any alteration</option>
@@ -282,7 +307,7 @@ export function defaultMoreView(kind: string, known: Known): Record<string, unkn
     return { kind, event: { eventType: ev ? ev.label : "" } };
   }
   if (kind === "clonality") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "APC", "PIK3CA", "SMAD4", "CDH1"] };
-  if (kind === "paired") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "PIK3CA", "ESR1", "AR", "CDKN2A", "MYC", "TERT"] };
+  if (kind === "paired") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : PAIRED_DEFAULT_GENES };
   if (kind === "diffexpr") {
     const profile = known.profiles.find((p) => /zscore/i.test(p) && /mrna|rna_seq/i.test(p))
       || known.profiles.find((p) => /mrna|rna_seq/i.test(p)) || known.profiles[0] || "";

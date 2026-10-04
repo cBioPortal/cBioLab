@@ -335,7 +335,7 @@ export function diffexprSvg(v: ViewResult, o: SvgOpts): string {
 export function pairedSvg(v: ViewResult, o: SvgOpts): string {
   const p = palette(o.theme), r = v.paired!;
   const W = o.width || 960, LBL = 90, STAT = 250, BAR_L = LBL + 10, BAR_W = W - BAR_L - STAT - 10;
-  const aL = r.pairBy.a.join("/"), bL = r.pairBy.b.join("/");
+  const aL = r.labels.a, bL = r.labels.b;
   const BOTH = p.muted;
   const out: string[] = [];
   let y = 8;
@@ -344,11 +344,14 @@ export function pairedSvg(v: ViewResult, o: SvgOpts): string {
   const sx = (n: number) => BAR_W * n / widest;
   r.panels.forEach((pn) => {
     out.push(`<text x="10" y="${y + 12}" font-size="12" font-weight="600" fill="${p.ink}">${esc(pn.cohort)}` +
-      `<tspan dx="6" font-size="10" font-weight="400" fill="${p.muted}">${fmt(pn.patients)} patients with both · ${fmt(pn.aSamples)} ${esc(aL)} and ${fmt(pn.bSamples)} ${esc(bL)} samples</tspan></text>`);
+      `<tspan dx="6" font-size="10" font-weight="400" fill="${p.muted}">${fmt(pn.patients)} patients with both · ${fmt(pn.aSamples)} ${esc(aL)} and ${fmt(pn.bSamples)} ${esc(bL)} samples` +
+      `${pn.tested != null ? ` · ${fmt(pn.tested)} genes with a discordant patient, ${pn.genes.length < pn.tested ? "the " + fmt(pn.genes.length) + " most one-sided" : "all"} drawn` : ""}</tspan></text>`);
     y += 22;
+    // legend entries spaced by their own text, so a long side label never runs into the next
+    const bothX = BAR_L + Math.max(90, Math.ceil((aL.length + 5) * 5.6) + 12);
     out.push(`<text x="${BAR_L}" y="${y + 8}" font-size="9.5" fill="${SERIES[0]}">${esc(aL)} only</text>` +
-      `<text x="${BAR_L + 90}" y="${y + 8}" font-size="9.5" fill="${p.muted}">both</text>` +
-      `<text x="${BAR_L + 130}" y="${y + 8}" font-size="9.5" fill="${SERIES[1]}">${esc(bL)} only</text>` +
+      `<text x="${bothX}" y="${y + 8}" font-size="9.5" fill="${p.muted}">both</text>` +
+      `<text x="${bothX + 40}" y="${y + 8}" font-size="9.5" fill="${SERIES[1]}">${esc(bL)} only</text>` +
       `<text x="${W - STAT + 8}" y="${y + 8}" font-size="9.5" fill="${p.muted}">concordant · profiled pairs · McNemar q</text>`);
     y += 14;
     pn.genes.forEach((g) => {
@@ -603,7 +606,7 @@ export function moreViewTitle(v: ViewResult): string | null {
   if (v.kind === "clonality") return "Clonality (FACETS)";
   if (v.kind === "labs") return "Lab course" + (v.labs ? " — " + v.labs.test + " from " + v.labs.anchoredTo : "");
   if (v.kind === "incidence") return "Cumulative incidence" + (v.incidence ? " — " + v.incidence.eventLabel + (v.incidence.anchoredTo ? " from " + v.incidence.anchoredTo : "") : "");
-  if (v.kind === "paired") return "Paired samples" + (v.paired ? " — " + v.paired.pairBy.a.join("/") + " vs " + v.paired.pairBy.b.join("/") : "");
+  if (v.kind === "paired") return "Paired samples" + (v.paired ? " — " + v.paired.labels.a + " vs " + v.paired.labels.b : "");
   if (v.kind === "diffexpr") return "Differential expression" + (v.diffexpr ? " — " + v.diffexpr.profileType : "");
   return null;
 }

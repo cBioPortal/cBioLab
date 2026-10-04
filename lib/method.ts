@@ -1197,30 +1197,44 @@ export function incidenceMethod(t: IncidenceTrace): MethodRecord {
 
 export interface PairedTrace {
   pairBy: { attribute: string; a: string[]; b: string[] };
+  /** each study's own sides, when they differ from `pairBy` */
+  perStudy?: Record<string, { attribute: string; a: string[]; b: string[] }>;
+  labels?: { a: string; b: string };
   measure: "driver" | "any";
   oncokbPin: string | null;
+  /** present when every altered gene was tested and the `top` most one-sided drawn */
+  scan?: { top: number };
   perSite: { cohort: string; study: string; cohortPatients: number }[];
-  panels: { cohort: string; patients: number }[];
+  panels: { cohort: string; patients: number; tested?: number }[];
   counts: { cohort: string; study: string; gene: string; pairs: number; both: number; aOnly: number; bOnly: number }[];
   /** what the view reported per cohort and gene — for the script check */
   results: { cohort: string; gene: string; p: number; q?: number }[];
 }
 
 export function pairedMethod(t: PairedTrace): MethodRecord {
-  const aL = t.pairBy.a.join("/"), bL = t.pairBy.b.join("/");
+  const aL = t.labels?.a ?? t.pairBy.a.join("/"), bL = t.labels?.b ?? t.pairBy.b.join("/");
   const what = t.measure === "driver" ? driverMeaning(t.oncokbPin).replace(/^driver: /, "") : ALTERED_MEANING.replace(/^altered: /, "");
-  const steps: MethodStep[] = t.perSite.map((s) => ({
-    kind: "fetch" as const, title: "Count each gene's state in paired samples",
-    detail: "The paired:patients and paired:genes queries above. Patients with both a " + t.pairBy.attribute + " = " + aL + " sample and a " + bL +
-      " sample; per gene, among those profiled for it on both sides by each side's own panels: altered (" + what + ") on both sides, on the " + aL +
-      " side only, or the " + bL + " side only. A patient with several samples on one side counts as altered there if any is. Counts only.",
-    scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
-  }));
+  const steps: MethodStep[] = t.perSite.map((s) => {
+    const sp = t.perStudy?.[s.study] || t.pairBy;
+    return {
+      kind: "fetch" as const, title: "Count each gene's state in paired samples",
+      detail: "The paired:patients and paired:genes queries above. Patients with both a " + sp.attribute + " = " + sp.a.join("/") + " sample (" + aL + ") and a " +
+        sp.attribute + " = " + sp.b.join("/") + " sample (" + bL + "); per gene" + (t.scan ? " — every gene altered (" + what + ") in some such patient" : "") +
+        ", among those profiled for it on both sides by each side's own panels: altered (" + what + ") on both sides, on the " + aL +
+        " side only, or the " + bL + " side only. A patient with several samples on one side counts as altered there if any is. Counts only.",
+      scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
+    };
+  });
   if (new Set(t.perSite.map((s) => s.cohort)).size < t.perSite.length) steps.push({ kind: "transform", title: "Add each cohort's counts across its studies", detail: "The counts add exactly." });
   steps.push({ kind: "statistic", title: "Exact McNemar test per gene",
     detail: "Only the discordant patients carry information about direction: of the " + aL + "-only and " + bL + "-only patients, each is a fair coin under the null, so p is twice the smaller binomial tail (capped at 1). Concordance is both ÷ altered anywhere.",
     params: t.panels.map((p) => [p.cohort, p.patients.toLocaleString() + " patients with both kinds of sample"] as [string, string]) });
-  steps.push({ kind: "statistic", title: "Benjamini–Hochberg across genes, per cohort", detail: "q-values over the genes with at least one discordant patient, separately for each cohort." });
+  steps.push({ kind: "statistic", title: "Benjamini–Hochberg across genes, per cohort", detail: "q-values over the genes with at least one discordant patient, separately for each cohort." +
+    (t.scan ? " In a scan that is every such gene, not only the ones drawn." : "") });
+  if (t.scan) steps.push({ kind: "transform", title: "Draw the " + t.scan.top + " most one-sided genes",
+    detail: "Of the genes with a discordant patient, ordered by McNemar p, then by the size of the imbalance between " + aL + "-only and " + bL +
+      "-only patients, then by the number of discordant patients, then by name; the first " + t.scan.top + " are drawn and reported.",
+    params: t.panels.map((p) => [p.cohort, (p.tested ?? 0).toLocaleString() + " genes tested"] as [string, string]) });
   const python = [
     "# Recompute with statsmodels " + VERIFIED.mcnemar.version + ", the version our code is tested against.",
     "import io",

@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-10-02",
+  "generated": "2026-10-04",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -169,6 +169,12 @@
     },
     "Paired samples: what differs between a patient's primary and metastasis": {
       "all patients": 48179
+    },
+    "Paired samples, every gene: what the metastasis carries that the primary does not": {
+      "all patients": 48179
+    },
+    "Before and after treatment, pooled across studies that label it differently": {
+      "before and after treatment": 481
     },
     "Clonality, LOH and genome doubling from FACETS": {
       "Colorectal": 4993,

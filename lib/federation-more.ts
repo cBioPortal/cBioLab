@@ -227,10 +227,15 @@ function pairedSidesCtes(cohortSql: string, study: string, db: string, by: PairB
  * (by that side's own panels — a gene one side never assayed says nothing about concordance):
  * altered on both sides, on side a only, on side b only. A patient with several samples on a
  * side is altered on that side if any of them is. Counts only.
+ *
+ * `genes` null scans: every gene with a counted alteration in a paired patient's sample, and only
+ * the genes with at least one patient altered on some side come back (a gene altered nowhere
+ * carries no information about concordance or direction).
  */
-export function pairedCountsSql(cohortSql: string, study: string, db: string, genes: string[], by: PairBy,
+export function pairedCountsSql(cohortSql: string, study: string, db: string, genes: string[] | null, by: PairBy,
   pin: string | null, measure: "driver" | "any"): string {
-  const geneList = genes.map(sq).join(",");
+  const scan = genes == null;
+  const geneList = scan ? "SELECT DISTINCT gene FROM alt" : genes.map(sq).join(",");
   const hit = measure === "driver" ? "max(ann.is_driver)" : "1";
   return (
     pairedSidesCtes(cohortSql, study, db, by) + ",\n" +
@@ -239,8 +244,11 @@ export function pairedCountsSql(cohortSql: string, study: string, db: string, ge
     "  FROM " + db + ".genomic_event_derived g\n" +
     (pin && measure === "driver" ? driverJoin(pin) : "") +
     "  INNER JOIN ps ON ps.suid = g.sample_unique_id\n" +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
+    "  WHERE g.cancer_study_identifier = " + sq(study) + (scan ? "" : " AND g.hugo_gene_symbol IN (" + geneList + ")") + " AND " + ALTERED_COND + "\n" +
+    // narrows the events before the annotation join rather than after it
+    "    AND g.sample_unique_id IN (SELECT suid FROM ps)\n" +
     "  GROUP BY gene, pid, side\n" +
+    (scan ? "  HAVING hit > 0\n" : "") +
     "),\n" +
     "cov AS (\n" +
     "  SELECT DISTINCT pg.gene AS gene, ps.pid AS pid, ps.side AS side\n" +
@@ -257,7 +265,7 @@ export function pairedCountsSql(cohortSql: string, study: string, db: string, ge
     "  GROUP BY gene, pid\n" +
     ")\n" +
     "SELECT gene, count() AS pairs, countIf(aa AND ab) AS both, countIf(aa AND NOT ab) AS a_only, countIf(ab AND NOT aa) AS b_only\n" +
-    "FROM per WHERE pa AND pb GROUP BY gene"
+    "FROM per WHERE pa AND pb GROUP BY gene" + (scan ? " HAVING both + a_only + b_only > 0" : "")
   );
 }
 

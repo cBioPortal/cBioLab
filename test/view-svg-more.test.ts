@@ -120,7 +120,7 @@ describe("paired", () => {
   const gene = (g: string, pairs: number, both: number, aOnly: number, bOnly: number, q: number) =>
     ({ gene: g, pairs, both, aOnly, bOnly, neither: pairs - both - aOnly - bOnly, concordance: both / (both + aOnly + bOnly || 1), p: q, q });
   const v: ViewResult = { kind: "paired", cohorts: ["all"], caveat: "where, not when",
-    paired: { pairBy: { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }, measure: "driver",
+    paired: { pairBy: { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }, labels: { a: "Primary", b: "Metastasis" }, measure: "driver",
       panels: [{ cohort: "all", patients: 100, aSamples: 110, bSamples: 120,
         genes: [gene("ESR1", 100, 4, 7, 49, 1e-8), gene("NOPE", 0, 0, 0, 0, 1)] }] } };
   test("names the side discordance favours, and a gene never profiled on both sides says so", () => {
@@ -131,6 +131,12 @@ describe("paired", () => {
   });
   test("no patient with both sides, no figure", () => {
     assert.equal(viewToSvg({ ...v, paired: { ...v.paired!, panels: [{ ...v.paired!.panels[0], patients: 0 }] } }), null);
+  });
+  test("a scan names its sides by their labels and says how many genes were tested", () => {
+    const svg = viewToSvg({ ...v, paired: { ...v.paired!, labels: { a: "before", b: "after" }, scan: { top: 1 },
+      panels: [{ ...v.paired!.panels[0], tested: 37, genes: [v.paired!.panels[0].genes[0]] }] } })!;
+    assert.ok(svg.includes("more after-only"));
+    assert.ok(svg.includes("37 genes with a discordant patient, the 1 most one-sided drawn"));
   });
 });
 
