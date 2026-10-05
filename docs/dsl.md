@@ -68,9 +68,12 @@ recorded value. Patients failing that go to a child named `"Not profiled: <GENE>
 `"No <ATTRIBUTE> recorded"`; patients matching no arm go to `"Other"` (or the `other` name).
 
 Each child is an ordinary cohort named `"<partition> / <arm>"`, usable anywhere a cohort name is
-(including as another partition's `of`, to nest), with its own readback and SQL. A view whose
-`cohorts` names the partition compares its arms and remainder, not the not-evaluable children;
-name a child to include it. A view with no `cohorts` shows only the authored cohorts. The result's
+(including as another partition's `of`, to nest), with its own readback and SQL. **A split
+replaces what it splits** in every view: wherever a view would show a split cohort — named in its
+`cohorts`, or shown by default because it names none — it shows that split's arms and remainder
+instead (not its not-evaluable children), and an arm that is split further shows ITS arms, so the
+leaves still add up to the cohort. Naming the partition does the same; naming one child shows just
+that child. If one cohort has two splits, views show the first declared. The result's
 `partitions` gives every child's count and checks the sum against the parent's (`conserved`).
 Conditions the engine cannot check evaluability for (expression, assay values, timeline events,
 derived metrics) are listed in `unchecked`: their patients with no data count as not matching.

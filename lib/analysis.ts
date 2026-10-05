@@ -33,7 +33,7 @@ import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } from "./cohort-partitions.ts";
-import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName } from "./partition-arms.ts";
+import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits } from "./partition-arms.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
 import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, courseMethod, sequenceMethod, type CoxTrace } from "./method.ts";
@@ -352,7 +352,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     const parentCount = cohorts[plan.of].count;
     partitionResults[plan.name] = { of: plan.of, parentCount, children, sum, conserved: sum === parentCount, unchecked: plan.unchecked };
   }
-  const partitionByName = Object.fromEntries(partitionPlans.map((p) => [p.name, p]));
+  const partitionShapes = partitionPlans.map((p) => ({ name: p.name, of: p.of, comparable: comparableChildren(p) }));
   const generatedNames = new Set(partitionPlans.flatMap((p) => p.children.map((c) => c.name)));
   const involved = [...new Set(Object.values(cohorts).flatMap((c) => c.studies))];
 
@@ -446,11 +446,10 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         continue;
       }
     } else {
-      // A view naming a partition compares its arms and Other; with no cohorts named it shows
-      // the authored cohorts, not every generated child.
-      vNames = (view.cohorts && view.cohorts.length ? view.cohorts : names.filter((n) => !generatedNames.has(n)))
-        .flatMap((n) => partitionByName[n] ? comparableChildren(partitionByName[n]) : [n])
-        .filter((n, i, all) => cohorts[n] && all.indexOf(n) === i);
+      // With no cohorts named a view shows the authored ones; either way a split replaces what it
+      // splits (expandSplits), so splitting a cohort changes every view that shows it.
+      vNames = expandSplits(view.cohorts && view.cohorts.length ? view.cohorts : names.filter((n) => !generatedNames.has(n)), partitionShapes)
+        .filter((n) => cohorts[n]);
     }
     const vStudies = [...new Set(vNames.flatMap((n) => cohorts[n].studies))];
     const mark = queryMark(), pushedBefore = views.length, viewT0 = Date.now();

@@ -23,7 +23,7 @@ import CustomDataPanel, { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import LoginButton from "./login-button.tsx";
 import { PartitionPanel, SplitForm, ChartMenu, type SplitSpec } from "./partitions.tsx";
-import { withoutPartition, armsFromSelection, renamePartitionChild, uniqueName, type ChartKey } from "../../lib/partition-arms.ts";
+import { withoutPartition, armsFromSelection, renamePartitionChild, uniqueName, expandSplits, type ChartKey, type PartitionShape } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
 import { installCustomDataFetch, saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
@@ -1660,14 +1660,12 @@ export default function AnalysisPage() {
   const setViewCohorts = (vi: number, names: string[], all: string[]) => updateView(vi, (v: any) => {
     const next = { ...v };
     const picked = all.filter((n) => names.includes(n));
-    const authored = Object.keys(doc.cohorts || {});
-    // exactly one partition's arms is written as the partition's name, so a later edit to its arms carries over
-    const whole = Object.entries((result && result.partitions) || {}).find(([, p]) => {
-      const arms = p.children.filter((c) => c.role !== "notEvaluable").map((c) => c.name);
-      return arms.length === picked.length && arms.every((a, k) => a === picked[k]);
-    });
-    if (!picked.length || (picked.length === authored.length && picked.every((n, k) => n === authored[k]))) delete next.cohorts;
-    else next.cohorts = whole ? [whole[0]] : picked;
+    const shapes = partitionShapes();
+    const same = (a: string[], b: string[]) => a.length === b.length && a.every((n, k) => n === b[k]);
+    // exactly one split's arms is written as the split's name, so a later edit to its arms carries over
+    const whole = shapes.find((p) => same(expandSplits([p.name], shapes), picked));
+    if (!picked.length || same(picked, expandSplits(Object.keys(doc.cohorts || {}), shapes))) delete next.cohorts;
+    else next.cohorts = whole ? [whole.name] : picked;
     // splitBy always targets the view's own single chosen cohort (no picker of its own — see
     // SplitByControl) — so narrowing to exactly one carries an existing split along to it,
     // same attribute/gene/oql, rather than leaving it pointed at whatever it last targeted.
@@ -2159,18 +2157,18 @@ function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove, onEditNot
  */
 function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, menuId, menuStore }: {
   busy?: boolean; canEdit: boolean; onEdit: () => void; onRemove: () => void;
-  /** the split form, when this cohort can be split (it is not split already) */
-  split?: React.ReactNode;
+  /** the split form, when this cohort can be split (it is not split already); `done` closes this menu */
+  split?: (done: () => void) => React.ReactNode;
   menuId: string; menuStore: Map<string, boolean>;
 }) {
   const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   const [splitting, setSplitting] = useState(false);
   return (
-    <details className="gearmenu cohortgear" ref={ref}
+    <details className="gearmenu cohortgear" ref={ref} data-menu-id={menuId}
       onToggle={(e) => { onToggle(e); if (!(e.currentTarget as HTMLDetailsElement).open) setSplitting(false); }}>
       <summary className="tbbtn" title="edit this cohort" aria-label="edit this cohort">⋯</summary>
       <div className={"gearmenu-items" + (splitting ? " wide" : "")}>
-        {split && (splitting ? <>{split}<hr /></> : <>
+        {split && (splitting ? <>{split(() => { menuStore.set(menuId, false); setSplitting(false); })}<hr /></> : <>
           <button className="linklike" disabled={busy} title="divide this cohort into arms that never overlap and add up to it"
             onClick={() => setSplitting(true)}>split into arms…</button>
           <hr />
@@ -2202,15 +2200,17 @@ function Latency({ v }: { v: any }) {
   const docView = (vi: number): any => ((doc.views || [])[vi] || {});
 
   /** what a view's cohort picker needs: today's choice, everything on offer, and where to write it */
+  /** the document's splits as the engine sees them, from the last result */
+  const partitionShapes = (): PartitionShape[] => Object.entries((result && result.partitions) || {}).map(([name, p]) =>
+    ({ name, of: p.of, comparable: p.children.filter((c) => c.role !== "notEvaluable").map((c) => c.name) }));
   const cohortChoice = (vi: number, v: any, max?: number) => {
-    // On offer: the authored cohorts, then every partition's arms and remainder (its not-evaluable
-    // children are disclosed in the partition, not compared). A view with no cohorts of its own
-    // shows the authored ones, as the engine does; one naming a partition shows its arms.
+    // On offer and chosen, a split replaces what it splits, exactly as in the engine: a split
+    // cohort is offered as its arms and Other. A view with no cohorts of its own shows the
+    // authored cohorts, expanded the same way.
+    const shapes = partitionShapes();
     const authored = Object.keys(doc.cohorts || {});
-    const parts = (result && result.partitions) || {};
-    const armsOf = (p: string) => parts[p].children.filter((c) => c.role !== "notEvaluable").map((c) => c.name);
-    const all = [...authored, ...Object.keys(parts).flatMap(armsOf)].filter((n) => !result || result.cohorts[n]);
-    const named: string[] = Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts.flatMap((n: string) => parts[n] ? armsOf(n) : [n]) : authored;
+    const all = expandSplits(authored, shapes).filter((n) => !result || result.cohorts[n]);
+    const named: string[] = expandSplits(Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored, shapes);
     const chosen = named.filter((n) => all.includes(n));
     return { chosen, all, max, busy, viewKey: resultViewKeys.current[vi] ?? vi, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
   };
@@ -2283,19 +2283,11 @@ function Latency({ v }: { v: any }) {
     try { runEdited(renamePartitionChild(doc, name, from, to)); }
     catch (e) { setError(String((e as Error)?.message || e)); }
   };
-  /**
-   * Split a cohort (or an arm) by what the server proposes from the data, then point the views
-   * that showed exactly that cohort at the new arms — splitting is asked for in order to compare
-   * them. A view showing other cohorts too is left as it is.
-   */
+  /** Split a cohort (or an arm) by what the server proposes from the data. Every view showing
+   *  that cohort then shows its arms instead (expandSplits). */
   const splitCohortBy = async (cohort: string, spec: SplitSpec) => {
     const { name, def } = await proposePartition({ doc, cohort, ...spec });
-    const authored = Object.keys(doc.cohorts || {});
-    const views = (doc.views || []).map((v) => {
-      const shows = Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored;
-      return shows.length === 1 && shows[0] === cohort ? { ...v, cohorts: [name] } : v;
-    });
-    runEdited({ ...doc, partitions: { ...(doc.partitions || {}), [name]: def }, views });
+    runEdited({ ...doc, partitions: { ...(doc.partitions || {}), [name]: def } });
   };
 
   const openCohortEdit = (name: string) => {
@@ -3832,7 +3824,7 @@ function Latency({ v }: { v: any }) {
                       <CohortEditMenu busy={busy} canEdit={!!(doc.title && spaces[doc.title])}
                         onEdit={() => openCohortEdit(n)} onRemove={() => removeCohort(n)}
                         split={!Object.values(doc.partitions || {}).some((p) => p.of === n)
-                          ? <SplitForm cohort={n} attrs={catalogAttrs()} busy={busy} onSplit={splitCohortBy} /> : undefined}
+                          ? (done: () => void) => <SplitForm cohort={n} attrs={catalogAttrs()} busy={busy} onSplit={splitCohortBy} onDone={done} /> : undefined}
                         menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
                       <div className="cohortbox-head">
                         <span className="cohortbox-name"><span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />{n}</span>

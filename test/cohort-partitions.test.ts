@@ -227,3 +227,25 @@ describe("renaming a partition's child", () => {
     assert.throws(() => renamePartitionChild(d(), "K", "G12C", "  "), /cannot be empty/);
   });
 });
+
+import { expandSplits } from "../lib/partition-arms.ts";
+
+describe("a split replaces what it splits, in a view's cohort list", () => {
+  const parts = [
+    { name: "K", of: "KRAS-mutant", comparable: ["K / G12C", "K / other", "K / Other"] },
+    { name: "S", of: "K / G12C", comparable: ["S / F", "S / Other"] }
+  ];
+  test("an unsplit cohort stays; a split one becomes its arms, recursively", () => {
+    assert.deepEqual(expandSplits(["EGFR-mutant", "KRAS-mutant"], parts),
+      ["EGFR-mutant", "S / F", "S / Other", "K / other", "K / Other"]);
+  });
+  test("the partition's own name expands the same way", () => {
+    assert.deepEqual(expandSplits(["K"], parts), ["S / F", "S / Other", "K / other", "K / Other"]);
+  });
+  test("a leaf named directly stays itself, and nothing is listed twice", () => {
+    assert.deepEqual(expandSplits(["K / other", "K"], parts), ["K / other", "S / F", "S / Other", "K / Other"]);
+  });
+  test("with two splits of one cohort, the first declared is shown", () => {
+    assert.deepEqual(expandSplits(["A"], [{ name: "P1", of: "A", comparable: ["P1 / x"] }, { name: "P2", of: "A", comparable: ["P2 / y"] }]), ["P1 / x"]);
+  });
+});

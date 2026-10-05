@@ -1083,9 +1083,12 @@ recorded value. Patients failing that go to a child named \`"Not profiled: <GENE
 \`"No <ATTRIBUTE> recorded"\`; patients matching no arm go to \`"Other"\` (or the \`other\` name).
 
 Each child is an ordinary cohort named \`"<partition> / <arm>"\`, usable anywhere a cohort name is
-(including as another partition's \`of\`, to nest), with its own readback and SQL. A view whose
-\`cohorts\` names the partition compares its arms and remainder, not the not-evaluable children;
-name a child to include it. A view with no \`cohorts\` shows only the authored cohorts. The result's
+(including as another partition's \`of\`, to nest), with its own readback and SQL. **A split
+replaces what it splits** in every view: wherever a view would show a split cohort — named in its
+\`cohorts\`, or shown by default because it names none — it shows that split's arms and remainder
+instead (not its not-evaluable children), and an arm that is split further shows ITS arms, so the
+leaves still add up to the cohort. Naming the partition does the same; naming one child shows just
+that child. If one cohort has two splits, views show the first declared. The result's
 \`partitions\` gives every child's count and checks the sum against the parent's (\`conserved\`).
 Conditions the engine cannot check evaluability for (expression, assay values, timeline events,
 derived metrics) are listed in \`unchecked\`: their patients with no data count as not matching.
@@ -1487,7 +1490,8 @@ export const AGENT_GRAMMAR = `Document shape:
   // first match wins (put the most specific first: G12C before KRAS: MUT). Patients not profiled for an
   // OQL arm's gene, or with no value for a clinical arm's attribute, get their own "Not profiled: …" /
   // "No … recorded" child; the rest go to "Other". Each child is the cohort "<partition> / <arm>" — name a
-  // child in "of" to nest. A view whose "cohorts" lists the partition name compares its arms and Other.
+  // child in "of" to nest. A split replaces what it splits in every view: a view showing the split cohort
+  // (named, or by default) shows its arms and Other instead, recursively; naming the partition does the same.
   // Prefer a partition to hand-written mutually exclusive cohorts, and to splitBy when the arms must not overlap.
   // compare/survival/cox/logistic/clinical/course/oncoprint (only) may carry "splitBy" instead of (or with)
   // "cohorts" — auto-splits one named cohort into several arms, scoped to THIS view only, never added to the

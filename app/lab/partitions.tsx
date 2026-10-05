@@ -26,7 +26,10 @@ export function SplitMenu({ label, ...props }: SplitProps & { label?: string }) 
 
 /** the choice itself: an attribute from the study's catalog, a gene, or OQL queries. Closes the
  *  menu it sits in once the split is made. */
-export function SplitForm({ cohort, attrs, busy, onSplit }: SplitProps) {
+export function SplitForm({ cohort, attrs, busy, onSplit, onDone }: SplitProps & {
+  /** after a successful split — e.g. to record that the menu holding this form is now closed */
+  onDone?: () => void;
+}) {
   const [mode, setMode] = useState<"attribute" | "gene" | "oql">("attribute");
   const [attribute, setAttribute] = useState("");
   const [gene, setGene] = useState("");
@@ -41,8 +44,16 @@ export function SplitForm({ cohort, attrs, busy, onSplit }: SplitProps) {
     const s = spec();
     if (!s) return;
     setErr(null); setWorking(true);
+    // The menu may be re-rendered while the split runs (the page re-mounts it and restores it open),
+    // so close the one on screen afterwards, found by its id, not the element clicked.
     const menu = (e.currentTarget as HTMLElement).closest("details");
-    try { await onSplit(cohort, s); if (menu) menu.open = false; }
+    const menuId = menu?.dataset.menuId;
+    try {
+      await onSplit(cohort, s);
+      onDone?.();
+      const live = menuId ? [...document.querySelectorAll<HTMLDetailsElement>("details[data-menu-id]")].filter((d) => d.dataset.menuId === menuId) : menu ? [menu] : [];
+      for (const d of live) d.open = false;
+    }
     catch (x) { setErr(String((x as Error)?.message || x)); }
     setWorking(false);
   };
@@ -126,8 +137,15 @@ export function PartitionPanel({ name, partitions, results, cohortText, attrs, b
 }) {
   const def = partitions[name];
   const res = results?.[name];
-  // Before the first run there are no counts: show the arms as written, waiting.
-  const rows = res ? res.children : [
+  // Before the first run there are no counts: show the arms as written, waiting. After it, the
+  // names still come from the document, which an edit (a rename) changes at once, while the
+  // counts come from the last result until the re-run lands.
+  const resArms = res ? res.children.filter((c) => c.role === "arm") : [];
+  const sameShape = !!res && resArms.length === def.arms.length;
+  const rows = res && sameShape ? res.children.map((c) => {
+    const label = c.role === "arm" ? def.arms[resArms.indexOf(c)].name : c.role === "other" ? def.other || "Other" : c.label;
+    return { ...c, label, name: name + " / " + label };
+  }) : res ? res.children : [
     ...def.arms.map((a) => ({ name: name + " / " + a.name, label: a.name, role: "arm" as const, count: null as number | null })),
     { name: name + " / " + (def.other || "Other"), label: def.other || "Other", role: "other" as const, count: null as number | null }
   ];
