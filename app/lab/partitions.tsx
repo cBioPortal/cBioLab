@@ -9,11 +9,24 @@ import { moveArm, removeArm, mergeArms, canMergeArms } from "../../lib/partition
 
 export type SplitSpec = { attribute: string } | { gene: string } | { oql: string[] };
 
-/** "split this cohort by …": an attribute from the study's catalog, a gene, or OQL queries */
-export function SplitMenu({ cohort, attrs, busy, label, onSplit }: {
-  cohort: string; attrs: { attribute: string; kind: string }[]; busy?: boolean; label?: string;
+type SplitProps = {
+  cohort: string; attrs: { attribute: string; kind: string }[]; busy?: boolean;
   onSplit: (cohort: string, spec: SplitSpec) => Promise<void>;
-}) {
+};
+
+/** "split this cohort by …" behind its own button */
+export function SplitMenu({ label, ...props }: SplitProps & { label?: string }) {
+  return (
+    <details className="gearmenu splitmenu">
+      <summary className="tbbtn" title={"split “" + props.cohort + "” into arms that add up to it"}>{label || "Split…"}</summary>
+      <div className="gearmenu-items wide"><SplitForm {...props} /></div>
+    </details>
+  );
+}
+
+/** the choice itself: an attribute from the study's catalog, a gene, or OQL queries. Closes the
+ *  menu it sits in once the split is made. */
+export function SplitForm({ cohort, attrs, busy, onSplit }: SplitProps) {
   const [mode, setMode] = useState<"attribute" | "gene" | "oql">("attribute");
   const [attribute, setAttribute] = useState("");
   const [gene, setGene] = useState("");
@@ -34,9 +47,7 @@ export function SplitMenu({ cohort, attrs, busy, label, onSplit }: {
     setWorking(false);
   };
   return (
-    <details className="gearmenu splitmenu">
-      <summary className="tbbtn" title={"split “" + cohort + "” into arms that add up to it"}>{label || "Split…"}</summary>
-      <div className="gearmenu-items wide">
+      <>
         <div className="setrow">
           <span className="meta">split by</span>
           <select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}>
@@ -70,8 +81,7 @@ export function SplitMenu({ cohort, attrs, busy, label, onSplit }: {
         <div><button className="primary" disabled={busy || working || !spec()} onClick={go}>
           {working && <span className="spinner onprimary" />}Split
         </button></div>
-      </div>
-    </details>
+      </>
   );
 }
 

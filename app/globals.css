@@ -868,6 +868,23 @@ button.customtag:hover { text-decoration: underline; }
 .cohortbox-study { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .cohortbox-more { flex: none; }
 /* ---- partitions: a cohort split into children that add up to it ----------- */
+/* A cohort and its splits are one unit: the split panel abuts the cohort's card, sharing its
+   border, so which cohort a split divides is seen rather than read from its header. */
+.cohortgroup { display: contents; }
+.cohortgroup.hassplit { display: flex; align-items: stretch; flex: 1 1 100%; min-width: 0; }
+.cohortgroup.hassplit > .cohortbox { flex: 0 0 19rem; max-width: 19rem; border-radius: var(--r-md) 0 0 var(--r-md); border-right-style: dashed; }
+.cohortgroup-splits { flex: 1 1 auto; min-width: 0; max-width: 46rem; display: flex; flex-direction: column; }
+.cohortgroup-splits > .partbox { max-width: none; border-left: none; border-radius: 0; background: var(--paper); }
+.cohortgroup-splits > .partbox:first-child { border-top-right-radius: var(--r-md); }
+.cohortgroup-splits > .partbox:last-child { border-bottom-right-radius: var(--r-md); }
+.cohortgroup-splits > .partbox + .partbox { border-top-style: dashed; }
+@media (max-width: 760px) {
+  .cohortgroup.hassplit { flex-direction: column; }
+  .cohortgroup.hassplit > .cohortbox { flex: none; max-width: none; border-radius: var(--r-md) var(--r-md) 0 0; border-right-style: solid; border-bottom-style: dashed; }
+  .cohortgroup-splits > .partbox { border-left: 1px solid var(--line); border-top: none; }
+  .cohortgroup-splits > .partbox:first-child { border-top-right-radius: 0; }
+  .cohortgroup-splits > .partbox:last-child { border-bottom-left-radius: var(--r-md); }
+}
 .partbox {
   border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card);
   padding: var(--s2) var(--s3); flex: 1 1 100%; max-width: 44rem;

@@ -22,7 +22,7 @@ import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import CustomDataPanel, { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import LoginButton from "./login-button.tsx";
-import { PartitionPanel, SplitMenu, ChartMenu, type SplitSpec } from "./partitions.tsx";
+import { PartitionPanel, SplitForm, ChartMenu, type SplitSpec } from "./partitions.tsx";
 import { withoutPartition, armsFromSelection, renamePartitionChild, uniqueName, type ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
 import { installCustomDataFetch, saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
@@ -2157,15 +2157,24 @@ function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove, onEditNot
  * "Cohorts" heading for why that is deliberately a separate, unscoped piece
  * of work.
  */
-function CohortEditMenu({ busy, canEdit, onEdit, onRemove, menuId, menuStore }: {
+function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, menuId, menuStore }: {
   busy?: boolean; canEdit: boolean; onEdit: () => void; onRemove: () => void;
+  /** the split form, when this cohort can be split (it is not split already) */
+  split?: React.ReactNode;
   menuId: string; menuStore: Map<string, boolean>;
 }) {
   const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
+  const [splitting, setSplitting] = useState(false);
   return (
-    <details className="gearmenu cohortgear" ref={ref} onToggle={onToggle}>
+    <details className="gearmenu cohortgear" ref={ref}
+      onToggle={(e) => { onToggle(e); if (!(e.currentTarget as HTMLDetailsElement).open) setSplitting(false); }}>
       <summary className="tbbtn" title="edit this cohort" aria-label="edit this cohort">⋯</summary>
-      <div className="gearmenu-items">
+      <div className={"gearmenu-items" + (splitting ? " wide" : "")}>
+        {split && (splitting ? <>{split}<hr /></> : <>
+          <button className="linklike" disabled={busy} title="divide this cohort into arms that never overlap and add up to it"
+            onClick={() => setSplitting(true)}>split into arms…</button>
+          <hr />
+        </>)}
         {canEdit && <>
           <button className="linklike" disabled={busy} onClick={onEdit}>edit…</button>
           <hr />
@@ -3813,10 +3822,17 @@ function Latency({ v }: { v: any }) {
                 ? Array.from({ length: Math.max(1, Object.keys(doc.cohorts || {}).length) }).map((_, i) => (
                     <div key={i} className="skeleton skeleton-cohort" />
                   ))
-                : result && Object.entries(result.cohorts).filter(([n]) => doc.cohorts?.[n]).map(([n, c], i) => (
-                    <div key={n} className="cohortbox">
+                : result && Object.entries(result.cohorts).filter(([n]) => doc.cohorts?.[n]).map(([n, c], i) => {
+                  // a cohort's splits are drawn attached to it, so which cohort a split divides is
+                  // seen, not read; splits of a split's arms are nested inside that split's panel
+                  const splits = Object.keys(doc.partitions || {}).filter((k) => doc.partitions![k].of === n);
+                  return (
+                  <div key={n} className={"cohortgroup" + (splits.length ? " hassplit" : "")}>
+                    <div className="cohortbox">
                       <CohortEditMenu busy={busy} canEdit={!!(doc.title && spaces[doc.title])}
                         onEdit={() => openCohortEdit(n)} onRemove={() => removeCohort(n)}
+                        split={!Object.values(doc.partitions || {}).some((p) => p.of === n)
+                          ? <SplitForm cohort={n} attrs={catalogAttrs()} busy={busy} onSplit={splitCohortBy} /> : undefined}
                         menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
                       <div className="cohortbox-head">
                         <span className="cohortbox-name"><span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />{n}</span>
@@ -3834,17 +3850,17 @@ function Latency({ v }: { v: any }) {
                       {saved[n] && doc.cohorts?.[n]?.notes && (
                         <p className="note">{doc.cohorts[n].notes}</p>
                       )}
-                      {!Object.values(doc.partitions || {}).some((p) => p.of === n) &&
-                        <SplitMenu cohort={n} attrs={catalogAttrs()} busy={busy} label="Split into arms…" onSplit={splitCohortBy} />}
                     </div>
-                  ))}
-              {result && Object.keys(doc.partitions || {})
-                .filter((k) => !Object.keys(doc.partitions || {}).some((o) => doc.partitions![k].of.startsWith(o + " / ")))
-                .map((k) => (
-                  <PartitionPanel key={k} name={k} partitions={doc.partitions!} results={result.partitions}
-                    cohortText={(c) => result.cohorts[c]?.text} attrs={catalogAttrs()} busy={busy}
-                    onChange={setPartitionDef} onRename={renamePartitionRow} onRemove={removePartitionNamed} onSplit={splitCohortBy} />
-                ))}
+                    {splits.length > 0 && <div className="cohortgroup-splits">
+                      {splits.map((k) => (
+                        <PartitionPanel key={k} name={k} partitions={doc.partitions!} results={result.partitions}
+                          cohortText={(x) => result.cohorts[x]?.text} attrs={catalogAttrs()} busy={busy}
+                          onChange={setPartitionDef} onRename={renamePartitionRow} onRemove={removePartitionNamed} onSplit={splitCohortBy} />
+                      ))}
+                    </div>}
+                  </div>
+                  );
+                })}
             </div>
           </div>
           {/* The document's JSON, generated SQL and run/clear controls: a dialog
