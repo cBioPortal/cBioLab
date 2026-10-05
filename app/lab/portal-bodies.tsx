@@ -276,39 +276,105 @@ export function AssaysBody({ v }: { v: ViewResult }) {
   );
 }
 
+// ---- paging: page 1 comes with the result; any other page is fetched for this view ------------
+
+type PageRows<R> = { rows: R[]; loading: boolean; error: string | null; page: number; size: number; pages: number; total: number;
+  setPage: (p: number) => void; setSize: (n: number) => void };
+
+/**
+ * The rows of one page of a paged view. The page and its size are this browser's (like scroll) —
+ * not in the document, never re-running the view: page 1 at the view's own size is the result's;
+ * any other is POSTed to /api/view-page as {document, view, offset, limit} and kept, so moving
+ * back and forth is instant. A new result (a sort changed, say) starts again at page 1.
+ */
+export function usePages<R>(first: R[], total: number, offset0: number, viewSize: number, vi: number, docJson?: () => string): PageRows<R> {
+  const [size, setSizeState] = useState(viewSize);
+  const [page, setPageState] = useState(0);
+  const [cache, setCache] = useState<Map<string, R[]>>(new Map());
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const gen = useRef(0);
+  // a new result resets everything
+  // a new result (a sort changed, say) starts again at page 1; the page size is the reader's and stays
+  useEffect(() => { setPageState(0); setCache(new Map()); setError(null); }, [first, total]);
+  const pages = Math.max(1, Math.ceil(total / size));
+  const k = page + ":" + size;
+  const local = offset0 === 0 && page * size + size <= first.length || (offset0 === 0 && first.length >= total) ? first.slice(page * size, page * size + size) : null;
+  useEffect(() => {
+    if (local || cache.has(k) || !docJson) return;
+    const g = ++gen.current;
+    setLoading(true); setError(null);
+    let doc: unknown;
+    try { doc = JSON.parse(docJson()); } catch { setLoading(false); setError("no document to page"); return; }
+    fetch("/api/view-page", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc, view: vi, offset: page * size, limit: size }) })
+      .then((r) => r.json())
+      .then((j) => { if (gen.current !== g) return; if (j.error) setError(j.error); else setCache((m) => new Map(m).set(k, j.rows)); })
+      .catch((e) => { if (gen.current === g) setError(String(e)); })
+      .finally(() => { if (gen.current === g) setLoading(false); });
+  }, [k, local, cache]);   // eslint-disable-line react-hooks/exhaustive-deps
+  return { rows: local || cache.get(k) || [], loading: !local && !cache.has(k) && loading, error, page, size, pages, total,
+    setPage: (p) => setPageState(Math.max(0, Math.min(pages - 1, p))),
+    setSize: (n) => { setSizeState(n); setPageState(0); } };
+}
+
+/** The pager under a paged table: first, previous, a window of page numbers, next, last; the page size. */
+export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
+  const nums: (number | null)[] = [];
+  const lo = Math.max(0, p.page - 2), hi = Math.min(p.pages - 1, p.page + 2);
+  if (lo > 0) nums.push(0, ...(lo > 1 ? [null] : []));
+  for (let i = lo; i <= hi; i++) nums.push(i);
+  if (hi < p.pages - 1) nums.push(...(hi < p.pages - 2 ? [null] : []), p.pages - 1);
+  const from = p.total ? p.page * p.size + 1 : 0, to = Math.min(p.total, (p.page + 1) * p.size);
+  return (
+    <div className="pb-pager">
+      <button type="button" className="tbbtn" disabled={p.page === 0} onClick={() => p.setPage(p.page - 1)} aria-label="previous page">‹</button>
+      {nums.map((n, i) => n == null ? <span key={"g" + i}>…</span>
+        : <button key={n} type="button" className={"tbbtn" + (n === p.page ? " on" : "")} aria-current={n === p.page ? "page" : undefined} onClick={() => p.setPage(n)}>{(n + 1).toLocaleString()}</button>)}
+      <button type="button" className="tbbtn" disabled={p.page >= p.pages - 1} onClick={() => p.setPage(p.page + 1)} aria-label="next page">›</button>
+      <span>Showing {from.toLocaleString()}–{to.toLocaleString()} of {p.total.toLocaleString()} {unit}</span>
+      <label className="tbfield">per page <select value={String(p.size)} onChange={(e) => p.setSize(Number(e.target.value))}>
+        {[25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+      </select></label>
+      {p.loading && <span className="waiting"><span className="spinner" /> loading page {p.page + 1}…</span>}
+      {p.error && <span className="mark">{p.error}</span>}
+    </div>
+  );
+}
+
 // ---- Mutations: one gene's mutation table, sorted by the server, every row downloadable ----------
 
 export function MutationsBody({ v, vi, busy, docJson, onSort }: { v: ViewResult; vi: number; busy: boolean; docJson?: () => string;
   onSort: (sort: { column: string; desc?: boolean } | undefined) => void }) {
   const t = v.mutations!;
-  const [page, setPage] = useState(0);
-  const size = 25, pages = Math.max(1, Math.ceil(t.rows.length / size)), pg = Math.min(page, pages - 1);
+  const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson);
   const multi = t.lists.length > 1;
   const fmt = (x: string | number | null, id: string) => x == null || x === "" ? "" : id === "vaf" ? Number(x).toFixed(2) : typeof x === "number" ? x.toLocaleString() : x;
   const ann = t.columns.findIndex((c) => c.id === "annotation");
   return (
     <div className="pb">
       <div className="tv-bar">
-        <span className="meta">{t.rows.length.toLocaleString()} of {t.total.toLocaleString()} {t.gene} mutations shown{t.sort ? ", sorted by " + (t.columns.find((c) => c.id === t.sort!.column)?.name || t.sort.column) + (t.sort.desc ? " ↓" : " ↑") : ", drivers first, then by codon"}</span>
+        <span className="meta">{t.total.toLocaleString()} {t.gene} mutations{t.sort ? ", sorted by " + (t.columns.find((c) => c.id === t.sort!.column)?.name || t.sort.column) + (t.sort.desc ? " ↓" : " ↑") : ", drivers first, then by codon"}{multi ? " across " + t.lists.length + " cohorts and studies" : ""}</span>
         <form method="post" action="/api/table" target="_blank" onSubmit={(e) => { (e.currentTarget.elements.namedItem("doc") as HTMLInputElement).value = docJson ? docJson() : ""; }}>
           <input type="hidden" name="doc" /><input type="hidden" name="view" value={String(vi)} />
           <button className="tbbtn" type="submit" disabled={busy || !docJson} title={"every row as tab-separated text: " + t.total.toLocaleString() + " mutations"}>download all {t.total.toLocaleString()} rows (TSV)</button>
         </form>
       </div>
-      <div className="tv-scroll">
+      <div className={"tv-scroll" + (p.loading ? " pb-loading" : "")}>
         <table className="pb-table">
           <thead><tr>
             {multi && <th>cohort</th>}
+            {multi && <th>study</th>}
             {t.columns.map((c) => (
               <th key={c.id} className={c.numeric ? "num" : undefined} aria-sort={t.sort && t.sort.column === c.id ? (t.sort.desc ? "descending" : "ascending") : "none"}
-                title="sort by this column (re-runs: the whole table is sorted, not just this page)"
+                title="sort by this column — the whole table, across every page"
                 onClick={() => { if (!busy) onSort({ column: c.id, ...(t.sort && t.sort.column === c.id && !t.sort.desc ? { desc: true } : c.numeric && !(t.sort && t.sort.column === c.id) ? { desc: true } : {}) }); }}>
                 {c.name}{t.sort && t.sort.column === c.id ? (t.sort.desc ? " ▾" : " ▴") : ""}
               </th>))}
           </tr></thead>
-          <tbody>{t.rows.slice(pg * size, (pg + 1) * size).map((r, i) => (
+          <tbody>{p.rows.map((r, i) => (
             <tr key={i}>
               {multi && <td className="meta">{r.cohort}</td>}
+              {multi && <td className="meta">{r.study}</td>}
               {r.values.map((x, j) => <td key={j} className={t.columns[j].numeric ? "num" : undefined}>
                 {j === ann && x ? <Badge text={String(x)} color={/oncogenic/i.test(String(x)) && !/likely neutral|inconclusive/i.test(String(x)) ? SERIES[4] : null} />
                   : j === 0 ? <span className="mono">{fmt(x, t.columns[j].id)}</span> : fmt(x, t.columns[j].id)}
@@ -316,11 +382,7 @@ export function MutationsBody({ v, vi, busy, docJson, onSort }: { v: ViewResult;
             </tr>))}</tbody>
         </table>
       </div>
-      <div className="pb-pager">
-        <button type="button" className="tbbtn" disabled={pg === 0} onClick={() => setPage(pg - 1)}>‹</button>
-        <span>Showing {t.rows.length ? pg * size + 1 : 0}–{Math.min(t.rows.length, (pg + 1) * size)} of {t.rows.length.toLocaleString()} fetched ({t.total.toLocaleString()} in all)</span>
-        <button type="button" className="tbbtn" disabled={pg >= pages - 1} onClick={() => setPage(pg + 1)}>›</button>
-      </div>
+      <Pager p={p as PageRows<unknown>} unit="mutations" />
     </div>
   );
 }

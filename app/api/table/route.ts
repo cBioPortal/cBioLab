@@ -8,7 +8,7 @@ export const maxDuration = 300;
  * A table view's every row, as TSV — the Clinical Data tab's download, and the Mutations tab's
  * (a mutations view pages the same way).
  *
- * The rows come from the table view itself, a page at a time (`tableChunk`), so this route adds no
+ * The rows come from the view itself, a page at a time (RunOpts.page), so this route adds no
  * data path of its own: a study that may not disclose patients contributes no rows here exactly as
  * it contributes none on screen, and the header says which studies were left out. The engine runs
  * uncached: a whole table is not an answer to keep, and a page is cheap to recompute.
@@ -49,18 +49,17 @@ export async function POST(req: Request) {
         if (t.excluded && t.excluded.length)
           controller.enqueue(enc.encode("# left out (do not disclose patients): " + t.excluded.map((e) => e.study + " — " + e.patients + " patients").join("; ") + "\n"));
         controller.enqueue(enc.encode(line(head)));
-        for (const l of t.lists) {
-          for (let offset = 0; offset < l.total; offset += TABLE_CHUNK) {
-            const r = await runAnalysis(doc, { tableChunk: { cohort: l.cohort, study: l.study, offset, limit: TABLE_CHUNK } });
-            const page = r.views[0] as { error?: string; table?: TableResult; mutations?: MutationsResult };
-            if (isTable) {
-              if (!page.table) throw new Error(page.error || "a page of " + l.cohort + " in " + l.study + " returned nothing");
-              controller.enqueue(enc.encode(page.table.rows.map((row) =>
-                line([row.cohort, row.study, row.patient, v.table!.unit === "sample" ? row.sample : row.samples, ...row.values])).join("")));
-            } else {
-              if (!page.mutations) throw new Error(page.error || "a page of " + l.cohort + " in " + l.study + " returned nothing");
-              controller.enqueue(enc.encode(page.mutations.rows.map((row) => line([row.cohort, row.study, row.patient, ...row.values])).join("")));
-            }
+        // one order across every cohort and study: page through it whole, as the page view does
+        for (let offset = 0; offset < t.total; offset += TABLE_CHUNK) {
+          const r = await runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK } });
+          const page = r.views[0] as { error?: string; table?: TableResult; mutations?: MutationsResult };
+          if (isTable) {
+            if (!page.table) throw new Error(page.error || "the page at row " + offset + " returned nothing");
+            controller.enqueue(enc.encode(page.table.rows.map((row) =>
+              line([row.cohort, row.study, row.patient, v.table!.unit === "sample" ? row.sample : row.samples, ...row.values])).join("")));
+          } else {
+            if (!page.mutations) throw new Error(page.error || "the page at row " + offset + " returned nothing");
+            controller.enqueue(enc.encode(page.mutations.rows.map((row) => line([row.cohort, row.study, row.patient, ...row.values])).join("")));
           }
         }
         controller.close();

@@ -178,7 +178,7 @@ describe("remote peers: nothing identifying leaves before the network is touched
     // its row query returns patient and sample ids, so it sits outside the aggregate builders
     assert.equal("tableRowsSql" in (federation as Record<string, unknown>), false,
       "tableRowsSql returns ids and must not sit among the aggregate builders");
-    assert.match(tableRowsSql("SELECT '' AS pid", "x", "db", "sample", [{ id: "AGE", name: "Age", per: "patient", numeric: true }], null, 10, 0),
+    assert.match(tableRowsSql([{ cohort: "c", study: "x", cohortSql: "SELECT '' AS pid" }], "db", "sample", [{ id: "AGE", name: "Age", per: "patient", numeric: true }], null, 10, 0),
       /AS patient, replaceOne\(u\.suid/);
     assert.equal(typeof (AggregateResolver.prototype as unknown as Record<string, unknown>).tableRows, "undefined",
       "AggregateResolver must not be able to return the clinical table's rows");
@@ -190,7 +190,7 @@ describe("remote peers: nothing identifying leaves before the network is touched
   test("the mutation table's rows are the entitlement, and live only where it lives", () => {
     assert.equal("mutationRowsSql" in (federation as Record<string, unknown>), false,
       "mutationRowsSql returns sample ids and must not sit among the aggregate builders");
-    assert.match(mutationRowsSql("SELECT '' AS pid", "x", "db", "KRAS", "v7.5", null, 10, 0), /m\.sid AS sid/);
+    assert.match(mutationRowsSql([{ cohort: "c", study: "x", cohortSql: "SELECT '' AS pid" }], "db", "KRAS", "v7.5", null, 10, 0), /m\.sid AS sid/);
     for (const R of [AggregateResolver, RemoteAggregateResolver])
       assert.equal(typeof (R.prototype as unknown as Record<string, unknown>).mutationRows, "undefined", R.name + " must not be able to return mutation rows");
     assert.equal(typeof (PatientLevelResolver.prototype as unknown as Record<string, unknown>).mutationRows, "function");

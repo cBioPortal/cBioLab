@@ -35,52 +35,74 @@ const SORT_EXPR: Record<string, string> = {
   chr: "chr", start: "start", end: "end", ref: "ref", var: "var", status: "status",
 };
 
-/**
- * One gene's mutations in one cohort and study: a row per call (uncalled calls excluded, as the
- * portal excludes them), with the sample's detailed cancer type and mutation count where the study
- * records them, and the OncoKB call at `pin` when there is one. Sorted by `sort` — by default
- * drivers first, then by codon — then sample, so a download paged by `offset` is the order shown.
- */
-export function mutationRowsSql(cohortSql: string, study: string, db: string, gene: string, pin: string | null,
-  sort: MutationSort | null, limit: number, offset: number): string {
-  const pre = sq(study + "_");
+/** One (cohort, study) part of a table: the cohort's SQL as that study's resolver compiles it. */
+export interface TablePart { cohort: string; study: string; cohortSql: string }
+
+/** A part's rows, every column the table has, labelled with its cohort, study and document order. */
+function partRows(p: TablePart, i: number, db: string, gene: string, pin: string | null): { ctes: string; rows: string } {
+  const pre = sq(p.study + "_");
   const attr = (name: string, as: string) =>
     as + " AS (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, any(attribute_value) AS v FROM " + db + ".clinical_data_derived\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(name) + "\n" +
-    "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM m) GROUP BY sid)";
-  const col = sort && SORT_EXPR[sort.column] ? SORT_EXPR[sort.column] : null;
-  const order = col
-    ? col + (sort!.desc ? " DESC" : " ASC") + " NULLS LAST, "
-    : "drv DESC, pos ASC NULLS LAST, ";
-  return (
-    "WITH cohort AS (" + cohortSql + "),\n" +
-    "m AS (\n" +
+    "  WHERE cancer_study_identifier = " + sq(p.study) + " AND type = 'sample' AND attribute_name = " + sq(name) + "\n" +
+    "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM m" + i + ") GROUP BY sid)";
+  const ctes =
+    "c" + i + " AS (" + p.cohortSql + "),\n" +
+    "m" + i + " AS (\n" +
     "  SELECT patientId AS pid, sampleId AS sid, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,\n" +
     "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS altCount, tumorRefCount AS refCount, mutationStatus AS status, proteinPosStart AS pos\n" +
     "  FROM " + db + ".mutation_derived\n" +
-    "  WHERE studyId = " + sq(study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
-    "    AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM cohort)\n" +
+    "  WHERE studyId = " + sq(p.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
+    "    AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c" + i + ")\n" +
     "),\n" +
-    (pin
-      ? "ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver\n" +
-        "  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'MUTATION' AND hugo_gene_symbol = " + sq(gene) + "\n" +
-        "  GROUP BY alteration),\n"
-      : "") +
-    attr("CANCER_TYPE_DETAILED", "ct") + ",\n" +
-    attr("MUTATION_COUNT", "mc") + ",\n" +
-    "rows AS (\n" +
-    "  SELECT m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,\n" +
+    attr("CANCER_TYPE_DETAILED", "ct" + i) + ",\n" +
+    attr("MUTATION_COUNT", "mc" + i) + ",\n";
+  const rows =
+    "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
+    "         m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,\n" +
     (pin ? "         ann.oncogenicity AS oncogenicity, ann.level AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,\n"
       : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
     "         m.mutationType AS mutationType, m.variantType AS variantType,\n" +
     "         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos\n" +
-    "  FROM m\n" +
+    "  FROM m" + i + " AS m\n" +
     (pin ? "  LEFT JOIN ann ON ann.alteration = m.proteinChange\n" : "") +
-    "  LEFT JOIN ct ON ct.sid = m.sid LEFT JOIN mc ON mc.sid = m.sid\n" +
-    ")\n" +
+    "  LEFT JOIN ct" + i + " AS ct ON ct.sid = m.sid LEFT JOIN mc" + i + " AS mc ON mc.sid = m.sid\n";
+  return { ctes, rows };
+}
+
+function allRows(parts: TablePart[], db: string, gene: string, pin: string | null): string {
+  const built = parts.map((p, i) => partRows(p, i, db, gene, pin));
+  return "WITH " +
+    (pin
+      ? "ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver\n" +
+        "  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'MUTATION' AND hugo_gene_symbol = " + sq(gene) + "\n" +
+        "  GROUP BY alteration),\n"
+      : "") +
+    built.map((b) => b.ctes).join("") +
+    "rows AS (\n" + built.map((b) => b.rows).join("  UNION ALL\n") + ")\n";
+}
+
+/**
+ * One page of one gene's mutations across every (cohort, study) part a table spans — combined and
+ * sorted together in the database, so the order is global (studies interleave, as in the portal's
+ * table) and any page is one query however deep. Uncalled calls are left out, as the portal leaves
+ * them out; the sample's detailed cancer type and mutation count come from the study's own
+ * attributes; the OncoKB call at `pin` when there is one. Sorted by `sort` — by default drivers
+ * first, then by codon — then sample, then document order, so the download pages the same order.
+ * All parts must live in the database this runs in.
+ */
+export function mutationRowsSql(parts: TablePart[], db: string, gene: string, pin: string | null,
+  sort: MutationSort | null, limit: number, offset: number): string {
+  if (!parts.length) throw new Error("mutationRowsSql needs at least one part");
+  const col = sort && SORT_EXPR[sort.column] ? SORT_EXPR[sort.column] : null;
+  const order = col ? col + (sort!.desc ? " DESC" : " ASC") + " NULLS LAST, " : "drv DESC, pos ASC NULLS LAST, ";
+  return allRows(parts, db, gene, pin) +
     "SELECT *, count() OVER () AS total FROM rows\n" +
-    "ORDER BY " + order + "sid, proteinChange\n" +
-    "LIMIT " + Math.max(0, Math.floor(limit)) + " OFFSET " + Math.max(0, Math.floor(offset))
-  );
+    "ORDER BY " + order + "sid, ord, proteinChange\n" +
+    "LIMIT " + Math.max(0, Math.floor(limit)) + " OFFSET " + Math.max(0, Math.floor(offset));
+}
+
+/** How many mutations each part holds — the table's per-cohort, per-study totals. Counts only. */
+export function mutationCountsSql(parts: TablePart[], db: string, gene: string): string {
+  return allRows(parts, db, gene, null) + "SELECT cohort, study, count() AS n FROM rows GROUP BY cohort, study";
 }

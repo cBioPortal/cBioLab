@@ -3,7 +3,7 @@
 // ViewHead, then this kind's controls, then the server-rendered figure — so all that differs
 // per kind lives here: its title, whether it takes a gene list, and its own settings.
 import React, { useEffect, useState } from "react";
-import { CancertypesBody, EnrichmentBody, CorrelatesBody, AssaysBody, MutationsBody } from "./portal-bodies";
+import { CancertypesBody, EnrichmentBody, CorrelatesBody, AssaysBody, MutationsBody, usePages, Pager } from "./portal-bodies";
 
 /**
  * A text field that keeps what is being typed to itself and hands the page the value only on
@@ -169,17 +169,14 @@ export function MoreControls({ c }: { c: MoreCtx }) {
       </div>
     </div>
   );
-  if (spec.kind === "mutations") return (
+  // the gene is its only setting; a portal tab whose chips set it leaves no bar at all
+  if (spec.kind === "mutations") return (c.locked || []).includes("gene") ? null : (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
         {!(c.locked || []).includes("gene") && <label className="tbfield" title="the gene whose mutations are listed">
           gene <DraftInput value={spec.gene || ""} disabled={busy} width="6rem" placeholder="KRAS" onCommit={(t) => patch({ gene: t.trim().toUpperCase() })} />
         </label>}
-        <label className="tbfield" title="rows fetched for the page; the download holds every row">
-          fetch <select value={String(spec.rows ?? 100)} disabled={busy} onChange={(e) => patch({ rows: Number(e.target.value) === 100 ? undefined : Number(e.target.value) })}>
-            {[100, 500, 1000].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select> rows
-        </label>
+
       </div>
     </div>
   );
@@ -203,11 +200,6 @@ export function MoreControls({ c }: { c: MoreCtx }) {
           </label>
           <label className="chk" title="highest or last first">
             <input type="checkbox" checked={!!(sort && sort.desc)} disabled={busy || !sort} onChange={(e) => patch({ sort: { attribute: sort.attribute, ...(e.target.checked ? { desc: true } : {}) } })} /> descending
-          </label>
-          <label className="tbfield" title="rows shown here; the download holds every row">
-            show <select value={String(spec.rows ?? 100)} disabled={busy} onChange={(e) => patch({ rows: Number(e.target.value) === 100 ? undefined : Number(e.target.value) })}>
-              {[25, 100, 500, 1000].map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
           </label>
         </div>
       </div>
@@ -514,8 +506,15 @@ export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
   if (c.spec.kind === "correlates" && c.v.correlates) return <CorrelatesBody v={c.v} docJson={c.docJson} />;
   if (c.spec.kind === "assays" && c.v.assays) return <AssaysBody v={c.v} />;
   if (c.spec.kind === "mutations" && c.v.mutations) return <MutationsBody v={c.v} vi={c.vi} busy={c.busy} docJson={c.docJson} onSort={(sort) => c.patch({ sort })} />;
-  if (c.spec.kind === "table" && c.v.table) {
+  if (c.spec.kind === "table" && c.v.table) return <ClinicalTableBody c={c} />;
+
+  return null;
+}
+
+/** The clinical data table's body: the page on screen (paged in the browser, see usePages), sortable headers, the full download. */
+function ClinicalTableBody({ c }: { c: MoreCtx }) {
     const t = c.v.table as import("../../lib/types").TableResult;
+    const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, c.vi, c.docJson);
     const multi = t.lists.length > 1;
     // on screen the sorted column sits beside the ids; the download keeps the document's order
     const si = t.sort ? t.columns.findIndex((x) => x.id === t.sort!.attribute) : -1;
@@ -523,7 +522,7 @@ export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
     return (
       <div className="tv">
         <div className="tv-bar">
-          <span className="meta">{t.rows.length.toLocaleString()} of {t.total.toLocaleString()} {t.unit}s shown{t.sort ? ", sorted by " + t.sort.attribute + (t.sort.desc ? " ↓" : " ↑") : ""}</span>
+          <span className="meta">{t.total.toLocaleString()} {t.unit}s{t.sort ? ", sorted by " + t.sort.attribute + (t.sort.desc ? " ↓" : " ↑") : ""}{multi ? " across " + t.lists.length + " cohorts and studies" : ""}</span>
           <form method="post" action="/api/table" target="_blank" onSubmit={(e) => {
             const f = e.currentTarget; (f.elements.namedItem("doc") as HTMLInputElement).value = c.docJson ? c.docJson() : "";
           }}>
@@ -533,7 +532,7 @@ export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
             </button>
           </form>
         </div>
-        <div className="tv-scroll">
+        <div className={"tv-scroll" + (p.loading ? " pb-loading" : "")}>
           <table>
             <thead><tr>
               {multi && <th>cohort</th>}
@@ -547,7 +546,7 @@ export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
               ))}
             </tr></thead>
             <tbody>
-              {t.rows.map((r, i) => (
+              {p.rows.map((r, i) => (
                 <tr key={i}>
                   {multi && <td className="meta">{r.cohort}</td>}
                   <td className="mono">{r.patient}</td>{t.unit === "sample" ? <td className="mono">{r.sample}</td> : <td className="num">{r.samples}</td>}
@@ -557,8 +556,7 @@ export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
             </tbody>
           </table>
         </div>
+      <Pager p={p as Parameters<typeof Pager>[0]["p"]} unit={t.unit + "s"} />
       </div>
     );
   }
-  return null;
-}

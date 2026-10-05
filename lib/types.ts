@@ -1090,15 +1090,19 @@ export interface TableView {
   /** the attribute columns, by id (default: every attribute the study records, highest priority first; at most 200) */
   attributes?: string[];
   sort?: { attribute: string; desc?: boolean };
-  /** rows shown on the page (default 100, at most 1000); the download is every row */
+  /** rows per page (default 25, at most 1000); every page and the download are slices of one order */
   rows?: number;
 }
 export interface TableResult {
   unit: "sample" | "patient";
   columns: { id: string; name: string; per: "patient" | "sample"; numeric: boolean }[];
   sort: { attribute: string; desc?: boolean } | null;
-  /** the first rows in sort order, each with its cohort and study; values align with `columns` */
+  /** one page of the table's single order (sorted across every cohort and study); values align with `columns` */
   rows: { cohort: string; study: string; patient: string; sample: string; samples: number; values: string[] }[];
+  /** where this page starts in that order, and the page size the view asks for */
+  offset: number; pageSize: number;
+  /** set when the studies live in several databases: each database's rows are sorted together and listed in turn */
+  instances?: number;
   /** rows the patient-level studies hold, per cohort and study — what the download pages through */
   lists: { cohort: string; study: string; total: number }[];
   total: number;
@@ -1116,19 +1120,23 @@ export interface MutationsView {
   gene: string;
   /** a column id (see lib/mutation-table.ts); default drivers first, then by codon */
   sort?: { column: string; desc?: boolean };
-  /** rows shown on the page (default 100, at most 1000); the download is every row */
+  /** rows per page (default 25, at most 1000); every page and the download are slices of one order */
   rows?: number;
 }
 export interface MutationsResult {
   gene: string;
   columns: { id: string; name: string; numeric: boolean }[];
   sort: { column: string; desc?: boolean } | null;
-  /** the first rows in sort order; values align with `columns` */
+  /** one page of the table's single order (sorted across every cohort and study); values align with `columns` */
   rows: { cohort: string; study: string; patient: string; sample: string; values: (string | number | null)[] }[];
+  /** where this page starts in that order, and the page size the view asks for */
+  offset: number; pageSize: number;
   lists: { cohort: string; study: string; total: number }[];
   total: number;
   /** the OncoKB version the annotation column reads, or null when none is pinned */
   oncokbPin: string | null;
+  /** set when the studies live in several databases: each database's rows are sorted together and listed in turn */
+  instances?: number;
   excluded?: { study: string; reason: string; patients: number }[];
 }
 import type { PlotAxis, PlotData } from "./plot.ts";

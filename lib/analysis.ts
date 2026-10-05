@@ -170,8 +170,8 @@ function cohortStudies(def: CohortDef | undefined, docStudy: string): string[] {
  */
 export interface RunOpts {
   oncoprint?: "svg" | "spec";
-  /** a table view's download (app/api/table): one page of one cohort's rows in one study */
-  tableChunk?: { cohort: string; study: string; offset: number; limit: number };
+  /** a paged view's page (app/api/view-page): rows offset to offset + limit of its one global order */
+  page?: { offset: number; limit: number };
 }
 
 export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: RunOpts = {}): Promise<AnalysisResult> {
@@ -1986,7 +1986,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         void oncoQueryMs;
       }
     } else if (isMoreViewKind(view.kind)) {
-      views.push(await runMoreView(view, { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, overLimit, studyProfiles, tableChunk: opts.tableChunk }));
+      views.push(await runMoreView(view, { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, overLimit, studyProfiles, page: opts.page }));
     } else {
       // unreachable for well-typed documents, but documents arrive as untrusted
       // JSON from clients/chat/MCP, so an unknown kind must still be reported

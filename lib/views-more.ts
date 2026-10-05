@@ -44,8 +44,8 @@ export interface ViewCtx {
   /** the molecular and generic-assay profiles a study holds (runAnalysis's cached inventory) */
   studyProfiles: (study: string) => Promise<{ profiles: string[]; gaProfiles: string[] }>;
   overLimit: (what: string, max: number, given: number) => string | null;
-  /** a table view's download: fetch this one page of one cohort's rows in one study instead of the preview */
-  tableChunk?: { cohort: string; study: string; offset: number; limit: number };
+  /** a paged view's page (the mutation and clinical tables): rows offset to offset + limit of its one global order */
+  page?: { offset: number; limit: number };
 }
 
 export const MORE_VIEW_KINDS = ["attrition", "genome", "pathways", "diffexpr", "paired", "clonality", "incidence", "labs", ...PORTAL_VIEW_KINDS] as const;
