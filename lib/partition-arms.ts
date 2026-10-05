@@ -145,3 +145,88 @@ export function withoutPartition<D extends { partitions?: Record<string, Partiti
   if (Object.keys(parts).length) next.partitions = parts; else delete next.partitions;
   return { doc: next, removed };
 }
+
+/** "gt 10, lte 20" as a short label: "> 10 – ≤ 20" */
+function rangeLabel(r: { gt?: number; gte?: number; lt?: number; lte?: number }): string {
+  const lo = r.gt != null ? "> " + r.gt : r.gte != null ? "≥ " + r.gte : "";
+  const hi = r.lt != null ? "< " + r.lt : r.lte != null ? "≤ " + r.lte : "";
+  return lo && hi ? lo + " and " + hi : lo || hi || "any";
+}
+
+export type ChartKey =
+  | { kind: "clinical"; attribute: string; per?: "patient" | "sample" }
+  /** a gene table: the OQL entries of one alteration kind (": MUT", ": AMP"/": HOMDEL", ": FUSION") */
+  | { kind: "genes"; specs: string[] };
+
+/**
+ * Explore's selection in ONE chart, turned into arms: each selected item becomes an arm, in the
+ * order it was clicked, and the rest of the selection stays as the cohort being split. A
+ * categorical chart's selection is one clause listing its values; each clicked histogram bin is
+ * its own range clause; the gene tables share one OQL clause whose entries are split out by kind.
+ * Returns null when the chart has nothing selected.
+ */
+export function armsFromSelection(draft: { all: Clause[] }, chart: ChartKey):
+  { base: { all: Clause[] }; arms: PartitionArm[] } | null {
+  const rest: Clause[] = [];
+  const arms: PartitionArm[] = [];
+  for (const c of draft.all) {
+    const l = c as Record<string, any>;
+    if (chart.kind === "clinical" && l.kind === "clinical" && l.attribute === chart.attribute
+      && (l.per || "patient") === (chart.per || "patient")) {
+      const per = l.per === "sample" ? { per: "sample" as const } : {};
+      if (Array.isArray(l.values)) for (const v of l.values)
+        arms.push({ name: armLabel(String(v)), where: { kind: "clinical", attribute: l.attribute, ...per, values: [v] } });
+      else if (l.op === "=" && l.value != null)
+        arms.push({ name: armLabel(String(l.value)), where: { kind: "clinical", attribute: l.attribute, ...per, values: [l.value] } });
+      else if (l.range) arms.push({ name: armLabel(rangeLabel(l.range)), where: c });
+      else if (l.op) arms.push({ name: armLabel(l.op + " " + l.value), where: c });
+      else rest.push(c);
+      continue;
+    }
+    if (chart.kind === "genes" && l.kind === "oql") {
+      const entries = String(l.q).split(";").map((e) => e.trim()).filter(Boolean);
+      const mine = entries.filter((e) => chart.specs.some((s) => e.toUpperCase().endsWith(s)));
+      for (const e of mine) arms.push({ name: armLabel(e), where: { kind: "oql", q: e } });
+      const others = entries.filter((e) => !mine.includes(e));
+      if (others.length) rest.push({ kind: "oql", q: others.join("; ") });
+      continue;
+    }
+    rest.push(c);
+  }
+  if (!arms.length) return null;
+  const seen = new Set<string>();
+  for (const a of arms) {
+    let n = a.name, k = 2;
+    while (seen.has(n)) n = a.name + " " + k++;
+    a.name = n; seen.add(n);
+  }
+  if (arms.length > 8) throw new Error("a split takes at most 8 arms, and " + arms.length + " items are selected in this chart — merge or deselect some first");
+  return { base: { all: rest }, arms };
+}
+
+/**
+ * Rename one child of a partition — an arm, or the remainder — and everything that refers to it
+ * by name: views listing the child, and partitions splitting it further.
+ */
+export function renamePartitionChild<D extends { partitions?: Record<string, PartitionDef>; views?: unknown[] }>(
+  doc: D, partition: string, from: string, to: string): D {
+  const p = doc.partitions?.[partition];
+  if (!p) throw new Error("no partition “" + partition + "”");
+  const label = to.trim();
+  if (!label) throw new Error("a name cannot be empty");
+  if (label.length > 80) throw new Error("names are at most 80 characters");
+  if (label === from) return doc;
+  const labels = [...p.arms.map((a) => a.name), p.other || "Other"];
+  if (labels.includes(label)) throw new Error("this split already has a row named “" + label + "”");
+  const isOther = (p.other || "Other") === from;
+  const next: PartitionDef = isOther ? { ...p, other: label }
+    : { ...p, arms: p.arms.map((a) => a.name === from ? { ...a, name: label } : a) };
+  const oldName = partition + " / " + from, newName = partition + " / " + label;
+  const partitions = Object.fromEntries(Object.entries(doc.partitions!).map(([k, d]) =>
+    [k, k === partition ? next : d.of === oldName ? { ...d, of: newName } : d]));
+  const views = (doc.views || []).map((v) => {
+    const cs = (v as { cohorts?: string[] }).cohorts;
+    return Array.isArray(cs) ? { ...(v as object), cohorts: cs.map((c) => c === oldName ? newName : c) } : v;
+  });
+  return { ...doc, partitions, views } as D;
+}

@@ -86,9 +86,22 @@ function AddArm({ busy, onAdd }: { busy?: boolean; onAdd: (q: string) => void })
   );
 }
 
+/** a row's name, editable in place: click it, type, Enter (Esc cancels) */
+function RowName({ label, editable, busy, onRename }: { label: string; editable: boolean; busy?: boolean; onRename: (to: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(label);
+  if (!editable) return <>{label}</>;
+  if (!editing)
+    return <button type="button" className="partrename" disabled={busy} title="rename" onClick={() => { setDraft(label); setEditing(true); }}>{label}</button>;
+  const commit = () => { setEditing(false); if (draft.trim() && draft.trim() !== label) onRename(draft.trim()); };
+  return <input className="partrenameinput" autoFocus value={draft} maxLength={80}
+    onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+    onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }} />;
+}
+
 const ROLE_MARK = { arm: "▸", other: "∘", notEvaluable: "?" } as const;
 
-export function PartitionPanel({ name, partitions, results, cohortText, attrs, busy, depth = 0, onChange, onRemove, onSplit }: {
+export function PartitionPanel({ name, partitions, results, cohortText, attrs, busy, depth = 0, onChange, onRename, onRemove, onSplit }: {
   name: string;
   partitions: Record<string, PartitionDef>;
   results?: Record<string, PartitionResult>;
@@ -96,6 +109,8 @@ export function PartitionPanel({ name, partitions, results, cohortText, attrs, b
   attrs: { attribute: string; kind: string }[];
   busy?: boolean; depth?: number;
   onChange: (name: string, def: PartitionDef) => void;
+  /** rename an arm or the remainder; the page also updates what refers to it */
+  onRename: (name: string, from: string, to: string) => void;
   onRemove: (name: string) => void;
   onSplit: (cohort: string, spec: SplitSpec) => Promise<void>;
 }) {
@@ -127,7 +142,7 @@ export function PartitionPanel({ name, partitions, results, cohortText, attrs, b
               <div className={"partrow " + c.role} role="row" title={cohortText(c.name) || c.name}>
                 <span className="partmark" aria-hidden="true">{ROLE_MARK[c.role]}</span>
                 <span className="partlabel">
-                  {c.label}
+                  <RowName label={c.label} editable={c.role !== "notEvaluable"} busy={busy} onRename={(to) => onRename(name, c.label, to)} />
                   {c.role === "other" && <span className="meta"> · no arm matched</span>}
                   {c.role === "notEvaluable" && <span className="meta"> · not compared</span>}
                   {c.role === "arm" && c.count === 0 && i > 0 &&
@@ -154,7 +169,7 @@ export function PartitionPanel({ name, partitions, results, cohortText, attrs, b
               </div>
               {nested.map((n) => (
                 <PartitionPanel key={n} name={n} partitions={partitions} results={results} cohortText={cohortText} attrs={attrs}
-                  busy={busy} depth={depth + 1} onChange={onChange} onRemove={onRemove} onSplit={onSplit} />
+                  busy={busy} depth={depth + 1} onChange={onChange} onRename={onRename} onRemove={onRemove} onSplit={onSplit} />
               ))}
             </div>
           );

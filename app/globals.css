@@ -903,6 +903,9 @@ button.customtag:hover { text-decoration: underline; }
 .partadd .tbbtn { height: var(--ctl-h); }
 details.splitmenu { margin: 0; }
 .facetsplit { font-size: var(--t-xs); padding: 0 var(--s2); font-weight: 400; vertical-align: middle; }
+.partrename { border: none; background: none; padding: 0; font: inherit; color: inherit; cursor: text; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.partrename:hover { text-decoration: underline dotted; }
+.partrenameinput { font: inherit; height: 1.45rem; width: 100%; box-sizing: border-box; padding: 0 var(--s1); }
 .cohortbox details.splitmenu { margin-top: var(--s2); }
 .cohortbox details.splitmenu > summary.tbbtn { height: var(--ctl-h); }
 textarea.splitoql { width: 100%; box-sizing: border-box; height: 4.5rem; font: var(--t-md) 'IBM Plex Mono', monospace; background: var(--code-bg); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--s1); }

@@ -23,7 +23,7 @@ import CustomDataPanel, { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import LoginButton from "./login-button.tsx";
 import { PartitionPanel, SplitMenu, type SplitSpec } from "./partitions.tsx";
-import { withoutPartition } from "../../lib/partition-arms.ts";
+import { withoutPartition, armsFromSelection, renamePartitionChild, uniqueName, type ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
 import { installCustomDataFetch, saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
@@ -823,6 +823,36 @@ export default function AnalysisPage() {
       run(nd);
     } catch (e) { setExMsg("Could not split by " + label + ": " + String((e as Error)?.message || e)); }
     setSplittingBy(null);
+  };
+  /**
+   * Analyze the selection with one chart's selected items as the arms: each item an arm, in the
+   * order clicked, and the rest of the selection as the cohort being split. No server proposal —
+   * the arms are the clauses already on screen.
+   */
+  const selectionArmCount = (chart: ChartKey): number => {
+    const d = parseDraft();
+    if (!d) return 0;
+    try { return armsFromSelection(d, chart)?.arms.length ?? 0; } catch { return 9; }
+  };
+  const splitDraftBySelection = (chart: ChartKey, label: string) => {
+    const d = parseDraft();
+    if (!d) return;
+    let r: ReturnType<typeof armsFromSelection>;
+    try { r = armsFromSelection(d, chart); } catch (e) { setExMsg("Could not split by the selected " + label + ": " + String((e as Error)?.message || e)); return; }
+    if (!r) return;
+    setExMsg(null);
+    const name = r.base.all.length ? "explored cohort"
+      : exSel.current.length === 1 ? "all of " + exSel.current[0] : "all selected studies";
+    const parent: CohortDef = r.base.all.length ? { ...d, all: r.base.all } : { ...(draftScaffold(exSel.current) as CohortDef) };
+    const pn = uniqueName(name + " by " + label, [name]);
+    const nextStudy = exSel.current[0] || study;
+    const nd: AnalysisDoc = { study: nextStudy, cohorts: { [name]: parent },
+      partitions: { [pn]: { of: name, arms: r.arms } }, views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [pn] })) };
+    setStudy(nextStudy);
+    setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
+    setResult(null); setError(null);
+    goTab("analysis");
+    run(nd);
   };
   /**
    * Saving asks for a name when you ask to save, rather than keeping a field in
@@ -2240,6 +2270,10 @@ function Latency({ v }: { v: any }) {
   const setPartitionDef = (name: string, def: PartitionDef) =>
     runEdited({ ...doc, partitions: { ...(doc.partitions || {}), [name]: def } });
   const removePartitionNamed = (name: string) => runEdited(withoutPartition(doc, name).doc);
+  const renamePartitionRow = (name: string, from: string, to: string) => {
+    try { runEdited(renamePartitionChild(doc, name, from, to)); }
+    catch (e) { setError(String((e as Error)?.message || e)); }
+  };
   /**
    * Split a cohort (or an arm) by what the server proposes from the data, then point the views
    * that showed exactly that cohort at the new arms — splitting is asked for in order to compare
@@ -3210,6 +3244,16 @@ function Latency({ v }: { v: any }) {
                             onClick={() => splitDraftBy({ attribute: c.attribute }, c.displayName || c.attribute)}>
                             {splittingBy === (c.displayName || c.attribute) && <span className="spinner" />}split by this
                           </button>
+                          {(() => {
+                            const chart: ChartKey = { kind: "clinical", attribute: c.attribute, per: c.per === "sample" ? "sample" : "patient" };
+                            const n = selectionArmCount(chart);
+                            return n > 0 && <>{" "}<button className="facet facetsplit on"
+                              title={"Analyze with each selected " + (c.kind === "num" ? "range" : "value") + " of " + (c.displayName || c.attribute) +
+                                " as its own arm (tested in the order you clicked them), the rest of your selection as the cohort they split, and everyone else in Other"}
+                              onClick={() => splitDraftBySelection(chart, c.displayName || c.attribute)}>
+                              split by selected ({n > 8 ? "8+" : n})
+                            </button></>;
+                          })()}
                         </div>
                       );
                     })()}
@@ -3451,6 +3495,15 @@ function Latency({ v }: { v: any }) {
                       <input className="genesearch" type="search" placeholder="find gene" value={geneFilter[kind] || ""}
                         title={"filters the " + all.length + " genes loaded for this table, not all " + (meta.total || all.length)}
                         onChange={e => setGeneFilter({ ...geneFilter, [kind]: e.target.value })} />
+                      {(() => {
+                        const chart: ChartKey = { kind: "genes", specs: kind === "mutated" ? [": MUT"] : kind === "cna" ? [": AMP", ": HOMDEL"] : [": FUSION"] };
+                        const n = selectionArmCount(chart);
+                        return n > 0 && <button className="facet facetsplit on"
+                          title={"Analyze with each selected gene in this table as its own arm (tested in the order you clicked them), the rest of your selection as the cohort they split, and everyone else in Other or Not profiled"}
+                          onClick={() => splitDraftBySelection(chart, kind === "mutated" ? "mutated genes" : kind === "cna" ? "CNA genes" : "SV genes")}>
+                          split by selected ({n > 8 ? "8+" : n})
+                        </button>;
+                      })()}
                       {kind === "mutated" && (() => {
                         const exact = all.find((g: any) => g.gene.toUpperCase() === needle);
                         return exact && <button className="facet facetsplit" disabled={!!splittingBy}
@@ -3795,7 +3848,7 @@ function Latency({ v }: { v: any }) {
                 .map((k) => (
                   <PartitionPanel key={k} name={k} partitions={doc.partitions!} results={result.partitions}
                     cohortText={(c) => result.cohorts[c]?.text} attrs={catalogAttrs()} busy={busy}
-                    onChange={setPartitionDef} onRemove={removePartitionNamed} onSplit={splitCohortBy} />
+                    onChange={setPartitionDef} onRename={renamePartitionRow} onRemove={removePartitionNamed} onSplit={splitCohortBy} />
                 ))}
             </div>
           </div>

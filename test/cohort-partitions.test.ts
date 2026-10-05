@@ -175,3 +175,55 @@ describe("resolvePartitions", () => {
     assert.throws(() => resolvePartitions(doc({ K: { arms: [{ name: "a", where: g12c }] } as never })), /needs `of`/);
   });
 });
+
+import { armsFromSelection, renamePartitionChild } from "../lib/partition-arms.ts";
+
+describe("arms from Explore's selection in one chart", () => {
+  const stage = (vals: string[]) => ({ kind: "clinical", attribute: "STAGE", values: vals } as Clause);
+  test("each selected value of a categorical chart becomes an arm; the rest of the selection is the parent", () => {
+    const r = armsFromSelection({ all: [luad.all![0], stage(["IV", "III"])] }, { kind: "clinical", attribute: "STAGE" })!;
+    assert.deepEqual(r.base.all, [luad.all![0]]);
+    assert.deepEqual(r.arms.map((a) => a.name), ["IV", "III"]);
+    assert.deepEqual(r.arms[0].where, { kind: "clinical", attribute: "STAGE", values: ["IV"] });
+  });
+  test("each clicked histogram bin becomes an arm with its own range", () => {
+    const bins: Clause[] = [{ kind: "clinical", attribute: "TMB", range: { gt: 10, lte: 20 } }, { kind: "clinical", attribute: "TMB", range: { gt: 20 } }];
+    const r = armsFromSelection({ all: bins }, { kind: "clinical", attribute: "TMB" })!;
+    assert.deepEqual(r.arms.map((a) => a.name), ["> 10 and ≤ 20", "> 20"]);
+    assert.deepEqual(r.base.all, []);
+  });
+  test("a gene table takes only its own kind of OQL entry", () => {
+    const r = armsFromSelection({ all: [{ kind: "oql", q: "KRAS: MUT; EGFR: AMP; STK11: MUT" }] }, { kind: "genes", specs: [": MUT"] })!;
+    assert.deepEqual(r.arms.map((a) => a.name), ["KRAS: MUT", "STK11: MUT"]);
+    assert.deepEqual(r.base.all, [{ kind: "oql", q: "EGFR: AMP" }]);
+  });
+  test("a chart with nothing selected gives nothing", () => {
+    assert.equal(armsFromSelection({ all: [luad.all![0]] }, { kind: "clinical", attribute: "STAGE" }), null);
+  });
+  test("the same value on two sample/patient levels stays two charts", () => {
+    const r = armsFromSelection({ all: [{ kind: "clinical", attribute: "X", per: "sample", values: ["a"] }, { kind: "clinical", attribute: "X", values: ["b"] }] },
+      { kind: "clinical", attribute: "X", per: "sample" })!;
+    assert.deepEqual(r.arms.map((a) => a.name), ["a"]);
+    assert.equal(r.base.all.length, 1);
+  });
+});
+
+describe("renaming a partition's child", () => {
+  const d = (): any => ({ partitions: {
+    K: { of: "LUAD", arms: [{ name: "G12C", where: g12c }, { name: "KRAS mutated", where: krasMut }] },
+    S: { of: "K / G12C", arms: [{ name: "F", where: g12c }] } },
+    views: [{ kind: "survival", cohorts: ["K / G12C", "K"] }] });
+  test("an arm: the arm, views naming it and splits of it all follow", () => {
+    const out = renamePartitionChild(d(), "K", "G12C", "KRAS G12C");
+    assert.equal(out.partitions.K.arms[0].name, "KRAS G12C");
+    assert.equal(out.partitions.S.of, "K / KRAS G12C");
+    assert.deepEqual((out.views[0] as any).cohorts, ["K / KRAS G12C", "K"]);
+  });
+  test("the remainder", () => {
+    assert.equal(renamePartitionChild(d(), "K", "Other", "KRAS wild-type").partitions.K.other, "KRAS wild-type");
+  });
+  test("clashes and blanks are refused", () => {
+    assert.throws(() => renamePartitionChild(d(), "K", "G12C", "KRAS mutated"), /already has a row/);
+    assert.throws(() => renamePartitionChild(d(), "K", "G12C", "  "), /cannot be empty/);
+  });
+});
