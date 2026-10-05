@@ -50,6 +50,19 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   `lib/federation.ts`, so the boundary suite sweeps it) and runs through the resolvers'
   `moreAggregate`/`moreMeta` — present on every local participant, absent on a remote peer, which
   those views name as left out. Figures: **`lib/view-svg-more.ts`**; cards: `app/lab/more-views.tsx`.
+- **Table views** (`table`, `mutations`, and any later view that lists rows) — **every one must
+  support the same five things: pagination, search over its text, a filter per column (text
+  conditions or a value list for text, a range for numbers), sorting, and a CSV download of every
+  row kept — plus choosing the columns shown.** Don't build these per view: a table supplies only a
+  `RowSource` (its `rows` CTE and how each column reads off it, beside the table, e.g.
+  `lib/mutation-table.ts`) and **`lib/table-query.ts`** does the rest in the database (validation,
+  search, filters, sort, page, counts, a column's values for its filter). The query
+  (`columns`/`search`/`filters`/`sort`, type `TableQuery`) is part of the view's spec — the page is
+  not. The rows name patients, so they run only through `PatientLevelResolver.rowsPage`/
+  `rowsCounts`/`rowsValues` (asserted in `test/boundary.test.ts`); `lib/views-portal.ts`'s
+  `runRows` groups parts per database and pages across them. UI: **`app/_table/DataTable.tsx`**;
+  `POST /api/view-page` (a page, or a column's values) and `POST /api/table` (the CSV) serve every
+  table view.
 - **`lib/event-names.ts`** — **THE only place timeline event names are normalized.** Case-fold and
   trim, nothing else; measured to be complete for event types and attribute keys (zero residual
   collisions). Folds are disclosed in the caveat, never silent. Do not fork it. Every timeline

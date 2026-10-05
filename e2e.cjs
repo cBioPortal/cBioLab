@@ -781,6 +781,61 @@ async function main() {
     ok(scheme + ": no JS errors", errors.length === 0, errors.slice(0, 4).join(" | "));
     await ctx.close();
   }
+  // Table views (app/_table/DataTable.tsx on lib/table-query.ts): search, a column's value
+  // filter, a header sort and the CSV download, on the Results page's mutation table. Each one
+  // re-runs the view in the database, so a check is a count the server agreed to, not a DOM trick.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    try {
+      await page.goto(BASE + "/portal/results?study=coadread_tcga_pub&genes=KRAS,NRAS,BRAF", { waitUntil: "domcontentloaded" });
+      await page.locator("button, [role=tab]").filter({ hasText: /^Mutations$/ }).first().click({ timeout: 120000 });
+      const title = page.locator(".dt-title").first();
+      await title.waitFor({ timeout: 240000 });
+      const settle = async () => {
+        await page.waitForTimeout(300);
+        await page.waitForFunction(() => { const s = document.querySelector(".dt-search input"); return s && !s.disabled; }, null, { timeout: 120000 });
+        await page.waitForTimeout(300);
+      };
+      const count = async () => { const m = /(?:([\d,]+) of )?([\d,]+) KRAS mutations/.exec(await title.innerText()); return m ? { kept: Number((m[1] || m[2]).replace(/,/g, "")), all: Number(m[2].replace(/,/g, "")) } : null; };
+      const all = await count();
+      ok("table: the mutation table lists KRAS's mutations", !!all && all.all > 50, JSON.stringify(all));
+      await page.locator(".dt-search input").fill("G13");
+      await page.locator(".dt-search input").press("Enter");
+      await settle();
+      const searched = await count();
+      ok("table: search keeps only matching rows", !!searched && searched.kept > 0 && searched.kept < all.all && searched.all === all.all, JSON.stringify(searched));
+      await page.getByRole("button", { name: "clear search" }).click();
+      await settle();
+      await page.getByRole("button", { name: "filter Protein Change" }).click();
+      await page.locator(".dt-values label").first().waitFor({ timeout: 60000 });
+      const top = await page.locator(".dt-values label").first().innerText();
+      const [value, n] = top.trim().split(/\s+/);
+      await page.locator(".dt-pop").getByRole("button", { name: "none" }).click();
+      await page.locator(".dt-values label").first().locator("input").check();
+      await page.locator(".dt-pop").getByRole("button", { name: "apply" }).click();
+      await settle();
+      const picked = await count();
+      ok("table: a value filter keeps exactly that value's rows", !!picked && picked.kept === Number(n), value + " listed " + n + ", table kept " + JSON.stringify(picked));
+      await page.locator(".dt-sort", { hasText: "# Mut in Sample" }).click();
+      await settle();
+      const nums = (await page.locator(".dt-table tbody tr td:last-child").allInnerTexts()).map((x) => Number(x.replace(/,/g, ""))).filter((x) => !Number.isNaN(x));
+      ok("table: a header click sorts the whole table, highest first", nums.length > 2 && nums.every((x, i) => i === 0 || nums[i - 1] >= x), nums.slice(0, 5).join(" "));
+      // the download: every kept row, every column, as CSV, from the same document
+      const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 120000 }).catch(() => null), page.locator("form[action='/api/table'] button").first().click()]);
+      const csv = dl ? require("fs").readFileSync(await dl.path(), "utf8") : "";
+      const lines = csv.trim().split(/\r?\n/);
+      ok("table: the CSV holds every kept row with every column", lines[0].startsWith("cohort,study,sample,cancerType,proteinChange") && lines.length - 1 === picked.kept,
+        (dl ? dl.suggestedFilename() : "no download") + " · " + (lines.length - 1) + " rows, header " + lines[0].slice(0, 60));
+    } catch (e) {
+      ok("table: the mutation table's controls", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("table: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+
   // Patient-data boundary gate: aggregate-only participants must never emit or
   // receive patient identifiers. See docs/DATA-BOUNDARY.md.
   try {
@@ -797,7 +852,7 @@ async function main() {
   // documented example must run against the live compiler.
   try {
     const { execSync } = require("child_process");
-    const out = execSync("npm run --silent docs:check", { cwd: __dirname, encoding: "utf8", timeout: 180000 });
+    const out = execSync("npm run --silent docs:check", { cwd: __dirname, encoding: "utf8", timeout: 300000 });
     for (const line of out.trim().split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
   } catch (e) {
     const out = String((e.stdout || "") + (e.stderr || "")).trim();

@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-10-04",
+  "generated": "2026-10-05",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -222,6 +222,9 @@
     },
     "Clinical data: every pancreatic cancer sample, oldest patients first": {
       "Pancreatic": 3109
+    },
+    "KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first": {
+      "Colorectal": 5543
     }
   }
 }

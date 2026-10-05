@@ -1,8 +1,9 @@
 // The mutation table: one gene's mutations in a cohort, one row per mutation call, with the columns
 // cBioPortal's Mutations tab lists. Its rows name samples, so — like the clinical table — the query
 // lives here, outside lib/federation*.ts's aggregate builders, and runs only through
-// PatientLevelResolver.mutationRows: a participant that may not disclose a patient has no such method.
+// PatientLevelResolver.rowsPage: a participant that may not disclose a patient has no such method.
 import { sq } from "./compiler.ts";
+import type { QueryColumn, RowSource } from "./table-query.ts";
 import { clinicalTable } from "./custom-data.ts";
 
 export interface MutationColumn { id: string; name: string; numeric: boolean }
@@ -27,14 +28,22 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
   { id: "status", name: "MS", numeric: false },
 ];
 
-export interface MutationSort { column: string; desc?: boolean }
+/** Shown unless the view names its columns: the portal's own default set. */
+export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange", "annotation", "mutationType", "mutCount"];
 
-/** How each sortable column orders in SQL; protein change orders by codon. */
-const SORT_EXPR: Record<string, string> = {
-  sample: "sid", cancerType: "cancerType", proteinChange: "pos", annotation: "drv", mutationType: "mutationType",
-  variantType: "variantType", vaf: "vaf", altCount: "altCount", refCount: "refCount", mutCount: "mutCount",
-  chr: "chr", start: "start", end: "end", ref: "ref", var: "var", status: "status",
-};
+/** How each column reads off the rows: as text (search, text filters, value lists), as a number, and its order. */
+function queryColumn(c: MutationColumn): QueryColumn {
+  const str = (x: string) => "ifNull(toString(" + x + "), '')";
+  const num = (x: string) => "CAST(" + x + " AS Nullable(Float64))";
+  switch (c.id) {
+    case "sample": return { ...c, text: "sid" };
+    // spelled as the table shows it, so search and the value list match what is on screen
+    case "annotation": return { ...c, text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))", order: "drv" };
+    case "proteinChange": return { ...c, text: str("proteinChange"), order: "pos" };
+    case "vaf": return { ...c, text: str("round(vaf, 2)"), num: num("vaf") };
+    default: return c.numeric ? { ...c, text: str(c.id), num: num(c.id) } : { ...c, text: str(c.id) };
+  }
+}
 
 /** One (cohort, study) part of a table: the cohort's SQL as that study's resolver compiles it. */
 export interface TablePart { cohort: string; study: string; cohortSql: string }
@@ -84,26 +93,20 @@ function allRows(parts: TablePart[], db: string, gene: string, pin: string | nul
 }
 
 /**
- * One page of one gene's mutations across every (cohort, study) part a table spans — combined and
- * sorted together in the database, so the order is global (studies interleave, as in the portal's
- * table) and any page is one query however deep. Uncalled calls are left out, as the portal leaves
- * them out; the sample's detailed cancer type and mutation count come from the study's own
- * attributes; the OncoKB call at `pin` when there is one. Sorted by `sort` — by default drivers
- * first, then by codon — then sample, then document order, so the download pages the same order.
- * All parts must live in the database this runs in.
+ * One gene's mutations across every (cohort, study) part a table spans, for lib/table-query.ts to
+ * search, filter, sort and page in the database — so the order is global (studies interleave, as in
+ * the portal's table) and any page is one query however deep. Uncalled calls are left out, as the
+ * portal leaves them out; the sample's detailed cancer type and mutation count come from the
+ * study's own attributes; the OncoKB call at `pin` when there is one. With no sort, drivers come
+ * first, then by codon. All parts must live in the database this runs in.
  */
-export function mutationRowsSql(parts: TablePart[], db: string, gene: string, pin: string | null,
-  sort: MutationSort | null, limit: number, offset: number): string {
-  if (!parts.length) throw new Error("mutationRowsSql needs at least one part");
-  const col = sort && SORT_EXPR[sort.column] ? SORT_EXPR[sort.column] : null;
-  const order = col ? col + (sort!.desc ? " DESC" : " ASC") + " NULLS LAST, " : "drv DESC, pos ASC NULLS LAST, ";
-  return allRows(parts, db, gene, pin) +
-    "SELECT *, count() OVER () AS total FROM rows\n" +
-    "ORDER BY " + order + "sid, ord, proteinChange\n" +
-    "LIMIT " + Math.max(0, Math.floor(limit)) + " OFFSET " + Math.max(0, Math.floor(offset));
-}
-
-/** How many mutations each part holds — the table's per-cohort, per-study totals. Counts only. */
-export function mutationCountsSql(parts: TablePart[], db: string, gene: string): string {
-  return allRows(parts, db, gene, null) + "SELECT cohort, study, count() AS n FROM rows GROUP BY cohort, study";
+export function mutationRowSource(parts: TablePart[], db: string, gene: string, pin: string | null): RowSource {
+  if (!parts.length) throw new Error("mutationRowSource needs at least one part");
+  return {
+    with: allRows(parts, db, gene, pin),
+    columns: MUTATION_COLUMNS.map(queryColumn),
+    select: "*",
+    defaultOrder: "drv DESC, pos ASC NULLS LAST",
+    tiebreak: "sid, ord, proteinChange",
+  };
 }

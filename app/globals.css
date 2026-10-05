@@ -1377,3 +1377,49 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .pb-loading { opacity: 0.45; transition: opacity 0.15s; }
 .pb-pager .tbbtn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pb-pager { flex-wrap: wrap; }
+
+/* ---- table views (app/_table/DataTable.tsx): search, column filters, column chooser, CSV ---- */
+.dt { display: flex; flex-direction: column; gap: var(--s2); }
+.dt-bar { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.dt-bar form { margin: 0; }
+.dt-title { font-size: var(--t-base); font-weight: 600; }
+.dt-title .meta { font-weight: 400; }
+.dt-search input { height: var(--ctl-h); width: 14rem; max-width: 60vw; padding: 0 var(--s2); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--card); color: var(--ink); font-size: var(--t-md); }
+.dt-bar .tbbtn { height: var(--ctl-h); }
+.dt .tbbtn.on { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-soft); }
+.dt .tbbtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.dt-anchor { position: relative; display: inline-flex; }
+.dt-pop {
+  position: fixed; z-index: 60; overflow-y: auto;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14); padding: var(--s2) var(--s3);
+  min-width: 16rem; max-width: 22rem; font-weight: 400; text-align: left; white-space: normal; cursor: default;
+}
+.dt-filter { display: flex; flex-direction: column; gap: var(--s1); font-size: var(--t-md); }
+.dt-filter .row { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.dt-filter .row.end { justify-content: flex-end; margin-top: var(--s1); }
+.dt-filter select, .dt-filter input[type=text], .dt-filter input[type=search], .dt-filter input[type=number] {
+  height: var(--ctl-h); padding: 0 var(--s1); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper); color: var(--ink); font-size: var(--t-md); min-width: 0;
+}
+.dt-filter input[type=text] { flex: 1; }
+.dt-filter input[type=number] { width: 6.5rem; }
+.dt-values { max-height: 14rem; overflow-y: auto; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: var(--s1) 0; }
+.dt-values label { display: flex; gap: var(--s2); align-items: baseline; padding: 1px 0; cursor: pointer; }
+.dt-values .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.dt-values .n { font-variant-numeric: tabular-nums; color: var(--muted); }
+.dt-values .mono, .dt-table .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.dt-chips { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; font-size: var(--t-sm); }
+.dt-chip { display: inline-flex; align-items: center; gap: 2px; padding: 0 0 0 var(--s2); border: 1px solid var(--accent); border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent-ink); }
+.dt-chip .linklike { text-decoration: none; font-size: var(--t-sm); padding: 0; color: inherit; }
+.dt-chip > button:last-child { border: none; background: none; color: inherit; cursor: pointer; padding: 0 var(--s2); font-size: var(--t-md); line-height: 1.4; }
+.dt-table th { cursor: default; vertical-align: bottom; }
+.dt-th { display: inline-flex; align-items: center; gap: 2px; }
+.dt-table th.num .dt-th { flex-direction: row-reverse; }
+.dt-sort { border: none; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.dt-sort:hover { color: var(--accent-ink); }
+.dt-funnel { border: none; background: none; padding: 2px 3px; border-radius: var(--r-sm); color: var(--line); cursor: pointer; display: inline-flex; }
+.dt-table th:hover .dt-funnel { color: var(--muted); }
+.dt-funnel:hover, .dt-funnel.on, .dt-table th:hover .dt-funnel.on { color: var(--accent); }
+.dt-funnel.on { background: var(--accent-soft); }
+.dt-table tbody tr { cursor: default; }
+.dt .tv-scroll > table { width: 100%; }

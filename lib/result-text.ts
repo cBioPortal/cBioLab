@@ -284,22 +284,11 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         `Spearman ρ${co.rhoFrom === "meta" ? " combined across studies by Fisher z" : ""}, BH q over ${co.tested.toLocaleString()} genes; ${co.significant.toLocaleString()} at q<0.05:\n` +
         ` most positively correlated:\n` + co.positive.map(line).join("\n") +
         `\n most negatively correlated:\n` + co.negative.map(line).join("\n") + caveatOf(v) + noteOf(v));
-    } else if (v.kind === "mutations") {
-      const mt = v.mutations!;
-      const shown = mt.rows.slice(0, 50);
-      out.push(`${mt.gene} mutations: ${mt.total.toLocaleString()} calls; the first ${shown.length}, tab-separated (the web app's view downloads every row):\n` +
-        [["cohort", "patient", ...mt.columns.map((c) => c.id)], ...shown.map((r) => [r.cohort, r.patient, ...r.values])]
-          .map((xs) => "  " + xs.map((x) => String(x ?? "").replace(/[\t\n]+/g, " ")).join("\t")).join("\n") +
-        (mt.total > shown.length ? `\n  … ${(mt.total - shown.length).toLocaleString()} more rows` : "") + caveatOf(v) + noteOf(v));
-    } else if (v.kind === "table") {
-      const tb = v.table!;
-      const head = ["cohort", "patient", tb.unit === "sample" ? "sample" : "samples", ...tb.columns.map((c) => c.id)];
-      const shown = tb.rows.slice(0, 50);
-      out.push(`Clinical data table: ${tb.total.toLocaleString()} ${tb.unit}s × ${tb.columns.length} attributes` +
-        (tb.sort ? `, sorted by ${tb.sort.attribute}${tb.sort.desc ? " (highest first)" : ""}` : "") + `; the first ${shown.length} rows, tab-separated` +
-        ` (the web app's table view downloads every row):\n` + [head, ...shown.map((r) => [r.cohort, r.patient, tb.unit === "sample" ? r.sample : r.samples, ...r.values])]
-          .map((xs) => "  " + xs.map((x) => String(x).replace(/[\t\n]+/g, " ")).join("\t")).join("\n") +
-        (tb.total > shown.length ? `\n  … ${(tb.total - shown.length).toLocaleString()} more rows` : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "mutations" || v.kind === "table") {
+      const t = (v.mutations || v.table)!;
+      const title = v.mutations ? `${v.mutations.gene} mutations` : `Clinical data table (one row per ${v.table!.unit})`;
+      out.push(`${title}: ${t.total < t.all ? `${t.total.toLocaleString()} of ${t.all.toLocaleString()} rows kept by the query` : `${t.total.toLocaleString()} rows`}; ` +
+        tableText(t) + caveatOf(v) + noteOf(v));
     } else if (v.kind === "overlap") {
       const ov = v.overlap!;
       out.push(`Cohort overlap (patients in exactly these cohorts and no other):\n` +
@@ -329,4 +318,14 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
     if (v.method) out[out.length - 1] += methodOf(v);
   }
   return out;
+}
+
+/** A table view's first rows, shown columns only, tab-separated — the web app's view pages and downloads every row. */
+function tableText(t: { columns: { id: string }[]; shown: string[]; rows: { cohort: string; values: unknown[] }[]; total: number }): string {
+  const idx = t.shown.map((id) => t.columns.findIndex((c) => c.id === id)).filter((i) => i >= 0);
+  const shown = t.rows.slice(0, 50);
+  return `the first ${shown.length}, tab-separated (the web app's view pages and downloads every row, with every column):\n` +
+    [["cohort", ...idx.map((i) => t.columns[i].id)], ...shown.map((r) => [r.cohort, ...idx.map((i) => r.values[i])])]
+      .map((xs) => "  " + xs.map((x) => String(x ?? "").replace(/[\t\n]+/g, " ")).join("\t")).join("\n") +
+    (t.total > shown.length ? `\n  … ${(t.total - shown.length).toLocaleString()} more rows` : "");
 }

@@ -2019,42 +2019,42 @@ export function correlatesMethod(t: CorrelatesTrace): MethodRecord {
   };
 }
 
-// ---- table: a listing, nothing computed ---------------------------------------------------------
+// ---- table views: listings, nothing computed ----------------------------------------------------
 
-export function tableMethod(t: { unit: "sample" | "patient"; cohorts: string[]; columns: number; sort: { attribute: string; desc?: boolean } | null; shown: number;
-  lists: { cohort: string; study: string; total: number }[]; excluded: { study: string; reason: string; patients: number }[]; instances: number }): MethodRecord {
-  const steps: MethodStep[] = [{
-    kind: "fetch" as const, title: "Count the " + t.unit + "s per cohort and study",
-    detail: "The table:counts query above: every " + t.unit + " of each cohort's patients" + (t.unit === "sample" ? " (from the study's sample list, so a sample with no sample attribute still has a row)" : "") + ".",
-    params: t.lists.map((l) => [l.cohort + " · " + l.study, l.total.toLocaleString("en-US")] as [string, string]),
+type TableLists = { cohort: string; study: string; total: number; all: number }[];
+
+/** The steps every table view shares after its count: what the query keeps, its order, the page. */
+function tableSteps(t: { label: string; what: string; queryText: string; order: string; shown: number; lists: TableLists; instances: number; excluded: { study: string }[]; source: string }): MethodStep[] {
+  return [{
+    kind: "fetch" as const, title: "Count the " + t.what + " per cohort and study" + (t.queryText ? ", and those the query keeps" : ""),
+    detail: "The " + t.label + ":counts query above: " + t.source + (t.queryText ? " The query keeps " + t.queryText + "." : ""),
+    params: t.lists.map((l) => [l.cohort + " · " + l.study, (t.queryText ? l.total.toLocaleString("en-US") + " of " : "") + l.all.toLocaleString("en-US")] as [string, string]),
   }, {
     kind: "fetch" as const, title: "Sort them together and take one page",
-    detail: "The table:rows query above: the rows of every cohort and study combined in one query" + (t.instances > 1 ? " per database (" + t.instances + " here, listed in turn)" : "") +
-      ", each with the value of each of the " + t.columns + " attributes as recorded — blank where none was — sorted " +
-      (t.sort ? "by " + t.sort.attribute + (t.sort.desc ? " descending" : "") + " with missing values last, then " : "by ") + "patient and sample id, and the " + t.shown +
-      " rows of the first page taken. Every other page, and the download, is the same query at another offset." +
+    detail: "The " + t.label + ":rows query above: the " + t.what + " of every cohort and study combined in one query" + (t.instances > 1 ? " per database (" + t.instances + " here, listed in turn)" : "") +
+      (t.queryText ? ", kept to " + t.queryText : "") + ", sorted " + t.order + ", and the " + t.shown + " rows of the first page taken." +
+      " Every other page, and the download, is the same query at another offset." +
       (t.excluded.length ? " Studies that do not disclose patients contribute no rows and are named: " + t.excluded.map((e) => e.study).join(", ") + "." : ""),
   }];
-  return { steps, implementation: { functions: ["tableRowsSql"], file: "lib/clinical-table.ts", commit: BUILD_COMMIT },
+}
+
+export function tableMethod(t: { unit: "sample" | "patient"; cohorts: string[]; columns: number; query: unknown; queryText: string; sortName: string | null; shown: number;
+  lists: TableLists; excluded: { study: string; reason: string; patients: number }[]; instances: number }): MethodRecord {
+  const desc = !!(t.query as { sort?: { desc?: boolean } })?.sort?.desc;
+  const steps = tableSteps({ label: "table", what: t.unit + "s", queryText: t.queryText, shown: t.shown, lists: t.lists, instances: t.instances, excluded: t.excluded,
+    source: "every " + t.unit + " of each cohort's patients" + (t.unit === "sample" ? " (from the study's sample list, so a sample with no sample attribute still has a row)" : "") +
+      ", each with the value of each of the " + t.columns + " attributes as recorded — blank where none was.",
+    order: (t.sortName ? "by " + t.sortName + (desc ? " descending" : "") + " with missing values last, then " : "by ") + "patient and sample id" });
+  return { steps, implementation: { functions: ["clinicalRowSource", "pageSql", "countsSql"], file: "lib/clinical-table.ts, lib/table-query.ts", commit: BUILD_COMMIT },
     verification: "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
 }
 
-// ---- mutations: a listing, nothing computed ------------------------------------------------------
-
-export function mutationsMethod(t: { gene: string; cohorts: string[]; oncokbPin: string | null; sort: { column: string; desc?: boolean } | null; shown: number;
-  lists: { cohort: string; study: string; total: number }[]; excluded: { study: string; reason: string; patients: number }[]; instances: number }): MethodRecord {
-  const steps: MethodStep[] = [{
-    kind: "fetch" as const, title: "Count " + t.gene + "'s mutation calls per cohort and study",
-    detail: "The mutations:counts query above: every called " + t.gene + " mutation in each cohort's samples (uncalled calls left out).",
-    params: t.lists.map((l) => [l.cohort + " · " + l.study, l.total.toLocaleString("en-US")] as [string, string]),
-  }, {
-    kind: "fetch" as const, title: "Sort them together and take one page",
-    detail: "The mutations:rows query above: the calls of every cohort and study combined in one query" + (t.instances > 1 ? " per database (" + t.instances + " here, listed in turn)" : "") +
-      ", with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded" + (t.oncokbPin ? " and the OncoKB " + t.oncokbPin + " call for its protein change" : "") +
-      "; allele frequency = variant / (variant + reference) reads; sorted " + (t.sort ? "by " + t.sort.column + (t.sort.desc ? " descending" : "") + ", missing last" : "drivers first, then by codon") +
-      ", then sample — and the " + t.shown + " rows of the first page taken. Every other page, and the download, is the same query at another offset." +
-      (t.excluded.length ? " Studies that do not disclose patients contribute no rows and are named: " + t.excluded.map((e) => e.study).join(", ") + "." : ""),
-  }];
-  return { steps, implementation: { functions: ["mutationRowsSql"], file: "lib/mutation-table.ts", commit: BUILD_COMMIT },
+export function mutationsMethod(t: { gene: string; cohorts: string[]; oncokbPin: string | null; queryText: string; sortName: string | null; desc: boolean; shown: number;
+  lists: TableLists; excluded: { study: string; reason: string; patients: number }[]; instances: number }): MethodRecord {
+  const steps = tableSteps({ label: "mutations", what: t.gene + " mutation calls", queryText: t.queryText, shown: t.shown, lists: t.lists, instances: t.instances, excluded: t.excluded,
+    source: "every called " + t.gene + " mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded" +
+      (t.oncokbPin ? " and the OncoKB " + t.oncokbPin + " call for its protein change" : "") + "; allele frequency = variant / (variant + reference) reads.",
+    order: (t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + ", missing last" : "drivers first, then by codon") + ", then sample" });
+  return { steps, implementation: { functions: ["mutationRowSource", "pageSql", "countsSql"], file: "lib/mutation-table.ts, lib/table-query.ts", commit: BUILD_COMMIT },
     verification: "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
 }

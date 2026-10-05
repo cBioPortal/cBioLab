@@ -1,8 +1,9 @@
 // The clinical data table: one row per sample (or patient) with every clinical attribute the study
 // records — cBioPortal's Clinical Data tab. Its rows ARE patients, so the row query lives here,
 // outside lib/federation*.ts's aggregate builders, and runs only through
-// PatientLevelResolver.tableRows: a participant that may not disclose a patient has no such method.
+// PatientLevelResolver.rowsPage: a participant that may not disclose a patient has no such method.
 import { sq } from "./compiler.ts";
+import type { QueryColumn, RowSource } from "./table-query.ts";
 import { clinicalTable, clinicalMetaTable } from "./custom-data.ts";
 
 export interface TableColumn {
@@ -11,8 +12,6 @@ export interface TableColumn {
   per: "patient" | "sample";
   numeric: boolean;
 }
-
-export interface TableSort { attribute: string; desc?: boolean }
 
 /** At most this many attribute columns; the widest study in the warehouse has 170. */
 export const TABLE_COLUMNS_MAX = 200;
@@ -26,17 +25,6 @@ export function tableAttributesSql(study: string, db: string): string {
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = m.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
     "ORDER BY priority DESC, name";
-}
-
-/** How one row's value of the sort attribute orders: numbers as numbers, missing last either way. */
-function sortExpr(sort: TableSort | null, columns: TableColumn[]): string {
-  if (!sort) return "";
-  const col = columns.find((c) => c.id === sort.attribute);
-  if (!col) return "";
-  const v = "m[" + sq(col.id) + "]";
-  return col.numeric
-    ? "toFloat64OrNull(" + v + ") " + (sort.desc ? "DESC" : "ASC") + " NULLS LAST, "
-    : "(" + v + " = '') ASC, " + v + " " + (sort.desc ? "DESC" : "ASC") + ", ";
 }
 
 /** One (cohort, study) part of a table: the cohort's SQL as that study's resolver compiles it. */
@@ -72,24 +60,34 @@ function allRows(parts: TablePart[], db: string, unit: "sample" | "patient", col
   return "WITH " + ctes.join("") + "rows AS (\n" + rows.join("  UNION ALL\n") + ")\n";
 }
 
-/**
- * One page of the clinical table across every (cohort, study) part it spans: patient and sample
- * ids with every requested attribute's value as a map — a sample row carries its patient's
- * attributes too, as the portal's table does — combined and sorted together in the database, so the
- * order is global and any page is one query however deep. Sorted by `sort`, then patient, sample
- * and document order, so the download pages the same order. All parts must live in the database
- * this runs in.
- */
-export function tableRowsSql(parts: TablePart[], db: string, unit: "sample" | "patient",
-  columns: TableColumn[], sort: TableSort | null, limit: number, offset: number): string {
-  if (!parts.length) throw new Error("tableRowsSql needs at least one part");
-  return allRows(parts, db, unit, columns) +
-    "SELECT cohort, study, patient, sample, samples, m, count() OVER () AS total FROM rows\n" +
-    "ORDER BY " + sortExpr(sort, columns) + "patient, sample, ord\n" +
-    "LIMIT " + Math.max(0, Math.floor(limit)) + " OFFSET " + Math.max(0, Math.floor(offset));
+/** The table's own columns, before the attributes: who each row is. */
+export function idColumns(unit: "sample" | "patient"): QueryColumn[] {
+  return [
+    { id: "patient", name: "Patient ID", numeric: false, text: "patient" },
+    unit === "sample"
+      ? { id: "sample", name: "Sample ID", numeric: false, text: "sample" }
+      : { id: "samples", name: "Samples", numeric: true, text: "toString(samples)", num: "toFloat64(samples)" },
+  ];
 }
 
-/** How many rows each part holds — the table's per-cohort, per-study totals. Counts only. */
-export function tableCountsSql(parts: TablePart[], db: string, unit: "sample" | "patient"): string {
-  return allRows(parts, db, unit, []) + "SELECT cohort, study, count() AS n FROM rows GROUP BY cohort, study";
+/**
+ * The clinical table's rows across every (cohort, study) part it spans: patient and sample ids with
+ * every requested attribute's value as a map — a sample row carries its patient's attributes too,
+ * as the portal's table does — for lib/table-query.ts to search, filter, sort and page in the
+ * database, so the order is global and any page is one query however deep. With no sort, rows go
+ * by patient and sample id, then document order. All parts must live in the database this runs in.
+ */
+export function clinicalRowSource(parts: TablePart[], db: string, unit: "sample" | "patient", columns: TableColumn[]): RowSource {
+  if (!parts.length) throw new Error("clinicalRowSource needs at least one part");
+  const attr = (c: TableColumn): QueryColumn => {
+    const v = "m[" + sq(c.id) + "]";
+    return { id: c.id, name: c.name, numeric: c.numeric, text: v, ...(c.numeric ? { num: "toFloat64OrNull(" + v + ")" } : {}) };
+  };
+  return {
+    with: allRows(parts, db, unit, columns),
+    columns: [...idColumns(unit), ...columns.map(attr)],
+    select: "cohort, study, patient, sample, samples, m",
+    defaultOrder: "patient, sample",
+    tiebreak: "patient, sample, ord",
+  };
 }

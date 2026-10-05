@@ -12,6 +12,7 @@
 //
 //   /api/explore            every server dataset with rows in the studies being explored
 //   /api/analysis, /api/oncoprint, /api/custom-data/members, /api/view-page
+//                           (and the table download, a form post, through withCustomRefs)
 //                           only datasets the document or spec names, so an analysis that uses
 //                           none stays on the shared result cache. A name the document pins
 //                           (`uploads`, see bindUploads) resolves to that version.
@@ -214,6 +215,15 @@ function attach(path: string, body: string): string | null {
   }
   if (!rows.length && !refs.length) return null;
   return JSON.stringify({ ...j, ...(rows.length ? { customData: rows.map(strip) } : {}), ...(refs.length ? { customRefs: refs } : {}) });
+}
+
+/**
+ * A body with the datasets it names attached, for a request the fetch wrapper does not see — the
+ * table download is a form post, so the browser can save the file as it streams.
+ */
+export async function withCustomRefs(path: string, body: string): Promise<string> {
+  await loadCustomData();
+  try { return attach(path, body) || body; } catch { return body; }
 }
 
 let installed = false;
