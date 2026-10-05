@@ -217,6 +217,38 @@ export interface CohortDef {
 }
 
 /**
+ * One arm of a partition: a name and the clause a patient must match to be in it. Arms are
+ * tested in order and the first match wins, so a patient is in exactly one arm.
+ */
+export interface PartitionArm { name: string; where: Clause; notes?: string }
+/**
+ * Split a named cohort into child cohorts that are disjoint and together exactly the parent —
+ * resolved before compilation by lib/cohort-partitions.ts. Each arm becomes the cohort
+ * "<partition> / <arm name>"; patients matching no arm go to "<partition> / Other"; and
+ * patients for whom an arm's condition cannot be decided (not profiled for the gene, no value
+ * recorded) go to a named "Not profiled: …" / "No … recorded" child instead of being counted as
+ * not matching it. A view that names the partition compares its arms and Other.
+ */
+export interface PartitionDef {
+  /** the cohort to split: a named cohort, or a child of another partition */
+  of: string;
+  arms: PartitionArm[];
+  /** name of the remainder child (default "Other") */
+  other?: string;
+  notes?: string;
+  /**
+   * How the arms were produced, when a tool wrote them from the data (e.g. one arm per value of
+   * an attribute). Provenance only: the engine runs the arms as written, so the document alone
+   * determines the children.
+   */
+  source?: { attribute?: string; gene?: string; oql?: string[]; minCount?: number; median?: boolean;
+    /** values seen but given no arm of their own (too few patients, or past the arm limit), up to 50 */
+    otherValues?: string[];
+    /** the attribute had more values than were ranked, so otherValues does not list them all */
+    otherValuesTruncated?: boolean };
+}
+
+/**
  * Auto-split ONE existing named cohort into an arm per distinct value of a categorical clinical
  * attribute, live from the data — instead of hand-writing one cohort per value. Lives on a VIEW,
  * not a cohort: the synthetic arms it produces are not added to the document's own named-cohort
@@ -1161,6 +1193,8 @@ export type TemplateDoc = Omit<AnalysisDoc, "views"> & {
 export interface AnalysisDoc {
   study?: string;
   cohorts: Record<string, CohortDef>;
+  /** splits of named cohorts into disjoint, exhaustive child cohorts — see PartitionDef */
+  partitions?: Record<string, PartitionDef>;
   views?: View[];
   /**
    * Template parameters. A value anywhere in the document that is exactly
@@ -1493,8 +1527,19 @@ export interface AnalysisResult {
   params?: Record<string, unknown>;
   unusedParams?: string[];
   cohorts: Record<string, CohortResult>;
+  /** each partition's children with their counts, and whether they add up to the parent */
+  partitions?: Record<string, PartitionResult>;
   views: ViewResult[];
   stats: { ms: number };
+}
+export interface PartitionResult {
+  of: string; parentCount: number;
+  children: { name: string; label: string; role: "arm" | "other" | "notEvaluable"; count: number }[];
+  /** sum of the children's counts; equals parentCount when the split is exact */
+  sum: number;
+  conserved: boolean;
+  /** arm conditions this engine cannot check evaluability for — Other may hold unknowns */
+  unchecked: string[];
 }
 
 // ---------- oncoprint render contract ---------------------------------------

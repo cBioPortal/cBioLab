@@ -44,6 +44,15 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
       (r.unusedParams?.length ? `  (declared but never referenced: ${r.unusedParams.map((x) => "$" + x).join(", ")})` : ""));
   out.push("Cohorts:\n" + Object.entries(r.cohorts)
     .map(([n, c]) => `- ${n}: ${c.count.toLocaleString()} patients — ${c.text}`).join("\n"));
+  for (const [name, p] of Object.entries(r.partitions || {})) {
+    const pct = (n: number) => p.parentCount ? " (" + (100 * n / p.parentCount).toFixed(1) + "%)" : "";
+    out.push(`Partition "${name}" of "${p.of}" (${p.parentCount.toLocaleString()} patients; arms tested in order, first match wins):\n` +
+      p.children.map((c) => `  - ${c.label}${c.role === "other" ? " [remainder]" : c.role === "notEvaluable" ? " [not evaluable — not compared]" : ""}: ` +
+        `${c.count.toLocaleString()}${pct(c.count)} — cohort "${c.name}"`).join("\n") +
+      (p.conserved ? `\n  The children add up to the parent (${p.sum.toLocaleString()}).`
+        : `\n  WARNING (tell the user): the children add up to ${p.sum.toLocaleString()}, not the parent's ${p.parentCount.toLocaleString()}.`) +
+      (p.unchecked.length ? `\n  CAVEAT (tell the user): whether a patient can be tested for ${p.unchecked.join(", ")} is not checked, so the remainder may hold patients with no data for it.` : ""));
+  }
   for (const v of r.views) {
     if (v.error) { out.push(`View ${v.kind}: ERROR — ${v.error}`); continue; }
     if (v.kind === "compare") {

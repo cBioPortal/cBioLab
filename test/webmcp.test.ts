@@ -97,6 +97,23 @@ describe("analysis tools: the engine decides, the page follows", () => {
     await text("analysis_remove_cohort", { name: "b" });
     assert.deepEqual(page.doc.views[0].cohorts, ["a"]);
   });
+  test("split_cohort adds the server's proposed partition and runs it", async () => {
+    let asked: any = null;
+    page.proposePartition = async (req: any) => { asked = req; return { name: "a by SEX", def: { of: "a", arms: [{ name: "Female", where: { kind: "clinical", attribute: "SEX", values: ["Female"] } }] }, note: "1 value to Other" }; };
+    const r = await text("analysis_split_cohort", { cohort: "a", attribute: "SEX" });
+    assert.equal(asked.cohort, "a"); assert.equal(asked.attribute, "SEX"); assert.ok(asked.doc.cohorts.a);
+    assert.match(r, /^1 value to Other[\s\S]*applied/);
+    assert.equal(page.doc.partitions["a by SEX"].of, "a");
+  });
+  test("removing a partition takes its nested partitions with it, and its views go back to the cohort it split", async () => {
+    page.doc = { study: "s1", cohorts: { a: { all: [] } },
+      partitions: { P: { of: "a", arms: [{ name: "x", where: {} }] }, Q: { of: "P / x", arms: [{ name: "y", where: {} }] }, R: { of: "a", arms: [{ name: "z", where: {} }] } },
+      views: [{ kind: "compare", genes: ["KRAS"], cohorts: ["P"] }, { kind: "compare", genes: ["TP53"], cohorts: ["a", "Q / y", "R"] }, { kind: "compare", genes: ["EGFR"], cohorts: ["P / x"] }] };
+    const r = await text("analysis_remove_partition", { name: "P" });
+    assert.match(r, /remove partitions "P", "Q"/);
+    assert.deepEqual(Object.keys(page.doc.partitions), ["R"]);
+    assert.deepEqual(page.doc.views, [{ kind: "compare", genes: ["KRAS"], cohorts: ["a"] }, { kind: "compare", genes: ["TP53"], cohorts: ["a", "R"] }]);
+  });
   test("update_view merges, and null removes a key", async () => {
     page.doc = { ...page.doc, views: [{ kind: "survival", endpoint: "OS", cohorts: ["a"] }] };
     await text("analysis_update_view", { index: 0, patch: { endpoint: "PFS", cohorts: null } });

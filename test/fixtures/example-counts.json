@@ -105,6 +105,13 @@
       "APC-mutant": 325,
       "APC-mutant, liver mets": 227
     },
+    "partitions: split a cohort into arms that add up to it": {
+      "NSCLC": 7809,
+      "KRAS allele / Not profiled: KRAS mutations": 0,
+      "KRAS allele / G12C": 916,
+      "KRAS allele / other KRAS": 1278,
+      "KRAS allele / KRAS wild-type": 5615
+    },
     "Median/IQR and a rank-sum test, single-study only": {
       "liver mets": 227,
       "no liver mets": 98

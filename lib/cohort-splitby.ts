@@ -14,8 +14,8 @@ import type { CohortDef, ClinicalLeaf, OqlLeaf, SplitBy } from "./types.ts";
 import { parseOql } from "./oql.ts";
 import { ATTR_NAME_RE, attributeLabel } from "./custom-data-names.ts";
 
-export const SPLIT_BY_DEFAULT_MAX_ARMS = 8;
-export const SPLIT_BY_DEFAULT_MIN_COUNT = 10;
+import { chooseArmValues, SPLIT_BY_DEFAULT_MAX_ARMS, SPLIT_BY_DEFAULT_MIN_COUNT } from "./partition-arms.ts";
+export { SPLIT_BY_DEFAULT_MAX_ARMS, SPLIT_BY_DEFAULT_MIN_COUNT };
 /** hard ceiling on `maxArms` (attribute mode) and on how many queries `oql` mode takes. Set to
  *  the compiler's own `{any:[...]}` leaf cap (lib/cohort2.ts) rather than the document's looser
  *  16-cohort budget: the Other arm's def negates "any of" every named arm/query in ONE clause,
@@ -158,19 +158,16 @@ export async function resolveSplitBy(
   if (!values.length)
     throw new Error("splitBy: no patient in “" + splitBy.cohort + "” has a recorded value for '" + attribute + "'");
 
-  // Most frequent first, ties broken alphabetically — deterministic and reproducible from the
-  // same data, not an artifact of whatever order the query happened to return rows in.
-  const sorted = [...values].sort((a, b) => b.n - a.n || (a.v < b.v ? -1 : 1));
-  const eligible = sorted.filter((x) => x.n >= minCount);
-  const thin = sorted.filter((x) => x.n < minCount); // always pools, regardless of maxArms
+  // the same rule a partition's "split by" uses (lib/partition-arms.ts)
+  const { own: ownValues, pooled } = chooseArmValues(values, maxArms, minCount);
+  const eligible = values.filter((x) => x.n >= minCount);
+  const thin = values.filter((x) => x.n < minCount);
 
   if (eligible.length < 2)
     throw new Error("splitBy: '" + attribute + "' has fewer than 2 values with at least " + minCount +
       " patients each in “" + splitBy.cohort + "” — not enough variation to split on" +
       (thin.length ? " (" + thin.length + " value" + (thin.length === 1 ? "" : "s") + " short of that floor)" : ""));
 
-  const ownValues = eligible.slice(0, maxArms - 1);
-  const pooled = [...eligible.slice(maxArms - 1), ...thin];
   const otherValues = pooled.map((x) => x.v);
 
   const clause = (v: string): ClinicalLeaf => ({ kind: "clinical", attribute, per: dist.per, op: "=", value: v });

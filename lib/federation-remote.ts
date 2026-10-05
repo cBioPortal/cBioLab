@@ -216,11 +216,12 @@ export class RemoteAggregateResolver implements AggregateCapable {
     this.remember(r);
     return r.pairCounts || [];
   }
-  async attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean }): Promise<AttrStats[]> {
+  async attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean; topValues?: number }): Promise<AttrStats[]> {
     this.guard(def);
     if (!attributes.length) return [];
     const r = await mcpCall(this.url, "federated_aggregates",
-      { study: this.study, cohort: def || {}, attributes, ...(opts?.histograms ? { attributeHistograms: true } : {}) });
+      { study: this.study, cohort: def || {}, attributes, ...(opts?.histograms ? { attributeHistograms: true } : {}),
+        ...(opts?.topValues != null ? { attributeTopValues: opts.topValues } : {}) });
     this.remember(r);
     return r.attributeStats || [];
   }

@@ -65,6 +65,17 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   resolved document is an ordinary one, so everything downstream stays as strictly typed as
   before (`AnalysisDoc` = resolved, `TemplateDoc` = as authored). `runAnalysis` is the boundary.
   Also `parameterize()`, the one-click lift of study + a shared gene list.
+- **Partitions** (`doc.partitions`) — a cohort split into child cohorts that are disjoint and add
+  up to it, for comparison. **`lib/cohort-partitions.ts`** expands each into ordinary child
+  cohorts (`"<partition> / <arm>"`, each `extends` its parent) before `extends` resolves: arms are
+  a first-match-wins decision chain, and an arm's condition must be decidable first (OQL → the
+  patient is profiled for that gene and type, panel-aware; clinical → a value is recorded), else
+  the patient goes to a named "Not profiled" / "No … recorded" child, never to wild-type or Other.
+  `runAnalysis` counts every child and reports `result.partitions[...].conserved`; a view naming a
+  partition compares its arms and Other. **`lib/partition-arms.ts`** (browser-safe) builds and
+  edits arms — the value-ranking rule there is shared with `splitBy`. `proposePartition`
+  (`POST /api/partition`) writes arms from the data; the result is explicit arms, so the
+  document alone decides the children. UI: `app/lab/partitions.tsx`, Explore's "split by this".
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
 - **Custom data** — a researcher's uploaded annotations, named `custom:<dataset>/<COLUMN>` and
   usable anywhere a clinical attribute is, stored on the server only (below; the browser keeps

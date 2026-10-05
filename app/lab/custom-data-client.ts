@@ -227,7 +227,7 @@ export function installCustomDataFetch(): void {
       if (init && (init.method || "GET").toUpperCase() === "POST" && typeof init.body === "string") {
         const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
         const path = new URL(href, window.location.href).pathname;
-        if (path === "/api/explore" || path === "/api/analysis" || path === "/api/oncoprint" || path === "/api/custom-data/members" || path === "/api/view-page") {
+        if (path === "/api/explore" || path === "/api/analysis" || path === "/api/oncoprint" || path === "/api/partition" || path === "/api/custom-data/members" || path === "/api/view-page") {
           // the page's first requests go out on mount, before the server has said what it holds;
           // a shared ?doc= link that names a dataset must not race it
           await loadCustomData();

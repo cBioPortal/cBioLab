@@ -469,7 +469,7 @@ function leafText(leaf: any): string {
       (leaf.percentile != null ? " (" + Math.round(leaf.percentile * 100) + "th percentile" + (leaf.percentileOf ? " of " + leaf.percentileOf : "") + ")" : ""));
     return leaf.attribute + " " + bits.join(" ") + (leaf.per === "sample" ? " (any sample)" : "");
   }
-  if (leaf.kind === "profiled") return "profiled for " + leaf.type;
+  if (leaf.kind === "profiled") return "profiled for " + (leaf.gene ? String(leaf.gene).toUpperCase() + " " : "") + leaf.type;
   if (leaf.kind === "derived") {
     const r = (leaf as any).range || {};
     const parts = [r.gte != null ? "\u2265 " + r.gte : null, r.gt != null ? "> " + r.gt : null,

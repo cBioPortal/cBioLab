@@ -111,6 +111,8 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           .describe("Clinical attributes to describe: value counts for categorical, (n, sum, sum of squares, min, max) for numeric. Never individual values."),
         attributeHistograms: z.boolean().nullish()
           .describe("With `attributes`, also return each numeric attribute's complete (value, count) distribution — an exact median/IQR or rank-sum test needs it, and it is safe only because the caller is comparing cohorts confined to THIS one study (a median is not additive across sites the way sum/sumsq is)"),
+        attributeTopValues: z.number().int().min(1).max(500).nullish()
+          .describe("Categorical attributes: return only the N most frequent values (and `distinct`, how many there are), instead of refusing one with more than 200"),
         momentGenes: z.array(z.string()).max(12).nullish()
           .describe("With `profileType`, genes for per-gene (n, sum, sum of squares) on that profile — enough to define a z-score reference distribution without disclosing any value"),
         variantGenes: z.array(z.string()).max(12).nullish()
@@ -123,7 +125,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           .describe("With `pairs`, a continuous molecular profile (e.g. an mRNA z-score profile): returns the six sums (n, Sx, Sy, Sxy, Sxx, Syy) per pair, which are sufficient for a correlation and carry no individual value")
       }
     },
-    async ({ study, cohort, genes, survival, pairs, attributes, attributeHistograms, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, endpointColumns, survivalEndpoints, anchor }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; attributeHistograms?: boolean | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; endpointColumns?: { months: string; status: string } | null; survivalEndpoints?: boolean | null; anchor?: any }) => {
+    async ({ study, cohort, genes, survival, pairs, attributes, attributeHistograms, attributeTopValues, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, endpointColumns, survivalEndpoints, anchor }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; attributeHistograms?: boolean | null; attributeTopValues?: number | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; endpointColumns?: { months: string; status: string } | null; survivalEndpoints?: boolean | null; anchor?: any }) => {
       try {
         const s = await resolveStudy(study);
         const { profiles, gaProfiles } = await studyProfiles(s);
@@ -134,7 +136,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           genes && genes.length ? res.geneCounts(cohort, genes) : Promise.resolve([]),
           survival ? res.survivalCounts(cohort, endpoint || "OS", anchor || null, endpointColumns || undefined) : Promise.resolve([]),
           pairs && pairs.length ? res.pairCounts(cohort, pairs) : Promise.resolve([]),
-          attributes && attributes.length ? res.attributeStats(cohort, attributes, { histograms: !!attributeHistograms }) : Promise.resolve([]),
+          attributes && attributes.length ? res.attributeStats(cohort, attributes, { histograms: !!attributeHistograms, ...(attributeTopValues != null ? { topValues: attributeTopValues } : {}) }) : Promise.resolve([]),
           pairs && pairs.length && profileType ? res.pairMoments(cohort, pairs, profileType) : Promise.resolve([]),
           variantGenes && variantGenes.length
             ? res.variantCounts(cohort, variantGenes, minCount || 1)
@@ -212,7 +214,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
     "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes), oncoprint, attrition (CONSORT-style counts after each cohort clause), genome (genome-wide copy-number gain/loss frequency from segments), pathways (the ten Sanchez-Vega oncogenic pathways, % altered per cohort), diffexpr (two-cohort differential expression volcano plus preranked GSEA), paired (primary-vs-metastasis or before-vs-after-treatment concordance within patients; omit genes to scan every gene, pairBy.studies to pool studies that label samples differently), clonality (FACETS clonal/subclonal calls, LOH, genome doubling, purity, ploidy), incidence (cumulative incidence of a timeline event with death as a competing risk, Gray's test), labs (a lab value's course and response from a treatment start, e.g. PSA50, with a waterfall), cancertypes (a gene list's alteration frequency per cancer type, the portal's Cancer Types Summary), overlap (how cohorts' patients intersect, as an UpSet plot), enrichment (every gene's alteration frequency compared between cohorts, the portal's Genomic Alterations tab), assays (every entity of a generic-assay profile — mutational signatures, arm-level copy number, treatment response — compared between cohorts), mutations (one gene's mutation table: every call with sample, protein change, OncoKB annotation, allele frequency; patient-level studies only), table (the clinical data table: each sample or patient with every clinical attribute, patient-level studies only), correlates (every gene's expression correlated with one gene's, the portal's Co-expression tab). Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
     {
       document: z.object({}).passthrough()
-        .describe("The Analysis document: {study, cohorts: {name: def, ...}, views: [...]}. Grammar and examples: describe_dsl.")
+        .describe("The Analysis document: {study, cohorts: {name: def, ...}, partitions?: {name: {of, arms, other?}}, views: [...]}. Grammar and examples: describe_dsl.")
     },
     async ({ document }: { document: AnalysisDoc }) => {
       let r;

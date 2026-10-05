@@ -21,7 +21,7 @@ import { fisherExact, kaplanMeier, logRank, logRankK, benjaminiHochberg, cochran
 import { contractToSvg } from "./oncoprint-svg.ts";
 import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
 import { viewToSvg, RISK_FLOOR as COURSE_RISK_FLOOR } from "./view-svg.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, LogRankK, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate, LogisticView, LogisticCoefficient, SplitBy } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, LogRankK, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate, LogisticView, LogisticCoefficient, SplitBy } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
@@ -32,6 +32,8 @@ import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis,
 import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
+import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } from "./cohort-partitions.ts";
+import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits } from "./partition-arms.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
 import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, courseMethod, sequenceMethod, type CoxTrace } from "./method.ts";
@@ -174,15 +176,112 @@ export interface RunOpts {
   page?: { offset: number; limit: number };
 }
 
+/**
+ * A categorical attribute's value counts within a cohort, merged across every study the cohort
+ * spans. Each study answers for its own patients (attributeStats is on AggregateCapable, so an
+ * aggregate-only or remote participant answers too), and disagreeing declared types across
+ * studies are refused, not silently merged, as the clinical view's cross-study comparison does.
+ */
+async function mergedDistribution(cohortName: string, def: CohortDef, studies: string[],
+  resolverOf: (s: string) => Promise<Resolver>, attribute: string, opts?: { topValues?: number }): Promise<AttributeDistribution & { partial?: boolean }> {
+  const perStudyStats = await Promise.all(studies.map(async (s) => {
+    const [stat] = await (await resolverOf(s)).attributeStats(def, [attribute], opts);
+    return stat;
+  }));
+  const skipped = perStudyStats.find((s) => s?.skipped);
+  if (skipped) return { kind: "cat", per: "patient", skipped: skipped!.skipped! };
+  const kinds = new Set(perStudyStats.map((s) => s?.kind).filter((k) => k != null));
+  if (kinds.size > 1)
+    return { kind: "cat", per: "patient",
+      skipped: "'" + attribute + "' is declared inconsistently (numeric in one study, categorical in another) across “" + cohortName + "”'s studies" };
+  const kind = (perStudyStats[0]?.kind ?? "cat") as "cat" | "num";
+  const per = (perStudyStats[0]?.per ?? "patient") as "patient" | "sample";
+  if (kind === "num") return { kind, per };
+  const merged = new Map<string, number>();
+  for (const s of perStudyStats) for (const { v, n } of (s?.values || [])) merged.set(v, (merged.get(v) || 0) + n);
+  const partial = perStudyStats.some((s) => s?.distinct != null && s.distinct > (s.values || []).length);
+  return { kind: "cat", per, values: [...merged.entries()].map(([v, n]) => ({ v, n })), ...(partial ? { partial } : {}) };
+}
+
+/** how many of a categorical attribute's values a split proposal ranks, per study */
+const PARTITION_TOP_VALUES = 100;
+
+export interface PartitionProposalRequest {
+  doc: AnalysisDoc | TemplateDoc;
+  /** the cohort to split: a named cohort or a partition's child */
+  cohort: string;
+  attribute?: string; gene?: string; oql?: string[];
+  maxArms?: number; minCount?: number;
+  /** the partition's name; default "<cohort> by <attribute|gene>" */
+  name?: string;
+}
+
+/**
+ * Write a partition's arms from the data, for an author to review and edit: one arm per frequent
+ * value of a categorical attribute (the same rule as a view's splitBy), a median split of a
+ * numeric one, a gene's mutated / wild-type, or one arm per OQL query. The returned definition
+ * is explicit — arms and clauses, no "split by" left to resolve — so the document alone decides
+ * what a reader sees, and re-running it later cannot quietly regroup patients.
+ */
+export async function proposePartition(req: PartitionProposalRequest): Promise<{ name: string; def: PartitionDef; note?: string }> {
+  const { doc: paramsDoc } = resolveParams(req.doc);
+  const { doc: partitionedDoc } = resolvePartitions(paramsDoc);
+  const extendsDoc = resolveExtends(partitionedDoc);
+  const docStudy = await resolveStudy(extendsDoc.study);
+  const doc = await resolveCohortPercentiles(extendsDoc, docStudy, async (study, refDef, attribute, per, p) =>
+    (await resolverFor(study, {})).attributeQuantile(refDef, attribute, per, p));
+  const cohort = String(req.cohort || "");
+  const def = doc.cohorts?.[cohort];
+  if (!def) throw new Error("no cohort “" + cohort + "” to split; have " + Object.keys(doc.cohorts || {}).join(", "));
+  const modes = [req.attribute, req.gene, req.oql].filter((x) => x != null && x !== "").length;
+  if (modes !== 1) throw new Error("name exactly one of attribute, gene or oql to split by");
+  const taken = [...Object.keys(doc.cohorts || {}), ...Object.keys(paramsDoc.partitions || {})];
+  const nameFor = (what: string) => req.name && req.name.trim() ? req.name.trim() : uniqueName(cohort + " by " + what, taken);
+  if (req.name && taken.includes(req.name.trim())) throw new Error("“" + req.name.trim() + "” is already a cohort or partition name");
+  if (req.gene) {
+    const p = partitionFromGene(cohort, req.gene);
+    return { name: nameFor(p.source!.gene!), def: p };
+  }
+  if (req.oql) return { name: nameFor("OQL"), def: partitionFromOql(cohort, req.oql) };
+
+  const attribute = String(req.attribute).trim();
+  if (!ATTR_NAME_RE.test(attribute)) throw new Error("'" + attribute + "' is not a valid attribute name");
+  const studies: string[] = [];
+  for (const s of cohortStudies(def, docStudy)) studies.push(await resolveStudy(s, docStudy));
+  const pin = process.env.ONCOKB_PIN || await oncokbPin();
+  const resolverOf = async (s: string) => { const { profiles, gaProfiles } = await studyProfiles(s); return resolverFor(s, { oncokbPin: pin, profiles, gaProfiles }); };
+  // Only the most frequent values can earn an arm, so a long tail is not a reason to refuse. The
+  // ranking decides which values get arms; every arm's count comes from evaluating its clause.
+  const dist = await mergedDistribution(cohort, def, studies, resolverOf, attribute, { topValues: PARTITION_TOP_VALUES });
+  if (dist.skipped) throw new Error("cannot split by '" + attribute + "': " + dist.skipped);
+  if (dist.kind === "num") {
+    // A median split relative to the cohort being split, through a percentile leaf: the engine
+    // resolves the cutoff live from this cohort's own patients.
+    if (studies.length > 1) throw new Error("'" + attribute + "' is numeric, and a median split needs a cohort in a single study (“" + cohort + "” spans " + studies.length + ")");
+    return { name: nameFor(attribute), note: "split at the median of " + attribute + " within “" + cohort + "”",
+      def: { of: cohort, arms: [{ name: attribute + " below median", where: { kind: "clinical", attribute, ...(dist.per === "sample" ? { per: "sample" as const } : {}), op: "<", percentile: 0.5, percentileOf: cohort } }],
+        other: attribute + " at or above median", source: { attribute, median: true } } };
+  }
+  const { def: p, pooled } = partitionFromValues(cohort, attribute, dist.per, dist.values || [], { maxArms: req.maxArms, minCount: req.minCount });
+  if (dist.partial && p.source) p.source.otherValuesTruncated = true;
+  return { name: nameFor(attribute), def: p,
+    ...(pooled.length ? { note: (dist.partial ? "Values" : pooled.length + " value" + (pooled.length === 1 ? "" : "s")) +
+      " with fewer patients go to Other: " + pooled.slice(0, 12).join(", ") + (pooled.length > 12 || dist.partial ? ", …" : "") } : {}) };
+}
+
 export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: RunOpts = {}): Promise<AnalysisResult> {
   const t0 = Date.now();
   // Parameters are resolved FIRST, so everything downstream — compilers,
   // validators, provenance — sees an ordinary document and cannot tell a
   // template from one written out by hand. `extends` is resolved right after,
   // for the same reason: by the time anything else looks at doc.cohorts, every
-  // cohort's `all` is already the full, flattened list.
+  // cohort's `all` is already the full, flattened list. Partitions expand into child cohorts
+  // that `extends` their parent, so they resolve just before it.
   const { doc: paramsDoc, params: usedParams, unused: unusedParams } = resolveParams(template);
-  const extendsDoc = resolveExtends(paramsDoc);
+  const authoredNames = Object.keys(paramsDoc.cohorts || {});
+  const { doc: partitionedDoc, plans: partitionPlans } = resolvePartitions(paramsDoc);
+  const extendsDoc = resolveExtends(partitionedDoc);
+  assertPartitionChildrenFit(extendsDoc.cohorts, partitionPlans);
   assertCustomDataPresent(extendsDoc);
   const docStudy = await resolveStudy(extendsDoc.study);
   // A percentile leaf needs a real query (a percentile is a fact about the data, not the
@@ -201,7 +300,10 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   // named cohorts, and 6 forced one such analysis into four separate documents. Views stay
   // at 6 — each one issues its own set of queries per cohort, so raising cohorts already
   // multiplies real query cost without also multiplying the view count.
-  { const e = overLimit("an analysis document", 16, names.length); if (e) throw new Error(e.replace("at most 16", "at most 16 cohorts")); }
+  { const e = overLimit("an analysis document", 16, authoredNames.length); if (e) throw new Error(e.replace("at most 16", "at most 16 cohorts")); }
+  // Partition children are counted separately: one split of a 16-cohort document can add a
+  // dozen children, and each costs one count per study, not a view's worth of queries.
+  { const e = overLimit("an analysis document", 48, names.length); if (e) throw new Error(e.replace("at most 48", "at most 48 cohorts including partition children")); }
   { const e = overLimit("an analysis document", 6, (doc.views || []).length); if (e) throw new Error(e.replace("at most 6", "at most 6 views")); }
 
   // ---- evaluate cohorts: per study, sum the counts ------------------------
@@ -241,6 +343,17 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     };
   };
   for (const name of names) cohorts[name] = await evalCohortDef(doc.cohorts[name]);
+  // The children of a partition are disjoint and cover the parent by construction; counting
+  // them is the check that the construction held, so a mismatch is reported, never hidden.
+  const partitionResults: NonNullable<AnalysisResult["partitions"]> = {};
+  for (const plan of partitionPlans) {
+    const children = plan.children.map((c) => ({ name: c.name, label: c.label, role: c.role, count: cohorts[c.name].count }));
+    const sum = children.reduce((n, c) => n + c.count, 0);
+    const parentCount = cohorts[plan.of].count;
+    partitionResults[plan.name] = { of: plan.of, parentCount, children, sum, conserved: sum === parentCount, unchecked: plan.unchecked };
+  }
+  const partitionShapes = partitionPlans.map((p) => ({ name: p.name, of: p.of, comparable: comparableChildren(p) }));
+  const generatedNames = new Set(partitionPlans.flatMap((p) => p.children.map((c) => c.name)));
   const involved = [...new Set(Object.values(cohorts).flatMap((c) => c.studies))];
 
   // ---- views --------------------------------------------------------------
@@ -285,29 +398,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         continue;
       }
       const baseDef = doc.cohorts[baseName];
-      // Same additive-across-studies shape every other federated feature here uses: each study
-      // answers for its own patients (attributeStats is on AggregateCapable, so this works for
-      // an aggregate-only or remote participant too — splitBy needs no patient-level access),
-      // and disagreeing declared types across studies is refused, not silently merged, the same
-      // rule the clinical view's own cross-study comparison already follows.
-      const distributionFor = async (attribute: string): Promise<AttributeDistribution> => {
-        const perStudyStats = await Promise.all(cohorts[baseName].studies.map(async (s) => {
-          const [stat] = await resolvers[s].attributeStats(baseDef, [attribute]);
-          return stat;
-        }));
-        const skipped = perStudyStats.find((s) => s?.skipped);
-        if (skipped) return { kind: "cat", per: "patient", skipped: skipped!.skipped! };
-        const kinds = new Set(perStudyStats.map((s) => s?.kind).filter((k) => k != null));
-        if (kinds.size > 1)
-          return { kind: "cat", per: "patient",
-            skipped: "'" + attribute + "' is declared inconsistently (numeric in one study, categorical in another) across “" + baseName + "”'s studies" };
-        const kind = (perStudyStats[0]?.kind ?? "cat") as "cat" | "num";
-        const per = (perStudyStats[0]?.per ?? "patient") as "patient" | "sample";
-        if (kind === "num") return { kind, per };
-        const merged = new Map<string, number>();
-        for (const s of perStudyStats) for (const { v, n } of (s?.values || [])) merged.set(v, (merged.get(v) || 0) + n);
-        return { kind: "cat", per, values: [...merged.entries()].map(([v, n]) => ({ v, n })) };
-      };
+      const distributionFor = (attribute: string) =>
+        mergedDistribution(baseName, baseDef, cohorts[baseName].studies, async (st) => resolvers[st], attribute);
       try {
         const resolved = await resolveSplitBy(sb, names, baseDef, distributionFor);
         // Every one of the 12 view branches below reads its cohort's DEFINITION via
@@ -354,7 +446,10 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         continue;
       }
     } else {
-      vNames = (view.cohorts && view.cohorts.length ? view.cohorts : names).filter((n) => cohorts[n]);
+      // With no cohorts named a view shows the authored ones; either way a split replaces what it
+      // splits (expandSplits), so splitting a cohort changes every view that shows it.
+      vNames = expandSplits(view.cohorts && view.cohorts.length ? view.cohorts : names.filter((n) => !generatedNames.has(n)), partitionShapes)
+        .filter((n) => cohorts[n]);
     }
     const vStudies = [...new Set(vNames.flatMap((n) => cohorts[n].studies))];
     const mark = queryMark(), pushedBefore = views.length, viewT0 = Date.now();
@@ -2019,6 +2114,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     // missed a reference: the run succeeds, so nothing else would say so.
     ...(Object.keys(usedParams).length ? { params: usedParams } : {}),
     ...(unusedParams.length ? { unusedParams } : {}),
+    ...(partitionPlans.length ? { partitions: partitionResults } : {}),
     cohorts: Object.fromEntries(names.map((n) => [n, {
       count: cohorts[n].count, text: cohorts[n].text,
       studies: cohorts[n].studies,
