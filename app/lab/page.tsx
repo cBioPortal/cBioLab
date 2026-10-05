@@ -22,7 +22,7 @@ import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import CustomDataPanel, { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import LoginButton from "./login-button.tsx";
-import { PartitionPanel, SplitMenu, type SplitSpec } from "./partitions.tsx";
+import { PartitionPanel, SplitMenu, ChartMenu, type SplitSpec } from "./partitions.tsx";
 import { withoutPartition, armsFromSelection, renamePartitionChild, uniqueName, type ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
 import { installCustomDataFetch, saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
@@ -3236,23 +3236,22 @@ function Latency({ v }: { v: any }) {
                           <span className="meta">
                             {(c.per === "sample" ? "· sample-level · " : "· ") + shown.toLocaleString() + unit}
                             {disj ? " · not narrowed by its own filter" : ""}
-                          </span>{" "}
-                          <button className="facet facetsplit" disabled={!!splittingBy}
-                            title={"Analyze the current selection split by " + (c.displayName || c.attribute) + (c.kind === "num"
-                              ? ": below / at or above its median within the selection" : ": one arm per value with at least 10 patients, the rest in Other") +
-                              " — arms that never overlap and add up to the selection"}
-                            onClick={() => splitDraftBy({ attribute: c.attribute }, c.displayName || c.attribute)}>
-                            {splittingBy === (c.displayName || c.attribute) && <span className="spinner" />}split by this
-                          </button>
+                          </span>
                           {(() => {
+                            const label = c.displayName || c.attribute;
                             const chart: ChartKey = { kind: "clinical", attribute: c.attribute, per: c.per === "sample" ? "sample" : "patient" };
                             const n = selectionArmCount(chart);
-                            return n > 0 && <>{" "}<button className="facet facetsplit on"
-                              title={"Analyze with each selected " + (c.kind === "num" ? "range" : "value") + " of " + (c.displayName || c.attribute) +
-                                " as its own arm (tested in the order you clicked them), the rest of your selection as the cohort they split, and everyone else in Other"}
-                              onClick={() => splitDraftBySelection(chart, c.displayName || c.attribute)}>
-                              split by selected ({n > 8 ? "8+" : n})
-                            </button></>;
+                            return <ChartMenu label={label} actions={[
+                              { label: "Split by this", disabled: !!splittingBy, working: splittingBy === label,
+                                title: "Analyze the current selection split by " + label + (c.kind === "num"
+                                  ? ": below / at or above its median within the selection" : ": one arm per value with at least 10 patients, the rest in Other") +
+                                  " — arms that never overlap and add up to the selection",
+                                onClick: () => splitDraftBy({ attribute: c.attribute }, label) },
+                              ...(n > 0 ? [{ label: "Split by selected (" + (n > 8 ? "8+" : n) + ")",
+                                title: "Analyze with each selected " + (c.kind === "num" ? "range" : "value") + " of " + label +
+                                  " as its own arm (tested in the order you clicked them), the rest of your selection as the cohort they split, and everyone else in Other",
+                                onClick: () => splitDraftBySelection(chart, label) }] : [])
+                            ]} />;
                           })()}
                         </div>
                       );
@@ -3498,19 +3497,15 @@ function Latency({ v }: { v: any }) {
                       {(() => {
                         const chart: ChartKey = { kind: "genes", specs: kind === "mutated" ? [": MUT"] : kind === "cna" ? [": AMP", ": HOMDEL"] : [": FUSION"] };
                         const n = selectionArmCount(chart);
-                        return n > 0 && <button className="facet facetsplit on"
-                          title={"Analyze with each selected gene in this table as its own arm (tested in the order you clicked them), the rest of your selection as the cohort they split, and everyone else in Other or Not profiled"}
-                          onClick={() => splitDraftBySelection(chart, kind === "mutated" ? "mutated genes" : kind === "cna" ? "CNA genes" : "SV genes")}>
-                          split by selected ({n > 8 ? "8+" : n})
-                        </button>;
-                      })()}
-                      {kind === "mutated" && (() => {
-                        const exact = all.find((g: any) => g.gene.toUpperCase() === needle);
-                        return exact && <button className="facet facetsplit" disabled={!!splittingBy}
-                          title={"Analyze the current selection split into " + exact.gene + " mutated / wild-type / not profiled for " + exact.gene}
-                          onClick={() => splitDraftBy({ gene: exact.gene }, exact.gene)}>
-                          {splittingBy === exact.gene && <span className="spinner" />}split by {exact.gene}
-                        </button>;
+                        const exact = kind === "mutated" ? all.find((g: any) => g.gene.toUpperCase() === needle) : undefined;
+                        return <ChartMenu label={meta.title} actions={[
+                          ...(exact ? [{ label: "Split by " + exact.gene, disabled: !!splittingBy, working: splittingBy === exact.gene,
+                            title: "Analyze the current selection split into " + exact.gene + " mutated / wild-type / not profiled for " + exact.gene,
+                            onClick: () => splitDraftBy({ gene: exact.gene }, exact.gene) }] : []),
+                          ...(n > 0 ? [{ label: "Split by selected (" + (n > 8 ? "8+" : n) + ")",
+                            title: "Analyze with each selected gene in this table as its own arm (tested in the order you clicked them), the rest of your selection as the cohort they split, and everyone else in Other or Not profiled",
+                            onClick: () => splitDraftBySelection(chart, kind === "mutated" ? "mutated genes" : kind === "cna" ? "CNA genes" : "SV genes") }] : [])
+                        ]} />;
                       })()}
                     </div>
                     <div className="generows">

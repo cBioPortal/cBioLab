@@ -186,3 +186,23 @@ export function PartitionPanel({ name, partitions, results, cohortText, attrs, b
     </div>
   );
 }
+
+export interface ChartAction { label: string; title: string; onClick: () => void; disabled?: boolean; working?: boolean }
+
+/** an Explore chart's "⋯" menu, pinned to the chart's corner; renders nothing without actions */
+export function ChartMenu({ actions, label }: { actions: ChartAction[]; label: string }) {
+  if (!actions.length) return null;
+  return (
+    <details className="gearmenu chartgear">
+      <summary className="tbbtn" title={"actions for " + label} aria-label={"actions for " + label}>⋯</summary>
+      <div className="gearmenu-items">
+        {actions.map((a) => (
+          <button key={a.label} className="linklike" disabled={a.disabled} title={a.title}
+            onClick={(e) => { const d = (e.currentTarget as HTMLElement).closest("details"); if (d) d.open = false; a.onClick(); }}>
+            {a.working && <span className="spinner" />}{a.label}
+          </button>
+        ))}
+      </div>
+    </details>
+  );
+}
