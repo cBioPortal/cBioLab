@@ -33,6 +33,9 @@ export * from "./federation-more.ts";
 export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
 export type { PlotData, PlotRequest, PlotGroup, PlotPoint } from "./plot.ts";
 import type { Moments } from "./stats.ts";
+// the clinical table's row query returns ids: imported for PatientLevelResolver.tableRows, never re-exported
+import { tableRowsSql, tableCountsSql, type TableColumn, type TableSort } from "./clinical-table.ts";
+import { mutationRowsSql, mutationCountsSql, type MutationSort, type TablePart } from "./mutation-table.ts";
 
 /** the colour key: the commonest categories, capped, each with the colour every renderer uses */
 export function legendFor(values: string[], ring = false): { label: string; color: string; ring?: boolean }[] {
@@ -1227,6 +1230,14 @@ export interface PatientLevelCapable extends AggregateCapable {
     Promise<{ rows: { y: number | string; values: (number | string)[] }[]; outcomeKind: AxisKind; kinds: AxisKind[] }>;
   /** one row per patient (never an identifier) for a lib/views-more.ts view — see PatientLevelResolver.moreRows */
   moreRows(label: string, def: CohortDef | null | undefined, build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
+  /** one page of the clinical table across parts in this instance, with their ids — see PatientLevelResolver.tableRows */
+  tableRows(label: string, parts: TablePart[], unit: "sample" | "patient", columns: TableColumn[], sort: TableSort | null, limit: number, offset: number):
+    Promise<{ rows: { cohort: string; study: string; patient: string; sample: string; samples: number; values: Record<string, string> }[]; total: number }>;
+  tableCounts(label: string, parts: TablePart[], unit: "sample" | "patient"): Promise<{ cohort: string; study: string; n: number }[]>;
+  /** one page of a gene's mutation rows across parts in this instance, with their sample ids — see PatientLevelResolver.mutationRows */
+  mutationRows(label: string, parts: TablePart[], gene: string, pin: string | null, sort: MutationSort | null, limit: number, offset: number):
+    Promise<{ rows: Record<string, unknown>[]; total: number }>;
+  mutationCounts(label: string, parts: TablePart[], gene: string): Promise<{ cohort: string; study: string; n: number }[]>;
 }
 
 export type Resolver = AggregateCapable | PatientLevelCapable;
@@ -1265,6 +1276,8 @@ export interface FederatedPlotCapable {
 export interface MoreAggregateCapable {
   moreAggregate(label: string, def: CohortDef | null | undefined,
     build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
+  moreAggregateMany(label: string, defs: (CohortDef | null | undefined)[],
+    build: (cohortSqls: string[], study: string, db: string) => string): Promise<ChRow[]>;
   moreMeta(label: string, build: (study: string, db: string) => string): Promise<ChRow[]>;
 }
 export function hasMoreAggregates(r: Resolver): r is Resolver & MoreAggregateCapable {
@@ -1706,6 +1719,13 @@ abstract class BaseResolver implements AggregateCapable {
     const r = await this.runLogged<ChRow>(label, build(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
     return r.data;
   }
+  /** The same for an aggregate over SEVERAL cohorts at once (how they overlap): each definition is
+   *  compiled by this resolver, in order, exactly as moreAggregate compiles one. */
+  async moreAggregateMany(label: string, defs: (CohortDef | null | undefined)[],
+    build: (cohortSqls: string[], study: string, db: string) => string): Promise<ChRow[]> {
+    const r = await this.runLogged<ChRow>(label, build(defs.map((d) => this.cohortSql(d)), this.study, this.instance.conn.db), this.instance.conn);
+    return r.data;
+  }
   /** Study metadata for those views (no cohort involved), logged the same way. */
   async moreMeta(label: string, build: (study: string, db: string) => string): Promise<ChRow[]> {
     const r = await this.runLogged<ChRow>(label, build(this.study, this.instance.conn.db), this.instance.conn);
@@ -1804,6 +1824,44 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]> {
     const r = await this.runLogged<ChRow>(label, build(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
     return r.data;
+  }
+
+  /**
+   * One page of the clinical table — patient and sample ids with every requested attribute's
+   * value — across every part (cohort × study) this instance holds, sorted together in its
+   * database. The rows are patients by definition, so — like plotPoints and members() — this lives
+   * on the patient-level resolver alone, and its query (lib/clinical-table.ts) sits outside the
+   * aggregate builders a peer may be sent.
+   */
+  async tableRows(label: string, parts: TablePart[], unit: "sample" | "patient", columns: TableColumn[], sort: TableSort | null,
+    limit: number, offset: number): Promise<{ rows: { cohort: string; study: string; patient: string; sample: string; samples: number; values: Record<string, string> }[]; total: number }> {
+    const r = await this.runLogged<ChRow>(label, tableRowsSql(parts, this.instance.conn.db, unit, columns, sort, limit, offset), this.instance.conn);
+    return {
+      rows: r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), patient: String(x.patient), sample: String(x.sample || ""),
+        samples: Number(x.samples) || 0, values: (x.m || {}) as Record<string, string> })),
+      total: r.data.length ? Number(r.data[0].total) : 0
+    };
+  }
+  async tableCounts(label: string, parts: TablePart[], unit: "sample" | "patient"): Promise<{ cohort: string; study: string; n: number }[]> {
+    const r = await this.runLogged<ChRow>(label, tableCountsSql(parts, this.instance.conn.db, unit), this.instance.conn);
+    return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n) }));
+  }
+
+
+  /**
+   * One page of a gene's mutations, a row per call with its sample — the Mutations tab's table —
+   * across every part (cohort × study) this instance holds, sorted together in its database. The
+   * rows name samples, so like tableRows this lives on the patient-level resolver alone, and its
+   * query (lib/mutation-table.ts) sits outside the aggregate builders a peer may be sent.
+   */
+  async mutationRows(label: string, parts: TablePart[], gene: string, pin: string | null, sort: MutationSort | null,
+    limit: number, offset: number): Promise<{ rows: Record<string, unknown>[]; total: number }> {
+    const r = await this.runLogged<ChRow>(label, mutationRowsSql(parts, this.instance.conn.db, gene, pin, sort, limit, offset), this.instance.conn);
+    return { rows: r.data as Record<string, unknown>[], total: r.data.length ? Number(r.data[0].total) : 0 };
+  }
+  async mutationCounts(label: string, parts: TablePart[], gene: string): Promise<{ cohort: string; study: string; n: number }[]> {
+    const r = await this.runLogged<ChRow>(label, mutationCountsSql(parts, this.instance.conn.db, gene), this.instance.conn);
+    return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n) }));
   }
 
   /**

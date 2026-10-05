@@ -19,6 +19,7 @@ const asText = (x: unknown) => typeof x === "string" ? x : JSON.stringify(x, nul
 export const SITE_PAGES = [
   { path: "/lab", what: "the analysis app: Explore studies and build a cohort from facets, saved cohorts and analyses, and the Analysis document (cohorts + views) with every result; the gallery of examples" },
   { path: "/campaign", what: "hypothesis campaigns: start one for a research question, then register hypotheses, lock and run them on held-out patients" },
+  { path: "/datasets", what: "every study this deployment holds, with sample counts per data type; each opens in Explore" },
   { path: "/reproductions", what: "published papers reproduced against the live data, each an analysis that opens in /lab" },
   { path: "/oncoprint-lab", what: "an oncoprint drawn from a spec (?spec=<base64url>), with presets" },
   { path: "/rationale", what: "why the project is built this way, and what is built versus planned" }

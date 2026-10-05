@@ -1228,3 +1228,88 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .loginstate { display: inline-flex; align-items: center; gap: var(--s2); }
 .logindialog .meta { display: block; margin-bottom: var(--s3); }
 .logindialog input { width: 100%; box-sizing: border-box; }
+
+/* /datasets — the data sets table */
+.ds-page { max-width: 1400px; }
+.ds-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); margin: var(--s5) 0 var(--s3); }
+.ds-controls input[type="search"] { min-width: 18rem; height: var(--ctl-h); }
+.ds-chips { display: flex; flex-wrap: wrap; gap: var(--s1); }
+.ds-scroll { overflow-x: auto; }
+.ds-table table { border-collapse: collapse; width: 100%; font-size: var(--t-sm); }
+.ds-table th { text-align: left; padding: var(--s2) var(--s2); border-bottom: 1px solid var(--line); cursor: pointer; white-space: nowrap; user-select: none; }
+.ds-table td { padding: var(--s2) var(--s2); border-bottom: 1px solid var(--line); vertical-align: top; }
+.ds-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.ds-table .ds-study { min-width: 22rem; }
+.ds-table .ds-study a { color: var(--accent-ink); text-decoration: none; font-weight: 600; }
+.ds-table .ds-also { max-width: 16rem; color: var(--muted); }
+.ds-table .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.ds-table td:last-child { white-space: nowrap; }
+
+/* the clinical data table view */
+.tv-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin: var(--s2) 0; flex-wrap: wrap; }
+.tv-bar form { margin: 0; }
+.tv-scroll { overflow: auto; max-height: 34rem; border: 1px solid var(--line); border-radius: var(--r-sm); }
+.tv table { border-collapse: collapse; font-size: var(--t-xs); }
+.tv th { position: sticky; top: 0; background: var(--card); text-align: left; padding: var(--s1) var(--s2); border-bottom: 1px solid var(--line); cursor: pointer; white-space: nowrap; user-select: none; }
+.tv td { padding: var(--s1) var(--s2); border-bottom: 1px solid var(--line); white-space: nowrap; max-width: 22rem; overflow: hidden; text-overflow: ellipsis; }
+.tv .num { text-align: right; font-variant-numeric: tabular-nums; }
+.tv .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+/* Explore's survival and density charts */
+.xc-card { grid-column: span 2; }
+.xc-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s2); }
+.xc-title { font-size: var(--t-md); font-weight: 600; }
+.xc-body { position: relative; min-height: 12rem; }
+.xc-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: var(--s2); background: color-mix(in srgb, var(--card) 70%, transparent); color: var(--muted); font-size: var(--t-sm); }
+.xc-density { width: 100%; max-width: 26rem; display: block; touch-action: none; cursor: crosshair; user-select: none; }
+.xc-frame { fill: none; stroke: var(--line); }
+.xc-cell { fill: var(--accent); }
+.xc-brush { fill: color-mix(in srgb, var(--accent) 15%, transparent); stroke: var(--accent); stroke-dasharray: 3 2; }
+.xc-tick { font-size: 9px; fill: var(--muted); }
+.xc-tickline { stroke: var(--muted); }
+.xc-axis { font-size: 10px; fill: var(--muted); }
+
+/* the portal pages (app/portal): cBioPortal's Results and Comparison layouts */
+.portal-main { max-width: 1400px; margin: 0 auto; padding: var(--s4); }
+.portal-head h1 { font-size: var(--t-xl); margin: var(--s2) 0; }
+.portal-head a { color: var(--accent-ink); text-decoration: none; font-weight: 600; }
+.portal-cohorts { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.portal-view { margin-top: var(--s3); }
+.portal-view .vtitle { font-size: var(--t-md); margin: 0 0 var(--s2); }
+.doctabs { display: flex; gap: var(--s1); flex-wrap: wrap; border-bottom: 1px solid var(--line); margin: var(--s3) 0; }
+.doctabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: var(--s2) var(--s3); font-size: var(--t-sm); color: var(--muted); cursor: pointer; display: inline-flex; gap: var(--s1); align-items: center; }
+.doctabs button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+
+/* the portal-style card bodies (app/lab/portal-bodies.tsx) */
+.pb-pills { display: flex; flex-wrap: wrap; gap: var(--s1); margin: var(--s2) 0; }
+.pb-pills button { border: 1px solid var(--line); background: var(--card); color: var(--accent-ink); border-radius: var(--r-sm); padding: 2px var(--s2); font-size: var(--t-xs); cursor: pointer; }
+.pb-pills button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pb-scroll { overflow-x: auto; }
+.pb-row { display: flex; gap: var(--s4); align-items: flex-start; flex-wrap: wrap; }
+.pb-row > * { min-width: 0; }
+.pb-table { border-collapse: collapse; font-size: var(--t-xs); }
+.pb-table th { text-align: left; padding: var(--s1) var(--s2); border-bottom: 2px solid var(--line); white-space: nowrap; cursor: pointer; user-select: none; }
+.pb-table td { padding: var(--s1) var(--s2); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.pb-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.pb-table tr.sel td { background: var(--accent-soft); }
+.pb-table tbody tr { cursor: pointer; }
+.pb-badge { display: inline-block; padding: 1px var(--s2); border-radius: var(--r-sm); color: #fff; font-size: var(--t-xs); font-weight: 600; }
+.pb-pager { display: flex; gap: var(--s2); align-items: center; margin-top: var(--s2); font-size: var(--t-xs); color: var(--muted); }
+.pb-tablewrap { margin-top: var(--s3); overflow-x: auto; }
+.pb-tablebar { display: flex; gap: var(--s3); align-items: center; justify-content: flex-end; margin-bottom: var(--s2); }
+.pb-plot { flex: 1 1 420px; max-width: 760px; }
+.ds-controls .spacer { flex: 1; }
+.ds-menu { position: relative; }
+.ds-menu > summary { list-style: none; cursor: pointer; }
+.ds-menu > summary::-webkit-details-marker { display: none; }
+.ds-menu-body { position: absolute; right: 0; z-index: 10; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s3); display: grid; gap: var(--s1); min-width: 13rem; box-shadow: 0 6px 24px rgb(0 0 0 / 0.12); }
+.ds-table .ds-dl a { color: var(--accent-ink); }
+.ds-table .ds-study { min-width: 20rem; }
+.portal-group { color: #fff; border-radius: var(--r-sm); padding: 1px var(--s2); font-size: var(--t-xs); }
+.doctabs-sub { margin-top: calc(-1 * var(--s2)); }
+.doctabs-sub button { font-size: var(--t-xs); padding: var(--s1) var(--s3); }
+.portal-head .portal-summary { display: flex; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; font-size: var(--t-sm); }
+.portal-chooser { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s2); }
+.pb-loading { opacity: 0.45; transition: opacity 0.15s; }
+.pb-pager .tbbtn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pb-pager { flex-wrap: wrap; }

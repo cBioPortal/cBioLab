@@ -179,3 +179,15 @@ test("a plot says how many cases the pair left out, and on which axis", () => {
   assert.equal(coverageNote({ ...d, n: 289869, coverage: { total: 289869, nx: 289869, ny: 289869 } }, "sample"), "", "nothing left out, nothing said");
   assert.equal(coverageNote({ ...d, coverage: undefined }, "patient"), "", "no coverage known, no claim made");
 });
+
+test("log: true reads log10(v + 1), leaves out what has no such log, and says so in the label", () => {
+  const ctx = { study: "s", db: "db", unit: "sample" as const, cohortSql: "SELECT '' AS pid" };
+  const clin = axisSelect({ source: "clinical", attribute: "MUTATION_COUNT", log: true }, ctx, "num");
+  assert.match(clin, /if\(toFloat64OrNull\(attribute_value\) >= 0, log10\(toFloat64OrNull\(attribute_value\) \+ 1\), NULL\) IS NOT NULL/);
+  assert.doesNotMatch(axisSelect({ source: "clinical", attribute: "MUTATION_COUNT" }, ctx, "num"), /log10/);
+  const mol = axisSelect({ source: "molecular", profileType: "mrna", gene: "ESR1", log: true }, ctx, "num");
+  assert.match(mol, /^SELECT id, v FROM \(/);
+  assert.match(mol, /\) WHERE v IS NOT NULL$/);
+  assert.equal(axisLabel({ source: "clinical", attribute: "MUTATION_COUNT", log: true }), "log10(MUTATION_COUNT + 1)");
+  assert.equal(axisLabel({ source: "molecular", profileType: "mrna", gene: "ESR1", log: true }), "log10(ESR1 mrna + 1)");
+});

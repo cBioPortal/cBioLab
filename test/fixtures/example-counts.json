@@ -192,6 +192,29 @@
     "Custom data: a curated biopsy site on every sample": {
       "all patients": 93,
       "CNS met": 8
+    },
+    "Cancer types summary: RAS genes across 50,000 tumours": {
+      "all patients": 48179
+    },
+    "Cohort overlap: how four groups share their patients": {
+      "TP53 mutant": 13105,
+      "KRAS mutant": 7115,
+      "Immunotherapy": 3341,
+      "NSCLC": 7809
+    },
+    "Alteration enrichment: what separates colorectal from pancreatic tumours": {
+      "Colorectal, MSS": 4957,
+      "Pancreatic, MSS": 3095
+    },
+    "Mutational signatures: what UV light and tobacco leave behind": {
+      "Melanoma": 1706,
+      "Non-small cell lung": 6633
+    },
+    "Co-expression: the genes that rise and fall with ESR1": {
+      "all patients": 1084
+    },
+    "Clinical data: every pancreatic cancer sample, oldest patients first": {
+      "Pancreatic": 3109
     }
   }
 }

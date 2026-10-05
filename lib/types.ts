@@ -891,10 +891,259 @@ export interface LabsResult {
   responseP?: number;
   excluded?: { study: string; reason: string }[];
 }
+/**
+ * Cancer Types Summary (cBioPortal's results-view tab): for a gene list, the share of the cohort's
+ * samples altered in at least one of the genes, per cancer type (or any sample attribute, or per
+ * study), split by kind of alteration. Each group's denominator is its samples profiled for at least
+ * one of the genes. Counts only.
+ */
+export interface CancertypesView {
+  note?: string;
+  kind: "cancertypes"; cohorts?: string[];
+  genes: GeneTrackSpec[];
+  /** a sample attribute to group by, or "study" (default "CANCER_TYPE") */
+  groupBy?: string;
+  /** count OncoKB drivers only, or any alteration (default) */
+  measure?: "driver" | "any";
+  /** groups with fewer profiled samples than this are pooled into one "other" bar (default 10) */
+  minSamples?: number;
+  /** draw percentages (default) or counts */
+  show?: "frequency" | "count";
+  /** count patients (default, as the portal does — a patient counts in each group a sample of theirs is in) or samples */
+  unit?: "patient" | "sample";
+}
+export interface CancertypesGroup {
+  key: string; label: string;
+  /** the group's units (patients or samples), profiled or not */
+  samples: number;
+  profiled: number; altered: number;
+  mutation: number; amp: number; homdel: number; sv: number; multiple: number;
+  /** units profiled for each data type at all (any gene) — the portal's "+" rows */
+  profiledFor?: { mutation: number; cna: number; sv: number };
+}
+export interface CancertypesPanel {
+  cohort: string; samples: number; profiled: number; altered: number;
+  groups: CancertypesGroup[];
+  /** groups under the size floor, pooled into one — counted, never dropped */
+  pooled?: CancertypesGroup & { count: number };
+  /** the same, one gene at a time (the portal's per-gene tabs) */
+  perGene?: { gene: string; groups: CancertypesGroup[]; pooled?: CancertypesGroup & { count: number } }[];
+}
+export interface CancertypesResult {
+  groupBy: string; measure: "driver" | "any"; genes: string[]; minSamples: number; show: "frequency" | "count";
+  unit: "patient" | "sample";
+  panels: CancertypesPanel[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Overlap (cBioPortal's group-comparison Overlap tab): how the cohorts' patients intersect, as an
+ * UpSet plot — every combination of cohorts with how many patients are in exactly those. Counts only.
+ */
+export interface OverlapView {
+  note?: string;
+  kind: "overlap"; cohorts?: string[];
+}
+export interface OverlapResult {
+  /** the cohorts, in bit order, with each one's own size in patients and in their samples */
+  sets: { name: string; size: number; samples?: number }[];
+  /** patients (and their samples) in exactly the named cohorts and no other, largest first */
+  intersections: { members: string[]; n: number; samples?: number }[];
+  /** patients in at least one cohort */
+  union: number;
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Genomic-alteration enrichment (cBioPortal's group-comparison Genomic Alterations tab): every gene's
+ * frequency of one alteration type in each cohort, counted in samples over the samples profiled for
+ * that gene, with a test per gene and Benjamini–Hochberg across all genes tested. Counts only.
+ */
+export interface EnrichmentView {
+  note?: string;
+  kind: "enrichment"; cohorts?: string[];
+  /** which alteration (default mutation); "cna" is amplification or deep deletion */
+  alteration?: "mutation" | "cna" | "amp" | "homdel" | "sv";
+  /** count OncoKB drivers only, or any alteration (default) */
+  measure?: "driver" | "any";
+  /** genes altered in fewer samples than this, across all cohorts, are not tested (default 5) */
+  minAltered?: number;
+  /** genes named on the volcano (default 12) */
+  label?: number;
+}
+export interface EnrichmentGene {
+  gene: string;
+  /** in the study's reference genome, when known */
+  cytoband?: string;
+  cells: { cohort: string; altered: number; profiled: number; pct: number | null }[];
+  /** two cohorts: log2 of the first cohort's altered share over the second's; null when either is zero */
+  log2Ratio?: number | null;
+  p: number; q: number;
+  /** the cohort with the highest altered share */
+  enrichedIn: string;
+}
+export interface EnrichmentResult {
+  alteration: string; measure: "driver" | "any"; groups: string[];
+  tested: number; untested: number; significant: number; minAltered: number;
+  test: string;
+  /** the most significant genes (≤300), the rest summarised in `grid` */
+  rows: EnrichmentGene[];
+  /** two cohorts: every other tested gene binned on the volcano's axes, [x bin, y bin, count] */
+  grid?: { xMax: number; yMax: number; nx: number; ny: number; cells: [number, number, number][] };
+  labels: string[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Generic-assay comparison (cBioPortal's group-comparison tabs for mutational signatures, arm-level
+ * copy number, treatment response and every other generic assay): every entity of one generic-assay
+ * profile compared between cohorts. Numeric profiles by Welch's t (two cohorts) or Welch's ANOVA;
+ * categorical ones by chi-squared on values × cohorts; Benjamini–Hochberg across the entities.
+ * Counts and moments only.
+ */
+export interface AssaysView {
+  note?: string;
+  kind: "assays"; cohorts?: string[];
+  /** the generic-assay profile, as the genericAssay clause names it (e.g. mutational_signatures_contribution_v2) */
+  profileType: string;
+  /** an entity with fewer measured samples than this in any cohort is not tested (default 3) */
+  minN?: number;
+  /** entities named on the volcano (default 12) */
+  label?: number;
+}
+export interface AssaysEntity {
+  entity: string; name: string;
+  /** numeric: n, mean and SD per cohort; categorical: n and the count of each value */
+  cells: { cohort: string; n: number; mean?: number | null; sd?: number | null; values?: Record<string, number> }[];
+  /** numeric, two cohorts: first cohort's mean minus the second's */
+  diff?: number;
+  statistic: number; p: number; q: number;
+  /** numeric: the cohort with the highest mean; categorical: the cohort and value most over-represented */
+  higherIn: string;
+  value?: string;
+}
+export interface AssaysResult {
+  profileType: string; profileName: string; assayType: string;
+  datatype: "numeric" | "categorical";
+  /** what one value describes */
+  unit: "samples" | "patients";
+  groups: string[];
+  tested: number; untested: number; significant: number; minN: number;
+  test: string;
+  /** categorical: every value seen, in order of frequency; missing ones (NA, blank) are counted apart */
+  values?: string[];
+  /** values left out: non-numeric entries of a numeric profile (a limit like ">8", NA), or NA/blank in a categorical one */
+  missing: number;
+  /** the most significant entities (≤300), the rest summarised in `grid` */
+  rows: AssaysEntity[];
+  grid?: { xMax: number; yMax: number; nx: number; ny: number; cells: [number, number, number][] };
+  labels: string[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Genome-wide co-expression (cBioPortal's results-view Co-expression tab): one gene's expression
+ * against every gene's in a profile, over one cohort's patients — Spearman's ρ (ranked by it, as
+ * the portal ranks) and Pearson's r, each with a p, and Benjamini–Hochberg over ρ. Sums only.
+ */
+export interface CorrelatesView {
+  note?: string;
+  kind: "correlates"; cohorts?: string[];
+  /** the query gene */
+  gene: string;
+  /** the query gene's profile */
+  profileType: string;
+  /** the profile every other gene is read from (default: the same one) — e.g. protein against mRNA */
+  otherProfile?: string;
+  /** genes listed in each direction (default 100, at most 250) */
+  show?: number;
+  /** a gene with fewer patients having both values is not tested (default 10) */
+  minN?: number;
+}
+export interface CorrelatesGene {
+  gene: string; n: number;
+  /** in the study's reference genome, when known */
+  cytoband?: string;
+  /** Spearman's ρ with its p (the t approximation scipy uses, or the Fisher-z meta p across studies) and BH q */
+  rho: number | null; rhoP: number; q: number;
+  /** Pearson's r and its p, from the pooled sums */
+  r: number | null; p: number;
+}
+export interface CorrelatesResult {
+  gene: string; profileType: string; otherProfile: string; cohort: string;
+  tested: number; untested: number; significant: number; minN: number;
+  /** "rank" when ρ is one study's; "meta" when ρ combines several studies' by Fisher z */
+  rhoFrom: "rank" | "meta";
+  /** the most positively and most negatively correlated genes, by ρ */
+  positive: CorrelatesGene[]; negative: CorrelatesGene[];
+  /** ρ of every gene tested, in bins of 0.05 from −1 to 1: [bin low edge, count] */
+  histogram: [number, number][];
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * The clinical data table (cBioPortal's Clinical Data tab): one row per sample — or per patient —
+ * of each cohort, with every clinical attribute the study records, sortable, and downloadable
+ * whole as TSV. Its rows are patients, so only a patient-level participant contributes them; the
+ * rest are named with how many patients they hold.
+ */
+export interface TableView {
+  note?: string;
+  kind: "table"; cohorts?: string[];
+  /** a row per sample (default, with its patient's attributes too) or per patient */
+  unit?: "sample" | "patient";
+  /** the attribute columns, by id (default: every attribute the study records, highest priority first; at most 200) */
+  attributes?: string[];
+  sort?: { attribute: string; desc?: boolean };
+  /** rows per page (default 25, at most 1000); every page and the download are slices of one order */
+  rows?: number;
+}
+export interface TableResult {
+  unit: "sample" | "patient";
+  columns: { id: string; name: string; per: "patient" | "sample"; numeric: boolean }[];
+  sort: { attribute: string; desc?: boolean } | null;
+  /** one page of the table's single order (sorted across every cohort and study); values align with `columns` */
+  rows: { cohort: string; study: string; patient: string; sample: string; samples: number; values: string[] }[];
+  /** where this page starts in that order, and the page size the view asks for */
+  offset: number; pageSize: number;
+  /** set when the studies live in several databases: each database's rows are sorted together and listed in turn */
+  instances?: number;
+  /** rows the patient-level studies hold, per cohort and study — what the download pages through */
+  lists: { cohort: string; study: string; total: number }[];
+  total: number;
+  /** studies that may not disclose patients, with how many of each cohort's patients they hold */
+  excluded?: { study: string; reason: string; patients: number }[];
+}
+/**
+ * The mutation table (cBioPortal's Mutations tab, under the lollipop): one gene's mutations in each
+ * cohort, a row per call with the portal's columns, sortable, the first rows shown and every row
+ * downloadable. Its rows name samples, so only a patient-level participant contributes them.
+ */
+export interface MutationsView {
+  note?: string;
+  kind: "mutations"; cohorts?: string[];
+  gene: string;
+  /** a column id (see lib/mutation-table.ts); default drivers first, then by codon */
+  sort?: { column: string; desc?: boolean };
+  /** rows per page (default 25, at most 1000); every page and the download are slices of one order */
+  rows?: number;
+}
+export interface MutationsResult {
+  gene: string;
+  columns: { id: string; name: string; numeric: boolean }[];
+  sort: { column: string; desc?: boolean } | null;
+  /** one page of the table's single order (sorted across every cohort and study); values align with `columns` */
+  rows: { cohort: string; study: string; patient: string; sample: string; values: (string | number | null)[] }[];
+  /** where this page starts in that order, and the page size the view asks for */
+  offset: number; pageSize: number;
+  lists: { cohort: string; study: string; total: number }[];
+  total: number;
+  /** the OncoKB version the annotation column reads, or null when none is pinned */
+  oncokbPin: string | null;
+  /** set when the studies live in several databases: each database's rows are sorted together and listed in turn */
+  instances?: number;
+  excluded?: { study: string; reason: string; patients: number }[];
+}
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
-  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView;
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView
+  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CorrelatesView | TableView | MutationsView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -1180,6 +1429,13 @@ export interface ViewResult {
   clonality?: ClonalityResult;              // FACETS clonality, WGD, purity/ploidy
   incidence?: IncidenceResult;              // competing-risks cumulative incidence
   labs?: LabsResult;                        // lab-value course and response
+  cancertypes?: CancertypesResult;          // alteration frequency per cancer type
+  overlap?: OverlapResult;                  // how cohorts intersect (UpSet)
+  enrichment?: EnrichmentResult;            // genome-wide alteration enrichment
+  assays?: AssaysResult;                    // generic-assay comparison
+  correlates?: CorrelatesResult;            // genome-wide co-expression with one gene
+  table?: TableResult;                      // the clinical data table
+  mutations?: MutationsResult;              // one gene's mutation table
 }
 /**
  * Therapy transitions, ready to draw: nodes in columns, flows between them.

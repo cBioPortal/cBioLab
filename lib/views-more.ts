@@ -18,6 +18,7 @@ import { genomeBinsSql, genomeCoverageSql, studyGenomeSql, geneSetCountsSql, pro
 import { fisherExact, benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea, mcnemarExact, Z_975,
   aalenJohansen, cifAt, grayPermutationTest, kaplanMeier, quantilesFromHistogram, type CrRecord } from "./stats.ts";
 import { geneSymbols } from "./gene-tracks.ts";
+import { PORTAL_VIEW_KINDS, isPortalViewKind, runPortalView } from "./views-portal.ts";
 import { viewToSvg } from "./view-svg.ts";
 import { LAB_MIN_POINT_N } from "./view-svg-more.ts";
 import { diffexprMethod, incidenceMethod, pairedMethod, genomeMethod, pathwaysMethod, attritionMethod, clonalityMethod, labsMethod, type IncidenceTrace, type LabsTrace, type PairedTrace } from "./method.ts";
@@ -43,9 +44,11 @@ export interface ViewCtx {
   /** the molecular and generic-assay profiles a study holds (runAnalysis's cached inventory) */
   studyProfiles: (study: string) => Promise<{ profiles: string[]; gaProfiles: string[] }>;
   overLimit: (what: string, max: number, given: number) => string | null;
+  /** a paged view's page (the mutation and clinical tables): rows offset to offset + limit of its one global order */
+  page?: { offset: number; limit: number };
 }
 
-export const MORE_VIEW_KINDS = ["attrition", "genome", "pathways", "diffexpr", "paired", "clonality", "incidence", "labs"] as const;
+export const MORE_VIEW_KINDS = ["attrition", "genome", "pathways", "diffexpr", "paired", "clonality", "incidence", "labs", ...PORTAL_VIEW_KINDS] as const;
 
 export function isMoreViewKind(kind: unknown): boolean {
   return (MORE_VIEW_KINDS as readonly string[]).includes(String(kind));
@@ -62,6 +65,7 @@ export async function runMoreView(view: { kind: string }, ctx: ViewCtx): Promise
     else if (view.kind === "clonality") r = await clonalityView(view as ClonalityView, ctx);
     else if (view.kind === "incidence") r = await incidenceView(view as IncidenceView, ctx);
     else if (view.kind === "labs") r = await labsView(view as LabsView, ctx);
+    else if (isPortalViewKind(view.kind)) r = await runPortalView(view, ctx);
     else r = { kind: view.kind, error: "unknown view kind" };
   } catch (e) {
     r = { kind: view.kind, cohorts: ctx.vNames, error: (e as Error).message };
@@ -134,14 +138,14 @@ async function attritionView(view: AttritionView, ctx: ViewCtx): Promise<ViewRes
 // ---------------------------------------------------------------------------
 // shared: which participants can answer a lib/federation-more.ts aggregate
 
-type MoreResolver = Resolver & MoreAggregateCapable;
+export type MoreResolver = Resolver & MoreAggregateCapable;
 
 /**
  * Split the view's studies into those that can answer (every local participant) and those that
  * cannot (a remote MCP peer, which does not serve these aggregates yet). The second list is
  * reported by the view, never silently dropped.
  */
-function answering(ctx: ViewCtx): { ok: Record<string, MoreResolver>; excluded: { study: string; reason: string }[] } {
+export function answering(ctx: ViewCtx): { ok: Record<string, MoreResolver>; excluded: { study: string; reason: string }[] } {
   const ok: Record<string, MoreResolver> = {};
   const excluded: { study: string; reason: string }[] = [];
   for (const st of ctx.vStudies) {
@@ -152,10 +156,10 @@ function answering(ctx: ViewCtx): { ok: Record<string, MoreResolver>; excluded: 
   return { ok, excluded };
 }
 
-const plural = (n: number, one: string, many = one + "s") => n.toLocaleString("en-US") + " " + (n === 1 ? one : many);
+export const plural = (n: number, one: string, many = one + "s") => n.toLocaleString("en-US") + " " + (n === 1 ? one : many);
 
 /** A view-level refusal: past a limit, or nothing that can answer. */
-const refuse = (kind: string, ctx: ViewCtx, error: string): ViewResult => ({ kind, cohorts: ctx.vNames, error });
+export const refuse = (kind: string, ctx: ViewCtx, error: string): ViewResult => ({ kind, cohorts: ctx.vNames, error });
 
 // ---------------------------------------------------------------------------
 // genome: genome-wide copy-number frequency from segments

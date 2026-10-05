@@ -8,7 +8,7 @@ import { REPRODUCTIONS } from "../../lib/reproductions.ts";
 import { encodeSpec } from "../../lib/lab-links.ts";
 import { AgentToolsMenu } from "./AgentToolsMenu.tsx";
 
-type Kind = "reproductions" | "provenance" | "oncoprint-lab" | "rationale";
+type Kind = "reproductions" | "provenance" | "oncoprint-lab" | "rationale" | "datasets";
 
 const pageText = (max = 30000) => {
   const t = (document.querySelector("main") || document.body).innerText;
@@ -40,6 +40,32 @@ function toolsFor(kind: Kind, spec: unknown): { tools: AgentTool[]; rows: [strin
     return { tools, intro: "Your AI assistant can list these reproductions, read their documents, and open one in the analysis app.",
       rows: [["reproductions_list", "list()"], ["reproduction_get_document", "getDocument(slug)"], ["reproduction_open", "openInLab(slug)"]],
       api: { list: () => tools[0].run({}), getDocument: (slug: string) => tools[1].run({ slug }), openInLab: (slug: string) => tools[2].run({ slug }) } };
+  }
+  if (kind === "datasets") {
+    type Row = { id: string; name: string; cancerType: string; [k: string]: unknown };
+    const rows = (spec as Row[]) || [];
+    const tools: AgentTool[] = [
+      { name: "datasets_list", description: "The studies this deployment holds, with sample counts per data type (mutation, cna, sv, segments, mrna, protein, timeline patients, treatments, methylation, FACETS, generic assays). Optional `query` filters by name, id or cancer type; optional `has` keeps studies with every named data type.",
+        inputSchema: { type: "object", properties: { query: { type: "string" },
+          has: { type: "array", items: { type: "string", enum: ["mutation", "cna", "sv", "segments", "mrna", "protein", "timeline", "treatments", "methylation", "ascn", "genericAssays"] } } } },
+        run: async ({ query, has }) => {
+          const needle = String(query || "").toLowerCase();
+          const need: string[] = Array.isArray(has) ? has : [];
+          return rows.filter((r) => (!needle || [r.name, r.id, r.cancerType].some((x) => String(x).toLowerCase().includes(needle))) &&
+            need.every((k) => { const v = r[k]; return Array.isArray(v) ? v.length > 0 : Boolean(v); }));
+        } },
+      { name: "dataset_explore", description: "Open one study in Explore (/lab), where its facets can be read and filtered with the Explore tools.",
+        inputSchema: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+        run: async ({ id }) => {
+          const r = rows.find((x) => x.id === id);
+          if (!r) throw new Error(`no study "${id}" here`);
+          setTimeout(() => location.assign("/lab?tab=explore&study=" + encodeURIComponent(r.id)), 300);
+          return `Opening ${r.name} in Explore.`;
+        } }
+    ];
+    return { tools, intro: "Your AI assistant can search these studies by what data they carry, and open one in Explore.",
+      rows: [["datasets_list", "list(query, has)"], ["dataset_explore", "explore(id)"]],
+      api: { list: (query?: string, has?: string[]) => tools[0].run({ query, has }), explore: (id: string) => tools[1].run({ id }) } };
   }
   if (kind === "provenance" || kind === "oncoprint-lab") {
     const tools: AgentTool[] = [

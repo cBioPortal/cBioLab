@@ -168,7 +168,11 @@ function cohortStudies(def: CohortDef | undefined, docStudy: string): string[] {
  * fetches the binary contract itself and draws it, so the run does no oncoprint queries.
  * The default, "svg", is what MCP needs.
  */
-export interface RunOpts { oncoprint?: "svg" | "spec" }
+export interface RunOpts {
+  oncoprint?: "svg" | "spec";
+  /** a paged view's page (app/api/view-page): rows offset to offset + limit of its one global order */
+  page?: { offset: number; limit: number };
+}
 
 export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: RunOpts = {}): Promise<AnalysisResult> {
   const t0 = Date.now();
@@ -1982,7 +1986,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         void oncoQueryMs;
       }
     } else if (isMoreViewKind(view.kind)) {
-      views.push(await runMoreView(view, { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, overLimit, studyProfiles }));
+      views.push(await runMoreView(view, { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, overLimit, studyProfiles, page: opts.page }));
     } else {
       // unreachable for well-typed documents, but documents arrive as untrusted
       // JSON from clients/chat/MCP, so an unknown kind must still be reported

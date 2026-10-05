@@ -648,6 +648,44 @@ comparing the truncated lists would measure the cut rather than the arithmetic.
 All of it is mutation-verified — restoring `count()` turns the independent-count
 check and the `brca_tcga` pins red, with `229/1080 -> 229/2160` in the output.
 
+## 3c. Pooling the analysis views: measured, and not done
+
+§3's rule — partition by connection, not by study — was measured on **Explore**, where
+per-study round trips had piled up (28 per study) and 546 studies met Vercel's 60 s ceiling.
+The analysis views added later (`cancertypes`, `overlap`, `enrichment`, `assays`, `correlates`,
+`genome`, `pathways`, `paired`, `clonality`, `incidence`, `labs`, `diffexpr`) also run one query per
+(cohort, study) — but they send them **all at once**. Pooling them was built and measured before
+deciding (October 2026), and is **not** shipped: on this ClickHouse Cloud deployment it is slower.
+
+Two pooled forms against what the views do now, on one builder (`enrichAlteredSql`, mutation
+counts per gene) for a TP53-mutant / wild-type pair of cohorts across TCGA PanCancer studies.
+Two runs each; all three return identical sums.
+
+| | 8 studies (16 pieces) | 32 studies (64 pieces) |
+|---|---|---|
+| per (cohort, study) query, sent in parallel — **what the views do** | 0.6–0.7 s | 2.3–3.6 s |
+| one scan, members joined in, `GROUP BY cohort, study` (§3's form) | 1.2–1.6 s | 3.7–5.8 s |
+| each piece's own query side by side in one `UNION ALL` statement | 1.7–2.1 s | 6.3–11.3 s |
+
+The `UNION ALL` form was built through every view (correct: the docs gate's pinned counts and
+every method script reproduced unchanged) and measured whole: a six-view document over those
+8 studies took **25.6 s per-study and 54.9 s pooled**; `enrichment` alone went from 49 queries in
+1.7 s to 4 queries in 28 s. Fewer round trips did not buy time — parallel requests spread across
+the cluster, one statement does not. The code is parked on the local branch
+`session/more-features-pooled`.
+
+So for the analysis views the rule is the opposite of §3's: **fan out per (cohort, study), in
+parallel**. What would change that, and should be measured before acting on it:
+
+- Very large cohorts. At several hundred studies the parallel requests may meet ClickHouse's
+  concurrent-query limit; the answer then is batching the parallel requests, or the single-scan
+  form for that case only — measured at ~546 studies first, not assumed.
+- A different database deployment (one replica, or a server where round trips dominate).
+
+The paged row views (`table`, `mutations`) are the exception, for a reason of correctness rather
+than speed: a page of one global order can only be cut from all the rows sorted together, so they
+combine every (cohort, study) part in one statement per connection.
+
 ## 4. Time to display vs cbioportal.org
 
 Oncoprint, 5 genes, measured from navigation to the figure's pixels going stable

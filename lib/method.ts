@@ -1725,3 +1725,336 @@ export function sequenceMethod(t: SequenceTrace): MethodRecord {
     }))),
   };
 }
+
+// ---- cancertypes: alteration frequency per cancer type ------------------------------------------
+
+export interface CancertypesTrace {
+  genes: string[]; groupBy: string; measure: "driver" | "any"; oncokbPin: string | null; minSamples: number;
+  unit: "patient" | "sample";
+  perSite: { cohort: string; study: string; groups: number; profiled: number }[];
+  panels: { cohort: string; groups: number; pooled: number; profiled: number; altered: number }[];
+}
+
+export function cancertypesMethod(t: CancertypesTrace): MethodRecord {
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Count " + t.unit + "s per " + t.groupBy + " group",
+    detail: "The cancertypes queries above. Per group, for the genes together and for each gene: the " + t.unit + "s profiled for it, and of those the " + t.unit + "s with " +
+      (t.measure === "driver" ? "an OncoKB driver (" + t.oncokbPin + ")" : "any mutation, amplification, deep deletion or structural variant") +
+      ", split by kind (one kind only, or more than one); and the whole cohort's, each " + t.unit + " once." +
+      (t.unit === "patient" ? " A patient counts in each group one of their samples is in, profiled if any of those samples is, altered if any is." : "") +
+      " Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.",
+    scope: s.cohort + " · " + s.study, rowsOut: s.groups,
+    params: [["genes", t.genes.join(", ")], ["profiled " + t.unit + "s", s.profiled.toLocaleString("en-US")]],
+  }));
+  if (new Set(t.perSite.map((s) => s.cohort)).size < t.perSite.length)
+    steps.push({ kind: "transform", title: "Add each group's counts across studies", detail: "Groups are matched by their folded value; the counts add exactly." });
+  for (const p of t.panels) steps.push({
+    kind: "transform", title: "Pool the small groups", scope: p.cohort,
+    detail: p.pooled ? p.pooled + " group" + (p.pooled === 1 ? "" : "s") + " with fewer than " + t.minSamples + " profiled " + t.unit + "s drawn as one pooled bar; " + p.groups + " drawn on their own."
+      : "Every group has at least " + t.minSamples + " profiled " + t.unit + "s; none pooled.",
+    params: [["profiled", p.profiled.toLocaleString("en-US")], ["altered", p.altered.toLocaleString("en-US")]],
+  });
+  return { steps, implementation: { functions: [], file: "lib/views-portal.ts", commit: BUILD_COMMIT } };
+}
+
+// ---- overlap: how cohorts intersect -------------------------------------------------------------
+
+export function overlapMethod(t: { cohorts: string[]; perSite: { study: string; cohorts: string[]; patients: number }[]; union: number; intersections: number }): MethodRecord {
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Count patients per combination of cohorts",
+    detail: "The overlap query above: every patient in any of " + s.cohorts.join(", ") + " gets a bitmask of the cohorts it is in, and the study returns one count per bitmask. Counts only.",
+    scope: s.study, rowsOut: s.patients,
+  }));
+  steps.push({ kind: "transform", title: "Add the counts across studies and name each combination",
+    detail: "Each study's bits are mapped back to the view's cohort order; combinations add exactly, and a patient can only overlap within one study.",
+    params: [["patients in any cohort", t.union.toLocaleString("en-US")], ["combinations with patients", String(t.intersections)]] });
+  return { steps, implementation: { functions: [], file: "lib/views-portal.ts", commit: BUILD_COMMIT } };
+}
+
+// ---- enrichment: every gene's alteration frequency between cohorts ------------------------------
+
+export interface EnrichmentTrace {
+  alteration: string; measure: "driver" | "any"; oncokbPin: string | null; cohorts: string[]; minAltered: number;
+  test: string; two: boolean;
+  perSite: { cohort: string; study: string; genes: number; wes: number }[];
+  tested: number; untested: number;
+  /** the rows the view shows, whose p and q the script must reproduce */
+  results: { gene: string; p: number; q: number }[];
+}
+
+export function enrichmentMethod(t: EnrichmentTrace): MethodRecord {
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Count altered and profiled samples per gene",
+    detail: "The enrichment queries above: per gene, samples with " + (t.measure === "driver" ? "an OncoKB driver (" + t.oncokbPin + ") " : "a ") + t.alteration +
+      "; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene.",
+    scope: s.cohort + " · " + s.study, rowsOut: s.genes, params: [["whole-exome samples", s.wes.toLocaleString("en-US")]],
+  }));
+  steps.push({ kind: "transform", title: "Profiled = panel samples + whole-exome samples, summed across studies",
+    detail: "A sample altered in a gene its panel does not list still counts as measured. Genes with fewer than " + t.minAltered +
+      " altered samples across the cohorts, or not profiled in one of them, are not tested.",
+    params: [["tested", t.tested.toLocaleString("en-US")], ["not tested", t.untested.toLocaleString("en-US")]] });
+  steps.push({ kind: "statistic", title: (t.two ? "Fisher's exact test" : "Chi-squared test") + " per gene, then Benjamini–Hochberg",
+    detail: "A " + t.test + " on altered vs not among the profiled, per gene; q across every gene tested." });
+  const python = [
+    "# Recompute with scipy " + VERIFIED.fisher.version + " and statsmodels " + VERIFIED.bh.version + ", the versions our code is tested against.",
+    "import pandas as pd",
+    t.two ? "from scipy.stats import fisher_exact" : "from scipy.stats import chi2_contingency",
+    "from statsmodels.stats.multitest import multipletests",
+    "",
+    RESULT_INIT,
+    "# Per cohort and gene: altered samples, and samples profiled for the gene (panel + whole-exome),",
+    "# summed across studies — export it from the enrichment queries above as enrichment_counts.csv",
+    "counts = pd.read_csv(\"enrichment_counts.csv\")",
+    "cohorts = " + JSON.stringify(t.cohorts),
+    "MIN_ALTERED = " + t.minAltered,
+    "rows = []",
+    "for gene, g in counts.groupby(\"gene\"):",
+    "    g = g.set_index(\"cohort\").reindex(cohorts).fillna(0)",
+    "    if g[\"altered\"].sum() < MIN_ALTERED or (g[\"profiled\"] == 0).any():",
+    "        continue",
+    t.two
+      ? "    (a, pa), (b, pb) = [(r.altered, r.profiled) for r in g.itertuples()]\n    p = fisher_exact([[a, pa - a], [b, pb - b]], alternative=\"two-sided\").pvalue"
+      : "    p = chi2_contingency([[r.altered, r.profiled - r.altered] for r in g.itertuples()], correction=False).pvalue",
+    "    rows.append((gene, p))",
+    "res = pd.DataFrame(rows, columns=[\"gene\", \"p\"])",
+    "res[\"q\"] = multipletests(res[\"p\"], method=\"fdr_bh\")[1]",
+    "res = res.sort_values([\"p\", \"gene\"])",
+    "print(len(res), \"genes tested\")",
+    "print(res.head(30).to_string(index=False))",
+    "for r in res.itertuples():",
+    "    RESULT[f\"enrichment:{r.gene}:p\"], RESULT[f\"enrichment:{r.gene}:q\"] = r.p, r.q",
+    "RESULT[\"enrichment:tested\"] = len(res)",
+  ].join("\n") + "\n";
+  return { steps, implementation: { functions: [t.two ? "fisherExact" : "chiSquareTest", "benjaminiHochberg"], file: "lib/stats.ts", commit: BUILD_COMMIT },
+    verification: (t.two ? "Fisher's exact test matches scipy " + VERIFIED.fisher.version + " fisher_exact" : "The chi-squared test matches scipy " + VERIFIED.chi2.version + " chi2_contingency") +
+      " and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts).",
+    python: withResult(python),
+    check: { "enrichment:tested": { v: t.tested }, ...checks("enrichment:", t.results.slice(0, 40), (r) => r.gene, [["p", "p"], ["q", "q"]]) } };
+}
+
+// ---- assays: every generic-assay entity, Welch t / ANOVA or chi-squared, then BH ---------------
+
+export interface AssaysTrace {
+  profileType: string; categorical: boolean; unit: "samples" | "patients";
+  cohorts: string[]; minN: number; test: string;
+  perSite: { cohort: string; study: string; rows: number }[];
+  tested: number; untested: number; missing: number;
+  /** numeric: per cohort and entity, summed over its studies */
+  moments: { cohort: string; entity: string; n: number; sx: number; sxx: number }[];
+  /** categorical: per cohort, entity and called value, summed over its studies */
+  counts: { cohort: string; entity: string; value: string; n: number }[];
+  /** what the view reported, for the script check */
+  results: { entity: string; p: number; q: number }[];
+}
+
+export function assaysMethod(t: AssaysTrace): MethodRecord {
+  const k = t.cohorts.length, two = k === 2, cat = t.categorical;
+  const one = t.unit.replace(/s$/, "");
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: cat ? "Count each entity's values" : "Sum each entity's values",
+    detail: "The assays:" + (cat ? "values" : "moments") + " query above, on “" + t.profileType + "”: per entity, over the cohort's " + t.unit +
+      (cat ? ", how many take each value." : ", n, Σv and Σv² of the values that read as numbers, and how many did not.") + " No individual value leaves the database.",
+    scope: s.cohort + " · " + s.study, rowsOut: s.rows,
+  }));
+  if (new Set(t.perSite.map((s) => s.cohort)).size < t.perSite.length) steps.push({ kind: "transform", title: "Add each cohort's " + (cat ? "counts" : "sums") + " across its studies",
+    detail: "The totals add exactly; there is no batch correction between studies." });
+  steps.push({ kind: "transform", title: "Leave out what cannot be tested",
+    detail: (cat ? "Values NA or blank (not called) are not a category: " : "Values that are not numbers: ") + t.missing.toLocaleString("en-US") + " left out. " +
+      "An entity with fewer than " + t.minN + " " + t.unit + " with a value in any cohort" + (cat ? ", or one value throughout," : ", or no spread in any cohort (variance ≤ 1e-12 · (1 + mean²)),") + " is not tested.",
+    params: [["tested", t.tested.toLocaleString("en-US")], ["not tested", t.untested.toLocaleString("en-US")]] });
+  steps.push({ kind: "statistic", title: t.test + " per entity, then Benjamini–Hochberg",
+    detail: (cat ? "On each entity's cohort × value table, no continuity correction; an all-zero column is dropped."
+      : two ? "Unequal-variance t from each cohort's n, mean and variance (Σv² − (Σv)²/n)/(n − 1), Welch–Satterthwaite df, two-sided."
+        : "The unequal-variance F test from each cohort's n, mean and variance; a cohort with fewer than 2 values or no variance is left out of that entity's test.") +
+      " q across every entity tested, one value per " + one + "." });
+  const file = cat ? "assays_counts.csv" : "assays_moments.csv";
+  const python = [
+    "# Recompute with scipy " + VERIFIED.welch.version + " and statsmodels " + VERIFIED.bh.version + ", the versions our code is tested against.",
+    "import io",
+    "import numpy as np",
+    "import pandas as pd",
+    cat ? "from scipy.stats import chi2_contingency" : two ? "from scipy.stats import ttest_ind_from_stats" : "from statsmodels.stats.oneway import anova_generic",
+    "from statsmodels.stats.multitest import multipletests",
+    "",
+    RESULT_INIT,
+    "cohorts = " + JSON.stringify(t.cohorts),
+    "MIN_N = " + t.minN,
+    ...(cat
+      ? pyTable("data", "Per cohort, entity and called value: how many " + t.unit + ", from the assays:values queries summed over each cohort's studies (NA and blank left out)",
+        ["cohort", "entity", "value", "n"], t.counts.map((r) => [r.cohort, r.entity, r.value, r.n]), file)
+      : pyTable("data", "Per cohort and entity: n, sum and sum of squares of the numeric values, from the assays:moments queries summed over each cohort's studies",
+        ["cohort", "entity", "n", "sx", "sxx"], t.moments.map((r) => [r.cohort, r.entity, r.n, r.sx, r.sxx]), file)),
+    "rows = []",
+    ...(cat ? [
+      "data[\"value\"] = data[\"value\"].astype(str)",
+      "for entity, g in data.groupby(\"entity\"):",
+      "    table = g.pivot_table(index=\"cohort\", columns=\"value\", values=\"n\", aggfunc=\"sum\", fill_value=0).reindex(cohorts, fill_value=0)",
+      "    if table.shape[1] < 2 or (table.sum(axis=1) < MIN_N).any():",
+      "        continue",
+      "    table = table.loc[:, table.sum(axis=0) > 0]",
+      "    rows.append((entity, chi2_contingency(table.to_numpy(), correction=False).pvalue))",
+    ] : [
+      "data[\"mean\"] = data[\"sx\"] / data[\"n\"]",
+      "data[\"var\"] = ((data[\"sxx\"] - data[\"sx\"] ** 2 / data[\"n\"]) / (data[\"n\"] - 1)).clip(lower=0)  # rounding can put a constant entity's just below 0",
+      "for entity, g in data.groupby(\"entity\"):",
+      "    g = g.set_index(\"cohort\").reindex(cohorts)",
+      "    if g[\"n\"].isna().any() or (g[\"n\"] < MIN_N).any() or (g[\"var\"] <= 1e-12 * (1 + g[\"mean\"] ** 2)).all():",
+      "        continue",
+      ...(two ? [
+        "    a, b = g.iloc[0], g.iloc[1]",
+        "    p = ttest_ind_from_stats(a[\"mean\"], np.sqrt(a[\"var\"]), a[\"n\"], b[\"mean\"], np.sqrt(b[\"var\"]), b[\"n\"], equal_var=False).pvalue",
+      ] : [
+        "    g = g[(g[\"n\"] >= 2) & (g[\"var\"] > 0)]  # a cohort with under 2 values or no variance says nothing",
+        "    p = anova_generic(g[\"mean\"].to_numpy(), g[\"var\"].to_numpy(), g[\"n\"].to_numpy(), use_var=\"unequal\", welch_correction=True).pvalue if len(g) >= 2 else 1.0",
+      ]),
+      "    rows.append((entity, p))",
+    ]),
+    "res = pd.DataFrame(rows, columns=[\"entity\", \"p\"])",
+    "res[\"q\"] = multipletests(res[\"p\"], method=\"fdr_bh\")[1]",
+    "res = res.sort_values([\"p\", \"entity\"])",
+    "print(len(res), \"entities tested\")",
+    "print(res.head(30).to_string(index=False))",
+    "for r in res.itertuples():",
+    "    RESULT[f\"assays:{r.entity}:p\"], RESULT[f\"assays:{r.entity}:q\"] = r.p, r.q",
+    "RESULT[\"assays:tested\"] = len(res)",
+  ].join("\n") + "\n";
+  return {
+    steps,
+    implementation: { functions: [cat ? "chiSquareTest" : two ? "welchT" : "welchAnovaTest", "varianceFromMoments", "benjaminiHochberg"], file: "lib/stats.ts", commit: BUILD_COMMIT },
+    verification: (cat ? "The chi-squared test matches scipy " + VERIFIED.chi2.version + " chi2_contingency"
+      : "Welch's t and ANOVA from moments match scipy " + VERIFIED.welch.version + " ttest_ind(equal_var=False) and statsmodels " + VERIFIED.anova.version + " " + VERIFIED.anova.fn) +
+      " and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts).",
+    python: withResult(python),
+    check: { "assays:tested": { v: t.tested }, ...checks("assays:", t.results.slice(0, 40), (r) => r.entity, [["p", "p", { rel: 1e-6, abs: 1e-300 }], ["q", "q", { rel: 1e-6, abs: 1e-300 }]]) },
+  };
+}
+
+// ---- correlates: Pearson and Spearman from sums, Fisher-z across studies, BH ------------------
+
+export interface CorrelatesTrace {
+  gene: string; profileType: string; otherProfile: string; cohort: string;
+  minN: number; multi: boolean; tested: number; untested: number;
+  perSite: { study: string; genes: number; patients: number }[];
+  /** per study and gene: the six sums on values, and the same six on average ranks */
+  sums: { study: string; gene: string; n: number; sx: number; sy: number; sxy: number; sxx: number; syy: number;
+    rsx: number; rsy: number; rsxy: number; rsxx: number; rsyy: number }[];
+  /** what the view reported, for the script check */
+  results: { gene: string; rho: number; rhoP: number; q: number; r: number; p: number }[];
+}
+
+export function correlatesMethod(t: CorrelatesTrace): MethodRecord {
+  const same = t.profileType === t.otherProfile;
+  const steps: MethodStep[] = t.perSite.map((s) => ({
+    kind: "fetch" as const, title: "Sum every gene's values and ranks against " + t.gene + "'s",
+    detail: "The correlates:moments query above. Per patient, " + t.gene + " on “" + t.profileType + "” and every gene on “" + t.otherProfile +
+      "” (a patient's samples averaged); per gene, over the patients with both: n, Σx, Σy, Σxy, Σx², Σy², and the same six over each value's average rank among those patients (ties share the mean of their ranks). Sums only.",
+    scope: t.cohort + " · " + s.study, rowsIn: s.patients, rowsOut: s.genes,
+  }));
+  steps.push({ kind: "statistic", title: "Pearson's r and Spearman's ρ per gene",
+    detail: "r from the sums: (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); ρ is the same formula on the rank sums. Each p from t = r√((n − 2)/(1 − r²)) on n − 2 df, as scipy's pearsonr and spearmanr compute it." +
+      (t.multi ? " Across studies, r pools the sums (exact); ρ is each study's, combined by Fisher z with weight n − 3 and a normal p, because ranks do not add." : "") +
+      (same ? " " + t.gene + " against itself is left out." : "") + " A gene with fewer than " + t.minN + " patients, or no spread, is not tested.",
+    params: [["tested", t.tested.toLocaleString("en-US")], ["not tested", t.untested.toLocaleString("en-US")]] });
+  steps.push({ kind: "statistic", title: "Benjamini–Hochberg over ρ", detail: "q-values over every gene tested, from ρ's p." });
+  const python = [
+    "# Recompute with numpy, scipy " + VERIFIED.pearson.version + " and statsmodels " + VERIFIED.bh.version + ", the versions our code is tested against.",
+    "import io",
+    "import numpy as np",
+    "import pandas as pd",
+    "from scipy.stats import t as student_t, norm",
+    "from statsmodels.stats.multitest import multipletests",
+    "",
+    RESULT_INIT,
+    "MIN_N = " + t.minN,
+    "QUERY = " + py(t.gene) + (same ? "  # left out: a gene against itself" : ""),
+    ...pyTable("sums", "Per study and gene: the six sums on values and on average ranks, from the correlates:moments queries",
+      ["study", "gene", "n", "sx", "sy", "sxy", "sxx", "syy", "rsx", "rsy", "rsxy", "rsxx", "rsyy"],
+      t.sums.map((r) => [r.study, r.gene, r.n, r.sx, r.sy, r.sxy, r.sxx, r.syy, r.rsx, r.rsy, r.rsxy, r.rsxx, r.rsyy]), "correlates_sums.csv"),
+    "",
+    "def corr(n, sx, sy, sxy, sxx, syy):",
+    "    den = np.sqrt((n * sxx - sx ** 2) * (n * syy - sy ** 2))",
+    "    with np.errstate(invalid=\"ignore\", divide=\"ignore\"):",
+    "        return np.where(den > 0, (n * sxy - sx * sy) / den, np.nan).clip(-1, 1)",
+    "",
+    "def t_p(r, n):",
+    "    with np.errstate(invalid=\"ignore\", divide=\"ignore\"):",
+    "        tt = r * np.sqrt((n - 2) / (1 - r ** 2))",
+    "    return np.where(np.abs(r) >= 1, 0.0, 2 * student_t.sf(np.abs(tt), n - 2))",
+    "",
+    "sums[\"rho_s\"] = corr(sums.n, sums.rsx, sums.rsy, sums.rsxy, sums.rsxx, sums.rsyy)",
+    "g = sums.groupby(\"gene\")[[\"n\", \"sx\", \"sy\", \"sxy\", \"sxx\", \"syy\"]].sum()",
+    "g[\"r\"] = corr(g.n, g.sx, g.sy, g.sxy, g.sxx, g.syy)",
+    "g[\"p\"] = t_p(g.r, g.n)",
+    ...(t.multi ? [
+      "# rho: each study's own, combined by Fisher z with weight n - 3 (|rho| = 1 or n < 4 carries no z)",
+      "ok = (sums.n >= 4) & (sums.rho_s.abs() < 1) & sums.rho_s.notna()",
+      "s = sums[ok].assign(w=lambda d: d.n - 3, z=lambda d: np.arctanh(d.rho_s))",
+      "m = s.assign(wz=s.w * s.z).groupby(\"gene\")[[\"w\", \"wz\"]].sum()",
+      "z = m.wz / m.w",
+      "g[\"rho\"] = np.tanh(z).reindex(g.index)",
+      "g[\"rho_p\"] = pd.Series(2 * norm.sf(np.abs(z) * np.sqrt(m.w)), index=m.index).reindex(g.index)",
+    ] : [
+      "g[\"rho\"] = sums.set_index(\"gene\").rho_s.reindex(g.index)",
+      "g[\"rho_p\"] = t_p(g.rho, g.n)",
+    ]),
+    "g = g[(g.n >= MIN_N) & g.rho.notna() & g.r.notna()" + (same ? " & (g.index != QUERY)" : "") + "].copy()",
+    "g[\"q\"] = multipletests(g.rho_p, method=\"fdr_bh\")[1]",
+    "print(len(g), \"genes tested\")",
+    "print(g.sort_values(\"rho\", ascending=False)[[\"n\", \"rho\", \"rho_p\", \"q\", \"r\", \"p\"]].head(15))",
+    "print(g.sort_values(\"rho\")[[\"n\", \"rho\", \"rho_p\", \"q\", \"r\", \"p\"]].head(15))",
+    "RESULT[\"correlates:tested\"] = len(g)",
+    "for gene, x in g.iterrows():",
+    "    for f in (\"rho\", \"rho_p\", \"q\", \"r\", \"p\"):",
+    "        RESULT[f\"correlates:{gene}:{f}\"] = x[f]",
+  ].join("\n") + "\n";
+  // ρ and r are reported to 4 decimals; their p-values come from the unrounded coefficient
+  const pTol = { rel: 1e-6, abs: 1e-300 };
+  return {
+    steps,
+    implementation: { functions: ["pearsonFromMoments", ...(t.multi ? ["fisherZMeta"] : []), "benjaminiHochberg"], file: "lib/stats.ts", commit: BUILD_COMMIT },
+    verification: "Pearson's r from sums matches scipy " + VERIFIED.pearson.version + " pearsonr (test/moments-golden.test.ts); ρ is the same formula on average ranks, which is how scipy's spearmanr defines it — checked against spearmanr on raw values for TCGA breast cancer ESR1 (FOXA1 ρ 0.7478, PSAT1 −0.6732). Benjamini–Hochberg matches statsmodels multipletests (test/tables-golden.test.ts).",
+    python: withResult(python),
+    check: { "correlates:tested": { v: t.tested },
+      ...checks("correlates:", t.results.slice(0, 80), (r) => r.gene, [["rho", "rho", { abs: 5e-5 + 1e-12 }], ["rhoP", "rho_p", pTol], ["q", "q", pTol], ["r", "r", { abs: 5e-5 + 1e-12 }], ["p", "p", pTol]]) },
+  };
+}
+
+// ---- table: a listing, nothing computed ---------------------------------------------------------
+
+export function tableMethod(t: { unit: "sample" | "patient"; cohorts: string[]; columns: number; sort: { attribute: string; desc?: boolean } | null; shown: number;
+  lists: { cohort: string; study: string; total: number }[]; excluded: { study: string; reason: string; patients: number }[]; instances: number }): MethodRecord {
+  const steps: MethodStep[] = [{
+    kind: "fetch" as const, title: "Count the " + t.unit + "s per cohort and study",
+    detail: "The table:counts query above: every " + t.unit + " of each cohort's patients" + (t.unit === "sample" ? " (from the study's sample list, so a sample with no sample attribute still has a row)" : "") + ".",
+    params: t.lists.map((l) => [l.cohort + " · " + l.study, l.total.toLocaleString("en-US")] as [string, string]),
+  }, {
+    kind: "fetch" as const, title: "Sort them together and take one page",
+    detail: "The table:rows query above: the rows of every cohort and study combined in one query" + (t.instances > 1 ? " per database (" + t.instances + " here, listed in turn)" : "") +
+      ", each with the value of each of the " + t.columns + " attributes as recorded — blank where none was — sorted " +
+      (t.sort ? "by " + t.sort.attribute + (t.sort.desc ? " descending" : "") + " with missing values last, then " : "by ") + "patient and sample id, and the " + t.shown +
+      " rows of the first page taken. Every other page, and the download, is the same query at another offset." +
+      (t.excluded.length ? " Studies that do not disclose patients contribute no rows and are named: " + t.excluded.map((e) => e.study).join(", ") + "." : ""),
+  }];
+  return { steps, implementation: { functions: ["tableRowsSql"], file: "lib/clinical-table.ts", commit: BUILD_COMMIT },
+    verification: "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
+}
+
+// ---- mutations: a listing, nothing computed ------------------------------------------------------
+
+export function mutationsMethod(t: { gene: string; cohorts: string[]; oncokbPin: string | null; sort: { column: string; desc?: boolean } | null; shown: number;
+  lists: { cohort: string; study: string; total: number }[]; excluded: { study: string; reason: string; patients: number }[]; instances: number }): MethodRecord {
+  const steps: MethodStep[] = [{
+    kind: "fetch" as const, title: "Count " + t.gene + "'s mutation calls per cohort and study",
+    detail: "The mutations:counts query above: every called " + t.gene + " mutation in each cohort's samples (uncalled calls left out).",
+    params: t.lists.map((l) => [l.cohort + " · " + l.study, l.total.toLocaleString("en-US")] as [string, string]),
+  }, {
+    kind: "fetch" as const, title: "Sort them together and take one page",
+    detail: "The mutations:rows query above: the calls of every cohort and study combined in one query" + (t.instances > 1 ? " per database (" + t.instances + " here, listed in turn)" : "") +
+      ", with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded" + (t.oncokbPin ? " and the OncoKB " + t.oncokbPin + " call for its protein change" : "") +
+      "; allele frequency = variant / (variant + reference) reads; sorted " + (t.sort ? "by " + t.sort.column + (t.sort.desc ? " descending" : "") + ", missing last" : "drivers first, then by codon") +
+      ", then sample — and the " + t.shown + " rows of the first page taken. Every other page, and the download, is the same query at another offset." +
+      (t.excluded.length ? " Studies that do not disclose patients contribute no rows and are named: " + t.excluded.map((e) => e.study).join(", ") + "." : ""),
+  }];
+  return { steps, implementation: { functions: ["mutationRowsSql"], file: "lib/mutation-table.ts", commit: BUILD_COMMIT },
+    verification: "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
+}

@@ -2,7 +2,7 @@
 // the author's notes, the way a model should read it. One renderer for every agent-facing
 // surface — the MCP run_analysis tool, the analysis page's WebMCP tools — so they cannot
 // describe the same result differently. Pure and browser-safe.
-import type { AnalysisDoc, AnalysisResult, ViewResult } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, ViewResult, AssaysEntity, CorrelatesGene } from "./types.ts";
 
 export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[] {
   const out: string[] = [];
@@ -252,6 +252,58 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
           `${pn.evaluable ? (100 * pn.responders / pn.evaluable).toFixed(1) : "—"}% fell ≥${lb.responseDrop}% (${pn.responders}/${pn.evaluable})\n` +
           `    median [IQR] by week: ` + pn.course.filter((c) => c.n >= 5).map((c) => `${c.week}w ${c.median}% [${c.q1}, ${c.q3}]`).join(", ")).join("\n") +
         (lb.responseP != null ? `\n  response rates differ: Fisher p=${pFmt(lb.responseP)}` : "") +
+        caveatOf(v) + noteOf(v));
+    } else if (v.kind === "enrichment") {
+      const en = v.enrichment!;
+      out.push(`Alteration enrichment (${en.alteration}${en.measure === "driver" ? ", drivers only" : ""}; ${en.test}, BH q over ${en.tested.toLocaleString()} genes; ${en.significant} at q<0.05):\n` +
+        en.rows.slice(0, 40).map((g) => `  ${g.gene}: ` + g.cells.map((c) => `${c.cohort} ${c.pct == null ? "—" : c.pct + "%"} (${c.altered}/${c.profiled})`).join(" | ") +
+          (g.log2Ratio != null && g.log2Ratio !== undefined ? `, log2 ratio ${g.log2Ratio.toFixed(2)}` : "") + `, q=${pFmt(g.q)}, enriched in ${g.enrichedIn}`).join("\n") +
+        (en.rows.length > 40 ? `\n  … ${en.tested - 40} more genes tested` : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "assays") {
+      const as = v.assays!;
+      const cell = (c: AssaysEntity["cells"][number]) => as.datatype === "numeric"
+        ? `${c.cohort} mean ${c.mean == null ? "—" : c.mean.toPrecision(3)} (n=${c.n})`
+        : `${c.cohort} ` + Object.entries(c.values || {}).map(([k, n]) => `${k} ${c.n ? (100 * n / c.n).toFixed(1) : "—"}%`).join(", ") + ` (n=${c.n})`;
+      out.push(`Generic-assay comparison, ${as.profileName} (${as.profileType}; ${as.datatype}, per ${as.unit.replace(/s$/, "")}; ${as.test}, BH q over ${as.tested.toLocaleString()} entities; ${as.significant} at q<0.05):\n` +
+        as.rows.slice(0, 40).map((g) => `  ${g.name}: ` + g.cells.map(cell).join(" | ") +
+          (g.diff != null ? `, difference ${g.diff.toPrecision(3)}` : "") + `, q=${pFmt(g.q)}, higher in ${g.higherIn}${g.value ? " (" + g.value + ")" : ""}`).join("\n") +
+        (as.rows.length > 40 ? `\n  … ${as.tested - 40} more entities tested` : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "correlates") {
+      const co = v.correlates!;
+      const line = (g: CorrelatesGene) => `  ${g.gene}: ρ ${g.rho} (q=${pFmt(g.q)}), r ${g.r}, n=${g.n}`;
+      out.push(`Genes co-expressed with ${co.gene} (${co.profileType}${co.otherProfile !== co.profileType ? " against " + co.otherProfile : ""}) in ${co.cohort}; ` +
+        `Spearman ρ${co.rhoFrom === "meta" ? " combined across studies by Fisher z" : ""}, BH q over ${co.tested.toLocaleString()} genes; ${co.significant.toLocaleString()} at q<0.05:\n` +
+        ` most positively correlated:\n` + co.positive.map(line).join("\n") +
+        `\n most negatively correlated:\n` + co.negative.map(line).join("\n") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "mutations") {
+      const mt = v.mutations!;
+      const shown = mt.rows.slice(0, 50);
+      out.push(`${mt.gene} mutations: ${mt.total.toLocaleString()} calls; the first ${shown.length}, tab-separated (the web app's view downloads every row):\n` +
+        [["cohort", "patient", ...mt.columns.map((c) => c.id)], ...shown.map((r) => [r.cohort, r.patient, ...r.values])]
+          .map((xs) => "  " + xs.map((x) => String(x ?? "").replace(/[\t\n]+/g, " ")).join("\t")).join("\n") +
+        (mt.total > shown.length ? `\n  … ${(mt.total - shown.length).toLocaleString()} more rows` : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "table") {
+      const tb = v.table!;
+      const head = ["cohort", "patient", tb.unit === "sample" ? "sample" : "samples", ...tb.columns.map((c) => c.id)];
+      const shown = tb.rows.slice(0, 50);
+      out.push(`Clinical data table: ${tb.total.toLocaleString()} ${tb.unit}s × ${tb.columns.length} attributes` +
+        (tb.sort ? `, sorted by ${tb.sort.attribute}${tb.sort.desc ? " (highest first)" : ""}` : "") + `; the first ${shown.length} rows, tab-separated` +
+        ` (the web app's table view downloads every row):\n` + [head, ...shown.map((r) => [r.cohort, r.patient, tb.unit === "sample" ? r.sample : r.samples, ...r.values])]
+          .map((xs) => "  " + xs.map((x) => String(x).replace(/[\t\n]+/g, " ")).join("\t")).join("\n") +
+        (tb.total > shown.length ? `\n  … ${(tb.total - shown.length).toLocaleString()} more rows` : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "overlap") {
+      const ov = v.overlap!;
+      out.push(`Cohort overlap (patients in exactly these cohorts and no other):\n` +
+        `  cohort sizes: ` + ov.sets.map((x) => `${x.name} ${x.size.toLocaleString()}`).join(", ") + `\n` +
+        ov.intersections.map((x) => `  ${x.members.join(" ∩ ")}${x.members.length < ov.sets.length ? " only" : ""}: ${x.n.toLocaleString()}`).join("\n") +
+        `\n  ${ov.union.toLocaleString()} patients in at least one cohort` + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "cancertypes") {
+      const ct = v.cancertypes!;
+      const line = (g: { label: string; altered: number; profiled: number; mutation: number; amp: number; homdel: number; sv: number; multiple: number }) =>
+        `    ${g.label}: ${(100 * g.altered / (g.profiled || 1)).toFixed(1)}% (${g.altered}/${g.profiled}; mutation ${g.mutation}, amp ${g.amp}, deep del ${g.homdel}, SV ${g.sv}, multiple ${g.multiple})`;
+      out.push(`Cancer types summary: ${ct.genes.join(", ")} by ${ct.groupBy} (${ct.measure === "driver" ? "drivers" : "any alteration"}; samples profiled for at least one gene):\n` +
+        ct.panels.map((pn) => `  ${pn.cohort}: ${pn.altered.toLocaleString()} of ${pn.profiled.toLocaleString()} profiled samples altered\n` +
+          [...pn.groups, ...(pn.pooled ? [pn.pooled] : [])].map(line).join("\n")).join("\n") +
         caveatOf(v) + noteOf(v));
     } else if (v.kind === "attrition") {
       out.push("Cohort attrition (patients left after each clause, in order):\n" + v.attrition!.map((pn) =>

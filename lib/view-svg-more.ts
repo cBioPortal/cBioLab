@@ -4,6 +4,7 @@
 import { esc, SERIES, palette, num, fmt, pFmt, frame, caption, type SvgOpts } from "./svg-kit.ts";
 import type { ViewResult } from "./types.ts";
 import { STYLE } from "./oncoprint-style.ts";
+import { portalViewToSvg, portalViewTitle } from "./view-svg-portal.ts";
 import { Z_975 } from "./stats.ts";
 
 /** The labs course draws a bin only from this many patients; the engine's caption says so. */
@@ -596,7 +597,7 @@ export function moreViewToSvg(v: ViewResult, o: SvgOpts): string | null {
   if (v.kind === "clonality" && v.clonality && v.clonality.panels.length) return clonalitySvg(v, o);
   if (v.kind === "incidence" && v.incidence && v.incidence.curves.some((c) => c.n)) return incidenceSvg(v, o);
   if (v.kind === "labs" && v.labs && v.labs.panels.some((pn) => pn.evaluable)) return labsSvg(v, o);
-  return null;
+  return portalViewToSvg(v, o);
 }
 
 export function moreViewTitle(v: ViewResult): string | null {
@@ -608,7 +609,7 @@ export function moreViewTitle(v: ViewResult): string | null {
   if (v.kind === "incidence") return "Cumulative incidence" + (v.incidence ? " — " + v.incidence.eventLabel + (v.incidence.anchoredTo ? " from " + v.incidence.anchoredTo : "") : "");
   if (v.kind === "paired") return "Paired samples" + (v.paired ? " — " + v.paired.labels.a + " vs " + v.paired.labels.b : "");
   if (v.kind === "diffexpr") return "Differential expression" + (v.diffexpr ? " — " + v.diffexpr.profileType : "");
-  return null;
+  return portalViewTitle(v);
 }
 
 void pct;
