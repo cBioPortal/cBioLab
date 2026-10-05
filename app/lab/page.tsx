@@ -23,7 +23,8 @@ import CustomDataPanel, { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import LoginButton from "./login-button.tsx";
 import { PartitionPanel, SplitForm, ChartMenu, type SplitSpec } from "./partitions.tsx";
-import { withoutPartition, armsFromSelection, renamePartitionChild, uniqueName, expandSplits, type ChartKey, type PartitionShape } from "../../lib/partition-arms.ts";
+import { withoutPartition, armsFromSelection, renamePartitionChild, expandSplits, flattenSplits, editSplits, splitKey, renameInViews, type ChartKey, type PartitionShape } from "../../lib/partition-arms.ts";
+import { DOC_VERSION, upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
 import { installCustomDataFetch, saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
@@ -331,6 +332,8 @@ export default function AnalysisPage() {
   const [exMsg, setExMsg] = useState<string | null>(null);
   /** the facet whose "split by this" is waiting on the server's proposed arms */
   const [splittingBy, setSplittingBy] = useState<string | null>(null);
+  /** set when an opened document was written for an older version and has been upgraded */
+  const [upgradeNote, setUpgradeNote] = useState<DocUpgrade | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [cdFocus, setCdFocus] = useState<CustomDataFocus | null>(null);
   // Explore → Custom data lives in the add-chart dialog, which exists only once Explore has
@@ -592,8 +595,16 @@ export default function AnalysisPage() {
   };
 
   const run = async (d0: AnalysisDoc = doc) => {
-    // pin any server-stored custom data the document names, so a shared link reads the same version
-    const d = bindUploads(d0);
+    // bring an older document to the current version (lib/doc-version.ts) — the page then holds,
+    // shows and saves the current shape — and pin any server-stored custom data it names, so a
+    // shared link reads the same version
+    let d: AnalysisDoc;
+    try {
+      const up = upgradeDocument(d0);
+      if (up.upgrade) setUpgradeNote(up.upgrade);
+      d = bindUploads(up.doc);
+    }
+    catch (e) { setBusy(false); setError(String((e as Error)?.message || e)); return; }
     if (d !== d0) { setDoc(d); setDocText(JSON.stringify(d, null, 2)); }
     if (!Object.keys(d.cohorts || {}).length) { setBusy(false); setResult(null); return; }
     setBusy(true); setError(null);
@@ -814,8 +825,8 @@ export default function AnalysisPage() {
     const nextStudy = exSel.current[0] || study;
     const base: AnalysisDoc = { study: nextStudy, cohorts: { [name]: d }, views: DEFAULT_VIEWS };
     try {
-      const { name: pn, def } = await proposePartition({ doc: base, cohort: name, ...spec });
-      const nd: AnalysisDoc = { ...base, partitions: { [pn]: def }, views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [pn] })) };
+      const { name: sn, def } = await proposePartition({ doc: base, cohort: name, ...spec });
+      const nd: AnalysisDoc = editSplits({ ...base, dsl: DOC_VERSION }, (f) => ({ ...f, partitions: { [splitKey(name, sn)]: { ...def, split: sn } } }));
       setStudy(nextStudy);
       setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
       setResult(null); setError(null);
@@ -844,10 +855,8 @@ export default function AnalysisPage() {
     const name = r.base.all.length ? "explored cohort"
       : exSel.current.length === 1 ? "all of " + exSel.current[0] : "all selected studies";
     const parent: CohortDef = r.base.all.length ? { ...d, all: r.base.all } : { ...(draftScaffold(exSel.current) as CohortDef) };
-    const pn = uniqueName(name + " by " + label, [name]);
     const nextStudy = exSel.current[0] || study;
-    const nd: AnalysisDoc = { study: nextStudy, cohorts: { [name]: parent },
-      partitions: { [pn]: { of: name, arms: r.arms } }, views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [pn] })) };
+    const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: { ...parent, splits: { [label]: { arms: r.arms } } } }, views: DEFAULT_VIEWS };
     setStudy(nextStudy);
     setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
     setResult(null); setError(null);
@@ -2201,7 +2210,7 @@ function Latency({ v }: { v: any }) {
 
   /** what a view's cohort picker needs: today's choice, everything on offer, and where to write it */
   /** the document's splits as the engine sees them, from the last result */
-  const partitionShapes = (): PartitionShape[] => Object.entries((result && result.partitions) || {}).map(([name, p]) =>
+  const partitionShapes = (): PartitionShape[] => Object.entries((result && result.splits) || {}).map(([name, p]) =>
     ({ name, of: p.of, comparable: p.children.filter((c) => c.role !== "notEvaluable").map((c) => c.name) }));
   const cohortChoice = (vi: number, v: any, max?: number) => {
     // On offer and chosen, a split replaces what it splits, exactly as in the engine: a split
@@ -2260,14 +2269,12 @@ function Latency({ v }: { v: any }) {
   };
 
   const removeCohort = (name: string) => {
-    // splits of this cohort go with it, and so does every view reference to their arms
-    let base: AnalysisDoc = doc;
-    for (const [pn, p] of Object.entries(doc.partitions || {}))
-      if (p.of === name && base.partitions?.[pn]) base = withoutPartition(base, pn).doc;
+    // its splits go with it (they are stored on it), and so does every view reference to their arms
+    const base: AnalysisDoc = doc;
     const cs = { ...base.cohorts }; delete cs[name];
     // views naming the cohort explicitly drop it; a view with no cohorts left goes too
     const views = (base.views || [])
-      .map(v => Array.isArray(v.cohorts) ? { ...v, cohorts: v.cohorts.filter(c => c !== name) } : v)
+      .map(v => Array.isArray(v.cohorts) ? { ...v, cohorts: v.cohorts.filter(c => c !== name && !c.startsWith(name + " / ")) } : v)
       .filter(v => !Array.isArray(v.cohorts) || v.cohorts.length);
     const d = { ...base, cohorts: cs, views };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
@@ -2276,18 +2283,21 @@ function Latency({ v }: { v: any }) {
 
   // ---- partitions: a cohort split into arms that add up to it ------------------------------
   const runEdited = (d: AnalysisDoc) => { setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d); };
+  // the page edits splits in their flat form (keyed "<cohort> / <split>") and writes them back
+  // onto their cohorts as a tree (editSplits)
+  const splitsFlat = () => flattenSplits(doc.cohorts || {});
   const setPartitionDef = (name: string, def: PartitionDef) =>
-    runEdited({ ...doc, partitions: { ...(doc.partitions || {}), [name]: def } });
-  const removePartitionNamed = (name: string) => runEdited(withoutPartition(doc, name).doc);
+    runEdited(editSplits(doc, (f) => ({ ...f, partitions: { ...f.partitions, [name]: def } })));
+  const removePartitionNamed = (name: string) => runEdited(editSplits(doc, (f) => withoutPartition(f, name).doc));
   const renamePartitionRow = (name: string, from: string, to: string) => {
-    try { runEdited(renamePartitionChild(doc, name, from, to)); }
+    try { runEdited(editSplits(doc, (f) => renamePartitionChild(f, name, from, to))); }
     catch (e) { setError(String((e as Error)?.message || e)); }
   };
   /** Split a cohort (or an arm) by what the server proposes from the data. Every view showing
    *  that cohort then shows its arms instead (expandSplits). */
   const splitCohortBy = async (cohort: string, spec: SplitSpec) => {
     const { name, def } = await proposePartition({ doc, cohort, ...spec });
-    runEdited({ ...doc, partitions: { ...(doc.partitions || {}), [name]: def } });
+    runEdited(editSplits(doc, (f) => ({ ...f, partitions: { ...f.partitions, [splitKey(cohort, name)]: { ...def, split: name } } })));
   };
 
   const openCohortEdit = (name: string) => {
@@ -2326,12 +2336,9 @@ function Latency({ v }: { v: any }) {
       setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
       return;
     }
-    const views = (doc.views || []).map(v => Array.isArray(v.cohorts)
-      ? { ...v, cohorts: v.cohorts.map(c => c === oldName ? newName : c) }
-      : v);
-    const partitions = doc.partitions && Object.fromEntries(Object.entries(doc.partitions)
-      .map(([k, p]) => [k, p.of === oldName ? { ...p, of: newName } : p]));
-    const d = { ...doc, cohorts: nextCohorts, views, ...(partitions ? { partitions } : {}) };
+    // its splits travel with it; their arms are named after it, so views naming them follow too
+    const views = renameInViews(doc.views, oldName, newName) as AnalysisDoc["views"];
+    const d = { ...doc, cohorts: nextCohorts, views };
     setDoc(d); setDocText(JSON.stringify(d, null, 2));
     run(d);
   };
@@ -2468,7 +2475,8 @@ function Latency({ v }: { v: any }) {
     if (j.error) throw new Error(j.error);
     return j as { name: string; def: PartitionDef; note?: string };
   };
-  const commitDoc = (d: AnalysisDoc, r: AnalysisResult) => {
+  const commitDoc = (d0: AnalysisDoc, r: AnalysisResult) => {
+    const d = upgradeDocument(d0).doc;
     // an unchanged view keeps its identity key, so its card (and a drawn oncoprint) is not remounted
     const old = new Map((doc.views || []).map((v) => [JSON.stringify(v), v]));
     for (const v of d.views || []) {
@@ -3809,6 +3817,13 @@ function Latency({ v }: { v: any }) {
                 Cohorts{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
               </h2>
             )}
+            {upgradeNote && (
+              <p className="note upgradenote">
+                This analysis was written {upgradeNote.from === "unversioned" ? "before analyses carried a version" : "for DSL " + upgradeNote.from} and has been upgraded to {upgradeNote.to}
+                {upgradeNote.changes.length ? ": " + upgradeNote.changes.join("; ") : ""}. Saving it, or sharing its link, uses the new version.{" "}
+                <button className="linklike" onClick={() => setUpgradeNote(null)}>dismiss</button>
+              </p>
+            )}
             <div className="cohortlist">
               {busy && !result
                 ? Array.from({ length: Math.max(1, Object.keys(doc.cohorts || {}).length) }).map((_, i) => (
@@ -3817,13 +3832,14 @@ function Latency({ v }: { v: any }) {
                 : result && Object.entries(result.cohorts).filter(([n]) => doc.cohorts?.[n]).map(([n, c], i) => {
                   // a cohort's splits are drawn attached to it, so which cohort a split divides is
                   // seen, not read; splits of a split's arms are nested inside that split's panel
-                  const splits = Object.keys(doc.partitions || {}).filter((k) => doc.partitions![k].of === n);
+                  const flat = splitsFlat();
+                  const splits = Object.keys(flat).filter((k) => flat[k].of === n);
                   return (
                   <div key={n} className={"cohortgroup" + (splits.length ? " hassplit" : "")}>
                     <div className="cohortbox">
                       <CohortEditMenu busy={busy} canEdit={!!(doc.title && spaces[doc.title])}
                         onEdit={() => openCohortEdit(n)} onRemove={() => removeCohort(n)}
-                        split={!Object.values(doc.partitions || {}).some((p) => p.of === n)
+                        split={!splits.length
                           ? (done: () => void) => <SplitForm cohort={n} attrs={catalogAttrs()} busy={busy} onSplit={splitCohortBy} onDone={done} /> : undefined}
                         menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
                       <div className="cohortbox-head">
@@ -3845,7 +3861,7 @@ function Latency({ v }: { v: any }) {
                     </div>
                     {splits.length > 0 && <div className="cohortgroup-splits">
                       {splits.map((k) => (
-                        <PartitionPanel key={k} name={k} partitions={doc.partitions!} results={result.partitions}
+                        <PartitionPanel key={k} name={k} partitions={flat} results={result.splits}
                           cohortText={(x) => result.cohorts[x]?.text} attrs={catalogAttrs()} busy={busy}
                           onChange={setPartitionDef} onRename={renamePartitionRow} onRemove={removePartitionNamed} onSplit={splitCohortBy} />
                       ))}

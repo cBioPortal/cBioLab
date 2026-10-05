@@ -31,6 +31,9 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
   const noteOf = (v: { annotationNote?: string; note?: string }) =>
     (v.annotationNote ? "\n  NOTE (the author's, tell the user): " + v.annotationNote : "") +
     (v.note ? "\n  " + v.note : "");
+  if (r.upgraded)
+    out.push(`NOTE (tell the user): this document was written ${r.upgraded.from === "unversioned" ? "before documents carried a version" : "for DSL " + r.upgraded.from} and was upgraded to ${r.upgraded.to} to run` +
+      (r.upgraded.changes.length ? ": " + r.upgraded.changes.join("; ") : "") + ". Saving it writes the new version.");
   out.push(`Analysis over ${r.involvedStudies.join(" + ")} — OncoKB pin ${r.oncokbPin || "none"} — ${r.stats.ms}ms.`);
   // The document's own title and notes are the author's framing of the whole
   // workspace. They were stored and rendered in the app but never reached a
@@ -44,9 +47,9 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
       (r.unusedParams?.length ? `  (declared but never referenced: ${r.unusedParams.map((x) => "$" + x).join(", ")})` : ""));
   out.push("Cohorts:\n" + Object.entries(r.cohorts)
     .map(([n, c]) => `- ${n}: ${c.count.toLocaleString()} patients — ${c.text}`).join("\n"));
-  for (const [name, p] of Object.entries(r.partitions || {})) {
+  for (const [, p] of Object.entries(r.splits || {})) {
     const pct = (n: number) => p.parentCount ? " (" + (100 * n / p.parentCount).toFixed(1) + "%)" : "";
-    out.push(`Partition "${name}" of "${p.of}" (${p.parentCount.toLocaleString()} patients; arms tested in order, first match wins):\n` +
+    out.push(`Split "${p.split}" of "${p.of}" (${p.parentCount.toLocaleString()} patients; arms tested in order, first match wins):\n` +
       p.children.map((c) => `  - ${c.label}${c.role === "other" ? " [remainder]" : c.role === "notEvaluable" ? " [not evaluable — not compared]" : ""}: ` +
         `${c.count.toLocaleString()}${pct(c.count)} — cohort "${c.name}"`).join("\n") +
       (p.conserved ? `\n  The children add up to the parent (${p.sum.toLocaleString()}).`

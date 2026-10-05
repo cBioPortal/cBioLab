@@ -10,9 +10,10 @@ const g12c: Clause = { kind: "oql", q: "KRAS: G12C" };
 const krasMut: Clause = { kind: "oql", q: "KRAS: MUT" };
 const krasProfiled: Leaf = { kind: "profiled", type: "MUTATION", gene: "KRAS" };
 
-function doc(partitions: AnalysisDoc["partitions"], cohorts: AnalysisDoc["cohorts"] = { LUAD: luad }): AnalysisDoc {
+function doc(partitions: Record<string, any> | undefined, cohorts: AnalysisDoc["cohorts"] = { LUAD: luad }): any {
   return { cohorts, partitions };
 }
+const resolve = (d: any) => resolvePartitions(d, d.partitions || {});
 
 // Simulate membership: evaluate a resolved cohort def against an in-memory patient table, using
 // the same meaning the compiler gives each clause (a `not` is "base patients EXCEPT").
@@ -82,7 +83,7 @@ describe("planPartition", () => {
 
   test("a child that would exceed 8 clauses after extends is refused by name", () => {
     const deep: CohortDef = { all: Array.from({ length: 7 }, (_, i) => ({ kind: "clinical", attribute: "A" + i, values: ["x"] } as Clause)) };
-    const { doc: out, plans } = resolvePartitions(doc({ K: { of: "LUAD", arms: [{ name: "G12C", where: g12c }] } }, { LUAD: deep }));
+    const { doc: out, plans } = resolve(doc({ K: { of: "LUAD", arms: [{ name: "G12C", where: g12c }] } }, { LUAD: deep }));
     assert.throws(() => assertPartitionChildrenFit(resolveExtends(out).cohorts, plans), /“G12C” needs 9 conditions/);
   });
 
@@ -140,11 +141,11 @@ describe("planPartition", () => {
 describe("resolvePartitions", () => {
   test("no partitions: the document is returned as is", () => {
     const d = doc(undefined);
-    assert.equal(resolvePartitions(d).doc, d);
+    assert.equal(resolve(d).doc, d);
   });
 
   test("children become ordinary cohorts that resolve through extends", () => {
-    const { doc: out } = resolvePartitions(doc({ K: { of: "LUAD", arms: [{ name: "G12C", where: g12c }] } }));
+    const { doc: out } = resolve(doc({ K: { of: "LUAD", arms: [{ name: "G12C", where: g12c }] } }));
     const flat = resolveExtends(out);
     assert.deepEqual(flat.cohorts["K / G12C"].all, [...luad.all!, krasProfiled, g12c]);
     assert.equal(flat.cohorts["K / G12C"].extends, undefined);
@@ -152,7 +153,7 @@ describe("resolvePartitions", () => {
   });
 
   test("a partition can split another partition's child, in any declaration order", () => {
-    const { doc: out, plans } = resolvePartitions(doc({
+    const { doc: out, plans } = resolve(doc({
       "G12C by stage": { of: "K / G12C", arms: [{ name: "IV", where: { kind: "clinical", attribute: "STAGE", values: ["IV"] } }] },
       K: { of: "LUAD", arms: [{ name: "G12C", where: g12c }] }
     }));
@@ -165,14 +166,14 @@ describe("resolvePartitions", () => {
   });
 
   test("unknown parents, cycles and name clashes are refused", () => {
-    assert.throws(() => resolvePartitions(doc({ K: { of: "nope", arms: [{ name: "a", where: g12c }] } })), /unknown cohort “nope”/);
-    assert.throws(() => resolvePartitions(doc({
+    assert.throws(() => resolve(doc({ K: { of: "nope", arms: [{ name: "a", where: g12c }] } })), /unknown cohort “nope”/);
+    assert.throws(() => resolve(doc({
       A: { of: "B / x", arms: [{ name: "x", where: g12c }] },
       B: { of: "A / x", arms: [{ name: "x", where: g12c }] }
     })), /splits its own descendant/);
-    assert.throws(() => resolvePartitions(doc({ LUAD: { of: "LUAD", arms: [{ name: "a", where: g12c }] } })), /same name as a cohort/);
-    assert.throws(() => resolvePartitions(doc({ K: { of: "LUAD", arms: [{ name: "a", where: g12c }] } }, { LUAD: luad, "K / a": luad })), /already exists/);
-    assert.throws(() => resolvePartitions(doc({ K: { arms: [{ name: "a", where: g12c }] } as never })), /needs `of`/);
+    assert.throws(() => resolve(doc({ LUAD: { of: "LUAD", arms: [{ name: "a", where: g12c }] } })), /same name as a cohort/);
+    assert.throws(() => resolve(doc({ K: { of: "LUAD", arms: [{ name: "a", where: g12c }] } }, { LUAD: luad, "K / a": luad })), /already exists/);
+    assert.throws(() => resolve(doc({ K: { arms: [{ name: "a", where: g12c }] } as never })), /needs `of`/);
   });
 });
 

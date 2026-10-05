@@ -9,7 +9,7 @@ import { exposeTools, type AgentTool, type Json } from "../../lib/webmcp.ts";
 import { analysisText } from "../../lib/result-text.ts";
 import { AGENT_GRAMMAR, EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, ExploreResult, PartitionDef } from "../../lib/types.ts";
-import { withoutPartition } from "../../lib/partition-arms.ts";
+import { withoutPartition, editSplits, splitKey } from "../../lib/partition-arms.ts";
 
 export interface LabBridge {
   doc: AnalysisDoc;
@@ -21,7 +21,7 @@ export interface LabBridge {
   savedAs: string | null;
   /** run a document on the server without changing the page; throws with the engine's reason */
   validate: (d: AnalysisDoc) => Promise<AnalysisResult>;
-  /** have the server write a partition's arms from the data (POST /api/partition) */
+  /** have the server write a split's arms from the data (POST /api/partition) */
   proposePartition: (req: { doc: AnalysisDoc; cohort: string; attribute?: string; gene?: string; oql?: string[]; name?: string; maxArms?: number; minCount?: number })
     => Promise<{ name: string; def: PartitionDef; note?: string }>;
   /** put an already-validated document and its result on the page */
@@ -112,14 +112,14 @@ function facetSummary(e: ExploreResult | null, section: string, limit: number) {
 /** Numbers that are legal but almost always a mistake, said out loud rather than left to be noticed. */
 function warnings(r: AnalysisResult): string {
   const out: string[] = [];
-  // a partition's not-evaluable and remainder children may honestly be empty; an empty ARM is
+  // a split's not-evaluable and remainder children may honestly be empty; an empty ARM is
   // worth a word, because an earlier, broader arm takes every patient it matches
-  const childRole = new Map(Object.values(r.partitions || {}).flatMap((p) => p.children.map((c) => [c.name, c.role] as const)));
+  const childRole = new Map(Object.values(r.splits || {}).flatMap((p) => p.children.map((c) => [c.name, c.role] as const)));
   const emptyArms = Object.entries(r.cohorts).filter(([n, c]) => c.count === 0 && childRole.get(n) === "arm").map(([n]) => n);
   if (emptyArms.length)
-    out.push(`WARNING: partition arm${emptyArms.length === 1 ? "" : "s"} ${emptyArms.map((n) => `"${n}"`).join(", ")} ${emptyArms.length === 1 ? "is" : "are"} empty — arms are tested in order, so an earlier, broader arm may take every patient it matches; move it earlier (analysis_set_partition) or check its condition.`);
-  for (const [name, p] of Object.entries(r.partitions || {}))
-    if (!p.conserved) out.push(`WARNING: partition "${name}"'s children add up to ${p.sum.toLocaleString()}, not "${p.of}"'s ${p.parentCount.toLocaleString()} — do not compare them until this is explained.`);
+    out.push(`WARNING: split arm${emptyArms.length === 1 ? "" : "s"} ${emptyArms.map((n) => `"${n}"`).join(", ")} ${emptyArms.length === 1 ? "is" : "are"} empty — arms are tested in order, so an earlier, broader arm may take every patient it matches; move it earlier (analysis_set_split) or check its condition.`);
+  for (const [name, p] of Object.entries(r.splits || {}))
+    if (!p.conserved) out.push(`WARNING: split "${name}"'s children add up to ${p.sum.toLocaleString()}, not "${p.of}"'s ${p.parentCount.toLocaleString()} — do not compare them until this is explained.`);
   const empty = Object.entries(r.cohorts).filter(([n, c]) => c.count === 0 && !childRole.has(n)).map(([n]) => n);
   if (empty.length)
     out.push(`WARNING: ${empty.map((n) => `"${n}"`).join(", ")} match${empty.length === 1 ? "es" : ""} 0 patients — check its attributes, values and event names against study_vocabulary before drawing any conclusion.`);
@@ -203,7 +203,7 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
 
     // ---- edit --------------------------------------------------------------------------
     { name: "analysis_set_document", description: "Replace the whole Analysis document. The engine runs it first; if it rejects the document (or any view errors), the page is left unchanged and the reason is returned.",
-      inputSchema: { type: "object", required: ["document"], properties: { document: { type: "object", description: "{study, cohorts: {name: cohortDef}, partitions?: {name: {of, arms, other?}}, views: [...], title?, notes?, params?}" } } },
+      inputSchema: { type: "object", required: ["document"], properties: { document: { type: "object", description: "{dsl?, study, cohorts: {name: cohortDef (may carry splits)}, views: [...], title?, notes?, params?}" } } },
       run: async ({ document }) => edit("set document", clone(document)) },
     { name: "analysis_set_cohort", description: "Add a cohort, or replace the definition of an existing one, by name. Every view is re-run, since a cohort feeds all of them.",
       inputSchema: { type: "object", required: ["name", "definition"], properties: { name: { type: "string" }, definition: { type: "object", description: "cohortDef: {all: [clause, ...], extends?, study?, studies?}" } } },
@@ -222,34 +222,37 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
         d.views = (d.views || []).map((v: any) => Array.isArray(v.cohorts) ? { ...v, cohorts: v.cohorts.filter((c: string) => c !== name) } : v);
         return edit(`remove cohort "${name}"`, d);
       } },
-    { name: "analysis_split_cohort", description: "Split a cohort into a partition: child cohorts that are disjoint and together exactly the cohort, for comparing them. Split by a categorical attribute (one arm per value held by at least minCount patients, most frequent first, at most maxArms-1 arms; the rest go to Other), a numeric attribute (at its median within the cohort), a gene (mutated / wild-type), or a list of OQL queries (one arm each, first match wins). Patients not profiled for a gene, or with no value recorded, get their own child instead of being counted as wild-type or Other. Name the cohort, or a partition's child (\"<partition> / <arm>\") to split it further. Adds the partition to the document; edit it afterwards with analysis_set_partition. A view compares the arms when its cohorts list names the partition.",
+    { name: "analysis_split_cohort", description: "Split a cohort: child cohorts that are disjoint and together exactly the cohort, for comparing them, stored on the cohort as one of its `splits`. Split by a categorical attribute (one arm per value held by at least minCount patients, most frequent first, at most maxArms-1 arms; the rest go to Other), a numeric attribute (at its median within the cohort), a gene (mutated / wild-type), or a list of OQL queries (one arm each, first match wins). Patients not profiled for a gene, or with no value recorded, get their own child instead of being counted as wild-type or Other. Name a cohort, or an arm (\"<cohort> / <split> / <arm>\") to split it further. Each child is the cohort \"<cohort> / <split> / <arm>\"; every view showing the split cohort then shows its arms instead. Edit it afterwards with analysis_set_split.",
       inputSchema: { type: "object", required: ["cohort"], properties: {
         cohort: { type: "string" }, attribute: { type: "string" }, gene: { type: "string" },
-        oql: { type: "array", items: { type: "string" } }, name: { type: "string", description: "the partition's name; default \"<cohort> by <attribute|gene>\"" },
+        oql: { type: "array", items: { type: "string" } }, name: { type: "string", description: "the split's name; default the attribute or gene" },
         maxArms: { type: "integer" }, minCount: { type: "integer" } } },
       run: async (args) => {
         const b = get();
         const { name, def, note } = await b.proposePartition({ ...(args as object), doc: b.doc } as never);
-        const d = clone(get().doc);
-        d.partitions = { ...(d.partitions || {}), [name]: def };
-        return (note ? note + "\n\n" : "") + await edit(`split "${def.of}" into partition "${name}"`, d);
+        const d = editSplits(clone(get().doc), (f) => ({ ...f, partitions: { ...f.partitions, [splitKey(def.of, name)]: { ...def, split: name } } }));
+        return (note ? note + "\n\n" : "") + await edit(`split "${def.of}" by "${name}"`, d);
       } },
-    { name: "analysis_set_partition", description: "Add or replace a partition by name: {of: cohort to split, arms: [{name, where: clause}], other?: name of the remainder}. Arms are tested in order and the first match wins, so a patient is in exactly one arm; reorder arms to change which wins. The engine adds a \"Not profiled …\" / \"No … recorded\" child for patients an arm cannot be decided for, and an Other child for the rest. Each child is the cohort \"<partition> / <arm>\".",
-      inputSchema: { type: "object", required: ["name", "of", "arms"], properties: {
-        name: { type: "string" }, of: { type: "string" },
+    { name: "analysis_set_split", description: "Add or replace a split of a cohort (or of an arm, \"<cohort> / <split> / <arm>\"), by name: {cohort, name, arms: [{name, where: clause}], other?: name of the remainder}. Arms are tested in order and the first match wins, so a patient is in exactly one arm; reorder arms to change which wins. The engine adds a \"Not profiled …\" / \"No … recorded\" child for patients an arm cannot be decided for, and an Other child for the rest. Each child is the cohort \"<cohort> / <split> / <arm>\". Replacing a split keeps the splits nested under arms whose names are unchanged; those under an arm that is gone go with it.",
+      inputSchema: { type: "object", required: ["cohort", "name", "arms"], properties: {
+        cohort: { type: "string" }, name: { type: "string" },
         arms: { type: "array", items: { type: "object", required: ["name", "where"], properties: { name: { type: "string" }, where: { type: "object" } } } },
         other: { type: "string" }, notes: { type: "string" } } },
-      run: async ({ name, of, arms, other, notes }) => {
-        const d = clone(get().doc);
-        const existed = !!d.partitions?.[name];
-        d.partitions = { ...(d.partitions || {}), [name]: { of, arms, ...(other ? { other } : {}), ...(notes ? { notes } : {}) } as PartitionDef };
-        return edit(`${existed ? "replace" : "add"} partition "${name}"`, d);
+      run: async ({ cohort, name, arms, other, notes }) => {
+        const key = splitKey(cohort, name);
+        let existed = false;
+        const d = editSplits(clone(get().doc), (f) => {
+          existed = !!f.partitions[key];
+          return { ...f, partitions: { ...f.partitions, [key]: { of: cohort, split: name, arms, ...(other ? { other } : {}), ...(notes ? { notes } : {}) } as PartitionDef } };
+        });
+        return edit(`${existed ? "replace" : "add"} split "${name}" of "${cohort}"`, d);
       } },
-    { name: "analysis_remove_partition", description: "Remove a partition by name, with any partition nested under its children. Views lose their references to it and its children.",
-      inputSchema: { type: "object", required: ["name"], properties: { name: { type: "string" } } },
-      run: async ({ name }) => {
-        const { doc: d, removed } = withoutPartition(clone(get().doc), name);
-        return edit(`remove partition${removed.length > 1 ? "s" : ""} ${removed.map((n) => `"${n}"`).join(", ")}`, d);
+    { name: "analysis_remove_split", description: "Remove a split of a cohort (or of an arm) by name, with any split nested under its arms. A view that showed the split shows the cohort it divided; references to its arms are dropped.",
+      inputSchema: { type: "object", required: ["cohort", "name"], properties: { cohort: { type: "string" }, name: { type: "string" } } },
+      run: async ({ cohort, name }) => {
+        let removed: string[] = [];
+        const d = editSplits(clone(get().doc), (f) => { const r = withoutPartition(f, splitKey(cohort, name)); removed = r.removed; return r.doc; });
+        return edit(`remove split${removed.length > 1 ? "s" : ""} ${removed.map((n) => `"${n}"`).join(", ")}`, d);
       } },
     { name: "analysis_add_view", description: "Add a view (compare, survival, clinical, oncoprint, cox, plot, …; grammar in dsl_reference). It goes at the top of the page unless a position is given. Rejected, page unchanged, if the engine cannot run it.",
       inputSchema: { type: "object", required: ["view"], properties: { view: { type: "object" }, position: { type: "integer", description: "index to insert at; default 0 (top)" } } },
@@ -428,8 +431,8 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
     setCohort: (name: string, definition: Json) => byName("analysis_set_cohort")({ name, definition }),
     removeCohort: (name: string) => byName("analysis_remove_cohort")({ name }),
     splitCohort: (args: Json) => byName("analysis_split_cohort")(args),
-    setPartition: (name: string, def: Json) => byName("analysis_set_partition")({ ...(def as object), name }),
-    removePartition: (name: string) => byName("analysis_remove_partition")({ name }),
+    setSplit: (cohort: string, name: string, def: Json) => byName("analysis_set_split")({ ...(def as object), cohort, name }),
+    removeSplit: (cohort: string, name: string) => byName("analysis_remove_split")({ cohort, name }),
     addView: (view: Json, position?: number) => byName("analysis_add_view")({ view, position }),
     updateView: (index: number, patch: Json) => byName("analysis_update_view")({ index, patch }),
     removeView: (index: number) => byName("analysis_remove_view")({ index }),
@@ -459,8 +462,8 @@ export const LAB_TOOL_NAMES = [
   ["analysis_get_provenance", "getProvenance()"], ["dsl_reference", "dslReference()"], ["study_vocabulary", "studyVocabulary(study?)"],
   ["list_studies", "listStudies()"], ["list_examples", "listExamples()"], ["analysis_set_document", "setDocument(doc)"],
   ["analysis_set_cohort", "setCohort(name, def)"], ["analysis_remove_cohort", "removeCohort(name)"],
-  ["analysis_split_cohort", "splitCohort({cohort, attribute|gene|oql})"], ["analysis_set_partition", "setPartition(name, {of, arms, other?})"],
-  ["analysis_remove_partition", "removePartition(name)"], ["analysis_add_view", "addView(view, position?)"],
+  ["analysis_split_cohort", "splitCohort({cohort, attribute|gene|oql})"], ["analysis_set_split", "setSplit(cohort, name, {arms, other?})"],
+  ["analysis_remove_split", "removeSplit(cohort, name)"], ["analysis_add_view", "addView(view, position?)"],
   ["analysis_update_view", "updateView(i, patch)"], ["analysis_remove_view", "removeView(i)"], ["analysis_move_view", "moveView(from, to)"],
   ["analysis_set_details", "setDetails({study, title, notes, params})"], ["analysis_undo", "undo()"], ["analysis_load_example", "loadExample(title)"],
   ["analysis_share_link", "shareLink()"], ["analysis_save", "save(name)"], ["open_tab", "openTab(tab)"],

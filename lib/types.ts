@@ -196,6 +196,8 @@ export function isClinicalLeaf(c: Clause | null | undefined): c is ClinicalLeaf 
 
 export interface CohortDef {
   all?: Clause[];
+  /** splits of this cohort into arms that never overlap and add up to it — see SplitDef */
+  splits?: Record<string, SplitDef>;
   /**
    * Name of another cohort in the same document whose `all` clauses this one inherits — spliced
    * in ahead of this cohort's own, so editing the parent updates every child instead of relying
@@ -217,21 +219,38 @@ export interface CohortDef {
 }
 
 /**
- * One arm of a partition: a name and the clause a patient must match to be in it. Arms are
- * tested in order and the first match wins, so a patient is in exactly one arm.
+ * One arm of a split: a name and the clause a patient must match to be in it. Arms are tested in
+ * order and the first match wins, so a patient is in exactly one arm. An arm may itself be split.
  */
+export interface SplitArm { name: string; where: Clause; notes?: string; splits?: Record<string, SplitDef> }
+/**
+ * A split of a cohort, stored on that cohort (`cohorts[name].splits[split]`, or on an arm): child
+ * cohorts that are disjoint and together exactly the parent, resolved before compilation by
+ * lib/cohort-partitions.ts. Each arm becomes the cohort "<cohort> / <split> / <arm>"; patients
+ * matching no arm go to "<cohort> / <split> / Other"; patients for whom an arm's condition cannot
+ * be decided (not profiled for the gene, no value recorded) go to a named "Not profiled: …" /
+ * "No … recorded" child instead of being counted as not matching it.
+ */
+export interface SplitDef {
+  arms: SplitArm[];
+  /** name of the remainder child (default "Other") */
+  other?: string;
+  /** splits of the remainder */
+  otherSplits?: Record<string, SplitDef>;
+  notes?: string;
+  source?: PartitionDef["source"];
+}
+/** One arm of a split, as the engine works with it: no nested splits (those are flattened). */
 export interface PartitionArm { name: string; where: Clause; notes?: string }
 /**
- * Split a named cohort into child cohorts that are disjoint and together exactly the parent —
- * resolved before compilation by lib/cohort-partitions.ts. Each arm becomes the cohort
- * "<partition> / <arm name>"; patients matching no arm go to "<partition> / Other"; and
- * patients for whom an arm's condition cannot be decided (not profiled for the gene, no value
- * recorded) go to a named "Not profiled: …" / "No … recorded" child instead of being counted as
- * not matching it. A view that names the partition compares its arms and Other.
+ * A split as the engine and the page work with it: flattened out of the cohort tree
+ * (lib/partition-arms.ts flattenSplits), keyed by "<owner> / <split>", knowing what it splits.
  */
 export interface PartitionDef {
-  /** the cohort to split: a named cohort, or a child of another partition */
+  /** the cohort it splits: a named cohort, or an arm (or remainder) of another split */
   of: string;
+  /** its own name, as stored on the cohort (the flat key is "<of> / <split>") */
+  split: string;
   arms: PartitionArm[];
   /** name of the remainder child (default "Other") */
   other?: string;
@@ -1194,9 +1213,9 @@ export type TemplateDoc = Omit<AnalysisDoc, "views"> & {
 
 export interface AnalysisDoc {
   study?: string;
+  /** the document's version (lib/doc-version.ts); written by everything that writes a document */
+  dsl?: string;
   cohorts: Record<string, CohortDef>;
-  /** splits of named cohorts into disjoint, exhaustive child cohorts — see PartitionDef */
-  partitions?: Record<string, PartitionDef>;
   views?: View[];
   /**
    * Template parameters. A value anywhere in the document that is exactly
@@ -1529,13 +1548,16 @@ export interface AnalysisResult {
   params?: Record<string, unknown>;
   unusedParams?: string[];
   cohorts: Record<string, CohortResult>;
-  /** each partition's children with their counts, and whether they add up to the parent */
-  partitions?: Record<string, PartitionResult>;
+  /** each split's children with their counts, and whether they add up to the cohort it splits;
+   *  keyed "<cohort> / <split>" */
+  splits?: Record<string, PartitionResult>;
+  /** present when the document was written in an older version and upgraded to run */
+  upgraded?: import("./doc-version.ts").DocUpgrade;
   views: ViewResult[];
   stats: { ms: number };
 }
 export interface PartitionResult {
-  of: string; parentCount: number;
+  of: string; split: string; parentCount: number;
   children: { name: string; label: string; role: "arm" | "other" | "notEvaluable"; count: number }[];
   /** sum of the children's counts; equals parentCount when the split is exact */
   sum: number;

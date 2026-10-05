@@ -97,22 +97,25 @@ describe("analysis tools: the engine decides, the page follows", () => {
     await text("analysis_remove_cohort", { name: "b" });
     assert.deepEqual(page.doc.views[0].cohorts, ["a"]);
   });
-  test("split_cohort adds the server's proposed partition and runs it", async () => {
+  test("split_cohort stores the server's proposed split on the cohort and runs it", async () => {
     let asked: any = null;
-    page.proposePartition = async (req: any) => { asked = req; return { name: "a by SEX", def: { of: "a", arms: [{ name: "Female", where: { kind: "clinical", attribute: "SEX", values: ["Female"] } }] }, note: "1 value to Other" }; };
+    page.proposePartition = async (req: any) => { asked = req; return { name: "SEX", def: { of: "a", split: "SEX", arms: [{ name: "Female", where: { kind: "clinical", attribute: "SEX", values: ["Female"] } }] }, note: "1 value to Other" }; };
     const r = await text("analysis_split_cohort", { cohort: "a", attribute: "SEX" });
     assert.equal(asked.cohort, "a"); assert.equal(asked.attribute, "SEX"); assert.ok(asked.doc.cohorts.a);
     assert.match(r, /^1 value to Other[\s\S]*applied/);
-    assert.equal(page.doc.partitions["a by SEX"].of, "a");
+    assert.deepEqual(page.doc.cohorts.a.splits.SEX.arms.map((x: any) => x.name), ["Female"]);
   });
-  test("removing a partition takes its nested partitions with it, and its views go back to the cohort it split", async () => {
-    page.doc = { study: "s1", cohorts: { a: { all: [] } },
-      partitions: { P: { of: "a", arms: [{ name: "x", where: {} }] }, Q: { of: "P / x", arms: [{ name: "y", where: {} }] }, R: { of: "a", arms: [{ name: "z", where: {} }] } },
-      views: [{ kind: "compare", genes: ["KRAS"], cohorts: ["P"] }, { kind: "compare", genes: ["TP53"], cohorts: ["a", "Q / y", "R"] }, { kind: "compare", genes: ["EGFR"], cohorts: ["P / x"] }] };
-    const r = await text("analysis_remove_partition", { name: "P" });
-    assert.match(r, /remove partitions "P", "Q"/);
-    assert.deepEqual(Object.keys(page.doc.partitions), ["R"]);
-    assert.deepEqual(page.doc.views, [{ kind: "compare", genes: ["KRAS"], cohorts: ["a"] }, { kind: "compare", genes: ["TP53"], cohorts: ["a", "R"] }]);
+  test("set_split adds a split to an arm; remove_split takes the splits under it, and its views go back to the cohort", async () => {
+    page.doc = { study: "s1", cohorts: { a: { all: [], splits: {
+        P: { arms: [{ name: "x", where: {}, splits: { Q: { arms: [{ name: "y", where: {} }] } } }] },
+        R: { arms: [{ name: "z", where: {} }] } } } },
+      views: [{ kind: "compare", genes: ["KRAS"], cohorts: ["a / P"] }, { kind: "compare", genes: ["TP53"], cohorts: ["a", "a / P / x / Q / y", "a / R"] }, { kind: "compare", genes: ["EGFR"], cohorts: ["a / P / x"] }] };
+    await text("analysis_set_split", { cohort: "a / R / z", name: "S", arms: [{ name: "w", where: { kind: "oql", q: "TP53: MUT" } }] });
+    assert.deepEqual(Object.keys(page.doc.cohorts.a.splits.R.arms[0].splits), ["S"]);
+    const r = await text("analysis_remove_split", { cohort: "a", name: "P" });
+    assert.match(r, /remove splits "a \/ P", "a \/ P \/ x \/ Q"/);
+    assert.deepEqual(Object.keys(page.doc.cohorts.a.splits), ["R"]);
+    assert.deepEqual(page.doc.views, [{ kind: "compare", genes: ["KRAS"], cohorts: ["a"] }, { kind: "compare", genes: ["TP53"], cohorts: ["a", "a / R"] }]);
   });
   test("update_view merges, and null removes a key", async () => {
     page.doc = { ...page.doc, views: [{ kind: "survival", endpoint: "OS", cohorts: ["a"] }] };

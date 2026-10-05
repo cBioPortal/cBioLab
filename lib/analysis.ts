@@ -33,7 +33,8 @@ import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } from "./cohort-partitions.ts";
-import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits } from "./partition-arms.ts";
+import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, flattenSplits, withoutSplitTrees, splitKey } from "./partition-arms.ts";
+import { upgradeDocument } from "./doc-version.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
 import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, courseMethod, sequenceMethod, type CoxTrace } from "./method.ts";
@@ -205,6 +206,13 @@ async function mergedDistribution(cohortName: string, def: CohortDef, studies: s
   return { kind: "cat", per, values: [...merged.entries()].map(([v, n]) => ({ v, n })), ...(partial ? { partial } : {}) };
 }
 
+/** The document's split tree, expanded into ordinary child cohorts (lib/cohort-partitions.ts);
+ *  the cohorts handed on carry no `splits` of their own. */
+function expandSplitTree(doc: AnalysisDoc) {
+  const flat = flattenSplits(doc.cohorts || {});
+  return resolvePartitions({ ...doc, cohorts: withoutSplitTrees(doc.cohorts || {}) }, flat);
+}
+
 /** how many of a categorical attribute's values a split proposal ranks, per study */
 const PARTITION_TOP_VALUES = 100;
 
@@ -226,8 +234,8 @@ export interface PartitionProposalRequest {
  * what a reader sees, and re-running it later cannot quietly regroup patients.
  */
 export async function proposePartition(req: PartitionProposalRequest): Promise<{ name: string; def: PartitionDef; note?: string }> {
-  const { doc: paramsDoc } = resolveParams(req.doc);
-  const { doc: partitionedDoc } = resolvePartitions(paramsDoc);
+  const { doc: paramsDoc } = resolveParams(upgradeDocument(req.doc).doc);
+  const { doc: partitionedDoc } = expandSplitTree(paramsDoc as AnalysisDoc);
   const extendsDoc = resolveExtends(partitionedDoc);
   const docStudy = await resolveStudy(extendsDoc.study);
   const doc = await resolveCohortPercentiles(extendsDoc, docStudy, async (study, refDef, attribute, per, p) =>
@@ -237,14 +245,19 @@ export async function proposePartition(req: PartitionProposalRequest): Promise<{
   if (!def) throw new Error("no cohort “" + cohort + "” to split; have " + Object.keys(doc.cohorts || {}).join(", "));
   const modes = [req.attribute, req.gene, req.oql].filter((x) => x != null && x !== "").length;
   if (modes !== 1) throw new Error("name exactly one of attribute, gene or oql to split by");
-  const taken = [...Object.keys(doc.cohorts || {}), ...Object.keys(paramsDoc.partitions || {})];
-  const nameFor = (what: string) => req.name && req.name.trim() ? req.name.trim() : uniqueName(cohort + " by " + what, taken);
-  if (req.name && taken.includes(req.name.trim())) throw new Error("“" + req.name.trim() + "” is already a cohort or partition name");
+  // a split is named on its cohort, so only that cohort's other splits (and the cohort names its
+  // children would collide with) are taken
+  const taken = Object.values(flattenSplits((paramsDoc as AnalysisDoc).cohorts || {})).filter((p) => p.of === cohort).map((p) => p.split);
+  const free = (n: string) => !taken.includes(n) && !doc.cohorts?.[splitKey(cohort, n)];
+  const nameFor = (what: string) => req.name && req.name.trim() ? req.name.trim()
+    : uniqueName(what, [...taken, ...Object.keys(doc.cohorts || {}).filter((c) => c.startsWith(cohort + " / ")).map((c) => c.slice(cohort.length + 3))]);
+  if (req.name && !free(req.name.trim())) throw new Error("“" + cohort + "” already has a split named “" + req.name.trim() + "”");
   if (req.gene) {
     const p = partitionFromGene(cohort, req.gene);
-    return { name: nameFor(p.source!.gene!), def: p };
+    const name = nameFor(p.source!.gene!);
+    return { name, def: { ...p, split: name } };
   }
-  if (req.oql) return { name: nameFor("OQL"), def: partitionFromOql(cohort, req.oql) };
+  if (req.oql) { const name = nameFor("OQL"); return { name, def: { ...partitionFromOql(cohort, req.oql), split: name } }; }
 
   const attribute = String(req.attribute).trim();
   if (!ATTR_NAME_RE.test(attribute)) throw new Error("'" + attribute + "' is not a valid attribute name");
@@ -260,13 +273,15 @@ export async function proposePartition(req: PartitionProposalRequest): Promise<{
     // A median split relative to the cohort being split, through a percentile leaf: the engine
     // resolves the cutoff live from this cohort's own patients.
     if (studies.length > 1) throw new Error("'" + attribute + "' is numeric, and a median split needs a cohort in a single study (“" + cohort + "” spans " + studies.length + ")");
-    return { name: nameFor(attribute), note: "split at the median of " + attribute + " within “" + cohort + "”",
-      def: { of: cohort, arms: [{ name: attribute + " below median", where: { kind: "clinical", attribute, ...(dist.per === "sample" ? { per: "sample" as const } : {}), op: "<", percentile: 0.5, percentileOf: cohort } }],
+    const name = nameFor(attribute);
+    return { name, note: "split at the median of " + attribute + " within “" + cohort + "”",
+      def: { of: cohort, split: name, arms: [{ name: attribute + " below median", where: { kind: "clinical", attribute, ...(dist.per === "sample" ? { per: "sample" as const } : {}), op: "<", percentile: 0.5, percentileOf: cohort } }],
         other: attribute + " at or above median", source: { attribute, median: true } } };
   }
   const { def: p, pooled } = partitionFromValues(cohort, attribute, dist.per, dist.values || [], { maxArms: req.maxArms, minCount: req.minCount });
   if (dist.partial && p.source) p.source.otherValuesTruncated = true;
-  return { name: nameFor(attribute), def: p,
+  const name = nameFor(attribute);
+  return { name, def: { ...p, split: name },
     ...(pooled.length ? { note: (dist.partial ? "Values" : pooled.length + " value" + (pooled.length === 1 ? "" : "s")) +
       " with fewer patients go to Other: " + pooled.slice(0, 12).join(", ") + (pooled.length > 12 || dist.partial ? ", …" : "") } : {}) };
 }
@@ -279,9 +294,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   // for the same reason: by the time anything else looks at doc.cohorts, every
   // cohort's `all` is already the full, flattened list. Partitions expand into child cohorts
   // that `extends` their parent, so they resolve just before it.
-  const { doc: paramsDoc, params: usedParams, unused: unusedParams } = resolveParams(template);
+  // A document written in an older version is brought up to date before anything reads it, and
+  // the result says so; one written for a newer version is refused (lib/doc-version.ts).
+  const { doc: currentDoc, upgrade } = upgradeDocument(template);
+  const { doc: paramsDoc, params: usedParams, unused: unusedParams } = resolveParams(currentDoc);
   const authoredNames = Object.keys(paramsDoc.cohorts || {});
-  const { doc: partitionedDoc, plans: partitionPlans } = resolvePartitions(paramsDoc);
+  const { doc: partitionedDoc, plans: partitionPlans } = expandSplitTree(paramsDoc);
   const extendsDoc = resolveExtends(partitionedDoc);
   assertPartitionChildrenFit(extendsDoc.cohorts, partitionPlans);
   assertCustomDataPresent(extendsDoc);
@@ -347,12 +365,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   for (const name of names) cohorts[name] = await evalCohortDef(doc.cohorts[name]);
   // The children of a partition are disjoint and cover the parent by construction; counting
   // them is the check that the construction held, so a mismatch is reported, never hidden.
-  const partitionResults: NonNullable<AnalysisResult["partitions"]> = {};
+  const partitionResults: NonNullable<AnalysisResult["splits"]> = {};
   for (const plan of partitionPlans) {
     const children = plan.children.map((c) => ({ name: c.name, label: c.label, role: c.role, count: cohorts[c.name].count }));
     const sum = children.reduce((n, c) => n + c.count, 0);
     const parentCount = cohorts[plan.of].count;
-    partitionResults[plan.name] = { of: plan.of, parentCount, children, sum, conserved: sum === parentCount, unchecked: plan.unchecked };
+    partitionResults[plan.name] = { of: plan.of, split: plan.split, parentCount, children, sum, conserved: sum === parentCount, unchecked: plan.unchecked };
   }
   const partitionShapes = partitionPlans.map((p) => ({ name: p.name, of: p.of, comparable: comparableChildren(p) }));
   const generatedNames = new Set(partitionPlans.flatMap((p) => p.children.map((c) => c.name)));
@@ -2116,7 +2134,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     // missed a reference: the run succeeds, so nothing else would say so.
     ...(Object.keys(usedParams).length ? { params: usedParams } : {}),
     ...(unusedParams.length ? { unusedParams } : {}),
-    ...(partitionPlans.length ? { partitions: partitionResults } : {}),
+    ...(partitionPlans.length ? { splits: partitionResults } : {}),
+    ...(upgrade ? { upgraded: upgrade } : {}),
     cohorts: Object.fromEntries(names.map((n) => [n, {
       count: cohorts[n].count, text: cohorts[n].text,
       studies: cohorts[n].studies,
