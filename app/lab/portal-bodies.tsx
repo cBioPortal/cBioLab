@@ -6,7 +6,7 @@
 // sub-tab or row is open is this browser's (invariant 9), never the document's.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ViewResult, TableQuery } from "../../lib/types";
-import { DataTable } from "../_table/DataTable.tsx";
+import { DataTable, specQuery } from "../_table/DataTable.tsx";
 export { usePages, Pager } from "../_table/DataTable.tsx";
 import { cancertypesPanelSvg, enrichmentVolcanoSvg, enrichmentScatterSvg, enrichmentTopSvg } from "../../lib/view-svg-portal";
 import { frame, palette, SERIES } from "../../lib/svg-kit";
@@ -280,12 +280,12 @@ export function AssaysBody({ v }: { v: ViewResult }) {
 
 // ---- Mutations: one gene's mutation table, on the shared table (app/_table/DataTable.tsx) ---------
 
-export function MutationsBody({ v, vi, busy, docJson, onQuery }: { v: ViewResult; vi: number; busy: boolean; docJson?: () => string;
+export function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: ViewResult; spec: Record<string, unknown>; vi: number; updating: boolean; docJson?: () => string;
   onQuery: (q: TableQuery) => void }) {
   const t = v.mutations!;
   return (
     <div className="pb">
-      <DataTable t={t} vi={vi} docJson={docJson} busy={busy} unit={t.gene + " mutations"} onQuery={onQuery}
+      <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} onQuery={onQuery}
         num={(id, x) => id === "vaf" ? x.toFixed(2) : x.toLocaleString()}
         cell={(id, x) => id === "annotation" && x ? <Badge text={String(x)} color={/oncogenic/i.test(String(x)) && !/likely neutral|inconclusive/i.test(String(x)) ? SERIES[4] : null} />
           : id === "sample" ? <span className="mono">{x}</span> : undefined} />

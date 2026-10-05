@@ -1423,3 +1423,18 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .dt-funnel.on { background: var(--accent-soft); }
 .dt-table tbody tr { cursor: default; }
 .dt .tv-scroll > table { width: 100%; }
+/* waiting: the rows are covered while a request for them runs; the bar, chips and headers stay usable */
+.dt-body { position: relative; }
+.dt-body.waiting-rows .tv-scroll { min-height: 9rem; }
+.dt-wait {
+  position: absolute; left: 1px; right: 1px; bottom: 1px; z-index: 4;
+  display: flex; align-items: flex-start; justify-content: center; padding-top: var(--s4, 1.25rem);
+  background: color-mix(in srgb, var(--card) 72%, transparent); border-radius: 0 0 var(--r-sm) var(--r-sm);
+}
+.dt-wait .loading-block { display: inline-flex; align-items: center; gap: var(--s2); padding: var(--s1) var(--s3); border-radius: var(--r-pill);
+  background: var(--card); border: 1px solid var(--line); color: var(--muted); font-size: var(--t-sm); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+.dt-title.stale { opacity: 0.55; }
+.dt-loading { display: flex; flex-direction: column; gap: 6px; padding: var(--s1) 0; }
+.dt-skel { display: block; height: 0.8rem; border-radius: var(--r-sm); }
+.dt-skel:nth-child(odd) { width: 70%; } .dt-skel:nth-child(even) { width: 85%; }
+

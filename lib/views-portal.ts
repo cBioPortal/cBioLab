@@ -719,7 +719,7 @@ async function tableView(view: TableView, ctx: ViewCtx): Promise<ViewResult> {
     const own: Record<string, string> = { patient: String(x.patient ?? ""), sample: String(x.sample ?? ""), samples: String(x.samples ?? "") };
     return { cohort: String(x.cohort), study: String(x.study), patient: own.patient, sample: own.sample, values: columns.map((c) => c.id in own && ids.some((i) => i.id === c.id) ? own[c.id] : m[c.id] ?? "") };
   });
-  const table = { unit, columns, shown, query: q, rows, offset: r.offset, pageSize: show, lists: r.lists, total: r.total, all: r.all,
+  const table = { unit, columns, shown, defaults, query: q, rows, offset: r.offset, pageSize: show, lists: r.lists, total: r.total, all: r.all,
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
   if (ctx.page || ctx.values) return { kind: "table", cohorts: vNames, table, participation: ctx.participationFor(ctx.vStudies, true) };
   const one = unit === "sample" ? "sample" : "patient";
@@ -774,7 +774,7 @@ async function mutationsView(view: MutationsView, ctx: ViewCtx): Promise<ViewRes
   const rows = r.rows.map((x) => ({ cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? ""),
     values: MUTATION_COLUMNS.map((c) => mutationValue(x, c.id)) }));
   const shown = shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS);
-  const mutations = { gene, columns: MUTATION_COLUMNS, shown, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin,
+  const mutations = { gene, columns: MUTATION_COLUMNS, shown, defaults: MUTATION_DEFAULT_COLUMNS, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin,
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
   if (ctx.page || ctx.values) return { kind: "mutations", cohorts: vNames, mutations, participation: ctx.participationFor(ctx.vStudies, true) };
   return {

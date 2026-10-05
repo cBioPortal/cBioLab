@@ -3,7 +3,7 @@
 // ViewHead, then this kind's controls, then the server-rendered figure — so all that differs
 // per kind lives here: its title, whether it takes a gene list, and its own settings.
 import React, { useEffect, useState } from "react";
-import { DataTable } from "../_table/DataTable.tsx";
+import { DataTable, specQuery } from "../_table/DataTable.tsx";
 import { CancertypesBody, EnrichmentBody, CorrelatesBody, AssaysBody, MutationsBody } from "./portal-bodies";
 
 /**
@@ -72,6 +72,12 @@ const PAIRED_DEFAULT_GENES = ["TP53", "KRAS", "PIK3CA", "ESR1", "AR", "CDKN2A", 
 
 export const isMoreKind = (k: unknown): boolean => Object.prototype.hasOwnProperty.call(MORE_KINDS, String(k));
 
+/**
+ * Views that show their own waiting state (the table views: their search, filters and headers stay
+ * usable while the rows are covered), so the page must not cover the card with its own.
+ */
+export const drawsOwnWaiting = (k: unknown): boolean => k === "table" || k === "mutations";
+
 /** What a card needs from the page: the view as written, its result, and a way to edit it. */
 export interface MoreCtx {
   vi: number;
@@ -80,6 +86,9 @@ export interface MoreCtx {
   /** the view's result */
   v: any;
   busy: boolean;
+  /** a request for this view is running (its own re-run, or the whole document's) — a view that draws its own
+   *  waiting state (drawsOwnWaiting) shows it; for the rest the page covers the card */
+  updating?: boolean;
   patch: (p: Record<string, unknown>) => void;
   attrs: { attribute: string; kind: string }[];
   profiles: string[];
@@ -494,7 +503,7 @@ export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
   if (c.spec.kind === "enrichment" && c.v.enrichment) return <EnrichmentBody v={c.v} />;
   if (c.spec.kind === "correlates" && c.v.correlates) return <CorrelatesBody v={c.v} docJson={c.docJson} />;
   if (c.spec.kind === "assays" && c.v.assays) return <AssaysBody v={c.v} />;
-  if (c.spec.kind === "mutations" && c.v.mutations) return <MutationsBody v={c.v} vi={c.vi} busy={c.busy} docJson={c.docJson} onQuery={(q) => c.patch({ ...q })} />;
+  if (c.spec.kind === "mutations" && c.v.mutations) return <MutationsBody v={c.v} spec={c.spec} vi={c.vi} updating={c.updating ?? c.busy} docJson={c.docJson} onQuery={(q) => c.patch({ ...q })} />;
   if (c.spec.kind === "table" && c.v.table) return <ClinicalTableBody c={c} />;
 
   return null;
@@ -503,7 +512,7 @@ export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
 /** The clinical data table's body, on the shared table (app/_table/DataTable.tsx). */
 function ClinicalTableBody({ c }: { c: MoreCtx }) {
   const t = c.v.table as import("../../lib/types").TableResult;
-  return <DataTable t={t} vi={c.vi} docJson={c.docJson} busy={c.busy} unit={t.unit + "s"}
+  return <DataTable t={t} query={specQuery(c.spec)} updating={c.updating ?? c.busy} vi={c.vi} docJson={c.docJson} unit={t.unit + "s"}
     onQuery={(q) => c.patch({ ...q, attributes: undefined })}
     cell={(id, x) => (id === "patient" || id === "sample") ? <span className="mono">{x}</span> : undefined} />;
 }

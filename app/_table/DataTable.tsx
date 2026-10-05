@@ -8,6 +8,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ColumnFilter, ColumnValues, TableQuery, TableRows, TextFilterOp } from "../../lib/types.ts";
 import { withCustomRefs } from "../lab/custom-data-client.ts";
+import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 
 const OP_LABELS: Record<TextFilterOp, string> = {
   contains: "contains", notContains: "does not contain", equals: "equals", notEquals: "does not equal",
@@ -49,7 +50,6 @@ export function usePages<R>(first: R[], total: number, offset0: number, viewSize
   const [size, setSizeState] = useState(viewSize);
   const [page, setPageState] = useState(0);
   const [cache, setCache] = useState<Map<string, R[]>>(new Map());
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const gen = useRef(0);
   // a new result starts again at page 1; the page size is the reader's and stays
@@ -60,16 +60,17 @@ export function usePages<R>(first: R[], total: number, offset0: number, viewSize
   useEffect(() => {
     if (local || cache.has(k) || !docJson) return;
     const g = ++gen.current;
-    setLoading(true); setError(null);
+    setError(null);
     let doc: unknown;
-    try { doc = JSON.parse(docJson()); } catch { setLoading(false); setError("no document to page"); return; }
+    try { doc = JSON.parse(docJson()); } catch { setError("no document to page"); return; }
     fetch("/api/view-page", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc, view: vi, offset: page * size, limit: size }) })
       .then((r) => r.json())
       .then((j) => { if (gen.current !== g) return; if (j.error) setError(j.error); else setCache((m) => new Map(m).set(k, j.rows)); })
-      .catch((e) => { if (gen.current === g) setError(String(e)); })
-      .finally(() => { if (gen.current === g) setLoading(false); });
+      .catch((e) => { if (gen.current === g) setError(String(e)); });
   }, [k, local, cache]);   // eslint-disable-line react-hooks/exhaustive-deps
-  return { rows: local || cache.get(k) || [], loading: !local && !cache.has(k) && loading, error, page, size, pages, total,
+  // a page not on hand is loading from the render that asks for it (the effect above fetches it), so the
+  // rows never flash empty first; with no document to fetch from, nothing is loading
+  return { rows: local || cache.get(k) || [], loading: !local && !cache.has(k) && !error && !!docJson, error, page, size, pages, total,
     setPage: (p) => setPageState(Math.max(0, Math.min(pages - 1, p))),
     setSize: (n) => { setSizeState(n); setPageState(0); } };
 }
@@ -92,7 +93,6 @@ export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
       <label className="tbfield">per page <select value={String(p.size)} onChange={(e) => p.setSize(Number(e.target.value))}>
         {[25, 50, 100, 250].map((n) => <option key={n} value={n}>{n}</option>)}
       </select></label>
-      {p.loading && <span className="waiting"><span className="spinner" /> loading page {p.page + 1}…</span>}
       {p.error && <span className="mark">{p.error}</span>}
     </div>
   );
@@ -133,28 +133,40 @@ function Popover({ open, onClose, children, align = "left" }: { open: boolean; o
 
 // ---- a column's filter ---------------------------------------------------------------------------
 
-/** The values a column takes among the rows the rest of the query keeps, fetched when its filter opens. */
-function useColumnValues(column: string | null, vi: number, docJson?: () => string): { v: ColumnValues | null; error: string | null } {
-  const [state, setState] = useState<{ v: ColumnValues | null; error: string | null }>({ v: null, error: null });
+/**
+ * The values a column takes among the rows the rest of the query keeps, fetched when its filter
+ * opens. Loading, failed and loaded are three states, and `retry` asks again after a failure.
+ */
+type Values = { status: "loading" } | { status: "failed"; error: string } | { status: "loaded"; v: ColumnValues };
+function useColumnValues(column: string, vi: number, docJson?: () => string): Values & { retry: () => void } {
+  const [state, setState] = useState<Values>({ status: "loading" });
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    if (!column || !docJson) return;
     let doc: unknown, live = true;
-    try { doc = JSON.parse(docJson()); } catch { return; }
-    setState({ v: null, error: null });
+    try { doc = JSON.parse(docJson ? docJson() : ""); } catch { setState({ status: "failed", error: "no document to read the values from" }); return; }
+    setState({ status: "loading" });
     fetch("/api/view-page", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc, view: vi, values: column }) })
       .then((r) => r.json())
-      .then((j) => { if (live) setState(j.error ? { v: null, error: j.error } : { v: j.values, error: null }); })
-      .catch((e) => { if (live) setState({ v: null, error: String(e) }); });
+      .then((j) => { if (live) setState(j.error || !j.values ? { status: "failed", error: j.error || "no values came back" } : { status: "loaded", v: j.values }); })
+      .catch((e) => { if (live) setState({ status: "failed", error: String((e as Error)?.message || e) }); });
     return () => { live = false; };
-  }, [column]);   // eslint-disable-line react-hooks/exhaustive-deps
-  return state;
+  }, [column, attempt]);   // eslint-disable-line react-hooks/exhaustive-deps
+  return { ...state, retry: () => setAttempt((n) => n + 1) };
+}
+
+/** What a filter menu shows in place of its values while they load, or when they could not be read. */
+function ValuesState({ s, what }: { s: Values & { retry: () => void }; what: string }) {
+  if (s.status === "loading") return <div className="dt-loading"><Waiting what={what} />{[0, 1, 2, 3, 4].map((i) => <span key={i} className="skeleton dt-skel" />)}</div>;
+  if (s.status === "failed") return <div className="dt-loading"><span className="mark">could not read the {what}: {s.error}</span> <button type="button" className="linklike" onClick={s.retry}>retry</button></div>;
+  return null;
 }
 
 function FilterMenu({ col, current, vi, docJson, onApply }: {
   col: { id: string; name: string; numeric: boolean }; current: ColumnFilter | undefined; vi: number; docJson?: () => string;
   onApply: (f: ColumnFilter | undefined) => void;
 }) {
-  const { v, error } = useColumnValues(col.id, vi, docJson);
+  const vals = useColumnValues(col.id, vi, docJson);
+  const v = vals.status === "loaded" ? vals.v : null;
   const cur = current;
   const [op, setOp] = useState<TextFilterOp>(cur && !isRange(cur) && !isValues(cur) ? cur.op : "contains");
   const [text, setText] = useState(cur && !isRange(cur) && !isValues(cur) ? cur.value : "");
@@ -173,11 +185,12 @@ function FilterMenu({ col, current, vi, docJson, onApply }: {
     return (
       <div className="dt-filter">
         <b>{col.name}</b>
-        <span className="meta">{range ? (range.n ? "values from " + range.min!.toLocaleString() + " to " + range.max!.toLocaleString() + " in " + range.n.toLocaleString() + " rows" : "no values in the rows kept")
-          : error ? <span className="mark">{error}</span> : "reading the range…"}</span>
+        {range ? <span className="meta">{range.n ? "values from " + range.min!.toLocaleString() + " to " + range.max!.toLocaleString() + " in " + range.n.toLocaleString() + " rows" : "no values in the rows kept"}</span>
+          : <ValuesState s={vals} what="range" />}
+        {/* typing a bound need not wait for the range; the range only fills the placeholders */}
         <div className="row">
-          <label className="tbfield">from <input type="number" step="any" value={lo} placeholder={range && range.min != null ? String(range.min) : ""} onChange={(e) => setLo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && apply()} /></label>
-          <label className="tbfield">to <input type="number" step="any" value={hi} placeholder={range && range.max != null ? String(range.max) : ""} onChange={(e) => setHi(e.target.value)} onKeyDown={(e) => e.key === "Enter" && apply()} /></label>
+          <label className="tbfield">from <input type="number" step="any" value={lo} placeholder={range && range.min != null ? String(range.min) : "min"} onChange={(e) => setLo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && apply()} /></label>
+          <label className="tbfield">to <input type="number" step="any" value={hi} placeholder={range && range.max != null ? String(range.max) : "max"} onChange={(e) => setHi(e.target.value)} onKeyDown={(e) => e.key === "Enter" && apply()} /></label>
         </div>
         <span className="meta">blank rows are left out once a range is set</span>
         <div className="row end">
@@ -215,11 +228,12 @@ function FilterMenu({ col, current, vi, docJson, onApply }: {
       <span className="meta">or pick values{list ? " — " + list.values.length.toLocaleString() + (list.truncated ? "+ (the most frequent)" : "") + " in the rows kept" : ""}</span>
       {list && list.values.length > 8 && <input type="search" value={find} placeholder="find a value" onChange={(e) => setFind(e.target.value)} aria-label="find a value" />}
       <div className="row">
-        <button type="button" className="linklike" onClick={() => { setPicked(null); setText(""); }}>all</button>
-        <button type="button" className="linklike" onClick={() => { setPicked(new Set()); setText(""); }}>none</button>
+        <button type="button" className="linklike" disabled={!list} title={list ? undefined : "waiting for the column's values"} onClick={() => { setPicked(null); setText(""); }}>all</button>
+        <button type="button" className="linklike" disabled={!list} title={list ? undefined : "waiting for the column's values"} onClick={() => { setPicked(new Set()); setText(""); }}>none</button>
       </div>
       <div className="dt-values">
-        {!list && (error ? <span className="mark">{error}</span> : <span className="meta">reading the values…</span>)}
+        {!list && <ValuesState s={vals} what="values" />}
+        {list && !list.values.length && <span className="meta">no values in the rows kept</span>}
         {shown.map((x) => (
           <label key={x.value} className="meta">
             <input type="checkbox" checked={isOn(x.value)} onChange={() => toggle(x.value)} />
@@ -267,11 +281,28 @@ function ColumnsMenu({ columns, shown, onShown }: { columns: { id: string; name:
 
 // ---- the table ---------------------------------------------------------------------------------------
 
+/** A table view's query as its spec holds it — older `attributes` and `sort.attribute` read as `columns` and `sort.column`. */
+export function specQuery(spec: Record<string, unknown>): TableQuery {
+  const s = spec.sort as { column?: string; attribute?: string; desc?: boolean } | undefined;
+  const column = s ? s.column || s.attribute : undefined;
+  return clean({
+    columns: (spec.columns || spec.attributes) as string[] | undefined,
+    search: spec.search as string | undefined,
+    filters: spec.filters as TableQuery["filters"],
+    sort: column ? { column, ...(s!.desc ? { desc: true } : {}) } : undefined,
+  });
+}
+
 export interface DataTableProps<V> {
+  /** the last result: the rows on screen, the columns, the counts */
   t: TableRows<V>;
+  /** the query as the document holds it now — what the controls show and what an edit builds on, so a second
+   *  edit made while the first is still running keeps the first (default: the result's) */
+  query?: TableQuery;
+  /** a request for this view is running (a query change, or the whole document): the rows are covered */
+  updating: boolean;
   /** the view's index in the document, and the document — for pages, a column's values and the download */
   vi: number; docJson?: () => string;
-  busy: boolean;
   /** what a row is, plural: "mutations", "samples" */
   unit: string;
   /** the view's search, filters, sort and columns changed: write them to its spec (re-runs the view) */
@@ -283,14 +314,21 @@ export interface DataTableProps<V> {
   title?: React.ReactNode;
 }
 
-export function DataTable<V extends string | number | null>({ t, vi, docJson, busy, unit, onQuery, cell, num, title }: DataTableProps<V>) {
-  const q = t.query || {};
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, unit, onQuery, cell, num, title }: DataTableProps<V>) {
+  const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson);
   const multi = t.lists.length > 1;
   const [menu, setMenu] = useState<string | null>(null);   // a column id, or "\x01columns"
   const [search, setSearch] = useState(q.search || "");
   useEffect(() => { setSearch(q.search || ""); }, [q.search]);
-  const set = (patch: Partial<TableQuery>, keepOpen = false) => { if (!keepOpen) setMenu(null); onQuery(clean({ ...q, ...patch })); };
+  const head = useRef<HTMLTableSectionElement>(null);
+  const [headH, setHeadH] = useState(0);
+  useLayoutEffect(() => { if (head.current) setHeadH(head.current.offsetHeight); });
+  const set = (patch: Partial<TableQuery>, keepOpen = false) => {
+    if (!keepOpen) setMenu(null);
+    const next = clean({ ...q, ...patch });
+    if (JSON.stringify(next) !== JSON.stringify(clean(q))) onQuery(next);
+  };
   const setFilter = (id: string, f: ColumnFilter | undefined) => {
     const filters = { ...(q.filters || {}) };
     if (f) filters[id] = f; else delete filters[id];
@@ -300,9 +338,13 @@ export function DataTable<V extends string | number | null>({ t, vi, docJson, bu
     const on = q.sort && q.sort.column === c.id;
     set({ sort: on ? { column: c.id, ...(q.sort!.desc ? {} : { desc: true }) } : { column: c.id, ...(c.numeric ? { desc: true } : {}) } });
   };
-  const shownIdx = t.shown.map((id) => t.columns.findIndex((c) => c.id === id)).filter((i) => i >= 0);
+  // the columns as the document asks for them; the result's own until it says otherwise
+  const known = (id: string) => t.columns.some((c) => c.id === id);
+  const shownIds = q.columns && q.columns.some(known) ? q.columns.filter(known) : !q.columns && t.query.columns ? (t.defaults || t.shown) : t.shown;
+  const shownIdx = shownIds.map((id) => t.columns.findIndex((c) => c.id === id)).filter((i) => i >= 0);
   const filters = Object.entries(q.filters || {});
   const filtered = t.total < t.all || filters.length > 0 || !!(q.search || "").trim();
+  const waiting = updating ? "updating…" : p.loading ? "loading page " + (p.page + 1).toLocaleString() + "…" : null;
   const show = (c: { id: string; numeric: boolean }, x: V) => {
     if (cell) { const r = cell(c.id, x); if (r !== undefined) return r; }
     if (x == null || x === "") return "";
@@ -319,76 +361,82 @@ export function DataTable<V extends string | number | null>({ t, vi, docJson, bu
   return (
     <div className="dt">
       <div className="dt-bar">
-        <span className="dt-title">{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}</> : <>{t.total.toLocaleString()} {unit}</>}
+        <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}</> : <>{t.total.toLocaleString()} {unit}</>}
           {multi ? <span className="meta"> across {t.lists.length} cohorts and studies</span> : null}</span>
+        {updating && <span className="waiting" role="status"><span className="spinner" /> updating…</span>}
         <span className="spacer" />
         <form className="dt-search" onSubmit={(e) => { e.preventDefault(); set({ search }); }}>
-          <input type="search" value={search} placeholder={"search " + unit} aria-label={"search " + unit} disabled={busy}
+          <input type="search" value={search} placeholder={"search " + unit} aria-label={"search " + unit}
             onChange={(e) => { setSearch(e.target.value); if (!e.target.value && q.search) set({ search: undefined }); }}
             onBlur={() => { if ((search || "") !== (q.search || "")) set({ search }); }} />
         </form>
         <span className="dt-anchor">
-          <button type="button" className={"tbbtn" + (menu === "\x01columns" ? " on" : "")} disabled={busy} onClick={() => setMenu(menu === "\x01columns" ? null : "\x01columns")}
-            title="choose the columns shown">columns ({t.shown.length}/{t.columns.length})</button>
+          <button type="button" className={"tbbtn" + (menu === "\x01columns" ? " on" : "")} onClick={() => setMenu(menu === "\x01columns" ? null : "\x01columns")}
+            title="choose the columns shown">columns ({shownIdx.length}/{t.columns.length})</button>
           <Popover open={menu === "\x01columns"} onClose={() => setMenu(null)} align="right">
-            <ColumnsMenu columns={t.columns} shown={t.shown} onShown={(ids) => set({ columns: ids }, true)} />
+            <ColumnsMenu columns={t.columns} shown={shownIds} onShown={(ids) => set({ columns: ids }, true)} />
           </Popover>
         </span>
         <form method="post" action="/api/table" target="_blank" onSubmit={download}>
           <input type="hidden" name="payload" />
-          <button className="tbbtn" type="submit" disabled={busy || !docJson || !t.total}
-            title={"every row kept, with all " + t.columns.length + " columns, as comma-separated text"}>download CSV ({t.total.toLocaleString()})</button>
+          <button className="tbbtn" type="submit" disabled={updating || !docJson || !t.total}
+            title={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download"
+              : "every row kept, with all " + t.columns.length + " columns, as comma-separated text"}>download CSV ({t.total.toLocaleString()})</button>
         </form>
       </div>
       {(filters.length > 0 || (q.search || "").trim()) && (
         <div className="dt-chips">
-          {(q.search || "").trim() && <span className="dt-chip">search “{q.search}” <button type="button" aria-label="clear search" disabled={busy} onClick={() => set({ search: undefined })}>×</button></span>}
+          {(q.search || "").trim() && <span className="dt-chip">search “{q.search}” <button type="button" aria-label="clear search" onClick={() => set({ search: undefined })}>×</button></span>}
           {filters.map(([id, f]) => (
             <span key={id} className="dt-chip">
-              <button type="button" className="linklike" disabled={busy} onClick={() => setMenu(id)}>{t.columns.find((c) => c.id === id)?.name || id} {filterText(f)}</button>
-              <button type="button" aria-label={"remove the filter on " + id} disabled={busy} onClick={() => setFilter(id, undefined)}>×</button>
+              <button type="button" className="linklike" onClick={() => setMenu(id)}>{t.columns.find((c) => c.id === id)?.name || id} {filterText(f)}</button>
+              <button type="button" aria-label={"remove the filter on " + id} onClick={() => setFilter(id, undefined)}>×</button>
             </span>))}
-          <button type="button" className="linklike" disabled={busy} onClick={() => set({ search: undefined, filters: undefined })}>clear all</button>
+          <button type="button" className="linklike" onClick={() => set({ search: undefined, filters: undefined })}>clear all</button>
         </div>
       )}
-      <div className={"tv-scroll" + (p.loading ? " pb-loading" : "")}>
-        <table className="pb-table dt-table">
-          <thead><tr>
-            {multi && <th>cohort</th>}
-            {multi && <th>study</th>}
-            {shownIdx.map((i) => {
-              const c = t.columns[i];
-              const sorted = q.sort && q.sort.column === c.id;
-              const fon = !!(q.filters && q.filters[c.id]);
-              return (
-                <th key={c.id} className={c.numeric ? "num" : undefined} aria-sort={sorted ? (q.sort!.desc ? "descending" : "ascending") : "none"}>
-                  <span className="dt-th">
-                    <button type="button" className="dt-sort" disabled={busy} onClick={() => sortBy(c)} title="sort the whole table by this column, across every page">
-                      {c.name}{sorted ? (q.sort!.desc ? " ▾" : " ▴") : ""}
-                    </button>
-                    <span className="dt-anchor">
-                      <button type="button" className={"dt-funnel" + (fon ? " on" : "")} disabled={busy} aria-label={"filter " + c.name}
-                        title={fon ? "filtered: " + filterText(q.filters![c.id]) : "filter this column"} onClick={() => setMenu(menu === c.id ? null : c.id)}>
-                        <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M1 1.5h10L7.2 6.2V10L4.8 11V6.2z" fill="currentColor" /></svg>
+      <div className={"dt-body" + (waiting ? " waiting-rows" : "")} aria-busy={!!waiting}>
+        <div className="tv-scroll">
+          <table className="pb-table dt-table">
+            <thead ref={head}><tr>
+              {multi && <th>cohort</th>}
+              {multi && <th>study</th>}
+              {shownIdx.map((i) => {
+                const c = t.columns[i];
+                const sorted = q.sort && q.sort.column === c.id;
+                const fon = !!(q.filters && q.filters[c.id]);
+                return (
+                  <th key={c.id} className={c.numeric ? "num" : undefined} aria-sort={sorted ? (q.sort!.desc ? "descending" : "ascending") : "none"}>
+                    <span className="dt-th">
+                      <button type="button" className="dt-sort" onClick={() => sortBy(c)} title="sort the whole table by this column, across every page">
+                        {c.name}{sorted ? (q.sort!.desc ? " ▾" : " ▴") : ""}
                       </button>
-                      <Popover open={menu === c.id} onClose={() => setMenu(null)} align={c.numeric ? "right" : "left"}>
-                        <FilterMenu col={c} current={q.filters?.[c.id]} vi={vi} docJson={docJson} onApply={(f) => setFilter(c.id, f)} />
-                      </Popover>
+                      <span className="dt-anchor">
+                        <button type="button" className={"dt-funnel" + (fon ? " on" : "")} aria-label={"filter " + c.name}
+                          title={fon ? "filtered: " + filterText(q.filters![c.id]) : "filter this column"} onClick={() => setMenu(menu === c.id ? null : c.id)}>
+                          <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M1 1.5h10L7.2 6.2V10L4.8 11V6.2z" fill="currentColor" /></svg>
+                        </button>
+                        <Popover open={menu === c.id} onClose={() => setMenu(null)} align={c.numeric ? "right" : "left"}>
+                          <FilterMenu col={c} current={q.filters?.[c.id]} vi={vi} docJson={docJson} onApply={(f) => setFilter(c.id, f)} />
+                        </Popover>
+                      </span>
                     </span>
-                  </span>
-                </th>);
-            })}
-          </tr></thead>
-          <tbody>
-            {p.rows.map((r, k) => (
-              <tr key={k}>
-                {multi && <td className="meta">{r.cohort}</td>}
-                {multi && <td className="meta">{r.study}</td>}
-                {shownIdx.map((i) => <td key={i} className={t.columns[i].numeric ? "num" : undefined}>{show(t.columns[i], r.values[i])}</td>)}
-              </tr>))}
-            {!p.rows.length && !p.loading && <tr><td className="meta" colSpan={shownIdx.length + (multi ? 2 : 0)}>{filtered ? "no rows match — loosen the search or a filter" : "no rows"}</td></tr>}
-          </tbody>
-        </table>
+                  </th>);
+              })}
+            </tr></thead>
+            <tbody>
+              {p.rows.map((r, k) => (
+                <tr key={k}>
+                  {multi && <td className="meta">{r.cohort}</td>}
+                  {multi && <td className="meta">{r.study}</td>}
+                  {shownIdx.map((i) => <td key={i} className={t.columns[i].numeric ? "num" : undefined}>{show(t.columns[i], r.values[i])}</td>)}
+                </tr>))}
+              {!p.rows.length && !waiting && <tr><td className="meta" colSpan={shownIdx.length + (multi ? 2 : 0)}>{filtered ? "no rows match — loosen the search or a filter" : "no rows"}</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        {/* the rows under it are the last answer, not this one: covered until the new one lands; the header stays usable */}
+        {waiting && <div className="dt-wait" style={{ top: headH + 1 }} role="status" aria-live="polite"><span className="loading-block"><span className="spinner" /> {waiting}</span></div>}
       </div>
       <Pager p={p as PageRows<unknown>} unit={unit} />
     </div>

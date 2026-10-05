@@ -794,10 +794,11 @@ async function main() {
       await page.locator("button, [role=tab]").filter({ hasText: /^Mutations$/ }).first().click({ timeout: 120000 });
       const title = page.locator(".dt-title").first();
       await title.waitFor({ timeout: 240000 });
+      // a change re-runs the view: the table covers its rows until the answer lands (its controls stay enabled)
       const settle = async () => {
         await page.waitForTimeout(300);
-        await page.waitForFunction(() => { const s = document.querySelector(".dt-search input"); return s && !s.disabled; }, null, { timeout: 120000 });
-        await page.waitForTimeout(300);
+        await page.waitForFunction(() => !document.querySelector(".dt-wait") && !document.querySelector(".dt-bar .waiting"), null, { timeout: 120000 });
+        await page.waitForTimeout(200);
       };
       const count = async () => { const m = /(?:([\d,]+) of )?([\d,]+) KRAS mutations/.exec(await title.innerText()); return m ? { kept: Number((m[1] || m[2]).replace(/,/g, "")), all: Number(m[2].replace(/,/g, "")) } : null; };
       const all = await count();
@@ -809,6 +810,35 @@ async function main() {
       ok("table: search keeps only matching rows", !!searched && searched.kept > 0 && searched.kept < all.all && searched.all === all.all, JSON.stringify(searched));
       await page.getByRole("button", { name: "clear search" }).click();
       await settle();
+      // waiting states, checked by holding the request (CLAUDE.md, "Verify waiting states by holding the request")
+      {
+        let release, open = false;
+        const gate = new Promise((r) => (release = r)); gate.then(() => (open = true));
+        await page.route("**/api/analysis**", async (route) => { if (!open) await gate; try { await route.continue(); } catch {} });
+        await page.locator(".dt-search input").fill("G12"); await page.locator(".dt-search input").press("Enter");
+        await page.waitForTimeout(800);
+        const card = page.locator(".viewcard", { has: page.locator(".dt") });
+        const w = { cover: await page.locator(".dt-wait").isVisible().catch(() => false), search: await page.locator(".dt-search input").isEnabled(),
+          sort: await page.locator(".dt-sort").first().isEnabled(), cardCover: await card.locator(".view-updating").count() };
+        release(); await page.unroute("**/api/analysis**");
+        ok("table: while a query change runs, its rows are covered and its controls stay usable", w.cover && w.search && w.sort && w.cardCover === 0, JSON.stringify(w));
+        await page.waitForFunction(() => !document.querySelector(".dt-wait"), null, { timeout: 120000 });
+        await page.getByRole("button", { name: "clear search" }).click();
+        await settle();
+        await page.waitForFunction(() => !document.querySelector(".dt-wait"), null, { timeout: 120000 });
+      }
+      {
+        let release, open = false;
+        const gate = new Promise((r) => (release = r)); gate.then(() => (open = true));
+        await page.route("**/api/view-page", async (route) => { if (!open && /"values"/.test(route.request().postData() || "")) await gate; try { await route.continue(); } catch {} });
+        await page.getByRole("button", { name: "filter Mutation Type" }).click();
+        await page.waitForTimeout(600);
+        const w = { loader: await page.locator(".dt-pop .dt-loading .waiting").isVisible().catch(() => false), condition: await page.locator(".dt-pop select").isEnabled().catch(() => false) };
+        release(); await page.unroute("**/api/view-page");
+        await page.locator(".dt-values label").first().waitFor({ timeout: 60000 });
+        ok("table: a filter whose values are loading shows a loader, not an empty list", w.loader && w.condition, JSON.stringify(w));
+        await page.keyboard.press("Escape");
+      }
       await page.getByRole("button", { name: "filter Protein Change" }).click();
       await page.locator(".dt-values label").first().waitFor({ timeout: 60000 });
       const top = await page.locator(".dt-values label").first().innerText();

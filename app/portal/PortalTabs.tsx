@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc, AnalysisResult, View } from "../../lib/types";
 import { SERIES } from "../../lib/svg-kit";
-import { MoreBody, MoreControls, isMoreKind } from "../lab/more-views";
+import { MoreBody, MoreControls, isMoreKind, drawsOwnWaiting } from "../lab/more-views";
 import { dataPart } from "../_oncoprint/view-display.ts";
 import { OncoprintCard, type TrackCatalog } from "../_oncoprint/OncoprintCard.tsx";
 import type { PageTab } from "./page-doc";
@@ -104,7 +104,7 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
         // a result belongs to the request that produced it; while a newer one runs, the cover says so
         const v = st?.result?.views[i];
         const busy = !!st?.loading;
-        const mc = { vi: i, spec, v: v || {}, busy, attrs: [], profiles: [], assays: [], events: [], locked: tab?.chooser?.locks || [],
+        const mc = { vi: i, spec, v: v || {}, busy, updating: busy, attrs: [], profiles: [], assays: [], events: [], locked: tab?.chooser?.locks || [],
           patch: (p: Patch) => edit(vi, { ...spec, ...p } as unknown as View), docJson: () => JSON.stringify(slice) };
         const body = v && !v.error && v.kind === "oncoprint" && v.spec
           // the lab's own oncoprint card; the page's cohorts are its own, so a drag counts but makes no cohort
@@ -116,7 +116,7 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
             {idx.length > 1 && <h3 className="vtitle">{titles[vi]}</h3>}
             {isMoreKind(spec.kind) && <MoreControls c={mc} />}
             {busy && !v && <div className="skeleton skeleton-view" />}
-            {busy && v && <div className="view-updating"><span className="spinner" /> updating…</div>}
+            {busy && v && !(drawsOwnWaiting(v.kind) && !v.error) && <div className="view-updating"><span className="spinner" /> updating…</div>}
             {!busy && st?.error && <p className="note">{st.error}</p>}
             {v && v.error && <p className="note">{v.error}</p>}
             {v && !v.error && (body

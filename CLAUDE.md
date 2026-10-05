@@ -268,6 +268,22 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   and failed are three different states and each must say which it is: an empty select during a
   fetch reads as "this study has none". A button gated on fetched data (the add-view buttons'
   `why`) waits with a spinner via its `loading` predicate rather than guessing either way.
+- **Every request a table view makes shows, in the table, that it is running** — a query change
+  (search, filter, sort, columns: the view re-runs), another page, the whole document re-running.
+  The rows on screen are the last answer, so they are covered ("updating…", "loading page 3…",
+  `.dt-wait` in `app/_table/DataTable.tsx`) and the count is dimmed with a spinner beside it; the
+  bar, chips and headers stay visible and usable, and an action that would act on the stale
+  answer (the download) waits, saying why. Such a view draws its own waiting state, so the page
+  must not cover its card (`drawsOwnWaiting` in `app/lab/more-views.tsx`, honoured by the lab and
+  `PortalTabs`). Its controls show and edit the query **the document holds**, not the last result's,
+  so a second edit made while the first is running keeps the first. A page not yet on hand is
+  loading from the render that asks for it — never a flash of "no rows" first.
+- **A menu, popover or list whose contents load never opens empty.** Its fixed controls (a
+  filter's condition and text, a range's inputs) are there and usable at once; where the loaded
+  part goes, a `Waiting` loader with skeleton rows stands in until it lands; controls that act on
+  it (all / none) are disabled with a title saying what they wait for. Loaded-but-empty says so
+  ("no values in the rows kept"), and a failed load names the error and offers retry — three
+  states, never one blank box.
 - **A loader must be tied to a request that will end it.** Before showing "loading…", make sure
   something is actually fetching (that is why the clinical-attribute catalog loads for any
   result, not only once a plot exists) and that failure clears it (`.finally`), or the spinner
