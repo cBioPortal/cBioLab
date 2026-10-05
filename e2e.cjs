@@ -882,7 +882,9 @@ async function main() {
   // documented example must run against the live compiler.
   try {
     const { execSync } = require("child_process");
-    const out = execSync("npm run --silent docs:check", { cwd: __dirname, encoding: "utf8", timeout: 300000 });
+    // Runs every gallery example against the live database, ~210s for 58 examples on a loaded
+    // box; the limit bounds a hang, not the check.
+    const out = execSync("npm run --silent docs:check", { cwd: __dirname, encoding: "utf8", timeout: 420000 });
     for (const line of out.trim().split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
   } catch (e) {
     const out = String((e.stdout || "") + (e.stderr || "")).trim();
