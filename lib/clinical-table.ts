@@ -3,6 +3,7 @@
 // outside lib/federation*.ts's aggregate builders, and runs only through
 // PatientLevelResolver.tableRows: a participant that may not disclose a patient has no such method.
 import { sq } from "./compiler.ts";
+import { clinicalTable, clinicalMetaTable } from "./custom-data.ts";
 
 export interface TableColumn {
   id: string; name: string;
@@ -21,7 +22,7 @@ export const TABLE_CHUNK = 10000;
 /** The study's clinical attributes, highest priority first (the portal's column order). Metadata only. */
 export function tableAttributesSql(study: string, db: string): string {
   return "SELECT m.attr_id AS id, m.display_name AS name, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority\n" +
-    "FROM " + db + ".clinical_attribute_meta m\n" +
+    "FROM " + clinicalMetaTable(db) + " m\n" +
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = m.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
     "ORDER BY priority DESC, name";
@@ -52,7 +53,7 @@ function allRows(parts: TablePart[], db: string, unit: "sample" | "patient", col
     const values = (per: "patient" | "sample", attrs: string[]) =>
       "  SELECT " + (per === "patient" ? "patient_unique_id" : "sample_unique_id") + " AS k,\n" +
       "         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m\n" +
-      "  FROM " + db + ".clinical_data_derived\n" +
+      "  FROM " + clinicalTable(db, columns.map((c) => c.id)) + "\n" +
       "  WHERE cancer_study_identifier = " + sq(p.study) + " AND type = " + sq(per) +
       (attrs.length ? " AND attribute_name IN (" + attrs.join(",") + ")" : " AND 0") + "\n" +
       "    AND attribute_value != '' AND " + inCohort("patient_unique_id") + "\n" +

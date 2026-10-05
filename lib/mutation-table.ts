@@ -3,6 +3,7 @@
 // lives here, outside lib/federation*.ts's aggregate builders, and runs only through
 // PatientLevelResolver.mutationRows: a participant that may not disclose a patient has no such method.
 import { sq } from "./compiler.ts";
+import { clinicalTable } from "./custom-data.ts";
 
 export interface MutationColumn { id: string; name: string; numeric: boolean }
 
@@ -42,7 +43,7 @@ export interface TablePart { cohort: string; study: string; cohortSql: string }
 function partRows(p: TablePart, i: number, db: string, gene: string, pin: string | null): { ctes: string; rows: string } {
   const pre = sq(p.study + "_");
   const attr = (name: string, as: string) =>
-    as + " AS (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, any(attribute_value) AS v FROM " + db + ".clinical_data_derived\n" +
+    as + " AS (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, any(attribute_value) AS v FROM " + clinicalTable(db, [name]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(p.study) + " AND type = 'sample' AND attribute_name = " + sq(name) + "\n" +
     "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM m" + i + ") GROUP BY sid)";
   const ctes =

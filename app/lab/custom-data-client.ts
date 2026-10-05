@@ -11,7 +11,7 @@
 // sends them without knowing they exist:
 //
 //   /api/explore            every server dataset with rows in the studies being explored
-//   /api/analysis, /api/oncoprint, /api/custom-data/members
+//   /api/analysis, /api/oncoprint, /api/custom-data/members, /api/view-page
 //                           only datasets the document or spec names, so an analysis that uses
 //                           none stays on the shared result cache. A name the document pins
 //                           (`uploads`, see bindUploads) resolves to that version.
@@ -193,9 +193,9 @@ export function unresolvedUploads(doc: { uploads?: UploadBinding[] }): { as: str
 // ---------------------------------------------------------------------------
 
 function attach(path: string, body: string): string | null {
-  const j = JSON.parse(body) as { studies?: string[]; study?: string; uploads?: UploadBinding[] };
+  const j = JSON.parse(body) as { studies?: string[]; study?: string; uploads?: UploadBinding[]; doc?: { uploads?: UploadBinding[] } };
   const rows: CustomDataset[] = [], refs: UploadBinding[] = [];
-  const named = referencedDatasets({ ...j, uploads: undefined });
+  const named = referencedDatasets({ ...j, uploads: undefined, ...(j.doc ? { doc: { ...j.doc, uploads: undefined } } : {}) });
   for (const as of named) { const b = builtinDataset(as); if (b) rows.push(b); }
   if (path === "/api/explore") {
     const studies = new Set([...(j.studies || []), ...(j.study ? [j.study] : [])]);
@@ -204,7 +204,7 @@ function attach(path: string, body: string): string | null {
       if (v && v.studies.some((st) => studies.has(st))) refs.push({ as: s.slug, dataset: s.id, version: s.latestVersion });
     }
   } else {
-    const pins = Array.isArray(j.uploads) ? j.uploads : activeBindings;
+    const pins = Array.isArray(j.uploads) ? j.uploads : Array.isArray(j.doc?.uploads) ? j.doc.uploads : activeBindings;
     for (const as of named) {
       if (builtinDataset(as)) continue;
       const pin = pins.find((b) => b.as === as), s = serverBySlug(as);
@@ -227,7 +227,7 @@ export function installCustomDataFetch(): void {
       if (init && (init.method || "GET").toUpperCase() === "POST" && typeof init.body === "string") {
         const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
         const path = new URL(href, window.location.href).pathname;
-        if (path === "/api/explore" || path === "/api/analysis" || path === "/api/oncoprint" || path === "/api/custom-data/members") {
+        if (path === "/api/explore" || path === "/api/analysis" || path === "/api/oncoprint" || path === "/api/custom-data/members" || path === "/api/view-page") {
           // the page's first requests go out on mount, before the server has said what it holds;
           // a shared ?doc= link that names a dataset must not race it
           await loadCustomData();

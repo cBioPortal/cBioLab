@@ -641,7 +641,7 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
     "),\n" +
     (attribute
       ? "grp AS (\n" +
-        "  SELECT sample_unique_id AS suid, any(" + fold + ") AS g, any(attribute_value) AS label FROM " + db + ".clinical_data_derived\n" +
+        "  SELECT sample_unique_id AS suid, any(" + fold + ") AS g, any(attribute_value) AS label FROM " + clinicalTable(db, [attribute]) + "\n" +
         "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(attribute) + "\n" +
         "    AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid\n" +
         "),\n"
@@ -709,7 +709,7 @@ export function cancerTypeSamplesSql(cohortSql: string, study: string, db: strin
     "FROM samp LEFT JOIN prof ON prof.suid = samp.suid\n" +
     (attribute
       ? "LEFT JOIN (\n" +
-        "  SELECT sample_unique_id AS suid, any(" + fold + ") AS g FROM " + db + ".clinical_data_derived\n" +
+        "  SELECT sample_unique_id AS suid, any(" + fold + ") AS g FROM " + clinicalTable(db, [attribute]) + "\n" +
         "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(attribute) + "\n" +
         "    AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid\n" +
         ") grp ON grp.suid = samp.suid\n"

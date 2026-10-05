@@ -1,4 +1,5 @@
 import { runAnalysis } from "../../../lib/analysis.ts";
+import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import type { AnalysisDoc, MutationsResult, TableResult } from "../../../lib/types.ts";
 
 export const maxDuration = 60;
@@ -16,13 +17,13 @@ const PAGE_MAX = 1000;
  */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const { customData, customRefs, ...body } = await req.json();
     const doc: AnalysisDoc = body.doc, vi = Number(body.view);
     const view = doc && Array.isArray(doc.views) ? doc.views[vi] : null;
     if (!view || !PAGED.has(view.kind)) throw new Error("view " + body.view + " is not a paged view (" + [...PAGED].join(", ") + ")");
     const offset = Math.max(0, Math.floor(Number(body.offset) || 0)), limit = Math.floor(Number(body.limit) || 25);
     if (!(limit >= 1 && limit <= PAGE_MAX)) throw new Error("limit is 1 to " + PAGE_MAX);
-    const r = await runAnalysis({ ...doc, views: [view] }, { page: { offset, limit } });
+    const r = await withRequestCustomData(customData, () => runAnalysis({ ...doc, views: [view] }, { page: { offset, limit } }), { refs: customRefs, req });
     const v = r.views[0] as { error?: string; mutations?: MutationsResult; table?: TableResult };
     const t = v.mutations || v.table;
     if (!t) throw new Error(v.error || "the view returned no rows");
