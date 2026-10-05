@@ -50,6 +50,19 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   `lib/federation.ts`, so the boundary suite sweeps it) and runs through the resolvers'
   `moreAggregate`/`moreMeta` — present on every local participant, absent on a remote peer, which
   those views name as left out. Figures: **`lib/view-svg-more.ts`**; cards: `app/lab/more-views.tsx`.
+- **Table views** (`table`, `mutations`, and any later view that lists rows) — **every one must
+  support the same five things: pagination, search over its text, a filter per column (text
+  conditions or a value list for text, a range for numbers), sorting, and a CSV download of every
+  row kept — plus choosing the columns shown.** Don't build these per view: a table supplies only a
+  `RowSource` (its `rows` CTE and how each column reads off it, beside the table, e.g.
+  `lib/mutation-table.ts`) and **`lib/table-query.ts`** does the rest in the database (validation,
+  search, filters, sort, page, counts, a column's values for its filter). The query
+  (`columns`/`search`/`filters`/`sort`, type `TableQuery`) is part of the view's spec — the page is
+  not. The rows name patients, so they run only through `PatientLevelResolver.rowsPage`/
+  `rowsCounts`/`rowsValues` (asserted in `test/boundary.test.ts`); `lib/views-portal.ts`'s
+  `runRows` groups parts per database and pages across them. UI: **`app/_table/DataTable.tsx`**;
+  `POST /api/view-page` (a page, or a column's values) and `POST /api/table` (the CSV) serve every
+  table view.
 - **`lib/event-names.ts`** — **THE only place timeline event names are normalized.** Case-fold and
   trim, nothing else; measured to be complete for event types and attribute keys (zero residual
   collisions). Folds are disclosed in the caveat, never silent. Do not fork it. Every timeline
@@ -255,6 +268,22 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   and failed are three different states and each must say which it is: an empty select during a
   fetch reads as "this study has none". A button gated on fetched data (the add-view buttons'
   `why`) waits with a spinner via its `loading` predicate rather than guessing either way.
+- **Every request a table view makes shows, in the table, that it is running** — a query change
+  (search, filter, sort, columns: the view re-runs), another page, the whole document re-running.
+  The rows on screen are the last answer, so they are covered ("updating…", "loading page 3…",
+  `.dt-wait` in `app/_table/DataTable.tsx`) and the count is dimmed with a spinner beside it; the
+  bar, chips and headers stay visible and usable, and an action that would act on the stale
+  answer (the download) waits, saying why. Such a view draws its own waiting state, so the page
+  must not cover its card (`drawsOwnWaiting` in `app/lab/more-views.tsx`, honoured by the lab and
+  `PortalTabs`). Its controls show and edit the query **the document holds**, not the last result's,
+  so a second edit made while the first is running keeps the first. A page not yet on hand is
+  loading from the render that asks for it — never a flash of "no rows" first.
+- **A menu, popover or list whose contents load never opens empty.** Its fixed controls (a
+  filter's condition and text, a range's inputs) are there and usable at once; where the loaded
+  part goes, a `Waiting` loader with skeleton rows stands in until it lands; controls that act on
+  it (all / none) are disabled with a title saying what they wait for. Loaded-but-empty says so
+  ("no values in the rows kept"), and a failed load names the error and offers retry — three
+  states, never one blank box.
 - **A loader must be tied to a request that will end it.** Before showing "loading…", make sure
   something is actually fetching (that is why the clinical-attribute catalog loads for any
   result, not only once a plot exists) and that failure clears it (`.finally`), or the spinner

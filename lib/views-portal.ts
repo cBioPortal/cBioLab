@@ -11,8 +11,9 @@ import { niceCeil } from "./views-more.ts";
 import { geneSymbols } from "./gene-tracks.ts";
 import { answering, refuse, plural, type ViewCtx, type MoreResolver } from "./views-more.ts";
 import { isPatientLevel, type PatientLevelCapable } from "./federation.ts";
-import { tableAttributesSql, TABLE_COLUMNS_MAX, TABLE_CHUNK, type TableColumn } from "./clinical-table.ts";
-import { MUTATION_COLUMNS, type TablePart } from "./mutation-table.ts";
+import { tableAttributesSql, clinicalRowSource, idColumns, TABLE_COLUMNS_MAX, type TableColumn } from "./clinical-table.ts";
+import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationRowSource, type TablePart } from "./mutation-table.ts";
+import { checkQuery, cleanQuery, describeQuery, mergeValues, shownColumns, type ColumnValues, type RowSource, type TableQuery } from "./table-query.ts";
 import { cancertypesMethod, overlapMethod, enrichmentMethod, assaysMethod, correlatesMethod, tableMethod, mutationsMethod } from "./method.ts";
 
 export const PORTAL_VIEW_KINDS = ["cancertypes", "overlap", "enrichment", "assays", "correlates", "table", "mutations"] as const;
@@ -578,24 +579,110 @@ async function correlatesView(view: CorrelatesView, ctx: ViewCtx): Promise<ViewR
 }
 
 // ---------------------------------------------------------------------------
-// table: the clinical data table, a page on screen and every row as a download
+// table views: the clinical table and the mutation table, on lib/table-query.ts
 
 const TABLE_ROWS_MAX = 1000;
+/** rows one page request may take (the download's chunk) */
+export const TABLE_CHUNK = 10000;
+
+/** Who may hand over rows: patient-level participants; the rest are named with their patients. */
+function rowHolders(ctx: ViewCtx) {
+  const holders = ctx.vStudies.filter((st) => isPatientLevel(ctx.resolvers[st]));
+  const excluded = ctx.vStudies.filter((st) => !holders.includes(st)).map((st) => ({
+    study: st, reason: ctx.resolvers[st].instance.id === "peer" ? "a remote peer, which does not disclose patients" : "aggregate-only: it does not disclose patients",
+    patients: ctx.vNames.reduce((n, c) => n + (ctx.cohorts[c].perStudy[st]?.count || 0), 0) }));
+  return { holders, excluded };
+}
+
+/** The column ids a query reads besides what is shown: its filters, its sort, and — for search — the shown ones. */
+function queryReads(q: TableQuery, shown: string[]): string[] {
+  return [...new Set([...Object.keys(q.filters || {}), ...(q.sort ? [q.sort.column] : []), ...((q.search || "").trim() ? shown : [])])];
+}
+
+type Rows = { rows: Record<string, unknown>[]; lists: { cohort: string; study: string; total: number; all: number }[]; total: number; all: number; offset: number; groups: number; values?: ColumnValues };
+
+/**
+ * A table view's rows: its parts grouped per database instance (a group's parts are combined and
+ * sorted together in its database), counted, and the page asked for taken walking the groups in
+ * order — one group, one query. With RunOpts.values, a column's values instead of rows.
+ * `source(parts, reads)` builds the table's row source; `reads` names the columns a query needs
+ * ("all" for a page), so a count need not carry every column.
+ */
+async function runRows(ctx: ViewCtx, label: string, holders: string[], q: TableQuery, defaults: string[], shown: string[], size: number,
+  source: (parts: TablePart[], reads: string[] | "all") => (db: string) => RowSource, values?: { column: string; numeric: boolean }): Promise<Rows> {
+  type PL = Pick<PatientLevelCapable, "rowsPage" | "rowsCounts" | "rowsValues">;
+  const groups: { resolver: PL; parts: TablePart[]; total: number }[] = [];
+  const byConn = new Map<string, number>();
+  for (const cn of ctx.vNames) for (const st of ctx.cohorts[cn].studies.filter((x) => holders.includes(x))) {
+    const r = ctx.resolvers[st], k = r.instance.conn.id;
+    if (!byConn.has(k)) { byConn.set(k, groups.length); groups.push({ resolver: r as unknown as PL, parts: [], total: 0 }); }
+    groups[byConn.get(k)!].parts.push({ cohort: cn, study: st, cohortSql: r.cohortSql(ctx.doc.cohorts[cn]) });
+  }
+  const reads = queryReads(q, shown);
+  if (values) {
+    const got = await Promise.all(groups.map((g) => g.resolver.rowsValues(label + ":values", source(g.parts, [...reads, values.column]), q, defaults, values.column)));
+    return { rows: [], lists: [], total: 0, all: 0, offset: 0, groups: groups.length, values: mergeValues(values.column, values.numeric, got as Record<string, unknown>[][]) };
+  }
+  const lists: Rows["lists"] = [];
+  let all = 0;
+  await Promise.all(groups.map(async (g) => {
+    const counts = await g.resolver.rowsCounts(label + ":counts", source(g.parts, reads), q, defaults);
+    for (const p of g.parts) {
+      const c = counts.find((x) => x.cohort === p.cohort && x.study === p.study);
+      lists.push({ cohort: p.cohort, study: p.study, total: c?.n || 0, all: c?.all || 0 });
+      g.total += c?.n || 0; all += c?.all || 0;
+    }
+  }));
+  const total = groups.reduce((n, g) => n + g.total, 0);
+  const want = ctx.page ? { offset: Math.max(0, Math.floor(ctx.page.offset)), limit: Math.min(TABLE_CHUNK, Math.max(1, Math.floor(ctx.page.limit))) } : { offset: 0, limit: size };
+  const rows: Record<string, unknown>[] = [];
+  let skip = want.offset;
+  for (const g of groups) {
+    if (rows.length >= want.limit) break;
+    if (skip >= g.total) { skip -= g.total; continue; }
+    const page = await g.resolver.rowsPage(label + ":rows", source(g.parts, "all"), q, defaults, want.limit - rows.length, skip);
+    rows.push(...page.rows); skip = 0;
+  }
+  const order = (l: { cohort: string; study: string }) => ctx.vNames.indexOf(l.cohort) * 1000 + ctx.vStudies.indexOf(l.study);
+  lists.sort((a, b) => order(a) - order(b));
+  return { rows, lists, total, all, offset: want.offset, groups: groups.length };
+}
+
+/** A view's query as the document gives it, with an older `sort.attribute` read as `sort.column`. */
+function viewQuery(view: TableQuery & { attributes?: string[]; sort?: { column?: string; attribute?: string; desc?: boolean } }): TableQuery {
+  const s = view.sort as { column?: string; attribute?: string; desc?: boolean } | undefined;
+  const column = s ? s.column || s.attribute : undefined;
+  return cleanQuery({
+    columns: view.columns || view.attributes,
+    search: view.search,
+    filters: view.filters,
+    sort: column ? { column: String(column), ...(s!.desc ? { desc: true } : {}) } : undefined,
+  });
+}
+
+/** The words every table view's caveat ends with: the order, the query, the paging, the databases, who is left out. */
+function tableTail(r: Rows, q: TableQuery, cols: { id: string; name: string }[], what: string, defaultOrder: string, excluded: { study: string; reason: string; patients: number }[], multiCohort: boolean): string {
+  const sortCol = q.sort ? cols.find((c) => c.id === q.sort!.column) : null;
+  const filtered = describeQuery(q, cols);
+  return (filtered ? "Showing " + r.total.toLocaleString("en-US") + " of " + plural(r.all, what) + ": " + filtered + ". " : plural(r.total, what) + ". ") +
+    "Sorted " + (sortCol ? "by " + sortCol.name + (q.sort!.desc ? " (highest first)" : "") + ", missing values last," : defaultOrder) +
+    " across " + (r.lists.length > 1 ? "every cohort and study together" : "the cohort") + "; every page is a slice of that one order, and the download holds every row kept, with every column. " +
+    (r.groups > 1 ? "These studies live in " + r.groups + " separate databases, so each database's rows are sorted together and listed in turn. " : "") +
+    (multiCohort ? "A patient in two cohorts is listed under each. " : "") +
+    (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + "; " + plural(e.patients, "patient") + " in these cohorts)").join(", ") + "." : "");
+}
 
 async function tableView(view: TableView, ctx: ViewCtx): Promise<ViewResult> {
-  const { doc, cohorts, vNames } = ctx;
+  const { vNames } = ctx;
   { const e = ctx.overLimit("a table view", 6, vNames.length); if (e) return refuse("table", ctx, e.replace("at most 6", "at most 6 cohorts")); }
   const unit: "sample" | "patient" = view.unit === "patient" ? "patient" : "sample";
   const show = view.rows == null ? 25 : Math.floor(Number(view.rows));
   if (!(show >= 1 && show <= TABLE_ROWS_MAX)) return refuse("table", ctx, "rows (the page size) is 1 to " + TABLE_ROWS_MAX);
-  if (view.attributes != null && (!Array.isArray(view.attributes) || view.attributes.some((a) => !ATTR_NAME.test(String(a)))))
-    return refuse("table", ctx, "attributes is a list of clinical attribute ids, e.g. [\"CANCER_TYPE\", \"AGE\"]");
+  const q = viewQuery(view);
+  if (q.columns && q.columns.some((a) => typeof a !== "string" || !ATTR_NAME.test(a) && !["patient", "sample", "samples"].includes(a)))
+    return refuse("table", ctx, "columns is a list of column ids: patient, " + (unit === "sample" ? "sample" : "samples") + " and clinical attribute ids, e.g. [\"patient\", \"CANCER_TYPE\", \"AGE\"]");
 
-  // only a patient-level participant may hand over rows; the rest are named with their patients
-  const holders = ctx.vStudies.filter((st) => isPatientLevel(ctx.resolvers[st]));
-  const excluded = ctx.vStudies.filter((st) => !holders.includes(st)).map((st) => ({
-    study: st, reason: ctx.resolvers[st].instance.id === "peer" ? "a remote peer, which does not disclose patients" : "aggregate-only: it does not disclose patients",
-    patients: vNames.reduce((n, c) => n + (cohorts[c].perStudy[st]?.count || 0), 0) }));
+  const { holders, excluded } = rowHolders(ctx);
   if (!holders.length) return refuse("table", ctx, "no study here may disclose patients' rows (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
 
   const all: TableColumn[] = [];
@@ -606,71 +693,51 @@ async function tableView(view: TableView, ctx: ViewCtx): Promise<ViewResult> {
     }
   }
   const usable = unit === "patient" ? all.filter((c) => c.per === "patient") : all;
-  let columns: TableColumn[];
-  if (view.attributes) {
-    const missing = view.attributes.filter((a) => !usable.some((c) => c.id === a));
-    if (missing.length) return refuse("table", ctx, (unit === "patient" && missing.every((a) => all.some((c) => c.id === a))
-      ? missing.join(", ") + " " + (missing.length === 1 ? "is a sample attribute" : "are sample attributes") + "; a per-patient table holds patient attributes only"
-      : "unknown attribute " + missing.join(", ")) + " — available: " + usable.map((c) => c.id).join(", "));
-    columns = view.attributes.map((a) => usable.find((c) => c.id === a)!);
-  } else columns = usable;
-  if (columns.length > TABLE_COLUMNS_MAX) return refuse("table", ctx, "a table view shows at most " + TABLE_COLUMNS_MAX + " attributes; these studies record " + columns.length + " — name the ones you want in attributes");
-  const sort = view.sort && view.sort.attribute ? { attribute: String(view.sort.attribute), ...(view.sort.desc ? { desc: true } : {}) } : null;
-  if (sort && !columns.some((c) => c.id === sort.attribute)) return refuse("table", ctx, "sort.attribute " + sort.attribute + " is not one of the table's columns");
+  const ids = idColumns(unit);
+  const known = [...ids, ...usable];
+  const bad = checkQuery(q, known);
+  if (bad) {
+    const sampleAttr = unit === "patient" && [...(q.columns || []), ...Object.keys(q.filters || {}), ...(q.sort ? [q.sort.column] : [])].find((a) => all.some((c) => c.id === a && c.per === "sample"));
+    return refuse("table", ctx, sampleAttr ? sampleAttr + " is a sample attribute; a per-patient table holds patient attributes only" : bad);
+  }
+  // the attributes the table holds: every one, unless the studies record more than a table carries
+  const named = new Set([...(q.columns || []), ...Object.keys(q.filters || {}), ...(q.sort ? [q.sort.column] : [])]);
+  const held = usable.length <= TABLE_COLUMNS_MAX ? usable
+    : [...usable.filter((c) => named.has(c.id)), ...usable.filter((c) => !named.has(c.id))].slice(0, TABLE_COLUMNS_MAX);
+  const defaults = [...ids.map((c) => c.id), ...held.map((c) => c.id)];
 
-  // one group per database instance: a group's parts are combined and sorted together in its database
-  type PL = { tableRows: PatientLevelCapable["tableRows"]; tableCounts: PatientLevelCapable["tableCounts"] };
-  const groups: { resolver: PL; parts: TablePart[]; total: number }[] = [];
-  const byConn = new Map<string, number>();
-  for (const cn of vNames) for (const st of cohorts[cn].studies.filter((x) => holders.includes(x))) {
-    const r = ctx.resolvers[st], k = r.instance.conn.id;
-    if (!byConn.has(k)) { byConn.set(k, groups.length); groups.push({ resolver: r as unknown as PL, parts: [], total: 0 }); }
-    groups[byConn.get(k)!].parts.push({ cohort: cn, study: st, cohortSql: r.cohortSql(doc.cohorts[cn]) });
-  }
-  const lists: { cohort: string; study: string; total: number }[] = [];
-  await Promise.all(groups.map(async (g) => {
-    const counts = await g.resolver.tableCounts("table:counts", g.parts, unit);
-    for (const p of g.parts) { const n = counts.find((c) => c.cohort === p.cohort && c.study === p.study)?.n || 0; lists.push({ cohort: p.cohort, study: p.study, total: n }); g.total += n; }
-  }));
-  const total = groups.reduce((n, g) => n + g.total, 0);
-  // the page asked for, walking the groups in order (one group: one query)
-  const want = ctx.page ? { offset: Math.max(0, Math.floor(ctx.page.offset)), limit: Math.min(TABLE_CHUNK, Math.max(1, Math.floor(ctx.page.limit))) } : { offset: 0, limit: show };
-  const got: Awaited<ReturnType<PL["tableRows"]>>["rows"] = [];
-  let skip = want.offset;
-  for (const g of groups) {
-    if (got.length >= want.limit) break;
-    if (skip >= g.total) { skip -= g.total; continue; }
-    const page = await g.resolver.tableRows("table:rows", g.parts, unit, columns, sort, want.limit - got.length, skip);
-    got.push(...page.rows); skip = 0;
-  }
-  const rows = got.map((r) => ({ cohort: r.cohort, study: r.study, patient: r.patient, sample: r.sample, samples: r.samples, values: columns.map((c) => r.values[c.id] ?? "") }));
-  const order = (l: { cohort: string; study: string }) => vNames.indexOf(l.cohort) * 1000 + ctx.vStudies.indexOf(l.study);
-  lists.sort((a, b) => order(a) - order(b));
-  const table = { unit, columns, sort, rows, offset: want.offset, pageSize: show, lists, total, ...(groups.length > 1 ? { instances: groups.length } : {}), ...(excluded.length ? { excluded } : {}) };
-  if (ctx.page) return { kind: "table", cohorts: vNames, table, participation: ctx.participationFor(ctx.vStudies, true) };
+  let r: Rows;
+  try {
+    r = await runRows(ctx, "table", holders, q, defaults, shownColumns(q, known, defaults), show,
+      (parts, reads) => (db) => clinicalRowSource(parts, db, unit, reads === "all" ? held : held.filter((c) => reads.includes(c.id))),
+      ctx.values ? { column: ctx.values, numeric: !!known.find((c) => c.id === ctx.values)?.numeric } : undefined);
+  } catch (e) { return refuse("table", ctx, (e as Error).message); }
+  const columns = [...ids.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric })), ...held.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric }))];
+  const shown = shownColumns(q, columns, defaults);
+  const rows = r.rows.map((x) => {
+    const m = (x.m || {}) as Record<string, string>;
+    const own: Record<string, string> = { patient: String(x.patient ?? ""), sample: String(x.sample ?? ""), samples: String(x.samples ?? "") };
+    return { cohort: String(x.cohort), study: String(x.study), patient: own.patient, sample: own.sample, values: columns.map((c) => c.id in own && ids.some((i) => i.id === c.id) ? own[c.id] : m[c.id] ?? "") };
+  });
+  const table = { unit, columns, shown, defaults, query: q, rows, offset: r.offset, pageSize: show, lists: r.lists, total: r.total, all: r.all,
+    ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
+  if (ctx.page || ctx.values) return { kind: "table", cohorts: vNames, table, participation: ctx.participationFor(ctx.vStudies, true) };
   const one = unit === "sample" ? "sample" : "patient";
   return {
     kind: "table", cohorts: vNames,
     table,
-    method: tableMethod({ unit, cohorts: vNames, columns: columns.length, sort, shown: rows.length, lists, excluded, instances: groups.length }),
+    method: tableMethod({ unit, cohorts: vNames, columns: held.length, query: q, queryText: describeQuery(q, columns), sortName: q.sort ? columns.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null,
+      shown: rows.length, lists: r.lists, excluded, instances: r.groups }),
     participation: ctx.participationFor(ctx.vStudies, true),
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
     caveat: "One row per " + one + (unit === "sample" ? " of each cohort's patients, carrying its patient's attributes too" : "") +
-      ", with " + plural(columns.length, "attribute") + " as each study recorded them — vocabularies are not harmonized across studies. " +
-      (vNames.length > 1 ? "A patient in two cohorts is listed under each. " : "") +
-      plural(total, one) + (sort ? ", sorted by " + sort.attribute + (sort.desc ? " (highest first)" : "") + ", missing values last" : ", by patient and sample id") +
-      " across " + (lists.length > 1 ? "every cohort and study together" : "the cohort") + "; every page is a slice of that one order, and the download holds every row. " +
-      (groups.length > 1 ? "These studies live in " + groups.length + " separate databases, so each database's rows are sorted together and listed in turn. " : "") +
-      (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + "; " + plural(e.patients, "patient") + " in these cohorts)").join(", ") + "." : "")
+      ", with " + plural(held.length, "attribute") + " as each study recorded them" + (held.length < usable.length ? " (of " + usable.length + "; name others in columns)" : "") +
+      " — vocabularies are not harmonized across studies. " +
+      tableTail(r, q, columns, one, "by patient and sample id", excluded, vNames.length > 1)
   };
 }
 
-// ---------------------------------------------------------------------------
-// mutations: one gene's mutation table, a page on screen and every row as a download
-
-const MUT_ROWS_MAX = 1000;
-
-/** A row's value in a column, from the query's row (numbers as numbers, the annotation spelled out). */
+/** A row's value in a column, from the query's row (numbers as numbers, the annotation spelled out as the SQL spells it). */
 function mutationValue(r: Record<string, unknown>, id: string): string | number | null {
   const num = (x: unknown) => x == null || x === "" ? null : Number(x);
   switch (id) {
@@ -686,70 +753,40 @@ function mutationValue(r: Record<string, unknown>, id: string): string | number 
 }
 
 async function mutationsView(view: MutationsView, ctx: ViewCtx): Promise<ViewResult> {
-  const { doc, cohorts, vNames, pin } = ctx;
+  const { vNames, pin } = ctx;
   { const e = ctx.overLimit("a mutations view", 6, vNames.length); if (e) return refuse("mutations", ctx, e.replace("at most 6", "at most 6 cohorts")); }
   let gene: string;
   try { [gene] = geneSymbols([view.gene]); } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
   if (!gene) return refuse("mutations", ctx, "a mutations view needs a gene, e.g. KRAS");
   const size = view.rows == null ? 25 : Math.floor(Number(view.rows));
-  if (!(size >= 1 && size <= MUT_ROWS_MAX)) return refuse("mutations", ctx, "rows (the page size) is 1 to " + MUT_ROWS_MAX);
-  const sort = view.sort && view.sort.column ? { column: String(view.sort.column), ...(view.sort.desc ? { desc: true } : {}) } : null;
-  if (sort && !MUTATION_COLUMNS.some((c) => c.id === sort.column)) return refuse("mutations", ctx, "sort.column is one of " + MUTATION_COLUMNS.map((c) => c.id).join(", "));
+  if (!(size >= 1 && size <= TABLE_ROWS_MAX)) return refuse("mutations", ctx, "rows (the page size) is 1 to " + TABLE_ROWS_MAX);
+  const q = viewQuery(view);
+  const bad = checkQuery(q, MUTATION_COLUMNS);
+  if (bad) return refuse("mutations", ctx, bad);
 
-  const holders = ctx.vStudies.filter((st) => isPatientLevel(ctx.resolvers[st]));
-  const excluded = ctx.vStudies.filter((st) => !holders.includes(st)).map((st) => ({
-    study: st, reason: ctx.resolvers[st].instance.id === "peer" ? "a remote peer, which does not disclose patients" : "aggregate-only: it does not disclose patients",
-    patients: vNames.reduce((n, c) => n + (cohorts[c].perStudy[st]?.count || 0), 0) }));
+  const { holders, excluded } = rowHolders(ctx);
   if (!holders.length) return refuse("mutations", ctx, "no study here may disclose patients' mutations (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
-  // one group per database instance: a group's parts are combined and sorted together in its database
-  const groups: { resolver: { mutationRows: PatientLevelCapable["mutationRows"]; mutationCounts: PatientLevelCapable["mutationCounts"] }; parts: TablePart[]; total: number }[] = [];
-  const byConn = new Map<string, number>();
-  for (const cn of vNames) for (const st of cohorts[cn].studies.filter((x) => holders.includes(x))) {
-    const r = ctx.resolvers[st];
-    const k = r.instance.conn.id;
-    if (!byConn.has(k)) { byConn.set(k, groups.length); groups.push({ resolver: r as unknown as typeof groups[number]["resolver"], parts: [], total: 0 }); }
-    groups[byConn.get(k)!].parts.push({ cohort: cn, study: st, cohortSql: r.cohortSql(doc.cohorts[cn]) });
-  }
-  const lists: { cohort: string; study: string; total: number }[] = [];
-  await Promise.all(groups.map(async (g) => {
-    const counts = await g.resolver.mutationCounts("mutations:counts", g.parts, gene);
-    for (const p of g.parts) {
-      const n = counts.find((c) => c.cohort === p.cohort && c.study === p.study)?.n || 0;
-      lists.push({ cohort: p.cohort, study: p.study, total: n });
-      g.total += n;
-    }
-  }));
-  const total = groups.reduce((n, g) => n + g.total, 0);
-  // the page asked for, walking the groups in order (one group: one query)
-  const want = ctx.page ? { offset: Math.max(0, Math.floor(ctx.page.offset)), limit: Math.min(MUT_ROWS_MAX * 10, Math.max(1, Math.floor(ctx.page.limit))) } : { offset: 0, limit: size };
-  const out: Record<string, unknown>[] = [];
-  let skip = want.offset;
-  for (const g of groups) {
-    if (out.length >= want.limit) break;
-    if (skip >= g.total) { skip -= g.total; continue; }
-    const page = await g.resolver.mutationRows("mutations:rows", g.parts, gene, pin, sort, want.limit - out.length, skip);
-    out.push(...page.rows);
-    skip = 0;
-  }
-  const rows = out.map((r) => ({ cohort: String(r.cohort ?? ""), study: String(r.study ?? ""), patient: String(r.patient ?? ""), sample: String(r.sid ?? ""),
-    values: MUTATION_COLUMNS.map((c) => mutationValue(r, c.id)) }));
-  const order = (l: { cohort: string; study: string }) => vNames.indexOf(l.cohort) * 1000 + ctx.vStudies.indexOf(l.study);
-  lists.sort((a, b) => order(a) - order(b));
-  const mutations = { gene, columns: MUTATION_COLUMNS, sort, rows, offset: want.offset, pageSize: size, lists, total, oncokbPin: pin,
-    ...(groups.length > 1 ? { instances: groups.length } : {}), ...(excluded.length ? { excluded } : {}) };
-  if (ctx.page) return { kind: "mutations", cohorts: vNames, mutations, participation: ctx.participationFor(ctx.vStudies, true) };
+  let r: Rows;
+  try {
+    r = await runRows(ctx, "mutations", holders, q, MUTATION_DEFAULT_COLUMNS, shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS), size, (parts) => (db) => mutationRowSource(parts, db, gene, pin),
+      ctx.values ? { column: ctx.values, numeric: !!MUTATION_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined);
+  } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
+  const rows = r.rows.map((x) => ({ cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? ""),
+    values: MUTATION_COLUMNS.map((c) => mutationValue(x, c.id)) }));
+  const shown = shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS);
+  const mutations = { gene, columns: MUTATION_COLUMNS, shown, defaults: MUTATION_DEFAULT_COLUMNS, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin,
+    ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
+  if (ctx.page || ctx.values) return { kind: "mutations", cohorts: vNames, mutations, participation: ctx.participationFor(ctx.vStudies, true) };
   return {
     kind: "mutations", cohorts: vNames, mutations,
-    method: mutationsMethod({ gene, cohorts: vNames, oncokbPin: pin, sort, shown: rows.length, lists, excluded, instances: groups.length }),
+    method: mutationsMethod({ gene, cohorts: vNames, oncokbPin: pin, queryText: describeQuery(q, MUTATION_COLUMNS),
+      sortName: q.sort ? MUTATION_COLUMNS.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null, desc: !!q.sort?.desc,
+      shown: rows.length, lists: r.lists, excluded, instances: r.groups }),
     participation: ctx.participationFor(ctx.vStudies, true),
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
     caveat: "Every " + gene + " mutation call in " + (vNames.length > 1 ? "each cohort's" : "the cohort's") + " samples, one row per call; uncalled mutations are left out, as the portal leaves them out. " +
       (pin ? "Annotation is OncoKB " + pin + " (oncogenicity and its highest sensitivity level for the gene). " : "No OncoKB version is pinned here, so the annotation column is empty. ") +
       "Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. " +
-      plural(total, "mutation") + ", sorted " + (sort ? "by " + (MUTATION_COLUMNS.find((c) => c.id === sort.column)?.name || sort.column) + (sort.desc ? " (highest first)" : "") : "drivers first, then by codon") +
-      " across " + (lists.length > 1 ? "every cohort and study together" : "the cohort") + "; every page is a slice of that one order, and the download holds every row. " +
-      (groups.length > 1 ? "These studies live in " + groups.length + " separate databases, so each database's rows are sorted together and listed in turn. " : "") +
-      (vNames.length > 1 ? "A patient in two cohorts is listed under each. " : "") +
-      (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + "; " + plural(e.patients, "patient") + " in these cohorts)").join(", ") + "." : "")
+      tableTail(r, q, MUTATION_COLUMNS, "mutation", "drivers first, then by codon", excluded, vNames.length > 1)
   };
 }

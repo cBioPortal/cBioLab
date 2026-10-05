@@ -316,6 +316,8 @@ export interface CompileCtx {
 
 // ---------- analysis document ----------------------------------------------
 import type { GeneTrackSpec } from "./gene-tracks.ts";
+import type { TableQuery, ColumnValues } from "./table-query.ts";
+export type { TableQuery, ColumnValues, ColumnFilter, TextFilterOp } from "./table-query.ts";
 export type { GeneTrackSpec };
 
 export interface CompareView {
@@ -1109,67 +1111,67 @@ export interface CorrelatesResult {
   excluded?: { study: string; reason: string }[];
 }
 /**
- * The clinical data table (cBioPortal's Clinical Data tab): one row per sample — or per patient —
- * of each cohort, with every clinical attribute the study records, sortable, and downloadable
- * whole as TSV. Its rows are patients, so only a patient-level participant contributes them; the
- * rest are named with how many patients they hold.
+ * What every table view's result shares (lib/table-query.ts): every column (the download's), the
+ * ones shown, the query as applied, one page of the rows the query keeps — searched, filtered and
+ * sorted together across every cohort and study — and how many it keeps of how many in all.
  */
-export interface TableView {
+export interface TableRows<V> {
+  /** every column the table holds, in download order; each row's values align with these */
+  columns: { id: string; name: string; numeric: boolean }[];
+  /** the ids shown, in order, and those shown when the query names none */
+  shown: string[]; defaults: string[];
+  /** the view's search, filters and sort as applied (columns as given) */
+  query: TableQuery;
+  /** one page of the query's single order; values align with `columns` */
+  rows: { cohort: string; study: string; patient: string; sample: string; values: V[] }[];
+  /** where this page starts in that order, and the page size the view asks for */
+  offset: number; pageSize: number;
+  /** per cohort and study: rows the query keeps (`total`) and every row (`all`) — what the download pages through */
+  lists: { cohort: string; study: string; total: number; all: number }[];
+  /** rows the query keeps, and every row the table holds */
+  total: number; all: number;
+  /** set when the studies live in several databases: each database's rows are sorted together and listed in turn */
+  instances?: number;
+  /** studies that may not disclose patients, with how many of each cohort's patients they hold */
+  excluded?: { study: string; reason: string; patients: number }[];
+  /** the values one column takes, when the request asked for them (RunOpts.values) — what its filter offers */
+  values?: ColumnValues;
+}
+/**
+ * The clinical data table (cBioPortal's Clinical Data tab): one row per sample — or per patient —
+ * of each cohort, with every clinical attribute the study records; searchable, filterable,
+ * sortable, paged, and downloadable whole as CSV. Its rows are patients, so only a patient-level
+ * participant contributes them; the rest are named with how many patients they hold.
+ */
+export interface TableView extends TableQuery {
   note?: string;
   kind: "table"; cohorts?: string[];
   /** a row per sample (default, with its patient's attributes too) or per patient */
   unit?: "sample" | "patient";
-  /** the attribute columns, by id (default: every attribute the study records, highest priority first; at most 200) */
+  /** older spelling of `columns`: the attribute columns shown */
   attributes?: string[];
-  sort?: { attribute: string; desc?: boolean };
   /** rows per page (default 25, at most 1000); every page and the download are slices of one order */
   rows?: number;
 }
-export interface TableResult {
+export interface TableResult extends TableRows<string> {
   unit: "sample" | "patient";
-  columns: { id: string; name: string; per: "patient" | "sample"; numeric: boolean }[];
-  sort: { attribute: string; desc?: boolean } | null;
-  /** one page of the table's single order (sorted across every cohort and study); values align with `columns` */
-  rows: { cohort: string; study: string; patient: string; sample: string; samples: number; values: string[] }[];
-  /** where this page starts in that order, and the page size the view asks for */
-  offset: number; pageSize: number;
-  /** set when the studies live in several databases: each database's rows are sorted together and listed in turn */
-  instances?: number;
-  /** rows the patient-level studies hold, per cohort and study — what the download pages through */
-  lists: { cohort: string; study: string; total: number }[];
-  total: number;
-  /** studies that may not disclose patients, with how many of each cohort's patients they hold */
-  excluded?: { study: string; reason: string; patients: number }[];
 }
 /**
  * The mutation table (cBioPortal's Mutations tab, under the lollipop): one gene's mutations in each
- * cohort, a row per call with the portal's columns, sortable, the first rows shown and every row
- * downloadable. Its rows name samples, so only a patient-level participant contributes them.
+ * cohort, a row per call with the portal's columns; searchable, filterable, sortable, paged, and
+ * downloadable whole. Its rows name samples, so only a patient-level participant contributes them.
  */
-export interface MutationsView {
+export interface MutationsView extends TableQuery {
   note?: string;
   kind: "mutations"; cohorts?: string[];
   gene: string;
-  /** a column id (see lib/mutation-table.ts); default drivers first, then by codon */
-  sort?: { column: string; desc?: boolean };
   /** rows per page (default 25, at most 1000); every page and the download are slices of one order */
   rows?: number;
 }
-export interface MutationsResult {
+export interface MutationsResult extends TableRows<string | number | null> {
   gene: string;
-  columns: { id: string; name: string; numeric: boolean }[];
-  sort: { column: string; desc?: boolean } | null;
-  /** one page of the table's single order (sorted across every cohort and study); values align with `columns` */
-  rows: { cohort: string; study: string; patient: string; sample: string; values: (string | number | null)[] }[];
-  /** where this page starts in that order, and the page size the view asks for */
-  offset: number; pageSize: number;
-  lists: { cohort: string; study: string; total: number }[];
-  total: number;
   /** the OncoKB version the annotation column reads, or null when none is pinned */
   oncokbPin: string | null;
-  /** set when the studies live in several databases: each database's rows are sorted together and listed in turn */
-  instances?: number;
-  excluded?: { study: string; reason: string; patients: number }[];
 }
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };

@@ -3,7 +3,8 @@
 // ViewHead, then this kind's controls, then the server-rendered figure — so all that differs
 // per kind lives here: its title, whether it takes a gene list, and its own settings.
 import React, { useEffect, useState } from "react";
-import { CancertypesBody, EnrichmentBody, CorrelatesBody, AssaysBody, MutationsBody, usePages, Pager } from "./portal-bodies";
+import { DataTable, specQuery } from "../_table/DataTable.tsx";
+import { CancertypesBody, EnrichmentBody, CorrelatesBody, AssaysBody, MutationsBody } from "./portal-bodies";
 
 /**
  * A text field that keeps what is being typed to itself and hands the page the value only on
@@ -71,6 +72,12 @@ const PAIRED_DEFAULT_GENES = ["TP53", "KRAS", "PIK3CA", "ESR1", "AR", "CDKN2A", 
 
 export const isMoreKind = (k: unknown): boolean => Object.prototype.hasOwnProperty.call(MORE_KINDS, String(k));
 
+/**
+ * Views that show their own waiting state (the table views: their search, filters and headers stay
+ * usable while the rows are covered), so the page must not cover the card with its own.
+ */
+export const drawsOwnWaiting = (k: unknown): boolean => k === "table" || k === "mutations";
+
 /** What a card needs from the page: the view as written, its result, and a way to edit it. */
 export interface MoreCtx {
   vi: number;
@@ -79,6 +86,9 @@ export interface MoreCtx {
   /** the view's result */
   v: any;
   busy: boolean;
+  /** a request for this view is running (its own re-run, or the whole document's) — a view that draws its own
+   *  waiting state (drawsOwnWaiting) shows it; for the rest the page covers the card */
+  updating?: boolean;
   patch: (p: Record<string, unknown>) => void;
   attrs: { attribute: string; kind: string }[];
   profiles: string[];
@@ -180,31 +190,19 @@ export function MoreControls({ c }: { c: MoreCtx }) {
       </div>
     </div>
   );
-  if (spec.kind === "table") {
-    const cols: { id: string; name: string }[] = c.v.table ? c.v.table.columns : [];
-    const sort = spec.sort || null;
-    return (
-      <div className="viewtb">
-        <div className="tbz"><span className="tbl">data</span>
-          <label className="tbfield" title="a row per sample, carrying its patient's attributes too, or a row per patient with patient attributes only">
-            rows per <select value={spec.unit === "patient" ? "patient" : "sample"} disabled={busy} onChange={(e) => patch({ unit: e.target.value === "patient" ? "patient" : undefined, sort: undefined })}>
-              <option value="sample">sample</option><option value="patient">patient</option>
-            </select>
-          </label>
-          <label className="tbfield" title="the attribute the table is sorted by; missing values always last">
-            sort <select value={sort ? sort.attribute : ""} disabled={busy || !cols.length} onChange={(e) => patch({ sort: e.target.value ? { attribute: e.target.value, ...(sort && sort.desc ? { desc: true } : {}) } : undefined })}>
-              <option value="">patient id</option>
-              {sort && !cols.some((x) => x.id === sort.attribute) && <option value={sort.attribute}>{sort.attribute}</option>}
-              {cols.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-            </select>
-          </label>
-          <label className="chk" title="highest or last first">
-            <input type="checkbox" checked={!!(sort && sort.desc)} disabled={busy || !sort} onChange={(e) => patch({ sort: { attribute: sort.attribute, ...(e.target.checked ? { desc: true } : {}) } })} /> descending
-          </label>
-        </div>
+  // the search, filters, sort and columns are the table's own (app/_table/DataTable.tsx); a change of unit starts them over
+  if (spec.kind === "table") return (
+    <div className="viewtb">
+      <div className="tbz"><span className="tbl">data</span>
+        <label className="tbfield" title="a row per sample, carrying its patient's attributes too, or a row per patient with patient attributes only">
+          rows per <select value={spec.unit === "patient" ? "patient" : "sample"} disabled={busy}
+            onChange={(e) => patch({ unit: e.target.value === "patient" ? "patient" : undefined, sort: undefined, filters: undefined, columns: undefined, attributes: undefined, search: undefined })}>
+            <option value="sample">sample</option><option value="patient">patient</option>
+          </select>
+        </label>
       </div>
-    );
-  }
+    </div>
+  );
   if (spec.kind === "correlates") {
     const profs = c.profiles.filter((p) => p !== "cna");
     const pick = (value: string, set: (v: string) => void, title: string, label: string) => (
@@ -505,58 +503,16 @@ export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
   if (c.spec.kind === "enrichment" && c.v.enrichment) return <EnrichmentBody v={c.v} />;
   if (c.spec.kind === "correlates" && c.v.correlates) return <CorrelatesBody v={c.v} docJson={c.docJson} />;
   if (c.spec.kind === "assays" && c.v.assays) return <AssaysBody v={c.v} />;
-  if (c.spec.kind === "mutations" && c.v.mutations) return <MutationsBody v={c.v} vi={c.vi} busy={c.busy} docJson={c.docJson} onSort={(sort) => c.patch({ sort })} />;
+  if (c.spec.kind === "mutations" && c.v.mutations) return <MutationsBody v={c.v} spec={c.spec} vi={c.vi} updating={c.updating ?? c.busy} docJson={c.docJson} onQuery={(q) => c.patch({ ...q })} />;
   if (c.spec.kind === "table" && c.v.table) return <ClinicalTableBody c={c} />;
 
   return null;
 }
 
-/** The clinical data table's body: the page on screen (paged in the browser, see usePages), sortable headers, the full download. */
+/** The clinical data table's body, on the shared table (app/_table/DataTable.tsx). */
 function ClinicalTableBody({ c }: { c: MoreCtx }) {
-    const t = c.v.table as import("../../lib/types").TableResult;
-    const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, c.vi, c.docJson);
-    const multi = t.lists.length > 1;
-    // on screen the sorted column sits beside the ids; the download keeps the document's order
-    const si = t.sort ? t.columns.findIndex((x) => x.id === t.sort!.attribute) : -1;
-    const order = si > 0 ? [si, ...t.columns.map((_, j) => j).filter((j) => j !== si)] : t.columns.map((_, j) => j);
-    return (
-      <div className="tv">
-        <div className="tv-bar">
-          <span className="meta">{t.total.toLocaleString()} {t.unit}s{t.sort ? ", sorted by " + t.sort.attribute + (t.sort.desc ? " ↓" : " ↑") : ""}{multi ? " across " + t.lists.length + " cohorts and studies" : ""}</span>
-          <form method="post" action="/api/table" target="_blank" onSubmit={(e) => {
-            const f = e.currentTarget; (f.elements.namedItem("doc") as HTMLInputElement).value = c.docJson ? c.docJson() : "";
-          }}>
-            <input type="hidden" name="doc" /><input type="hidden" name="view" value={String(c.vi)} />
-            <button className="tbbtn" type="submit" disabled={c.busy || !c.docJson} title={"every row as tab-separated text: " + t.total.toLocaleString() + " " + t.unit + "s × " + t.columns.length + " attributes"}>
-              download all {t.total.toLocaleString()} rows (TSV)
-            </button>
-          </form>
-        </div>
-        <div className={"tv-scroll" + (p.loading ? " pb-loading" : "")}>
-          <table>
-            <thead><tr>
-              {multi && <th>cohort</th>}
-              <th>patient</th>{t.unit === "sample" ? <th>sample</th> : <th className="num">samples</th>}
-              {order.map((j) => t.columns[j]).map((col) => (
-                <th key={col.id} title={col.id + " · recorded per " + col.per} className={col.numeric ? "num" : undefined}
-                  aria-sort={t.sort && t.sort.attribute === col.id ? (t.sort.desc ? "descending" : "ascending") : "none"}
-                  onClick={() => { if (!c.busy) c.patch({ sort: { attribute: col.id, ...(t.sort && t.sort.attribute === col.id && !t.sort.desc ? { desc: true } : {}) } }); }}>
-                  {col.name}{t.sort && t.sort.attribute === col.id ? (t.sort.desc ? " ↓" : " ↑") : ""}
-                </th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {p.rows.map((r, i) => (
-                <tr key={i}>
-                  {multi && <td className="meta">{r.cohort}</td>}
-                  <td className="mono">{r.patient}</td>{t.unit === "sample" ? <td className="mono">{r.sample}</td> : <td className="num">{r.samples}</td>}
-                  {order.map((j) => <td key={j} className={t.columns[j].numeric ? "num" : undefined} title={r.values[j].length > 40 ? r.values[j] : undefined}>{r.values[j]}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      <Pager p={p as Parameters<typeof Pager>[0]["p"]} unit={t.unit + "s"} />
-      </div>
-    );
-  }
+  const t = c.v.table as import("../../lib/types").TableResult;
+  return <DataTable t={t} query={specQuery(c.spec)} updating={c.updating ?? c.busy} vi={c.vi} docJson={c.docJson} unit={t.unit + "s"}
+    onQuery={(q) => c.patch({ ...q, attributes: undefined })}
+    cell={(id, x) => (id === "patient" || id === "sample") ? <span className="mono">{x}</span> : undefined} />;
+}

@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import CohortPills, { normalizeDef } from "./pills";
-import { MORE_KINDS, isMoreKind, moreSub, MoreControls, MoreBody, defaultMoreView } from "./more-views";
+import { MORE_KINDS, isMoreKind, moreSub, MoreControls, MoreBody, defaultMoreView, drawsOwnWaiting } from "./more-views";
 import { ExploreCharts } from "./explore-charts";
 import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
 import { OncoprintCard, Waiting, GeneListEditor, pruneSort } from "../_oncoprint/OncoprintCard.tsx";
@@ -3986,7 +3986,7 @@ function Latency({ v }: { v: any }) {
             {result && result.views.map((v, vi) => (
               <div className="card viewcard" key={resultViewKeys.current[vi] ?? vi}>
                 {/* recomputing this view (a settings change), or the whole document */}
-                {!(v as any).pending && (busy || pendingKeys.has(resultViewKeys.current[vi])) && <Updating />}
+                {!(v as any).pending && !(drawsOwnWaiting(v.kind) && !v.error) && (busy || pendingKeys.has(resultViewKeys.current[vi])) && <Updating />}
                 {/* addView's placeholder for a brand-new view that has no prior
                     result to keep showing while its own delta request is in
                     flight (see addView) — every v.kind===… block below is
@@ -4369,7 +4369,7 @@ function Latency({ v }: { v: any }) {
                       ? <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
                       : undefined} />
                   {(() => {
-                    const mc = { vi, spec: docView(vi), v, busy, patch: (p: Record<string, unknown>) => patchView(vi, p),
+                    const mc = { vi, spec: docView(vi), v, busy, updating: busy || pendingKeys.has(resultViewKeys.current[vi]), patch: (p: Record<string, unknown>) => patchView(vi, p),
                       attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), docJson: () => JSON.stringify(doc) };
                     const body = MoreBody({ c: mc });
                     return <>

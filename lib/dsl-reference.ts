@@ -999,7 +999,19 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_chord_2024",
       cohorts: { "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" }] } },
-      views: [{ kind: "table", sort: { attribute: "CURRENT_AGE_DEID", desc: true }, rows: 25 }]
+      views: [{ kind: "table", sort: { column: "CURRENT_AGE_DEID", desc: true }, rows: 25 }]
+    }
+  },
+  {
+    title: "KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first",
+    demonstrates: "A table view's query: `columns` picks what is shown, `filters` keeps rows — a regular expression on protein change, a range on allele frequency — and `sort` orders them, all in the database across the whole table. The caveat says how many rows the query kept of how many; the download holds every kept row with every column. The same fields work on the `table` view.",
+    tags: ["mutations", "table", "filter"],
+    note: "MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at an allele frequency of 0.2 or more, highest first.",
+    doc: {
+      study: "msk_chord_2024",
+      cohorts: { "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" }] } },
+      views: [{ kind: "mutations", gene: "KRAS", columns: ["sample", "proteinChange", "annotation", "vaf", "mutCount"],
+        filters: { proteinChange: { op: "regex", value: "^G1[23]" }, vaf: { min: 0.2 } }, sort: { column: "vaf", desc: true } }]
     }
   }
 ];
@@ -1245,8 +1257,8 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | \`overlap\` | \`cohorts?:[names] (2–6)\` | **how cohorts' patients intersect**, cBioPortal's group-comparison Overlap tab: for every combination of the cohorts, the patients — and their samples — in exactly those cohorts and none of the others, with each cohort's own size. Two or three cohorts are drawn as the portal draws them, area-proportional diagrams of samples and of patients side by side; more as an UpSet plot. A cohort is a set of patients, so a patient's samples go wherever the patient does. Each study's database answers with one count per combination (a bitmask of membership) — counts only — and a cohort's size here must equal its own count, or the view says the definition gave two answers. Ids are study-qualified, so patients only ever overlap within a study |
 | \`enrichment\` | \`alteration?:"mutation"\|"cna"\|"amp"\|"homdel"\|"sv", measure?:"any"\|"driver", minAltered?:5, label?:12, cohorts:[2–6 names]\` | **genomic-alteration enrichment across every gene**, cBioPortal's group-comparison Genomic Alterations tab: each gene's frequency of one alteration type per cohort, counted in SAMPLES over the samples profiled for that gene — samples on a panel listing it (counted per panel, then joined to its genes, Explore's own construction) plus whole-exome samples, and a sample altered off-panel counts as measured. Uncalled mutations are excluded as the portal excludes them; copy number is high-level only. Two cohorts: a two-sided Fisher test and the log2 ratio of the altered shares, drawn as a volcano beside the table; three or more: a chi-squared test. q is Benjamini–Hochberg across every gene tested; genes altered in fewer than \`minAltered\` samples, or unprofiled in a cohort, are counted as not tested. The caption warns that hypermutated tumours enrich almost every gene. Counts only |
 | \`assays\` | \`profileType:"<generic-assay profile>", minN?:3, label?:12, cohorts:[2–6 names]\` | **every entity of one generic-assay profile compared between cohorts**, cBioPortal's group-comparison tabs for generic assays (mutational signatures, arm-level copy number, treatment response, …): one value per sample (every sample of each cohort's patients) or per patient for a patient-level profile. A numeric profile: each entity's n, Σv and Σv² per cohort — values that are not numbers, such as a limit \`">8"\` or NA, are counted and left out — then Welch's t for two cohorts (drawn as a volcano of the difference in means) or Welch's ANOVA for more. A categorical one: each entity's count per value per cohort — NA and blank are not called and are counted apart — then a chi-squared test on cohort × value. q is Benjamini–Hochberg across every entity tested; an entity with fewer than \`minN\` values in a cohort, or with no spread, is counted as not tested. Per-probe methylation is refused (hundreds of thousands of probes), as is any profile past 20,000 entities. Counts and moments only |
-| \`mutations\` | \`gene:"<symbol>", sort?:{column, desc?}, rows?:25, cohorts?:[≤6 names]\` | **one gene's mutation table**, the table under cBioPortal's Mutations-tab lollipop: every called mutation of \`gene\` in each cohort's samples (uncalled calls left out), one row per call — sample, detailed cancer type, protein change, the OncoKB annotation at the pinned version, mutation and variant type, allele frequency (variant / variant + reference reads) with both read counts, the study's MUTATION_COUNT, chromosome, positions, alleles, mutation status. Sorted by \`sort\` (default drivers first, then by codon) across every cohort and study together, in the database; the result is the first page of \`rows\` and any other page is that one order at another offset (the web app pages it, and \`POST /api/view-page\` returns a page), every row downloadable as TSV. Its rows name samples, so only a patient-level participant contributes them; any other study is named |
-| \`table\` | \`unit?:"sample"\|"patient", attributes?:[≤200 ids], sort?:{attribute, desc?}, rows?:25, cohorts?:[≤6 names]\` | **the clinical data table**, cBioPortal's Clinical Data tab: one row per sample of each cohort's patients — carrying its patient's attributes too — or per patient (patient attributes only), with every clinical attribute the study records (highest priority first) or the ones named, values as recorded. Sorted by \`sort\` (numbers as numbers, missing values last), then patient and sample id, across every cohort and study together, in the database; the result is the first page of \`rows\` (at most 1000) and any other page is that one order at another offset (\`POST /api/view-page\`), every row downloadable as TSV. Its rows are patients, so only a patient-level participant contributes them; an aggregate-only or remote study is named with how many of each cohort's patients it holds. A patient in two cohorts is listed under each. A listing: no statistic |
+| \`mutations\` | \`gene:"<symbol>", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts?:[≤6 names]\` | **one gene's mutation table**, the table under cBioPortal's Mutations-tab lollipop: every called mutation of \`gene\` in each cohort's samples (uncalled calls left out), one row per call — sample, detailed cancer type, protein change, the OncoKB annotation at the pinned version, mutation and variant type, allele frequency (variant / variant + reference reads) with both read counts, the study's MUTATION_COUNT, chromosome, positions, alleles, mutation status. Column ids: \`sample\`, \`cancerType\`, \`proteinChange\`, \`annotation\`, \`mutationType\`, \`variantType\`, \`vaf\`, \`altCount\`, \`refCount\`, \`mutCount\`, \`chr\`, \`start\`, \`end\`, \`ref\`, \`var\`, \`status\`; shown by default: sample, cancerType, proteinChange, annotation, mutationType, mutCount (the portal's own). Searched, filtered and sorted as every table view is (see *Table views* below; default order drivers first, then by codon; \`proteinChange\` sorts by codon, \`annotation\` drivers first). Its rows name samples, so only a patient-level participant contributes them; any other study is named |
+| \`table\` | \`unit?:"sample"\|"patient", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts?:[≤6 names]\` | **the clinical data table**, cBioPortal's Clinical Data tab: one row per sample of each cohort's patients — carrying its patient's attributes too — or per patient (patient attributes only), with every clinical attribute the study records (highest priority first; at most 200 — past that, name the ones you want in \`columns\`), values as recorded. Column ids: \`patient\`, \`sample\` (or \`samples\`, the count, per patient), and the attribute ids; every one is shown by default. Searched, filtered and sorted as every table view is (see *Table views* below; an attribute the study declares NUMBER is numeric; default order patient and sample id). \`attributes\` and \`sort.attribute\` are older spellings of \`columns\` and \`sort.column\`. Its rows are patients, so only a patient-level participant contributes them; an aggregate-only or remote study is named with how many of each cohort's patients it holds. A patient in two cohorts is listed under each. A listing: no statistic |
 | \`correlates\` | \`gene:"<symbol>", profileType:"<continuous profile>", otherProfile?:"<profile>", show?:100, minN?:10, cohorts:[one name]\` | **genome-wide co-expression with one gene**, cBioPortal's Co-expression tab: \`gene\` on \`profileType\` against every gene on \`otherProfile\` (the same profile unless given — e.g. protein against mRNA), over one cohort's patients with both values (a patient's samples averaged). Each study's database returns six sums per gene on the values and six on their average ranks among those patients — nothing else — from which Pearson's r and Spearman's ρ follow exactly, each p from t on n − 2 df as scipy computes it. Ranked by ρ, as the portal ranks; q is Benjamini–Hochberg over ρ's p. Across studies r pools the sums; ρ, which does not add, is each study's combined by Fisher z. Lists the \`show\` most positive and most negative genes, with every tested gene's ρ as a histogram. Sums only |
 | \`oncoprint\` | \`genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], unit?:"patient"\\|"sample", display?:{…}, overlays?:[≤2], derivedCohorts?:[≤3], cohorts?:[names]\` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
@@ -1256,6 +1268,31 @@ smuggle formatting or links into a page that reports numbers.
 
 \`views[].cohorts\` defaults to all cohorts. Oncoprints federate across studies: columns are
 study-qualified, a synthetic **Study** track shows each column's origin, and duplicates appear twice.
+
+### Table views: columns, search, filters, sort
+
+Every view that lists rows — \`table\`, \`mutations\` — takes the same four fields, and its result
+answers them the same way. They are the view's spec, so a shared document reproduces the
+filtered, sorted table; the page is the reader's and is not.
+
+- \`columns: [ids]\` — the columns shown, in order (default: the view's own set). The download
+  holds every column whatever is shown.
+- \`search: "text"\` — keeps rows containing the text, case-insensitively, in any shown column
+  (numbers as written).
+- \`filters: {"<column>": filter}\` — a row is kept when it passes every filter. A text column takes
+  \`{"op": "contains"|"notContains"|"equals"|"notEquals"|"startsWith"|"endsWith"|"regex", "value": "…"}\`
+  (case-insensitive but for \`regex\`, RE2 syntax) or \`{"values": ["…", …]}\` (≤500 exact values; \`""\`
+  is blank); a numeric column takes \`{"min"?: n, "max"?: n}\` (inclusive; a blank value fails it).
+- \`sort: {"column": id, "desc"?: true}\` — numbers as numbers, missing values last either way.
+
+All four run in the database across every cohort and study together, so the order is global and
+any page is one query however deep. The result carries \`total\` (rows kept) and \`all\` (rows in
+the table), per cohort and study in \`lists\`, and the caveat says what the query kept. A bad
+column id or a filter that does not suit its column is refused with the ids accepted.
+\`POST /api/view-page {doc, view, offset, limit}\` returns another page; \`{doc, view, values:
+"<column>"}\` returns the values that column takes among the rows the rest of the query keeps
+(distinct values with counts, or a numeric column's range) — what its filter offers.
+\`POST /api/table {doc, view}\` streams every row kept, every column, as CSV.
 
 ### Plot axes
 
@@ -1561,10 +1598,10 @@ export const AGENT_GRAMMAR = `Document shape:
                // every gene's alteration frequency compared between cohorts (Fisher/chi-squared, BH), volcano + table
              {"kind":"assays","profileType":"<generic-assay profile>","minN":3,"cohorts":[2-6 names]},
                // every entity of a generic-assay profile (signatures, arm-level CNA, …) between cohorts (Welch t/ANOVA or chi-squared, BH)
-             {"kind":"mutations","gene":"KRAS","sort":{"column":"vaf","desc":true}?,"rows":25},
+             {"kind":"mutations","gene":"KRAS","columns":["sample","proteinChange","vaf"]?,"search":"G12"?,"filters":{"<column>":{"op":"contains","value":"Missense"}|{"values":["G12D","G12V"]}|{"min":0.1,"max":1}}?,"sort":{"column":"vaf","desc":true}?,"rows":25},
                // one gene's mutation table: every call with sample, protein change, OncoKB, allele frequency (patient-level studies only)
-             {"kind":"table","unit":"sample|patient","attributes":["<attribute>", ...(max 200)]?,"sort":{"attribute":"<attribute>","desc":true}?,"rows":25},
-               // the clinical data table: every sample/patient with its attributes (patient-level studies only); downloadable as TSV
+             {"kind":"table","unit":"sample|patient","columns":["patient","<attribute>", ...]?,"search":"<text>"?,"filters":{"<column>":<filter>}?,"sort":{"column":"<column>","desc":true}?,"rows":25},
+               // the clinical data table: every sample/patient with its attributes (patient-level studies only); searchable, filterable, downloadable as CSV
              {"kind":"correlates","gene":"ESR1","profileType":"<continuous profile>","otherProfile":"<profile>"?,"show":100,"cohorts":[one name]},
                // every gene's expression against one gene's (Spearman + Pearson, BH), the portal's Co-expression tab
                // the study base, then patients left after each clause of each cohort, in order (CONSORT-style)

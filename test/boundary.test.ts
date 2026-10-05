@@ -30,8 +30,9 @@ import {
 } from "../lib/federation.ts";
 import * as federation from "../lib/federation.ts";
 import { axisSelect, plotPointsSql } from "../lib/plot.ts";
-import { tableRowsSql } from "../lib/clinical-table.ts";
-import { mutationRowsSql } from "../lib/mutation-table.ts";
+import { clinicalRowSource } from "../lib/clinical-table.ts";
+import { mutationRowSource } from "../lib/mutation-table.ts";
+import { pageSql } from "../lib/table-query.ts";
 import { RemoteAggregateResolver } from "../lib/federation-remote.ts";
 import type { Instance } from "../lib/federation.ts";
 import { PRIMARY } from "../lib/ch.ts";
@@ -174,26 +175,18 @@ describe("remote peers: nothing identifying leaves before the network is touched
     }
   });
 
-  test("the clinical table's rows are the entitlement, and live only where it lives", () => {
-    // its row query returns patient and sample ids, so it sits outside the aggregate builders
-    assert.equal("tableRowsSql" in (federation as Record<string, unknown>), false,
-      "tableRowsSql returns ids and must not sit among the aggregate builders");
-    assert.match(tableRowsSql([{ cohort: "c", study: "x", cohortSql: "SELECT '' AS pid" }], "db", "sample", [{ id: "AGE", name: "Age", per: "patient", numeric: true }], null, 10, 0),
-      /AS patient, replaceOne\(u\.suid/);
-    assert.equal(typeof (AggregateResolver.prototype as unknown as Record<string, unknown>).tableRows, "undefined",
-      "AggregateResolver must not be able to return the clinical table's rows");
-    assert.equal(typeof (RemoteAggregateResolver.prototype as unknown as Record<string, unknown>).tableRows, "undefined",
-      "a remote peer must not be able to return the clinical table's rows");
-    assert.equal(typeof (PatientLevelResolver.prototype as unknown as Record<string, unknown>).tableRows, "function");
-  });
-
-  test("the mutation table's rows are the entitlement, and live only where it lives", () => {
-    assert.equal("mutationRowsSql" in (federation as Record<string, unknown>), false,
-      "mutationRowsSql returns sample ids and must not sit among the aggregate builders");
-    assert.match(mutationRowsSql([{ cohort: "c", study: "x", cohortSql: "SELECT '' AS pid" }], "db", "KRAS", "v7.5", null, 10, 0), /m\.sid AS sid/);
-    for (const R of [AggregateResolver, RemoteAggregateResolver])
-      assert.equal(typeof (R.prototype as unknown as Record<string, unknown>).mutationRows, "undefined", R.name + " must not be able to return mutation rows");
-    assert.equal(typeof (PatientLevelResolver.prototype as unknown as Record<string, unknown>).mutationRows, "function");
+  test("a table view's rows are the entitlement, and live only where it lives", () => {
+    // the row sources return patient and sample ids, so they sit outside the aggregate builders
+    for (const name of ["clinicalRowSource", "mutationRowSource", "pageSql"])
+      assert.equal(name in (federation as Record<string, unknown>), false, name + " returns ids and must not sit among the aggregate builders");
+    const part = [{ cohort: "c", study: "x", cohortSql: "SELECT '' AS pid" }];
+    assert.match(pageSql(clinicalRowSource(part, "db", "sample", [{ id: "AGE", name: "Age", per: "patient", numeric: true }]), {}, [], 10, 0), /AS patient, replaceOne\(u\.suid/);
+    assert.match(pageSql(mutationRowSource(part, "db", "KRAS", "v7.5"), {}, [], 10, 0), /m\.sid AS sid/);
+    for (const m of ["rowsPage", "rowsCounts", "rowsValues"]) {
+      for (const R of [AggregateResolver, RemoteAggregateResolver])
+        assert.equal(typeof (R.prototype as unknown as Record<string, unknown>)[m], "undefined", R.name + " must not be able to run a table view's " + m);
+      assert.equal(typeof (PatientLevelResolver.prototype as unknown as Record<string, unknown>)[m], "function");
+    }
   });
 
   test("a box plot's points are the entitlement, and live only where it lives", () => {

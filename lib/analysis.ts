@@ -174,6 +174,8 @@ export interface RunOpts {
   oncoprint?: "svg" | "spec";
   /** a paged view's page (app/api/view-page): rows offset to offset + limit of its one global order */
   page?: { offset: number; limit: number };
+  /** a table view's column whose values to return instead of rows (what its filter offers) */
+  values?: string;
 }
 
 /**
@@ -2081,7 +2083,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         void oncoQueryMs;
       }
     } else if (isMoreViewKind(view.kind)) {
-      views.push(await runMoreView(view, { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, overLimit, studyProfiles, page: opts.page }));
+      views.push(await runMoreView(view, { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, overLimit, studyProfiles, page: opts.page, values: opts.values }));
     } else {
       // unreachable for well-typed documents, but documents arrive as untrusted
       // JSON from clients/chat/MCP, so an unknown kind must still be reported

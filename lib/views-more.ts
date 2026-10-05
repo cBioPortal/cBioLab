@@ -46,6 +46,8 @@ export interface ViewCtx {
   overLimit: (what: string, max: number, given: number) => string | null;
   /** a paged view's page (the mutation and clinical tables): rows offset to offset + limit of its one global order */
   page?: { offset: number; limit: number };
+  /** a table view's column whose values to return instead of rows (what its filter offers) */
+  values?: string;
 }
 
 export const MORE_VIEW_KINDS = ["attrition", "genome", "pathways", "diffexpr", "paired", "clonality", "incidence", "labs", ...PORTAL_VIEW_KINDS] as const;
