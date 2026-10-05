@@ -1,6 +1,6 @@
 <!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.ts; regenerate with `npm run docs:gen`. -->
 
-# cbio-lab DSL (v2.2)
+# cbio-lab DSL (v2.3)
 
 One declarative JSON object — the **Analysis document** — describes everything cbio-lab does:
 which patients form each cohort, and which views compare them. The server compiles it to
@@ -11,9 +11,9 @@ SQL each cohort compiled to.
 ## Analysis document
 
 ```
-{ "study":   "<default study id>",            // validated against cancer_study
+{ "dsl":     "2.3",                         // the document's version; see "Versions" below
+  "study":   "<default study id>",            // validated against cancer_study
   "cohorts": { "<name>": cohortDef, ... },    // max 16
-  "partitions"?: { "<name>": partitionDef },  // split a cohort into disjoint children that add up to it
   "views":   [ view, ... ],                   // max 6
   "uploads"?: [ { "as": "<name>", "dataset": "<id>", "version": n } ] }  // server-stored custom data, pinned
 ```
@@ -34,11 +34,12 @@ cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient 
                "study"?:   "<id>",            // evaluate in another study
                "studies"?: ["<id>", ...],     // union across studies (federated, no count limit)
                "lineGap"?: 90,                // derived-treatment-line gap, days
-               "notes"?:   "<prose>" }        // the analyst's own note on this cohort; never compiled
-partitionDef := { "of": "<cohort name>",       // the cohort to split: a named cohort, or another partition's child
-                  "arms": [ { "name": "<label>", "where": clause } × 1-8 ],  // tested in order; the first match wins
-                  "other"?: "<label>",          // the remainder's name, default "Other"
-                  "notes"?: "<prose>" }
+               "notes"?:   "<prose>",         // the analyst's own note on this cohort; never compiled
+               "splits"?:  { "<name>": splitDef } }  // divisions of this cohort into arms that add up to it
+splitDef  := { "arms": [ { "name": "<label>", "where": clause, "splits"?: {…} } × 1-8 ],  // tested in order; first match wins; an arm may be split again
+               "other"?: "<label>",            // the remainder's name, default "Other"
+               "otherSplits"?: {…},            // splits of the remainder
+               "notes"?: "<prose>" }
 clause    := leaf | { "any": [leaf × 1-8] }   // OR (UNION DISTINCT)
                   | { "not": leaf | { "any": [leaf × 1-8] } }  // study base EXCEPT leaf, or EXCEPT the OR of several (De Morgan's, in one clause instead of one "not" per leaf)
 ```
@@ -56,7 +57,7 @@ drifting apart when one gets edited. Only `all` is inherited — `study`/`studie
 name) before compilation, so every downstream reader — compiled SQL, the plain-language readback,
 provenance — sees the fully flattened `all` list, exactly as if it had been written out by hand.
 
-**Partitions.** `"partitions": {"<name>": partitionDef}` splits a cohort into child cohorts that
+**Splits.** A cohort's `"splits": {"<name>": splitDef}` divide it into child cohorts that
 are **disjoint and together exactly the parent** — the grouping a comparison needs, rather than a
 set of filters that may overlap or quietly lose patients. Arms are tested in order and the first
 match wins, so a patient matching two arms is in the earlier one, and reordering arms changes who
@@ -67,18 +68,28 @@ query needs mutation, copy-number and structural-variant profiling), a `clinical
 recorded value. Patients failing that go to a child named `"Not profiled: <GENE> <type>"` or
 `"No <ATTRIBUTE> recorded"`; patients matching no arm go to `"Other"` (or the `other` name).
 
-Each child is an ordinary cohort named `"<partition> / <arm>"`, usable anywhere a cohort name is
-(including as another partition's `of`, to nest), with its own readback and SQL. **A split
+Each child is an ordinary cohort named `"<cohort> / <split> / <arm>"` (an arm split again: `"NSCLC /
+KRAS allele / G12C / sex / Female"`), usable anywhere a cohort name is, with its own readback and
+SQL; a split itself is addressed as `"<cohort> / <split>"`. **A split
 replaces what it splits** in every view: wherever a view would show a split cohort — named in its
 `cohorts`, or shown by default because it names none — it shows that split's arms and remainder
 instead (not its not-evaluable children), and an arm that is split further shows ITS arms, so the
-leaves still add up to the cohort. Naming the partition does the same; naming one child shows just
+leaves still add up to the cohort. Naming the split does the same; naming one child shows just
 that child. If one cohort has two splits, views show the first declared. The result's
-`partitions` gives every child's count and checks the sum against the parent's (`conserved`).
+`splits` gives every child's count and checks the sum against the parent's (`conserved`).
 Conditions the engine cannot check evaluability for (expression, assay values, timeline events,
 derived metrics) are listed in `unchecked`: their patients with no data count as not matching.
 Up to 16 authored cohorts and 48 cohorts in all, children included. Expanded before `extends`, so
-each child `extends` its parent and runs in the parent's studies.
+each child `extends` its parent and runs in the parent's studies. (Not to be confused with the
+`{"kind":"split"}` leaf below, which selects the engine's fixed discovery or validation half.)
+
+**Versions.** A document carries `"dsl": "2.3"`. One written for an older version is
+upgraded when it is read — the result's `upgraded` says from which version and what changed
+(2.2 → 2.3 moved top-level `partitions` onto the cohorts they split as `splits`, and renamed
+their children from `"<partition> / <arm>"` to `"<cohort> / <partition> / <arm>"`, views
+included) — and saving it writes the new version. One with no `dsl` is read the same way, so
+leaving it out is harmless. One written for a NEWER version than the server reads is refused,
+rather than silently ignoring what it does not understand.
 
 ### Leaf kinds
 
@@ -2215,7 +2226,7 @@ APC-mutant colorectal cancer, then the same population restricted to liver metas
 }
 ```
 
-### Example 29: partitions: split a cohort into arms that add up to it
+### Example 29: Splits: a cohort divided into arms that add up to it
 
 Non-small cell lung cancer split by KRAS allele: G12C first, then any other KRAS mutation, then wild-type. Because G12C is tested first, "other KRAS" needs no hand-written "and not G12C". 916 + 1,278 + 5,615 = 7,809, the whole cohort, with nobody unprofiled for KRAS in this study. STK11 and KEAP1 are enriched in both KRAS-mutant arms and TP53 in wild-type — the known co-mutation pattern — while overall survival does not differ significantly across the three arms (k-group log-rank p≈0.1).
 
@@ -2233,29 +2244,28 @@ Non-small cell lung cancer split by KRAS allele: G12C first, then any other KRAS
           ],
           "per": "sample"
         }
-      ]
-    }
-  },
-  "partitions": {
-    "KRAS allele": {
-      "of": "NSCLC",
-      "other": "KRAS wild-type",
-      "arms": [
-        {
-          "name": "G12C",
-          "where": {
-            "kind": "oql",
-            "q": "KRAS: G12C"
-          }
-        },
-        {
-          "name": "other KRAS",
-          "where": {
-            "kind": "oql",
-            "q": "KRAS: MUT"
-          }
+      ],
+      "splits": {
+        "KRAS allele": {
+          "other": "KRAS wild-type",
+          "arms": [
+            {
+              "name": "G12C",
+              "where": {
+                "kind": "oql",
+                "q": "KRAS: G12C"
+              }
+            },
+            {
+              "name": "other KRAS",
+              "where": {
+                "kind": "oql",
+                "q": "KRAS: MUT"
+              }
+            }
+          ]
         }
-      ]
+      }
     }
   },
   "views": [
@@ -2267,13 +2277,13 @@ Non-small cell lung cancer split by KRAS allele: G12C first, then any other KRAS
         "TP53"
       ],
       "cohorts": [
-        "KRAS allele"
+        "NSCLC / KRAS allele"
       ]
     },
     {
       "kind": "survival",
       "cohorts": [
-        "KRAS allele"
+        "NSCLC / KRAS allele"
       ]
     }
   ]

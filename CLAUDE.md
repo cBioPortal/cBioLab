@@ -78,17 +78,25 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   resolved document is an ordinary one, so everything downstream stays as strictly typed as
   before (`AnalysisDoc` = resolved, `TemplateDoc` = as authored). `runAnalysis` is the boundary.
   Also `parameterize()`, the one-click lift of study + a shared gene list.
-- **Partitions** (`doc.partitions`) — a cohort split into child cohorts that are disjoint and add
-  up to it, for comparison. **`lib/cohort-partitions.ts`** expands each into ordinary child
-  cohorts (`"<partition> / <arm>"`, each `extends` its parent) before `extends` resolves: arms are
-  a first-match-wins decision chain, and an arm's condition must be decidable first (OQL → the
-  patient is profiled for that gene and type, panel-aware; clinical → a value is recorded), else
-  the patient goes to a named "Not profiled" / "No … recorded" child, never to wild-type or Other.
-  `runAnalysis` counts every child and reports `result.partitions[...].conserved`; a view naming a
-  partition compares its arms and Other. **`lib/partition-arms.ts`** (browser-safe) builds and
-  edits arms — the value-ranking rule there is shared with `splitBy`. `proposePartition`
-  (`POST /api/partition`) writes arms from the data; the result is explicit arms, so the
-  document alone decides the children. UI: `app/lab/partitions.tsx`, Explore's "split by this".
+- **Splits** (`cohorts[name].splits`, and `arms[i].splits` to nest) — a cohort divided into child
+  cohorts that are disjoint and add up to it, for comparison. Stored as a tree on the cohort; the
+  engine and page work on a flat form keyed `"<cohort> / <split>"` (`flattenSplits` /
+  `unflattenSplits` / `editSplits` in **`lib/partition-arms.ts`**, browser-safe, which also builds
+  and edits arms and holds the value-ranking rule shared with `splitBy`). **`lib/cohort-partitions.ts`**
+  expands each split into ordinary child cohorts (`"<cohort> / <split> / <arm>"`, each `extends` its
+  parent) before `extends` resolves: arms are a first-match-wins decision chain, and an arm's condition
+  must be decidable first (OQL → profiled for that gene and type, panel-aware; clinical → a value is
+  recorded), else the patient goes to a named "Not profiled" / "No … recorded" child, never to
+  wild-type or Other. `runAnalysis` counts every child and reports `result.splits[...].conserved`; a
+  split replaces what it splits in every view (`expandSplits`). `proposePartition`
+  (`POST /api/partition`) writes arms from the data as explicit clauses, so the document alone decides
+  the children. UI: `app/lab/partitions.tsx`, the cohort card's menu, Explore charts' menus.
+- **Document versions** — **`lib/doc-version.ts`** is THE place an older document is brought up to
+  date. Documents carry `"dsl": DOC_VERSION`; one with an older version (or none) is upgraded where it
+  enters — the page on `run()`, the engine in `runAnalysis` — and `result.upgraded` / the page's note
+  say what changed; one for a NEWER version is refused, because an older engine would silently ignore
+  what it does not know. A change to the document's shape, or to what an unchanged document means,
+  bumps DOC_VERSION and adds an upgrade step there; never re-interpret an old shape anywhere else.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
 - **Custom data** — a researcher's uploaded annotations, named `custom:<dataset>/<COLUMN>` and
   usable anywhere a clinical attribute is, stored on the server only (below; the browser keeps

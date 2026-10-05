@@ -50,9 +50,9 @@ for (const ex of EXAMPLES) {
     runPin = r.oncokbPin;
     // A partition's child may honestly be empty (nobody unprofiled for the gene); an authored
     // cohort may not. Every partition must add up to its parent.
-    const children = new Set(Object.values(r.partitions || {}).flatMap((p) => p.children.map((c) => c.name)));
+    const children = new Set(Object.values(r.splits || {}).flatMap((p) => p.children.map((c) => c.name)));
     const bad = Object.entries(r.cohorts).filter(([nm, c]) => !c.count && !children.has(nm)).map(([nm]) => nm);
-    const leaky = Object.entries(r.partitions || {}).filter(([, p]) => !p.conserved)
+    const leaky = Object.entries(r.splits || {}).filter(([, p]) => !p.conserved)
       .map(([nm, p]) => nm + " (" + n(p.sum) + " of " + n(p.parentCount) + ")");
     const viewErr = r.views.find(v => v.error);
     const actual: Record<string, number> = {};

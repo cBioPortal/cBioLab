@@ -1,7 +1,7 @@
 // Building and editing a partition's arms — pure and browser-safe, shared by the server's "split
 // by" proposal, Explore's "split by this", the analysis page's partition panel and the
 // assistant's tools, so every path picks arms by the same rule.
-import type { Clause, Leaf, PartitionArm, PartitionDef } from "./types.ts";
+import type { Clause, CohortDef, Leaf, PartitionArm, PartitionDef, SplitDef } from "./types.ts";
 
 export const SPLIT_BY_DEFAULT_MAX_ARMS = 8;
 export const SPLIT_BY_DEFAULT_MIN_COUNT = 10;
@@ -34,7 +34,7 @@ export function partitionFromValues(of: string, attribute: string, per: "patient
     where: { kind: "clinical", attribute, ...(per === "sample" ? { per } : {}), values: [x.v] }
   }));
   return {
-    def: { of, arms, source: { attribute, minCount, ...(pooled.length ? { otherValues: pooled.slice(0, 50).map((x) => x.v) } : {}) } },
+    def: { of, split: attribute, arms, source: { attribute, minCount, ...(pooled.length ? { otherValues: pooled.slice(0, 50).map((x) => x.v) } : {}) } },
     pooled: pooled.map((x) => x.v)
   };
 }
@@ -43,14 +43,14 @@ export function partitionFromValues(of: string, attribute: string, per: "patient
 export function partitionFromGene(of: string, gene: string): PartitionDef {
   const g = gene.trim().toUpperCase();
   if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(g)) throw new Error("'" + gene + "' is not a valid gene symbol");
-  return { of, arms: [{ name: g + " mutated", where: { kind: "oql", q: g + ": MUT" } }], other: g + " wild-type", source: { gene: g } };
+  return { of, split: g, arms: [{ name: g + " mutated", where: { kind: "oql", q: g + ": MUT" } }], other: g + " wild-type", source: { gene: g } };
 }
 
 /** One arm per OQL query, first match wins. */
 export function partitionFromOql(of: string, queries: string[]): PartitionDef {
   const qs = queries.map((q) => q.trim()).filter(Boolean);
   if (!qs.length) throw new Error("give at least one OQL query");
-  return { of, arms: qs.map((q) => ({ name: armLabel(q), where: { kind: "oql", q } })), source: { oql: qs } };
+  return { of, split: "OQL", arms: qs.map((q) => ({ name: armLabel(q), where: { kind: "oql", q } })), source: { oql: qs } };
 }
 
 export function armLabel(v: string): string {
@@ -221,14 +221,12 @@ export function renamePartitionChild<D extends { partitions?: Record<string, Par
   const isOther = (p.other || "Other") === from;
   const next: PartitionDef = isOther ? { ...p, other: label }
     : { ...p, arms: p.arms.map((a) => a.name === from ? { ...a, name: label } : a) };
+  // everything beneath the renamed row is named after it: nested splits' owners, and views
   const oldName = partition + " / " + from, newName = partition + " / " + label;
+  const move = (c: string) => c === oldName ? newName : c.startsWith(oldName + " / ") ? newName + c.slice(oldName.length) : c;
   const partitions = Object.fromEntries(Object.entries(doc.partitions!).map(([k, d]) =>
-    [k, k === partition ? next : d.of === oldName ? { ...d, of: newName } : d]));
-  const views = (doc.views || []).map((v) => {
-    const cs = (v as { cohorts?: string[] }).cohorts;
-    return Array.isArray(cs) ? { ...(v as object), cohorts: cs.map((c) => c === oldName ? newName : c) } : v;
-  });
-  return { ...doc, partitions, views } as D;
+    [move(k), k === partition ? next : { ...d, of: move(d.of) }]));
+  return { ...doc, partitions, views: renameInViews(doc.views, oldName, newName) } as D;
 }
 
 /** what expandSplits needs to know about one partition */
@@ -255,4 +253,103 @@ export function expandSplits(names: string[], parts: PartitionShape[]): string[]
   };
   for (const n of names) visit(n, new Set());
   return out.filter((n, i) => out.indexOf(n) === i);
+}
+
+// ---- the split tree (stored on cohorts) and its flat working form ---------------------------
+
+type Cohorts = Record<string, CohortDef>;
+
+/** "<owner> / <split>": how a split is addressed, and the prefix of every child it makes */
+export function splitKey(of: string, split: string): string { return of + " / " + split; }
+
+/**
+ * Every split in the document as a flat map keyed "<owner> / <split>", each knowing what it
+ * splits. The owner is a cohort's name or an arm's full name ("NSCLC / KRAS allele / G12C"), so a
+ * split nested under an arm is keyed "NSCLC / KRAS allele / G12C / sex". Arms come back without
+ * their nested splits — those are entries of their own.
+ */
+export function flattenSplits(cohorts: Cohorts): Record<string, PartitionDef> {
+  const out: Record<string, PartitionDef> = {};
+  const walk = (of: string, splits: Record<string, SplitDef> | undefined) => {
+    for (const [split, d] of Object.entries(splits || {})) {
+      if (!d || typeof d !== "object") throw new Error("split “" + split + "” of “" + of + "” must be an object");
+      const key = splitKey(of, split);
+      const { arms, otherSplits, ...rest } = d;
+      out[key] = { ...rest, of, split, arms: (Array.isArray(arms) ? arms : []).map(({ splits: _s, ...a }) => a) };
+      for (const a of Array.isArray(arms) ? arms : []) if (a && a.splits) walk(splitKey(key, String(a.name)), a.splits);
+      if (otherSplits) walk(splitKey(key, d.other || "Other"), otherSplits);
+    }
+  };
+  for (const [name, def] of Object.entries(cohorts || {})) walk(name, def?.splits);
+  return out;
+}
+
+/** The cohorts without their splits: what the compiler (and a federated peer) is given. */
+export function withoutSplitTrees(cohorts: Cohorts): Cohorts {
+  return Object.fromEntries(Object.entries(cohorts || {}).map(([n, d]) => {
+    if (!d || !d.splits) return [n, d];
+    const { splits: _s, ...rest } = d;
+    return [n, rest];
+  }));
+}
+
+/**
+ * Write a flat map of splits back onto the cohorts as a tree (replacing whatever splits they had).
+ * A split whose owner is neither a cohort nor an arm / remainder of another split is refused by
+ * name rather than dropped.
+ */
+export function unflattenSplits(cohorts: Cohorts, flat: Record<string, PartitionDef>): Cohorts {
+  const out: Cohorts = Object.fromEntries(Object.entries(withoutSplitTrees(cohorts)).map(([n, d]) => [n, { ...d }]));
+  const built = new Map<string, SplitDef>();
+  const entries = Object.values(flat).map((p) => ({ key: splitKey(p.of, p.split), p }));
+  const attach = (key: string, p: PartitionDef, chain: string[]) => {
+    if (built.has(key)) return;
+    if (chain.includes(key)) throw new Error("split “" + key + "” splits its own descendant");
+    const { of, split, arms, ...rest } = p;
+    const def: SplitDef = { ...rest, arms: arms.map((a) => ({ ...a })) };
+    if (out[of]) {
+      out[of] = { ...out[of], splits: { ...(out[of].splits || {}), [split]: def } };
+    } else {
+      const parent = entries.find((e) => of.startsWith(e.key + " / "));
+      if (!parent) throw new Error("split “" + split + "” is of “" + of + "”, which is not a cohort or an arm of a split");
+      attach(parent.key, parent.p, [...chain, key]);
+      const pd = built.get(parent.key)!;
+      const label = of.slice(parent.key.length + 3);
+      const arm = pd.arms.find((a) => a.name === label);
+      if (arm) arm.splits = { ...(arm.splits || {}), [split]: def };
+      else if ((pd.other || "Other") === label) pd.otherSplits = { ...(pd.otherSplits || {}), [split]: def };
+      else throw new Error("split “" + split + "” is of “" + of + "”, which is not an arm of “" + parent.key + "”");
+    }
+    built.set(key, def);
+  };
+  for (const e of entries) attach(e.key, e.p, []);
+  return out;
+}
+
+/**
+ * Edit a document's splits through their flat form (splits nested under an arm the edit removed
+ * are dropped with it): `edit` gets {partitions, views} — the shape
+ * withoutPartition / renamePartitionChild work on — and the result is written back as a tree.
+ */
+export function editSplits<D extends { cohorts: Cohorts; views?: unknown[] }>(
+  doc: D, edit: (flat: { partitions: Record<string, PartitionDef>; views?: unknown[] }) => { partitions?: Record<string, PartitionDef>; views?: unknown[] }): D {
+  const out = edit({ partitions: flattenSplits(doc.cohorts), views: doc.views });
+  // a split of an arm that no longer exists goes with it, as a cohort's splits go with the cohort
+  const flat = { ...(out.partitions || {}) };
+  const owns = (of: string) => !!doc.cohorts[of] || Object.entries(flat).some(([k, p]) =>
+    of.startsWith(k + " / ") && [...p.arms.map((a) => a.name), p.other || "Other"].includes(of.slice(k.length + 3)));
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const [k, p] of Object.entries(flat)) if (!owns(p.of)) { delete flat[k]; changed = true; }
+  }
+  return { ...doc, cohorts: unflattenSplits(doc.cohorts, flat), views: out.views } as D;
+}
+
+/** Rewrite a cohort name, and every name beneath it, in views' cohort lists. */
+export function renameInViews(views: unknown[] | undefined, from: string, to: string): unknown[] | undefined {
+  const re = (c: string) => c === from ? to : c.startsWith(from + " / ") ? to + c.slice(from.length) : c;
+  return views && views.map((v) => {
+    const cs = (v as { cohorts?: string[] }).cohorts;
+    return Array.isArray(cs) ? { ...(v as object), cohorts: cs.map(re) } : v;
+  });
 }

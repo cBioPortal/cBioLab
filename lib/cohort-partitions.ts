@@ -30,7 +30,10 @@ export const PARTITION_SEP = " / ";
 export type PartitionChildRole = "arm" | "other" | "notEvaluable";
 export interface PartitionChild { name: string; role: PartitionChildRole; label: string }
 export interface PartitionPlan {
+  /** "<cohort> / <split>": the split's address, and the prefix of every child it makes */
   name: string; of: string;
+  /** the split's own name, as stored on the cohort */
+  split: string;
   children: PartitionChild[];
   /** arm conditions whose evaluability this engine cannot check (no "not evaluable" child is
    *  generated for them), named so the reader knows the Other arm may hold unknowns */
@@ -126,8 +129,8 @@ class Chain {
 
 function validateArmName(partition: string, n: unknown): string {
   const name = typeof n === "string" ? n.trim() : "";
-  if (!name) throw new Error("partition “" + partition + "”: every arm needs a name");
-  if (name.length > 80) throw new Error("partition “" + partition + "”: arm name “" + name.slice(0, 40) + "…” is longer than 80 characters");
+  if (!name) throw new Error("split “" + partition + "”: every arm needs a name");
+  if (name.length > 80) throw new Error("split “" + partition + "”: arm name “" + name.slice(0, 40) + "…” is longer than 80 characters");
   return name;
 }
 
@@ -137,13 +140,13 @@ export function partitionChildName(partition: string, label: string): string {
 }
 
 /** Plan one partition: the children's names, roles and defs, from the parent def. */
-export function planPartition(name: string, def: PartitionDef, parent: CohortDef): { plan: PartitionPlan; defs: Record<string, CohortDef> } {
-  if (!def || typeof def !== "object") throw new Error("partition “" + name + "” must be an object");
-  if (!Array.isArray(def.arms) || !def.arms.length) throw new Error("partition “" + name + "” needs at least one arm");
+export function planPartition(name: string, def: Omit<PartitionDef, "split"> & { split?: string }, parent: CohortDef): { plan: PartitionPlan; defs: Record<string, CohortDef> } {
+  if (!def || typeof def !== "object") throw new Error("split “" + name + "” must be an object");
+  if (!Array.isArray(def.arms) || !def.arms.length) throw new Error("split “" + name + "” needs at least one arm");
   if (def.arms.length > PARTITION_MAX_ARMS)
-    throw new Error("partition “" + name + "” has " + def.arms.length + " arms; at most " + PARTITION_MAX_ARMS);
+    throw new Error("split “" + name + "” has " + def.arms.length + " arms; at most " + PARTITION_MAX_ARMS);
   if (parent.a && parent.rel && !parent.all)
-    throw new Error("partition “" + name + "”: “" + def.of + "” uses the shorthand event form — write it as all: [...] to split it");
+    throw new Error("split “" + name + "”: “" + def.of + "” uses the shorthand event form — write it as all: [...] to split it");
 
   // Children are evaluated exactly where the parent is: same studies, same line gap.
   const inherit: CohortDef = {
@@ -156,7 +159,7 @@ export function planPartition(name: string, def: PartitionDef, parent: CohortDef
   const defs: Record<string, CohortDef> = {};
   const add = (role: PartitionChildRole, label: string, all: Clause[]) => {
     const childName = partitionChildName(name, label);
-    if (defs[childName]) throw new Error("partition “" + name + "”: two children would both be named “" + label + "”");
+    if (defs[childName]) throw new Error("split “" + name + "”: two children would both be named “" + label + "”");
     children.push({ name: childName, role, label });
     defs[childName] = { ...inherit, extends: def.of, all };
   };
@@ -166,7 +169,7 @@ export function planPartition(name: string, def: PartitionDef, parent: CohortDef
   const unchecked: string[] = [];
   for (const arm of def.arms) {
     const label = validateArmName(name, arm && arm.name);
-    if (!arm.where || typeof arm.where !== "object") throw new Error("partition “" + name + "”: arm “" + label + "” needs a where clause");
+    if (!arm.where || typeof arm.where !== "object") throw new Error("split “" + name + "”: arm “" + label + "” needs a where clause");
     const ev = clauseEvaluability(arm.where);
     for (const u of ev.unchecked) if (!unchecked.includes(u)) unchecked.push(u);
     for (const e of ev.leaves) {
@@ -180,23 +183,22 @@ export function planPartition(name: string, def: PartitionDef, parent: CohortDef
     S.exclude(arm.where);
   }
   add("other", otherLabel, S.clauses());
-  return { plan: { name, of: def.of, children, unchecked }, defs };
+  return { plan: { name, of: def.of, split: def.split || name, children, unchecked }, defs };
 }
 
 /**
  * Expand every partition into its child cohorts. Partitions may split a child of another
  * partition, so they resolve in dependency order; a cycle or a missing parent is rejected.
  */
-export function resolvePartitions(doc: AnalysisDoc): { doc: AnalysisDoc; plans: PartitionPlan[] } {
-  const parts = doc.partitions || {};
+export function resolvePartitions(doc: AnalysisDoc, parts: Record<string, Omit<PartitionDef, "split"> & { split?: string }>): { doc: AnalysisDoc; plans: PartitionPlan[] } {
   const names = Object.keys(parts);
   if (!names.length) return { doc, plans: [] };
   const cohorts: Record<string, CohortDef> = { ...(doc.cohorts || {}) };
   const plans: Record<string, PartitionPlan> = {};
   const producer: Record<string, string> = {}; // child cohort name -> partition producing it
   for (const n of names) {
-    if (!n.trim()) throw new Error("partition names must be non-empty");
-    if (cohorts[n]) throw new Error("partition “" + n + "” has the same name as a cohort — name it differently");
+    if (!n.trim()) throw new Error("split names must be non-empty");
+    if (cohorts[n]) throw new Error("split “" + n + "” has the same name as a cohort — name the split differently");
   }
   // A child's name is fixed by its partition's name and arm labels, so who-produces-what is known
   // before any partition is planned.
@@ -206,15 +208,15 @@ export function resolvePartitions(doc: AnalysisDoc): { doc: AnalysisDoc; plans: 
   }
   const resolve = (n: string, chain: string[]): void => {
     if (plans[n]) return;
-    if (chain.includes(n)) throw new Error("partition “" + n + "” splits its own descendant: " + [...chain, n].join(" -> "));
+    if (chain.includes(n)) throw new Error("split “" + n + "” splits its own descendant: " + [...chain, n].join(" -> "));
     const p = parts[n];
-    if (!p || typeof p.of !== "string" || !p.of) throw new Error("partition “" + n + "” needs `of`: the cohort it splits");
+    if (!p || typeof p.of !== "string" || !p.of) throw new Error("split “" + n + "” needs `of`: the cohort it splits");
     if (!cohorts[p.of] && producer[p.of]) resolve(producer[p.of], [...chain, n]);
     const parent = cohorts[p.of];
-    if (!parent) throw new Error("partition “" + n + "” splits unknown cohort “" + p.of + "”");
+    if (!parent) throw new Error("split “" + n + "” splits unknown cohort “" + p.of + "”");
     const { plan, defs } = planPartition(n, p, parent);
     for (const [cn, cd] of Object.entries(defs)) {
-      if (cohorts[cn]) throw new Error("partition “" + n + "” would create “" + cn + "”, which already exists");
+      if (cohorts[cn]) throw new Error("split “" + n + "” would create “" + cn + "”, which already exists");
       cohorts[cn] = cd;
     }
     plans[n] = plan;
@@ -233,7 +235,7 @@ export function assertPartitionChildrenFit(cohorts: Record<string, CohortDef>, p
   for (const plan of plans) for (const c of plan.children) {
     const n = (cohorts[c.name]?.all || []).length;
     if (n > max)
-      throw new Error("partition “" + plan.name + "”: “" + c.label + "” needs " + n + " conditions (those of “" + plan.of +
+      throw new Error("split “" + plan.name + "”: “" + c.label + "” needs " + n + " conditions (those of “" + plan.of +
         "” and every split above it, plus this split's own), and a cohort takes at most " + max +
         " — simplify the cohort being split, or split it in fewer levels");
   }

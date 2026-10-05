@@ -1,8 +1,9 @@
 "use client";
-// A partition on the analysis page: the cohort it splits, each child with its count and share of
+// A split on the analysis page: the cohort it splits, each child with its count and share of
 // the parent, and whether the children add up. Arms can be reordered (first match wins, so order
 // decides who goes where), merged, removed, added as OQL, and split again; the panel edits the
-// document's `partitions` and the page re-runs it, so every number shown is the engine's.
+// split (stored on its cohort, edited here in its flat form) and the page re-runs the document,
+// so every number shown is the engine's.
 import { useState } from "react";
 import type { PartitionDef, PartitionResult } from "../../lib/types.ts";
 import { moveArm, removeArm, mergeArms, canMergeArms } from "../../lib/partition-arms.ts";
@@ -156,7 +157,7 @@ export function PartitionPanel({ name, partitions, results, cohortText, attrs, b
   return (
     <div className={"partbox" + (depth ? " nested" : "")} data-partition={name}>
       <div className="parthead">
-        <span className="partname" title="a partition: arms tested in order, the first match wins">⑂ {name}</span>
+        <span className="partname" title={"split “" + name + "”: arms tested in order, the first match wins"}>⑂ {def.split || name}</span>
         <span className="meta">splits “{def.of}”{res ? " · " + res.parentCount.toLocaleString() + " patients" : ""}</span>
         <button className="tbbtn partrm" disabled={busy} title="remove this split (and any split nested under it)" onClick={() => onRemove(name)}>✕</button>
       </div>
