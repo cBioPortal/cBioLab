@@ -2,6 +2,13 @@ const { chromium } = require("/home/ubuntu/cohort-lab/node_modules/playwright");
 
 const BASE = "http://localhost:" + (process.env.E2E_PORT || 3100);
 
+// Explore starts with no studies selected; the checks that browse facets pick the two studies they
+// were written against, through the page's own tool (what a reader's ticking does).
+async function pickExploreStudies(p) {
+  await p.waitForFunction(() => window.cohortLab && window.cohortLab.selectStudies, null, { timeout: 120000 });
+  await p.evaluate(() => window.cohortLab.selectStudies(["msk_chord_2024", "genie_public"]));
+}
+
 async function main() {
   const browser = await chromium.launch({
     executablePath: process.env.HOME + "/.cache/ms-playwright/chromium-1217/chrome-linux64/chrome"
@@ -106,6 +113,7 @@ async function main() {
       // .exbar (the filters bar) only renders once a filter exists now — the
       // Exploring/studies card is the one thing always present on this tab.
       await page.waitForSelector('h2:has-text("Exploring")', { timeout: 120000 });
+      await pickExploreStudies(page);
       let der = { facets: 0, filtered: false };
       let derivedFacetsHidden = false;
       try {
@@ -173,6 +181,7 @@ async function main() {
       await page.goto(BASE + "/lab");
       await page.locator("button:has-text('Explore')").first().click();
       await page.waitForSelector('h2:has-text("Exploring")', { timeout: 120000 });
+      await pickExploreStudies(page);
       let unfiltered = "";
       try {
         await page.waitForFunction(() => {
@@ -947,6 +956,7 @@ async function main() {
     const sp = await ctx.newPage();
     try {
       await sp.goto(BASE + "/lab?tab=explore", { waitUntil: "domcontentloaded" });
+      await pickExploreStudies(sp);
       await sp.waitForSelector("[data-attr]", { timeout: 300000 });
       await sp.waitForTimeout(2000);
       let apiCalls = 0;

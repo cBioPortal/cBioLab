@@ -294,7 +294,6 @@ function KMChart({ curves, cutoffMonths, tickMonths, incidence }:
 
 /** Explore opens on these: one deeply-annotated MSK study and one large
  *  consortium cohort on the peer instance, so federation is visible up front. */
-const DEFAULT_EXPLORE_STUDIES = ["msk_chord_2024", "genie_public"];
 
 const EMPTY_DOC: AnalysisDoc = { cohorts: {}, views: [] };
 // "compare" dropped from the default set: computing driver/any/p for 7 genes
@@ -486,7 +485,7 @@ export default function AnalysisPage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Record<string, { id: string; def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null }>>({});
   const [cName, setCName] = useState("");
-  const [cDefText, setCDefText] = useState(JSON.stringify({ studies: [...DEFAULT_EXPLORE_STUDIES], all: [] }, null, 2));
+  const [cDefText, setCDefText] = useState(JSON.stringify({ all: [] }, null, 2));
   const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
   const [studies, setStudies] = useState<{ id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string }[]>([]);
   const studyNames = useMemo(() => new Map(studies.map((s) => [s.id, s.name] as const)), [studies]);
@@ -500,9 +499,9 @@ export default function AnalysisPage() {
   const [catLoading, setCatLoading] = useState(false);
   const [sQuery, setSQuery] = useState("");                             // study-panel search
   const [sCaps, setSCaps] = useState<Set<string>>(() => new Set());                  // study-panel capability filters
-  const [exStudies, setExStudies] = useState<string[]>([...DEFAULT_EXPLORE_STUDIES]); // studies being explored (checkboxes)
+  const [exStudies, setExStudies] = useState<string[]>([]); // studies being explored (checkboxes); none until the reader picks
   const [exPanelOpen, setExPanelOpen] = useState(false);                // study panel expanded?
-  const exSel = useRef<string[]>([...DEFAULT_EXPLORE_STUDIES]);                   // current selection (ref: immune to state races)
+  const exSel = useRef<string[]>([]);                   // current selection (ref: immune to state races)
   const exFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);                                    // debounce for multi-toggle refetch
   const exFetchSeq = useRef(0);
   /** facets from the last UNNARROWED response — the bar is always computed from these */
@@ -757,13 +756,11 @@ export default function AnalysisPage() {
     fetch("/api/studies").then(r => r.json()).then(j => {
       const list = j.studies || [];
       setStudies(list);
-      // The default selection names studies that a given deployment may not hold
-      // (a peer instance need not be configured). Keep only what is reachable,
-      // and fall back to the largest available study rather than an empty state.
+      // A selection (from a ?doc= link) may name studies this deployment does not hold; keep only
+      // what is reachable. Nothing is chosen for the reader: with no selection Explore asks.
       const have = new Set(list.map((s: { id: string }) => s.id));
       const keep = exSel.current.filter((id) => have.has(id));
-      const next = keep.length ? keep : (list.length ? [list[0].id] : []);
-      if (list.length && next.join(",") !== exSel.current.join(",")) setExploreStudies(next);
+      if (list.length && keep.join(",") !== exSel.current.join(",")) setExploreStudies(keep);
     }).catch(() => {});
     // tab itself is already correct from the initial render (see initialTab()) — this
     // only needs to fetch what that landing tab needs and hydrate a shared ?doc= link.
@@ -2835,10 +2832,14 @@ function Latency({ v }: { v: any }) {
                     // minute, and showing the old 267,816 as though it described
                     // the new set is worse than showing the study list's own sum
                     // and saying it is still counting.
-                    (exploreBusy || !explore?.totals
-                      ? selPts.toLocaleString() + " patients" + (exploreBusy ? " · counting…" : "")
-                      : explore.totals.patients.toLocaleString() + " patients · " + explore.totals.samples.toLocaleString() + " samples") +
-                    (exStudies.length > 1 ? " (overlap not deduplicated)" : "")}</span></h2>
+                    (exploreBusy || !explore?.totals ? ""
+                      : explore.totals.patients.toLocaleString() + " patients · " + explore.totals.samples.toLocaleString() + " samples" +
+                        (exStudies.length > 1 ? " (overlap not deduplicated)" : ""))}
+                    {/* the counts arrive with the facets; until then a placeholder holds their
+                        place, so the header neither shows a wrong number nor jumps */}
+                    {exStudies.length > 0 && (exploreBusy || !explore?.totals) &&
+                      <span className="skeleton skeleton-counts" title={selPts ? "counting… (the selected studies hold " + selPts.toLocaleString() + " patients before deduplication)" : "counting…"} />}
+                  </span></h2>
                   {/* One chip per study is fine for a handful and unreadable for
                       560 — the header became a wall of identifiers that pushed
                       everything else off screen. Past CHIP_CAP it summarises,
@@ -2873,12 +2874,13 @@ function Latency({ v }: { v: any }) {
                     title={ready ? "start a fresh analysis of this cohort (replaces the current document)" : "select a study first"}>
                     Analyze
                   </button>}
-                  <button onClick={() => {
+                  {exStudies.length > 0 && <button onClick={() => {
                     if (exPanelOpen) { setExDraftStudies(null); setExPanelOpen(false); }   // close discards
                     else { setExDraftStudies(exStudies); setExPanelOpen(true); }           // open seeds
-                  }}>{exPanelOpen ? "cancel" : "add / change studies"}</button>
+                  }}>{exPanelOpen ? "cancel" : "add / change studies"}</button>}
                 </div>
-                {exPanelOpen && <>
+                {/* with nothing selected the picker is simply open: there is nothing else to do here */}
+                {(exPanelOpen || exStudies.length === 0) && <>
                   <div className="row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center", margin: "0.6rem 0" }}>
                     <input placeholder="search name, id, or cancer type…" value={sQuery} onChange={e => setSQuery(e.target.value)}
                       style={{ flex: 1, minWidth: "16rem" }} />
@@ -3001,8 +3003,11 @@ function Latency({ v }: { v: any }) {
               separately-submitted action, not an immediate filter. */}
           <div className={exploreBusy ? "busy" : undefined} aria-busy={exploreBusy}>
           {exStudies.length === 0 && <div className="card"><p className="note" style={{ fontSize: "var(--t-md)", margin: 0 }}>
-            No studies selected — check one or more above to explore.</p></div>}
-          {!explore && exStudies.length > 0 && <div className="card"><div className="loading-block"><span className="spinner" /> Building study facets…</div></div>}
+            Choose one or more studies above to explore.</p></div>}
+          {/* first load: placeholders shaped like the facet grid, so it does not jump when it lands */}
+          {!explore && exStudies.length > 0 && <div className="facetgrid" aria-label="building study facets…">
+            {Array.from({ length: 8 }).map((_, i) => <div key={i} className="skeleton skeleton-facet" />)}
+          </div>}
           {/* Clinical/gene-status/derived-timeline filter builders used to sit here as
               three permanent cards, pushing the facet grid below the fold before you'd
               touched any of them. One button, one modal with a tab per kind instead. */}
