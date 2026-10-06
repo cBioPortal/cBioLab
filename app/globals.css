@@ -934,6 +934,12 @@ details.splitmenu { margin: 0; }
 .addcohortname { display: inline-flex; align-items: center; gap: var(--s2); margin: 0; font-size: var(--t-md); color: var(--muted); }
 .addcohortname input { height: var(--ctl-h); width: 14rem; font-size: var(--t-md); }
 h2.vtitle .addcohortbtn { height: var(--ctl-h); font-size: var(--t-md); text-transform: none; letter-spacing: 0; font-weight: 500; }
+/* under a view's title: what it draws, and the colour each has in the figure */
+.viewcohorts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s3); margin: calc(-1 * var(--s1)) 0 var(--s2); font-size: var(--t-md); color: var(--ink); }
+.vc-label { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.vc-split { color: var(--muted); }
+.vc-split strong { color: var(--ink); }
+.vc-item { display: inline-flex; align-items: center; gap: var(--s1); white-space: nowrap; }
 /* a view's cohort picker: the cohorts as a tree, each split one row that can open to its groups */
 details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0; padding: 0 0 var(--s1); max-height: 65vh; overflow-y: auto; }
 .cpick-head {

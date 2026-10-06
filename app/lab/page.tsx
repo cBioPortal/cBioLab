@@ -2075,6 +2075,33 @@ function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuStore }:
 }
 
 /**
+ * The line under a view's title saying what it draws: the cohorts, or the split and its groups,
+ * each with the colour its curve / column / bar has in the figure (the view colours by position
+ * in the list it drew), so the line is both the title and the key.
+ */
+function DrawnCohorts({ drawn, nodes }: { drawn: string[]; nodes: CohortNode[] }) {
+  if (!drawn.length) return null;
+  const byName = new Map(nodes.map((x) => [x.name, x] as const));
+  const splits = nodes.filter((x) => x.kind === "split");
+  const owner = drawn.map((n) => splits.filter((x) => n.startsWith(x.name + " / ")).sort((a, b) => b.name.length - a.name.length)[0])
+    .find((x) => x) || null;
+  const swatch = (i: number) => drawn.length > 1 &&
+    <span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />;
+  const parent = owner && owner.name.slice(0, owner.name.length - owner.label.length - 3);
+  return (
+    <p className="viewcohorts">
+      <span className="vc-label">Showing</span>
+      {owner && <span className="vc-split"><strong>{parent!.split(" / ").join(" › ")}</strong> by {owner.label}:</span>}
+      {drawn.map((n, i) => (
+        <span key={n} className="vc-item" title={n}>{swatch(i)}
+          {owner ? (byName.get(n)?.label ?? n.slice(owner.name.length + 3)) : <strong>{byName.get(n)?.label ?? n}</strong>}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+/**
  * Which studies a cohort was evaluated in, on one line: the first study's name, and past one a
  * count of the rest that stays visible however long that name is. The tooltip lists every
  * study's id and name.
@@ -2102,7 +2129,7 @@ function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown
   v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode;
   onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void; onEditNote?: () => void; menuStore: Map<string, boolean>;
   /** which cohorts this view draws; absent when the document has only one */
-  cohorts?: { chosen: string[]; all: string[]; nodes: CohortNode[]; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void };
+  cohorts?: { chosen: string[]; all: string[]; nodes: CohortNode[]; drawn: string[]; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void };
 }) {
   const menuKey = cohorts?.viewKey ?? "vh";
   return (
@@ -2130,6 +2157,7 @@ function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown
           reader's aside about the figure ViewHead just named, not something
           that competes with the title for the first thing read. Plain text
           by design, see .viewnote in globals.css for why it's never markdown. */}
+      {cohorts && !v.error && <DrawnCohorts drawn={cohorts.drawn} nodes={cohorts.nodes} />}
       {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
       <SplitByNote v={v} />
     </>
@@ -2249,7 +2277,9 @@ function Latency({ v }: { v: any }) {
     let chosen = (Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored).filter((n: string) => all.includes(n));
     // a view that draws one cohort draws the first group its list stands for: show that, not the list
     if (max === 1 && chosen.length) chosen = [expandSplits(chosen, shapes)[0]].filter((n) => all.includes(n));
-    return { chosen, all, nodes, max, busy, viewKey: resultViewKeys.current[vi] ?? vi, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
+    // what the view draws, in the order it colours them (the engine expands the list the same way)
+    const drawn = expandSplits(chosen, shapes).filter((n) => !result || result.cohorts[n]);
+    return { chosen, all, nodes, drawn, max, busy, viewKey: resultViewKeys.current[vi] ?? vi, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
   };
 
 
@@ -4661,6 +4691,7 @@ function Latency({ v }: { v: any }) {
                     <ViewMenu menuId={"reorder:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)} hasNote={!!v.annotationNote} />
                     </div>
                   </div>
+                  <DrawnCohorts drawn={cohortChoice(vi, docView(vi), 1).drawn} nodes={cohortChoice(vi, docView(vi), 1).nodes} />
                   {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
       <SplitByNote v={v} />
                   <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
@@ -4748,6 +4779,7 @@ function Latency({ v }: { v: any }) {
                     <ViewMenu menuId={"reorder:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)} hasNote={!!v.annotationNote} />
                     </div>
                     </div>
+                  <DrawnCohorts drawn={cohortChoice(vi, docView(vi)).drawn} nodes={cohortChoice(vi, docView(vi)).nodes} />
                   {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
       <SplitByNote v={v} />
                   {/* The same SVG MCP clients receive \u2014 one renderer,
