@@ -919,6 +919,21 @@ button.customtag:hover { text-decoration: underline; }
 .partadd input { flex: 1; min-width: 0; height: var(--ctl-h); font-size: var(--t-md); }
 .partadd .tbbtn { height: var(--ctl-h); }
 details.splitmenu { margin: 0; }
+/* Explore in add mode: over the analysis, which stays where it was underneath */
+.exploremodal {
+  position: fixed; inset: 0; z-index: 60; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--paper); padding: 0 var(--s5) var(--s5);
+}
+.addcohortbar {
+  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; flex-wrap: wrap; gap: var(--s3);
+  margin: 0 calc(-1 * var(--s5)) var(--s4); padding: var(--s3) var(--s5);
+  background: var(--accent-soft); border-bottom: 1px solid var(--accent);
+}
+.exploremodal .exbar { top: var(--addbar-h, 3.2rem); }
+.addcohortbar { z-index: 7; }
+.addcohortname { display: inline-flex; align-items: center; gap: var(--s2); margin: 0; font-size: var(--t-md); color: var(--muted); }
+.addcohortname input { height: var(--ctl-h); width: 14rem; font-size: var(--t-md); }
+h2.vtitle .addcohortbtn { height: var(--ctl-h); font-size: var(--t-md); text-transform: none; letter-spacing: 0; font-weight: 500; }
 /* an Explore chart's "⋯" menu: pinned to the card's corner, like a cohort box's */
 .facetgrid > .card { position: relative; }
 .facetgrid > .card > div:first-child { padding-right: 1.8rem; }

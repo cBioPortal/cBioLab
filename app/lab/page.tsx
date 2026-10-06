@@ -95,6 +95,54 @@ const fmtP = (p: number): string =>
  * reads as the new one. Measures where the card's header/toolbars end rather than assuming it,
  * since every view kind lays those out differently; a card with none is covered whole.
  */
+/**
+ * The bar across the top of Explore in add mode: name the cohort being built, then add it to the
+ * open analysis or cancel. Owns its own text, so typing re-renders only this bar.
+ */
+function AddCohortBar({ existing, ready, error, onAdd, onCancel }: {
+  existing: string[]; ready: boolean; error?: string | null; onAdd: (name: string) => void; onCancel: () => void;
+}) {
+  const [name, setName] = useState(() => {
+    for (let i = existing.length + 1; ; i++) if (!existing.includes("cohort " + i)) return "cohort " + i;
+  });
+  const cancel = useRef(onCancel);
+  cancel.current = onCancel;
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && !(e.target as HTMLElement)?.closest?.("details[open]")) cancel.current(); };
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, []);
+  // Explore's own sticky filter bar sits just below this one; this bar can wrap, so it says how tall it is
+  const bar = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = bar.current, host = el?.parentElement;
+    if (!el || !host) return;
+    const set = () => host.style.setProperty("--addbar-h", el.getBoundingClientRect().height + "px");
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const clash = existing.includes(name.trim());
+  return (
+    <div className="addcohortbar" ref={bar}>
+      <strong>Add a cohort to this analysis</strong>
+      <span className="meta">filter below, then add it</span>
+      <span className="spacer" />
+      <label className="addcohortname">name
+        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80}
+          onKeyDown={(e) => { if (e.key === "Enter" && ready && name.trim() && !clash) onAdd(name); }} />
+      </label>
+      <button className="primary" disabled={!ready || !name.trim() || clash} onClick={() => onAdd(name)}
+        title={!ready ? "select a study first" : clash ? "the analysis already has a cohort with this name" : "add this selection to the analysis as “" + name.trim() + "”"}>
+        Add to analysis
+      </button>
+      <button onClick={onCancel} title="close without adding (Esc)">Cancel</button>
+      {(clash || error) && <p className="error" style={{ flexBasis: "100%", margin: 0 }}>{clash ? "the analysis already has a cohort named “" + name.trim() + "”" : error}</p>}
+    </div>
+  );
+}
+
 function Updating() {
   const ref = useRef<HTMLDivElement>(null);
   const [top, setTop] = useState(0);
@@ -333,6 +381,11 @@ export default function AnalysisPage() {
   const [exMsg, setExMsg] = useState<string | null>(null);
   /** the facet whose "split by this" is waiting on the server's proposed arms */
   const [splittingBy, setSplittingBy] = useState<string | null>(null);
+  /**
+   * Explore opened over the analysis to add one cohort to it ("+ Add cohort"), with the Explore
+   * state it replaced, restored when it closes so the Explore tab is as the reader left it.
+   */
+  const [addMode, setAddMode] = useState<null | { ids: string[]; text: string; explore: ExploreResult | null }>(null);
   /** set when an opened document was written for an older version and has been upgraded */
   const [upgradeNote, setUpgradeNote] = useState<DocUpgrade | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -2301,6 +2354,51 @@ function Latency({ v }: { v: any }) {
     runEdited(editSplits(doc, (f) => ({ ...f, partitions: { ...f.partitions, [splitKey(cohort, name)]: { ...def, split: name } } })));
   };
 
+  // ---- "+ Add cohort": Explore over the analysis, adding to it instead of replacing it ---------
+  /** the studies the analysis already uses: its default study and every cohort's own */
+  const analysisStudies = (): string[] => {
+    const ids = new Set<string>();
+    if (doc.study) ids.add(doc.study);
+    for (const c of Object.values(doc.cohorts || {})) {
+      if (c.study) ids.add(c.study);
+      for (const st of c.studies || []) ids.add(st);
+    }
+    if (!ids.size && study) ids.add(study);
+    return [...ids];
+  };
+  const openAddCohort = () => {
+    setAddMode({ ids: exSel.current, text: cDefText, explore });
+    const ids = analysisStudies();
+    exSel.current = ids; setExStudies(ids);
+    setCDefText(JSON.stringify(draftScaffold(ids), null, 2));
+    setExMsg(null);
+    fetchExplore(null, ids);
+  };
+  const closeAddCohort = () => {
+    if (!addMode) return;
+    exSel.current = addMode.ids; setExStudies(addMode.ids);
+    setCDefText(addMode.text); setExplore(addMode.explore);
+    setAddMode(null);
+  };
+  /** Add Explore's current selection to the open analysis as a new cohort, and close add mode. */
+  const addDraftToAnalysis = (name: string) => {
+    const def = barDef();
+    if (!def) { setExMsg("select at least one study first"); return; }
+    const n = name.trim();
+    if (!n) { setExMsg("give the cohort a name"); return; }
+    if (doc.cohorts?.[n]) { setExMsg("this analysis already has a cohort named “" + n + "”"); return; }
+    const nd: AnalysisDoc = { ...doc, ...(doc.study ? {} : { study: exSel.current[0] || study }),
+      cohorts: { ...(doc.cohorts || {}), [n]: def },
+      ...(doc.views && doc.views.length ? {} : { views: DEFAULT_VIEWS }) };
+    // a view that lists its own cohorts keeps its list; say so, rather than leave the reader to
+    // wonder why the new cohort is missing from it
+    const listed = (doc.views || []).filter((v) => Array.isArray(v.cohorts) && v.cohorts.length).length;
+    closeAddCohort();
+    runEdited(nd);
+    if (listed) setToast("Added “" + n + "”. " + listed + " view" + (listed === 1 ? " lists" : "s list") +
+      " its own cohorts — tick “" + n + "” in " + (listed === 1 ? "its" : "their") + " cohorts menu to show it there.");
+  };
+
   const openCohortEdit = (name: string) => {
     setCohortEditing(name);
     setCeName(name);
@@ -2686,7 +2784,10 @@ function Latency({ v }: { v: any }) {
         })()}
 
         {/* ================= Explore tab ================= */}
-        {tab === "explore" && <div>
+        {(tab === "explore" || addMode) && <div className={addMode ? "exploremodal" : undefined}
+          role={addMode ? "dialog" : undefined} aria-modal={addMode ? true : undefined} aria-label={addMode ? "add a cohort to this analysis" : undefined}>
+          {addMode && <AddCohortBar existing={Object.keys(doc.cohorts || {})} ready={exStudies.length > 0} error={exMsg}
+            onAdd={addDraftToAnalysis} onCancel={closeAddCohort} />}
           {(() => {
             const CAP_FILTERS: [string, string, (s: any) => boolean][] = [
               ["timeline", "timeline events", (s: any) => s.timelinePatients > 0],
@@ -2764,10 +2865,10 @@ function Latency({ v }: { v: any }) {
                     );
                   })()}
                   <span className="spacer" />
-                  <button className="primary" onClick={analyzeDraft} disabled={!ready}
+                  {!addMode && <button className="primary" onClick={analyzeDraft} disabled={!ready}
                     title={ready ? "start a fresh analysis of this cohort (replaces the current document)" : "select a study first"}>
                     Analyze
-                  </button>
+                  </button>}
                   <button onClick={() => {
                     if (exPanelOpen) { setExDraftStudies(null); setExPanelOpen(false); }   // close discards
                     else { setExDraftStudies(exStudies); setExPanelOpen(true); }           // open seeds
@@ -3251,7 +3352,7 @@ function Latency({ v }: { v: any }) {
                             const label = c.displayName || c.attribute;
                             const chart: ChartKey = { kind: "clinical", attribute: c.attribute, per: c.per === "sample" ? "sample" : "patient" };
                             const n = selectionArmCount(chart);
-                            return <ChartMenu label={label} actions={[
+                            return <ChartMenu label={label} actions={addMode ? [] : [
                               { label: "Split by this", disabled: !!splittingBy, working: splittingBy === label,
                                 title: "Analyze the current selection split by " + label + (c.kind === "num"
                                   ? ": below / at or above its median within the selection" : ": one arm per value with at least 10 patients, the rest in Other") +
@@ -3508,7 +3609,7 @@ function Latency({ v }: { v: any }) {
                         const chart: ChartKey = { kind: "genes", specs: kind === "mutated" ? [": MUT"] : kind === "cna" ? [": AMP", ": HOMDEL"] : [": FUSION"] };
                         const n = selectionArmCount(chart);
                         const exact = kind === "mutated" ? all.find((g: any) => g.gene.toUpperCase() === needle) : undefined;
-                        return <ChartMenu label={meta.title} actions={[
+                        return <ChartMenu label={meta.title} actions={addMode ? [] : [
                           ...(exact ? [{ label: "Split by " + exact.gene, disabled: !!splittingBy, working: splittingBy === exact.gene,
                             title: "Analyze the current selection split into " + exact.gene + " mutated / wild-type / not profiled for " + exact.gene,
                             onClick: () => splitDraftBy({ gene: exact.gene }, exact.gene) }] : []),
@@ -3814,8 +3915,10 @@ function Latency({ v }: { v: any }) {
                 analysis already in progress (a modal, most likely) — a bigger
                 piece of work than this pass, and not yet scoped. */}
             {(busy || result) && (
-              <h2 className="vtitle" style={{ marginBottom: "0.9rem" }}>
-                Cohorts{busy && <span className="spinner" style={{ marginLeft: "0.5rem" }} />}
+              <h2 className="vtitle" style={{ marginBottom: "0.9rem", display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                Cohorts{busy && <span className="spinner" />}
+                <button className="tbbtn addcohortbtn" disabled={busy} onClick={openAddCohort}
+                  title="build another cohort in Explore and add it to this analysis">+ Add cohort</button>
               </h2>
             )}
             {upgradeNote && (
@@ -3957,9 +4060,10 @@ function Latency({ v }: { v: any }) {
             ))}
             {!busy && !result && (
               <div className="card">
-                <p className="note" style={{ fontSize: "var(--t-md)", margin: 0 }}>
-                  Make a cohort on the <button className="linklike" onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore page</button>,
-                  {" "}or choose cohorts on the <button className="linklike" onClick={() => goTab("cohorts")}>Cohorts page</button>.
+                <p className="note" style={{ fontSize: "var(--t-md)", margin: 0, display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+                  <button className="primary" onClick={openAddCohort}>+ Add cohort</button>
+                  <span>to start an analysis here, or make one on the <button className="linklike" onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore page</button>
+                  {" "}or choose cohorts on the <button className="linklike" onClick={() => goTab("cohorts")}>Cohorts page</button>.</span>
                 </p>
               </div>
             )}
