@@ -1987,24 +1987,69 @@ interface CohortNode { name: string; label: string; kind: "cohort" | "split" | "
 
 /**
  * Which cohorts a view draws, as the tree they come from: each cohort, its splits under it, each
- * split's groups under that. A split ticked draws all its groups. Ticking anything unticks its own
- * parent and children — a cohort and its split's groups in one view would count the same patients
- * twice — so moving between a cohort and its split is one click. Groups of one split, and
- * different cohorts, combine freely. A view drawing one cohort at most behaves like radio buttons.
+ * split collapsed to one row that draws all its groups, opened (▸) to pick single groups. Rules,
+ * applied as you click rather than refused after:
+ *   - ticking anything unticks its own parent and children (a cohort and its own split's groups
+ *     would count the same patients twice), so moving between levels is one click;
+ *   - a view draws from ONE split: ticking a split, or a group of one, replaces any other split's;
+ *   - whole cohorts combine freely; a one-cohort view (max 1) behaves like radio buttons;
+ *   - the last ticked item cannot be unticked — ticking another switches to it.
  */
 function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuStore }: {
   nodes: CohortNode[]; chosen: string[]; max?: number; busy?: boolean;
   onChange: (next: string[]) => void; menuId: string; menuStore: Map<string, boolean>;
 }) {
   const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
+  const byName = new Map(nodes.map((x) => [x.name, x] as const));
+  const splits = nodes.filter((x) => x.kind === "split");
+  /** the split a name draws from: itself if a split, else the deepest split it sits under */
+  const ownerOf = (n: string): string | null => byName.get(n)?.kind === "split" ? n
+    : splits.filter((x) => n.startsWith(x.name + " / ")).sort((a, b) => b.name.length - a.name.length)[0]?.name ?? null;
   const related = (a: string, b: string) => a === b || a.startsWith(b + " / ") || b.startsWith(a + " / ");
-  const groupsOf = (n: string) => nodes.find((x) => x.name === n)?.groups ?? 1;
+  const groupsOf = (n: string) => byName.get(n)?.groups ?? 1;
   const drawn = chosen.reduce((k, n) => k + groupsOf(n), 0);
+  const current = chosen.map(ownerOf).find((x) => x) ?? null;
+  // a split opens when one of its single groups is chosen, so what is ticked is always visible
+  const [open, setOpen] = useState<Set<string>>(() => new Set(chosen.map(ownerOf).filter((o, k) => o && o !== chosen[k]) as string[]));
+  const hidden = (n: string) => splits.some((x) => !open.has(x.name) && n.startsWith(x.name + " / "));
   const choose = (n: string) => {
     if (chosen.includes(n)) { if (chosen.length > 1) onChange(chosen.filter((c) => c !== n)); return; }
-    const kept = max === 1 ? [] : chosen.filter((c) => !related(c, n));
+    const owner = ownerOf(n);
+    let kept = max === 1 ? [] : chosen.filter((c) => !related(c, n));
+    if (owner) kept = kept.filter((c) => { const o = ownerOf(c); return !o || o === owner; });
     if (max != null && kept.length >= max) return;
     onChange([...kept, n]);
+  };
+  const row = (o: CohortNode) => {
+    const on = chosen.includes(o.name);
+    const implied = !on && chosen.some((c) => o.name.startsWith(c + " / ") && byName.get(c)?.kind === "split");
+    const last = on && chosen.length === 1;
+    const full = !on && max != null && max > 1 && chosen.filter((c) => !related(c, o.name)).length >= max;
+    const replaces = !on && !implied && o.kind !== "cohort" && current && ownerOf(o.name) !== current;
+    const kids = o.kind === "split" ? nodes.filter((x) => x.kind === "arm" && x.name.startsWith(o.name + " / ") && x.depth === o.depth + 1) : [];
+    return (
+      <div key={o.name} className={"cpick " + o.kind + (implied ? " implied" : "") + (on ? " on" : "")} style={{ paddingLeft: (0.5 + o.depth * 1.15) + "rem" }}>
+        <label title={last ? "a view draws at least one — tick another to switch" : full ? "this view draws at most " + max
+            : implied ? "drawn as part of the split — click to draw only this group"
+            : replaces ? "a view draws one split — this replaces “" + current + "”" : o.name}>
+          <input type={max === 1 ? "radio" : "checkbox"} checked={on || implied} disabled={busy || full}
+            onChange={() => choose(o.name)} onClick={() => { if (last) choose(o.name); }} />
+          <span className="cpick-label">
+            <span className="cpick-line">
+              {o.kind === "split" ? <><span className="cpick-fork" aria-hidden="true">⑂</span>by {o.label} <span className="meta">· {o.groups} groups</span></> : o.label}
+            </span>
+            {o.kind === "split" && !open.has(o.name) && <span className="cpick-kids">{kids.map((k) => k.label).join(" · ")}</span>}
+          </span>
+        </label>
+        {o.kind === "split"
+          ? <button type="button" className="cpick-open" aria-expanded={open.has(o.name)}
+              title={open.has(o.name) ? "hide its groups" : "pick single groups"}
+              onClick={() => setOpen((s) => { const n = new Set(s); if (n.has(o.name)) n.delete(o.name); else n.add(o.name); return n; })}>
+              {open.has(o.name) ? "▾" : "▸"}
+            </button>
+          : <span className="cpick-n">{o.count == null ? "" : o.count.toLocaleString()}</span>}
+      </div>
+    );
   };
   return (
     <details className="gearmenu cohortpick" ref={ref} onToggle={onToggle}>
@@ -2012,24 +2057,9 @@ function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuStore }:
         cohorts ({drawn === chosen.length ? drawn : drawn + " groups"})
       </summary>
       <div className="gearmenu-items">
-        {nodes.map((o) => {
-          const on = chosen.includes(o.name);
-          // a group of a ticked split is drawn too; shown ticked, and clicking it draws only it
-          const implied = !on && chosen.some((c) => o.name.startsWith(c + " / ") && nodes.find((x) => x.name === c)?.kind === "split");
-          const last = on && chosen.length === 1;
-          const full = !on && max != null && max > 1 && chosen.filter((c) => !related(c, o.name)).length >= max;
-          return (
-            <label key={o.name} className={"cpick " + o.kind + (implied ? " implied" : "")} style={{ paddingLeft: (0.2 + o.depth * 1.1) + "rem" }}
-              title={last ? "a view draws at least one — tick another to switch" : full ? "this view draws at most " + max
-                : implied ? "drawn as part of the split — click to draw only this group" : o.name}>
-              <input type={max === 1 ? "radio" : "checkbox"} checked={on || implied} disabled={busy || full}
-                onChange={() => choose(o.name)} onClick={() => { if (last) choose(o.name); }} />
-              <span className="cpick-label">{o.kind === "split" ? "⑂ " : ""}{o.label}
-                {o.kind === "split" && <span className="meta"> · {o.groups} groups</span>}</span>
-              <span className="cpick-n">{o.kind === "split" || o.count == null ? "" : o.count.toLocaleString()}</span>
-            </label>
-          );
-        })}
+        <div className="cpick-head">Draw in this view</div>
+        {nodes.filter((o) => !hidden(o.name)).map(row)}
+        {splits.length > 0 && <p className="cpick-foot">A view draws one split at a time — choosing another replaces it. Whole cohorts can sit alongside.</p>}
       </div>
     </details>
   );

@@ -245,6 +245,21 @@ export function expandSplits(names: string[], parts: PartitionShape[]): string[]
   return out.filter((n, i) => out.indexOf(n) === i);
 }
 
+/**
+ * The splits a view's cohort list draws from: a split's own name counts as that split, a group's
+ * name as the split it belongs to (the deepest split whose name prefixes it); a whole cohort counts
+ * as none. A view may draw from at most one split — groups of two splits, even of different
+ * cohorts, are two separate comparisons, and two splits of one cohort count every patient twice.
+ */
+export function splitsDrawn(names: string[], parts: PartitionShape[]): string[] {
+  const owners = names.map((n) => {
+    if (parts.some((p) => p.name === n)) return n;
+    const under = parts.filter((p) => n.startsWith(p.name + " / ")).sort((a, b) => b.name.length - a.name.length);
+    return under[0]?.name ?? null;
+  }).filter((x): x is string => !!x);
+  return owners.filter((n, i) => owners.indexOf(n) === i);
+}
+
 // ---- the split tree (stored on cohorts) and its flat working form ---------------------------
 
 type Cohorts = Record<string, CohortDef>;

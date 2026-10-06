@@ -229,7 +229,7 @@ describe("renaming a partition's child", () => {
   });
 });
 
-import { expandSplits } from "../lib/partition-arms.ts";
+import { expandSplits, splitsDrawn } from "../lib/partition-arms.ts";
 
 describe("a view's cohort list: a cohort is itself, a split is its arms", () => {
   const parts = [
@@ -248,5 +248,23 @@ describe("a view's cohort list: a cohort is itself, a split is its arms", () => 
   });
   test("a nested split is chosen by its own name", () => {
     assert.deepEqual(expandSplits(["KRAS-mutant / K / G12C / S"], parts), ["KRAS-mutant / K / G12C / S / F", "KRAS-mutant / K / G12C / S / Other"]);
+  });
+});
+
+describe("a view draws from at most one split", () => {
+  const parts = [
+    { name: "N / KRAS", of: "N", comparable: ["N / KRAS / G12C", "N / KRAS / Other"] },
+    { name: "N / stage", of: "N", comparable: ["N / stage / I", "N / stage / Other"] },
+    { name: "E / sex", of: "E", comparable: ["E / sex / F", "E / sex / Other"] },
+    { name: "N / KRAS / G12C / sex", of: "N / KRAS / G12C", comparable: ["N / KRAS / G12C / sex / F", "N / KRAS / G12C / sex / Other"] }
+  ];
+  test("whole cohorts and one split's groups are one split", () => {
+    assert.deepEqual(splitsDrawn(["E", "N / KRAS / G12C", "N / KRAS / Other"], parts), ["N / KRAS"]);
+    assert.deepEqual(splitsDrawn(["E", "N"], parts), []);
+  });
+  test("two splits — of one cohort, of different cohorts, or nested — are told apart", () => {
+    assert.deepEqual(splitsDrawn(["N / KRAS", "N / stage / I"], parts), ["N / KRAS", "N / stage"]);
+    assert.deepEqual(splitsDrawn(["N / KRAS", "E / sex"], parts), ["N / KRAS", "E / sex"]);
+    assert.deepEqual(splitsDrawn(["N / KRAS / Other", "N / KRAS / G12C / sex / F"], parts), ["N / KRAS", "N / KRAS / G12C / sex"]);
   });
 });

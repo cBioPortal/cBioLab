@@ -53,6 +53,9 @@ describe("upgradeDocument", () => {
       ["NSCLC / KRAS allele / G12C / G12C by sex / F", "NSCLC / KRAS allele / G12C / G12C by sex / Other"]
     ]);
     assert.match(upgrade.changes[1], /2 views that drew a split cohort's arms now list them/);
+    // view 1 drew groups of three splits (the nested ones included), which 2.4 refuses — said, not
+    // hidden; view 2 draws only the nested "G12C by sex" split's groups, which is fine
+    assert.match(upgrade.changes[2], /^view 1 drew the groups of several splits at once/);
     // nothing the old document said is lost: the flat form is the same splits, re-addressed
     const flat = flattenSplits(doc.cohorts);
     assert.deepEqual(Object.keys(flat).sort(), [

@@ -12,7 +12,7 @@
 // MEANS changes, so a saved analysis can say which rules it was written under. Pure and
 // browser-safe: the page upgrades a document when it opens one, the engine whenever it runs one.
 
-import { flattenSplits } from "./partition-arms.ts";
+import { flattenSplits, splitsDrawn } from "./partition-arms.ts";
 
 export const DOC_VERSION = "2.4";
 
@@ -124,17 +124,23 @@ function splitsNoLongerReplace(doc: AnyDoc, changes: string[]): AnyDoc {
     return out.filter((n, i) => out.indexOf(n) === i);
   };
   const authored = Object.keys(doc.cohorts || {});
+  const shapes = Object.keys(flat).map((key) => ({ name: key, of: flat[key].of, comparable: arms(key) }));
   let fixed = 0;
-  const views = (doc.views || []).map((v: AnyDoc) => {
+  const several: number[] = [];
+  const views = (doc.views || []).map((v: AnyDoc, i: number) => {
     if (!v || typeof v !== "object") return v;
     const list: string[] = Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored;
     const before = drew23(list), after = drew24(list);
-    if (before.length === after.length && before.every((n, i) => n === after[i])) return v;
+    if (before.length === after.length && before.every((n, k) => n === after[k])) return v;
     fixed++;
+    // nested splits drew the groups of several splits at once, which a 2.4 view cannot
+    if (splitsDrawn(before, shapes).length > 1) several.push(i + 1);
     return { ...v, cohorts: before };
   });
   if (fixed) changes.push(fixed + " view" + (fixed === 1 ? "" : "s") + " that drew a split cohort's arms now list" +
     (fixed === 1 ? "s" : "") + " them by name, since a cohort's name now means the whole cohort");
+  if (several.length) changes.push("view" + (several.length === 1 ? " " : "s ") + several.join(", ") + " drew the groups of several splits at once, " +
+    "which a view no longer does — choose one split in " + (several.length === 1 ? "its" : "their") + " cohorts menu");
   return fixed ? { ...doc, views } : doc;
 }
 
