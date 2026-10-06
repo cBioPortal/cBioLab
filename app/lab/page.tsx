@@ -2168,10 +2168,12 @@ function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove, onEditNot
  * "Cohorts" heading for why that is deliberately a separate, unscoped piece
  * of work.
  */
-function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, menuId, menuStore }: {
+function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCount = 0, menuId, menuStore }: {
   busy?: boolean; canEdit: boolean; onEdit: () => void; onRemove: () => void;
-  /** the split form, when this cohort can be split (it is not split already); `done` closes this menu */
+  /** the split form; `done` closes this menu. A cohort may have several splits — each view draws one */
   split?: (done: () => void) => React.ReactNode;
+  /** how many splits the cohort has already */
+  splitCount?: number;
   menuId: string; menuStore: Map<string, boolean>;
 }) {
   const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
@@ -2183,7 +2185,7 @@ function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, menuId, menuSt
       <div className={"gearmenu-items" + (splitting ? " wide" : "")}>
         {split && (splitting ? <>{split(() => { menuStore.set(menuId, false); setSplitting(false); })}<hr /></> : <>
           <button className="linklike" disabled={busy} title="divide this cohort into arms that never overlap and add up to it"
-            onClick={() => setSplitting(true)}>split into arms…</button>
+            onClick={() => setSplitting(true)}>{splitCount ? "split another way…" : "split into arms…"}</button>
           <hr />
         </>)}
         {canEdit && <>
@@ -3902,8 +3904,8 @@ function Latency({ v }: { v: any }) {
                     <div className="cohortbox">
                       <CohortEditMenu busy={busy} canEdit={!!(doc.title && spaces[doc.title])}
                         onEdit={() => openCohortEdit(n)} onRemove={() => removeCohort(n)}
-                        split={!splits.length
-                          ? (done: () => void) => <SplitForm cohort={n} attrs={catalogAttrs()} busy={busy} onSplit={splitCohortBy} onDone={done} /> : undefined}
+                        split={(done: () => void) => <SplitForm cohort={n} attrs={catalogAttrs()} busy={busy} onSplit={splitCohortBy} onDone={done} />}
+                        splitCount={splits.length}
                         menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
                       <div className="cohortbox-head">
                         <span className="cohortbox-name"><span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />{n}</span>
