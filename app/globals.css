@@ -135,6 +135,15 @@ pre {
    .sbrow/.generow's own grid-template-columns) that read as cramped at one tile's
    width — matching the portal's own wider tiles for these same tables. */
 .facetgrid > .card.wide { grid-column: span 2; }
+/* Explore's reading order: what the selection is (cancer type, then detailed), then what is altered
+   in it, then everything else; the two derived charts (survival, mutation count vs FGA) come after
+   the attribute tiles. Set here rather than by the order the page builds them in. */
+.facetgrid > [data-attr$="|CANCER_TYPE"] { order: -30; }
+.facetgrid > [data-attr$="|CANCER_TYPE_DETAILED"] { order: -29; }
+.facetgrid > [data-genetable="mutated"] { order: -20; }
+.facetgrid > [data-genetable="cna"] { order: -19; }
+.facetgrid > [data-genetable="sv"] { order: -18; }
+.facetgrid > .xc-card { order: 10; }
 @media (max-width: 620px) { .facetgrid > .card.wide { grid-column: span 1; } }
 .chk { display: flex; gap: 0.4rem; align-items: center; }
 .chk input { width: auto; }

@@ -3603,7 +3603,7 @@ function Latency({ v }: { v: any }) {
                 const rows = needle ? all.filter((g: any) => g.gene.toUpperCase().includes(needle)) : all;
                 if (!all.length) return null;
                 return (
-                  <div className="card wide" key={kind}>
+                  <div className="card wide" key={kind} data-genetable={kind}>
                     <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
                       <h2 style={{ margin: 0 }}>{meta.title} <span className="plain">— samples, panel-aware frequency</span></h2>
                       <span className="spacer" />
