@@ -956,6 +956,7 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
 .cpick-fork { margin-right: var(--s1); }
 .cpick.arm > label { padding: 0.15rem 0; }
 .cpick.implied input { opacity: 0.45; }
+.cpick-noinput { width: 13px; flex: none; }
 .cpick-open { border: none; background: none; color: var(--accent-ink); font-size: var(--t-md); padding: 0 var(--s1); cursor: pointer; }
 .cpick-foot { margin: var(--s1) var(--s3) 0; padding-top: var(--s1); border-top: 1px solid var(--line); font-size: var(--t-sm); color: var(--muted); }
 /* an Explore chart's "⋯" menu: pinned to the card's corner, like a cohort box's */

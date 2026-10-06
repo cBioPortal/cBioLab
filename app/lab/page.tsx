@@ -24,7 +24,7 @@ import CustomDataPanel, { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import LoginButton from "./login-button.tsx";
 import { PartitionPanel, SplitForm, ChartMenu, type SplitSpec } from "./partitions.tsx";
-import { withoutPartition, armsFromSelection, renamePartitionChild, flattenSplits, editSplits, splitKey, renameInViews, type ChartKey, type PartitionShape } from "../../lib/partition-arms.ts";
+import { withoutPartition, armsFromSelection, renamePartitionChild, expandSplits, flattenSplits, editSplits, splitKey, renameInViews, type ChartKey, type PartitionShape } from "../../lib/partition-arms.ts";
 import { DOC_VERSION, upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
 import { installCustomDataFetch, saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
@@ -2012,7 +2012,9 @@ function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuStore }:
   const current = chosen.map(ownerOf).find((x) => x) ?? null;
   // a split opens when one of its single groups is chosen, so what is ticked is always visible
   const [open, setOpen] = useState<Set<string>>(() => new Set(chosen.map(ownerOf).filter((o, k) => o && o !== chosen[k]) as string[]));
-  const hidden = (n: string) => splits.some((x) => !open.has(x.name) && n.startsWith(x.name + " / "));
+  // a view drawing one cohort cannot take a whole split: its splits are headings, open, to pick a group
+  const single = max === 1;
+  const hidden = (n: string) => !single && splits.some((x) => !open.has(x.name) && n.startsWith(x.name + " / "));
   const choose = (n: string) => {
     if (chosen.includes(n)) { if (chosen.length > 1) onChange(chosen.filter((c) => c !== n)); return; }
     const owner = ownerOf(n);
@@ -2036,16 +2038,18 @@ function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuStore }:
             : implied ? "drawn as part of the split — click to draw only this group"
             : replaces ? (mine ? "a view draws one split's groups or whole cohorts — this replaces what is ticked"
               : "a view draws whole cohorts or one split's groups — this replaces “" + current + "”") : o.name}>
-          <input type={max === 1 ? "radio" : "checkbox"} checked={on || implied} disabled={busy || full}
-            onChange={() => choose(o.name)} onClick={() => { if (last) choose(o.name); }} />
+          {single && o.kind === "split" ? <span className="cpick-noinput" aria-hidden="true" /> :
+            <input type={single ? "radio" : "checkbox"} checked={on || implied} disabled={busy || full}
+              onChange={() => choose(o.name)} onClick={() => { if (last) choose(o.name); }} />}
           <span className="cpick-label">
             <span className="cpick-line">
               {o.kind === "split" ? <><span className="cpick-fork" aria-hidden="true">⑂</span>by {o.label} <span className="meta">· {o.groups} groups</span></> : o.label}
             </span>
-            {o.kind === "split" && !open.has(o.name) && <span className="cpick-kids">{kids.map((k) => k.label).join(" · ")}</span>}
+            {o.kind === "split" && !open.has(o.name) && !single && <span className="cpick-kids">{kids.map((k) => k.label).join(" · ")}</span>}
           </span>
         </label>
-        {o.kind === "split"
+        {o.kind === "split" && single ? <span />
+          : o.kind === "split"
           ? <button type="button" className="cpick-open" aria-expanded={open.has(o.name)}
               title={open.has(o.name) ? "hide its groups" : "pick single groups"}
               onClick={() => setOpen((s) => { const n = new Set(s); if (n.has(o.name)) n.delete(o.name); else n.add(o.name); return n; })}>
@@ -2063,7 +2067,8 @@ function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuStore }:
       <div className="gearmenu-items">
         <div className="cpick-head">Draw in this view</div>
         {nodes.filter((o) => !hidden(o.name)).map(row)}
-        {splits.length > 0 && <p className="cpick-foot">A view draws whole cohorts, or the groups of one split — not both. Choosing one replaces the other.</p>}
+        {single ? <p className="cpick-foot">This view draws one cohort — pick one, or one group of a split.</p>
+          : splits.length > 0 && <p className="cpick-foot">A view draws whole cohorts, or the groups of one split — not both. Choosing one replaces the other.</p>}
       </div>
     </details>
   );
@@ -2241,7 +2246,9 @@ function Latency({ v }: { v: any }) {
     };
     for (const n of authored) offer(n, n, "cohort", 0);
     const all = nodes.map((x) => x.name);
-    const chosen = (Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored).filter((n: string) => all.includes(n));
+    let chosen = (Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored).filter((n: string) => all.includes(n));
+    // a view that draws one cohort draws the first group its list stands for: show that, not the list
+    if (max === 1 && chosen.length) chosen = [expandSplits(chosen, shapes)[0]].filter((n) => all.includes(n));
     return { chosen, all, nodes, max, busy, viewKey: resultViewKeys.current[vi] ?? vi, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
   };
 
@@ -4121,7 +4128,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi))} sub="lollipop by protein position, as the portal's mutation tab draws it" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi), 1)} sub="lollipop by protein position, as the portal's mutation tab draws it" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {/* the plot from the same renderer MCP uses (lib/view-svg.ts), with the gene summary and the
                       alteration grid beside it as controls; the grid's selection re-runs nothing */}
@@ -4130,7 +4137,7 @@ function Latency({ v }: { v: any }) {
                   })} />
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi), 1)} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<>
                       <label className="tbfield" title="the molecular profile the correlation is computed over">profile <select
                         value={docView(vi).profileType || ""} disabled={busy}
@@ -4220,7 +4227,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi))} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi), 1)} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
