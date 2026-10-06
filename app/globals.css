@@ -934,6 +934,20 @@ details.splitmenu { margin: 0; }
 .addcohortname { display: inline-flex; align-items: center; gap: var(--s2); margin: 0; font-size: var(--t-md); color: var(--muted); }
 .addcohortname input { height: var(--ctl-h); width: 14rem; font-size: var(--t-md); }
 h2.vtitle .addcohortbtn { height: var(--ctl-h); font-size: var(--t-md); text-transform: none; letter-spacing: 0; font-weight: 500; }
+/* a view's cohort picker: the cohorts as a tree, a split's groups under it */
+details.cohortpick .gearmenu-items { min-width: 21rem; max-width: 30rem; gap: 0; padding: var(--s1) 0; max-height: 60vh; overflow-y: auto; }
+.cpick {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) 4.5rem; align-items: center; gap: var(--s2);
+  margin: 0; padding: var(--s1) var(--s3); font-size: var(--t-md); color: var(--ink); cursor: pointer;
+}
+.cpick:hover { background: var(--code-bg); }
+.cpick input { margin: 0; }
+.cpick-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cpick-n { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.cpick.cohort { font-weight: 600; }
+.cpick.cohort:not(:first-child) { border-top: 1px solid var(--line); margin-top: var(--s1); padding-top: var(--s2); }
+.cpick.split .cpick-label { color: var(--accent-ink); }
+.cpick.implied input { opacity: 0.45; }
 /* an Explore chart's "⋯" menu: pinned to the card's corner, like a cohort box's */
 .facetgrid > .card { position: relative; }
 .facetgrid > .card > div:first-child { padding-right: 1.8rem; }
