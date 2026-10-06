@@ -2,7 +2,8 @@
 // (react-mutation-mapper / cbioportal-frontend-commons).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildLollipopGene, canonicalType, impactType, labelledPosition, lollipopColor, lollipopLabelText, IMPACT_COLORS } from "../lib/lollipop.ts";
+import { buildLollipopGene, canonicalType, impactType, labelledPosition, lollipopColor, lollipopLabelText, IMPACT_COLORS,
+  impactSql, filterHotspotGene, checkHide, ALTERATION_CELLS, cellLabel } from "../lib/lollipop.ts";
 
 test("mutation types map the way getCanonicalMutationType / getProteinImpactType map them", () => {
   assert.equal(impactType(canonicalType("Missense_Mutation")), "missense");
@@ -70,4 +71,61 @@ test("the badge tally counts every mutation row by impact type and driver status
   assert.deepEqual(g.tally.splice, { driver: 0, vus: 2 }, "the unpositioned splice rows still count");
   assert.deepEqual(g.tally.other, { driver: 0, vus: 3 });
   assert.deepEqual(g.tally.fusion, { driver: 0, vus: 0 });
+});
+
+// ---- the alteration grid's selection ---------------------------------------------------------
+
+test("the alteration grid's selection", async (t) => {
+  const rep = (changes: { pos: number; change: string; n: number; impact: string; driver: boolean; mtype: string }[]) => ({
+    changes: changes.map((c) => ({ gene: "G", pos: c.pos, change: c.change, n: c.n, rows: c.n, driver: c.driver, impact: c.impact })),
+    types: changes.map((c) => ({ gene: "G", pos: c.pos, mtype: c.mtype, driver: c.driver, rows: c.n })),
+    totals: [{ gene: "G", patients: 20, pairs: 20, somaticSamples: 5 }], cohortSamples: 50, minCount: 1, annotated: true,
+  });
+  const g = () => buildLollipopGene("G", [rep([
+    { pos: 12, change: "G12D", n: 6, impact: "missense", driver: true, mtype: "Missense_Mutation" },
+    { pos: 12, change: "G12fs", n: 2, impact: "truncating", driver: false, mtype: "Frame_Shift_Del" },
+    { pos: 61, change: "Q61H", n: 3, impact: "missense", driver: false, mtype: "Missense_Mutation" },
+  ])], { proteinLength: 189, transcriptId: "T", domains: [] });
+
+  await t.test("nothing hidden is the plot as built", () => {
+    const f = filterHotspotGene(g(), []);
+    assert.equal(f.shown, 11); assert.equal(f.total, 11); assert.equal(f.gene.positions.length, 2);
+  });
+  await t.test("a hidden cell takes its changes out; a codon left empty goes, a codon left with others shrinks and recolours", () => {
+    const f = filterHotspotGene(g(), ["missense.driver"]);
+    assert.deepEqual(f.gene.positions.map((p) => [p.pos, p.n]), [[12, 2], [61, 3]]);
+    const p12 = f.gene.positions.find((p) => p.pos === 12)!;
+    assert.equal(p12.impact, "truncating"); assert.equal(p12.driver, false, "the frameshift is a VUS, so its VUS colour");
+    assert.equal(f.shown, 5); assert.equal(f.total, 11);
+    assert.deepEqual(filterHotspotGene(g(), ["missense.vus", "missense.driver"]).gene.positions.map((p) => p.pos), [12]);
+  });
+  await t.test("the label moves to the tallest stem left", () => {
+    assert.equal(filterHotspotGene(g(), ["missense.driver"]).gene.label?.pos, 61);
+  });
+  await t.test("the tally stays whole — it is the grid's own counts", () => {
+    assert.deepEqual(filterHotspotGene(g(), ["missense.driver"]).gene.tally, g().tally);
+  });
+  await t.test("a change with no class (a peer on older code) cannot be judged: it stays drawn and is counted", () => {
+    const old = buildLollipopGene("G", [{ ...rep([{ pos: 5, change: "A5T", n: 4, impact: "missense", driver: true, mtype: "Missense_Mutation" }]),
+      changes: [{ gene: "G", pos: 5, change: "A5T", n: 4, rows: 4, driver: true }] }], { proteinLength: 100, transcriptId: "T", domains: [] });
+    const f = filterHotspotGene(old, ["missense.driver"]);
+    assert.equal(f.shown, 4); assert.equal(f.unclassed, 4);
+  });
+  await t.test("checkHide names a bad cell and the cells accepted", () => {
+    assert.equal(checkHide(undefined), null);
+    assert.equal(checkHide(["missense.vus", "other.driver"]), null);
+    assert.match(checkHide(["missense.maybe"])!, /unknown cell missense\.maybe/);
+    assert.match(checkHide("missense.vus")!, /hide is a list/);
+    assert.equal(ALTERATION_CELLS.length, 12);
+    assert.equal(cellLabel("truncating.vus"), "Truncating · VUS");
+  });
+  await t.test("the SQL classifies every mutation type exactly as the browser does", () => {
+    const sql = impactSql("t");
+    // each listed raw type sits in the multiIf branch of the class the browser gives it
+    for (const m of sql.matchAll(/IN \(([^)]*)\), '(\w+)'/g)) {
+      for (const raw of m[1].split(", ").map((x) => x.slice(1, -1))) assert.equal(impactType(canonicalType(raw)), m[2], raw);
+    }
+    assert.match(sql, /'other'\)$/, "anything else is other");
+    assert.ok(sql.includes("'splice_region_variant'") && sql.includes("'nonsense_mutation'"));
+  });
 });

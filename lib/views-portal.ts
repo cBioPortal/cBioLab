@@ -12,7 +12,7 @@ import { geneSymbols } from "./gene-tracks.ts";
 import { answering, refuse, plural, type ViewCtx, type MoreResolver } from "./views-more.ts";
 import { isPatientLevel, type PatientLevelCapable } from "./federation.ts";
 import { tableAttributesSql, clinicalRowSource, idColumns, TABLE_COLUMNS_MAX, type TableColumn } from "./clinical-table.ts";
-import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationRowSource, type TablePart } from "./mutation-table.ts";
+import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationRowSource, alterationOf, type TablePart } from "./mutation-table.ts";
 import { checkQuery, cleanQuery, describeQuery, mergeValues, shownColumns, type ColumnValues, type RowSource, type TableQuery } from "./table-query.ts";
 import { cancertypesMethod, overlapMethod, enrichmentMethod, assaysMethod, correlatesMethod, tableMethod, mutationsMethod } from "./method.ts";
 
@@ -738,7 +738,7 @@ async function tableView(view: TableView, ctx: ViewCtx): Promise<ViewResult> {
 }
 
 /** A row's value in a column, from the query's row (numbers as numbers, the annotation spelled out as the SQL spells it). */
-function mutationValue(r: Record<string, unknown>, id: string): string | number | null {
+function mutationValue(r: Record<string, unknown>, id: string, pin: string | null): string | number | null {
   const num = (x: unknown) => x == null || x === "" ? null : Number(x);
   switch (id) {
     case "sample": return String(r.sid ?? "");
@@ -747,6 +747,7 @@ function mutationValue(r: Record<string, unknown>, id: string): string | number 
       return o ? o + (lv ? " · " + lv.replace(/^LEVEL_/, "Level ") : "") : "";
     }
     case "vaf": return r.vaf == null ? null : Math.round(Number(r.vaf) * 1000) / 1000;
+    case "alteration": return alterationOf(String(r.mutationType ?? ""), Number(r.drv) === 1, pin);
     case "altCount": case "refCount": case "mutCount": case "start": case "end": return num(r[id]);
     default: return r[id] == null ? "" : String(r[id]);
   }
@@ -772,7 +773,7 @@ async function mutationsView(view: MutationsView, ctx: ViewCtx): Promise<ViewRes
       ctx.values ? { column: ctx.values, numeric: !!MUTATION_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined);
   } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
   const rows = r.rows.map((x) => ({ cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? ""),
-    values: MUTATION_COLUMNS.map((c) => mutationValue(x, c.id)) }));
+    values: MUTATION_COLUMNS.map((c) => mutationValue(x, c.id, pin)) }));
   const shown = shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS);
   const mutations = { gene, columns: MUTATION_COLUMNS, shown, defaults: MUTATION_DEFAULT_COLUMNS, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin,
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };

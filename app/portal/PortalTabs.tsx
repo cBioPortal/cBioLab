@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc, AnalysisResult, View } from "../../lib/types";
 import { SERIES } from "../../lib/svg-kit";
+import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
 import { MoreBody, MoreControls, isMoreKind, drawsOwnWaiting } from "../lab/more-views";
 import { dataPart } from "../_oncoprint/view-display.ts";
 import { OncoprintCard, type TrackCatalog } from "../_oncoprint/OncoprintCard.tsx";
@@ -58,7 +59,13 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
       .catch((e) => { if (gen.current[key] === g) setState((s) => ({ ...s, [key]: { sent, loading: false, error: String(e) } })); });
   }, [key, sent]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const edit = (i: number, next: View) => onDoc({ ...doc, views: views.map((v, j) => j === i ? next : v) });
+  // an edit to one view; a tab that keeps its views in step (its link) adjusts the others
+  const edit = (i: number, next: View) => {
+    const k = idx.indexOf(i), link = (sub ? undefined : tab?.link);
+    if (!link || k < 0) return onDoc({ ...doc, views: views.map((v, j) => j === i ? next : v) });
+    const mine = link(idx.map((j) => j === i ? next : views[j]), k);
+    onDoc({ ...doc, views: views.map((v, j) => { const m = idx.indexOf(j); return m >= 0 ? mine[m] : v; }) });
+  };
   const counts = Object.values(state).find((s) => s.result)?.result?.cohorts;
   const st = state[key];
   const spinning = (k: string) => Object.entries(state).some(([x, s]) => (x === k || x.startsWith(k + " › ")) && s.loading);
@@ -106,7 +113,9 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
         const busy = !!st?.loading;
         const mc = { vi: i, spec, v: v || {}, busy, updating: busy, attrs: [], profiles: [], assays: [], events: [], locked: tab?.chooser?.locks || [],
           patch: (p: Patch) => edit(vi, { ...spec, ...p } as unknown as View), docJson: () => JSON.stringify(slice) };
-        const body = v && !v.error && v.kind === "oncoprint" && v.spec
+        const body = v && !v.error && v.kind === "hotspots" && v.hotspots
+          ? <HotspotsBody v={v} hide={spec.hide as string[] | undefined} onHide={(h) => edit(vi, { ...spec, hide: h } as unknown as View)} />
+          : v && !v.error && v.kind === "oncoprint" && v.spec
           // the lab's own oncoprint card; the page's cohorts are its own, so a drag counts but makes no cohort
           ? <OncoprintCard view={spec} spec={v.spec} busy={busy} cohortNames={Object.keys(doc.cohorts || {})} catalog={catalog}
               onView={(n) => edit(vi, n as unknown as View)} note={v.note} studies={v.studies} />

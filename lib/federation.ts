@@ -32,6 +32,7 @@ import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validate
 export * from "./federation-more.ts";
 export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
 export type { PlotData, PlotRequest, PlotGroup, PlotPoint } from "./plot.ts";
+import { impactSql } from "./lollipop.ts";
 import type { Moments } from "./stats.ts";
 // a table view's row queries return ids: imported for PatientLevelResolver.rowsPage, never re-exported
 import { pageSql, countsSql, valuesSql, type RowSource, type TableQuery } from "./table-query.ts";
@@ -102,7 +103,8 @@ export interface VariantCount {
 export interface GeneMutationTotal { gene: string; n: number; distinctVariants: number }
 export interface VariantReport { variants: VariantCount[]; totals: GeneMutationTotal[]; minCount: number }
 /** One (codon, protein change) of a gene: distinct patients carrying it, and raw mutation rows. */
-export interface LollipopChange { gene: string; pos: number | null; change: string; n: number; rows: number; driver: boolean }
+/** `impact`: the change's protein impact class (lib/lollipop.ts impactSql) — absent from a peer on older code */
+export interface LollipopChange { gene: string; pos: number | null; change: string; n: number; rows: number; driver: boolean; impact?: string }
 /** Raw mutation rows of one type at one codon — what a lollipop's colour is decided from. */
 export interface LollipopType { gene: string; pos: number | null; mtype: string; driver: boolean; rows: number }
 export interface LollipopTotal { gene: string; patients: number; pairs: number; somaticSamples: number }
@@ -453,10 +455,11 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
     "     kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= " + floor + ")\n"
   );
 }
-/** Per (codon, change): distinct patients (the height), raw rows (the label's ordering). */
+/** Per (codon, change): distinct patients (the height), raw rows (the label's ordering), and the change's
+ * driver status and protein impact class (its commonest), so the plot can be filtered by class in the browser. */
 export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB): string {
   return lollipopCte(cohortSql, genes, study, minCount, pin, db) +
-    "SELECT gene, pos, change, uniqExact(pid) AS n, count() AS rows, max(driver) AS driver\n" +
+    "SELECT gene, pos, change, uniqExact(pid) AS n, count() AS rows, max(driver) AS driver, topK(1)(" + impactSql("mtype") + ")[1] AS impact\n" +
     "FROM m GROUP BY gene, pos, change HAVING n >= " + Math.max(1, Math.floor(minCount));
 }
 /**
@@ -1416,7 +1419,8 @@ abstract class BaseResolver implements AggregateCapable {
     ]);
     return {
       minCount, annotated: !!pin, cohortSamples: Number(cs.data[0]?.n || 0),
-      changes: c.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), change: String(x.change), n: Number(x.n), rows: Number(x.rows), driver: Number(x.driver) === 1 })),
+      changes: c.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), change: String(x.change), n: Number(x.n), rows: Number(x.rows), driver: Number(x.driver) === 1,
+        ...(x.impact ? { impact: String(x.impact) } : {}) })),
       types: t.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), mtype: String(x.mtype), driver: Number(x.driver) === 1, rows: Number(x.rows) })),
       totals: tot.data.map((x) => ({ gene: String(x.gene), patients: Number(x.patients), pairs: Number(x.pairs), somaticSamples: Number(x.somatic_samples) }))
     };

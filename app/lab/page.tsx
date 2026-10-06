@@ -2,6 +2,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import CohortPills, { normalizeDef } from "./pills";
+import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
 import { MORE_KINDS, isMoreKind, moreSub, MoreControls, MoreBody, defaultMoreView, drawsOwnWaiting } from "./more-views";
 import { ExploreCharts } from "./explore-charts";
 import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
@@ -4051,11 +4052,11 @@ function Latency({ v }: { v: any }) {
                 {v.kind === "hotspots" && v.hotspots && <>
                   <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi))} sub="lollipop by protein position, as the portal's mutation tab draws it" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
-                  {/* one renderer (lib/view-svg.ts) for this figure everywhere: the app and MCP;
-                      the caption under it carries the note, so it isn't repeated above */}
-                  {v.svg
-                    ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
-                    : <p className="note">{v.note || "no mutations in these genes for this cohort"}</p>}
+                  {/* the plot from the same renderer MCP uses (lib/view-svg.ts), with the gene summary and the
+                      alteration grid beside it as controls; the grid's selection re-runs nothing */}
+                  <HotspotsBody v={v} hide={docView(vi).hide} onHide={(h) => updateViewLocal(vi, (vv: any) => {
+                    const nx = { ...vv }; if (h) nx.hide = h; else delete nx.hide; return nx;
+                  })} />
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
                   <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi))} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}

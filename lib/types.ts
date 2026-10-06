@@ -525,7 +525,13 @@ export interface CoexpressionView {
   note?: string; kind: "coexpression"; genes: string[]; profileType: string; cohorts?: string[] }
 export interface HotspotsView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
-  note?: string; kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number }
+  note?: string; kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number;
+  /**
+   * The cells of the Driver/VUS × alteration class grid left out of the plot ("missense.vus",
+   * "truncating.driver", …): the grid beside it selects them. Applied where the figure is drawn,
+   * so a change re-runs nothing; the counts in the grid stay whole.
+   */
+  hide?: string[] }
 /**
  * The clinical course: what fraction of the still-observable cohort is in each
  * event state, over time relative to an anchor.
@@ -1289,8 +1295,11 @@ export interface CooccurRow {
 /** One drawn stem: a codon, its height (distinct patient + change pairs), and how it is coloured. */
 export interface LollipopPosition {
   pos: number; n: number; color: string; impact: string; driver: boolean;
-  /** every change at this codon, by raw rows then name — the label and tooltip read these */
-  changes: { change: string; n: number; rows: number }[];
+  /** every change at this codon, by raw rows then name — the label and tooltip read these; each with its
+   *  protein impact class and driver status, so a selection can leave it out (no class: a site on older code) */
+  changes: { change: string; n: number; rows: number; impact?: string; driver?: boolean }[];
+  /** the raw rows here by mutation type and driver status — the colour, recomputed when cells are hidden */
+  types?: { mtype: string; driver: boolean; rows: number }[];
 }
 export interface LollipopDomain { accession: string; name: string; start: number; end: number; color: string }
 /**
@@ -1460,6 +1469,8 @@ export interface ViewResult {
   /** a plot's aggregated contract: bins, groups or cells — never points */
   plot?: PlotData;               // co-expression
   hotspots?: HotspotGene[];                 // hotspots / lollipop
+  /** hotspots: the cells the view hides, as applied to its figure (`hotspots` itself stays whole, so the app can re-filter it) */
+  hide?: string[];
   course?: CourseSeries[];                  // clinical course
   sequence?: SequenceResult;                // treatment sequences
   /** course: bin width and window actually used, in months */

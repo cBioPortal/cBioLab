@@ -8,8 +8,31 @@ import type { CohortDef, View } from "../../../lib/types";
 import { PortalTabs } from "../PortalTabs";
 import { useStudyKnown, expressionProfile, type StudyKnown } from "../study-known";
 import { arrange, decodeDoc, usePageDoc, type PageLayout } from "../page-doc";
+import { ALTERATION_CELLS, cellLabel } from "../../../lib/lollipop";
 
 const CLINICAL_SHOWN = 8;
+
+/**
+ * The Mutations tab's lollipop grid and its table, kept in step as the portal keeps them: the grid's
+ * hidden cells become the table's filter on its Alteration column (the cells still shown), and a
+ * value filter set on that column from the table becomes the grid's selection. A condition filter
+ * there ("contains …") is not a set of cells, so it leaves the grid alone.
+ */
+function linkMutations(vs: View[], changed: number): View[] {
+  const [lp, tb] = vs as unknown as [{ hide?: string[] } & View, { filters?: Record<string, unknown> } & View];
+  if (changed === 0) {
+    const hide = lp.hide || [];
+    const filters = { ...(tb.filters || {}) };
+    if (hide.length) filters.alteration = { values: ALTERATION_CELLS.filter((c) => !hide.includes(c)).map(cellLabel) };
+    else delete filters.alteration;
+    return [lp, { ...tb, filters: Object.keys(filters).length ? filters : undefined } as View];
+  }
+  const f = (tb.filters || {}).alteration as { values?: string[] } | undefined;
+  if (f && !Array.isArray(f.values)) return vs;
+  const shown = f ? new Set(f.values) : null;
+  const hide = shown ? ALTERATION_CELLS.filter((c) => !shown.has(cellLabel(c))) : [];
+  return [{ ...lp, hide: hide.length ? hide : undefined } as View, tb];
+}
 
 /** The Results page as the portal has it, for this study and genes. */
 function resultsLayout(study: string, genes: string[], known: StudyKnown): PageLayout {
@@ -33,7 +56,9 @@ function resultsLayout(study: string, genes: string[], known: StudyKnown): PageL
         v("Mutation table", { kind: "mutations", gene: genes[0], cohorts: ["Altered"] })],
       chooser: { label: "gene", options: genes, locks: ["gene", "genes"],
         value: (vs) => String(((vs[1] as unknown as { gene?: string }).gene) || genes[0]),
-        apply: (vs, g) => [{ ...vs[0], genes: [g] } as View, { ...vs[1], gene: g, sort: undefined, search: undefined, filters: undefined } as View] } },
+        // a new gene keeps the grid's selection (it is about classes, not this gene) and starts the table's own query over
+        apply: (vs, g) => linkMutations([{ ...vs[0], genes: [g] } as View, { ...vs[1], gene: g, sort: undefined, search: undefined, filters: undefined } as View], 0) },
+      link: linkMutations },
     ...(expr ? [{ title: "Co-expression", views: [v("Co-expression with " + genes[0], { kind: "correlates", gene: genes[0], profileType: expr, cohorts: ["All patients"] })] }] : []),
     { title: "Comparison/Survival", sub: [
       { title: "Overlap", views: [v("Overlap", { kind: "overlap", cohorts: both })] },

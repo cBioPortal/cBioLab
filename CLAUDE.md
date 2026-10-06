@@ -238,6 +238,17 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 Added by a design audit of the analysis page; `scripts/layout-metrics.cjs` measures whether it
 still holds, against a running server.
 
+- **A figure is the data alone; anything the reader clicks is HTML beside it.** A selector, a
+  legend that filters, a summary with links (the lollipop's gene summary and Driver/VUS × class
+  grid, `app/_lollipop/HotspotsBody.tsx`) is a control, not part of the SVG: the figure the server
+  draws for MCP and exports carries what those controls show *in words* in its caption — including
+  what a selection hides — so an image that travels alone is still complete. A selection that only
+  changes what is drawn is kept in the view's spec (so a link reproduces it) but applied in the
+  browser from the whole result, so a click re-runs nothing (`dataPart` leaves it out of the
+  re-run key). Code the browser draws with must not import server modules: `lib/view-svg.ts`
+  reaches the database layer through `lib/plot.ts`, so browser-drawn figures live in their own
+  module (`lib/lollipop-svg.ts`) that `lib/view-svg.ts` reuses — `node:async_hooks` in a client
+  bundle fails the whole page.
 - **One scale, in `app/globals.css`.** Seven type steps (`--t-xs` … `--t-2xl`), seven spacing
   steps (`--s0` … `--s6`), four radii, one control height (`--ctl-h`). Nothing declares a font
   size or a border radius outside it — the app once had 36 distinct font sizes, five of them

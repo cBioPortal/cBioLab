@@ -39,6 +39,72 @@ export function impactType(canonical: string): ImpactType {
   }
 }
 
+export const IMPACT_TYPES: readonly ImpactType[] = ["missense", "truncating", "inframe", "splice", "fusion", "other"];
+
+/**
+ * A mutation type column's protein impact class in SQL, the same mapping canonicalType and
+ * impactType make in the browser (generated from CANONICAL, so the two cannot drift): what a
+ * site returns per change so the lollipop can be filtered by class, and the mutation table's
+ * alteration column.
+ */
+export function impactSql(col: string): string {
+  const by = new Map<ImpactType, string[]>();
+  for (const [raw, canonical] of Object.entries(CANONICAL)) {
+    const k = impactType(canonical);
+    if (k !== "other") (by.get(k) ?? by.set(k, []).get(k)!).push(raw);
+  }
+  const quote = (x: string) => "'" + x.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
+  return "multiIf(" + IMPACT_TYPES.filter((k) => k !== "other" && by.has(k))
+    .map((k) => "lowerUTF8(" + col + ") IN (" + by.get(k)!.map(quote).join(", ") + "), '" + k + "'").join(", ") + ", 'other')";
+}
+
+/** A cell of the Driver/VUS × impact class grid, the unit a lollipop's selection hides: "missense.vus". */
+export type AlterationCell = `${ImpactType}.${"driver" | "vus"}`;
+export const ALTERATION_CELLS: readonly AlterationCell[] = IMPACT_TYPES.flatMap((k) => [k + ".driver", k + ".vus"] as AlterationCell[]);
+export const cellOf = (impact: string, driver: boolean): AlterationCell => ((IMPACT_TYPES as readonly string[]).includes(impact) ? impact : "other") + (driver ? ".driver" : ".vus") as AlterationCell;
+/** "Missense · Driver" — how the mutation table's alteration column spells a cell */
+export const cellLabel = (c: AlterationCell): string => IMPACT_COLORS[c.split(".")[0] as ImpactType].label + (c.endsWith(".driver") ? " · Driver" : " · VUS");
+
+/** What is wrong with a selection's `hide` list, or null. */
+export function checkHide(hide: unknown): string | null {
+  if (hide == null) return null;
+  if (!Array.isArray(hide) || hide.some((h) => typeof h !== "string")) return "hide is a list of cells like \"missense.vus\"";
+  const bad = hide.filter((h) => !(ALTERATION_CELLS as readonly string[]).includes(h));
+  return bad.length ? "unknown cell " + bad.join(", ") + " in hide — cells are <class>.driver or <class>.vus, classes " + IMPACT_TYPES.join(", ") : null;
+}
+
+/**
+ * A gene's lollipop with the hidden cells left out — what the grid beside it selects. Each change
+ * goes in or out whole by its class and driver status; stems, heights, colours and the label are
+ * recomputed from what remains. The tally stays whole: it is the grid's own counts. A change a site
+ * returned without a class (a peer on older code) cannot be judged, so it stays drawn and is counted.
+ */
+export function filterHotspotGene(g: HotspotGene, hide: readonly string[]): { gene: HotspotGene; shown: number; total: number; unclassed: number } {
+  const total = g.positions.reduce((n, p) => n + p.n, 0);
+  if (!hide.length) return { gene: g, shown: total, total, unclassed: 0 };
+  const hidden = new Set(hide);
+  let unclassed = 0;
+  const positions: LollipopPosition[] = [];
+  for (const p of g.positions) {
+    const changes = p.changes.filter((c) => {
+      if (!c.impact) { unclassed += c.n; return true; }
+      return !hidden.has(cellOf(c.impact, !!c.driver));
+    });
+    if (!changes.length) continue;
+    const types = (p.types || []).filter((t) => !hidden.has(cellOf(impactType(canonicalType(t.mtype)), t.driver)));
+    const col = types.length ? lollipopColor(types) : { color: p.color, impact: p.impact as ImpactType, driver: p.driver };
+    positions.push({ ...p, n: changes.reduce((a, c) => a + c.n, 0), changes, types, color: col.color, impact: col.impact, driver: col.driver });
+  }
+  const lp = labelledPosition(positions, g.domains);
+  const at = positions.find((q) => q.pos === lp);
+  const { label: _old, ...rest } = g;
+  void _old;
+  return {
+    gene: { ...rest, positions, ...(at ? { label: { pos: at.pos, text: lollipopLabelText(at.changes) } } : {}) },
+    shown: positions.reduce((n, p) => n + p.n, 0), total, unclassed,
+  };
+}
+
 /** MUTATION_TYPE_PRIORITY — the tie-break when two types have the same count at a codon */
 const PRIORITY: Record<string, number> = {
   missense: 1, inframe: 2, truncating: 4, nonsense: 6, nonstop: 7, nonstart: 8, frameshift: 4,
@@ -178,14 +244,16 @@ export function fetchProteinInfo(gene: string): Promise<ProteinInfo | null> {
  * is counted into `unpositioned` and disclosed, where the portal drops it silently.
  */
 export function buildLollipopGene(gene: string, reports: LollipopReport[], protein: ProteinInfo | null): HotspotGene {
-  const changes = new Map<string, { pos: number | null; change: string; n: number; rows: number }>();
+  const changes = new Map<string, { pos: number | null; change: string; n: number; rows: number; impact?: string; driver: boolean }>();
   const types = new Map<string, { pos: number | null; mtype: string; driver: boolean; rows: number }>();
   let mutated = 0, pairs = 0, somaticSamples = 0, cohortSamples = 0;
   for (const rep of reports) {
     cohortSamples += rep.cohortSamples;
     for (const c of rep.changes) if (c.gene === gene) {
       const k = c.pos + "\u0000" + c.change, cur = changes.get(k);
-      if (cur) { cur.n += c.n; cur.rows += c.rows; } else changes.set(k, { pos: c.pos, change: c.change, n: c.n, rows: c.rows });
+      // a class from one site is kept; a site that sent none (older code) leaves it undefined
+      if (cur) { cur.n += c.n; cur.rows += c.rows; cur.driver ||= c.driver; if (!cur.impact) cur.impact = c.impact; }
+      else changes.set(k, { pos: c.pos, change: c.change, n: c.n, rows: c.rows, driver: c.driver, ...(c.impact ? { impact: c.impact } : {}) });
     }
     for (const t of rep.types) if (t.gene === gene) {
       const k = t.pos + "\u0000" + t.mtype + "\u0000" + t.driver, cur = types.get(k);
@@ -198,17 +266,18 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
   const proteinLength = protein?.proteinLength || observedMax || 10;
   const drawable = (pos: number | null): pos is number => pos != null && Number.isFinite(pos) && pos >= 0 && pos <= proteinLength + 1;
 
-  const byPos = new Map<number, { change: string; n: number; rows: number }[]>();
+  const byPos = new Map<number, { change: string; n: number; rows: number; impact?: string; driver: boolean }[]>();
   let returned = 0, unpositioned = 0;
   for (const c of changes.values()) {
     returned += c.n;
     if (!drawable(c.pos)) { unpositioned += c.n; continue; }
-    (byPos.get(c.pos) ?? byPos.set(c.pos, []).get(c.pos)!).push({ change: c.change, n: c.n, rows: c.rows });
+    (byPos.get(c.pos) ?? byPos.set(c.pos, []).get(c.pos)!).push({ change: c.change, n: c.n, rows: c.rows, driver: c.driver, ...(c.impact ? { impact: c.impact } : {}) });
   }
   const positions: LollipopPosition[] = [...byPos.entries()].map(([pos, cs]) => {
-    const col = lollipopColor([...types.values()].filter((t) => t.pos === pos));
+    const here = [...types.values()].filter((t) => t.pos === pos).map((t) => ({ mtype: t.mtype, driver: t.driver, rows: t.rows }));
+    const col = lollipopColor(here);
     return { pos, n: cs.reduce((a, c) => a + c.n, 0), color: col.color, impact: col.impact, driver: col.driver,
-      changes: cs.sort((a, b) => b.rows - a.rows || (a.change < b.change ? -1 : 1)) };
+      changes: cs.sort((a, b) => b.rows - a.rows || (a.change < b.change ? -1 : 1)), types: here };
   }).sort((a, b) => a.pos - b.pos);
 
   const seen = new Map<string, string>();
