@@ -74,7 +74,11 @@ SQL; a split itself is addressed as `"<cohort> / <split>"`. **Each view chooses 
 in a view's `cohorts`, a cohort's name is that whole cohort, split or not; a split's name is its arms
 and remainder (not its not-evaluable children, which the split discloses); an arm's name is that arm,
 whole, even if it is split further. So one view can show NSCLC while another shows "NSCLC / KRAS
-allele", or one view both. A view with no `cohorts` shows the authored cohorts, whole. The result's
+allele". A view draws **either whole cohorts or the groups of one split, never a mix and never two
+splits** — two splits of one cohort count every patient twice, groups of two splits are two
+comparisons in one, and a whole cohort beside a split's groups can share their patients — and a view
+naming such a list is refused, naming what clashes. A view with no `cohorts` shows the authored
+cohorts, whole. A cohort may have several splits; each view picks at most one. The result's
 `splits` gives every child's count and checks the sum against the parent's (`conserved`).
 Conditions the engine cannot check evaluability for (expression, assay values, timeline events,
 derived metrics) are listed in `unchecked`: their patients with no data count as not matching.

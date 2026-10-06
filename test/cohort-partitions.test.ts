@@ -229,7 +229,7 @@ describe("renaming a partition's child", () => {
   });
 });
 
-import { expandSplits, splitsDrawn } from "../lib/partition-arms.ts";
+import { expandSplits, splitsDrawn, viewDrawProblem } from "../lib/partition-arms.ts";
 
 describe("a view's cohort list: a cohort is itself, a split is its arms", () => {
   const parts = [
@@ -266,5 +266,23 @@ describe("a view draws from at most one split", () => {
     assert.deepEqual(splitsDrawn(["N / KRAS", "N / stage / I"], parts), ["N / KRAS", "N / stage"]);
     assert.deepEqual(splitsDrawn(["N / KRAS", "E / sex"], parts), ["N / KRAS", "E / sex"]);
     assert.deepEqual(splitsDrawn(["N / KRAS / Other", "N / KRAS / G12C / sex / F"], parts), ["N / KRAS", "N / KRAS / G12C / sex"]);
+  });
+});
+
+describe("a view draws whole cohorts or one split's groups, not both", () => {
+  const parts = [
+    { name: "N / KRAS", of: "N", comparable: ["N / KRAS / G12C", "N / KRAS / Other"] },
+    { name: "N / stage", of: "N", comparable: ["N / stage / I", "N / stage / Other"] }
+  ];
+  test("whole cohorts together, or one split's groups together, are fine", () => {
+    assert.equal(viewDrawProblem(["E", "N"], parts), null);
+    assert.equal(viewDrawProblem(["N / KRAS"], parts), null);
+    assert.equal(viewDrawProblem(["N / KRAS / G12C", "N / KRAS / Other"], parts), null);
+  });
+  test("a whole cohort beside a split's groups is refused, naming both", () => {
+    assert.match(viewDrawProblem(["E", "N / KRAS / G12C"], parts)!, /whole cohorts or the groups of one split, not both; this one names “E” beside “N \/ KRAS”/);
+  });
+  test("two splits are refused, naming both", () => {
+    assert.match(viewDrawProblem(["N / KRAS", "N / stage / I"], parts)!, /“N \/ KRAS” and “N \/ stage”/);
   });
 });

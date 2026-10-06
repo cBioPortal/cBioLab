@@ -55,7 +55,7 @@ describe("upgradeDocument", () => {
     assert.match(upgrade.changes[1], /2 views that drew a split cohort's arms now list them/);
     // view 1 drew groups of three splits (the nested ones included), which 2.4 refuses — said, not
     // hidden; view 2 draws only the nested "G12C by sex" split's groups, which is fine
-    assert.match(upgrade.changes[2], /^view 1 drew the groups of several splits at once/);
+    assert.match(upgrade.changes[2], /^view 1 drew whole cohorts beside a split's groups, or the groups of several splits/);
     // nothing the old document said is lost: the flat form is the same splits, re-addressed
     const flat = flattenSplits(doc.cohorts);
     assert.deepEqual(Object.keys(flat).sort(), [
@@ -75,7 +75,9 @@ describe("upgradeDocument", () => {
       ["EGFR"],                                                     // unchanged: nothing split
       ["KRAS / allele"]                                             // unchanged: a split's name means the same
     ]);
-    assert.deepEqual(upgrade.changes, ["2 views that drew a split cohort's arms now list them by name, since a cohort's name now means the whole cohort"]);
+    assert.equal(upgrade.changes[0], "2 views that drew a split cohort's arms now list them by name, since a cohort's name now means the whole cohort");
+    // view 1 drew EGFR whole beside KRAS's arms, which a 2.4 view does not — the note names it
+    assert.match(upgrade.changes[1], /^view 1 drew whole cohorts beside a split's groups/);
   });
 
   test("a 2.3 document without splits upgrades with nothing to report", () => {

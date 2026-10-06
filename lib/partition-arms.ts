@@ -260,6 +260,25 @@ export function splitsDrawn(names: string[], parts: PartitionShape[]): string[] 
   return owners.filter((n, i) => owners.indexOf(n) === i);
 }
 
+/**
+ * Why a view's cohort list cannot be drawn, or null. A view draws EITHER whole cohorts OR the groups
+ * of one split: two splits count patients twice or ask two questions at once, and a whole cohort
+ * beside a split's groups can share their patients (EGFR-mutant NSCLC is partly inside NSCLC's
+ * "KRAS wild-type").
+ */
+export function viewDrawProblem(names: string[], parts: PartitionShape[]): string | null {
+  const splits = splitsDrawn(names, parts);
+  if (splits.length > 1)
+    return "a view draws the groups of one split; this one names " + splits.map((n) => "“" + n + "”").join(" and ") + " — choose one";
+  if (splits.length === 1) {
+    const whole = names.filter((n) => splitsDrawn([n], parts).length === 0);
+    if (whole.length)
+      return "a view draws whole cohorts or the groups of one split, not both; this one names " +
+        whole.map((n) => "“" + n + "”").join(", ") + " beside “" + splits[0] + "” — choose one";
+  }
+  return null;
+}
+
 // ---- the split tree (stored on cohorts) and its flat working form ---------------------------
 
 type Cohorts = Record<string, CohortDef>;

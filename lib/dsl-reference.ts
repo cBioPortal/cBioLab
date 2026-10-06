@@ -1104,7 +1104,11 @@ SQL; a split itself is addressed as \`"<cohort> / <split>"\`. **Each view choose
 in a view's \`cohorts\`, a cohort's name is that whole cohort, split or not; a split's name is its arms
 and remainder (not its not-evaluable children, which the split discloses); an arm's name is that arm,
 whole, even if it is split further. So one view can show NSCLC while another shows "NSCLC / KRAS
-allele", or one view both. A view with no \`cohorts\` shows the authored cohorts, whole. The result's
+allele". A view draws **either whole cohorts or the groups of one split, never a mix and never two
+splits** — two splits of one cohort count every patient twice, groups of two splits are two
+comparisons in one, and a whole cohort beside a split's groups can share their patients — and a view
+naming such a list is refused, naming what clashes. A view with no \`cohorts\` shows the authored
+cohorts, whole. A cohort may have several splits; each view picks at most one. The result's
 \`splits\` gives every child's count and checks the sum against the parent's (\`conserved\`).
 Conditions the engine cannot check evaluability for (expression, assay values, timeline events,
 derived metrics) are listed in \`unchecked\`: their patients with no data count as not matching.
@@ -1544,7 +1548,9 @@ export const AGENT_GRAMMAR = `Document shape:
   // value for a clinical arm's attribute, get their own "Not profiled: …" / "No … recorded" child; the rest go to
   // "Other". Each child is the cohort "<cohort> / <split> / <arm>"; an arm may carry its own "splits" to nest. In a
   // view's "cohorts", a cohort's name is the WHOLE cohort (split or not), "<cohort> / <split>" is that split's arms and
-  // Other, and an arm's name is that arm — so to compare the arms, list the split's name. Prefer a split to
+  // Other, and an arm's name is that arm — so to compare the arms, list the split's name. A view lists EITHER whole
+  // cohorts OR the groups of ONE split (the split's name, or some of its arms) — never a mix, never two splits; such a
+  // view is refused. A cohort may have several splits ("splits" holds them all); each view picks one. Prefer a split to
   // hand-written mutually exclusive cohorts, and to splitBy when the arms must not overlap. (Not the {"kind":"split"}
   // held-out-half leaf.) Always write "dsl": "${DOC_VERSION}" in a document you author.
   // compare/survival/cox/logistic/clinical/course/oncoprint (only) may carry "splitBy" instead of (or with)

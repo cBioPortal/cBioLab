@@ -1991,8 +1991,9 @@ interface CohortNode { name: string; label: string; kind: "cohort" | "split" | "
  * applied as you click rather than refused after:
  *   - ticking anything unticks its own parent and children (a cohort and its own split's groups
  *     would count the same patients twice), so moving between levels is one click;
- *   - a view draws from ONE split: ticking a split, or a group of one, replaces any other split's;
- *   - whole cohorts combine freely; a one-cohort view (max 1) behaves like radio buttons;
+ *   - a view draws EITHER whole cohorts OR the groups of one split: ticking a split, or a group of
+ *     one, replaces whole cohorts and any other split's; ticking a whole cohort replaces a split;
+ *   - whole cohorts combine with each other; a one-cohort view (max 1) behaves like radio buttons;
  *   - the last ticked item cannot be unticked — ticking another switches to it.
  */
 function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuStore }: {
@@ -2016,7 +2017,8 @@ function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuStore }:
     if (chosen.includes(n)) { if (chosen.length > 1) onChange(chosen.filter((c) => c !== n)); return; }
     const owner = ownerOf(n);
     let kept = max === 1 ? [] : chosen.filter((c) => !related(c, n));
-    if (owner) kept = kept.filter((c) => { const o = ownerOf(c); return !o || o === owner; });
+    // whole cohorts, or one split's groups — never a mix
+    kept = kept.filter((c) => ownerOf(c) === owner);
     if (max != null && kept.length >= max) return;
     onChange([...kept, n]);
   };
@@ -2025,13 +2027,15 @@ function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuStore }:
     const implied = !on && chosen.some((c) => o.name.startsWith(c + " / ") && byName.get(c)?.kind === "split");
     const last = on && chosen.length === 1;
     const full = !on && max != null && max > 1 && chosen.filter((c) => !related(c, o.name)).length >= max;
-    const replaces = !on && !implied && o.kind !== "cohort" && current && ownerOf(o.name) !== current;
+    const mine = ownerOf(o.name);
+    const replaces = !on && !implied && chosen.some((c) => ownerOf(c) !== mine);
     const kids = o.kind === "split" ? nodes.filter((x) => x.kind === "arm" && x.name.startsWith(o.name + " / ") && x.depth === o.depth + 1) : [];
     return (
       <div key={o.name} className={"cpick " + o.kind + (implied ? " implied" : "") + (on ? " on" : "")} style={{ paddingLeft: (0.5 + o.depth * 1.15) + "rem" }}>
         <label title={last ? "a view draws at least one — tick another to switch" : full ? "this view draws at most " + max
             : implied ? "drawn as part of the split — click to draw only this group"
-            : replaces ? "a view draws one split — this replaces “" + current + "”" : o.name}>
+            : replaces ? (mine ? "a view draws one split's groups or whole cohorts — this replaces what is ticked"
+              : "a view draws whole cohorts or one split's groups — this replaces “" + current + "”") : o.name}>
           <input type={max === 1 ? "radio" : "checkbox"} checked={on || implied} disabled={busy || full}
             onChange={() => choose(o.name)} onClick={() => { if (last) choose(o.name); }} />
           <span className="cpick-label">
@@ -2059,7 +2063,7 @@ function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuStore }:
       <div className="gearmenu-items">
         <div className="cpick-head">Draw in this view</div>
         {nodes.filter((o) => !hidden(o.name)).map(row)}
-        {splits.length > 0 && <p className="cpick-foot">A view draws one split at a time — choosing another replaces it. Whole cohorts can sit alongside.</p>}
+        {splits.length > 0 && <p className="cpick-foot">A view draws whole cohorts, or the groups of one split — not both. Choosing one replaces the other.</p>}
       </div>
     </details>
   );
@@ -2301,16 +2305,18 @@ function Latency({ v }: { v: any }) {
     catch (e) { setError(String((e as Error)?.message || e)); }
   };
   /** Split a cohort (or an arm) by what the server proposes from the data, and switch the views
-   *  that were showing it to the new split — an edit to their lists, which each view's cohorts
-   *  menu can change back. */
+   *  that were showing only it to the new split — an edit to their lists, which each view's
+   *  cohorts menu can change back. */
   const splitCohortBy = async (cohort: string, spec: SplitSpec) => {
     const { name, def } = await proposePartition({ doc, cohort, ...spec });
     const key = splitKey(cohort, name);
     const withSplit = editSplits(doc, (f) => ({ ...f, partitions: { ...f.partitions, [key]: { ...def, split: name } } }));
+    // only a view showing just this cohort switches: one showing other cohorts too would then mix
+    // whole cohorts with a split's groups, which a view does not draw
     const authored = Object.keys(doc.cohorts || {});
     const views = (withSplit.views || []).map((v) => {
       const list = Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored;
-      return list.includes(cohort) ? { ...v, cohorts: list.map((c) => c === cohort ? key : c) } : v;
+      return list.length === 1 && list[0] === cohort ? { ...v, cohorts: [key] } : v;
     });
     runEdited({ ...withSplit, views });
   };

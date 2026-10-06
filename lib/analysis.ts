@@ -33,7 +33,7 @@ import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } from "./cohort-partitions.ts";
-import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, splitsDrawn, flattenSplits, withoutSplitTrees, splitKey } from "./partition-arms.ts";
+import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey } from "./partition-arms.ts";
 import { upgradeDocument } from "./doc-version.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
@@ -469,12 +469,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       // With no cohorts named a view shows the authored ones, whole; a split's name in the list
       // stands for its arms (expandSplits)
       const listed = view.cohorts && view.cohorts.length ? view.cohorts : names.filter((n) => !generatedNames.has(n));
-      const drawnSplits = splitsDrawn(listed, partitionShapes);
-      if (drawnSplits.length > 1) {
-        views.push({ kind: view.kind, error: "a view draws groups of at most one split; this one names " +
-          drawnSplits.map((n) => "“" + n + "”").join(" and ") + " — choose one (whole cohorts can sit alongside it)" });
-        continue;
-      }
+      const problem = viewDrawProblem(listed, partitionShapes);
+      if (problem) { views.push({ kind: view.kind, error: problem }); continue; }
       vNames = expandSplits(listed, partitionShapes).filter((n) => cohorts[n]);
     }
     const vStudies = [...new Set(vNames.flatMap((n) => cohorts[n].studies))];
