@@ -12,7 +12,9 @@
 // MEANS changes, so a saved analysis can say which rules it was written under. Pure and
 // browser-safe: the page upgrades a document when it opens one, the engine whenever it runs one.
 
-export const DOC_VERSION = "2.3";
+import { flattenSplits } from "./partition-arms.ts";
+
+export const DOC_VERSION = "2.4";
 
 /** what upgrading a document did, reported in the result so a reader is told, not left to notice */
 export interface DocUpgrade {
@@ -95,9 +97,51 @@ function partitionsToSplits(doc: AnyDoc, changes: string[]): AnyDoc {
   return { ...rest, cohorts, views };
 }
 
+/**
+ * 2.3 → 2.4: in 2.3 a split replaced what it split in every view — a view showing a split cohort,
+ * by name or by default, drew that cohort's (first) split's arms instead, recursively. In 2.4 a
+ * cohort's name is the whole cohort and a view names the split to draw its arms. Every view whose
+ * drawing would change is given the explicit list it drew under 2.3, so it draws the same thing.
+ */
+function splitsNoLongerReplace(doc: AnyDoc, changes: string[]): AnyDoc {
+  const flat = flattenSplits(doc.cohorts || {});
+  if (!Object.keys(flat).length) return doc;
+  const arms = (key: string) => [...flat[key].arms.map((a) => key + " / " + a.name), key + " / " + (flat[key].other || "Other")];
+  const firstOf = new Map<string, string>();
+  for (const [key, p] of Object.entries(flat)) if (!firstOf.has(p.of)) firstOf.set(p.of, key);
+  const drew23 = (names: string[]): string[] => {
+    const out: string[] = [];
+    const visit = (n: string, seen: Set<string>) => {
+      const key = flat[n] ? n : firstOf.get(n);
+      if (!key || seen.has(key)) { out.push(n); return; }
+      for (const c of arms(key)) visit(c, new Set(seen).add(key));
+    };
+    for (const n of names) visit(n, new Set());
+    return out.filter((n, i) => out.indexOf(n) === i);
+  };
+  const drew24 = (names: string[]): string[] => {
+    const out = names.flatMap((n) => flat[n] ? arms(n) : [n]);
+    return out.filter((n, i) => out.indexOf(n) === i);
+  };
+  const authored = Object.keys(doc.cohorts || {});
+  let fixed = 0;
+  const views = (doc.views || []).map((v: AnyDoc) => {
+    if (!v || typeof v !== "object") return v;
+    const list: string[] = Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored;
+    const before = drew23(list), after = drew24(list);
+    if (before.length === after.length && before.every((n, i) => n === after[i])) return v;
+    fixed++;
+    return { ...v, cohorts: before };
+  });
+  if (fixed) changes.push(fixed + " view" + (fixed === 1 ? "" : "s") + " that drew a split cohort's arms now list" +
+    (fixed === 1 ? "s" : "") + " them by name, since a cohort's name now means the whole cohort");
+  return fixed ? { ...doc, views } : doc;
+}
+
 /** each step upgrades from the version before `to`; unversioned documents start at the first */
 const STEPS: { to: string; run: (doc: AnyDoc, changes: string[]) => AnyDoc }[] = [
-  { to: "2.3", run: partitionsToSplits }
+  { to: "2.3", run: partitionsToSplits },
+  { to: "2.4", run: splitsNoLongerReplace }
 ];
 
 /**

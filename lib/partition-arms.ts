@@ -233,25 +233,15 @@ export function renamePartitionChild<D extends { partitions?: Record<string, Par
 export interface PartitionShape { name: string; of: string; comparable: string[] }
 
 /**
- * A split replaces what it splits. In a view's cohort list, a cohort that has been split stands
- * for its arms and remainder (its not-evaluable children are disclosed, not compared), and so
- * does the partition's own name; an arm that is split further stands for ITS arms, and so on.
- * The leaves of a split tree are still disjoint and still add up to the cohort. If one cohort
- * has two splits, the first declared is the one a view shows. Used by the engine and by the
- * page's cohort pickers alike, so the two cannot disagree.
+ * What a view's cohort list draws. A cohort's name is that whole cohort, split or not; a split's
+ * name ("<cohort> / <split>") is its arms and remainder (its not-evaluable children are disclosed
+ * in the split, not compared); an arm's name is that arm. Each view chooses for itself, so one
+ * view can show a cohort while another shows its split. Used by the engine and by the page's
+ * cohort pickers alike, so the two cannot disagree.
  */
 export function expandSplits(names: string[], parts: PartitionShape[]): string[] {
   const byName = new Map(parts.map((p) => [p.name, p]));
-  const byOf = new Map<string, PartitionShape>();
-  for (const p of parts) if (!byOf.has(p.of)) byOf.set(p.of, p);
-  const out: string[] = [];
-  const visit = (n: string, seen: Set<string>) => {
-    const p = byName.get(n) || byOf.get(n);
-    if (!p || seen.has(p.name)) { out.push(n); return; }
-    const next = new Set(seen).add(p.name);
-    for (const c of p.comparable) visit(c, next);
-  };
-  for (const n of names) visit(n, new Set());
+  const out = names.flatMap((n) => byName.get(n)?.comparable ?? [n]);
   return out.filter((n, i) => out.indexOf(n) === i);
 }
 

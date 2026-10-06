@@ -231,22 +231,22 @@ describe("renaming a partition's child", () => {
 
 import { expandSplits } from "../lib/partition-arms.ts";
 
-describe("a split replaces what it splits, in a view's cohort list", () => {
+describe("a view's cohort list: a cohort is itself, a split is its arms", () => {
   const parts = [
-    { name: "K", of: "KRAS-mutant", comparable: ["K / G12C", "K / other", "K / Other"] },
-    { name: "S", of: "K / G12C", comparable: ["S / F", "S / Other"] }
+    { name: "KRAS-mutant / K", of: "KRAS-mutant", comparable: ["KRAS-mutant / K / G12C", "KRAS-mutant / K / other", "KRAS-mutant / K / Other"] },
+    { name: "KRAS-mutant / K / G12C / S", of: "KRAS-mutant / K / G12C", comparable: ["KRAS-mutant / K / G12C / S / F", "KRAS-mutant / K / G12C / S / Other"] }
   ];
-  test("an unsplit cohort stays; a split one becomes its arms, recursively", () => {
-    assert.deepEqual(expandSplits(["EGFR-mutant", "KRAS-mutant"], parts),
-      ["EGFR-mutant", "S / F", "S / Other", "K / other", "K / Other"]);
+  test("a split cohort named in a view is the whole cohort", () => {
+    assert.deepEqual(expandSplits(["EGFR-mutant", "KRAS-mutant"], parts), ["EGFR-mutant", "KRAS-mutant"]);
   });
-  test("the partition's own name expands the same way", () => {
-    assert.deepEqual(expandSplits(["K"], parts), ["S / F", "S / Other", "K / other", "K / Other"]);
+  test("the split's name is its arms and Other; an arm split again stays one arm", () => {
+    assert.deepEqual(expandSplits(["KRAS-mutant / K"], parts), ["KRAS-mutant / K / G12C", "KRAS-mutant / K / other", "KRAS-mutant / K / Other"]);
   });
-  test("a leaf named directly stays itself, and nothing is listed twice", () => {
-    assert.deepEqual(expandSplits(["K / other", "K"], parts), ["K / other", "S / F", "S / Other", "K / Other"]);
+  test("parent and split in one list; nothing listed twice", () => {
+    assert.deepEqual(expandSplits(["KRAS-mutant", "KRAS-mutant / K", "KRAS-mutant / K / other"], parts),
+      ["KRAS-mutant", "KRAS-mutant / K / G12C", "KRAS-mutant / K / other", "KRAS-mutant / K / Other"]);
   });
-  test("with two splits of one cohort, the first declared is shown", () => {
-    assert.deepEqual(expandSplits(["A"], [{ name: "P1", of: "A", comparable: ["P1 / x"] }, { name: "P2", of: "A", comparable: ["P2 / y"] }]), ["P1 / x"]);
+  test("a nested split is chosen by its own name", () => {
+    assert.deepEqual(expandSplits(["KRAS-mutant / K / G12C / S"], parts), ["KRAS-mutant / K / G12C / S / F", "KRAS-mutant / K / G12C / S / Other"]);
   });
 });

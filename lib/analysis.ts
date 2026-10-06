@@ -466,8 +466,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         continue;
       }
     } else {
-      // With no cohorts named a view shows the authored ones; either way a split replaces what it
-      // splits (expandSplits), so splitting a cohort changes every view that shows it.
+      // With no cohorts named a view shows the authored ones, whole; a split's name in the list
+      // stands for its arms (expandSplits)
       vNames = expandSplits(view.cohorts && view.cohorts.length ? view.cohorts : names.filter((n) => !generatedNames.has(n)), partitionShapes)
         .filter((n) => cohorts[n]);
     }

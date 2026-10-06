@@ -24,7 +24,7 @@ import CustomDataPanel, { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import LoginButton from "./login-button.tsx";
 import { PartitionPanel, SplitForm, ChartMenu, type SplitSpec } from "./partitions.tsx";
-import { withoutPartition, armsFromSelection, renamePartitionChild, expandSplits, flattenSplits, editSplits, splitKey, renameInViews, type ChartKey, type PartitionShape } from "../../lib/partition-arms.ts";
+import { withoutPartition, armsFromSelection, renamePartitionChild, flattenSplits, editSplits, splitKey, renameInViews, type ChartKey, type PartitionShape } from "../../lib/partition-arms.ts";
 import { DOC_VERSION, upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
 import { installCustomDataFetch, saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
@@ -880,7 +880,8 @@ export default function AnalysisPage() {
     const base: AnalysisDoc = { study: nextStudy, cohorts: { [name]: d }, views: DEFAULT_VIEWS };
     try {
       const { name: sn, def } = await proposePartition({ doc: base, cohort: name, ...spec });
-      const nd: AnalysisDoc = editSplits({ ...base, dsl: DOC_VERSION }, (f) => ({ ...f, partitions: { [splitKey(name, sn)]: { ...def, split: sn } } }));
+      const nd: AnalysisDoc = editSplits({ ...base, dsl: DOC_VERSION, views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, sn)] })) },
+        (f) => ({ ...f, partitions: { [splitKey(name, sn)]: { ...def, split: sn } } }));
       setStudy(nextStudy);
       setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
       setResult(null); setError(null);
@@ -910,7 +911,8 @@ export default function AnalysisPage() {
       : exSel.current.length === 1 ? "all of " + exSel.current[0] : "all selected studies";
     const parent: CohortDef = r.base.all.length ? { ...d, all: r.base.all } : { ...(draftScaffold(exSel.current) as CohortDef) };
     const nextStudy = exSel.current[0] || study;
-    const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: { ...parent, splits: { [label]: { arms: r.arms } } } }, views: DEFAULT_VIEWS };
+    const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: { ...parent, splits: { [label]: { arms: r.arms } } } },
+      views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, label)] })) };
     setStudy(nextStudy);
     setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
     setResult(null); setError(null);
@@ -1723,12 +1725,9 @@ export default function AnalysisPage() {
   const setViewCohorts = (vi: number, names: string[], all: string[]) => updateView(vi, (v: any) => {
     const next = { ...v };
     const picked = all.filter((n) => names.includes(n));
-    const shapes = partitionShapes();
-    const same = (a: string[], b: string[]) => a.length === b.length && a.every((n, k) => n === b[k]);
-    // exactly one split's arms is written as the split's name, so a later edit to its arms carries over
-    const whole = shapes.find((p) => same(expandSplits([p.name], shapes), picked));
-    if (!picked.length || same(picked, expandSplits(Object.keys(doc.cohorts || {}), shapes))) delete next.cohorts;
-    else next.cohorts = whole ? [whole.name] : picked;
+    const authored = Object.keys(doc.cohorts || {});
+    if (!picked.length || (picked.length === authored.length && picked.every((n, k) => n === authored[k]))) delete next.cohorts;
+    else next.cohorts = picked;
     // splitBy always targets the view's own single chosen cohort (no picker of its own — see
     // SplitByControl) — so narrowing to exactly one carries an existing split along to it,
     // same attribute/gene/oql, rather than leaving it pointed at whatever it last targeted.
@@ -2135,7 +2134,7 @@ function ViewHead({ v, title, sub, actions, chips, cohorts, splitBy, onMoveUp, o
   v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode;
   onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void; onEditNote?: () => void; menuStore: Map<string, boolean>;
   /** which cohorts this view draws; absent when the document has only one */
-  cohorts?: { chosen: string[]; all: string[]; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void };
+  cohorts?: { chosen: string[]; all: string[]; hints?: Record<string, string>; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void };
   /** auto-split the view's own single selected cohort into an arm per attribute value; no
    *  cohort of its own to pick — see SplitByControl's `cohort` prop */
   splitBy?: { current?: SplitBy; cohort?: string; attrs: { attribute: string; kind: string }[]; onChange: (next: SplitBy | undefined) => void };
@@ -2149,7 +2148,7 @@ function ViewHead({ v, title, sub, actions, chips, cohorts, splitBy, onMoveUp, o
           <ViewHelpButton kind={v.kind} menuId={"help:" + menuKey} menuStore={menuStore} />
           {cohorts && cohorts.all.length > 1 && (
             <PickMenu label="cohorts" title="which cohorts this view draws; all of them unless you say otherwise"
-              options={cohorts.all.map((n) => ({ value: n, label: n }))} chosen={cohorts.chosen}
+              options={cohorts.all.map((n) => ({ value: n, label: n, hint: cohorts.hints?.[n] }))} chosen={cohorts.chosen}
               onChange={cohorts.onChange} min={1} max={cohorts.max} busy={cohorts.busy} menuId={"pick:" + menuKey} menuStore={menuStore} />
           )}
           {splitBy && cohorts && (
@@ -2267,15 +2266,23 @@ function Latency({ v }: { v: any }) {
   const partitionShapes = (): PartitionShape[] => Object.entries((result && result.splits) || {}).map(([name, p]) =>
     ({ name, of: p.of, comparable: p.children.filter((c) => c.role !== "notEvaluable").map((c) => c.name) }));
   const cohortChoice = (vi: number, v: any, max?: number) => {
-    // On offer and chosen, a split replaces what it splits, exactly as in the engine: a split
-    // cohort is offered as its arms and Other. A view with no cohorts of its own shows the
-    // authored cohorts, expanded the same way.
+    // On offer: each cohort, whole; under it each of its splits (drawn as its arms); under that
+    // each arm, and any split of an arm, the same way. A view chooses any of them — a cohort and
+    // its split can be drawn by different views, or side by side in one. With no list of its own
+    // a view shows the authored cohorts, whole.
     const shapes = partitionShapes();
     const authored = Object.keys(doc.cohorts || {});
-    const all = expandSplits(authored, shapes).filter((n) => !result || result.cohorts[n]);
-    const named: string[] = expandSplits(Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored, shapes);
-    const chosen = named.filter((n) => all.includes(n));
-    return { chosen, all, max, busy, viewKey: resultViewKeys.current[vi] ?? vi, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
+    const order: string[] = [];
+    const offer = (n: string) => {
+      order.push(n);
+      for (const p of shapes.filter((x) => x.of === n)) { order.push(p.name); for (const c of p.comparable) offer(c); }
+    };
+    authored.forEach(offer);
+    const isSplit = (n: string) => shapes.some((p) => p.name === n);
+    const all = order.filter((n) => !result || result.cohorts[n] || isSplit(n));
+    const hints = Object.fromEntries(shapes.map((p) => [p.name, "split: its " + p.comparable.length + " groups"]));
+    const chosen = (Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored).filter((n: string) => all.includes(n));
+    return { chosen, all, hints, max, busy, viewKey: resultViewKeys.current[vi] ?? vi, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
   };
 
   /** "split by" for a view's own ViewHead — reuses the same attribute catalog every axis
@@ -2347,11 +2354,19 @@ function Latency({ v }: { v: any }) {
     try { runEdited(editSplits(doc, (f) => renamePartitionChild(f, name, from, to))); }
     catch (e) { setError(String((e as Error)?.message || e)); }
   };
-  /** Split a cohort (or an arm) by what the server proposes from the data. Every view showing
-   *  that cohort then shows its arms instead (expandSplits). */
+  /** Split a cohort (or an arm) by what the server proposes from the data, and switch the views
+   *  that were showing it to the new split — an edit to their lists, which each view's cohorts
+   *  menu can change back. */
   const splitCohortBy = async (cohort: string, spec: SplitSpec) => {
     const { name, def } = await proposePartition({ doc, cohort, ...spec });
-    runEdited(editSplits(doc, (f) => ({ ...f, partitions: { ...f.partitions, [splitKey(cohort, name)]: { ...def, split: name } } })));
+    const key = splitKey(cohort, name);
+    const withSplit = editSplits(doc, (f) => ({ ...f, partitions: { ...f.partitions, [key]: { ...def, split: name } } }));
+    const authored = Object.keys(doc.cohorts || {});
+    const views = (withSplit.views || []).map((v) => {
+      const list = Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored;
+      return list.includes(cohort) ? { ...v, cohorts: list.map((c) => c === cohort ? key : c) } : v;
+    });
+    runEdited({ ...withSplit, views });
   };
 
   // ---- "+ Add cohort": Explore over the analysis, adding to it instead of replacing it ---------
