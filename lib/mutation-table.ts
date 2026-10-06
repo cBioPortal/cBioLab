@@ -4,6 +4,7 @@
 // PatientLevelResolver.rowsPage: a participant that may not disclose a patient has no such method.
 import { sq } from "./compiler.ts";
 import type { QueryColumn, RowSource } from "./table-query.ts";
+import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS } from "./lollipop.ts";
 import { clinicalTable } from "./custom-data.ts";
 
 export interface MutationColumn { id: string; name: string; numeric: boolean }
@@ -15,6 +16,7 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
   { id: "proteinChange", name: "Protein Change", numeric: false },
   { id: "annotation", name: "Annotation (OncoKB)", numeric: false },
   { id: "mutationType", name: "Mutation Type", numeric: false },
+  { id: "alteration", name: "Alteration", numeric: false },
   { id: "variantType", name: "Variant Type", numeric: false },
   { id: "vaf", name: "Allele Freq (T)", numeric: true },
   { id: "altCount", name: "Variant Reads", numeric: true },
@@ -31,8 +33,23 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
 /** Shown unless the view names its columns: the portal's own default set. */
 export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange", "annotation", "mutationType", "mutCount"];
 
+/**
+ * The lollipop grid's cell a mutation falls in, spelled as the grid labels it ("Missense · Driver"):
+ * its protein impact class (the lollipop's own mapping, lib/lollipop.ts) and driver status — every
+ * mutation a driver when no OncoKB version is pinned, as the lollipop counts them then.
+ */
+export function alterationSql(pin: string | null): string {
+  const klass = "transform(" + impactSql("mutationType") + ", [" + IMPACT_TYPES.map((k) => "'" + k + "'").join(", ") + "], [" +
+    IMPACT_TYPES.map((k) => "'" + IMPACT_COLORS[k].label + "'").join(", ") + "], 'Other')";
+  return "concat(" + klass + ", " + (pin ? "if(drv = 1, ' · Driver', ' · VUS')" : "' · Driver'") + ")";
+}
+/** The same, in the browser, for a row the table returned. */
+export function alterationOf(mutationType: string, driver: boolean, pin: string | null): string {
+  return cellLabel(cellOf(impactType(canonicalType(mutationType)), pin ? driver : true));
+}
+
 /** How each column reads off the rows: as text (search, text filters, value lists), as a number, and its order. */
-function queryColumn(c: MutationColumn): QueryColumn {
+function queryColumn(c: MutationColumn, pin: string | null): QueryColumn {
   const str = (x: string) => "ifNull(toString(" + x + "), '')";
   const num = (x: string) => "CAST(" + x + " AS Nullable(Float64))";
   switch (c.id) {
@@ -40,6 +57,7 @@ function queryColumn(c: MutationColumn): QueryColumn {
     // spelled as the table shows it, so search and the value list match what is on screen
     case "annotation": return { ...c, text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))", order: "drv" };
     case "proteinChange": return { ...c, text: str("proteinChange"), order: "pos" };
+    case "alteration": return { ...c, text: alterationSql(pin) };
     case "vaf": return { ...c, text: str("round(vaf, 2)"), num: num("vaf") };
     default: return c.numeric ? { ...c, text: str(c.id), num: num(c.id) } : { ...c, text: str(c.id) };
   }
@@ -104,7 +122,7 @@ export function mutationRowSource(parts: TablePart[], db: string, gene: string, 
   if (!parts.length) throw new Error("mutationRowSource needs at least one part");
   return {
     with: allRows(parts, db, gene, pin),
-    columns: MUTATION_COLUMNS.map(queryColumn),
+    columns: MUTATION_COLUMNS.map((c) => queryColumn(c, pin)),
     select: "*",
     defaultOrder: "drv DESC, pos ASC NULLS LAST",
     tiebreak: "sid, ord, proteinChange",

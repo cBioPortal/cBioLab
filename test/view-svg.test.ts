@@ -159,15 +159,21 @@ describe("the lollipop draws every codon, the way the portal's mutation tab does
     assert.ok(svg.includes(">189aa<") && svg.includes(">Ras<"));
     assert.ok(svg.includes("># KRAS Mutations<"), "the portal's y-axis label");
   });
-  test("beside the plot: transcript ids as links, somatic frequency, and the Driver/VUS badges", () => {
+  test("the figure is the plot alone; the frequency and the Driver/VUS counts travel in its caption", () => {
     const g = { ...kras(), ids: { refseq: "NM_004985", ensembl: "ENST00000311936.3", ccds: "CCDS8702", uniprotAccession: "P01116", uniprotName: "RASK_HUMAN" } };
     const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [g] } as any)!;
-    for (const id of ["NM_004985", "ENST00000311936.3", "CCDS8702", "RASK_HUMAN"]) assert.ok(svg.includes(">" + id + "</tspan></a>"), id + " is a link");
-    assert.ok(svg.includes('href="https://www.uniprot.org/uniprot/P01116"'));
-    assert.ok(svg.includes(">Somatic Mutation Frequency<") && svg.includes(">10.0%<"), "5 of 50 samples");
-    assert.ok(svg.includes(">Missense<") && svg.includes(">Truncating<") && svg.includes(">Fusion<"));
-    assert.ok(!svg.includes(">Other<"), "no Other row when nothing is 'other'");
-    assert.ok(svg.includes(">10</text>"), "10 missense driver rows");
+    assert.ok(!svg.includes("Somatic Mutation Frequency") && !svg.includes("NM_004985"), "the gene summary is the app's control, not the figure's");
+    assert.ok(!svg.includes(">Driver<") && !svg.includes(">VUS<"), "no badge grid in the figure");
+    assert.ok(svg.includes("somatic mutation frequency 10.0%"), "5 of 50 samples, in words");
+    assert.ok(svg.includes("missense 10 driver / 0 VUS"), "the tally, in words");
+  });
+  test("a hidden cell leaves its changes out of the figure, and the caption says so", () => {
+    const g = buildLollipopGene("G", [report([{ pos: 12, change: "G12D", n: 6 }, { pos: 61, change: "Q61*", n: 2, mtype: "Nonsense_Mutation" }].map((c) => c),
+      { changes: [{ gene: "G", pos: 12, change: "G12D", n: 6, rows: 6, driver: true, impact: "missense" }, { gene: "G", pos: 61, change: "Q61*", n: 2, rows: 2, driver: true, impact: "truncating" }] })],
+      { proteinLength: 189, transcriptId: "T", domains: [] });
+    const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [g], hide: ["missense.driver"] } as any)!;
+    assert.equal((svg.match(/<circle [^>]*r="2\.8"/g) || []).length, 1, "only the truncating codon is drawn");
+    assert.ok(svg.includes("Hidden: Missense · Driver") && svg.includes("drawn: 2 of 8 mutations"));
   });
   test("a codon's tooltip lists its changes with their counts", () => {
     const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [kras()] } as any)!;

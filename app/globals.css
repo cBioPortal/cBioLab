@@ -1438,3 +1438,34 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .dt-skel { display: block; height: 0.8rem; border-radius: var(--r-sm); }
 .dt-skel:nth-child(odd) { width: 70%; } .dt-skel:nth-child(even) { width: 85%; }
 
+
+/* ---- the lollipop (app/_lollipop/HotspotsBody.tsx): the plot, and beside it the gene summary and the alteration grid ---- */
+.lp { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s2); }
+.lp-banner { display: flex; align-items: center; gap: var(--s2); align-self: flex-start; padding: var(--s1) var(--s3); border-radius: var(--r-sm);
+  background: var(--ok-soft); border: 1px solid var(--ok); font-size: var(--t-sm); color: var(--ink); }
+.lp-banner .tbbtn { height: 1.4rem; font-size: var(--t-sm); }
+.lp-gene { display: flex; gap: var(--s4, 1.25rem); align-items: flex-start; flex-wrap: wrap; }
+.lp-plot { flex: 0 1 760px; min-width: 0; overflow-x: auto; }
+.lp-plot svg { max-width: 100%; height: auto; }
+.lp-side { flex: 0 0 15rem; display: flex; flex-direction: column; gap: var(--s2); font-size: var(--t-sm); padding-top: var(--s4, 1.25rem); }
+.lp-summary { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
+.lp-summary a { color: var(--accent-ink); }
+.lp-freq { display: flex; justify-content: space-between; gap: var(--s2); color: var(--ink); margin-top: var(--s1); }
+.lp-grid { border-collapse: collapse; }
+.lp-grid th, .lp-grid td { padding: 2px 4px; text-align: center; font-weight: 400; }
+.lp-grid tbody th { text-align: right; }
+.lp-grid thead th { border-bottom: 1px solid var(--line); padding-bottom: var(--s1); }
+.lp-head { display: inline-flex; align-items: center; gap: 4px; position: relative; }
+.lp-grid thead .lp-head { flex-direction: column; gap: 2px; }
+.lp-colname, .lp-rowname { border: none; background: none; padding: 0; font: inherit; font-weight: 600; cursor: pointer; color: var(--ink); }
+.lp-rowname.off { opacity: 0.45; }
+.lp-colname:hover, .lp-rowname:hover { text-decoration: underline; }
+.lp-badge { min-width: 2rem; height: 1.15rem; padding: 0 6px; border-radius: var(--r-pill); border: 1.5px solid; font-size: var(--t-xs); font-weight: 600;
+  color: #fff; background: transparent; cursor: pointer; font-variant-numeric: tabular-nums; line-height: 1; }
+.lp-badge.off { background: transparent; }
+.lp-badge:focus-visible, .lp-colname:focus-visible, .lp-rowname:focus-visible, .lp-only:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* "only" appears where the reader is: on hover of its row or column, or on keyboard focus */
+.lp-only { border: none; background: none; padding: 0 2px; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--accent-ink);
+  cursor: pointer; visibility: hidden; }
+.lp-grid tr:hover .lp-only, .lp-grid thead th:hover .lp-only, .lp-only:focus-visible { visibility: visible; }
+.lp-grid thead tr:hover th:not(:hover) .lp-only { visibility: hidden; }

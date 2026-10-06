@@ -36,6 +36,8 @@ export function withSortKeys<V extends { sort?: unknown }>(v: V, keys: string[])
 
 /** the view without what the figure applies in the browser — what decides whether a re-run is needed */
 export function dataPart(v: Record<string, unknown>): Record<string, unknown> {
+  // the lollipop's alteration grid is applied in the browser, from the whole result
+  if (v.kind === "hotspots") { const { hide, ...rest } = v; void hide; return rest; }
   if (v.kind !== "oncoprint") return v;
   const { sort, display, ...rest } = v;
   void sort;

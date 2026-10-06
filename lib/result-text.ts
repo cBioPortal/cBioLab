@@ -3,6 +3,7 @@
 // surface — the MCP run_analysis tool, the analysis page's WebMCP tools — so they cannot
 // describe the same result differently. Pure and browser-safe.
 import type { AnalysisDoc, AnalysisResult, ViewResult, AssaysEntity, CorrelatesGene } from "./types.ts";
+import { lollipopSummaryText } from "./lollipop-svg.ts";
 
 export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[] {
   const out: string[] = [];
@@ -127,6 +128,7 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
           (g.topChanges.slice(0, 6).map((x) => `${x.change} ${x.n.toLocaleString()} (${x.pct}%)`).join(", ") || "no change above the floor") +
           (g.unpositioned ? `  [${g.unpositioned.toLocaleString()} with no protein position, not drawn]` : "") +
           (g.withheld ? `  [${g.withheld.toLocaleString()} below the suppression floor]` : "")).join("\n") +
+        "\n  " + lollipopSummaryText(v.hotspots || [], v.hide || []) +
         caveatOf(v) + noteOf(v));
     } else if (v.kind === "course") {
       const axis = v.courseAxis;

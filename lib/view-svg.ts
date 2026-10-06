@@ -18,7 +18,9 @@
 // inlined in the app follows the page theme while the same string rasterised
 // for a chat gets a fixed light figure.
 import { categoryColor, isAbsent, jitterFor } from "./plot.ts";
-import { IMPACT_COLORS } from "./lollipop.ts";
+import { filterHotspotGene } from "./lollipop.ts";
+import { lollipopPanelsSvg, lollipopSummaryText } from "./lollipop-svg.ts";
+export { lollipopSummaryText };
 import { survivalAxis } from "./stats.ts";
 import type { ViewResult, KmCurve, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind, PlotData } from "./types.ts";
 import { moreViewToSvg, moreViewTitle } from "./view-svg-more.ts";
@@ -69,143 +71,12 @@ function survivalSvg(v: ViewResult, o: SvgOpts): string {
   return frame(W, H, out.join(""), p.bg);
 }
 
-/**
- * The panel beside a lollipop: the portal's GeneSummary (RefSeq | Ensembl, CCDS | UniProt, each
- * a link) with its somatic mutation frequency, then the Driver/VUS badges by protein impact type,
- * a total row first. "Other" (silent, unknown types) only appears when there is some, so a
- * mutation the five portal rows don't cover still shows up in the tally.
- */
-function geneSummary(g: HotspotGene, x0: number, y0: number, freq: number | null, p: ReturnType<typeof palette>): string {
-  const LINK = "#337ab7", COL_D = x0 + 122, COL_V = x0 + 174;
-  const out: string[] = [];
-  // one <text> per pair with the links inline, so the browser spaces "A | B" itself
-  const part = (text: string | undefined, href: string) => text
-    ? `<a href="${esc(href)}" target="_blank" rel="noreferrer"><tspan fill="${LINK}">${esc(text)}</tspan></a>` : `<tspan>-</tspan>`;
-  const ids = g.ids || {};
-  const pair = (y: number, a: string | undefined, aHref: string, b: string | undefined, bHref: string) =>
-    out.push(`<text x="${x0}" y="${y}" font-size="11" fill="${p.muted}">${part(a, aHref)}<tspan> | </tspan>${part(b, bHref)}</text>`);
-  pair(y0, ids.refseq, "https://www.ncbi.nlm.nih.gov/nuccore/" + (ids.refseq || ""),
-    ids.ensembl, "https://grch37.ensembl.org/homo_sapiens/Transcript/Summary?t=" + (ids.ensembl || "").replace(/\.\d+$/, ""));
-  pair(y0 + 16, ids.ccds, "https://www.ncbi.nlm.nih.gov/CCDS/CcdsBrowse.cgi?REQUEST=CCDS&DATA=" + (ids.ccds || ""),
-    ids.uniprotName || ids.uniprotAccession, "https://www.uniprot.org/uniprot/" + (ids.uniprotAccession || ""));
-  out.push(`<text x="${x0}" y="${y0 + 36}" font-size="11" fill="${p.ink}">Somatic Mutation Frequency</text>` +
-    `<text x="${COL_V + 16}" y="${y0 + 36}" font-size="11" font-weight="600" fill="${p.ink}" text-anchor="end">${freq == null ? "—" : freq.toFixed(1) + "%"}</text>`);
-  out.push(`<text x="${COL_D}" y="${y0 + 56}" font-size="11" font-weight="600" fill="${p.ink}" text-anchor="middle">Driver</text>` +
-    `<text x="${COL_V}" y="${y0 + 56}" font-size="11" font-weight="600" fill="${p.ink}" text-anchor="middle">VUS</text>`);
-  const badge = (cx: number, cy: number, n: number, fill: string) => {
-    const t = fmt(n), w = Math.max(18, 8 + t.length * 6.2);
-    return `<rect x="${num(cx - w / 2)}" y="${cy - 8}" width="${num(w)}" height="16" rx="8" fill="${fill}"/>` +
-      `<text x="${num(cx)}" y="${cy + 3.5}" font-size="10" font-weight="600" fill="#ffffff" text-anchor="middle">${t}</text>`;
-  };
-  const kinds = ["missense", "truncating", "inframe", "splice", "fusion", "other"] as const;
-  const total = kinds.reduce((a, k) => ({ driver: a.driver + g.tally[k].driver, vus: a.vus + g.tally[k].vus }), { driver: 0, vus: 0 });
-  out.push(badge(COL_D, y0 + 72, total.driver, "#000000"), badge(COL_V, y0 + 72, total.vus, "#696969"),
-    `<line x1="${x0 + 60}" y1="${y0 + 84}" x2="${COL_V + 22}" y2="${y0 + 84}" stroke="${p.line}"/>`);
-  let y = y0 + 100;
-  for (const k of kinds) {
-    const c = IMPACT_COLORS[k], t = g.tally[k];
-    if (k === "other" && !t.driver && !t.vus) continue;
-    out.push(`<text x="${COL_D - 29}" y="${y + 4}" font-size="11" font-weight="600" fill="${k === "truncating" ? p.ink : c.driver}" text-anchor="end">${c.label}</text>`,
-      badge(COL_D, y, t.driver, c.driver), badge(COL_V, y, t.vus, c.vus));
-    y += 20;
-  }
-  return out.join("");
-}
-
-/**
- * The lollipop, drawn as cBioPortal's results-page mutation tab draws it (react-mutation-mapper's
- * LollipopPlotNoTooltip / LollipopMutationPlot): a protein backbone with its Pfam domains, one
- * grey stem per codon topped by a 2.8px head in the codon's colour, a linear y axis of
- * "# GENE Mutations" whose max is at least 5, and one label on the tallest stem. What the rules
- * decide lives in lib/lollipop.ts; this only places it.
- */
+/** The lollipop standing alone (an MCP client's image): the selection applied, the app's controls in words in the caption. */
 function hotspotsSvg(v: ViewResult, o: SvgOpts): string {
-  const p = palette(o.theme), W = o.width || 720;
-  const genes = (v.hotspots || []) as HotspotGene[];
-  // the portal's gene summary sits to the right of the plot: transcript ids, somatic mutation
-  // frequency, and the Driver/VUS badge tally by mutation type (GeneSummary + its badge selector)
-  const SIDE = 200;
-  const L = 56, R = 16 + SIDE, plotW = W - L - R;
-  const STEM = 160, LABEL_ROOM = 20, BACKBONE = 14, DOMAIN = 24, STICK = "#BABDB6";
-  const PANEL = 22 + LABEL_ROOM + STEM + DOMAIN + 40 + 18;
-  const out: string[] = [];
-  genes.forEach((g, gi) => {
-    const top = 8 + gi * PANEL;
-    const len = Math.max(1, g.proteinLength);
-    const x = (pos: number) => L + plotW * Math.min(pos, len) / len;
-    const yTop = top + 22 + LABEL_ROOM, yBase = yTop + STEM;
-    const maxN = Math.max(0, ...g.positions.map((q) => q.n));
-    const yMax = Math.max(5, maxN);
-    const freq = g.cohortSamples ? Math.round(1000 * g.somaticSamples / g.cohortSamples) / 10 : null;
-    out.push(`<text x="8" y="${top + 12}" font-size="12" font-weight="600" fill="${p.ink}">${esc(g.gene)}</text>` +
-      `<text x="${8 + g.gene.length * 8 + 10}" y="${top + 12}" font-size="10" fill="${p.muted}">` +
-      esc(fmt(g.mutations) + " mutations · " + fmt(g.mutated) + " mutated patients" +
-        (g.lengthSource === "genome-nexus" ? "" : " · length unknown — axis runs to codon " + len)) + `</text>`);
-    out.push(geneSummary(g, W - SIDE + 6, yTop - 12, freq, p));
-
-    // y axis: ticks at 0 and max labelled; unlabelled ones between at the first step giving < 9 intervals
-    const stepY = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000].find((st) => yMax / st < 9) ?? Math.ceil(yMax / 8);
-    const yAt = (n: number) => yBase - STEM * Math.min(1, n / yMax);
-    out.push(`<line x1="${L - 6}" y1="${yTop}" x2="${L - 6}" y2="${yBase}" stroke="${p.muted}" stroke-width="1"/>`);
-    for (let t = 0; t <= yMax; t += stepY) out.push(`<line x1="${L - 10}" y1="${num(yAt(t))}" x2="${L - 6}" y2="${num(yAt(t))}" stroke="${p.muted}"/>`);
-    out.push(`<text x="${L - 12}" y="${num(yAt(0) + 3)}" font-size="10" fill="${p.muted}" text-anchor="end">0</text>`,
-      `<text x="${L - 12}" y="${num(yAt(yMax) + 3)}" font-size="10" fill="${p.muted}" text-anchor="end">${fmt(yMax)}</text>`,
-      `<text x="14" y="${num((yTop + yBase) / 2)}" font-size="10" fill="${p.muted}" text-anchor="middle" ` +
-      `transform="rotate(-90 14 ${num((yTop + yBase) / 2)})"># ${esc(g.gene)} Mutations</text>`);
-
-    // backbone and domains
-    const bbY = yBase + (DOMAIN - BACKBONE) / 2;
-    out.push(`<rect x="${L}" y="${num(bbY)}" width="${num(plotW)}" height="${BACKBONE}" fill="${STICK}"/>`);
-    for (const d of g.domains) {
-      const dx = x(d.start), dw = Math.max(2, x(d.end) - x(d.start));
-      const fit = Math.floor(dw / 6);
-      const name = d.name.length <= fit ? d.name : fit > 2 ? d.name.slice(0, fit - 2) + ".." : "";
-      out.push(`<g><title>${esc(d.name + " (" + d.accession + "): " + d.start + "–" + d.end)}</title>` +
-        `<rect x="${num(dx)}" y="${yBase}" width="${num(dw)}" height="${DOMAIN}" fill="${d.color}"/>` +
-        (name ? `<text x="${num(dx + dw / 2)}" y="${yBase + DOMAIN / 2 + 3.5}" font-size="10" fill="#ffffff" text-anchor="middle">${esc(name)}</text>` : "") + `</g>`);
-    }
-
-    // x axis: ticks at the first interval giving < 15, labels at even multiples, 0 and "<len>aa" always
-    const stepX = [50, 100, 200, 250, 500, 1000, 2500, 5000, 10000, 25000].find((st) => len / st < 15) ?? 50000;
-    const axY = yBase + DOMAIN + 6;
-    const tick = (pos: number, label: string | null) => out.push(`<line x1="${num(x(pos))}" y1="${axY}" x2="${num(x(pos))}" y2="${axY + 4}" stroke="${p.muted}"/>` +
-      (label != null ? `<text x="${num(x(pos))}" y="${axY + 15}" font-size="10" fill="${p.muted}" text-anchor="middle">${label}</text>` : ""));
-    tick(0, "0");
-    for (let t = stepX, k = 1; t < len; t += stepX, k++) tick(t, k % 2 === 0 && len - t > (2 / 3) * stepX ? String(t) : null);
-    tick(len, len + "aa");
-
-    // stems, heads, tooltips
-    for (const q of g.positions) {
-      const cx = x(q.pos), cy = yAt(q.n);
-      const tip = "codon " + q.pos + ": " + fmt(q.n) + " mutation" + (q.n === 1 ? "" : "s") + "\n" +
-        q.changes.slice(0, 12).map((c) => c.change + " " + fmt(c.n)).join("\n") +
-        (q.changes.length > 12 ? "\n…and " + (q.changes.length - 12) + " more" : "");
-      out.push(`<g><title>${esc(tip)}</title>` +
-        `<line x1="${num(cx)}" y1="${yBase}" x2="${num(cx)}" y2="${num(cy)}" stroke="${STICK}" stroke-width="1"/>` +
-        `<circle class="lollipop-head" cx="${num(cx)}" cy="${num(cy)}" r="2.8" fill="${q.color}"/></g>`);
-    }
-    if (g.label) {
-      const lq = g.positions.find((q) => q.pos === g.label!.pos);
-      if (lq) {
-        const lx = x(lq.pos), half = g.label.text.length * 2.9;
-        const anchor = lx - half < L ? "start" : lx + half > W - R ? "end" : "middle";
-        out.push(`<text x="${num(lx)}" y="${num(yAt(lq.n) - 7)}" font-size="10" font-family="Arial,sans-serif" fill="${p.ink}" text-anchor="${anchor}">${esc(g.label.text)}</text>`);
-      }
-    }
-
-    // legend: the colours this gene actually uses
-    const used = new Map<string, string>();
-    for (const q of g.positions) used.set(q.color, (IMPACT_COLORS as any)[q.impact].label + (q.driver ? "" : " (VUS)"));
-    let lx = L;
-    const ly = axY + 32;
-    for (const [color, label] of used) {
-      out.push(`<circle cx="${lx + 4}" cy="${ly - 3}" r="3.5" fill="${color}"/><text x="${lx + 11}" y="${ly}" font-size="9" fill="${p.muted}">${esc(label)}</text>`);
-      lx += 22 + label.length * 5.4;
-    }
-  });
-  const H = 8 + genes.length * PANEL;
-  const cap = caption(v.note || "", W, H, p.muted);
-  return frame(W, H + cap.height + 10, out.join("") + cap.svg, p.bg);
+  const hide = (v.hide || []) as string[];
+  const all = (v.hotspots || []) as HotspotGene[];
+  return lollipopPanelsSvg(all.map((g) => filterHotspotGene(g, hide).gene), o,
+    [v.note || "", lollipopSummaryText(all, hide)].filter(Boolean).join(" "));
 }
 
 /** Shared horizontal-bar figure: label, bar, value. */

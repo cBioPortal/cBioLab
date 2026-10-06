@@ -19,7 +19,7 @@ import { fisherExact, kaplanMeier, logRank, logRankK, benjaminiHochberg, cochran
   applyCutoff, toIncidence, coxRegression, logisticRegression, mannWhitneyU, kruskalWallis, quantilesFromHistogram,
   type Moments, type CoxRow, type LogisticRow } from "./stats.ts";
 import { contractToSvg } from "./oncoprint-svg.ts";
-import { buildLollipopGene, fetchProteinInfo } from "./lollipop.ts";
+import { buildLollipopGene, fetchProteinInfo, checkHide } from "./lollipop.ts";
 import { viewToSvg, RISK_FLOOR as COURSE_RISK_FLOOR } from "./view-svg.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, CompareRow, CompareCell, ChRow, OncoprintView, CompareView, LogRank, LogRankK, CooccurrenceView, CooccurRow, ClinicalView, ClinicalRow, SurvivalView, CoexpressionView, CoexprRow, HotspotsView, HotspotGene, ZReference, ViewParticipation, CourseView, CourseSeries, CoursePoint, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind, TemplateDoc, CoxView, CoxCoefficient, CoxCovariate, LogisticView, LogisticCoefficient, SplitBy } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
@@ -1511,6 +1511,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       if (!uniq.length) { views.push({ kind: "hotspots", error: "hotspots view needs genes" }); continue; }
       { const e = overLimit("a hotspots view", 12, uniq.length); if (e) { views.push({ kind: "hotspots", error: e.replace("at most 12", "at most 12 genes") }); continue; } }
       const minCount = Math.max(1, Math.min(1000, Math.floor(Number(hv.minCount) || 1)));
+      { const e = checkHide(hv.hide); if (e) { views.push({ kind: "hotspots", error: e }); continue; } }
+      const hide = [...new Set(hv.hide || [])];
       const cn = vNames[0];
       const studies = cohorts[cn].studies;
       // the sites' counts and the proteins (length, Pfam domains) are independent, so both at once
@@ -1525,7 +1527,9 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       const withheld = hotspots.reduce((n, h) => n + h.withheld, 0);
       const observed = hotspots.filter((h) => h.lengthSource === "observed").map((h) => h.gene);
       const annotated = reports.every((r) => r.annotated);
-      const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies,
+      // the figure and the text apply the selection (lib/view-svg.ts lollipopSummaryText says what it hides);
+      // `hotspots` stays whole, so the app re-filters it without a re-run
+      const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(hide.length ? { hide } : {}),
         participation: participationFor(studies, false),
         note: "Mutations in “" + cn + "” by protein position, as cBioPortal's mutation tab draws them: one stem per codon" +
           " (the stored protein start position), its height the number of distinct patient + protein change pairs there." +
