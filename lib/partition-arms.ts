@@ -233,26 +233,50 @@ export function renamePartitionChild<D extends { partitions?: Record<string, Par
 export interface PartitionShape { name: string; of: string; comparable: string[] }
 
 /**
- * A split replaces what it splits. In a view's cohort list, a cohort that has been split stands
- * for its arms and remainder (its not-evaluable children are disclosed, not compared), and so
- * does the partition's own name; an arm that is split further stands for ITS arms, and so on.
- * The leaves of a split tree are still disjoint and still add up to the cohort. If one cohort
- * has two splits, the first declared is the one a view shows. Used by the engine and by the
- * page's cohort pickers alike, so the two cannot disagree.
+ * What a view's cohort list draws. A cohort's name is that whole cohort, split or not; a split's
+ * name ("<cohort> / <split>") is its arms and remainder (its not-evaluable children are disclosed
+ * in the split, not compared); an arm's name is that arm. Each view chooses for itself, so one
+ * view can show a cohort while another shows its split. Used by the engine and by the page's
+ * cohort pickers alike, so the two cannot disagree.
  */
 export function expandSplits(names: string[], parts: PartitionShape[]): string[] {
   const byName = new Map(parts.map((p) => [p.name, p]));
-  const byOf = new Map<string, PartitionShape>();
-  for (const p of parts) if (!byOf.has(p.of)) byOf.set(p.of, p);
-  const out: string[] = [];
-  const visit = (n: string, seen: Set<string>) => {
-    const p = byName.get(n) || byOf.get(n);
-    if (!p || seen.has(p.name)) { out.push(n); return; }
-    const next = new Set(seen).add(p.name);
-    for (const c of p.comparable) visit(c, next);
-  };
-  for (const n of names) visit(n, new Set());
+  const out = names.flatMap((n) => byName.get(n)?.comparable ?? [n]);
   return out.filter((n, i) => out.indexOf(n) === i);
+}
+
+/**
+ * The splits a view's cohort list draws from: a split's own name counts as that split, a group's
+ * name as the split it belongs to (the deepest split whose name prefixes it); a whole cohort counts
+ * as none. A view may draw from at most one split — groups of two splits, even of different
+ * cohorts, are two separate comparisons, and two splits of one cohort count every patient twice.
+ */
+export function splitsDrawn(names: string[], parts: PartitionShape[]): string[] {
+  const owners = names.map((n) => {
+    if (parts.some((p) => p.name === n)) return n;
+    const under = parts.filter((p) => n.startsWith(p.name + " / ")).sort((a, b) => b.name.length - a.name.length);
+    return under[0]?.name ?? null;
+  }).filter((x): x is string => !!x);
+  return owners.filter((n, i) => owners.indexOf(n) === i);
+}
+
+/**
+ * Why a view's cohort list cannot be drawn, or null. A view draws EITHER whole cohorts OR the groups
+ * of one split: two splits count patients twice or ask two questions at once, and a whole cohort
+ * beside a split's groups can share their patients (EGFR-mutant NSCLC is partly inside NSCLC's
+ * "KRAS wild-type").
+ */
+export function viewDrawProblem(names: string[], parts: PartitionShape[]): string | null {
+  const splits = splitsDrawn(names, parts);
+  if (splits.length > 1)
+    return "a view draws the groups of one split; this one names " + splits.map((n) => "“" + n + "”").join(" and ") + " — choose one";
+  if (splits.length === 1) {
+    const whole = names.filter((n) => splitsDrawn([n], parts).length === 0);
+    if (whole.length)
+      return "a view draws whole cohorts or the groups of one split, not both; this one names " +
+        whole.map((n) => "“" + n + "”").join(", ") + " beside “" + splits[0] + "” — choose one";
+  }
+  return null;
 }
 
 // ---- the split tree (stored on cohorts) and its flat working form ---------------------------

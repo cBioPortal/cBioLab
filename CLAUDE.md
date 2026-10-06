@@ -88,7 +88,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   must be decidable first (OQL → profiled for that gene and type, panel-aware; clinical → a value is
   recorded), else the patient goes to a named "Not profiled" / "No … recorded" child, never to
   wild-type or Other. `runAnalysis` counts every child and reports `result.splits[...].conserved`; a
-  split replaces what it splits in every view (`expandSplits`). `proposePartition`
+  view's `cohorts` chooses what it draws (`expandSplits`): a cohort's name is the whole cohort, a
+  split's name its arms, an arm's name that arm. `proposePartition`
   (`POST /api/partition`) writes arms from the data as explicit clauses, so the document alone decides
   the children. UI: `app/lab/partitions.tsx`, the cohort card's menu, Explore charts' menus.
 - **Document versions** — **`lib/doc-version.ts`** is THE place an older document is brought up to

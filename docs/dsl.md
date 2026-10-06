@@ -1,6 +1,6 @@
 <!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.ts; regenerate with `npm run docs:gen`. -->
 
-# cbio-lab DSL (v2.3)
+# cbio-lab DSL (v2.4)
 
 One declarative JSON object — the **Analysis document** — describes everything cbio-lab does:
 which patients form each cohort, and which views compare them. The server compiles it to
@@ -11,7 +11,7 @@ SQL each cohort compiled to.
 ## Analysis document
 
 ```
-{ "dsl":     "2.3",                         // the document's version; see "Versions" below
+{ "dsl":     "2.4",                         // the document's version; see "Versions" below
   "study":   "<default study id>",            // validated against cancer_study
   "cohorts": { "<name>": cohortDef, ... },    // max 16
   "views":   [ view, ... ],                   // max 6
@@ -70,12 +70,15 @@ recorded value. Patients failing that go to a child named `"Not profiled: <GENE>
 
 Each child is an ordinary cohort named `"<cohort> / <split> / <arm>"` (an arm split again: `"NSCLC /
 KRAS allele / G12C / sex / Female"`), usable anywhere a cohort name is, with its own readback and
-SQL; a split itself is addressed as `"<cohort> / <split>"`. **A split
-replaces what it splits** in every view: wherever a view would show a split cohort — named in its
-`cohorts`, or shown by default because it names none — it shows that split's arms and remainder
-instead (not its not-evaluable children), and an arm that is split further shows ITS arms, so the
-leaves still add up to the cohort. Naming the split does the same; naming one child shows just
-that child. If one cohort has two splits, views show the first declared. The result's
+SQL; a split itself is addressed as `"<cohort> / <split>"`. **Each view chooses what it draws**:
+in a view's `cohorts`, a cohort's name is that whole cohort, split or not; a split's name is its arms
+and remainder (not its not-evaluable children, which the split discloses); an arm's name is that arm,
+whole, even if it is split further. So one view can show NSCLC while another shows "NSCLC / KRAS
+allele". A view draws **either whole cohorts or the groups of one split, never a mix and never two
+splits** — two splits of one cohort count every patient twice, groups of two splits are two
+comparisons in one, and a whole cohort beside a split's groups can share their patients — and a view
+naming such a list is refused, naming what clashes. A view with no `cohorts` shows the authored
+cohorts, whole. A cohort may have several splits; each view picks at most one. The result's
 `splits` gives every child's count and checks the sum against the parent's (`conserved`).
 Conditions the engine cannot check evaluability for (expression, assay values, timeline events,
 derived metrics) are listed in `unchecked`: their patients with no data count as not matching.
@@ -83,11 +86,13 @@ Up to 16 authored cohorts and 48 cohorts in all, children included. Expanded bef
 each child `extends` its parent and runs in the parent's studies. (Not to be confused with the
 `{"kind":"split"}` leaf below, which selects the engine's fixed discovery or validation half.)
 
-**Versions.** A document carries `"dsl": "2.3"`. One written for an older version is
+**Versions.** A document carries `"dsl": "2.4"`. One written for an older version is
 upgraded when it is read — the result's `upgraded` says from which version and what changed
 (2.2 → 2.3 moved top-level `partitions` onto the cohorts they split as `splits`, and renamed
 their children from `"<partition> / <arm>"` to `"<cohort> / <partition> / <arm>"`, views
-included) — and saving it writes the new version. One with no `dsl` is read the same way, so
+included; 2.3 → 2.4 ended "a split replaces what it splits" — a view that drew a split cohort's arms
+under 2.3 is given those arms by name, so it draws the same thing) — and saving it writes the new
+version. One with no `dsl` is read the same way, so
 leaving it out is harmless. One written for a NEWER version than the server reads is refused,
 rather than silently ignoring what it does not understand.
 

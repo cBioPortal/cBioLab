@@ -45,15 +45,46 @@ describe("upgradeDocument", () => {
     assert.deepEqual(split.arms.map((a: any) => a.name), ["G12C", "other KRAS"]);
     assert.deepEqual(Object.keys(split.arms[0].splits), ["G12C by sex"]);
     assert.deepEqual(Object.keys(split.otherSplits), ["rest by sex"]);
+    // both views drew leaves under the old "a split replaces what it splits" rule; 2.4 lists them
     assert.deepEqual(doc.views.map((v: any) => v.cohorts), [
-      ["NSCLC / KRAS allele"],
-      ["NSCLC / KRAS allele / G12C", "NSCLC / KRAS allele / G12C / G12C by sex / F"]
+      ["NSCLC / KRAS allele / G12C / G12C by sex / F", "NSCLC / KRAS allele / G12C / G12C by sex / Other",
+       "NSCLC / KRAS allele / other KRAS",
+       "NSCLC / KRAS allele / wild-type / rest by sex / F", "NSCLC / KRAS allele / wild-type / rest by sex / Other"],
+      ["NSCLC / KRAS allele / G12C / G12C by sex / F", "NSCLC / KRAS allele / G12C / G12C by sex / Other"]
     ]);
+    assert.match(upgrade.changes[1], /2 views that drew a split cohort's arms now list them/);
+    // view 1 drew groups of three splits (the nested ones included), which 2.4 refuses — said, not
+    // hidden; view 2 draws only the nested "G12C by sex" split's groups, which is fine
+    assert.match(upgrade.changes[2], /^view 1 drew whole cohorts beside a split's groups, or the groups of several splits/);
     // nothing the old document said is lost: the flat form is the same splits, re-addressed
     const flat = flattenSplits(doc.cohorts);
     assert.deepEqual(Object.keys(flat).sort(), [
       "NSCLC / KRAS allele", "NSCLC / KRAS allele / G12C / G12C by sex", "NSCLC / KRAS allele / wild-type / rest by sex"
     ]);
+  });
+
+  test("2.3 → 2.4: a view that drew a split cohort's arms keeps drawing them, by name", () => {
+    const d23 = { dsl: "2.3",
+      cohorts: { EGFR: { all: [] }, KRAS: { all: [], splits: { allele: { arms: [{ name: "G12C", where: g12c }] } } } },
+      views: [{ kind: "survival" }, { kind: "compare", cohorts: ["KRAS"] }, { kind: "clinical", cohorts: ["EGFR"] }, { kind: "cox", cohorts: ["KRAS / allele"] }] };
+    const { doc, upgrade } = upgradeDocument(d23) as any;
+    assert.equal(doc.dsl, "2.4");
+    assert.deepEqual(doc.views.map((v: any) => v.cohorts), [
+      ["EGFR", "KRAS / allele / G12C", "KRAS / allele / Other"],   // default list: KRAS was drawn as its arms
+      ["KRAS / allele / G12C", "KRAS / allele / Other"],
+      ["EGFR"],                                                     // unchanged: nothing split
+      ["KRAS / allele"]                                             // unchanged: a split's name means the same
+    ]);
+    assert.equal(upgrade.changes[0], "2 views that drew a split cohort's arms now list them by name, since a cohort's name now means the whole cohort");
+    // view 1 drew EGFR whole beside KRAS's arms, which a 2.4 view does not — the note names it
+    assert.match(upgrade.changes[1], /^view 1 drew whole cohorts beside a split's groups/);
+  });
+
+  test("a 2.3 document without splits upgrades with nothing to report", () => {
+    const { doc, upgrade } = upgradeDocument({ dsl: "2.3", cohorts: { A: { all: [] } }, views: [{ kind: "survival" }] }) as any;
+    assert.equal(doc.dsl, "2.4");
+    assert.deepEqual(upgrade.changes, []);
+    assert.deepEqual(doc.views, [{ kind: "survival" }]);
   });
 
   test("a document for a newer version is refused, naming both versions", () => {

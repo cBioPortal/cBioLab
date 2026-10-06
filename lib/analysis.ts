@@ -33,7 +33,7 @@ import { canonicalEventName, foldEventNames, foldNote } from "./event-names.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } from "./cohort-partitions.ts";
-import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, flattenSplits, withoutSplitTrees, splitKey } from "./partition-arms.ts";
+import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey } from "./partition-arms.ts";
 import { upgradeDocument } from "./doc-version.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { runMoreView, isMoreViewKind } from "./views-more.ts";
@@ -466,10 +466,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         continue;
       }
     } else {
-      // With no cohorts named a view shows the authored ones; either way a split replaces what it
-      // splits (expandSplits), so splitting a cohort changes every view that shows it.
-      vNames = expandSplits(view.cohorts && view.cohorts.length ? view.cohorts : names.filter((n) => !generatedNames.has(n)), partitionShapes)
-        .filter((n) => cohorts[n]);
+      // With no cohorts named a view shows the authored ones, whole; a split's name in the list
+      // stands for its arms (expandSplits)
+      const listed = view.cohorts && view.cohorts.length ? view.cohorts : names.filter((n) => !generatedNames.has(n));
+      const problem = viewDrawProblem(listed, partitionShapes);
+      if (problem) { views.push({ kind: view.kind, error: problem }); continue; }
+      vNames = expandSplits(listed, partitionShapes).filter((n) => cohorts[n]);
     }
     const vStudies = [...new Set(vNames.flatMap((n) => cohorts[n].studies))];
     const mark = queryMark(), pushedBefore = views.length, viewT0 = Date.now();
