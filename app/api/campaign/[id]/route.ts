@@ -4,15 +4,18 @@
 // assistant in the browser (WebMCP / window.cohortLab), an MCP client, or pasted JSON.
 import {
   getCampaign, addHypotheses, removeHypothesis, lockCampaign, runCampaign, funnel, priorTests,
-  checkFeasibility, reportText
+  checkFeasibility, reportText, requireCampaignAccess
 } from "../../../../lib/campaign.ts";
 import { cachedAnalysis } from "../../../../lib/next-cache.ts";
+import { AccessError } from "../../../../lib/auth.ts";
 import type { AnalysisDoc } from "../../../../lib/types.ts";
 
 export const maxDuration = 300;
 
 const run = (d: AnalysisDoc) => cachedAnalysis(d);
-const fail = (e: unknown, status = 400) => Response.json({ error: String((e as Error)?.message || e) }, { status });
+const fail = (e: unknown, status = 400) =>
+  Response.json({ error: String((e as Error)?.message || e) }, { status: e instanceof AccessError ? e.status : status });
+
 
 async function view(id: string) {
   const c = await getCampaign(id);
@@ -35,6 +38,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let body: any;
   try { body = await req.json(); } catch { return fail("body must be JSON"); }
   try {
+    requireCampaignAccess(req, body.action);
     const c = await getCampaign(id);
     let note: unknown = null;
     if (body.action === "add") {

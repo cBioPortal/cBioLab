@@ -14,11 +14,26 @@
 // referee, and a referee that could be talked into anything would be worthless.
 import { createHash } from "node:crypto";
 import { dbQuery } from "./db.ts";
+import { requirePrincipal } from "./auth.ts";
 import {
   DEFAULT_PLAN, extractPrimary, testIdentity, primaryCohorts, pinCohortOrder, replicated, scoreDiscovery,
   validateHypothesis, withSplit, type Hypothesis, type Outcome, type Plan, type Verdict
 } from "./hypothesis.ts";
 import type { AnalysisDoc, AnalysisResult } from "./types.ts";
+
+/** The campaign actions that change the record, and what each is called in a refusal. */
+const CAMPAIGN_CHANGES: Record<string, string> = {
+  add: "register hypotheses", remove: "remove a hypothesis", lock: "lock a campaign", run: "run a campaign",
+};
+/**
+ * Changing a campaign needs the login (lib/auth.ts); reading one does not, and neither does
+ * `check`, which only runs a feasibility analysis, as /api/analysis does for anyone. Throws an
+ * AccessError naming what was refused.
+ */
+export function requireCampaignAccess(req: Request, action: unknown): void {
+  const what = typeof action === "string" ? CAMPAIGN_CHANGES[action] : undefined;
+  if (what) requirePrincipal(req, what);
+}
 
 export type Run = (doc: AnalysisDoc) => Promise<AnalysisResult>;
 

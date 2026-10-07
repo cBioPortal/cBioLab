@@ -3,7 +3,7 @@
 // deployment's password (LOGIN_PASSWORD), which unlocks saved cohorts, analyses and custom data. Shown
 // only where the deployment has set one.
 import { useEffect, useRef, useState } from "react";
-import { logIn, logOut, onLoginRequest } from "./custom-data-client.ts";
+import { loadCustomData, logIn, logOut, onLoginRequest } from "./custom-data-client.ts";
 import { useCustomDataState } from "./custom-data-panel.tsx";
 
 export default function LoginButton() {
@@ -13,7 +13,8 @@ export default function LoginButton() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const open = () => { setErr(null); setPassword(""); ref.current?.showModal(); };
-  useEffect(() => onLoginRequest(open), []);
+  // whether this deployment has a login, and whether this browser is in (once per page)
+  useEffect(() => { loadCustomData(); return onLoginRequest(open); }, []);
   if (!server.enabled) return null;
 
   const submit = async () => {
