@@ -2,7 +2,8 @@
 // is request-time work, so under Cache Components it streams inside a Suspense boundary (it is
 // part of the same response; nothing is fetched separately).
 import { Suspense } from "react";
+import { LabProviders } from "./providers.tsx";
 
 export default function LabLayout({ children }: { children: React.ReactNode }) {
-  return <Suspense>{children}</Suspense>;
+  return <LabProviders><Suspense>{children}</Suspense></LabProviders>;
 }

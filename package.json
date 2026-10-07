@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
+    "@tanstack/react-query": "^5.104.1",
     "express": "^5.2.1",
     "marked": "^18.0.11",
     "mcp-handler": "^1.1.0",

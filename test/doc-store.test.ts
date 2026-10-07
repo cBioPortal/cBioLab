@@ -50,6 +50,12 @@ describe("view ids", () => {
     }
     assert.equal(s.text, JSON.stringify(s.doc, null, 2));
   });
+  test("only a different document starts a new epoch", () => {
+    const s = start();
+    assert.equal(setDoc(s, doc([a, c])).epoch, s.epoch);
+    assert.equal(commitDoc(s, doc([a])).epoch, s.epoch);
+    assert.equal(replaceDoc(s, doc([a])).epoch, s.epoch + 1);
+  });
   test("the same object twice in a list gets two ids", () => {
     const s = initialDocState(doc([a, a]));
     const t = setDoc(s, doc([a, a, b]));

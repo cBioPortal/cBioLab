@@ -18,14 +18,15 @@
 import { useRef, useState } from "react";
 import type { AnalysisDoc } from "../../lib/types.ts";
 
-export interface DocState { doc: AnalysisDoc; ids: number[]; text: string; nextId: number }
+/** `epoch` counts replace()s: a different document, whose numbers must never stand in for this one's */
+export interface DocState { doc: AnalysisDoc; ids: number[]; text: string; nextId: number; epoch: number }
 
 const views = (d: AnalysisDoc): unknown[] => (d.views || []) as unknown[];
 const textOf = (d: AnalysisDoc) => JSON.stringify(d, null, 2);
 
 export function initialDocState(doc: AnalysisDoc): DocState {
   const n = views(doc).length;
-  return { doc, ids: Array.from({ length: n }, (_, i) => i), text: textOf(doc), nextId: n };
+  return { doc, ids: Array.from({ length: n }, (_, i) => i), text: textOf(doc), nextId: n, epoch: 0 };
 }
 
 /** Ids for an edit: the same object keeps its id; otherwise, in a list of unchanged length, the position's. */
@@ -61,12 +62,12 @@ export function matchIds(s: DocState, d: AnalysisDoc): { ids: number[]; nextId: 
   return { ids, nextId };
 }
 
-export function setDoc(s: DocState, d: AnalysisDoc): DocState { return { doc: d, ...alignIds(s, d), text: textOf(d) }; }
+export function setDoc(s: DocState, d: AnalysisDoc): DocState { return { ...s, doc: d, ...alignIds(s, d), text: textOf(d) }; }
 export function replaceDoc(s: DocState, d: AnalysisDoc): DocState {
   const n = views(d).length;
-  return { doc: d, ids: Array.from({ length: n }, (_, i) => s.nextId + i), text: textOf(d), nextId: s.nextId + n };
+  return { doc: d, ids: Array.from({ length: n }, (_, i) => s.nextId + i), text: textOf(d), nextId: s.nextId + n, epoch: s.epoch + 1 };
 }
-export function commitDoc(s: DocState, d: AnalysisDoc): DocState { return { doc: d, ...matchIds(s, d), text: textOf(d) }; }
+export function commitDoc(s: DocState, d: AnalysisDoc): DocState { return { ...s, doc: d, ...matchIds(s, d), text: textOf(d) }; }
 
 export interface DocStore {
   /** the latest state — current even before React has re-rendered */
