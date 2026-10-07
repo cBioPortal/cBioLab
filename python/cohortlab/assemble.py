@@ -296,16 +296,24 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
 
     # ---- track meta (panel-aware frequencies) -------------------------------
     tracks: list[Track] = []
-    for gt in gene_tracks:
-        cells = gene_cells[gt.label][order_arr]
+
+    def gene_counts(cells: np.ndarray) -> dict[str, Any]:
+        """The pooled numbers and each group's: the same formula over a slice of the columns."""
         profiled = int((cells != NOT_PROFILED).sum())
         altered = int((cells > 0).sum())
         driver_altered = int(((cells > 0) & ((cells & BITS["DRIVER"]) != 0)).sum())
+        return {"altered": altered, "profiled": profiled, "driverAltered": driver_altered,
+                "freqPct": _round(1000 * altered / profiled) / 10 if profiled else None,
+                "driverPct": _round(1000 * driver_altered / profiled) / 10 if profiled else None}
+
+    for gt in gene_tracks:
+        cells = gene_cells[gt.label][order_arr]
+        by_group = [{"group": g["name"], **{k: v for k, v in gene_counts(cells[g["start"]:g["start"] + g["count"]]).items() if k != "driverAltered"}}
+                    for g in ranges] if len(ranges) > 1 else None
         tracks.append(Track("gene", gt.label, cells, {
             **({"members": list(gt.members)} if len(gt.members) > 1 else {}),
-            "altered": altered, "profiled": profiled, "driverAltered": driver_altered,
-            "freqPct": _round(1000 * altered / profiled) / 10 if profiled else None,
-            "driverPct": _round(1000 * driver_altered / profiled) / 10 if profiled else None}))
+            **gene_counts(cells),
+            **({"byGroup": by_group} if by_group is not None else {})}))
     for t in dev:
         cells = t.cells[order_arr]
         alt = int((cells == 1).sum())

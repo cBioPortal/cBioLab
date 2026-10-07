@@ -123,6 +123,10 @@ def _jsnum(v: Any) -> Any:
     """JSON numbers the way JavaScript prints them: integral floats without a fraction."""
     if isinstance(v, float) and v.is_integer():
         return int(v)
+    if isinstance(v, list):
+        return [_jsnum(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _jsnum(x) for k, x in v.items()}
     return v
 
 
