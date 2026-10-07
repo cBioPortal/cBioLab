@@ -1,4 +1,4 @@
-import { chQuery, STUDY, PORTAL } from "../../../lib/ch";
+import { chQuery, STUDY, PORTAL, withoutFailedQueries } from "../../../lib/ch";
 import { catalogSqls, lineCatalogSqls, LINE_TYPE } from "../../../lib/compiler";
 import { survivalEndpointsSql, studyRouting, restrictedStudies } from "../../../lib/federation";
 import { cacheLife } from "next/cache";
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
 async function catalogEntry(study: string, _version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
-  return pack(await catalogFor(study));
+  return pack(await withoutFailedQueries(() => catalogFor(study)));
 }
 
 async function catalogFor(study: string) {

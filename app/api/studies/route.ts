@@ -1,4 +1,4 @@
-import { chQuery, connections, type ChConn } from "../../../lib/ch.ts";
+import { chQuery, connections, withoutFailedQueries, type ChConn } from "../../../lib/ch.ts";
 import { isRestrictedStudy } from "../../../lib/federation.ts";
 import { cacheLife } from "next/cache";
 import { pack, throughCache, dataVersion } from "../../../lib/next-cache.ts";
@@ -86,7 +86,7 @@ async function allStudies(): Promise<StudyRow[]> {
 async function studiesEntry(_version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
-  return pack(await allStudies());
+  return pack(await withoutFailedQueries(() => allStudies()));
 }
 /** what the reachable instances returned, when one of them did not answer */
 class Partial extends Error { constructor(readonly rows: StudyRow[]) { super("an instance did not answer"); } }

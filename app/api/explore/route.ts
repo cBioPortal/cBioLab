@@ -2,7 +2,7 @@ import { buildExplore, buildExploreFederated } from "../../../lib/explore.ts";
 import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/federation.ts";
 import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
 import { mergeExplore } from "../../../lib/explore.ts";
-import { PRIMARY, withChContext, ensureChContext } from "../../../lib/ch.ts";
+import { PRIMARY, withChContext, ensureChContext, withoutFailedQueries } from "../../../lib/ch.ts";
 import { cacheLife } from "next/cache";
 import { pack, throughCache, dataVersion } from "../../../lib/next-cache.ts";
 import { studyProfiles, resolveStudy } from "../../../lib/analysis.ts";
@@ -46,7 +46,7 @@ async function handle(req: Request) {
 async function exploreEntry(body: any, _version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
-  return pack(await ensureChContext(() => exploreFor(body)));
+  return pack(await ensureChContext(() => withoutFailedQueries(() => exploreFor(body))));
 }
 
 

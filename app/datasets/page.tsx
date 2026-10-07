@@ -3,6 +3,7 @@
 import { cacheLife } from "next/cache";
 import { connection } from "next/server";
 import { allDatasets, type DatasetRow } from "../../lib/datasets.ts";
+import { withoutFailedQueries } from "../../lib/ch.ts";
 import { pack, throughCache, dataVersion } from "../../lib/next-cache.ts";
 import { DatasetsTable } from "./DatasetsTable.tsx";
 import { PageTools } from "../_agent/PageTools.tsx";
@@ -12,7 +13,7 @@ export const metadata = { title: "Data sets — cbio-lab" };
 async function datasetsEntry(_version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
-  const r = await allDatasets();
+  const r = await withoutFailedQueries(() => allDatasets());
   // a catalog missing an instance is served, not kept for a day
   if (r.unreachable.length) throw new Error("an instance did not answer");
   return pack(r);

@@ -85,6 +85,28 @@ interface ChExternalEnc { name: string; structure: string; blob: Blob }
 interface ChCtx { signal?: AbortSignal; externals: Map<string, ChExternalEnc> }
 const ctxStore = new AsyncLocalStorage<ChCtx>();
 
+/**
+ * Queries that failed under a cached computation, whether or not the caller caught them. The
+ * engine turns many failures into a view's `error` so the other views still answer, and that is
+ * right for the reader in front of it — but such a result must not be cached, or a dropped
+ * connection is served to everyone for a day as "this view failed".
+ */
+const failedStore = new AsyncLocalStorage<{ n: number }>();
+export class FailedQueriesError extends Error {
+  readonly count: number;
+  constructor(count: number) {
+    super(count + " database quer" + (count === 1 ? "y" : "ies") + " failed while computing this answer; it is not cached");
+    this.count = count;
+  }
+}
+/** `fn`'s value, or a throw when any query under it failed — for the body of a cached function. */
+export async function withoutFailedQueries<T>(fn: () => Promise<T>): Promise<T> {
+  const s = { n: 0 };
+  const v = await failedStore.run(s, fn);
+  if (s.n) throw new FailedQueriesError(s.n);
+  return v;
+}
+
 /** Run `fn` in a fresh context — the request boundary. */
 export function withChContext<T>(ctx: { signal?: AbortSignal }, fn: () => Promise<T>): Promise<T> {
   return ctxStore.run({ signal: ctx.signal, externals: new Map() }, fn);
@@ -200,6 +222,10 @@ async function post(sql: string, conn: ChConn, format: string): Promise<string> 
       if (!RETRYABLE.test(msg)) throw e;
       return await send();   // one retry: a dropped connection, not a bad query
     }
+  } catch (e) {
+    const f = failedStore.getStore();
+    if (f) f.n++;
+    throw e;
   } finally { release(); }
 }
 

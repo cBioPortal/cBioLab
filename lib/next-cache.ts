@@ -11,7 +11,9 @@
 //   - time: `cacheLife("days")` regenerates an entry a day after it was written
 //
 // Only a value the function returns is stored. A thrown error, a refused request or a query the
-// reader abandoned is never cached, so every path that means "no answer" must throw.
+// reader abandoned is never cached, so every path that means "no answer" must throw. Each cached
+// body runs under `withoutFailedQueries`, which throws when any query failed even if the code
+// caught it — a view that degraded to an error for one reader is not kept for the next.
 //
 // Every read goes through `throughCache`, which answers directly when the cached call throws.
 // That is how an error reaches the reader at all: a production build replaces the message of
@@ -31,7 +33,7 @@
 // and the tests use the uncached engine directly.
 import { cacheLife } from "next/cache";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { chQuery, connections } from "./ch.ts";
+import { chQuery, connections, withoutFailedQueries } from "./ch.ts";
 import { oncokbPin } from "./annotation.ts";
 import { runAnalysis } from "./analysis.ts";
 import { buildContract } from "./oncoprint.ts";
@@ -84,7 +86,7 @@ export function dataVersion(): Promise<string> {
 async function analysisEntry(doc: AnalysisDoc, oncoprint: "svg" | "spec", _version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
-  return pack(await runAnalysis(doc, { oncoprint }));
+  return pack(await withoutFailedQueries(() => runAnalysis(doc, { oncoprint })));
 }
 export async function cachedAnalysis(doc: AnalysisDoc, opts: { oncoprint?: "svg" | "spec" } = {}): Promise<AnalysisResult> {
   const oncoprint = opts.oncoprint ?? "svg";
@@ -96,7 +98,7 @@ export async function cachedAnalysis(doc: AnalysisDoc, opts: { oncoprint?: "svg"
 async function contractEntry(spec: OncoprintSpec, _version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
-  return pack(await buildContract(spec));
+  return pack(await withoutFailedQueries(() => buildContract(spec)));
 }
 export async function cachedContract(spec: OncoprintSpec): Promise<Contract> {
   if (hasCustomData()) return buildContract(spec);
