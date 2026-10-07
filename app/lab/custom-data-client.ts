@@ -50,7 +50,7 @@ export function referencedDatasets(x: unknown): string[] {
 
 /** A document's pin: the name it uses -> a stored dataset at one version. */
 export interface UploadBinding { as: string; dataset: string; version: number }
-export interface ServerState { enabled: boolean; unlocked: boolean; datasets: DatasetMeta[]; error?: string }
+export interface ServerState { enabled: boolean; unlocked: boolean; datasets: DatasetMeta[]; error?: string; /** false until the server has answered once */ loaded?: boolean }
 
 let server: ServerState = { enabled: false, unlocked: false, datasets: [] };
 export function serverState(): ServerState { return server; }
@@ -65,8 +65,8 @@ export async function loadServerData(): Promise<void> {
       if (j.error) throw new Error(j.error);
       datasets = j.datasets;
     }
-    server = { enabled: !!st.enabled, unlocked: !!st.unlocked, datasets };
-  } catch (e) { server = { ...server, error: String((e as Error)?.message || e) }; }
+    server = { enabled: !!st.enabled, unlocked: !!st.unlocked, datasets, loaded: true };
+  } catch (e) { server = { ...server, error: String((e as Error)?.message || e), loaded: true }; }
   emit();
 }
 

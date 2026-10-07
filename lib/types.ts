@@ -1270,6 +1270,8 @@ export interface KmPoint { t: number; s: number }
 export interface KmCurve {
   cohort: string; points: KmPoint[]; median: number | null;
   n: number; events: number; missing?: number;
+  /** patients whose follow-up ended at or before their entry: never at risk, so left out of n */
+  unobserved?: number;
 }
 export interface Cmh {
   chi2: number; p: number; df: number;
@@ -1640,8 +1642,6 @@ export interface OncoprintSpec {
   cohort?: { dsl: CohortDef } | null;
   layout?: { groupBy: { kind: "cohorts"; groups: { name: string; dsl: CohortDef }[] } } | null;
   conventions?: { lineGap?: number };
-  /** study -> database name on the same instance, for studies outside the default database */
-  dbs?: Record<string, string>;
   /** "<profileType>|<gene>" -> pooled reference, supplied by the analysis layer */
   zReference?: Record<string, ZReference>;
 }

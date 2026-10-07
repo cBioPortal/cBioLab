@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { installIndexTools } from "./agent-tools.ts";
 import { Prompt } from "./prompt.tsx";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
+import LoginButton from "../lab/login-button.tsx";
 
 type Row = { id: string; question: string; study: string; status: string; lockedAt: string | null; createdAt: string };
 
@@ -38,6 +39,7 @@ export default function CampaignIndex() {
         <span className="spacer" />
         <a href="/lab" className="camp-nav">analysis app</a>
         <a href="/rationale" className="camp-nav">why this exists</a>
+        <LoginButton />
         <AgentToolsMenu page="campaign list" tools={[["campaign_create", "createCampaign(question, study?)"], ["campaign_list", "listCampaigns()"]]} webmcp={webmcp}
           intro="Your AI assistant — Claude in the Chrome sidebar — starts a campaign for your question with these tools; the campaign's own page then has the tools for its hypotheses." />
       </header>
@@ -54,7 +56,8 @@ export default function CampaignIndex() {
           <p className="camp-help">
             This site does not call an AI model. Your assistant in the browser starts the campaign and writes its hypotheses
             through the tools this page exposes (<a href="#for-ai-agents">For AI agents</a>, below); the site checks everything
-            it submits against the data and keeps the record. Open the sidebar on this page and give it your question:
+            it submits against the data and keeps the record. Starting a campaign, and changing one, needs the login (top
+            right); reading them does not. Open the sidebar on this page and give it your question:
           </p>
           <Prompt label="Start a campaign over WebMCP" text={START_PROMPT} />
           <p className="camp-help">Example questions, on msk_chord_2024:</p>

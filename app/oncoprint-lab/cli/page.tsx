@@ -19,7 +19,9 @@ export const maxDuration = 300;
 const run = promisify(execFile);
 const ROOT = process.cwd();
 const FIX = "test/fixtures/oncoprint";
-const PY = join(ROOT, "python", ".venv", "bin", "python");
+// a runtime path, not a build input: python/.venv's interpreter is a symlink out of the project,
+// which the build's file tracing cannot follow
+const PY = join(/* turbopackIgnore: true */ ROOT, "python", ".venv", "bin", "python");
 
 interface Step { title: string; cmd: string; stdout: string; stderr: string; ms: number; svg?: string; png?: string; text?: string; skipped?: string }
 const memo = new Map<string, { at: number; steps: Step[] }>();

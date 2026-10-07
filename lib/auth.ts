@@ -46,11 +46,11 @@ export function principalFor(req: Request): string | null {
   return v && same(v, tokenOf(code)) ? SHARED_PRINCIPAL : null;
 }
 
-export function requirePrincipal(req: Request): string {
+export function requirePrincipal(req: Request, what = "use saved cohorts, analyses and custom data"): string {
   if (!loginEnabled())
-    throw new AccessError("this deployment has no login (LOGIN_PASSWORD is not set), so nothing can be saved on it", 404);
+    throw new AccessError("this deployment has no login (LOGIN_PASSWORD is not set), so it cannot " + what, 404);
   const p = principalFor(req);
-  if (!p) throw new AccessError("log in to use saved cohorts, analyses and custom data", 403);
+  if (!p) throw new AccessError("log in to " + what, 403);
   return p;
 }
 

@@ -11,6 +11,8 @@ import type { Campaign, Funnel, HypothesisRow } from "../../../lib/campaign.ts";
 import { installAgentTools } from "../agent-tools.ts";
 import { Prompt } from "../prompt.tsx";
 import { AgentToolsMenu } from "../../_agent/AgentToolsMenu.tsx";
+import LoginButton from "../../lab/login-button.tsx";
+import { useCustomDataState } from "../../lab/custom-data-panel.tsx";
 
 type Prior = { campaignId: string; question: string; verdict: string | null; p: number | null; lockedAt: string | null };
 type View = { campaign: Campaign; funnel: Funnel; prior: Record<string, Prior[]>; note?: any };
@@ -59,6 +61,11 @@ export default function CampaignPage() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | string>(null);
   const [note, setNote] = useState<string | null>(null);
+  // changing the record (register, remove, lock, run) needs the login; reading it does not
+  const login = useCustomDataState();
+  const why = !login.loaded ? "checking whether you are logged in…"
+    : !login.enabled ? "this deployment has no login, so campaigns cannot be changed on it"
+    : !login.unlocked ? "log in to change this campaign" : null;
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/campaign/${id}`, { cache: "no-store" });
@@ -114,6 +121,7 @@ export default function CampaignPage() {
         <span className="spacer" />
         <a href="/lab" className="camp-nav">analysis app</a>
         <a href="/rationale" className="camp-nav">why this exists</a>
+        <LoginButton />
         <AgentToolsMenu page="campaign" tools={TOOL_LIST} webmcp={webmcp}
           intro="Your AI assistant — Claude in the Chrome sidebar — writes, checks and registers this campaign's hypotheses with these tools, and can lock and run it once you agree. The engine checks everything it submits." />
       </header>
@@ -174,14 +182,14 @@ export default function CampaignPage() {
               // was cut off (a server time limit). Results so far are saved and a resume re-runs
               // only what is missing, so offering it is safe either way.
               <div className="camp-act-row">
-                <button className="primary" disabled={!!busy} onClick={() => act("run")}>Resume the run</button>
+                <button className="primary" disabled={!!busy || !!why} title={why || undefined} onClick={() => act("run")}>Resume the run</button>
                 <span className="camp-dim">
                   {c.hypotheses.filter((h) => h.discovery).length}/{testable.length} tested so far. A run is in progress elsewhere or
                   was interrupted; resuming re-runs only what is missing.
                 </span>
               </div>
             ) : (
-              <button className="primary" disabled={!!busy} onClick={() => act("run")}>{`Run all ${testable.length} tests`}</button>
+              <button className="primary" disabled={!!busy || !!why} title={why || undefined} onClick={() => act("run")}>{`Run all ${testable.length} tests`}</button>
             )}
           </section>
         )}
@@ -191,12 +199,12 @@ export default function CampaignPage() {
             <h2>Hypotheses <span className="plain">· {testable.length} testable{untestable.length ? `, ${untestable.length} untestable` : ""}</span></h2>
             {!c.hypotheses.length && <p className="camp-help">None yet.</p>}
             <div className="camp-list">
-              {testable.map((h) => <HypCard key={h.id} h={h} prior={v.prior[h.id]} canRemove={c.status === "draft" && !busy} onRemove={() => act("remove", { hypothesisId: h.id })} />)}
+              {testable.map((h) => <HypCard key={h.id} h={h} prior={v.prior[h.id]} canRemove={c.status === "draft" && !busy} removeWhy={why} onRemove={() => act("remove", { hypothesisId: h.id })} />)}
             </div>
             {!!untestable.length && <>
               <h3 className="camp-sub">Untestable with this data</h3>
               <div className="camp-list">
-                {untestable.map((h) => <HypCard key={h.id} h={h} prior={v.prior[h.id]} canRemove={c.status === "draft" && !busy} onRemove={() => act("remove", { hypothesisId: h.id })} />)}
+                {untestable.map((h) => <HypCard key={h.id} h={h} prior={v.prior[h.id]} canRemove={c.status === "draft" && !busy} removeWhy={why} onRemove={() => act("remove", { hypothesisId: h.id })} />)}
               </div>
             </>}
           </section>
@@ -210,12 +218,12 @@ export default function CampaignPage() {
               nothing can be added, removed or reworded — the database itself refuses. This is what lets the final report
               say “1 of {testable.length} tested” and mean it.
             </p>
-            <button className="primary" disabled={!!busy} onClick={() => act("lock")}>
+            <button className="primary" disabled={!!busy || !!why} title={why || undefined} onClick={() => act("lock")}>
               {busy === "lock" ? <><span className="spinner onprimary" /> locking…</> : `Lock in ${testable.length} ${testable.length === 1 ? "hypothesis" : "hypotheses"}`}
             </button>
           </section>
         )}
-        <AgentPanel c={c} webmcp={webmcp} busy={!!busy} onSubmit={(hs, source) => act("add", { hypotheses: hs, source })} />
+        <AgentPanel c={c} webmcp={webmcp} busy={!!busy} why={why} onSubmit={(hs, source) => act("add", { hypotheses: hs, source })} />
       </main>
     </>
   );
@@ -231,7 +239,7 @@ const TOOL_LIST: [string, string][] = [
 ];
 
 /** How an AI agent in the browser drives this page — visible, so an agent reading the page finds it. */
-function AgentPanel({ c, webmcp, busy, onSubmit }: { c: Campaign; webmcp: boolean | null; busy: boolean; onSubmit: (hs: unknown[], source: "generator" | "researcher") => void }) {
+function AgentPanel({ c, webmcp, busy, why, onSubmit }: { c: Campaign; webmcp: boolean | null; busy: boolean; why: string | null; onSubmit: (hs: unknown[], source: "generator" | "researcher") => void }) {
   const [text, setText] = useState("");
   const [mine, setMine] = useState(false);
   const [bad, setBad] = useState<string | null>(null);
@@ -266,7 +274,7 @@ function AgentPanel({ c, webmcp, busy, onSubmit }: { c: Campaign; webmcp: boolea
         <textarea id="agent-json" className="camp-json" rows={6} value={text} onChange={(e) => setText(e.target.value)}
           placeholder='[{"statement": "…", "rationale": "…", "doc": {"study": "…", "cohorts": {…}, "views": [{…}]}, "primary": {"view": 0, "stat": "compare", "gene": "…"}, "direction": "higher"}]' />
         <div className="row">
-          <button disabled={busy || !text.trim()} onClick={submit}>Submit hypotheses</button>
+          <button disabled={busy || !text.trim() || !!why} title={why || undefined} onClick={submit}>Submit hypotheses</button>
           <label className="chk camp-inline"><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> these are the researcher's own ideas</label>
           {bad && <span className="camp-err">{bad}</span>}
         </div>
@@ -275,7 +283,7 @@ function AgentPanel({ c, webmcp, busy, onSubmit }: { c: Campaign; webmcp: boolea
   );
 }
 
-function HypCard({ h, prior, canRemove, onRemove }: { h: HypothesisRow; prior?: Prior[]; canRemove: boolean; onRemove: () => void }) {
+function HypCard({ h, prior, canRemove, removeWhy, onRemove }: { h: HypothesisRow; prior?: Prior[]; canRemove: boolean; removeWhy: string | null; onRemove: () => void }) {
   const n = h.feasibility?.n || {};
   return (
     <article className={"camp-hyp" + (h.feasibility?.ok ? "" : " untest")}>
@@ -295,7 +303,7 @@ function HypCard({ h, prior, canRemove, onRemove }: { h: HypothesisRow; prior?: 
       {!!prior?.length && <p className="camp-prior">Tested before: {prior.map((p) => `“${p.question}” → ${p.verdict}${p.p != null ? ` (p=${fmtP(p.p)})` : ""}`).join("; ")}</p>}
       <div className="camp-links">
         <a href={labLink(h)} target="_blank" rel="noreferrer">open the analysis</a>
-        {canRemove && <button className="camp-x" onClick={onRemove}>remove</button>}
+        {canRemove && <button className="camp-x" disabled={!!removeWhy} title={removeWhy || undefined} onClick={onRemove}>remove</button>}
       </div>
     </article>
   );

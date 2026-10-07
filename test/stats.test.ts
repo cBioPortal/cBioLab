@@ -780,3 +780,28 @@ describe("kruskalWallis: the k-group generalization of mannWhitneyU", () => {
     assert.equal(r.df, 0);
   });
 });
+
+// Follow-up that ends at or before entry (OS_MONTHS = 0 under an anchor) was never at risk: its
+// event used to be counted against a risk set it was not in, driving the curve below zero.
+describe("records with no follow-up after entry", () => {
+  const atEntry = [{ t: 5, event: 1, entry: 5 }, { t: 5, event: 1, entry: 5 }];
+  const later = { t: 10, event: 0, entry: 0 };
+  test("Kaplan–Meier leaves them out and says how many", () => {
+    const km = kaplanMeier([...atEntry, later]);
+    assert.ok(km.points.every((p) => p.s >= 0 && p.s <= 1), JSON.stringify(km.points));
+    assert.equal(km.n, 1);
+    assert.equal(km.events, 0);
+    assert.equal(km.unobserved, 2);
+    assert.equal(kaplanMeier([later]).unobserved, undefined);
+  });
+  test("a record that enters after it ends does not shrink anyone else's risk set", () => {
+    const base = [{ t: 4, event: 1 }, { t: 8, event: 1 }, { t: 12, event: 0 }];
+    assert.deepEqual(kaplanMeier([...base, { t: 3, event: 0, entry: 6 }]).points, kaplanMeier(base).points);
+  });
+  test("the log-rank tests ignore them", () => {
+    const a = [{ t: 3, event: 1 }, { t: 6, event: 1 }, { t: 9, event: 0 }, { t: 12, event: 1 }];
+    const b = [{ t: 4, event: 0 }, { t: 7, event: 1 }, { t: 11, event: 0 }, { t: 14, event: 1 }];
+    assert.deepEqual(logRank([{ a: [...a, ...atEntry], b }]), logRank([{ a, b }]));
+    assert.deepEqual(logRankK([{ groups: [[...a, ...atEntry], b, a] }]), logRankK([{ groups: [a, b, a] }]));
+  });
+});

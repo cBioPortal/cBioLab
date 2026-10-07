@@ -3,6 +3,7 @@
 // codes each term the way the fit did.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, diffexprMethod, incidenceMethod, pairedMethod, genomeMethod, pathwaysMethod, attritionMethod, clonalityMethod, labsMethod, courseMethod, sequenceMethod, GSEA_NULL_PY, GRAY_NULL_PY, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
 import type { CoxCovariate } from "../lib/types.ts";
 
@@ -157,7 +158,7 @@ describe("survivalMethod", () => {
 
   test("the script carries the counts, quoting a cohort name with a comma, and expands them to patients", () => {
     const m = survivalMethod(trace());
-    assert.match(m.python!, /cohort,study,months,event,n\n"A, mutant",s1,5,1,2\n/);
+    assert.match(m.python!, /"cohort,study,months,event,n",\n {4}"\\"A, mutant\\",s1,5,1,2",\n/);
     assert.match(m.python!, /counts\.index\.repeat\(counts\["n"\]\)/);
     assert.match(m.python!, /survdiff\(df\["months"\], df\["event"\], df\["cohort"\]\)/);
     assert.match(m.python!, /chi2_dist\.sf\(chi2, 1\)/);
@@ -182,6 +183,15 @@ describe("survivalMethod", () => {
     assert.match(m.steps.find((s) => s.title.startsWith("Estimate"))!.detail, /delayed entry: re-anchored to first Treatment/);
     assert.match(m.python!, /entry=g\["entry"\]/);
     assert.match(m.python!, /entry=df\["entry"\]/);
+    assert.match(m.python!, /df = df\[df\["months"\] > df\["entry"\]\]/);
+  });
+
+  test("patients never at risk are named in the step and dropped by the script the same way", () => {
+    const m = survivalMethod(trace({ anchor: "first Treatment",
+      cohorts: trace().cohorts.map((c, i) => i ? c : { ...c, unobserved: 3 }),
+      counts: trace().counts.map((r) => ({ ...r, entry: 1 })) }));
+    assert.match(m.steps.find((s) => s.title.startsWith("Estimate"))!.detail, /never at risk and is left out: A, mutant 3/);
+    assert.doesNotMatch(survivalMethod(trace()).python!, /df\["months"\] > df\["entry"\]/);
   });
 
   test("past the inline limit the script names a file to export instead of embedding the table", () => {
@@ -189,6 +199,32 @@ describe("survivalMethod", () => {
     const m = survivalMethod(trace({ counts: big }));
     assert.match(m.python!, /too many to include here: export them as survival_counts\.csv/);
     assert.doesNotMatch(m.python!, /io\.StringIO/);
+  });
+
+  // A cohort name is the document author's text, and reaches the script through every inlined
+  // table and comment. Python's own parser decides what is code: with every string literal
+  // blanked out, nothing of the name may be left.
+  test("a hostile cohort name stays data: no code outside a string literal, and the table reads back", () => {
+    const evil = 'x"""\n)); print("INJECTED") # \\N{BULLET} \\u00e9 \r\nprint("INJECTED2")';
+    const m = survivalMethod(trace({
+      cohorts: trace().cohorts.map((c, i) => i ? c : { ...c, name: evil }),
+      counts: trace().counts.map((r) => r.cohort === "B" ? r : { ...r, cohort: evil }),
+    }));
+    const r = spawnSync("python3", ["-I", "-c", [
+      "import ast, csv, io, json, sys",
+      "tree = ast.parse(sys.stdin.read())",
+      "table = next(n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)",
+      "             and n.func.attr == 'join' and isinstance(n.func.value, ast.Constant) and n.func.value.value == '\\n')",
+      "rows = list(csv.reader(io.StringIO('\\n'.join(ast.literal_eval(table.args[0])))))",
+      "for n in ast.walk(tree):",
+      "    if isinstance(n, ast.Constant) and isinstance(n.value, str): n.value = ''",
+      "print(json.dumps(rows[1][0]))",
+      "print('INJECTED' in ast.unparse(tree))",
+    ].join("\n")], { input: m.python!, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    const [name, leaked] = r.stdout.trim().split("\n");
+    assert.equal(leaked, "False");
+    assert.equal(JSON.parse(name), evil);
   });
 });
 

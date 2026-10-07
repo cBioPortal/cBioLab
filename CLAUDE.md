@@ -192,7 +192,14 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 8. **Renderers read `lib/oncoprint-style.ts`; they never define a colour, band, priority or legend
    label of their own.** The Python port is pinned by conformance tests (contract JSON, bucket
    codes) and golden snapshots (`test/fixtures/oncoprint/golden.svg`, `golden-raster.npz`;
-   `UPDATE_GOLDEN=1` to accept an intentional change).
+   `UPDATE_GOLDEN=1` to accept an intentional change). These are real cross-language checks —
+   `python/tests/test_cohortlab.py`'s `Conformance` and `LevelOfDetailConformance` classes shell
+   out to `node scripts/oncoprint-cli.ts` and diff its output against the Python port — and
+   `scripts/gate.sh` runs the whole Python suite (bootstrapping `python/.venv` on first run) as
+   part of every gate, so a TS-only change to the assembler, LOD or binary format fails the gate
+   if the port drifts. `npm run test:python` runs just that suite while iterating. The
+   conformance tests assert `node` is on `PATH` rather than skipping when it isn't — a missing
+   dependency must fail loud, not silently pass.
 9. **The document holds anything that changes what a reader sees; the browser holds the rest.**
    If a setting would change a shared link, the server-rendered SVG, the CLI or the Python
    package, it belongs in the view — that is why the oncoprint's viewing options are a `display`

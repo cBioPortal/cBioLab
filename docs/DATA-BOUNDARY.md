@@ -88,7 +88,8 @@ silently drops those patients and reports a smaller cohort as if it were whole.
 `npm test` and into `e2e.cjs` so the standard gate catches a breach):
 
 - `carriesPatientIds` finds a `patients` leaf at top level, in `all`, nested in
-  `any`, nested in `not` — and does not false-positive on ordinary clauses.
+  `any`, nested in `not`, and at any depth below those (`{not:{not:…}}`,
+  `{not:{any:[…]}}`) — and does not false-positive on ordinary clauses.
 - Aggregate resolvers structurally lack `members()`; patient-level ones have it.
 - Aggregate resolvers refuse id-carrying definitions and still compile ordinary
   ones; a patient-level resolver *may* use an explicit list.

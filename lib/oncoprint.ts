@@ -221,9 +221,15 @@ export function normalizeSpec(spec: OncoprintSpec) {
   return { genes, geneList, clinical, derivedEvents, lineGap, sort, heatmap, unit, overlays, display: normalizeDisplay(spec.display) };
 }
 
+/** The study a single-study spec draws: `studies` when it lists exactly one, else `study`. */
+function specStudy(spec: OncoprintSpec): string {
+  const listed = Array.isArray(spec.studies) && spec.studies.length === 1 ? spec.studies[0] : null;
+  return String(listed || spec.study || STUDY).replace(/[^A-Za-z0-9._-]/g, "");
+}
+
 // Provenance: the exact SQL a spec compiles to, without executing anything.
 export function specToQueries(spec: OncoprintSpec, pin?: string | null) {
-  const study = (spec.study || STUDY).replace(/[^A-Za-z0-9._-]/g, "");
+  const study = specStudy(spec);
   const { genes, clinical, derivedEvents, lineGap, unit } = normalizeSpec(spec);
   const queries: { label: string; sql: string }[] = [];
   const gb = spec.layout && spec.layout.groupBy;
@@ -271,7 +277,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
     entry.ms = r._ms;
     return r;
   };
-  const study = (spec.study || STUDY).replace(/[^A-Za-z0-9._-]/g, "");
+  const study = specStudy(spec);
   // Federation: spec.studies = [..] makes this a multi-study contract. Columns are
   // then keyed by qualified ids ("<study>_<pid>") so id collisions across studies
   // stay distinct columns (overlap is deliberately NOT deduplicated), and every
@@ -284,18 +290,18 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   // carries the cohort DEFINITION, not compiled SQL, so an `OQL ... DRIVER` clause is compiled
   // here — and without the pin it would be refused for want of an annotation store.
   const pin = await oncokbPin();
-  // Where each study actually lives. `spec.dbs` stays as an explicit override, but nothing ever
-  // populated it, so every study fell back to the app's default database — and a study held by
-  // another instance (GENIE beside the public portal) then matched no rows at all and surfaced
-  // as "cohort is empty". Ask federation instead, which is the one place that knows.
+  // Where each study lives, asked of federation, the one place that knows. The columns are
+  // patient (or sample) ids, so a study this deployment holds only in aggregate is refused, and
+  // a study it does not route — unknown, or restricted — is refused rather than looked for on
+  // the default connection.
   //
   // Imported dynamically on purpose: federation.ts imports this module's SQL builders, so a
   // static import here would close a cycle.
-  const { studyRouting } = await import("./federation.ts");
-  const routing = await studyRouting();
-  const connOf = (s: string): ChConn => routing.get(s) || PRIMARY;
-  const dbOf = (s: string): string =>
-    String((spec.dbs || {})[s] || "").replace(/[^A-Za-z0-9_]/g, "") || connOf(s).db;
+  const { patientLevelConn } = await import("./federation.ts");
+  const conns = new Map(await Promise.all(studies.map(async (s) =>
+    [s, await patientLevelConn(s, "an oncoprint's columns are patients")] as const)));
+  const connOf = (s: string): ChConn => conns.get(s)!;
+  const dbOf = (s: string): string => connOf(s).db;
   const { genes, geneList, clinical, derivedEvents, lineGap, sort, heatmap, display, unit, overlays } = normalizeSpec(spec);
   if (multi && derivedEvents.length) throw new Error("derived-event tracks are single-study; drop them or the extra studies");
   if (unit === "sample" && derivedEvents.length)
@@ -428,11 +434,11 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
   // ---- molecular overlays: values thresholded into the gene cells ---------
   const overlaysIn: AssembleInput["overlays"] = [];
   for (const ov of overlays) {
-    const avail = await Promise.all(studies.map(async (s) => (await studyProfileTypes(s, dbOf(s))).has(ov.profileType) ? s : null));
+    const avail = await Promise.all(studies.map(async (s) => (await studyProfileTypes(s, dbOf(s), connOf(s))).has(ov.profileType) ? s : null));
     const okStudies = avail.filter((s): s is string => s !== null);
     if (!okStudies.length)
       throw new Error("overlay: profile '" + ov.profileType + "' not in " + studies.join("/") +
-        " (available: " + ([...(await studyProfileTypes(studies[0], dbOf(studies[0])))].join(", ") || "none") + ")");
+        " (available: " + ([...(await studyProfileTypes(studies[0], dbOf(studies[0]), connOf(studies[0])))].join(", ") || "none") + ")");
     const values = new Map<string, number>();
     const fetched = await Promise.all(okStudies.map(async (s) =>
       ({ s, r: await lqRows("oncoprint:overlay " + ov.kind, heatmapSql(ov.profileType, genes, s, dbOf(s), unit), s) })));
@@ -443,8 +449,9 @@ const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // prov
 
   // ---- derived-event rows (cohort-DSL expressions as phenotypes) ---------
   const derivedIn: AssembleInput["derived"] = [];
+  const derivedConn = derivedEvents.length ? conns.get(study) || await patientLevelConn(study, "derived-event rows list patients") : null;
   for (const de of derivedEvents)
-    derivedIn.push({ label: de.label, pids: new Set<string>(await cohortPatients({ ...de.expression, lineGap }, study, opts.log, "oncoprint:derivedEvent", dbOf(study), unit, pin)) });
+    derivedIn.push({ label: de.label, pids: new Set<string>(await cohortPatients({ ...de.expression, lineGap }, study, opts.log, "oncoprint:derivedEvent", derivedConn!.db, unit, pin, derivedConn!)) });
 
   const queryMs = Date.now() - t0;
   const tAsm = Date.now();

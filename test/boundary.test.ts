@@ -104,6 +104,16 @@ describe("carriesPatientIds: detects identifiers anywhere in a definition", () =
   test("patientList leaf nested in not", () => {
     assert.equal(carriesPatientIds({ all: [{ not: { kind: "patientList", ids: ["s:P-1"] } }] }), true);
   });
+  // the compiler takes a clause, not just a leaf, under `not`: {not:{not:L}} is exactly L
+  test("patientList leaf under a double not", () => {
+    assert.equal(carriesPatientIds({ all: [{ not: { not: { kind: "patientList", ids: ["s:P-1"] } } } as any] }), true);
+  });
+  test("sampleList leaf in an any[] under not", () => {
+    assert.equal(carriesPatientIds({ all: [{ not: { any: [{ kind: "oql", q: "TP53: MUT" }, { kind: "sampleList", ids: ["s:S-1"] }] } } as any] }), true);
+  });
+  test("ids nested at any depth", () => {
+    assert.equal(carriesPatientIds({ all: [{ not: { not: { not: { any: [{ kind: "patientList", ids: ["s:P-1"] }] } } } } as any] }), true);
+  });
   test("ordinary clauses do not trip it", () => {
     assert.equal(carriesPatientIds({ all: [{ kind: "oql", q: "TP53: MUT" }, { kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] }), false);
     assert.equal(carriesPatientIds(null), false);
@@ -437,5 +447,57 @@ describe("boundary: uploaded custom data", () => {
     const src = readFileSync(new URL("../lib/custom-data-server.ts", import.meta.url), "utf8");
     assert.match(src, /peerForStudy\(study\)\)\s*\n\s*throw/);
     assert.match(src, /inst\.mode !== "patient-level"\)\s*\n\s*throw/);
+  });
+});
+
+// A study the routing map does not hold — unknown, or restricted and so deliberately left out —
+// must be refused, never looked for on the default connection. With no ClickHouse configured the
+// map is empty, so every study is unrouted here.
+describe("unrouted studies are refused, not sent to the default connection", { skip: !!process.env.CLICKHOUSE_URL && "needs an empty routing map" }, () => {
+  test("routeStudy refuses an unknown study", async () => {
+    await assert.rejects(federation.routeStudy("no_such_study"), /unknown study 'no_such_study'/);
+  });
+  test("routeStudy names a restricted study as restricted", async () => {
+    federation.restrictedStudies.add("genie_private");
+    try {
+      await assert.rejects(federation.routeStudy("genie_private"), /consortium\/private-access/);
+    } finally { federation.restrictedStudies.delete("genie_private"); }
+  });
+  test("instanceForStudy and patientLevelConn refuse it too", async () => {
+    await assert.rejects(federation.instanceForStudy("no_such_study"), /unknown study/);
+    await assert.rejects(federation.patientLevelConn("no_such_study"), /unknown study/);
+  });
+  test("the oncoprint's columns and one column's detail refuse it before any query", async () => {
+    const { buildContract } = await import("../lib/oncoprint.ts");
+    const { columnDetail } = await import("../lib/oncoprint-detail.ts");
+    await assert.rejects(buildContract({ study: "no_such_study", genes: ["TP53"] } as any), /unknown study/);
+    await assert.rejects(columnDetail({ study: "no_such_study", genes: ["TP53"] } as any, "P-1"), /unknown study/);
+  });
+});
+
+// The peer's own MCP tools refuse an id-carrying definition themselves: a caller that is not
+// this codebase's RemoteAggregateResolver has checked nothing.
+describe("a peer's federation tools refuse explicit id lists on their own", () => {
+  const handlers = new Map<string, (args: any) => Promise<any>>();
+  // registerTool is captured; whatever else registerTools calls (tool, resource…) is a no-op
+  const fake = new Proxy({}, {
+    get: (_t, prop) => prop === "registerTool"
+      ? (name: string, _def: unknown, h: (args: any) => Promise<any>) => { handlers.set(name, h); }
+      : () => undefined
+  });
+  const nested = { all: [{ not: { not: { kind: "patientList", ids: ["s:P-1"] } } }] };
+  test("federated_aggregates", async () => {
+    const { registerTools } = await import("../mcp/tools.ts");
+    registerTools(fake);
+    const r = await handlers.get("federated_aggregates")!({ study: "s", cohort: nested, attributes: ["AGE"] });
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, /REJECTED: cohort contains an explicit sample or patient list/);
+  });
+  test("federated_facets", async () => {
+    const { registerTools } = await import("../mcp/tools.ts");
+    registerTools(fake);
+    const r = await handlers.get("federated_facets")!({ study: "s", draft: nested });
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, /explicit sample or patient list/);
   });
 });

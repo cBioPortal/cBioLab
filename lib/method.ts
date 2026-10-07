@@ -135,6 +135,8 @@ export interface LogisticTrace extends FitTrace {
 
 const plural = (n: number, one: string, many = one + "s") => n.toLocaleString() + " " + (n === 1 ? one : many);
 const py = (s: string) => JSON.stringify(s);
+/** Text for a `#` comment: a line break in a cohort name or a value would end the comment and run the rest. */
+const pyComment = (s: unknown) => String(s).replace(/[\r\n]+/g, " ");
 
 /** Why a categorical covariate's reference level is the one it is — mirrors buildCoxColumns. */
 function referenceReason(cov: CoxCovariate, reference: string): string {
@@ -180,7 +182,7 @@ function pyTerms(t: FitTrace, indent: string): string {
     const c = py("c" + col.axisIndex);
     return indent + py(col.label) + ": " + (t.kinds[col.axisIndex] === "num"
       ? "df[" + c + "].astype(float),"
-      : "(df[" + c + "] == " + py(col.level!) + ").astype(float),  # reference: " + col.reference);
+      : "(df[" + c + "] == " + py(col.level!) + ").astype(float),  # reference: " + pyComment(col.reference));
   }).join("\n");
 }
 
@@ -330,7 +332,7 @@ export function logisticMethod(t: LogisticTrace, o: { outcomeLabel: string; quer
     "",
     RESULT_INIT,
     "df = pd.read_csv(\"logistic_rows.csv\"" + pyCategoricalDtypes(t, t.outcomeKind === "num" ? [] : ["y"]) + ")",
-    "y = " + y + "  # the outcome: " + (t.outcomeKind === "num" ? "already 0/1" : "event = " + t.outcomeEvent),
+    "y = " + y + "  # the outcome: " + (t.outcomeKind === "num" ? "already 0/1" : "event = " + pyComment(t.outcomeEvent)),
     "X = pd.DataFrame({",
     pyTerms(t, "    "),
     "})",
@@ -358,20 +360,22 @@ export const INLINE_ROWS_MAX = 20000;
 
 function csvField(v: string | number | null | undefined): string {
   const s = v == null ? "" : String(v);
-  return /[",\n]/.test(s) ? "\"" + s.replace(/"/g, "\"\"") + "\"" : s;
+  return /[",\r\n]/.test(s) ? "\"" + s.replace(/"/g, "\"\"") + "\"" : s;
 }
 
 /** `name = pd.read_csv(...)`: inline when small enough, else from a file the reader exports. */
 function pyTable(name: string, what: string, columns: string[], rows: (string | number | null | undefined)[][], file: string): string[] {
   if (rows.length > INLINE_ROWS_MAX) {
-    return ["# " + what + " — " + rows.length.toLocaleString() + " rows, too many to include here: export them as " + file,
-      "# with columns " + columns.join(", ") + ".",
+    return ["# " + pyComment(what) + " — " + rows.length.toLocaleString() + " rows, too many to include here: export them as " + pyComment(file),
+      "# with columns " + pyComment(columns.join(", ")) + ".",
       name + " = pd.read_csv(" + py(file) + ")"];
   }
-  return ["# " + what + ".",
-    name + " = pd.read_csv(io.StringIO(\"\"\"" + columns.join(","),
-    ...rows.map((r) => r.map(csvField).join(",")),
-    "\"\"\"))"];
+  // each CSV line is its own string literal, so no value in the data can end the string
+  return ["# " + pyComment(what) + ".",
+    name + " = pd.read_csv(io.StringIO(\"\\n\".join([",
+    "    " + py(columns.map(csvField).join(",")) + ",",
+    ...rows.map((r) => "    " + py(r.map(csvField).join(",")) + ","),
+    "])))"];
 }
 
 // ---- survival: Kaplan-Meier and log-rank -------------------------------------------------------
@@ -390,6 +394,8 @@ export interface SurvivalTrace {
     name: string;
     perStudy: { study: string; cohortPatients: number; patients: number; rows: number }[];
     n: number; events: number; median: number | null;
+    /** follow-up ending at or before entry: never at risk, left out */
+    unobserved?: number;
   }[];
   /** every (months, event, n[, entry]) row each study returned, per cohort */
   counts: { cohort: string; study: string; months: number; event: number; n: number; entry?: number }[];
@@ -423,6 +429,8 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
     kind: "statistic", title: "Estimate survival by Kaplan–Meier",
     detail: "The product-limit estimator, one curve per cohort, pooled over its studies" +
       (t.anchor ? ", with delayed entry: re-anchored to " + t.anchor + ", a patient is at risk only from the time the study could first observe them" : "") +
+      (t.cohorts.some((c) => c.unobserved) ? ". A patient whose follow-up ends at or before their entry was never at risk and is left out: " +
+        t.cohorts.filter((c) => c.unobserved).map((c) => c.name + " " + c.unobserved!.toLocaleString("en-US")).join(", ") : "") +
       ". The median is the first time the curve is at or below 0.5" +
       (t.display === "incidence" ? ". The figure shows cumulative incidence, 1 − S(t)" : "") + ".",
     params: t.cohorts.map((c) => [c.name, c.n.toLocaleString() + " patients, " + c.events.toLocaleString() + " events, median " +
@@ -466,6 +474,7 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
       "df.loc[df[\"months\"] > " + t.cutoffMonths + ", \"event\"] = 0  # censor at " + t.cutoffMonths + " months",
       "df[\"months\"] = df[\"months\"].clip(upper=" + t.cutoffMonths + ")"] : []),
     "df = df[df[\"months\"] >= 0]",
+    ...(hasEntry ? ["df = df[df[\"months\"] > df[\"entry\"]]  # follow-up ending at or before entry was never at risk"] : []),
     "",
     "for cohort, g in df.groupby(\"cohort\", sort=False):",
     "    km = KaplanMeierFitter().fit(g[\"months\"], g[\"event\"]" + (hasEntry ? ", entry=g[\"entry\"]" : "") + ", label=cohort)",

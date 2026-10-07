@@ -2,7 +2,7 @@ import { buildExplore, buildExploreFederated } from "../../../lib/explore.ts";
 import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/federation.ts";
 import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
 import { mergeExplore } from "../../../lib/explore.ts";
-import { PRIMARY, withChContext, ensureChContext } from "../../../lib/ch.ts";
+import { PRIMARY, withChContext, ensureChContext, withoutFailedQueries } from "../../../lib/ch.ts";
 import { cacheLife } from "next/cache";
 import { pack, throughCache, dataVersion } from "../../../lib/next-cache.ts";
 import { studyProfiles, resolveStudy } from "../../../lib/analysis.ts";
@@ -46,7 +46,7 @@ async function handle(req: Request) {
 async function exploreEntry(body: any, _version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
-  return pack(await ensureChContext(() => exploreFor(body)));
+  return pack(await ensureChContext(() => withoutFailedQueries(() => exploreFor(body))));
 }
 
 
@@ -72,6 +72,8 @@ async function exploreFor(body: any) {
   // inside the query text (and, being study-scoped, could never match there).
   if (carriesPatientIds(body.draft)) {
     for (const s of studies) {
+      if (remote.includes(s))
+        throw new Error("this draft contains an explicit patient list, which cannot be sent to the remote peer holding " + s + "; remove that clause or deselect it");
       const inst = await instanceForStudy(s);
       if (inst.mode !== "patient-level")
         throw new Error("this draft contains an explicit patient list, which cannot be sent to " + inst.label + "; remove that clause or deselect " + s);
