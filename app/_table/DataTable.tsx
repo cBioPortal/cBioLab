@@ -53,7 +53,8 @@ export function usePages<R>(first: R[], total: number, offset0: number, viewSize
   const [error, setError] = useState<string | null>(null);
   const gen = useRef(0);
   // a new result starts again at page 1; the page size is the reader's and stays
-  useEffect(() => { setPageState(0); setCache(new Map()); setError(null); }, [first, total]);
+  // and a page still loading for the old query is dropped when it lands, not cached under this one
+  useEffect(() => { gen.current++; setPageState(0); setCache(new Map()); setError(null); }, [first, total]);
   const pages = Math.max(1, Math.ceil(total / size));
   const k = page + ":" + size;
   const local = offset0 === 0 && page * size + size <= first.length || (offset0 === 0 && first.length >= total) ? first.slice(page * size, page * size + size) : null;

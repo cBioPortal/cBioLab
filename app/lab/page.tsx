@@ -13,11 +13,9 @@ import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 import { parameterize } from "../../lib/params.ts";
 import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve, PartitionDef } from "../../lib/types.ts";
 import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
-import type { ViewParticipation } from "../../lib/types.ts";
 import { survivalAxis } from "../../lib/stats.ts";
 import { MethodPanel } from "./method-panel.tsx";
 import { foldEventNames } from "../../lib/event-names.ts";
-import { VIEW_HELP } from "../../lib/view-help.ts";
 import { installLabTools, LAB_TOOL_NAMES, type LabBridge } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import CustomDataPanel, { useCustomDataState } from "./custom-data-panel.tsx";
@@ -28,7 +26,11 @@ import { withoutPartition, armsFromSelection, renamePartitionChild, expandSplits
 import { DOC_VERSION, upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
 import { installCustomDataFetch, saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
-import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
+import { isCustomAttr, parseCustomAttr } from "../../lib/custom-data-names.ts";
+import { useDocStore } from "./doc-store.ts";
+import { useAnalysis, seedAnalysis, rerunAnalysis } from "./use-analysis.ts";
+import { useQueryClient } from "@tanstack/react-query";
+import { AxisPicker, useGearmenuOpen, ViewHelpButton, SplitByNote, PickMenu, CohortNode, CohortPicker, DrawnCohorts, CohortStudies, ViewHead, ViewMenu, CohortEditMenu, Latency, CAT_COLORS, Participation } from "./view-chrome.tsx";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -50,7 +52,6 @@ function tabFromParams(sp: SearchParams): typeof TABS[number] {
   return typeof sp.doc === "string" ? "analysis" : "explore";
 }
 
-const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
 /**
  * Which clinical attributes draw as a pie rather than a table — a fixed
  * editorial choice, not a live count. It used to be "distinct values above
@@ -191,41 +192,6 @@ function DraftText({ draft, initial, multiline, onFilled, ...rest }: {
     : <input {...(rest as React.InputHTMLAttributes<HTMLInputElement>)} value={v} onChange={change} />;
 }
 
-function Participation({ p }: { p?: ViewParticipation }) {
-  if (!p || !p.studies.length) return null;
-  // Two ORTHOGONAL facts, deliberately not merged into one word. The method is
-  // uniform — every view but the oncoprint is computed from aggregates no matter
-  // who answers — so a label like "mixed" would wrongly suggest the feature
-  // itself varies. What can vary is the SOURCES: whether some study was answered
-  // by an instance that will not disclose patients, or by a remote peer.
-  const restricted = p.studies.filter(x => x.mode === "aggregate-only");
-  const remotes = restricted.filter(x => x.remote);
-  const method = p.requiresPatientLevel ? "patient-level" : "aggregate-only";
-  const methodTitle = p.requiresPatientLevel
-    ? "This view's output IS patients, so it needs identities from each contributing instance; an aggregate-only participant cannot contribute columns."
-    : "Computed entirely from aggregates. Every participant answered with counts — no identifier was needed from any of them, whatever each instance would have permitted.";
-  const srcTitle = p.studies.map(x =>
-    x.study + " — " + x.mode + (x.remote ? " (remote MCP peer)" : "")).join("\n");
-  const srcLabel = !restricted.length ? null
-    : remotes.length === restricted.length
-      ? restricted.length + (restricted.length === 1 ? " source via MCP peer" : " sources via MCP peers")
-      : restricted.length + (restricted.length === 1 ? " aggregate-only source" : " aggregate-only sources");
-  return (
-    <span className="partwrap">
-      <span className={"partbadge " + (p.requiresPatientLevel ? "pl" : "agg")}
-        title={methodTitle + "\n\n" + srcTitle}>
-        <i aria-hidden="true" />{method}
-      </span>
-      {srcLabel && (
-        <span className="partbadge src"
-          title={srcTitle + "\n\nNo patient identifier left " +
-            restricted.map(x => x.study).join(", ") + "."}>
-          {srcLabel}
-        </span>
-      )}
-    </span>
-  );
-}
 
 /** the same value for a table cell, where the column header already says "p" */
 const pCell = (p: number): string =>
@@ -295,7 +261,8 @@ function KMChart({ curves, cutoffMonths, tickMonths, incidence }:
 /** Explore opens on these: one deeply-annotated MSK study and one large
  *  consortium cohort on the peer instance, so federation is visible up front. */
 
-const EMPTY_DOC: AnalysisDoc = { cohorts: {}, views: [] };
+// already the current version, so opening the page normalizes (and writes into the URL) nothing
+const EMPTY_DOC: AnalysisDoc = { dsl: DOC_VERSION, cohorts: {}, views: [] };
 // "compare" dropped from the default set: computing driver/any/p for 7 genes
 // across every cohort is by far the slowest of the three, and this set exists
 // to make Analyze feel instant, not to be exhaustive — add it back per-document
@@ -366,6 +333,9 @@ export default function AnalysisPage() {
   // ?doc= link's loading skeleton), so nothing here needs them to be reactive.
   const params = useSearchParams();
   const sp: SearchParams = Object.fromEntries(params.entries());
+  // the ?doc= link as the page was opened with it: by the time the mount effect reads it, the
+  // document store may already have written the URL
+  const openedWith = useRef(typeof sp.doc === "string" ? sp.doc : null);
   const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">(() => tabFromParams(sp));
   /** The "Saved" tab's own sub-tabs (Cohorts / Analyses) — these used to be
    *  two separate top-level tabs ("Cohorts" and "Saved") with a cross-link
@@ -403,49 +373,9 @@ export default function AnalysisPage() {
   const tabRef = useRef<string>(tabFromParams(sp));            // the tab syncUrl should record
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
   const exAbort = useRef<AbortController | null>(null);      // cancel a facet request the reader has moved past
-  /**
-   * Stable React keys for view cards, by the identity of the DRAFT view object
-   * that produced each one — not the array index, and not the objects in
-   * `result.views` itself, which the server rebuilds from scratch on every
-   * run() and so would remount every card on every edit, including ones
-   * nobody touched. `doc.views[i]` keeps its object reference across
-   * addView, removeView and patchView (they only ever replace the one view
-   * that changed), and moveView explicitly swaps those references rather
-   * than cloning them, so a card's key travels with it when it moves.
-   *
-   * `resultViewKeys` is the actual per-render lookup (index in result.views
-   * -> stable key), snapshotted by run() from the SAME `d` it just sent,
-   * not re-derived from the live `doc` state at render time — `doc` can
-   * already hold the next edit (one more/fewer view) by the time a slower
-   * run() resolves, and indexing into it with `result.views`' index during
-   * that window pairs each view with the WRONG doc entry, which briefly
-   * looks to React like every view past the edit point turned into a
-   * different one and remounted it (an oncoprint losing its already-drawn
-   * canvas to a needless refetch, mid-edit).
-   */
-  const viewKeys = useRef(new WeakMap<object, number>());
-  const nextViewKey = useRef(0);
-  const resultViewKeys = useRef<number[]>([]);
   /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
   const menuOpenRef = useRef(new Map<string, boolean>());
   const moreDerivedMenu = useGearmenuOpen("explore:more-derivations", menuOpenRef.current);
-  const keyFor = (v: object): number => {
-    let k = viewKeys.current.get(v);
-    if (k == null) { k = nextViewKey.current++; viewKeys.current.set(v, k); }
-    return k;
-  };
-  /**
-   * Which view cards are mid-recompute from a ONE-view delta request (see
-   * runViewDelta below) — not the same thing as `busy`, which also covers a
-   * full run() of the whole document. Keyed by the same stable `keyFor` id
-   * as `resultViewKeys`, so a card's own spinner tracks whether ITS query is
-   * running, not whether some unrelated view's is.
-   */
-  const [pendingKeys, setPendingKeys] = useState<Set<number>>(new Set());
-  // per-key generation counter: a delta response only applies if it's still
-  // the newest one requested for that key, so firing a second edit before
-  // the first one's response lands can't have the first response clobber it
-  const deltaGen = useRef(new Map<number, number>());
   const [cat, setCat] = useState<any>(null);                 // event/endpoint catalog for the survival control
   const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>"
   /**
@@ -454,7 +384,10 @@ export default function AnalysisPage() {
    * taking up permanent width beside the results.
    */
   const docDialog = useRef<HTMLDialogElement | null>(null);
-  const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
+  // the document, its views' ids and the JSON editor's text (app/lab/doc-store.ts); every new
+  // document goes into the URL, so a refresh or a shared link shows exactly it
+  const docs = useDocStore(EMPTY_DOC, (d) => syncUrl(undefined, d));
+  const doc = docs.current.doc;
   // Requests that carry a spec rather than the document (the oncoprint's own fetch) resolve pins
   // from here. Set during render, not in an effect: a child's effects run before its parent's,
   // so the figure's fetch would otherwise go out with the previous document's pins.
@@ -463,26 +396,27 @@ export default function AnalysisPage() {
   const unresolvedCount = unresolvedUploads(doc).length;
   const wasUnresolved = useRef(0);
   useEffect(() => {
-    if (wasUnresolved.current > 0 && unresolvedCount === 0 && Object.keys(doc.cohorts || {}).length) { setError(null); run(doc); }
+    if (wasUnresolved.current > 0 && unresolvedCount === 0 && Object.keys(doc.cohorts || {}).length) { setError(null); rerunAnalysis(queryClient); }
     wasUnresolved.current = unresolvedCount;
   }, [unresolvedCount]); // eslint-disable-line
-  const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const docText = docs.current.text;
   /**
    * Decoded oncoprint contracts, keyed by the spec they came from rather than by view index.
    * A re-run that leaves a figure's spec unchanged does not refetch it, so keying by index and
    * clearing on every run left the header and the provenance panel permanently empty.
    */
   const [contracts, setContracts] = useState<Record<string, UnpackedContract>>({});
-  // Starts true exactly when a ?doc= link means the mount effect below is
-  // about to call run(d) — same reasoning, and the same `sp` (not a
-  // client-only re-read of window.location), as tabFromParams above: without
-  // this, the first render shows "Nothing here yet" (busy=false, no result
-  // yet) for one frame before that effect flips busy on, which is the flash.
-  // A malformed link's catch block below resets this, so a bad ?doc= doesn't
-  // leave the page stuck on the loading skeleton forever.
-  const [busy, setBusy] = useState(() => typeof sp.doc === "string");
-  const [error, setError] = useState<string | null>(null);
+  // Starts true exactly when a ?doc= link means the mount effect below is about to load it — same
+  // reasoning, and the same `sp` (not a client-only re-read of window.location), as tabFromParams
+  // above: without this, the first render shows "Nothing here yet" for one frame before the
+  // document arrives, which is the flash. The mount effect clears it, a malformed link included.
+  const [linkLoading, setLinkLoading] = useState(() => typeof sp.doc === "string");
+  /** the AI tools' edit being checked by the engine before it reaches the page */
+  const [validating, setValidating] = useState(false);
+  /** what went wrong outside the analysis itself (a refused action, a bad link); the analysis's own error is the query's */
+  const [uiError, setError] = useState<string | null>(null);
+  // a different document starts with nothing to apologise for
+  useEffect(() => { setError(null); }, [docs.current.doc]);
   const [saved, setSaved] = useState<Record<string, { id: string; def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null }>>({});
   const [cName, setCName] = useState("");
   const [cDefText, setCDefText] = useState(JSON.stringify({ all: [] }, null, 2));
@@ -490,6 +424,29 @@ export default function AnalysisPage() {
   const [studies, setStudies] = useState<{ id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string }[]>([]);
   const studyNames = useMemo(() => new Map(studies.map((s) => [s.id, s.name] as const)), [studies]);
   const [study, setStudy] = useState("msk_chord_2024");
+
+  // ---- the analysis: queries keyed by what decides each answer (app/lab/use-analysis.ts) ----------
+  // A document is asked about as the current version (lib/doc-version.ts) with any server-stored
+  // custom data it names pinned, so a shared link reads the same version; the page then holds,
+  // shows and saves that shape. Until it does, nothing is sent.
+  const queryClient = useQueryClient();
+  let normalized: AnalysisDoc | null = null, normalizeError: string | null = null;
+  try { normalized = bindUploads(upgradeDocument(doc).doc); }
+  catch (e) { normalizeError = String((e as Error)?.message || e); }
+  useEffect(() => {
+    // a linked document is normalized once it is loaded, not the empty one standing in for it
+    if (linkLoading || !normalized || normalized === doc) return;
+    const up = upgradeDocument(doc);
+    if (up.upgrade) setUpgradeNote(up.upgrade);
+    docs.set(normalized);
+  }, [normalized, linkLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  const analysis = useAnalysis(doc, docs.current.ids, docs.current.epoch, study, normalized === doc);
+  const result = analysis.result;
+  /** each view's id, in the document's (and so the result's) order: what a card is keyed by */
+  const viewIds = docs.current.ids;
+  const pendingKeys = analysis.pending;
+  const busy = analysis.busy || validating || linkLoading;
+  const error = uiError || normalizeError || analysis.error;
   const [explore, setExplore] = useState<ExploreResult | null>(null);
   const [exploreBusy, setExploreBusy] = useState(false);
   const [trackAttrs, setTrackAttrs] = useState<{ key: string; attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[]; gaProfiles: string[] }>({ key: "", attrs: [], profiles: [], gaProfiles: [] }); // track picker options
@@ -643,105 +600,26 @@ export default function AnalysisPage() {
     setSaved(prev => { const nx = { ...prev }; delete nx[name]; return nx; });
   };
 
-  const run = async (d0: AnalysisDoc = doc) => {
-    // bring an older document to the current version (lib/doc-version.ts) — the page then holds,
-    // shows and saves the current shape — and pin any server-stored custom data it names, so a
-    // shared link reads the same version
-    let d: AnalysisDoc;
-    try {
-      const up = upgradeDocument(d0);
-      if (up.upgrade) setUpgradeNote(up.upgrade);
-      d = bindUploads(up.doc);
-    }
-    catch (e) { setBusy(false); setError(String((e as Error)?.message || e)); return; }
-    if (d !== d0) { setDoc(d); setDocText(JSON.stringify(d, null, 2)); }
-    if (!Object.keys(d.cohorts || {}).length) { setBusy(false); setResult(null); return; }
-    setBusy(true); setError(null);
-    try {
-      const payload = { study: d.study || study, ...d };
-      // the page draws its own oncoprints from the binary contract, so the run returns
-      // a spec for each one instead of a server-rendered SVG
-      const res = await fetch("/api/analysis?oncoprint=spec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const j = await res.json();
-      if (j.error) throw new Error(j.error);
-      // aligned with `d`, the document THIS run actually sent — not `doc`,
-      // which may already hold a further edit by the time this resolves
-      resultViewKeys.current = (d.views || []).map((v: any) => keyFor(v));
-      setResult(j);
-      syncUrl(undefined, d);
-    } catch (e) { setError(String((e as Error)?.message || e)); }
-    setBusy(false);
-  };
-
-  /**
-   * Recompute ONE view instead of the whole document. `runAnalysis` doesn't
-   * care how many views it's given — it just loops over `doc.views` — so a
-   * request carrying only `view` still re-evaluates the cohorts (cheap, and
-   * kept authoritative rather than trusting a client-cached count) but skips
-   * every OTHER view's queries entirely. That's a real cost saved, not just
-   * a cosmetic one: a full run() re-hits ClickHouse for every cohort AND
-   * every other view on the page, every time, because nothing in
-   * runAnalysis is cached across calls.
-   *
-   * Deliberately does NOT touch the global `busy` flag — that's what made
-   * Survival/Cox show a spinner for edits to a completely different view,
-   * since both read `busy` for their own "recomputing" indicator. This sets
-   * `pendingKeys` instead, scoped to just this view's stable key.
-   *
-   * The response is spliced into `result.views` by KEY, found via
-   * `resultViewKeys.current` at the moment the response lands — not the
-   * index captured when the request was made. addView/patchView/updateView
-   * all keep `resultViewKeys.current` in lockstep with `doc.views`
-   * synchronously, before this fetch even starts, so this finds the right
-   * slot even if another view was added, removed or reordered while this
-   * one was still in flight. If the key is gone (the view was removed
-   * before its answer came back), the response is just discarded.
-   */
-  const runViewDelta = async (d: AnalysisDoc, view: any) => {
-    const key = keyFor(view);
-    const gen = (deltaGen.current.get(key) ?? 0) + 1;
-    deltaGen.current.set(key, gen);
-    setPendingKeys(prev => new Set(prev).add(key));
-    const applyToSlot = (vr: unknown) => setResult(prev => {
-      if (!prev) return prev;
-      const idx = resultViewKeys.current.indexOf(key);
-      if (idx < 0) return prev; // removed before this delta came back
-      const views = [...prev.views];
-      views[idx] = vr as typeof views[number];
-      return { ...prev, views };
-    });
-    try {
-      const payload = { ...d, views: [view] };
-      const res = await fetch("/api/analysis?oncoprint=spec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const j = await res.json();
-      if (deltaGen.current.get(key) !== gen) return; // superseded by a later edit to this same view
-      if (j.error) throw new Error(j.error);
-      const vr = j.views && j.views[0];
-      if (!vr) throw new Error("no result for this view");
-      applyToSlot(vr);
-    } catch (e) {
-      if (deltaGen.current.get(key) !== gen) return;
-      applyToSlot({ kind: view.kind, error: String((e as Error)?.message || e) });
-    } finally {
-      if (deltaGen.current.get(key) === gen) setPendingKeys(prev => { if (!prev.has(key)) return prev; const nx = new Set(prev); nx.delete(key); return nx; });
-    }
-  };
-
   // Saved cohorts and analyses belong to the login (lib/auth.ts): read when it is in, cleared
   // when it goes, so a logged-out page never shows someone's saved work.
   const loggedIn = customState.unlocked;
   useEffect(() => {
     if (!loggedIn) { setSaved({}); setSpaces({}); return; }
+    // a reply that lands after logging out must not put the saved work back on the page
+    let live = true;
     fetch("/api/artifacts?kind=cohort").then(r => r.json()).then(j => {
+      if (!live) return;
       const map: typeof saved = {};
       for (const a of j.artifacts || []) map[a.name] = { id: a.id, def: a.definition, savedAt: fmtDate(a.updatedAt), lastEval: null };
       setSaved(map);
     }).catch(() => {});
     fetch("/api/artifacts?kind=workspace").then(r => r.json()).then(j => {
+      if (!live) return;
       const map: typeof spaces = {};
       for (const a of j.artifacts || []) map[a.name] = { id: a.id, doc: a.definition, savedAt: fmtDate(a.updatedAt) };
       setSpaces(map);
     }).catch(() => {});
+    return () => { live = false; };
   }, [loggedIn]);
   /** Saving needs the login: logged out, ask for it rather than fail. Returns true when saving may go ahead. */
   const canSave = (): boolean => {
@@ -770,13 +648,12 @@ export default function AnalysisPage() {
     // a pie belonged — reflected the wrong population until the next click
     // quietly re-scoped everything and the shapes changed under the reader.
     try {
-      const b64 = new URLSearchParams(window.location.search).get("doc");
+      const b64 = openedWith.current;
       if (b64) {
         const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0))));
         if (d.study) { setStudy(d.study); setExStudies([d.study]); exSel.current = [d.study]; }
-        setDoc(d); setDocText(JSON.stringify(d, null, 2));
+        docs.replace(d);
         if (tabRef.current === "explore") fetchExplore();
-        run(d);
       } else {
         // ?study=a,b opens Explore scoped to those studies (the data sets page links here)
         const only = (new URLSearchParams(window.location.search).get("study") || "")
@@ -784,7 +661,8 @@ export default function AnalysisPage() {
         if (only.length) { setStudy(only[0]); setExStudies(only); exSel.current = only; }
         if (tabRef.current === "explore") fetchExplore();
       }
-    } catch (e) { setBusy(false); setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
+    } catch (e) { setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
+    setLinkLoading(false);
   }, []); // eslint-disable-line
 
   /**
@@ -792,9 +670,9 @@ export default function AnalysisPage() {
    * lands on the same tab. `doc` and `tab` are written together — writing one
    * with a bare "?tab=…" would drop the other.
    */
-  // run() writes the URL too, and during the mount effect its closure still
-  // holds the initial tab — so the current tab is read from a ref, never from
-  // the render closure, or a shared ?doc= link would record the wrong tab.
+  // The document store writes the URL too, from whatever closure set the document — during the
+  // mount effect that still holds the initial tab — so the current tab is read from a ref, never
+  // from the render closure, or a shared ?doc= link would record the wrong tab.
   const syncUrl = (nextTab?: string, d?: AnalysisDoc | null) => {
     try {
       const q = new URLSearchParams(window.location.search);
@@ -808,7 +686,7 @@ export default function AnalysisPage() {
   const goTab = (t: typeof TABS[number]) => { tabRef.current = t; setTab(t); syncUrl(t); };
 
   const applyText = () => {
-    try { const d = JSON.parse(docText); setDoc(d); run(d); }
+    try { const d = JSON.parse(docText); docs.set(d); }
     catch (e) { setError("document JSON: " + String((e as Error)?.message || e)); }
   };
 
@@ -853,10 +731,9 @@ export default function AnalysisPage() {
     const nextStudy = exSel.current[0] || study;
     const nd: AnalysisDoc = { study: nextStudy, cohorts: { [name]: d }, views: DEFAULT_VIEWS };
     setStudy(nextStudy);
-    setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
-    setResult(null); setError(null);     // never leave the previous run's numbers on screen
+    docs.replace(nd);
+    setError(null);     // never leave the previous run's numbers on screen
     goTab("analysis");
-    run(nd);
   };
   /**
    * Analyze the selection split by one facet: the same fresh analysis as Analyze, with the
@@ -876,10 +753,9 @@ export default function AnalysisPage() {
       const nd: AnalysisDoc = editSplits({ ...base, dsl: DOC_VERSION, views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, sn)] })) },
         (f) => ({ ...f, partitions: { [splitKey(name, sn)]: { ...def, split: sn } } }));
       setStudy(nextStudy);
-      setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
-      setResult(null); setError(null);
+      docs.replace(nd);
+      setError(null);
       goTab("analysis");
-      run(nd);
     } catch (e) { setExMsg("Could not split by " + label + ": " + String((e as Error)?.message || e)); }
     setSplittingBy(null);
   };
@@ -907,10 +783,9 @@ export default function AnalysisPage() {
     const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: { ...parent, splits: { [label]: { arms: r.arms } } } },
       views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, label)] })) };
     setStudy(nextStudy);
-    setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
-    setResult(null); setError(null);
+    docs.replace(nd);
+    setError(null);
     goTab("analysis");
-    run(nd);
   };
   /**
    * Saving asks for a name when you ask to save, rather than keeping a field in
@@ -1103,12 +978,7 @@ export default function AnalysisPage() {
     const all = doc.views || [];
     const keep = all.map((v: any, j: number) => !drop(v, j));
     const views = all.filter((_: any, j: number) => keep[j]);
-    const d = { ...doc, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    syncUrl(undefined, d);
-    if (!views.length) { setResult(null); return; }   // nothing left to show
-    setResult(prev => prev ? { ...prev, views: prev.views.filter((_, j) => keep[j]) } : prev);
-    resultViewKeys.current = resultViewKeys.current.filter((_, j) => keep[j]);
+    docs.set({ ...doc, views });
   };
   const removeView = (i: number) => removeViews((_, j) => j === i);
 
@@ -1120,17 +990,7 @@ export default function AnalysisPage() {
     const views = [...(doc.views || [])];
     if (j < 0 || j >= views.length) return;
     [views[i], views[j]] = [views[j], views[i]];
-    const d = { ...doc, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    syncUrl(undefined, d);
-    if (result) {
-      const rviews = [...result.views];
-      [rviews[i], rviews[j]] = [rviews[j], rviews[i]];
-      setResult({ ...result, views: rviews });
-      const rk = [...resultViewKeys.current];
-      [rk[i], rk[j]] = [rk[j], rk[i]];
-      resultViewKeys.current = rk;
-    }
+    docs.set({ ...doc, views });
   };
 
   const addView = (kind: string) => {
@@ -1182,21 +1042,8 @@ export default function AnalysisPage() {
           outcome: { source: "alteration", gene: genes[0] || "TP53", by: "mutated" }, outcomeEvent: "Mutated",
           covariates: [{ source: "clinical", attribute: viewAttrs()[0] || "SEX" }] }
       : { kind, genes };
-    const d = { ...doc, views: [v, ...(doc.views || [])] };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    syncUrl(undefined, d);
-    // No prior result to keep the OTHER cards from — a fresh analysis's
-    // very first view has nothing to diff against, so it needs a real run().
-    if (!result) { run(d); return; }
-    // Otherwise: every existing card already has a valid answer that adding
-    // one more view doesn't change, so only the new view goes to the server.
-    // resultViewKeys.current is kept in lockstep with doc.views right here,
-    // synchronously, before the request even starts — see runViewDelta's
-    // comment for why that matters once the response comes back.
-    const key = keyFor(v);
-    resultViewKeys.current = [key, ...resultViewKeys.current];
-    setResult(prev => prev ? { ...prev, views: [{ kind: v.kind, pending: true } as any, ...prev.views] } : prev);
-    runViewDelta(d, v);
+    // only the new view is asked for: every other card's answer is already cached under its key
+    docs.set({ ...doc, views: [v, ...(doc.views || [])] });
   };
 
   const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
@@ -1579,25 +1426,13 @@ export default function AnalysisPage() {
     return () => { dead = true; };
   }, [study]);
 
-  /** Rewrite one view in the document and recompute just that one (see
-   *  runViewDelta) — editing this view's settings can't change any OTHER
-   *  view's answer, only its own. */
+  /** Rewrite one view in the document; only its own query re-runs (use-analysis.ts) — editing this
+   *  view's settings can't change any OTHER view's answer. */
   const patchView = (i: number, patch: Record<string, unknown>) => {
-    const views = (doc.views || []).map((v: any, j: number) => {
-      if (j !== i) return v;
-      const nv = { ...v, ...patch };
-      // see updateView's comment: keyFor() is by object identity, and this always
-      // makes a new object, so the edited view's own key must be carried over by
-      // hand or the card being edited is the one that remounts.
-      const k = viewKeys.current.get(v);
-      if (k != null) viewKeys.current.set(nv, k);
-      return nv;
-    });
+    // a new object at the same position keeps its view id (app/lab/doc-store.ts), so the card is not remounted
+    const views = (doc.views || []).map((v: any, j: number) => j === i ? { ...v, ...patch } : v);
     for (const v of views as any[]) if (v.anchor == null) delete v.anchor;   // null means "study baseline"
-    const d = { ...doc, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    syncUrl(undefined, d);
-    runViewDelta(d, views[i]);
+    docs.set({ ...doc, views });
   };
 
   // the creator's quick-add row needs the study catalog even before Explore is visited
@@ -1606,22 +1441,10 @@ export default function AnalysisPage() {
   }, [tab, study, explore]); // eslint-disable-line
 
   const updateView = (vi: number, patch: (v: any) => any) => {
-    const views = (doc.views || []).map((v, i: number) => {
-      if (i !== vi) return v;
-      const nv = patch(v);
-      // keyFor() looks up a view by object identity, and `patch` always returns a
-      // new object — carry the old one's key over, or every edit (a checkbox, a
-      // gene, an anchor) would read as "this view is gone, a new one appeared" and
-      // remount the very card being edited: closing any open menu on it, and
-      // dropping the oncoprint canvas it had already drawn.
-      const k = viewKeys.current.get(v);
-      if (k != null) viewKeys.current.set(nv, k);
-      return nv;
-    });
-    const d = { ...doc, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    syncUrl(undefined, d);
-    runViewDelta(d, views[vi]);
+    // the edited view keeps its id (app/lab/doc-store.ts): its card is not remounted, and the
+    // re-run's answer finds its slot
+    const views = (doc.views || []).map((v, i: number) => i === vi ? patch(v) : v);
+    docs.set({ ...doc, views });
   };
 
   /**
@@ -1632,7 +1455,7 @@ export default function AnalysisPage() {
   const updateViewLocal = (vi: number, patch: (v: any) => any) => {
     const views = (doc.views || []).map((v, i: number) => i === vi ? patch(v) : v);
     const d = { ...doc, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
+    docs.set(d);
   };
 
   /**
@@ -1668,7 +1491,7 @@ export default function AnalysisPage() {
     if (!name) return;
     wsDialog.current?.close();
     const d = { ...doc, title: name };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    docs.set(d);
     setWsError(null);
     try {
       await persistSpaces(name, d);
@@ -1678,11 +1501,10 @@ export default function AnalysisPage() {
     const w = spaces[name];
     if (!w) return;
     const d = w.doc;
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    setResult(null); setError(null);
+    docs.replace(d);
+    setError(null);
     if (d.study) setStudy(d.study);
     goTab("analysis");
-    run(d);
   };
   const deleteWorkspace = async (name: string) => {
     setWsError(null);
@@ -1698,16 +1520,16 @@ export default function AnalysisPage() {
     const d = parameterize(doc) as AnalysisDoc;
     if (d === doc) { setError("nothing to lift: a template needs a study, or a gene list that every gene view shares"); return; }
     setError(null);
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
+    docs.set(d);
   };
   /** Change one parameter and re-run — the whole point of a template. */
   const setParam = (key: string, value: unknown) => {
     const d = { ...doc, params: { ...(doc.params || {}), [key]: value } };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
+    docs.set(d);
   };
   const setNotes = (text: string) => {
     const d = { ...doc, notes: text };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));   // no re-run: prose changes no numbers
+    docs.set(d);   // no re-run: prose changes no numbers
   };
 
   const openGenes = (vi: number) => { setGenesFor(vi); genesDialog.current?.showModal(); };
@@ -1734,516 +1556,7 @@ export default function AnalysisPage() {
     updateView(vi, v => pruneSort({ ...v, genes }));
 
 
-  function GeneEditor({ vi }: { vi: number }) {
-    // the DOCUMENT's view, never the result (a result's genes are {gene, driverPct, …})
-    return <GeneListEditor view={(doc.views || [])[vi] || {}} busy={busy} onGenes={(g) => setViewGenes(vi, g)} />;
-  }
 
-  /**
- * One axis of a plot. The source decides what else is asked for: a clinical attribute, a gene
- * in a molecular profile, or a gene's alterations. It is the same vocabulary the engine uses,
- * so what the reader picks is what the document says.
- */
-function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChange, allowNone, categorical }: {
-  side: string; axis: any; busy?: boolean;
-  attrs: { attribute: string; kind: string }[]; profiles: string[];
-  /** the attribute/profile catalog is still being fetched: its select waits with a loader */
-  loading?: boolean;
-  onChange: (a: any) => void;
-  /** a colour is optional in a way an axis is not */
-  allowNone?: boolean;
-  /** colours come from categories, so a molecular value is not on offer */
-  categorical?: boolean;
-}) {
-  const a = axis || {};
-  const src = axis ? (a.source || "clinical") : "none";
-  const set = (next: any) => onChange(next);
-  return (
-    <span className="axispick">
-      <span className="tbl">{side}</span>
-      <select value={src} disabled={busy} title="what this axis measures"
-        onChange={(e) => {
-          const s = e.target.value;
-          // Keep whatever this axis last held for each source (spreading `a` rather than
-          // starting fresh), so switching away and back round-trips instead of always
-          // reverting to the catalog's first entry — a molecular axis already did this for
-          // its gene; clinical's attribute and molecular's profile now do too.
-          set(s === "none" ? undefined
-            : s === "clinical" ? { ...a, source: "clinical", attribute: a.attribute || (attrs[0] || {}).attribute || "" }
-            : s === "molecular" ? { ...a, source: "molecular", profileType: a.profileType || profiles[0] || "", gene: a.gene || "TP53" }
-            : { ...a, source: "alteration", gene: a.gene || "TP53", by: a.by || "mutationType" });
-        }}>
-        {allowNone && <option value="none">none</option>}
-        <option value="clinical">clinical</option>
-        {!categorical && <option value="molecular">molecular</option>}
-        <option value="alteration">alteration</option>
-      </select>
-      {src === "clinical" && loading && !attrs.length && <Waiting what="attributes" />}
-      {src === "clinical" && !(loading && !attrs.length) && (
-        <select value={a.attribute || ""} disabled={busy} title="which clinical attribute"
-          onChange={(e) => set({ ...a, attribute: e.target.value })}>
-          {!attrs.some((x) => x.attribute === a.attribute) && <option value={a.attribute || ""}>{a.attribute || "(none)"}</option>}
-          {attrs.map((x) => <option key={x.attribute} value={x.attribute}>{attributeLabel(x.attribute)}{x.kind === "num" ? "" : " (categorical)"}</option>)}
-        </select>
-      )}
-      {src === "molecular" && <>
-        {loading && !profiles.length ? <Waiting what="profiles" /> :
-        <select value={a.profileType || ""} disabled={busy} title="which molecular profile"
-          onChange={(e) => set({ ...a, profileType: e.target.value })}>
-          {!profiles.includes(a.profileType || "") && <option value={a.profileType || ""}>{a.profileType || "(none)"}</option>}
-          {profiles.map((pt) => <option key={pt} value={pt}>{pt}</option>)}
-        </select>}
-        <GeneInput gene={a.gene || ""} busy={busy} onCommit={(gene) => set({ ...a, gene })} />
-      </>}
-      {src === "alteration" && <>
-        <GeneSetInput genes={a.genes && a.genes.length ? a.genes : a.gene ? [a.gene] : []} busy={busy}
-          onCommit={(genes) => {
-            // A gene SET (2+) only supports "mutated vs not" — combining several genes'
-            // mutation types or copy-number states into one category has no honest reading,
-            // so switching to a set falls back to that rather than leaving an axis the
-            // engine would refuse.
-            const by = genes.length > 1 && a.by && a.by !== "mutated" ? "mutated" : a.by;
-            set(genes.length > 1 ? { ...a, gene: undefined, genes, by }
-              : { ...a, genes: undefined, gene: genes[0] || "", by });
-          }} />
-        <select value={a.by || (a.genes && a.genes.length > 1 ? "mutated" : "mutationType")} disabled={busy || (a.genes && a.genes.length > 1)}
-          title={a.genes && a.genes.length > 1 ? "a gene set only supports \"mutated vs not\"" : "how the gene's alterations are grouped"}
-          onChange={(e) => set({ ...a, by: e.target.value })}>
-          <option value="mutationType">mutation type</option>
-          <option value="mutated">mutated vs not</option>
-          <option value="cna">copy number</option>
-        </select>
-      </>}
-    </span>
-  );
-}
-
-/**
- * A gene name typed into a plot axis, debounced before it reaches the document/URL. Committing
- * on every keystroke (as the rest of this axis picker does for selects) meant an in-progress
- * edit — including the empty string between deleting the old gene and typing the new one —
- * briefly became the shareable link, which the compiler then rejects ("a molecular axis needs
- * one gene"). A short pause before committing keeps that mid-edit state local to the input.
- */
-function GeneInput({ gene, busy, onCommit }: { gene: string; busy?: boolean; onCommit: (gene: string) => void }) {
-  const [draft, setDraft] = useState(gene);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => setDraft(gene), [gene]);
-  const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); onCommit(v); };
-  return (
-    <input className="axisgene" value={draft} disabled={busy} placeholder="gene"
-      onChange={(e) => {
-        const v = e.target.value.toUpperCase();
-        setDraft(v);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => onCommit(v), 500);
-      }}
-      onBlur={() => commit(draft)} />
-  );
-}
-
-/**
- * One gene, or a gene SET typed as a comma-separated list ("TP53,KRAS,PIK3CA") — an alteration
- * axis's "is ANY of these altered" covariate. Same debounce-before-commit shape as GeneInput, for
- * the same reason: committing every keystroke would briefly make an empty or half-typed gene
- * list the shareable link, which the compiler then rejects.
- */
-function GeneSetInput({ genes, busy, onCommit }: { genes: string[]; busy?: boolean; onCommit: (genes: string[]) => void }) {
-  const joined = genes.join(",");
-  const [draft, setDraft] = useState(joined);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => setDraft(joined), [joined]);
-  const parse = (v: string) => v.split(",").map((g) => g.trim().toUpperCase()).filter(Boolean);
-  const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); onCommit(parse(v)); };
-  return (
-    <input className="axisgene geneset" value={draft} disabled={busy} placeholder="gene, or gene,gene,... for a set" size={Math.max(8, Math.min(30, draft.length + 2))}
-      title={'one gene, or a comma-separated gene set ("is any of these altered")'}
-      onChange={(e) => {
-        const v = e.target.value.toUpperCase();
-        setDraft(v);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => onCommit(parse(v)), 500);
-      }}
-      onBlur={() => commit(draft)} />
-  );
-}
-
-/**
- * A gearmenu's open/closed state, keyed by a caller-chosen id, read from a
- * store the page keeps in a ref (see `menuOpenRef` in AnalysisPage) rather
- * than in this module's own top-level state. An edit to the very view a menu
- * belongs to (ticking a cohort, changing an anchor — anything that runs
- * updateView/patchView) makes Next.js re-evaluate this whole module — a
- * plain module-level Map would be a fresh, empty one on the next read, same
- * as every function declared here, ViewHead and PickMenu included, being a
- * new object each time. A `useRef` on the page's own component survives
- * that (its hooks live on the fiber, not on this module), which is also why
- * `doc`/`result`/etc. were never at risk — only bindings that live at this
- * module's top level are.
- *
- * A native `<details>` has no memory of its own across a remount like that,
- * so without this it silently reopens closed the moment you interact with
- * something inside it. This restores it synchronously before the browser
- * paints, so the close is never visible, and stays current on every
- * open/close however it happens — a click on the summary, or
- * PopoverAutoClose's outside-click/Escape handler, both fire the same
- * native "toggle" event this listens for.
- */
-function useGearmenuOpen(id: string, store: Map<string, boolean>) {
-  const ref = useRef<HTMLDetailsElement>(null);
-  useLayoutEffect(() => {
-    if (store.get(id) && ref.current) ref.current.open = true;
-  }, [id, store]);
-  const onToggle = (e: React.SyntheticEvent<HTMLDetailsElement>) => store.set(id, e.currentTarget.open);
-  return { ref, onToggle };
-}
-
-/**
- * The "?" in every view's header: a plain-language explanation of what this KIND of view is —
- * for a reader who isn't a scientist, not the DSL's own precise documentation (lib/dsl-reference.ts
- * is for someone writing a document; this is for someone reading the figure). One component in
- * ViewHead means every view kind gets it for free, with nothing to add at each view's own JSX.
- */
-function ViewHelpButton({ kind, menuId, menuStore }: { kind: string; menuId: string; menuStore: Map<string, boolean> }) {
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
-  const help = VIEW_HELP[kind];
-  if (!help) return null;
-  return (
-    <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title="what this view is, in plain language" aria-label="what this view is, in plain language">?</summary>
-      <div className="gearmenu-items">
-        <p className="viewhelp-text">{help.text}</p>
-      </div>
-    </details>
-  );
-}
-
-/**
- * What a view's `splitBy` (set in the document; the page no longer offers it — cohort splits
- * replace it) actually did, once results are in: which raw values got pooled into
- * "Other" rather than getting their own arm, and how many patients landed in more than one arm.
- * Arms are never forced into a strict partition (a patient can match 2+ oql queries, or already
- * hold 2+ values of a sample-level attribute), so this is the one place that says by how much —
- * silence here would read as "these arms are disjoint," which isn't always true. Renders nothing
- * when there's nothing to disclose (a clean split with no pooling and no overlap).
- */
-function SplitByNote({ v }: { v: any }) {
-  const sb = v.splitBy;
-  if (!sb) return null;
-  const label = sb.gene ? "gene " + sb.gene : sb.oql ? "oql (" + sb.oql.length + " quer" + (sb.oql.length === 1 ? "y" : "ies") + ")" : sb.attribute;
-  const bits: string[] = [];
-  if (sb.otherValues && sb.otherValues.length)
-    bits.push("“Other” pools " + sb.otherValues.length + " value" + (sb.otherValues.length === 1 ? "" : "s") +
-      " not shown as its own arm: " + sb.otherValues.join(", "));
-  if (sb.overlapCount)
-    bits.push(sb.overlapCount.toLocaleString() + " patient" + (sb.overlapCount === 1 ? "" : "s") +
-      " counted toward more than one arm — split arms aren't a strict partition, so this can happen even outside “Other”");
-  if (!bits.length) return null;
-  return <p className="viewnote" title={"split “" + sb.cohort + "” by " + label}>{bits.join(" · ")}</p>;
-}
-
-/**
- * A checkbox menu in a view's header: which cohorts it uses, which attributes it compares.
- * One component, because these were the settings you could only reach by editing the JSON.
- */
-function PickMenu({ label, title, options, chosen, onChange, min, max, busy, loading, menuId, menuStore }: {
-  label: string; title: string; busy?: boolean; min?: number; max?: number; menuId: string; menuStore: Map<string, boolean>;
-  /** the options are still being fetched */
-  loading?: boolean;
-  options: { value: string; label: string; hint?: string }[];
-  chosen: string[]; onChange: (next: string[]) => void;
-}) {
-  const toggle = (v: string) => {
-    const has = chosen.includes(v);
-    if (has && min != null && chosen.length <= min) return;
-    onChange(has ? chosen.filter((x) => x !== v) : [...chosen, v]);
-  };
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
-  return (
-    <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title={title}>{label} ({chosen.length}){loading && !options.length && <span className="spinner" />}</summary>
-      <div className="gearmenu-items">
-        {options.length === 0 && (loading ? <Waiting what={label} /> : <span className="meta">nothing to choose from</span>)}
-        {options.map((o) => {
-          const on = chosen.includes(o.value);
-          const stuck = on ? (min != null && chosen.length <= min) : (max != null && chosen.length >= max);
-          return (
-            <label key={o.value} className="chk" title={stuck ? (on ? "a view needs at least " + min : "at most " + max) : undefined}>
-              <input type="checkbox" checked={on} disabled={busy || stuck} onChange={() => toggle(o.value)} />
-              {o.label}{o.hint && <span className="meta"> — {o.hint}</span>}
-            </label>
-          );
-        })}
-      </div>
-    </details>
-  );
-}
-
-/** one row of a view's cohort picker: a cohort, one of its splits, or one of a split's groups */
-interface CohortNode { name: string; label: string; kind: "cohort" | "split" | "arm"; depth: number; count: number | null; groups?: number }
-
-/**
- * Which cohorts a view draws, as the tree they come from: each cohort, its splits under it, each
- * split collapsed to one row that draws all its groups, opened (▸) to pick single groups. Rules,
- * applied as you click rather than refused after:
- *   - ticking anything unticks its own parent and children (a cohort and its own split's groups
- *     would count the same patients twice), so moving between levels is one click;
- *   - a view draws EITHER whole cohorts OR the groups of one split: ticking a split, or a group of
- *     one, replaces whole cohorts and any other split's; ticking a whole cohort replaces a split;
- *   - whole cohorts combine with each other; a one-cohort view (max 1) behaves like radio buttons;
- *   - the last ticked item cannot be unticked — ticking another switches to it.
- */
-function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuStore }: {
-  nodes: CohortNode[]; chosen: string[]; max?: number; busy?: boolean;
-  onChange: (next: string[]) => void; menuId: string; menuStore: Map<string, boolean>;
-}) {
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
-  const byName = new Map(nodes.map((x) => [x.name, x] as const));
-  const splits = nodes.filter((x) => x.kind === "split");
-  /** the split a name draws from: itself if a split, else the deepest split it sits under */
-  const ownerOf = (n: string): string | null => byName.get(n)?.kind === "split" ? n
-    : splits.filter((x) => n.startsWith(x.name + " / ")).sort((a, b) => b.name.length - a.name.length)[0]?.name ?? null;
-  const related = (a: string, b: string) => a === b || a.startsWith(b + " / ") || b.startsWith(a + " / ");
-  const groupsOf = (n: string) => byName.get(n)?.groups ?? 1;
-  const drawn = chosen.reduce((k, n) => k + groupsOf(n), 0);
-  const current = chosen.map(ownerOf).find((x) => x) ?? null;
-  // a split opens when one of its single groups is chosen, so what is ticked is always visible
-  const [open, setOpen] = useState<Set<string>>(() => new Set(chosen.map(ownerOf).filter((o, k) => o && o !== chosen[k]) as string[]));
-  // a view drawing one cohort cannot take a whole split: its splits are headings, open, to pick a group
-  const single = max === 1;
-  const hidden = (n: string) => !single && splits.some((x) => !open.has(x.name) && n.startsWith(x.name + " / "));
-  const choose = (n: string) => {
-    if (chosen.includes(n)) { if (chosen.length > 1) onChange(chosen.filter((c) => c !== n)); return; }
-    const owner = ownerOf(n);
-    let kept = max === 1 ? [] : chosen.filter((c) => !related(c, n));
-    // whole cohorts, or one split's groups — never a mix
-    kept = kept.filter((c) => ownerOf(c) === owner);
-    if (max != null && kept.length >= max) return;
-    onChange([...kept, n]);
-  };
-  const row = (o: CohortNode) => {
-    const on = chosen.includes(o.name);
-    const implied = !on && chosen.some((c) => o.name.startsWith(c + " / ") && byName.get(c)?.kind === "split");
-    const last = on && chosen.length === 1;
-    const full = !on && max != null && max > 1 && chosen.filter((c) => !related(c, o.name)).length >= max;
-    const mine = ownerOf(o.name);
-    const replaces = !on && !implied && chosen.some((c) => ownerOf(c) !== mine);
-    const kids = o.kind === "split" ? nodes.filter((x) => x.kind === "arm" && x.name.startsWith(o.name + " / ") && x.depth === o.depth + 1) : [];
-    return (
-      <div key={o.name} className={"cpick " + o.kind + (implied ? " implied" : "") + (on ? " on" : "")} style={{ paddingLeft: (0.5 + o.depth * 1.15) + "rem" }}>
-        <label title={last ? "a view draws at least one — tick another to switch" : full ? "this view draws at most " + max
-            : implied ? "drawn as part of the split — click to draw only this group"
-            : replaces ? (mine ? "a view draws one split's groups or whole cohorts — this replaces what is ticked"
-              : "a view draws whole cohorts or one split's groups — this replaces “" + current + "”") : o.name}>
-          {single && o.kind === "split" ? <span className="cpick-noinput" aria-hidden="true" /> :
-            <input type={single ? "radio" : "checkbox"} checked={on || implied} disabled={busy || full}
-              onChange={() => choose(o.name)} onClick={() => { if (last) choose(o.name); }} />}
-          <span className="cpick-label">
-            <span className="cpick-line">
-              {o.kind === "split" ? <><span className="cpick-fork" aria-hidden="true">⑂</span>by {o.label} <span className="meta">· {o.groups} groups</span></> : o.label}
-            </span>
-            {o.kind === "split" && !open.has(o.name) && !single && <span className="cpick-kids">{kids.map((k) => k.label).join(" · ")}</span>}
-          </span>
-        </label>
-        {o.kind === "split" && single ? <span />
-          : o.kind === "split"
-          ? <button type="button" className="cpick-open" aria-expanded={open.has(o.name)}
-              title={open.has(o.name) ? "hide its groups" : "pick single groups"}
-              onClick={() => setOpen((s) => { const n = new Set(s); if (n.has(o.name)) n.delete(o.name); else n.add(o.name); return n; })}>
-              {open.has(o.name) ? "▾" : "▸"}
-            </button>
-          : <span className="cpick-n">{o.count == null ? "" : o.count.toLocaleString()}</span>}
-      </div>
-    );
-  };
-  return (
-    <details className="gearmenu cohortpick" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title="which cohorts this view draws — a split draws each of its groups">
-        cohorts ({drawn === chosen.length ? drawn : drawn + " groups"})
-      </summary>
-      <div className="gearmenu-items">
-        <div className="cpick-head">Draw in this view</div>
-        {nodes.filter((o) => !hidden(o.name)).map(row)}
-        {single ? <p className="cpick-foot">This view draws one cohort — pick one, or one group of a split.</p>
-          : splits.length > 0 && <p className="cpick-foot">A view draws whole cohorts, or the groups of one split — not both. Choosing one replaces the other.</p>}
-      </div>
-    </details>
-  );
-}
-
-/**
- * The line under a view's title saying what it draws: the cohorts, or the split and its groups,
- * each with the colour its curve / column / bar has in the figure (the view colours by position
- * in the list it drew), so the line is both the title and the key.
- */
-function DrawnCohorts({ drawn, nodes }: { drawn: string[]; nodes: CohortNode[] }) {
-  if (!drawn.length) return null;
-  const byName = new Map(nodes.map((x) => [x.name, x] as const));
-  const splits = nodes.filter((x) => x.kind === "split");
-  const owner = drawn.map((n) => splits.filter((x) => n.startsWith(x.name + " / ")).sort((a, b) => b.name.length - a.name.length)[0])
-    .find((x) => x) || null;
-  const swatch = (i: number) => drawn.length > 1 &&
-    <span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />;
-  const parent = owner && owner.name.slice(0, owner.name.length - owner.label.length - 3);
-  return (
-    <p className="viewcohorts">
-      <span className="vc-label">Showing</span>
-      {owner && <span className="vc-split"><strong>{parent!.split(" / ").join(" › ")}</strong> by {owner.label}:</span>}
-      {drawn.map((n, i) => (
-        <span key={n} className="vc-item" title={n}>{swatch(i)}
-          {owner ? (byName.get(n)?.label ?? n.slice(owner.name.length + 3)) : <strong>{byName.get(n)?.label ?? n}</strong>}
-        </span>
-      ))}
-    </p>
-  );
-}
-
-/**
- * Which studies a cohort was evaluated in, on one line: the first study's name, and past one a
- * count of the rest that stays visible however long that name is. The tooltip lists every
- * study's id and name.
- */
-function CohortStudies({ ids, names }: { ids: string[]; names: Map<string, string> }) {
-  if (!ids.length) return null;
-  const more = ids.length - 1;
-  const title = (more ? ids.length.toLocaleString() + " studies:\n" : "") +
-    ids.map((id) => names.get(id) ? id + " — " + names.get(id) : id).join("\n");
-  return (
-    <div className="cohortbox-studies meta" title={title}>
-      <span className="cohortbox-study">{names.get(ids[0]) || ids[0]}</span>
-      {more > 0 && <span className="cohortbox-more">+{more.toLocaleString()} more {more === 1 ? "study" : "studies"}</span>}
-    </div>
-  );
-}
-
-/**
- * Every view's header, with one anatomy: the title and what it is, then the actions that
- * belong to this view, then its status chips, then the controls that reorder and remove it.
- * Before this each view kind built its own, so the timing chip landed in a different place
- * in each card.
- */
-function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown, onRemove, onEditNote, menuStore }: {
-  v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode;
-  onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void; onEditNote?: () => void; menuStore: Map<string, boolean>;
-  /** which cohorts this view draws; absent when the document has only one */
-  cohorts?: { chosen: string[]; all: string[]; nodes: CohortNode[]; drawn: string[]; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void };
-}) {
-  const menuKey = cohorts?.viewKey ?? "vh";
-  return (
-    <>
-      <div className="vhead">
-        <h2 className="vtitle">{title}{sub != null && <span className="plain"> — {sub}</span>}</h2>
-        <div className="vmeta">
-          <ViewHelpButton kind={v.kind} menuId={"help:" + menuKey} menuStore={menuStore} />
-          {cohorts && cohorts.all.length > 1 && (
-            <CohortPicker nodes={cohorts.nodes} chosen={cohorts.chosen} max={cohorts.max} busy={cohorts.busy}
-              onChange={cohorts.onChange} menuId={"pick:" + menuKey} menuStore={menuStore} />
-          )}
-          {actions}
-          {chips}
-          <Latency v={v} />
-          <Participation p={v.participation} />
-          {(onMoveUp || onMoveDown || onRemove || onEditNote) && (
-            <ViewMenu menuId={"reorder:" + menuKey} menuStore={menuStore} onMoveUp={onMoveUp} onMoveDown={onMoveDown}
-              onRemove={onRemove} onEditNote={onEditNote} hasNote={!!v.annotationNote} />
-          )}
-        </div>
-      </div>
-      {/* The analyst's own one-line annotation (doc.views[i].note, echoed
-          through as v.annotationNote) — below the title, not above: it's a
-          reader's aside about the figure ViewHead just named, not something
-          that competes with the title for the first thing read. Plain text
-          by design, see .viewnote in globals.css for why it's never markdown. */}
-      {cohorts && !v.error && <DrawnCohorts drawn={cohorts.drawn} nodes={cohorts.nodes} />}
-      {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
-      <SplitByNote v={v} />
-    </>
-  );
-}
-
-/** The gear at the end of every card's header: reorder this view, or drop it. */
-function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove, onEditNote, hasNote }: {
-  menuId: string; menuStore: Map<string, boolean>; onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void;
-  onEditNote?: () => void; hasNote?: boolean;
-}) {
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
-  return (
-    <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title="reorder or remove this view" aria-label="reorder or remove this view">⋯</summary>
-      <div className="gearmenu-items">
-        <button className="linklike" disabled={!onMoveUp} onClick={onMoveUp}>move up</button>
-        <button className="linklike" disabled={!onMoveDown} onClick={onMoveDown}>move down</button>
-        {/* a note belongs to a saved analysis, as a cohort's edits do (see CohortEditMenu), so the
-            item only exists once there is a saved analysis for it to belong to */}
-        {onEditNote && analysisSaved && <>
-          <hr />
-          <button className="linklike" onClick={onEditNote}>{hasNote ? "edit note…" : "add note…"}</button>
-        </>}
-        {onRemove && <>
-          <hr />
-          <button className="linklike" onClick={onRemove}>remove</button>
-        </>}
-      </div>
-    </details>
-  );
-}
-
-/**
- * The gear at the top-right of a cohort box: rename it, note it, or drop it
- * from the analysis — "edit…" opens a small dialog for the name and note
- * together (see cohortEditDialog), rather than a form crammed into this
- * dropdown. "edit…" is left OUT of the menu entirely (not just disabled)
- * until the workspace itself is saved: a rename/note on a cohort inside a
- * document that isn't saved anywhere yet has nothing to attach to, and a
- * greyed-out option in an otherwise-live menu reads as broken rather than
- * as "do something else first". Editing the FILTERS themselves isn't here
- * yet — a cohort's clauses come from Explore or hand-typed JSON, and
- * neither has a form this menu could hold; see the comment above the
- * "Cohorts" heading for why that is deliberately a separate, unscoped piece
- * of work.
- */
-function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCount = 0, menuId, menuStore }: {
-  busy?: boolean; canEdit: boolean; onEdit: () => void; onRemove: () => void;
-  /** the split form; `done` closes this menu. A cohort may have several splits — each view draws one */
-  split?: (done: () => void) => React.ReactNode;
-  /** how many splits the cohort has already */
-  splitCount?: number;
-  menuId: string; menuStore: Map<string, boolean>;
-}) {
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
-  const [splitting, setSplitting] = useState(false);
-  return (
-    <details className="gearmenu cohortgear" ref={ref} data-menu-id={menuId}
-      onToggle={(e) => { onToggle(e); if (!(e.currentTarget as HTMLDetailsElement).open) setSplitting(false); }}>
-      <summary className="tbbtn" title="edit this cohort" aria-label="edit this cohort">⋯</summary>
-      <div className={"gearmenu-items" + (splitting ? " wide" : "")}>
-        {split && (splitting ? <>{split(() => { menuStore.set(menuId, false); setSplitting(false); })}<hr /></> : <>
-          <button className="linklike" disabled={busy} title="divide this cohort into arms that never overlap and add up to it"
-            onClick={() => setSplitting(true)}>{splitCount ? "split another way…" : "split into arms…"}</button>
-          <hr />
-        </>)}
-        {canEdit && <>
-          <button className="linklike" disabled={busy} onClick={onEdit}>edit…</button>
-          <hr />
-        </>}
-        <button className="linklike" disabled={busy} onClick={onRemove}>remove this cohort</button>
-      </div>
-    </details>
-  );
-}
-
-/** the server-side wall clock for one view, and what that number does and does not include */
-function Latency({ v }: { v: any }) {
-  if (v.ms == null) return null;
-  return (
-    <span className="lat" title={
-      "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-      (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-      {v.ms.toLocaleString()}ms
-      {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-    </span>
-  );
-}
 
   /** the document's view at vi, whatever its kind */
   const docView = (vi: number): any => ((doc.views || [])[vi] || {});
@@ -2276,7 +1589,7 @@ function Latency({ v }: { v: any }) {
     if (max === 1 && chosen.length) chosen = [expandSplits(chosen, shapes)[0]].filter((n) => all.includes(n));
     // what the view draws, in the order it colours them (the engine expands the list the same way)
     const drawn = expandSplits(chosen, shapes).filter((n) => !result || result.cohorts[n]);
-    return { chosen, all, nodes, drawn, max, busy, viewKey: resultViewKeys.current[vi] ?? vi, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
+    return { chosen, all, nodes, drawn, max, busy, viewKey: viewIds[vi] ?? vi, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
   };
 
 
@@ -2309,8 +1622,7 @@ function Latency({ v }: { v: any }) {
     for (let i = 2; taken.has(name); i++) name = (sel.name || "selection") + " " + i;
     const qualified = ids.map(id => one + ":" + id);
     const d: AnalysisDoc = { ...doc, cohorts: { ...doc.cohorts, [name]: { all: [{ kind: "patientList", ids: qualified }] } } };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    run(d);
+    docs.set(d);
   };
 
   const removeCohort = (name: string) => {
@@ -2322,12 +1634,11 @@ function Latency({ v }: { v: any }) {
       .map(v => Array.isArray(v.cohorts) ? { ...v, cohorts: v.cohorts.filter(c => c !== name && !c.startsWith(name + " / ")) } : v)
       .filter(v => !Array.isArray(v.cohorts) || v.cohorts.length);
     const d = { ...base, cohorts: cs, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    if (Object.keys(cs).length) run(d); else setResult(null);
+    docs.set(d);
   };
 
   // ---- partitions: a cohort split into arms that add up to it ------------------------------
-  const runEdited = (d: AnalysisDoc) => { setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d); };
+  const runEdited = (d: AnalysisDoc) => { docs.set(d); };
   // the page edits splits in their flat form (keyed "<cohort> / <split>") and writes them back
   // onto their cohorts as a tree (editSplits)
   const splitsFlat = () => flattenSplits(doc.cohorts || {});
@@ -2413,9 +1724,8 @@ function Latency({ v }: { v: any }) {
    *  Renaming rewrites every `view.cohorts` reference too, so a view already
    *  scoped to this cohort keeps drawing it under its new name — and since
    *  the server keys everything (result.cohorts, every row/curve) by name,
-   *  a rename needs a real run(), unlike a note-only edit, which changes no
-   *  number and so never re-runs (matching what a plain note edit did before
-   *  this had its own dialog). */
+   *  a rename re-runs the analysis, unlike a note-only edit, which changes no
+   *  number and so re-runs nothing (use-analysis.ts leaves notes out of its keys). */
   const confirmCohortEdit = () => {
     if (!cohortEditing) return;
     const oldName = cohortEditing;
@@ -2433,18 +1743,19 @@ function Latency({ v }: { v: any }) {
     if (newName === oldName) {
       // a note-only edit re-runs nothing, so nothing else would put it in the shareable link
       const d = { ...doc, cohorts: nextCohorts };
-      setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
+      docs.set(d);
       return;
     }
     // its splits travel with it; their arms are named after it, so views naming them follow too
     const views = renameInViews(doc.views, oldName, newName) as AnalysisDoc["views"];
     const d = { ...doc, cohorts: nextCohorts, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    run(d);
+    docs.set(d);
   };
 
   /** the analysis exists as a saved workspace — what a view's note, like a cohort's, belongs to */
   const analysisSaved = !!(doc.title && spaces[doc.title]);
+  /** a view's note belongs to a saved analysis, so its menu item exists only once there is one */
+  const noteEdit = (vi: number) => analysisSaved ? () => openViewNoteEdit(vi) : undefined;
   const openViewNoteEdit = (vi: number) => {
     if (!analysisSaved) return;
     setViewNoteEditing(vi);
@@ -2468,25 +1779,15 @@ function Latency({ v }: { v: any }) {
       if (i !== vi) return v;
       const nv = { ...v };
       if (trimmed) nv.note = trimmed; else delete nv.note;
-      const k = viewKeys.current.get(v);
-      if (k != null) viewKeys.current.set(nv, k);
       return nv;
     });
-    const d = { ...doc, views };
-    // no re-run follows, so the link has to be told here or the note is lost on refresh/share
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
-    setResult(prev => {
-      if (!prev || !prev.views[vi]) return prev;
-      const rviews = [...prev.views];
-      rviews[vi] = { ...rviews[vi], annotationNote: trimmed || undefined };
-      return { ...prev, views: rviews };
-    });
+    // the note is read from the document (use-analysis.ts): nothing re-runs
+    docs.set({ ...doc, views });
   };
 
   const clearAnalysis = () => {
     const d = { ...EMPTY_DOC, study };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setError(null);
-    syncUrl(undefined, d);   // the shared link should describe the empty document too
+    docs.set(d); setError(null);
   };
 
   /**
@@ -2511,10 +1812,9 @@ function Latency({ v }: { v: any }) {
       return;
     }
     const nd: AnalysisDoc = { study, cohorts: Object.fromEntries(chosen), views: DEFAULT_VIEWS };
-    setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
-    setResult(null); setError(null);
+    docs.replace(nd);
+    setError(null);
     goTab("analysis");
-    run(nd);
   };
   const togglePick = (key: string) =>
     setPicked((p) => p.includes(key) ? p.filter((x) => x !== key) : [...p, key]);
@@ -2522,11 +1822,10 @@ function Latency({ v }: { v: any }) {
   /** Load a documented example into the Analysis tab and run it. */
   const runDocExample = (ex: DslExample) => {
     const d = JSON.parse(JSON.stringify(ex.doc)) as AnalysisDoc;   // never hand the shared object to the editor
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    docs.replace(d);
     setStudy(d.study || study);
-    setResult(null); setError(null);
+    setError(null);
     goTab("analysis");
-    run(d);
   };
 
   // Accepts the authored form: this only serialises, and a template is exactly
@@ -2559,13 +1858,16 @@ function Latency({ v }: { v: any }) {
   // researcher's assistant in the browser. The bridge is rebuilt every render, so a tool always
   // sees the current document; edits are validated by the engine before they reach the page.
   const validateDoc = async (d: AnalysisDoc): Promise<AnalysisResult> => {
-    setBusy(true);
+    setValidating(true);
     try {
       const res = await fetch("/api/analysis?oncoprint=spec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ study: d.study || study, ...d }) });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
       return j as AnalysisResult;
-    } catch (e) { setBusy(false); throw e; }
+    } finally {
+      // released whatever happens next: an edit the tool then rejects never reaches commitDoc
+      setValidating(false);
+    }
   };
   /** the server's proposed arms for "split this cohort by X" — see proposePartition in lib/analysis.ts */
   const proposePartition = async (req: { doc: AnalysisDoc; cohort: string; attribute?: string; gene?: string; oql?: string[]; name?: string; maxArms?: number; minCount?: number }) => {
@@ -2577,23 +1879,17 @@ function Latency({ v }: { v: any }) {
   };
   const commitDoc = (d0: AnalysisDoc, r: AnalysisResult) => {
     const d = upgradeDocument(d0).doc;
-    // an unchanged view keeps its identity key, so its card (and a drawn oncoprint) is not remounted
-    const old = new Map((doc.views || []).map((v) => [JSON.stringify(v), v]));
-    for (const v of d.views || []) {
-      const was = old.get(JSON.stringify(v));
-      const k = was ? viewKeys.current.get(was) : undefined;
-      if (k != null) viewKeys.current.set(v, k);
-    }
-    resultViewKeys.current = (d.views || []).map((v: any) => keyFor(v));
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    // the engine has already answered this document: the page's queries find that answer
+    // instead of asking again, and an unchanged view keeps its id, so its card is not remounted
+    seedAnalysis(queryClient, d, d.study || study, r);
+    docs.commit(d);
     if (d.study && d.study !== study) setStudy(d.study);
-    setResult(r); setError(null); setBusy(false);
+    setError(null);
     goTab("analysis");
-    syncUrl(undefined, d);
   };
   const saveAs = async (name: string) => {
     const d = { ...doc, title: name };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
+    docs.set(d);
     await persistSpaces(name, d);
   };
   const labBridge = useRef<LabBridge | null>(null);
@@ -2753,7 +2049,8 @@ function Latency({ v }: { v: any }) {
           {genesFor != null && (
             <>
               <h3>Genes <span className="plain">— {String(((doc.views || [])[genesFor] as any)?.kind || "view")}</span></h3>
-              <GeneEditor vi={genesFor} />
+              {/* the DOCUMENT's view, never the result (a result's genes are {gene, driverPct, …}) */}
+              <GeneListEditor view={(doc.views || [])[genesFor] || {}} busy={busy} onGenes={(g) => setViewGenes(genesFor, g)} />
               <div className="row" style={{ marginTop: "0.8rem", justifyContent: "flex-end" }}>
                 <button className="primary" onClick={() => genesDialog.current?.close()}>Done</button>
               </div>
@@ -3995,7 +3292,7 @@ function Latency({ v }: { v: any }) {
             {/* id, because the notes textarea above it also matches "textarea" —
                 anything reading the document from outside React needs to be
                 able to say WHICH one. */}
-            <textarea id="docjson" value={docText} onChange={e => setDocText(e.target.value)} spellCheck={false}
+            <textarea id="docjson" value={docText} onChange={e => docs.setText(e.target.value)} spellCheck={false}
               style={{ width: "100%", height: "20rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
             <div className="row" style={{ marginTop: "0.6rem" }}>
               <button className="primary" disabled={busy} onClick={applyText}>{busy && <span className="spinner onprimary" />}{busy ? "Running…" : "Run document"}</button>
@@ -4081,7 +3378,7 @@ function Latency({ v }: { v: any }) {
                 <h2>Cohorts evaluated — no views defined</h2>
                 <p className="note" style={{ fontSize: "var(--t-md)" }}>
                   Add a views array to the document (e.g. <code>{`{"kind":"survival"}`}</code>),{" "}
-                  <button className="linklike" onClick={() => { const d = { ...doc, views: DEFAULT_VIEWS }; setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d); }}>add the default views</button>, or ask your AI assistant in the browser sidebar.
+                  <button className="linklike" onClick={() => { const d = { ...doc, views: DEFAULT_VIEWS }; docs.set(d); }}>add the default views</button>, or ask your AI assistant in the browser sidebar.
                 </p>
               </div>
             )}
@@ -4114,9 +3411,9 @@ function Latency({ v }: { v: any }) {
               </div>
             )}
             {result && result.views.map((v, vi) => (
-              <div className="card viewcard" key={resultViewKeys.current[vi] ?? vi}>
+              <div className="card viewcard" key={viewIds[vi] ?? vi}>
                 {/* recomputing this view (a settings change), or the whole document */}
-                {!(v as any).pending && !(drawsOwnWaiting(v.kind) && !v.error) && (busy || pendingKeys.has(resultViewKeys.current[vi])) && <Updating />}
+                {!(v as any).pending && !(drawsOwnWaiting(v.kind) && !v.error) && (busy || pendingKeys.has(viewIds[vi])) && <Updating />}
                 {/* addView's placeholder for a brand-new view that has no prior
                     result to keep showing while its own delta request is in
                     flight (see addView) — every v.kind===… block below is
@@ -4125,7 +3422,7 @@ function Latency({ v }: { v: any }) {
                     this is the only thing that needs to render for it. */}
                 {(v as any).pending && <div className="skeleton skeleton-view" />}
                 {v.kind === "compare" && v.rows && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
                     style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
@@ -4163,7 +3460,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "hotspots" && v.hotspots && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi), 1)} sub="lollipop by protein position, as the portal's mutation tab draws it" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi), 1)} sub="lollipop by protein position, as the portal's mutation tab draws it" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {/* the plot from the same renderer MCP uses (lib/view-svg.ts), with the gene summary and the
                       alteration grid beside it as controls; the grid's selection re-runs nothing */}
@@ -4172,7 +3469,7 @@ function Latency({ v }: { v: any }) {
                   })} />
                 </>}
                 {v.kind === "coexpression" && v.coexpression && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi), 1)} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi), 1)} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
                     actions={<>
                       <label className="tbfield" title="the molecular profile the correlation is computed over">profile <select
                         value={docView(vi).profileType || ""} disabled={busy}
@@ -4216,9 +3513,9 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "clinical" && v.clinical && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
                     actions={<PickMenu label="attributes" title="which clinical attributes this view compares" busy={busy}
-                      menuId={"attrs:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} loading={attrsLoading()}
+                      menuId={"attrs:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} loading={attrsLoading()}
                       options={catalogAttrs().map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind }))}
                       chosen={(docView(vi).attributes || []).map(String)} min={1} max={20}
                       onChange={(next) => setViewAttrs(vi, next)} />} />
@@ -4262,7 +3559,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "cooccurrence" && v.pairs && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi), 1)} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi), 1)} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
                     actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
                   {v.note && <p className="note">{v.note}</p>}
                   <div style={{ overflowX: "auto" }}>
@@ -4302,7 +3599,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 </>}
                 {v.kind === "survival" && v.curves && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
                     sub={<>Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}{v.anchoredTo && <> — from {v.anchoredTo}</>}</>}
                     chips={v.truncated ? <span className="trunc" title={
                       "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
@@ -4408,7 +3705,7 @@ function Latency({ v }: { v: any }) {
                   <p className="note">{v.caveat}</p>
                 </>}
                 {v.kind === "cox" && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Cox regression" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Cox regression" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
                     sub={<>Multivariate Cox, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}</>} />
                   {(() => {
                     const sv: any = (doc.views || [])[vi] || {};
@@ -4494,12 +3791,12 @@ function Latency({ v }: { v: any }) {
                     sub={moreSub(v.kind, docView(vi), v)}
                     cohorts={cohortChoice(vi, docView(vi), MORE_KINDS[v.kind].maxCohorts)}
                     onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined}
-                    onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                    onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
                     actions={MORE_KINDS[v.kind].genes
                       ? <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
                       : undefined} />
                   {(() => {
-                    const mc = { vi, spec: docView(vi), v, busy, updating: busy || pendingKeys.has(resultViewKeys.current[vi]), patch: (p: Record<string, unknown>) => patchView(vi, p),
+                    const mc = { vi, spec: docView(vi), v, busy, updating: busy || pendingKeys.has(viewIds[vi]), patch: (p: Record<string, unknown>) => patchView(vi, p),
                       attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), docJson: () => JSON.stringify(doc) };
                     const body = MoreBody({ c: mc });
                     return <>
@@ -4513,7 +3810,7 @@ function Latency({ v }: { v: any }) {
                   })()}
                 </>}
                 {v.kind === "logistic" && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Logistic regression" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Logistic regression" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
                     sub={<>Multivariate logistic, odds ratios</>} />
                   {(() => {
                     const sv: any = (doc.views || [])[vi] || {};
@@ -4598,7 +3895,7 @@ function Latency({ v }: { v: any }) {
                   </div>
                 )}
                 {v.kind === "plot" && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
                     sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
                   {/* Every control here changes what is DRAWN and costs a query, so there is one
                       zone and it says so — the same toolbar the oncoprint uses. */}
@@ -4650,9 +3947,9 @@ function Latency({ v }: { v: any }) {
                       — lines of therapy by {v.sequence ? v.sequence.labelKey : ""}
                       {v.sequence ? " · " + v.sequence.lineGap + "-day line gap" : ""}</span></h2>
                     <div className="vmeta">
-                      <ViewHelpButton kind="sequence" menuId={"help:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} />
+                      <ViewHelpButton kind="sequence" menuId={"help:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} />
                       <CohortPicker nodes={cohortChoice(vi, docView(vi)).nodes} chosen={cohortChoice(vi, docView(vi)).chosen} max={1} busy={busy}
-                        menuId={"pick:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current}
+                        menuId={"pick:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current}
                         onChange={(next) => setViewCohorts(vi, next, cohortChoice(vi, docView(vi)).all)} />
                     {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
                       <details className="gearmenu inline">
@@ -4693,7 +3990,7 @@ function Latency({ v }: { v: any }) {
                       </details>
                     )}
                     <Latency v={v} /><Participation p={v.participation} />
-                    <ViewMenu menuId={"reorder:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)} hasNote={!!v.annotationNote} />
+                    <ViewMenu menuId={"reorder:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)} hasNote={!!v.annotationNote} />
                     </div>
                   </div>
                   <DrawnCohorts drawn={cohortChoice(vi, docView(vi), 1).drawn} nodes={cohortChoice(vi, docView(vi), 1).nodes} />
@@ -4707,9 +4004,9 @@ function Latency({ v }: { v: any }) {
                       — {[...new Set((v.course || []).map(c => c.eventType))].join(", ")}
                       {v.anchoredTo ? "" : ""} · {v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
                     <div className="vmeta">
-                      <ViewHelpButton kind="course" menuId={"help:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} />
+                      <ViewHelpButton kind="course" menuId={"help:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} />
                       <CohortPicker nodes={cohortChoice(vi, docView(vi)).nodes} chosen={cohortChoice(vi, docView(vi)).chosen} busy={busy}
-                        menuId={"pick:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current}
+                        menuId={"pick:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current}
                         onChange={(next) => setViewCohorts(vi, next, cohortChoice(vi, docView(vi)).all)} />
                     <details className="gearmenu inline">
                       <summary title="clinical course options">settings</summary>
@@ -4781,7 +4078,7 @@ function Latency({ v }: { v: any }) {
                   })()}
                     </details>
                     <Latency v={v} /><Participation p={v.participation} />
-                    <ViewMenu menuId={"reorder:" + (resultViewKeys.current[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)} hasNote={!!v.annotationNote} />
+                    <ViewMenu menuId={"reorder:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)} hasNote={!!v.annotationNote} />
                     </div>
                     </div>
                   <DrawnCohorts drawn={cohortChoice(vi, docView(vi)).drawn} nodes={cohortChoice(vi, docView(vi)).nodes} />
@@ -4796,7 +4093,7 @@ function Latency({ v }: { v: any }) {
                   const vNames = v.cohorts || ocView(vi).cohorts || Object.keys(result.cohorts);
                   const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];
                   return <>
-                    <ViewHead menuStore={menuOpenRef.current} v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={() => openViewNoteEdit(vi)}
+                    <ViewHead menuStore={menuOpenRef.current} v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
                       cohorts={cohortChoice(vi, docView(vi), 4)}
                       sub={c ? <>{c.stats.nColumns.toLocaleString()} {c.unit}s · {c.conventions.annotation}</> : "loading…"} />
                     <OncoprintCard
@@ -4861,7 +4158,7 @@ function Latency({ v }: { v: any }) {
         bindings={doc.uploads || []}
         onRepin={(as, version) => {
           const d = { ...doc, uploads: (doc.uploads || []).map((b) => b.as === as ? { ...b, version } : b) };
-          setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
+          docs.set(d);
         }}
         onManage={openCustomManager} />
     </>

@@ -42,7 +42,9 @@ async function main() {
     page.on("response", r => {
       if (r.status() >= 500) errors.push("http " + r.status() + " " + r.request().method() + " " + r.url());
     });
-    page.on("requestfailed", r => errors.push("requestfailed " + r.method() + " " + r.url() +
+    // net::ERR_ABORTED is the page cancelling a request it no longer needs (an analysis query
+    // superseded by a later edit, use-analysis.ts), not a failure
+    page.on("requestfailed", r => ((r.failure() || {}).errorText === "net::ERR_ABORTED") || errors.push("requestfailed " + r.method() + " " + r.url() +
       " (" + ((r.failure() || {}).errorText || "?") + ")"));
 
     // "/" no longer serves the standalone query-builder UI — it redirects into
@@ -987,6 +989,9 @@ async function main() {
     }
     await ctx.close();
   }
+
+  // the analysis page's requests finishing out of order (e2e-lab-races.cjs)
+  await require("./e2e-lab-races.cjs").labRaces(browser, ok, BASE);
 
   await browser.close();
 

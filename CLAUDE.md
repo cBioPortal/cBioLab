@@ -337,7 +337,12 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   typed in page state: `AnalysisPage` is one very large component, so every keystroke re-renders
   every view card, the oncoprint and the inlined figures (a dialog's textarea measured ~350 ms a
   key). Use `DraftText` — local state, the page reads a ref on save — or a small component that
-  owns its own draft. An edit that re-runs nothing must still `syncUrl`, or it is lost on refresh.
+  owns its own draft.
+- **One way to change the document.** The analysis page's document lives in `app/lab/doc-store.ts`:
+  `docs.set` for an edit, `docs.replace` for a different document (an example, a link, a new
+  analysis), `docs.commit` for one the AI tools validated. It gives each view a stable id that keys
+  its card and lets a one-view re-run find its slot, and puts every new document in the URL — so an
+  edit that re-runs nothing is not lost on refresh. Never set the document any other way.
 - **Verify waiting states by holding the request.** A loader that flashes past in a normal run
   proves nothing; in Playwright, `page.route()` the endpoint and hold it, check the loader is on
   screen and the controls are still usable, then release it and check the loader is gone.
@@ -348,7 +353,11 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
 - Test: `npm test` — unit suites, no database needed (the patient-data boundary, the stats used by
   federated views, cohort-definition semantics, clinical-course semantics, and the SVG figure
   renderers, plots, gene tracks, template parameters and the panel-aware denominator;
-  252 checks across 40 suites).
+  252 checks across 40 suites). `npm run test:db` (~15 s, in `scripts/gate.sh`) runs the stores'
+  Postgres SQL, `db/migrations` and their triggers on an in-process Postgres (PGlite,
+  `test/postgres.db-test.ts`) — the e2e gate uses the in-memory fallback, so that is the only place
+  the database path is exercised. A store promise belongs in `test/support/store-contracts.ts`,
+  which runs on both backends.
   `node e2e.cjs` — 81 checks (Playwright + docs gate + the boundary suite + the
   denominator gate).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.

@@ -35,7 +35,7 @@ const measure = () => ({
 function sourceCounts() {
   const root = join(__dirname, "..");
   const css = readFileSync(join(root, "app/globals.css"), "utf8");
-  const files = ["app/lab/page.tsx", "app/_oncoprint/OncoprintFigure.tsx"].map((f) => readFileSync(join(root, f), "utf8"));
+  const files = ["app/lab/page.tsx", "app/lab/view-chrome.tsx", "app/_oncoprint/OncoprintFigure.tsx"].map((f) => readFileSync(join(root, f), "utf8"));
   const sizes = new Set([...css.matchAll(/font-size: *([0-9.]+rem)/g)].map((m) => m[1]));
   for (const f of files) for (const m of f.matchAll(/fontSize: *"([0-9.]+rem)"/g)) sizes.add(m[1]);
   return { fontSizes: sizes.size, inlineStyles: files.reduce((n, f) => n + (f.match(/style=\{\{/g) || []).length, 0) };

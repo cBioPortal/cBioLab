@@ -6,7 +6,7 @@
 // oncoprint — the one view whose output is patients — carries the cohort SQL and
 // re-derives its columns inside the owning database.
 // Deliberately deferred: cross-study patient dedup and attribute harmonization.
-import { chQuery, DB, STUDY, PRIMARY } from "./ch.ts";
+import { chQuery, DB, STUDY, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { compileCohortDef, describeCohortDef, lineClassesParam } from "./cohort2.ts";
 import { lineGapOf, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
@@ -25,7 +25,7 @@ import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, 
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
 import type { PidsCarrier } from "./oncoprint.ts";
 import {
-  resolverFor, isPatientLevel, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
+  resolverFor, isPatientLevel, PatientLevelResolver, AggregateResolver, hasFederatedPlot, expandSurvivalCounts, studyRouting, restrictedStudies,
   type Resolver, type GeneCounts, type SurvivalCount, type Instance, type PairCounts, type AttrStats, type PairMoments, type ProfileMoments, type EndpointColumns,
   type TimelineSpan, type CourseCount, type CourseOpts, type SequenceOpts, type SequenceFlow, type FederatedPlotCapable, legendFor, SEQUENCE_ROW_LIMIT, COURSE_ANCHORED, COURSE_OBSERVED } from "./federation.ts";
 import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, axisLabel, validateAxis, coverageNote, type PlotData, type PlotGroup, type AxisKind } from "./plot.ts";
@@ -180,6 +180,12 @@ export interface RunOpts {
   page?: { offset: number; limit: number };
   /** a table view's column whose values to return instead of rows (what its filter offers) */
   values?: string;
+  /**
+   * How a local participant's cohort is counted, given its compiled SQL: the Next routes pass a
+   * cached one (lib/next-cache.ts), so the per-view requests the page sends do not each count
+   * every cohort again. A remote peer always answers for itself.
+   */
+  count?: (conn: ChConn, cohortSql: string) => Promise<number>;
 }
 
 /**
@@ -351,7 +357,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       resolvers[s] = res;
       // count() first: a remote peer only learns its own SQL by answering, and
       // cohortSql() reads what it reported.
-      const count = await res.count(def);
+      const local = res instanceof PatientLevelResolver || res instanceof AggregateResolver;
+      const count = local && opts.count ? await opts.count(res.instance.conn, res.cohortSql(def)) : await res.count(def);
       return { s, res, sql: res.cohortSql(def), count };
     }));
     for (const { s, res, sql, count } of evals) {
