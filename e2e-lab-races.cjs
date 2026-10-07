@@ -96,6 +96,21 @@ async function labRaces(browser, ok, BASE) {
         "before " + before.join(",") + " · hide " + JSON.stringify(hidden) + " · after " + after.join(","));
     }
 
+    // 4. What a reader is typing survives the page re-rendering around it: a control declared
+    //    inside the page component would be a new component every render, and lose it.
+    {
+      await page.locator(".viewcard .genesbtn").first().click();
+      const input = page.locator("dialog.genedialog input[placeholder='add a gene…']");
+      await input.click();
+      await input.type("BRC");
+      await tool(page, "analysis_set_details", { notes: "re-render while typing" });
+      await settled(page);
+      // (focus is not asserted: the input is disabled while the edit runs, which blurs it)
+      const kept = await input.inputValue().catch(() => null);
+      await page.keyboard.press("Escape");
+      ok("lab: text being typed in a dialog survives the page re-rendering", kept === "BRC", JSON.stringify(kept));
+    }
+
     // 3. An edit the engine rejects leaves nothing waiting.
     {
       let rejected = "";
