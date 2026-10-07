@@ -27,6 +27,7 @@ import { DOC_VERSION, upgradeDocument, type DocUpgrade } from "../../lib/doc-ver
 import type { OnCustomData } from "./pills";
 import { installCustomDataFetch, saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
 import { isCustomAttr, parseCustomAttr } from "../../lib/custom-data-names.ts";
+import { useDocStore } from "./doc-store.ts";
 import { AxisPicker, useGearmenuOpen, ViewHelpButton, SplitByNote, PickMenu, CohortNode, CohortPicker, DrawnCohorts, CohortStudies, ViewHead, ViewMenu, CohortEditMenu, Latency, CAT_COLORS, Participation } from "./view-chrome.tsx";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
@@ -367,40 +368,23 @@ export default function AnalysisPage() {
   const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
   const exAbort = useRef<AbortController | null>(null);      // cancel a facet request the reader has moved past
   /**
-   * Stable React keys for view cards, by the identity of the DRAFT view object
-   * that produced each one — not the array index, and not the objects in
-   * `result.views` itself, which the server rebuilds from scratch on every
-   * run() and so would remount every card on every edit, including ones
-   * nobody touched. `doc.views[i]` keeps its object reference across
-   * addView, removeView and patchView (they only ever replace the one view
-   * that changed), and moveView explicitly swaps those references rather
-   * than cloning them, so a card's key travels with it when it moves.
+   * Each view card is keyed by its view's id (app/lab/doc-store.ts): it follows the view through
+   * edits, moves and removals, so an untouched card is never remounted.
    *
-   * `resultViewKeys` is the actual per-render lookup (index in result.views
-   * -> stable key), snapshotted by run() from the SAME `d` it just sent,
-   * not re-derived from the live `doc` state at render time — `doc` can
-   * already hold the next edit (one more/fewer view) by the time a slower
-   * run() resolves, and indexing into it with `result.views`' index during
-   * that window pairs each view with the WRONG doc entry, which briefly
-   * looks to React like every view past the edit point turned into a
-   * different one and remounted it (an oncoprint losing its already-drawn
-   * canvas to a needless refetch, mid-edit).
+   * `resultViewKeys` is the per-render lookup (index in result.views -> view id), snapshotted by
+   * run() from the SAME `d` it sent, not re-derived from the live `doc` at render time — `doc` can
+   * already hold the next edit (one more/fewer view) by the time a slower run() resolves, and
+   * indexing into it with `result.views`' index during that window would pair each view with the
+   * wrong card and remount it (an oncoprint losing its drawn canvas to a needless refetch).
    */
-  const viewKeys = useRef(new WeakMap<object, number>());
-  const nextViewKey = useRef(0);
   const resultViewKeys = useRef<number[]>([]);
   /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
   const menuOpenRef = useRef(new Map<string, boolean>());
   const moreDerivedMenu = useGearmenuOpen("explore:more-derivations", menuOpenRef.current);
-  const keyFor = (v: object): number => {
-    let k = viewKeys.current.get(v);
-    if (k == null) { k = nextViewKey.current++; viewKeys.current.set(v, k); }
-    return k;
-  };
   /**
    * Which view cards are mid-recompute from a ONE-view delta request (see
    * runViewDelta below) — not the same thing as `busy`, which also covers a
-   * full run() of the whole document. Keyed by the same stable `keyFor` id
+   * full run() of the whole document. Keyed by the same view id
    * as `resultViewKeys`, so a card's own spinner tracks whether ITS query is
    * running, not whether some unrelated view's is.
    */
@@ -417,7 +401,10 @@ export default function AnalysisPage() {
    * taking up permanent width beside the results.
    */
   const docDialog = useRef<HTMLDialogElement | null>(null);
-  const [doc, setDoc] = useState<AnalysisDoc>(EMPTY_DOC);
+  // the document, its views' ids and the JSON editor's text (app/lab/doc-store.ts); every new
+  // document goes into the URL, so a refresh or a shared link shows exactly it
+  const docs = useDocStore(EMPTY_DOC, (d) => syncUrl(undefined, d));
+  const doc = docs.current.doc;
   // Requests that carry a spec rather than the document (the oncoprint's own fetch) resolve pins
   // from here. Set during render, not in an effect: a child's effects run before its parent's,
   // so the figure's fetch would otherwise go out with the previous document's pins.
@@ -429,7 +416,7 @@ export default function AnalysisPage() {
     if (wasUnresolved.current > 0 && unresolvedCount === 0 && Object.keys(doc.cohorts || {}).length) { setError(null); run(doc); }
     wasUnresolved.current = unresolvedCount;
   }, [unresolvedCount]); // eslint-disable-line
-  const [docText, setDocText] = useState(JSON.stringify(EMPTY_DOC, null, 2));
+  const docText = docs.current.text;
   const [result, setResult] = useState<AnalysisResult | null>(null);
   /**
    * Decoded oncoprint contracts, keyed by the spec they came from rather than by view index.
@@ -621,11 +608,14 @@ export default function AnalysisPage() {
       d = bindUploads(up.doc);
     }
     catch (e) { setBusy(false); setError(String((e as Error)?.message || e)); return; }
-    if (d !== d0) { setDoc(d); setDocText(JSON.stringify(d, null, 2)); }
+    if (d !== d0) { docs.set(d); }
     if (!Object.keys(d.cohorts || {}).length) { setBusy(false); setResult(null); return; }
     setBusy(true); setError(null);
     // a view edited on its own while this runs (runViewDelta) has a newer answer than this run's
     const gens = new Map(deltaGen.current);
+    // aligned with `d`, the document THIS run sends — not `doc`, which may already hold a further
+    // edit by the time this resolves
+    const keys = docs.idsFor(d);
     try {
       const payload = { study: d.study || study, ...d };
       // the page draws its own oncoprints from the binary contract, so the run returns
@@ -634,10 +624,7 @@ export default function AnalysisPage() {
       const j = await res.json();
       if (!current()) return;
       if (j.error) throw new Error(j.error);
-      // aligned with `d`, the document THIS run actually sent — not `doc`,
-      // which may already hold a further edit by the time this resolves
       const before = resultViewKeys.current;
-      const keys = (d.views || []).map((v: any) => keyFor(v));
       resultViewKeys.current = keys;
       setResult((prev) => {
         if (!prev) return j;
@@ -647,7 +634,6 @@ export default function AnalysisPage() {
         });
         return { ...j, views };
       });
-      syncUrl(undefined, d);
     } catch (e) {
       if (!current()) return;
       setError(String((e as Error)?.message || e));
@@ -680,7 +666,7 @@ export default function AnalysisPage() {
    * before its answer came back), the response is just discarded.
    */
   const runViewDelta = async (d: AnalysisDoc, view: any) => {
-    const key = keyFor(view);
+    const key = docs.idsFor(d)[(d.views || []).indexOf(view)];
     const gen = (deltaGen.current.get(key) ?? 0) + 1;
     deltaGen.current.set(key, gen);
     setPendingKeys(prev => new Set(prev).add(key));
@@ -761,7 +747,7 @@ export default function AnalysisPage() {
       if (b64) {
         const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0))));
         if (d.study) { setStudy(d.study); setExStudies([d.study]); exSel.current = [d.study]; }
-        setDoc(d); setDocText(JSON.stringify(d, null, 2));
+        docs.replace(d);
         if (tabRef.current === "explore") fetchExplore();
         run(d);
       } else {
@@ -795,7 +781,7 @@ export default function AnalysisPage() {
   const goTab = (t: typeof TABS[number]) => { tabRef.current = t; setTab(t); syncUrl(t); };
 
   const applyText = () => {
-    try { const d = JSON.parse(docText); setDoc(d); run(d); }
+    try { const d = JSON.parse(docText); docs.set(d); run(d); }
     catch (e) { setError("document JSON: " + String((e as Error)?.message || e)); }
   };
 
@@ -840,7 +826,7 @@ export default function AnalysisPage() {
     const nextStudy = exSel.current[0] || study;
     const nd: AnalysisDoc = { study: nextStudy, cohorts: { [name]: d }, views: DEFAULT_VIEWS };
     setStudy(nextStudy);
-    setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
+    docs.replace(nd);
     setResult(null); setError(null);     // never leave the previous run's numbers on screen
     goTab("analysis");
     run(nd);
@@ -863,7 +849,7 @@ export default function AnalysisPage() {
       const nd: AnalysisDoc = editSplits({ ...base, dsl: DOC_VERSION, views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, sn)] })) },
         (f) => ({ ...f, partitions: { [splitKey(name, sn)]: { ...def, split: sn } } }));
       setStudy(nextStudy);
-      setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
+      docs.replace(nd);
       setResult(null); setError(null);
       goTab("analysis");
       run(nd);
@@ -894,7 +880,7 @@ export default function AnalysisPage() {
     const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: { ...parent, splits: { [label]: { arms: r.arms } } } },
       views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, label)] })) };
     setStudy(nextStudy);
-    setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
+    docs.replace(nd);
     setResult(null); setError(null);
     goTab("analysis");
     run(nd);
@@ -1091,8 +1077,7 @@ export default function AnalysisPage() {
     const keep = all.map((v: any, j: number) => !drop(v, j));
     const views = all.filter((_: any, j: number) => keep[j]);
     const d = { ...doc, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    syncUrl(undefined, d);
+    docs.set(d);
     if (!views.length) { setResult(null); return; }   // nothing left to show
     setResult(prev => prev ? { ...prev, views: prev.views.filter((_, j) => keep[j]) } : prev);
     resultViewKeys.current = resultViewKeys.current.filter((_, j) => keep[j]);
@@ -1108,8 +1093,7 @@ export default function AnalysisPage() {
     if (j < 0 || j >= views.length) return;
     [views[i], views[j]] = [views[j], views[i]];
     const d = { ...doc, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    syncUrl(undefined, d);
+    docs.set(d);
     if (result) {
       const rviews = [...result.views];
       [rviews[i], rviews[j]] = [rviews[j], rviews[i]];
@@ -1170,8 +1154,7 @@ export default function AnalysisPage() {
           covariates: [{ source: "clinical", attribute: viewAttrs()[0] || "SEX" }] }
       : { kind, genes };
     const d = { ...doc, views: [v, ...(doc.views || [])] };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    syncUrl(undefined, d);
+    docs.set(d);
     // No prior result to keep the OTHER cards from — a fresh analysis's
     // very first view has nothing to diff against, so it needs a real run().
     if (!result) { run(d); return; }
@@ -1180,7 +1163,7 @@ export default function AnalysisPage() {
     // resultViewKeys.current is kept in lockstep with doc.views right here,
     // synchronously, before the request even starts — see runViewDelta's
     // comment for why that matters once the response comes back.
-    const key = keyFor(v);
+    const key = docs.idsFor(d)[0];
     resultViewKeys.current = [key, ...resultViewKeys.current];
     setResult(prev => prev ? { ...prev, views: [{ kind: v.kind, pending: true } as any, ...prev.views] } : prev);
     runViewDelta(d, v);
@@ -1570,20 +1553,11 @@ export default function AnalysisPage() {
    *  runViewDelta) — editing this view's settings can't change any OTHER
    *  view's answer, only its own. */
   const patchView = (i: number, patch: Record<string, unknown>) => {
-    const views = (doc.views || []).map((v: any, j: number) => {
-      if (j !== i) return v;
-      const nv = { ...v, ...patch };
-      // see updateView's comment: keyFor() is by object identity, and this always
-      // makes a new object, so the edited view's own key must be carried over by
-      // hand or the card being edited is the one that remounts.
-      const k = viewKeys.current.get(v);
-      if (k != null) viewKeys.current.set(nv, k);
-      return nv;
-    });
+    // a new object at the same position keeps its view id (app/lab/doc-store.ts), so the card is not remounted
+    const views = (doc.views || []).map((v: any, j: number) => j === i ? { ...v, ...patch } : v);
     for (const v of views as any[]) if (v.anchor == null) delete v.anchor;   // null means "study baseline"
     const d = { ...doc, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    syncUrl(undefined, d);
+    docs.set(d);
     runViewDelta(d, views[i]);
   };
 
@@ -1593,21 +1567,11 @@ export default function AnalysisPage() {
   }, [tab, study, explore]); // eslint-disable-line
 
   const updateView = (vi: number, patch: (v: any) => any) => {
-    const views = (doc.views || []).map((v, i: number) => {
-      if (i !== vi) return v;
-      const nv = patch(v);
-      // keyFor() looks up a view by object identity, and `patch` always returns a
-      // new object — carry the old one's key over, or every edit (a checkbox, a
-      // gene, an anchor) would read as "this view is gone, a new one appeared" and
-      // remount the very card being edited: closing any open menu on it, and
-      // dropping the oncoprint canvas it had already drawn.
-      const k = viewKeys.current.get(v);
-      if (k != null) viewKeys.current.set(nv, k);
-      return nv;
-    });
+    // the edited view keeps its id (app/lab/doc-store.ts): its card is not remounted, and the
+    // re-run's answer finds its slot
+    const views = (doc.views || []).map((v, i: number) => i === vi ? patch(v) : v);
     const d = { ...doc, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
-    syncUrl(undefined, d);
+    docs.set(d);
     runViewDelta(d, views[vi]);
   };
 
@@ -1617,16 +1581,9 @@ export default function AnalysisPage() {
    * and the Python package reproduce the same figure; only the round trip is skipped.
    */
   const updateViewLocal = (vi: number, patch: (v: any) => any) => {
-    const views = (doc.views || []).map((v, i: number) => {
-      if (i !== vi) return v;
-      // the card keeps its key (see updateView): a later edit to this view must find its slot
-      const nv = patch(v);
-      const k = viewKeys.current.get(v);
-      if (k != null) viewKeys.current.set(nv, k);
-      return nv;
-    });
+    const views = (doc.views || []).map((v, i: number) => i === vi ? patch(v) : v);
     const d = { ...doc, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
+    docs.set(d);
   };
 
   /**
@@ -1662,7 +1619,7 @@ export default function AnalysisPage() {
     if (!name) return;
     wsDialog.current?.close();
     const d = { ...doc, title: name };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    docs.set(d);
     setWsError(null);
     try {
       await persistSpaces(name, d);
@@ -1672,7 +1629,7 @@ export default function AnalysisPage() {
     const w = spaces[name];
     if (!w) return;
     const d = w.doc;
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    docs.replace(d);
     setResult(null); setError(null);
     if (d.study) setStudy(d.study);
     goTab("analysis");
@@ -1692,16 +1649,16 @@ export default function AnalysisPage() {
     const d = parameterize(doc) as AnalysisDoc;
     if (d === doc) { setError("nothing to lift: a template needs a study, or a gene list that every gene view shares"); return; }
     setError(null);
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
+    docs.set(d); run(d);
   };
   /** Change one parameter and re-run — the whole point of a template. */
   const setParam = (key: string, value: unknown) => {
     const d = { ...doc, params: { ...(doc.params || {}), [key]: value } };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
+    docs.set(d); run(d);
   };
   const setNotes = (text: string) => {
     const d = { ...doc, notes: text };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));   // no re-run: prose changes no numbers
+    docs.set(d);   // no re-run: prose changes no numbers
   };
 
   const openGenes = (vi: number) => { setGenesFor(vi); genesDialog.current?.showModal(); };
@@ -1794,7 +1751,7 @@ export default function AnalysisPage() {
     for (let i = 2; taken.has(name); i++) name = (sel.name || "selection") + " " + i;
     const qualified = ids.map(id => one + ":" + id);
     const d: AnalysisDoc = { ...doc, cohorts: { ...doc.cohorts, [name]: { all: [{ kind: "patientList", ids: qualified }] } } };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    docs.set(d);
     run(d);
   };
 
@@ -1807,12 +1764,12 @@ export default function AnalysisPage() {
       .map(v => Array.isArray(v.cohorts) ? { ...v, cohorts: v.cohorts.filter(c => c !== name && !c.startsWith(name + " / ")) } : v)
       .filter(v => !Array.isArray(v.cohorts) || v.cohorts.length);
     const d = { ...base, cohorts: cs, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    docs.set(d);
     if (Object.keys(cs).length) run(d); else setResult(null);
   };
 
   // ---- partitions: a cohort split into arms that add up to it ------------------------------
-  const runEdited = (d: AnalysisDoc) => { setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d); };
+  const runEdited = (d: AnalysisDoc) => { docs.set(d); run(d); };
   // the page edits splits in their flat form (keyed "<cohort> / <split>") and writes them back
   // onto their cohorts as a tree (editSplits)
   const splitsFlat = () => flattenSplits(doc.cohorts || {});
@@ -1918,13 +1875,13 @@ export default function AnalysisPage() {
     if (newName === oldName) {
       // a note-only edit re-runs nothing, so nothing else would put it in the shareable link
       const d = { ...doc, cohorts: nextCohorts };
-      setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
+      docs.set(d);
       return;
     }
     // its splits travel with it; their arms are named after it, so views naming them follow too
     const views = renameInViews(doc.views, oldName, newName) as AnalysisDoc["views"];
     const d = { ...doc, cohorts: nextCohorts, views };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    docs.set(d);
     run(d);
   };
 
@@ -1955,13 +1912,10 @@ export default function AnalysisPage() {
       if (i !== vi) return v;
       const nv = { ...v };
       if (trimmed) nv.note = trimmed; else delete nv.note;
-      const k = viewKeys.current.get(v);
-      if (k != null) viewKeys.current.set(nv, k);
       return nv;
     });
     const d = { ...doc, views };
-    // no re-run follows, so the link has to be told here or the note is lost on refresh/share
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
+    docs.set(d);
     setResult(prev => {
       if (!prev || !prev.views[vi]) return prev;
       const rviews = [...prev.views];
@@ -1972,8 +1926,7 @@ export default function AnalysisPage() {
 
   const clearAnalysis = () => {
     const d = { ...EMPTY_DOC, study };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); setResult(null); setError(null);
-    syncUrl(undefined, d);   // the shared link should describe the empty document too
+    docs.set(d); setResult(null); setError(null);
   };
 
   /**
@@ -1998,7 +1951,7 @@ export default function AnalysisPage() {
       return;
     }
     const nd: AnalysisDoc = { study, cohorts: Object.fromEntries(chosen), views: DEFAULT_VIEWS };
-    setDoc(nd); setDocText(JSON.stringify(nd, null, 2));
+    docs.replace(nd);
     setResult(null); setError(null);
     goTab("analysis");
     run(nd);
@@ -2009,7 +1962,7 @@ export default function AnalysisPage() {
   /** Load a documented example into the Analysis tab and run it. */
   const runDocExample = (ex: DslExample) => {
     const d = JSON.parse(JSON.stringify(ex.doc)) as AnalysisDoc;   // never hand the shared object to the editor
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    docs.replace(d);
     setStudy(d.study || study);
     setResult(null); setError(null);
     goTab("analysis");
@@ -2067,23 +2020,16 @@ export default function AnalysisPage() {
   };
   const commitDoc = (d0: AnalysisDoc, r: AnalysisResult) => {
     const d = upgradeDocument(d0).doc;
-    // an unchanged view keeps its identity key, so its card (and a drawn oncoprint) is not remounted
-    const old = new Map((doc.views || []).map((v) => [JSON.stringify(v), v]));
-    for (const v of d.views || []) {
-      const was = old.get(JSON.stringify(v));
-      const k = was ? viewKeys.current.get(was) : undefined;
-      if (k != null) viewKeys.current.set(v, k);
-    }
-    resultViewKeys.current = (d.views || []).map((v: any) => keyFor(v));
-    setDoc(d); setDocText(JSON.stringify(d, null, 2));
+    // an unchanged view keeps its id, so its card (and a drawn oncoprint) is not remounted
+    docs.commit(d);
+    resultViewKeys.current = docs.current.ids;
     if (d.study && d.study !== study) setStudy(d.study);
     setResult(r); setError(null); setBusy(false);
     goTab("analysis");
-    syncUrl(undefined, d);
   };
   const saveAs = async (name: string) => {
     const d = { ...doc, title: name };
-    setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
+    docs.set(d);
     await persistSpaces(name, d);
   };
   const labBridge = useRef<LabBridge | null>(null);
@@ -3486,7 +3432,7 @@ export default function AnalysisPage() {
             {/* id, because the notes textarea above it also matches "textarea" —
                 anything reading the document from outside React needs to be
                 able to say WHICH one. */}
-            <textarea id="docjson" value={docText} onChange={e => setDocText(e.target.value)} spellCheck={false}
+            <textarea id="docjson" value={docText} onChange={e => docs.setText(e.target.value)} spellCheck={false}
               style={{ width: "100%", height: "20rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
             <div className="row" style={{ marginTop: "0.6rem" }}>
               <button className="primary" disabled={busy} onClick={applyText}>{busy && <span className="spinner onprimary" />}{busy ? "Running…" : "Run document"}</button>
@@ -3572,7 +3518,7 @@ export default function AnalysisPage() {
                 <h2>Cohorts evaluated — no views defined</h2>
                 <p className="note" style={{ fontSize: "var(--t-md)" }}>
                   Add a views array to the document (e.g. <code>{`{"kind":"survival"}`}</code>),{" "}
-                  <button className="linklike" onClick={() => { const d = { ...doc, views: DEFAULT_VIEWS }; setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d); }}>add the default views</button>, or ask your AI assistant in the browser sidebar.
+                  <button className="linklike" onClick={() => { const d = { ...doc, views: DEFAULT_VIEWS }; docs.set(d); run(d); }}>add the default views</button>, or ask your AI assistant in the browser sidebar.
                 </p>
               </div>
             )}
@@ -4352,7 +4298,7 @@ export default function AnalysisPage() {
         bindings={doc.uploads || []}
         onRepin={(as, version) => {
           const d = { ...doc, uploads: (doc.uploads || []).map((b) => b.as === as ? { ...b, version } : b) };
-          setDoc(d); setDocText(JSON.stringify(d, null, 2)); run(d);
+          docs.set(d); run(d);
         }}
         onManage={openCustomManager} />
     </>

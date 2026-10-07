@@ -1,6 +1,7 @@
-// The analysis page's requests can finish in any order. Each check holds a request with
-// page.route() (CLAUDE.md, "Verify waiting states by holding the request"), lets a later one
-// through, and then asserts that what the page shows is the newer answer.
+// The analysis page's requests can finish in any order. Each request-order check holds a request
+// with page.route() (CLAUDE.md, "Verify waiting states by holding the request"), lets a later one
+// through, and then asserts that what the page shows is the newer answer. The rest check what the
+// document store (app/lab/doc-store.ts) promises: cards keep their element, edits reach the URL.
 //
 // Run by e2e.cjs; on its own against a running server: E2E_PORT=3109 node e2e-lab-races.cjs
 
@@ -122,6 +123,44 @@ async function labRaces(browser, ok, BASE) {
       ok("lab: an edit the engine rejects leaves the page usable, not stuck updating",
         /REJECTED/.test(rejected) && !d.running && covered === 0,
         "rejected: " + rejected.slice(0, 80) + " · running " + d.running + " · covers " + covered);
+    }
+
+    // 5. A card that was not touched is not remounted: not when another view moves, not when the
+    //    AI tools edit another view. (Its DOM element carries a mark set here; a remount loses it.)
+    {
+      await tool(page, "analysis_load_example", { title: OQL });
+      await until(async () => (await page.locator(".viewcard").count()) === 2 && !(await tool(page, "analysis_get_document")).running, "two cards");
+      await settled(page);
+      await page.locator(".viewcard").evaluateAll((els) => els.forEach((el, i) => { el.__mark = "card" + i; }));
+      const marks = () => page.locator(".viewcard").evaluateAll((els) => els.map((el) => el.__mark || "new"));
+      await page.locator(".viewcard").first().locator("summary[aria-label='reorder or remove this view']").click();
+      await page.locator(".viewcard").first().getByRole("button", { name: "move down" }).click();
+      await page.waitForTimeout(500);
+      const moved = await marks();
+      const kinds = (await doc(page)).views.map((v) => v.kind);
+      await tool(page, "analysis_update_view", { index: 0, patch: { endpoint: "OS" } });
+      await settled(page);
+      const edited = await marks();
+      ok("lab: untouched cards keep their element through a move and through another view's edit",
+        moved.join() === "card1,card0" && kinds.join() === "survival,compare" && edited[1] === "card0",
+        "after move " + moved.join() + " (" + kinds.join() + ") · after editing view 0 " + edited.join());
+    }
+
+    // 6. An edit applied in the browser alone still reaches the shareable link.
+    {
+      await tool(page, "analysis_load_example", { title: CAP });
+      await until(async () => (await page.locator(".lp-colname").count()) > 0, "the lollipop's grid");
+      await settled(page);
+      await page.locator(".lp-colname").first().click();
+      await page.waitForTimeout(300);
+      const fromUrl = await page.evaluate(() => {
+        const b64 = new URLSearchParams(location.search).get("doc") || "";
+        const json = new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)));
+        return JSON.parse(json).views[0].hide || null;
+      }).catch((e) => "unreadable: " + e.message);
+      const onPage = (await doc(page)).views[0].hide;
+      ok("lab: a browser-only edit is in the URL at once", Array.isArray(fromUrl) && JSON.stringify(fromUrl) === JSON.stringify(onPage),
+        "url " + JSON.stringify(fromUrl) + " · page " + JSON.stringify(onPage));
     }
   } catch (e) {
     ok("lab: request-order checks", false, String(e.message).split("\n")[0].slice(0, 200));
