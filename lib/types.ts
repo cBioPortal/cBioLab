@@ -1640,8 +1640,6 @@ export interface OncoprintSpec {
   cohort?: { dsl: CohortDef } | null;
   layout?: { groupBy: { kind: "cohorts"; groups: { name: string; dsl: CohortDef }[] } } | null;
   conventions?: { lineGap?: number };
-  /** study -> database name on the same instance, for studies outside the default database */
-  dbs?: Record<string, string>;
   /** "<profileType>|<gene>" -> pooled reference, supplied by the analysis layer */
   zReference?: Record<string, ZReference>;
 }

@@ -72,6 +72,8 @@ async function exploreFor(body: any) {
   // inside the query text (and, being study-scoped, could never match there).
   if (carriesPatientIds(body.draft)) {
     for (const s of studies) {
+      if (remote.includes(s))
+        throw new Error("this draft contains an explicit patient list, which cannot be sent to the remote peer holding " + s + "; remove that clause or deselect it");
       const inst = await instanceForStudy(s);
       if (inst.mode !== "patient-level")
         throw new Error("this draft contains an explicit patient list, which cannot be sent to " + inst.label + "; remove that clause or deselect " + s);

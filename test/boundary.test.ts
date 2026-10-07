@@ -449,3 +449,28 @@ describe("boundary: uploaded custom data", () => {
     assert.match(src, /inst\.mode !== "patient-level"\)\s*\n\s*throw/);
   });
 });
+
+// A study the routing map does not hold — unknown, or restricted and so deliberately left out —
+// must be refused, never looked for on the default connection. With no ClickHouse configured the
+// map is empty, so every study is unrouted here.
+describe("unrouted studies are refused, not sent to the default connection", { skip: !!process.env.CLICKHOUSE_URL && "needs an empty routing map" }, () => {
+  test("routeStudy refuses an unknown study", async () => {
+    await assert.rejects(federation.routeStudy("no_such_study"), /unknown study 'no_such_study'/);
+  });
+  test("routeStudy names a restricted study as restricted", async () => {
+    federation.restrictedStudies.add("genie_private");
+    try {
+      await assert.rejects(federation.routeStudy("genie_private"), /consortium\/private-access/);
+    } finally { federation.restrictedStudies.delete("genie_private"); }
+  });
+  test("instanceForStudy and patientLevelConn refuse it too", async () => {
+    await assert.rejects(federation.instanceForStudy("no_such_study"), /unknown study/);
+    await assert.rejects(federation.patientLevelConn("no_such_study"), /unknown study/);
+  });
+  test("the oncoprint's columns and one column's detail refuse it before any query", async () => {
+    const { buildContract } = await import("../lib/oncoprint.ts");
+    const { columnDetail } = await import("../lib/oncoprint-detail.ts");
+    await assert.rejects(buildContract({ study: "no_such_study", genes: ["TP53"] } as any), /unknown study/);
+    await assert.rejects(columnDetail({ study: "no_such_study", genes: ["TP53"] } as any, "P-1"), /unknown study/);
+  });
+});

@@ -214,8 +214,33 @@ function aggregateOnlyStudies(): string[] {
   return (process.env.AGGREGATE_ONLY_STUDIES || "").split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
 }
 
+/**
+ * The connection that holds `study`. A study that is not routed is refused rather than looked
+ * for on PRIMARY: restricted studies are left out of the routing map precisely so that no
+ * surface can reach them, and a default connection would reach them anyway.
+ */
+export async function routeStudy(study: string): Promise<ChConn> {
+  const conn = (await studyRouting()).get(study);
+  if (conn) return conn;
+  if (restrictedStudies.has(study))
+    throw new Error("study '" + study.slice(0, 60) + "' is consortium/private-access and is excluded from this deployment");
+  throw new Error("unknown study '" + study.slice(0, 60) + "'");
+}
+
+/**
+ * The connection for a request that returns patient or sample identifiers to the caller (an
+ * oncoprint's columns, one column's detail, a selection's patients). Refused for a study this
+ * deployment holds only in aggregate.
+ */
+export async function patientLevelConn(study: string, what = "this request lists patients"): Promise<ChConn> {
+  const inst = await instanceForStudy(study);
+  if (inst.mode !== "patient-level")
+    throw new Error(what + ", and " + inst.label + " is not entitled to patient-level data (" + study + ")");
+  return inst.conn;
+}
+
 export async function instanceForStudy(study: string): Promise<Instance> {
-  const conn = (await studyRouting()).get(study) || PRIMARY;
+  const conn = await routeStudy(study);
   const agg = aggregateOnlyIds().includes(conn.id) || aggregateOnlyStudies().includes(study);
   return {
     id: conn.id,
