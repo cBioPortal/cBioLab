@@ -104,6 +104,16 @@ describe("carriesPatientIds: detects identifiers anywhere in a definition", () =
   test("patientList leaf nested in not", () => {
     assert.equal(carriesPatientIds({ all: [{ not: { kind: "patientList", ids: ["s:P-1"] } }] }), true);
   });
+  // the compiler takes a clause, not just a leaf, under `not`: {not:{not:L}} is exactly L
+  test("patientList leaf under a double not", () => {
+    assert.equal(carriesPatientIds({ all: [{ not: { not: { kind: "patientList", ids: ["s:P-1"] } } } as any] }), true);
+  });
+  test("sampleList leaf in an any[] under not", () => {
+    assert.equal(carriesPatientIds({ all: [{ not: { any: [{ kind: "oql", q: "TP53: MUT" }, { kind: "sampleList", ids: ["s:S-1"] }] } } as any] }), true);
+  });
+  test("ids nested at any depth", () => {
+    assert.equal(carriesPatientIds({ all: [{ not: { not: { not: { any: [{ kind: "patientList", ids: ["s:P-1"] }] } } } } as any] }), true);
+  });
   test("ordinary clauses do not trip it", () => {
     assert.equal(carriesPatientIds({ all: [{ kind: "oql", q: "TP53: MUT" }, { kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] }), false);
     assert.equal(carriesPatientIds(null), false);

@@ -1160,18 +1160,21 @@ export function sequenceKeysSql(cohortSql: string, study: string, db: string, ev
  * respect — and the ids are study-qualified anyway, so they could never
  * match there. These leaves are refused for federation entirely: they
  * simply never reach an aggregate-only or remote participant.
+ *
+ * The whole definition is searched, not the clause grammar: a `not` may hold an `any` or another
+ * `not`, and whatever nests next must not open a way around this check.
  */
 export function carriesPatientIds(def: CohortDef | null | undefined): boolean {
-  if (!def) return false;
-  const leafHasIds = (l: any): boolean =>
-    !!l && (l.kind === "sampleList" || l.kind === "patientList") && Array.isArray(l.ids) && l.ids.length > 0;
-  for (const c of def.all || []) {
-    const any = (c as any).any, not = (c as any).not;
-    if (Array.isArray(any) ? any.some(leafHasIds) : false) return true;
-    if (not && leafHasIds(not)) return true;
-    if (leafHasIds(c)) return true;
-  }
-  return false;
+  const seen = new Set<object>();
+  const walk = (x: unknown): boolean => {
+    if (!x || typeof x !== "object" || seen.has(x)) return false;
+    seen.add(x);
+    if (Array.isArray(x)) return x.some(walk);
+    const o = x as { kind?: unknown; ids?: unknown };
+    if ((o.kind === "sampleList" || o.kind === "patientList") && Array.isArray(o.ids) && o.ids.length > 0) return true;
+    return Object.values(x).some(walk);
+  };
+  return walk(def);
 }
 
 const NO_IDS_MSG =
