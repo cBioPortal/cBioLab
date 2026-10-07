@@ -394,6 +394,8 @@ export interface SurvivalTrace {
     name: string;
     perStudy: { study: string; cohortPatients: number; patients: number; rows: number }[];
     n: number; events: number; median: number | null;
+    /** follow-up ending at or before entry: never at risk, left out */
+    unobserved?: number;
   }[];
   /** every (months, event, n[, entry]) row each study returned, per cohort */
   counts: { cohort: string; study: string; months: number; event: number; n: number; entry?: number }[];
@@ -427,6 +429,8 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
     kind: "statistic", title: "Estimate survival by Kaplan–Meier",
     detail: "The product-limit estimator, one curve per cohort, pooled over its studies" +
       (t.anchor ? ", with delayed entry: re-anchored to " + t.anchor + ", a patient is at risk only from the time the study could first observe them" : "") +
+      (t.cohorts.some((c) => c.unobserved) ? ". A patient whose follow-up ends at or before their entry was never at risk and is left out: " +
+        t.cohorts.filter((c) => c.unobserved).map((c) => c.name + " " + c.unobserved!.toLocaleString("en-US")).join(", ") : "") +
       ". The median is the first time the curve is at or below 0.5" +
       (t.display === "incidence" ? ". The figure shows cumulative incidence, 1 − S(t)" : "") + ".",
     params: t.cohorts.map((c) => [c.name, c.n.toLocaleString() + " patients, " + c.events.toLocaleString() + " events, median " +
@@ -470,6 +474,7 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
       "df.loc[df[\"months\"] > " + t.cutoffMonths + ", \"event\"] = 0  # censor at " + t.cutoffMonths + " months",
       "df[\"months\"] = df[\"months\"].clip(upper=" + t.cutoffMonths + ")"] : []),
     "df = df[df[\"months\"] >= 0]",
+    ...(hasEntry ? ["df = df[df[\"months\"] > df[\"entry\"]]  # follow-up ending at or before entry was never at risk"] : []),
     "",
     "for cohort, g in df.groupby(\"cohort\", sort=False):",
     "    km = KaplanMeierFitter().fit(g[\"months\"], g[\"event\"]" + (hasEntry ? ", entry=g[\"entry\"]" : "") + ", label=cohort)",

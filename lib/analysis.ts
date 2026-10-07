@@ -750,6 +750,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           entryMonths = { median: at(0.5), p90: at(0.9), max: at(1) };
         }
       }
+      const unobservedTotal = curvesRaw.reduce((sum, c) => sum + (c.unobserved || 0), 0);
       const beyondCutoff = cutoffMonths != null
         ? vNames.reduce((sum, n) => sum + expandSurvivalCounts([...perSite.get(n)!.values()].flat())
             .filter((r) => r.t > cutoffMonths!).length, 0)
@@ -768,7 +769,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           ...(anchor ? { anchor: anchor.occurrence!.toLowerCase() + " " + anchor.eventType + (anchor.key ? " where " + anchor.key + "=" + anchor.value : "") } : {}),
           ...(cutoffMonths != null ? { cutoffMonths } : {}), beyondCutoff, display,
           cohorts: curvesRaw.map((c) => ({
-            name: c.cohort, n: c.n, events: c.events, median: c.median,
+            name: c.cohort, n: c.n, events: c.events, median: c.median, ...(c.unobserved ? { unobserved: c.unobserved } : {}),
             perStudy: [...perSite.get(c.cohort)!.entries()].map(([st, rows]) => ({
               study: st, cohortPatients: cohorts[c.cohort].perStudy[st]?.count || 0,
               patients: rows.reduce((k, r) => k + r.n, 0), rows: rows.length })),
@@ -792,6 +793,11 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
             ? "Administratively censored at " + cutoffMonths + " months" +
               (beyondCutoff ? " (" + beyondCutoff + " patient" + (beyondCutoff === 1 ? "" : "s") + " still under observation past this point)" : "") +
               ". "
+            : "") +
+          (unobservedTotal
+            ? unobservedTotal.toLocaleString("en-US") + " patient" + (unobservedTotal === 1 ? "" : "s") +
+              " whose follow-up ends at or before their entry " + (unobservedTotal === 1 ? "was" : "were") +
+              " never at risk and " + (unobservedTotal === 1 ? "is" : "are") + " left out of the curves and the test. "
             : "") +
           (anchor
           ? endpoint + " re-anchored to " + anchor.occurrence!.toLowerCase() + " " + anchor.eventType +

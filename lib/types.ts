@@ -1270,6 +1270,8 @@ export interface KmPoint { t: number; s: number }
 export interface KmCurve {
   cohort: string; points: KmPoint[]; median: number | null;
   n: number; events: number; missing?: number;
+  /** patients whose follow-up ended at or before their entry: never at risk, so left out of n */
+  unobserved?: number;
 }
 export interface Cmh {
   chi2: number; p: number; df: number;

@@ -183,6 +183,15 @@ describe("survivalMethod", () => {
     assert.match(m.steps.find((s) => s.title.startsWith("Estimate"))!.detail, /delayed entry: re-anchored to first Treatment/);
     assert.match(m.python!, /entry=g\["entry"\]/);
     assert.match(m.python!, /entry=df\["entry"\]/);
+    assert.match(m.python!, /df = df\[df\["months"\] > df\["entry"\]\]/);
+  });
+
+  test("patients never at risk are named in the step and dropped by the script the same way", () => {
+    const m = survivalMethod(trace({ anchor: "first Treatment",
+      cohorts: trace().cohorts.map((c, i) => i ? c : { ...c, unobserved: 3 }),
+      counts: trace().counts.map((r) => ({ ...r, entry: 1 })) }));
+    assert.match(m.steps.find((s) => s.title.startsWith("Estimate"))!.detail, /never at risk and is left out: A, mutant 3/);
+    assert.doesNotMatch(survivalMethod(trace()).python!, /df\["months"\] > df\["entry"\]/);
   });
 
   test("past the inline limit the script names a file to export instead of embedding the table", () => {

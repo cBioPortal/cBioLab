@@ -38,6 +38,16 @@ export function fisherExact(a: number, b: number, c: number, d: number): number 
  */
 export interface SurvRecord { t: number; event: number; entry?: number }
 
+/**
+ * A record that was observed at risk at all: a usable time, and — with delayed entry — follow-up
+ * that ends after it began. One that ends at or before its entry (OS_MONTHS = 0 under an anchor,
+ * a cutoff earlier than the entry) is never in a risk set, so its event cannot be weighed against
+ * one; R's survival refuses such intervals. Callers count them out loud (`unobserved`).
+ */
+export function observable(d: SurvRecord): boolean {
+  return Number.isFinite(d.t) && d.t >= 0 && (d.entry == null || d.t > d.entry);
+}
+
 /** Number at risk just before `t`: entered strictly before it, not yet left. */
 function riskSweep(recs: SurvRecord[]) {
   const entries = recs.map(r => (r.entry == null ? -Infinity : r.entry)).sort((a, b) => a - b);
@@ -54,7 +64,9 @@ function riskSweep(recs: SurvRecord[]) {
 // Kaplan-Meier product-limit estimator, with optional delayed entry.
 // data: [{t: months, event: 0|1, entry?}] -> { points: [{t, s}], median, n, events }
 export function kaplanMeier(data: SurvRecord[]): Omit<KmCurve, "cohort"> {
-  const clean = data.filter(d => Number.isFinite(d.t) && d.t >= 0).sort((x, y) => x.t - y.t);
+  const usable = data.filter(d => Number.isFinite(d.t) && d.t >= 0);
+  const clean = usable.filter(observable).sort((x, y) => x.t - y.t);
+  const unobserved = usable.length - clean.length;
   const n0 = clean.length;
   const atRiskAt = riskSweep(clean);
   let s = 1;
@@ -74,7 +86,7 @@ export function kaplanMeier(data: SurvRecord[]): Omit<KmCurve, "cohort"> {
       events += d;
     }
   }
-  return { points, median, n: n0, events };
+  return { points, median, n: n0, events, ...(unobserved ? { unobserved } : {}) };
 }
 
 /**
@@ -404,7 +416,7 @@ export type SurvPoint = SurvRecord;
 
 /** One stratum's contribution: observed and expected events in group A, and the variance. */
 function stratumTerms(a: SurvPoint[], b: SurvPoint[]): { o1: number; e1: number; v: number; o2: number } {
-  const ok = (d: SurvPoint) => Number.isFinite(d.t) && d.t >= 0;
+  const ok = observable;
   const A = a.filter(ok).slice().sort((x, y) => x.t - y.t);
   const B = b.filter(ok).slice().sort((x, y) => x.t - y.t);
   const riskA = riskSweep(A), riskB = riskSweep(B);
@@ -461,7 +473,7 @@ export function logRank(strata: { a: SurvPoint[]; b: SurvPoint[] }[]): LogRank {
  * fewer possible in the others at that same risk set).
  */
 function stratumTermsK(groups: SurvPoint[][]): { o: number[]; e: number[]; v: number[][]; events: number } {
-  const ok = (d: SurvPoint) => Number.isFinite(d.t) && d.t >= 0;
+  const ok = observable;
   const k = groups.length;
   const G = groups.map((g) => g.filter(ok).slice().sort((x, y) => x.t - y.t));
   const risk = G.map((g) => riskSweep(g));
