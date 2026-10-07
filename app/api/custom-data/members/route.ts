@@ -1,3 +1,4 @@
+import { parseBody, MembersRequest } from "../../../../lib/api-schemas.ts";
 import { cohortMembership, withRequestCustomData } from "../../../../lib/custom-data-server.ts";
 
 export const maxDuration = 60;
@@ -8,8 +9,7 @@ export const maxDuration = 60;
  */
 export async function POST(req: Request) {
   try {
-    const { customData, customRefs, def, studies } = await req.json();
-    if (!def || typeof def !== "object" || !Array.isArray(studies)) throw new Error("def (a cohort definition) and studies are required");
+    const { customData, customRefs, def, studies } = parseBody(MembersRequest, await req.json());
     return Response.json({ studies: await withRequestCustomData(customData, () => cohortMembership(def, studies.map(String)), { refs: customRefs, req }) });
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });

@@ -2,6 +2,7 @@
 // What a portal page needs to know about a study before laying out its tabs: its continuous
 // molecular profiles, generic-assay profiles and clinical attributes (most covered first).
 import { useEffect, useState } from "react";
+import { api } from "../lab/api.ts";
 
 export interface StudyKnown {
   profiles: string[]; gaProfiles: string[]; clinical: string[];
@@ -18,7 +19,7 @@ export function useStudyKnown(study: string): { known: StudyKnown | null; error:
     if (!study) return;
     setKnown(null); setError(null);
     Promise.all([
-      fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ study }) }).then((r) => r.json()),
+      api.explore({ study }).then((r) => r.json()),
       fetch("/api/studies").then((r) => r.json()).catch(() => ({ studies: [] }))
     ])
       .then(([j, st]) => {

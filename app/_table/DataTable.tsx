@@ -7,8 +7,9 @@
 // re-runs the view and a shared document reproduces the table; the page is this browser's.
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ColumnFilter, ColumnValues, TableQuery, TableRows, TextFilterOp } from "../../lib/types.ts";
-import { withCustomRefs } from "../lab/custom-data-client.ts";
+import { api } from "../lab/api.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
+import type { ViewPageBody, TableBody } from "../../lib/api-schemas.ts";
 
 const OP_LABELS: Record<TextFilterOp, string> = {
   contains: "contains", notContains: "does not contain", equals: "equals", notEquals: "does not equal",
@@ -64,7 +65,7 @@ export function usePages<R>(first: R[], total: number, offset0: number, viewSize
     setError(null);
     let doc: unknown;
     try { doc = JSON.parse(docJson()); } catch { setError("no document to page"); return; }
-    fetch("/api/view-page", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc, view: vi, offset: page * size, limit: size }) })
+    api.viewPage({ doc: doc as ViewPageBody["doc"], view: vi, offset: page * size, limit: size })
       .then((r) => r.json())
       .then((j) => { if (gen.current !== g) return; if (j.error) setError(j.error); else setCache((m) => new Map(m).set(k, j.rows)); })
       .catch((e) => { if (gen.current === g) setError(String(e)); });
@@ -146,7 +147,7 @@ function useColumnValues(column: string, vi: number, docJson?: () => string): Va
     let doc: unknown, live = true;
     try { doc = JSON.parse(docJson ? docJson() : ""); } catch { setState({ status: "failed", error: "no document to read the values from" }); return; }
     setState({ status: "loading" });
-    fetch("/api/view-page", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc, view: vi, values: column }) })
+    api.viewPage({ doc: doc as ViewPageBody["doc"], view: vi, values: column })
       .then((r) => r.json())
       .then((j) => { if (live) setState(j.error || !j.values ? { status: "failed", error: j.error || "no values came back" } : { status: "loaded", v: j.values }); })
       .catch((e) => { if (live) setState({ status: "failed", error: String((e as Error)?.message || e) }); });
@@ -356,7 +357,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     const f = e.currentTarget;
     let doc: unknown;
     try { doc = JSON.parse(docJson ? docJson() : ""); } catch { return; }
-    (f.elements.namedItem("payload") as HTMLInputElement).value = await withCustomRefs("/api/table", JSON.stringify({ doc, view: vi }));
+    (f.elements.namedItem("payload") as HTMLInputElement).value = await api.tablePayload({ doc: doc as TableBody["doc"], view: vi });
     f.submit();
   };
   return (

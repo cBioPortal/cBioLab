@@ -1,0 +1,58 @@
+// The engine's endpoints, as the pages call them. Each takes the body its route accepts — the
+// envelope types in lib/api-schemas.ts, which the route parses with — so a change to either side
+// is a type error on the other; and each attaches the uploaded datasets its body uses
+// (withCustomData), so a caller passes what it means and nothing is added out of sight.
+//
+// They return the Response, as fetch does: a caller still decides how to read it (JSON, the
+// binary contract, a file) and what an error status means for it.
+import type {
+  AnalysisBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, MembersBody, ViewPageBody, TableBody,
+} from "../../lib/api-schemas.ts";
+import { withCustomData, type UploadBinding } from "./custom-data-client.ts";
+
+interface Opts { signal?: AbortSignal }
+
+function post(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+  return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
+}
+
+export const api = {
+  /** The document's cohorts and views. `query`: "?oncoprint=spec" (the page draws its own oncoprints), "?figures=svg". */
+  analysis: async (doc: AnalysisBody, opts: Opts & { query?: string } = {}) =>
+    post("/api/analysis" + (opts.query || ""), await withCustomData(doc), opts.signal),
+
+  /** Facets of the selected studies under a draft cohort; every upload with rows in them comes along. */
+  explore: async (body: ExploreBody, opts: Opts = {}) =>
+    post("/api/explore", await withCustomData(body, { explore: true }), opts.signal),
+
+  /**
+   * An oncoprint's contract (or its picture: `query` "?format=svg…"). A spec carries no pins of its
+   * own, so `pins` are the document's; `endpoint` is the local-tables route, which reads no uploads.
+   */
+  oncoprint: async (spec: OncoprintBody, opts: Opts & { query?: string; pins?: UploadBinding[]; endpoint?: string } = {}) => {
+    const path = opts.endpoint || "/api/oncoprint";
+    const body = path === "/api/oncoprint" ? await withCustomData(spec, { pins: opts.pins }) : spec;
+    return post(path + (opts.query || ""), body, opts.signal);
+  },
+
+  /** What one column of an oncoprint carries. */
+  oncoprintDetail: (body: OncoprintDetailBody, opts: Opts = {}) => post("/api/oncoprint/detail", body, opts.signal),
+
+  /** The patients a selection of sample columns came from. */
+  patientsOf: (body: PatientsOfBody, opts: Opts = {}) => post("/api/oncoprint/patients-of", body, opts.signal),
+
+  /** Proposed arms for splitting a cohort. */
+  partition: async (body: PartitionBody, opts: Opts = {}) =>
+    post("/api/partition", await withCustomData(body), opts.signal),
+
+  /** A cohort's patients and the rest of each study, for "save as feature". */
+  members: async (body: MembersBody, opts: Opts = {}) =>
+    post("/api/custom-data/members", await withCustomData(body), opts.signal),
+
+  /** One page of a table view, or the values one of its columns takes. */
+  viewPage: async (body: ViewPageBody, opts: Opts = {}) =>
+    post("/api/view-page", await withCustomData(body), opts.signal),
+
+  /** The table download's payload: it is a form post, so the browser can save the file as it streams. */
+  tablePayload: async (body: TableBody): Promise<string> => JSON.stringify(await withCustomData(body)),
+};

@@ -12,6 +12,7 @@ import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type G
 import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
+import type { UploadBinding } from "../lab/custom-data-client.ts";
 
 type V = Record<string, any>;   // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -263,7 +264,7 @@ export function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derive
 
 export interface TrackCatalog { attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[]; loading: boolean }
 
-export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, onGenes, onCreateCohort, onSaveFeature, onContract, contract, note, studies }: {
+export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, onGenes, onCreateCohort, onSaveFeature, onContract, contract, note, studies, uploads }: {
   /** the view as the document holds it */
   view: V;
   /** the render request the engine returned for it */
@@ -285,6 +286,8 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
   contract?: UnpackedContract | null;
   /** the result's own note, and the studies it spans */
   note?: string; studies?: string[];
+  /** the document's pinned uploads, for the figure's own requests */
+  uploads?: UploadBinding[];
 }) {
   const [own, setOwn] = useState<UnpackedContract | null>(null);
   const c = contract !== undefined ? contract : own;
@@ -295,6 +298,7 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
     <>
       <OncoprintFigure
         spec={spec}
+        uploads={uploads}
         display={figureDisplayOf(view)}
         sortKeys={sortKeysOf(view)}
         onDisplay={(d) => onView(withFigureDisplay(view, d), false)}

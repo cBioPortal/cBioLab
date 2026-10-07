@@ -25,12 +25,13 @@ import { PartitionPanel, SplitForm, ChartMenu, type SplitSpec } from "./partitio
 import { withoutPartition, armsFromSelection, renamePartitionChild, expandSplits, flattenSplits, editSplits, splitKey, renameInViews, type ChartKey, type PartitionShape } from "../../lib/partition-arms.ts";
 import { DOC_VERSION, upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
-import { installCustomDataFetch, saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, setActiveBindings, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
+import { saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
 import { isCustomAttr, parseCustomAttr } from "../../lib/custom-data-names.ts";
 import { useDocStore } from "./doc-store.ts";
 import { useAnalysis, seedAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { AxisPicker, useGearmenuOpen, ViewHelpButton, SplitByNote, PickMenu, CohortNode, CohortPicker, DrawnCohorts, CohortStudies, ViewHead, ViewMenu, CohortEditMenu, Latency, CAT_COLORS, Participation } from "./view-chrome.tsx";
+import { api } from "./api.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -388,10 +389,6 @@ export default function AnalysisPage() {
   // document goes into the URL, so a refresh or a shared link shows exactly it
   const docs = useDocStore(EMPTY_DOC, (d) => syncUrl(undefined, d));
   const doc = docs.current.doc;
-  // Requests that carry a spec rather than the document (the oncoprint's own fetch) resolve pins
-  // from here. Set during render, not in an effect: a child's effects run before its parent's,
-  // so the figure's fetch would otherwise go out with the previous document's pins.
-  setActiveBindings(doc.uploads);
   // an analysis refused for want of its custom data runs once that data arrives (an import, an unlock)
   const unresolvedCount = unresolvedUploads(doc).length;
   const wasUnresolved = useRef(0);
@@ -630,7 +627,6 @@ export default function AnalysisPage() {
   };
 
   useEffect(() => {
-    installCustomDataFetch();
     fetch("/api/studies").then(r => r.json()).then(j => {
       const list = j.studies || [];
       setStudies(list);
@@ -692,8 +688,7 @@ export default function AnalysisPage() {
 
   // ---- cohort creator / library -----------------------------------------
   const evalDef = async (name: string, def: CohortDef) => {
-    const res = await fetch("/api/analysis", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ study, cohorts: { [name || "preview"]: def }, views: [] }) });
+    const res = await api.analysis({ study, cohorts: { [name || "preview"]: def }, views: [] });
     const j = await res.json();
     if (j.error) throw new Error(j.error);
     const c = Object.values(j.cohorts)[0] as { count: number; text: string };
@@ -1104,14 +1099,13 @@ export default function AnalysisPage() {
       const list = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current;
       if (!list.length) { setExplore(null); exInflight.current = null; setExploreBusy(false); return; }
       const draft = draftOverride !== undefined ? draftOverride : parseDraft();
-      const res = await fetch("/api/explore", { method: "POST", signal: ac.signal, headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studies: list, draft,
+      const res = await api.explore({ studies: list, draft,
           // Narrow the server's work to the attributes that will actually be
           // shown. Only sent once a previous result has told us which those are.
           ...((attrsOverride ?? attrsForBar(attrCoverage, studiesOverride)).length
             ? { attributes: attrsOverride ?? attrsForBar(attrCoverage, studiesOverride) } : {}),
           ...(geneChartsRef.current.length ? { geneCharts: geneChartsRef.current } : {}),
-          ...(exExtraDerivedRef.current.length ? { extraDerived: exExtraDerivedRef.current } : {}) }) });
+          ...(exExtraDerivedRef.current.length ? { extraDerived: exExtraDerivedRef.current } : {}) }, { signal: ac.signal });
       // 499 is this request being superseded server-side; it carries no body, and a newer
       // request already owns the page. Never parse it as JSON.
       if (res.status === 499 || seq !== exFetchSeq.current) return;
@@ -1389,7 +1383,7 @@ export default function AnalysisPage() {
     trackAttrsWant.current = key;
     setTrackAttrsLoading(true);
     Promise.all(studies.map(s =>
-      fetch("/api/explore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ study: s }) })
+      api.explore({ study: s })
         .then(r => r.json()).catch(() => null)))
       .then(js => {
         const seen = new Map<string, { kind: string; patients: number }>(); // attribute -> kind + how many carry it
@@ -1610,8 +1604,7 @@ export default function AnalysisPage() {
       studies.length + " (" + studies.join(", ") + "), and the columns are study-qualified — select within a single-study figure");
     let ids = sel.ids;
     if (sel.unit === "sample") {
-      const res = await fetch("/api/oncoprint/patients-of", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ study: one, samples: ids }) });
+      const res = await api.patientsOf({ study: one, samples: ids });
       const j = await res.json();
       if (!res.ok || j.error) throw new Error(j.error || res.statusText);
       ids = j.patients as string[];
@@ -1860,7 +1853,7 @@ export default function AnalysisPage() {
   const validateDoc = async (d: AnalysisDoc): Promise<AnalysisResult> => {
     setValidating(true);
     try {
-      const res = await fetch("/api/analysis?oncoprint=spec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ study: d.study || study, ...d }) });
+      const res = await api.analysis({ study: d.study || study, ...d }, { query: "?oncoprint=spec" });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
       return j as AnalysisResult;
@@ -1871,8 +1864,7 @@ export default function AnalysisPage() {
   };
   /** the server's proposed arms for "split this cohort by X" — see proposePartition in lib/analysis.ts */
   const proposePartition = async (req: { doc: AnalysisDoc; cohort: string; attribute?: string; gene?: string; oql?: string[]; name?: string; maxArms?: number; minCount?: number }) => {
-    const res = await fetch("/api/partition", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...req, doc: { study: req.doc.study || study, ...req.doc } }) });
+    const res = await api.partition({ ...req, doc: { study: req.doc.study || study, ...req.doc } });
     const j = await res.json();
     if (j.error) throw new Error(j.error);
     return j as { name: string; def: PartitionDef; note?: string };
@@ -4099,6 +4091,7 @@ export default function AnalysisPage() {
                     <OncoprintCard
                       view={ocView(vi) as any}
                       spec={v.spec}
+                      uploads={doc.uploads}
                       onSaveFeature={(sel, all) => featureFromSelection(sel, all, (c ? c.studies : vStudies) || vStudies)}
                       busy={busy}
                       cohortNames={Object.keys(result.cohorts)}

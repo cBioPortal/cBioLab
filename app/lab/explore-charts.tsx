@@ -4,6 +4,8 @@
 // views over the current selection, so their numbers are the same ones an analysis would report.
 // The density is a filter: drag a rectangle over it to add both axes' ranges to the selection.
 import { useEffect, useRef, useState } from "react";
+import { api } from "./api.ts";
+import type { CohortDef, View } from "../../lib/types.ts";
 
 type Clause = Record<string, unknown>;
 type Draft = { all: Clause[] } | null;
@@ -38,12 +40,11 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
     if (!studies.length || (!ep && !hasScatter)) return;
     want.current = key;
     setLoading(true);
-    const cohort = { ...(studies.length > 1 ? { studies } : {}), all: draft ? draft.all : [] };
-    const views: Clause[] = [];
+    const cohort: CohortDef = { ...(studies.length > 1 ? { studies } : {}), all: (draft ? draft.all : []) as CohortDef["all"] };
+    const views: View[] = [];
     if (ep) views.push({ kind: "survival", endpoint: ep });
     if (hasScatter) views.push({ kind: "plot", x: { source: "clinical", attribute: X_ATTR, log: true }, y: { source: "clinical", attribute: Y_ATTR }, bins: [48, 32] });
-    fetch("/api/analysis", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ study: studies[0], cohorts: { Selected: cohort }, views }) })
+    api.analysis({ study: studies[0], cohorts: { Selected: cohort }, views })
       .then((r) => r.json())
       .then((j) => {
         if (want.current !== key) return;   // a newer selection was asked for meanwhile
