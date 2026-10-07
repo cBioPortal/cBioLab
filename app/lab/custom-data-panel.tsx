@@ -5,7 +5,7 @@
 // field" in CLAUDE.md).
 import { useEffect, useState } from "react";
 import {
-  onCustomDataChange, parseUpload, buildDataset, datasetToTsv, serverState, requestLogin, saveToServer,
+  onCustomDataChange, loadCustomData, parseUpload, buildDataset, datasetToTsv, serverState, requestLogin, saveToServer,
   deleteServerDataset, serverBySlug, fetchServerVersion, type ParsedUpload, type ResolveResponse, type ServerState, type StoredDataset
 } from "./custom-data-client.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
@@ -16,9 +16,16 @@ const EXAMPLE = "PATIENT_ID\tMET_SITE\tKPS\nP-0000012\tBrain\t80\nP-0000015\tPri
 const LOW_MATCH = 0.5;
 
 /** What the server holds for this browser; re-renders whenever that changes. */
+/** The server's login and custom-data state, loaded once per page by whichever component asks
+ *  first — not left to the first engine request, which a page may never make (Explore with no
+ *  study chosen, the Saved tab). */
 export function useCustomDataState(): ServerState {
   const [, bump] = useState(0);
-  useEffect(() => onCustomDataChange(() => bump((n) => n + 1)), []);
+  useEffect(() => {
+    const off = onCustomDataChange(() => bump((n) => n + 1));
+    loadCustomData();
+    return off;
+  }, []);
   return serverState();
 }
 
