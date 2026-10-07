@@ -33,7 +33,7 @@
 // and the tests use the uncached engine directly.
 import { cacheLife } from "next/cache";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { chQuery, connections, withoutFailedQueries } from "./ch.ts";
+import { chQuery, connections, connById, withoutFailedQueries, type ChConn } from "./ch.ts";
 import { oncokbPin } from "./annotation.ts";
 import { runAnalysis } from "./analysis.ts";
 import { buildContract } from "./oncoprint.ts";
@@ -83,16 +83,39 @@ export function dataVersion(): Promise<string> {
   return value;
 }
 
+/**
+ * One cohort's size on one connection, by its compiled SQL — which already says everything that
+ * decides it (definition, study, OncoKB pin, profiles). The page asks for a document's cohorts and
+ * then for each view on its own, and each of those requests counts every cohort; this answers all
+ * but the first. A count, never a membership, so nothing patient-level is stored.
+ */
+async function countEntry(connId: string, sql: string, _version: string): Promise<string> {
+  "use cache: remote";
+  cacheLife("days");
+  const conn = connById(connId);
+  if (!conn) throw new Error("no connection '" + connId + "'");
+  return pack(await withoutFailedQueries(async () =>
+    Number((await chQuery<{ n: string }>("SELECT count() AS n FROM (" + sql + ")", conn)).data[0].n)));
+}
+async function countDirect(conn: ChConn, sql: string): Promise<number> {
+  return Number((await chQuery<{ n: string }>("SELECT count() AS n FROM (" + sql + ")", conn)).data[0].n);
+}
+export async function cachedCount(conn: ChConn, sql: string): Promise<number> {
+  // a statement over uploaded data belongs to its uploader, never to the shared cache
+  if (hasCustomData()) return countDirect(conn, sql);
+  return throughCache(async () => countEntry(conn.id, sql, await dataVersion()), () => countDirect(conn, sql));
+}
+
 async function analysisEntry(doc: AnalysisDoc, oncoprint: "svg" | "spec", _version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
-  return pack(await withoutFailedQueries(() => runAnalysis(doc, { oncoprint })));
+  return pack(await withoutFailedQueries(() => runAnalysis(doc, { oncoprint, count: cachedCount })));
 }
 export async function cachedAnalysis(doc: AnalysisDoc, opts: { oncoprint?: "svg" | "spec" } = {}): Promise<AnalysisResult> {
   const oncoprint = opts.oncoprint ?? "svg";
   // an answer that depends on uploaded data belongs to its uploader, never to the shared cache
   if (hasCustomData()) return runAnalysis(doc, { oncoprint });
-  return throughCache(async () => analysisEntry(doc, oncoprint, await dataVersion()), () => runAnalysis(doc, { oncoprint }));
+  return throughCache(async () => analysisEntry(doc, oncoprint, await dataVersion()), () => runAnalysis(doc, { oncoprint, count: cachedCount }));
 }
 
 async function contractEntry(spec: OncoprintSpec, _version: string): Promise<string> {
