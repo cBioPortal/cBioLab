@@ -171,3 +171,21 @@ describe("split: a fixed, engine-owned held-out partition", () => {
     assert.match(describeCohortDef({ all: [{ kind: "split", part: "validation" }] }), /validation half/);
   });
 });
+
+// Study ids nest: brca_tcga_pub and brca_tcga_pan_can_atlas_2018 both start with "brca_tcga_", and
+// TCGA patient ids are shared across them. A leaf of one study must not read another's rows.
+describe("leaves read only their own study, not siblings named after it", () => {
+  const ctx = { study: "brca_tcga", db: "db", gaProfiles: ["phosphoprotein_quantification"] };
+  test("genericAssay: the study's own profile by its exact id, no prefix match", () => {
+    const sql = compileCohortDef({ all: [{ kind: "genericAssay", profileType: "phosphoprotein_quantification", entity: "AKT1", range: { gt: 1 } } as any] }, ctx);
+    assert.match(sql, /profile_stable_id = 'brca_tcga_phosphoprotein_quantification'/);
+    assert.doesNotMatch(sql, /LIKE 'brca_tcga_%'/);
+  });
+  test("caseList: constrained to the study, shorthand or full id", () => {
+    for (const id of ["all", "brca_tcga_all", "brca_tcga_pub_all"]) {
+      const sql = compileCohortDef({ all: [{ kind: "caseList", id } as any] }, ctx);
+      assert.match(sql, /cs\.cancer_study_identifier = 'brca_tcga'/, id);
+    }
+    assert.match(compileCohortDef({ all: [{ kind: "caseList", id: "brca_tcgaall" } as any] }, ctx), /sl\.stable_id = 'brca_tcga_brca_tcgaall'/);
+  });
+});

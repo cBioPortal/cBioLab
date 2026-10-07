@@ -128,8 +128,11 @@ export async function studyProfiles(study: string): Promise<{ profiles: string[]
   const conn = (await studyRouting()).get(study) || PRIMARY;
   const profiles = (await chQuery(
     "SELECT DISTINCT profile_type FROM " + conn.db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study), conn)).data.map((r) => r.profile_type);
+  // by the study's own id, not a prefix of the profile id, which also matches sibling studies
   const gaProfiles = (await chQuery(
-    "SELECT DISTINCT replaceOne(profile_stable_id, " + sq(study + "_") + ", '') AS pt FROM " + conn.db + ".generic_assay_profile_entity_derived WHERE profile_stable_id LIKE " + sq(study + "_%"), conn)).data.map((r) => r.pt);
+    "SELECT DISTINCT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt FROM " + conn.db + ".genetic_profile gp\n" +
+    "JOIN " + conn.db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'GENERIC_ASSAY'", conn)).data.map((r) => r.pt);
   const out = { profiles, gaProfiles };
   _profileCache.set(study, out);
   return out;

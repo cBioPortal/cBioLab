@@ -255,13 +255,16 @@ function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): string {
 function caseListLeafSql(leaf: CaseListLeaf, ctx: Ctx): string {
   let id = String(leaf.id || "").trim();
   if (!/^[A-Za-z0-9._-]{1,120}$/.test(id)) throw new Error("caseList clause: bad list id");
-  if (!id.startsWith(ctx.study)) id = ctx.study + "_" + id; // accept 'sequenced' shorthand
+  if (!id.startsWith(ctx.study + "_")) id = ctx.study + "_" + id; // accept 'sequenced' shorthand
+  // only this study's lists: a sibling study's id also starts with this one's, and TCGA patient
+  // ids are shared across TCGA studies, so its list would read as plausible members
   return "SELECT DISTINCT p.stable_id AS pid\n" +
     "  FROM " + dbOf(ctx) + ".sample_list sl\n" +
+    "  JOIN " + dbOf(ctx) + ".cancer_study cs ON cs.cancer_study_id = sl.cancer_study_id\n" +
     "  JOIN " + dbOf(ctx) + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
     "  JOIN " + dbOf(ctx) + ".sample s ON s.internal_id = sll.sample_id\n" +
     "  JOIN " + dbOf(ctx) + ".patient p ON p.internal_id = s.patient_id\n" +
-    "  WHERE sl.stable_id = " + sq(id);
+    "  WHERE sl.stable_id = " + sq(id) + " AND cs.cancer_study_identifier = " + sq(ctx.study);
 }
 
 function numRangeConds(range: ClinicalRange | undefined, expr: string): string[] {
@@ -307,8 +310,10 @@ function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): string {
   if (!conds.length) throw new Error("genericAssay clause needs range or values[]");
   return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
     "  FROM " + dbOf(ctx) + ".generic_assay_data_derived\n" +
-    "  WHERE (sample_unique_id LIKE " + sq(ctx.study + "_%") + " OR patient_unique_id LIKE " + sq(ctx.study + "_%") + ")\n" +
-    "    AND profile_type = " + sq(pt) + " AND entity_stable_id = " + sq(entity) + "\n" +
+    // the study's own profile by its exact id: a prefix match on the ids also reads every sibling
+    // study named after this one (brca_tcga_pub_…, brca_tcga_pan_can_atlas_2018_…)
+    "  WHERE profile_type = " + sq(pt) + " AND profile_stable_id = " + sq(ctx.study + "_" + pt) + "\n" +
+    "    AND entity_stable_id = " + sq(entity) + "\n" +
     "    AND " + conds.join(" AND ");
 }
 
