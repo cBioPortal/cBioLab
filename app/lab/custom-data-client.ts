@@ -7,18 +7,18 @@
 // exception is the gallery's demo data (`customData` on a lib/dsl-reference.ts example): public
 // data bundled with the code, sent as rows so the example runs anywhere, code or no code.
 //
-// One fetch wrapper attaches both, so every caller — including the shared OncoprintFigure —
-// sends them without knowing they exist:
+// withCustomData attaches both to a request body, and app/lab/api.ts calls it for every endpoint
+// that reads them:
 //
-//   /api/explore            every server dataset with rows in the studies being explored
-//   /api/analysis, /api/oncoprint, /api/custom-data/members, /api/view-page
-//                           (and the table download, a form post, through withCustomRefs)
-//                           only datasets the document or spec names, so an analysis that uses
+//   explore                 every server dataset with rows in the studies being explored
+//   everything else         only datasets the document or spec names, so an analysis that uses
 //                           none stays on the shared result cache. A name the document pins
-//                           (`uploads`, see bindUploads) resolves to that version.
+//                           (`uploads`, see bindUploads) resolves to that version; a body that
+//                           carries a spec rather than the document is given the pins with it.
 import { CUSTOM_PREFIX, LIMITS, type CustomColumn, type CustomDataset, type CustomLevel } from "../../lib/custom-data-names.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
 import { EXAMPLES } from "../../lib/dsl-reference.ts";
+import type { MembersBody } from "../../lib/api-schemas.ts";
 
 /** A dataset with the record of how its upload matched, as saved and as read back. */
 export interface StoredDataset extends CustomDataset {
@@ -151,10 +151,6 @@ export async function fetchServerVersion(id: string, version: number): Promise<S
   return out;
 }
 
-/** The pins of the document on the page, for requests that carry a spec rather than the document. */
-let activeBindings: UploadBinding[] = [];
-export function setActiveBindings(b: UploadBinding[] | undefined): void { activeBindings = Array.isArray(b) ? b : []; }
-
 /**
  * Pin every server dataset a document names: a name with no pin that the server holds gets
  * `{ as, dataset, version: latest }`; pins the document no longer uses are dropped. Returns the
@@ -190,22 +186,34 @@ export function unresolvedUploads(doc: { uploads?: UploadBinding[] }): { as: str
 }
 
 // ---------------------------------------------------------------------------
-// The fetch wrapper
+// Attaching datasets to a request
 // ---------------------------------------------------------------------------
 
-function attach(path: string, body: string): string | null {
-  const j = JSON.parse(body) as { studies?: string[]; study?: string; uploads?: UploadBinding[]; doc?: { uploads?: UploadBinding[] } };
+type Attachable = { studies?: string[]; study?: string; uploads?: UploadBinding[]; doc?: { uploads?: UploadBinding[] } };
+
+/**
+ * `body` with the datasets it uses: `customData` rows for the gallery's built-in ones,
+ * `customRefs` for server-stored ones. `explore` attaches every server dataset with rows in the
+ * studies explored; otherwise only what the body names, pinned by its own `uploads` (or its
+ * document's), else by `pins` — the document's, for a body that carries a spec instead — else the
+ * latest version. A body that uses none goes out as it is.
+ */
+export async function withCustomData<B extends object>(body: B, opts: { explore?: boolean; pins?: UploadBinding[] } = {}): Promise<B> {
+  // the page's first requests go out on mount, before the server has said what it holds; a shared
+  // ?doc= link that names a dataset must not race it
+  await loadCustomData();
+  const j = body as B & Attachable;
   const rows: CustomDataset[] = [], refs: UploadBinding[] = [];
   const named = referencedDatasets({ ...j, uploads: undefined, ...(j.doc ? { doc: { ...j.doc, uploads: undefined } } : {}) });
   for (const as of named) { const b = builtinDataset(as); if (b) rows.push(b); }
-  if (path === "/api/explore") {
+  if (opts.explore) {
     const studies = new Set([...(j.studies || []), ...(j.study ? [j.study] : [])]);
     for (const s of server.datasets) {
       const v = s.versions.find((x) => x.version === s.latestVersion);
       if (v && v.studies.some((st) => studies.has(st))) refs.push({ as: s.slug, dataset: s.id, version: s.latestVersion });
     }
   } else {
-    const pins = Array.isArray(j.uploads) ? j.uploads : Array.isArray(j.doc?.uploads) ? j.doc.uploads : activeBindings;
+    const pins = Array.isArray(j.uploads) ? j.uploads : Array.isArray(j.doc?.uploads) ? j.doc!.uploads! : opts.pins || [];
     for (const as of named) {
       if (builtinDataset(as)) continue;
       const pin = pins.find((b) => b.as === as), s = serverBySlug(as);
@@ -213,41 +221,8 @@ function attach(path: string, body: string): string | null {
       else if (s) refs.push({ as, dataset: s.id, version: s.latestVersion });
     }
   }
-  if (!rows.length && !refs.length) return null;
-  return JSON.stringify({ ...j, ...(rows.length ? { customData: rows.map(strip) } : {}), ...(refs.length ? { customRefs: refs } : {}) });
-}
-
-/**
- * A body with the datasets it names attached, for a request the fetch wrapper does not see — the
- * table download is a form post, so the browser can save the file as it streams.
- */
-export async function withCustomRefs(path: string, body: string): Promise<string> {
-  await loadCustomData();
-  try { return attach(path, body) || body; } catch { return body; }
-}
-
-let installed = false;
-/** Wrap window.fetch so engine requests carry the datasets they need. Idempotent. */
-export function installCustomDataFetch(): void {
-  if (installed || typeof window === "undefined") return;
-  installed = true;
-  const orig = window.fetch.bind(window);
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    try {
-      if (init && (init.method || "GET").toUpperCase() === "POST" && typeof init.body === "string") {
-        const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-        const path = new URL(href, window.location.href).pathname;
-        if (path === "/api/explore" || path === "/api/analysis" || path === "/api/oncoprint" || path === "/api/partition" || path === "/api/custom-data/members" || path === "/api/view-page") {
-          // the page's first requests go out on mount, before the server has said what it holds;
-          // a shared ?doc= link that names a dataset must not race it
-          await loadCustomData();
-          const body = attach(path, init.body);
-          if (body) init = { ...init, body };
-        }
-      }
-    } catch { /* a body that is not JSON goes out as it was */ }
-    return orig(input, init);
-  };
+  if (!rows.length && !refs.length) return body;
+  return { ...body, ...(rows.length ? { customData: rows.map(strip) } : {}), ...(refs.length ? { customRefs: refs } : {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -384,8 +359,9 @@ export function buildFeature(name: string, level: CustomLevel,
 
 /** Freeze a cohort definition's current membership (Explore's filter) into a feature. */
 export async function featureFromCohort(name: string, def: unknown, studies: string[]): Promise<StoredDataset> {
+  const body: MembersBody = { def: def as MembersBody["def"], studies };
   const res = await fetch("/api/custom-data/members", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ def, studies }) });
+    body: JSON.stringify(await withCustomData(body)) });
   const j = await res.json();
   if (!res.ok || j.error) throw new Error(j.error || res.statusText);
   const cases = (j.studies as { study: string; members: string[]; others: string[] }[]).flatMap((s) => [

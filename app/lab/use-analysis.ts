@@ -15,6 +15,8 @@ import { QueryClient, useQueries, useQuery, type QueryClient as QC } from "@tans
 import { useRef } from "react";
 import { dataPart } from "../_oncoprint/view-display.ts";
 import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
+import { api } from "./api.ts";
+import type { AnalysisBody } from "../../lib/api-schemas.ts";
 
 /** Analyses are a function of the document and the data: never stale in a session, never refetched
  *  on focus, and an engine error is a refusal, not something to retry. */
@@ -50,7 +52,7 @@ const viewKey = (base: AnalysisDoc, v: V) => ["analysis", "view", JSON.stringify
 
 async function post(body: unknown, signal: AbortSignal): Promise<AnalysisResult> {
   // the page draws its own oncoprints from the binary contract, so a run returns a spec for each
-  const res = await fetch("/api/analysis?oncoprint=spec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
+  const res = await api.analysis(body as AnalysisBody, { query: "?oncoprint=spec", signal });
   const j = await res.json();
   if (j.error) throw new Error(j.error);
   return j as AnalysisResult;

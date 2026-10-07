@@ -12,6 +12,7 @@ import { MoreBody, MoreControls, isMoreKind, drawsOwnWaiting } from "../lab/more
 import { dataPart } from "../_oncoprint/view-display.ts";
 import { OncoprintCard, type TrackCatalog } from "../_oncoprint/OncoprintCard.tsx";
 import type { PageTab } from "./page-doc";
+import { api } from "../lab/api.ts";
 
 type Patch = Record<string, unknown>;
 
@@ -49,7 +50,7 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
     gen.current[key] = g;
     setState((s) => ({ ...s, [key]: { ...s[key], sent, loading: true, error: undefined } }));
     // the oncoprint comes back as a spec the interactive figure draws; every other view as a figure
-    fetch("/api/analysis?oncoprint=spec&figures=svg", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(slice) })
+    api.analysis(slice, { query: "?oncoprint=spec&figures=svg" })
       .then((r) => r.json())
       .then((j) => {
         if (gen.current[key] !== g) return;
@@ -117,7 +118,7 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
           ? <HotspotsBody v={v} hide={spec.hide as string[] | undefined} onHide={(h) => edit(vi, { ...spec, hide: h } as unknown as View)} />
           : v && !v.error && v.kind === "oncoprint" && v.spec
           // the lab's own oncoprint card; the page's cohorts are its own, so a drag counts but makes no cohort
-          ? <OncoprintCard view={spec} spec={v.spec} busy={busy} cohortNames={Object.keys(doc.cohorts || {})} catalog={catalog}
+          ? <OncoprintCard view={spec} spec={v.spec} uploads={doc.uploads} busy={busy} cohortNames={Object.keys(doc.cohorts || {})} catalog={catalog}
               onView={(n) => edit(vi, n as unknown as View)} note={v.note} studies={v.studies} />
           : v && !v.error ? MoreBody({ c: { ...mc, v } }) : null;
         return (

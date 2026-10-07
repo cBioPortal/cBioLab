@@ -5,11 +5,12 @@
 // and MCP — so the two cannot drift; only the arrangement and the interaction live here. Which
 // sub-tab or row is open is this browser's (invariant 9), never the document's.
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { ViewResult, TableQuery } from "../../lib/types";
+import type { ViewResult, TableQuery, CohortDef, View } from "../../lib/types";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 export { usePages, Pager } from "../_table/DataTable.tsx";
 import { cancertypesPanelSvg, enrichmentVolcanoSvg, enrichmentScatterSvg, enrichmentTopSvg } from "../../lib/view-svg-portal";
 import { frame, palette, SERIES } from "../../lib/svg-kit";
+import { api } from "./api.ts";
 
 const framed = (c: { body: string; width: number; height: number } | null) => c ? frame(c.width, c.height, c.body, palette("auto").bg, true) : null;
 export const pFmt = (x: number) => x === 0 ? "< 1e-300" : x < 1e-3 ? x.toExponential(2) : x.toFixed(3);
@@ -151,12 +152,11 @@ function usePairPlot(docJson: (() => string) | undefined, cohort: string, view: 
     if (!view || !docJson) return;
     want.current = key;
     setState(null);
-    let doc: { study?: string; cohorts?: Record<string, unknown> };
+    let doc: { study?: string; cohorts?: Record<string, CohortDef> };
     try { doc = JSON.parse(docJson()); } catch { setState({ key, error: "no document to plot from" }); return; }
     const def = doc.cohorts && doc.cohorts[cohort];
     if (!def) { setState({ key, error: "cohort “" + cohort + "” is not in the document" }); return; }
-    fetch("/api/analysis?figures=svg", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ study: doc.study, cohorts: { [cohort]: def }, views: [{ ...view, cohorts: [cohort] }] }) })
+    api.analysis({ study: doc.study, cohorts: { [cohort]: def }, views: [{ ...view, cohorts: [cohort] } as View] }, { query: "?figures=svg" })
       .then((r) => r.json())
       .then((j) => { if (want.current !== key) return; const pv = j.views && j.views[0]; setState({ key, ...(j.error || pv?.error ? { error: j.error || pv.error } : { svg: pv?.svg }) }); })
       .catch((e) => { if (want.current === key) setState({ key, error: String(e) }); });

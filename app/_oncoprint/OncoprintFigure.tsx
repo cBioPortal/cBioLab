@@ -15,6 +15,10 @@ import { geneLegendFor, resolveStyle, styleForDisplay, trackTooltipLines } from 
 import { jupyterLiteUrl, labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { setPngDpi } from "../../lib/png-dpi.ts";
+import { api } from "../lab/api.ts";
+import type { UploadBinding } from "../lab/custom-data-client.ts";
+import type { OncoprintBody } from "../../lib/api-schemas.ts";
+import type { OncoprintSpec } from "../../lib/types.ts";
 
 const MAX_ZOOM = 24;
 /** common page widths for the export dialog's preset picker; the number field beside it takes any value */
@@ -77,6 +81,8 @@ export interface OncoprintFigureProps {
   footer?: React.ReactNode;
   /** called with each decoded contract (frequencies, queries, column count) */
   onContract?: (c: UnpackedContract) => void;
+  /** the document's pinned uploads: a spec names datasets but carries no pins of its own */
+  uploads?: UploadBinding[];
   /** show the timings panel (the lab's instrument) */
   timings?: boolean;
   /** expose the figure on window.__onco so headless runs can drive it */
@@ -166,8 +172,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     (async () => {
       try {
         const t0 = performance.now();
-        const base = props.endpoint || "/api/oncoprint";
-        const res = await fetch(base + "?format=bin&provenance=1", { method: "POST", headers: { "Content-Type": "application/json" }, body: specKey });
+        const res = await api.oncoprint(JSON.parse(specKey), { query: "?format=bin&provenance=1", endpoint: props.endpoint, pins: props.uploads });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
         const buf = await res.arrayBuffer();
         const fetchMs = performance.now() - t0;
@@ -434,8 +439,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       if (!props.endpoint && !(col in detail)) detailTimer.current = setTimeout(async () => {
         setDetail((d) => ({ ...d, [col]: "loading" }));
         try {
-          const res = await fetch("/api/oncoprint/detail", { method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ spec, column: col }) });
+          const res = await api.oncoprintDetail({ spec: spec as OncoprintSpec, column: col });
           const j = await res.json();
           setDetail((d) => ({ ...d, [col]: j.error ? { column: col, study: "", unit: data.unit, alterations: [], panels: [], notProfiled: [], annotation: j.error } : j }));
         } catch { setDetail((d) => { const n = { ...d }; delete n[col]; return n; }); }
@@ -665,13 +669,12 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         save(sized, stem + "-" + exportWidthIn + "in.png");
       } else if (what === "svg") {
         const w = Math.max(200, Math.round(exportWidthIn * EXPORT_LAYOUT_DPI));
-        const res = await fetch((props.endpoint || "/api/oncoprint") + "?format=svg&width=" + w + "&widthIn=" + exportWidthIn,
-          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(specOnScreen()) });
+        const res = await api.oncoprint(specOnScreen() as OncoprintBody, { query: "?format=svg&width=" + w + "&widthIn=" + exportWidthIn,
+          endpoint: props.endpoint, pins: props.uploads });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
         save(await res.blob(), stem + "-" + exportWidthIn + "in.svg");
       } else {
-        const res = await fetch((props.endpoint || "/api/oncoprint") + "?format=" + what,
-          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(specOnScreen()) });
+        const res = await api.oncoprint(specOnScreen() as OncoprintBody, { query: "?format=" + what, endpoint: props.endpoint, pins: props.uploads });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
         save(await res.blob(), stem + "." + what);
       }

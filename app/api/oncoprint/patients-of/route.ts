@@ -1,3 +1,4 @@
+import { parseBody, PatientsOfRequest } from "../../../../lib/api-schemas.ts";
 import { chQueryRows, STUDY } from "../../../../lib/ch";
 import { patientLevelConn } from "../../../../lib/federation";
 import { sq } from "../../../../lib/compiler";
@@ -14,9 +15,7 @@ export const maxDuration = 30;
  */
 export async function POST(req: Request) {
   try {
-    const { study, samples } = await req.json();
-    if (!Array.isArray(samples) || !samples.length) throw new Error("samples must be a non-empty array of sample ids");
-    if (samples.length > 50000) throw new Error("selection is larger than the 50,000-id ceiling on an explicit patient list");
+    const { study, samples } = parseBody(PatientsOfRequest, await req.json());
     const s = String(study || STUDY).replace(/[^A-Za-z0-9._-]/g, "");
     const conn = await patientLevelConn(s, "a selection's patients are a list of patients");
     const ids = samples.map(String).filter((x) => /^[A-Za-z0-9._-]{1,80}$/.test(x));

@@ -1,3 +1,4 @@
+import { parseBody, ViewPageRequest } from "../../../lib/api-schemas.ts";
 import { runAnalysis } from "../../../lib/analysis.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import type { AnalysisDoc, MutationsResult, TableResult } from "../../../lib/types.ts";
@@ -6,7 +7,6 @@ export const maxDuration = 60;
 
 /** Table views: their rows are paged, searched, filtered and sorted by lib/table-query.ts. */
 const PAGED = new Set(["mutations", "table"]);
-const PAGE_MAX = 1000;
 
 /**
  * One page of a table view — rows `offset` to `offset + limit` of the view's one order, as its
@@ -19,9 +19,9 @@ const PAGE_MAX = 1000;
  */
 export async function POST(req: Request) {
   try {
-    const { customData, customRefs, ...body } = await req.json();
-    const doc: AnalysisDoc = body.doc, vi = Number(body.view);
-    const view = doc && Array.isArray(doc.views) ? doc.views[vi] : null;
+    const { customData, customRefs, ...body } = parseBody(ViewPageRequest, await req.json());
+    const doc = body.doc as unknown as AnalysisDoc, vi = body.view;
+    const view = Array.isArray(doc.views) ? doc.views[vi] : null;
     if (!view || !PAGED.has(view.kind)) throw new Error("view " + body.view + " is not a table view (" + [...PAGED].join(", ") + ")");
     const one = { ...doc, views: [view] };
     const run = (opts: Parameters<typeof runAnalysis>[1]) => withRequestCustomData(customData, () => runAnalysis(one, opts), { refs: customRefs, req });
@@ -35,8 +35,7 @@ export async function POST(req: Request) {
       const t = pick(await run({ values: String(body.values) }));
       return Response.json({ values: t.values });
     }
-    const offset = Math.max(0, Math.floor(Number(body.offset) || 0)), limit = Math.floor(Number(body.limit) || 25);
-    if (!(limit >= 1 && limit <= PAGE_MAX)) throw new Error("limit is 1 to " + PAGE_MAX);
+    const { offset, limit } = body;
     const t = pick(await run({ page: { offset, limit } }));
     return Response.json({ rows: t.rows, total: t.total, offset });
   } catch (e) {

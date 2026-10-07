@@ -99,6 +99,13 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   what it does not know. A change to the document's shape, or to what an unchanged document means,
   bumps DOC_VERSION and adds an upgrade step there; never re-interpret an old shape anywhere else.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
+- **Requests from the pages** go through **`app/lab/api.ts`** (`api.analysis`, `api.explore`,
+  `api.oncoprint`, …), never a bare `fetch`: each takes its endpoint's envelope type from
+  **`lib/api-schemas.ts`** and attaches the uploads its body uses (`withCustomData`). The routes
+  parse the same envelope (`parseBody`), so a change to either side is a type error in the other.
+  An envelope checks only the route's own parameters (which view, which page, which uploads) and
+  passes the document, definition or spec it carries to the engine — don't grow it into a second
+  schema of the DSL. A new endpoint the pages call gets an envelope and an `api` function.
 - **Custom data** — a researcher's uploaded annotations, named `custom:<dataset>/<COLUMN>` and
   usable anywhere a clinical attribute is, stored on the server only (below; the browser keeps
   nothing — `app/lab/custom-data-client.ts` attaches references). **`lib/custom-data.ts`**: for

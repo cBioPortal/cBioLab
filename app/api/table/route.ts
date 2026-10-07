@@ -1,3 +1,4 @@
+import { parseBody, TableRequest } from "../../../lib/api-schemas.ts";
 import { runAnalysis } from "../../../lib/analysis.ts";
 import { TABLE_CHUNK } from "../../../lib/views-portal.ts";
 import { csvField, describeQuery } from "../../../lib/table-query.ts";
@@ -23,9 +24,9 @@ export async function POST(req: Request) {
   let doc: AnalysisDoc, body: Record<string, unknown>;
   try {
     const type = req.headers.get("content-type") || "";
-    body = type.includes("application/json") ? await req.json() : JSON.parse(String((await req.formData()).get("payload") || "{}"));
+    body = parseBody(TableRequest, type.includes("application/json") ? await req.json() : JSON.parse(String((await req.formData()).get("payload") || "{}")));
     doc = (typeof body.doc === "string" ? JSON.parse(body.doc) : body.doc) as AnalysisDoc;
-    const vi = Number(body.view);
+    const vi = body.view as number;
     const view = doc && Array.isArray(doc.views) ? doc.views[vi] : null;
     if (!view || (view.kind !== "table" && view.kind !== "mutations")) throw new Error("view " + body.view + " is not a table view");
     doc = { ...doc, views: [view] };
