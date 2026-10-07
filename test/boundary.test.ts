@@ -474,3 +474,30 @@ describe("unrouted studies are refused, not sent to the default connection", { s
     await assert.rejects(columnDetail({ study: "no_such_study", genes: ["TP53"] } as any, "P-1"), /unknown study/);
   });
 });
+
+// The peer's own MCP tools refuse an id-carrying definition themselves: a caller that is not
+// this codebase's RemoteAggregateResolver has checked nothing.
+describe("a peer's federation tools refuse explicit id lists on their own", () => {
+  const handlers = new Map<string, (args: any) => Promise<any>>();
+  // registerTool is captured; whatever else registerTools calls (tool, resource…) is a no-op
+  const fake = new Proxy({}, {
+    get: (_t, prop) => prop === "registerTool"
+      ? (name: string, _def: unknown, h: (args: any) => Promise<any>) => { handlers.set(name, h); }
+      : () => undefined
+  });
+  const nested = { all: [{ not: { not: { kind: "patientList", ids: ["s:P-1"] } } }] };
+  test("federated_aggregates", async () => {
+    const { registerTools } = await import("../mcp/tools.ts");
+    registerTools(fake);
+    const r = await handlers.get("federated_aggregates")!({ study: "s", cohort: nested, attributes: ["AGE"] });
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, /REJECTED: cohort contains an explicit sample or patient list/);
+  });
+  test("federated_facets", async () => {
+    const { registerTools } = await import("../mcp/tools.ts");
+    registerTools(fake);
+    const r = await handlers.get("federated_facets")!({ study: "s", draft: nested });
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, /explicit sample or patient list/);
+  });
+});

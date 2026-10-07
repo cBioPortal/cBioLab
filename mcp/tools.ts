@@ -127,6 +127,10 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
     },
     async ({ study, cohort, genes, survival, pairs, attributes, attributeHistograms, attributeTopValues, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, endpointColumns, survivalEndpoints, anchor }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; attributeHistograms?: boolean | null; attributeTopValues?: number | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; endpointColumns?: { months: string; status: string } | null; survivalEndpoints?: boolean | null; anchor?: any }) => {
       try {
+        // Refused here, by the peer, whatever the caller checked: an explicit list compiles to the
+        // ids themselves, and beside a clinical attribute a count of 0 or 1 reads one patient's value.
+        if (carriesPatientIds(cohort))
+          throw new Error("cohort contains an explicit sample or patient list; identifiers are not accepted across instances");
         const s = await resolveStudy(study);
         const { profiles, gaProfiles } = await studyProfiles(s);
         const pin = process.env.ONCOKB_PIN || null;
@@ -146,8 +150,8 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           survivalEndpoints ? res.survivalEndpoints() : Promise.resolve([] as string[]),
           lollipopGenes && lollipopGenes.length ? res.lollipopCounts(cohort, lollipopGenes, minCount || 1) : Promise.resolve(null)
         ]);
-        // SQL text carries no patient data, and an id-carrying definition was already
-        // refused, so disclosing what we ran restores end-to-end provenance for the
+        // SQL text carries no patient data, and an id-carrying definition was refused
+        // above, so disclosing what we ran restores end-to-end provenance for the
         // caller. A deployment that treats its schema as sensitive sets
         // FEDERATION_HIDE_SQL=1 and the caller degrades gracefully.
         const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
@@ -182,9 +186,9 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
     },
     async ({ study, draft, geneSearch }: { study: string; draft?: any; geneSearch?: string | null }) => {
       try {
-        const s = await resolveStudy(study);
         if (carriesPatientIds(draft))
           throw new Error("draft contains an explicit sample or patient list; identifiers are not accepted across instances");
+        const s = await resolveStudy(study);
         const { profiles, gaProfiles } = await studyProfiles(s);
         const conn = (await studyRouting()).get(s) || PRIMARY;
         const facets = await buildExplore({
