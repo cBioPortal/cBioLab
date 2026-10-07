@@ -988,6 +988,9 @@ async function main() {
     await ctx.close();
   }
 
+  // the analysis page's requests finishing out of order (e2e-lab-races.cjs)
+  await require("./e2e-lab-races.cjs").labRaces(browser, ok, BASE);
+
   await browser.close();
 
   // Panel-aware denominator gate. A gene's frequency is altered / profiled-for-

@@ -643,7 +643,11 @@ export default function AnalysisPage() {
     setSaved(prev => { const nx = { ...prev }; delete nx[name]; return nx; });
   };
 
+  /** The newest full run: an older one's answer is dropped when it lands, never shown over a newer one. */
+  const runSeq = useRef(0);
   const run = async (d0: AnalysisDoc = doc) => {
+    const seq = ++runSeq.current;
+    const current = () => runSeq.current === seq;
     // bring an older document to the current version (lib/doc-version.ts) — the page then holds,
     // shows and saves the current shape — and pin any server-stored custom data it names, so a
     // shared link reads the same version
@@ -657,19 +661,34 @@ export default function AnalysisPage() {
     if (d !== d0) { setDoc(d); setDocText(JSON.stringify(d, null, 2)); }
     if (!Object.keys(d.cohorts || {}).length) { setBusy(false); setResult(null); return; }
     setBusy(true); setError(null);
+    // a view edited on its own while this runs (runViewDelta) has a newer answer than this run's
+    const gens = new Map(deltaGen.current);
     try {
       const payload = { study: d.study || study, ...d };
       // the page draws its own oncoprints from the binary contract, so the run returns
       // a spec for each one instead of a server-rendered SVG
       const res = await fetch("/api/analysis?oncoprint=spec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await res.json();
+      if (!current()) return;
       if (j.error) throw new Error(j.error);
       // aligned with `d`, the document THIS run actually sent — not `doc`,
       // which may already hold a further edit by the time this resolves
-      resultViewKeys.current = (d.views || []).map((v: any) => keyFor(v));
-      setResult(j);
+      const before = resultViewKeys.current;
+      const keys = (d.views || []).map((v: any) => keyFor(v));
+      resultViewKeys.current = keys;
+      setResult((prev) => {
+        if (!prev) return j;
+        const views = (j as AnalysisResult).views.map((v, i) => {
+          const k = keys[i], at = before.indexOf(k);
+          return (deltaGen.current.get(k) ?? 0) !== (gens.get(k) ?? 0) && at >= 0 && prev.views[at] ? prev.views[at] : v;
+        });
+        return { ...j, views };
+      });
       syncUrl(undefined, d);
-    } catch (e) { setError(String((e as Error)?.message || e)); }
+    } catch (e) {
+      if (!current()) return;
+      setError(String((e as Error)?.message || e));
+    }
     setBusy(false);
   };
 
@@ -732,16 +751,21 @@ export default function AnalysisPage() {
   const loggedIn = customState.unlocked;
   useEffect(() => {
     if (!loggedIn) { setSaved({}); setSpaces({}); return; }
+    // a reply that lands after logging out must not put the saved work back on the page
+    let live = true;
     fetch("/api/artifacts?kind=cohort").then(r => r.json()).then(j => {
+      if (!live) return;
       const map: typeof saved = {};
       for (const a of j.artifacts || []) map[a.name] = { id: a.id, def: a.definition, savedAt: fmtDate(a.updatedAt), lastEval: null };
       setSaved(map);
     }).catch(() => {});
     fetch("/api/artifacts?kind=workspace").then(r => r.json()).then(j => {
+      if (!live) return;
       const map: typeof spaces = {};
       for (const a of j.artifacts || []) map[a.name] = { id: a.id, doc: a.definition, savedAt: fmtDate(a.updatedAt) };
       setSpaces(map);
     }).catch(() => {});
+    return () => { live = false; };
   }, [loggedIn]);
   /** Saving needs the login: logged out, ask for it rather than fail. Returns true when saving may go ahead. */
   const canSave = (): boolean => {
@@ -1630,7 +1654,14 @@ export default function AnalysisPage() {
    * and the Python package reproduce the same figure; only the round trip is skipped.
    */
   const updateViewLocal = (vi: number, patch: (v: any) => any) => {
-    const views = (doc.views || []).map((v, i: number) => i === vi ? patch(v) : v);
+    const views = (doc.views || []).map((v, i: number) => {
+      if (i !== vi) return v;
+      // the card keeps its key (see updateView): a later edit to this view must find its slot
+      const nv = patch(v);
+      const k = viewKeys.current.get(v);
+      if (k != null) viewKeys.current.set(nv, k);
+      return nv;
+    });
     const d = { ...doc, views };
     setDoc(d); setDocText(JSON.stringify(d, null, 2)); syncUrl(undefined, d);
   };
@@ -2565,7 +2596,10 @@ function Latency({ v }: { v: any }) {
       const j = await res.json();
       if (j.error) throw new Error(j.error);
       return j as AnalysisResult;
-    } catch (e) { setBusy(false); throw e; }
+    } finally {
+      // released whatever happens next: an edit the tool then rejects never reaches commitDoc
+      setBusy(false);
+    }
   };
   /** the server's proposed arms for "split this cohort by X" — see proposePartition in lib/analysis.ts */
   const proposePartition = async (req: { doc: AnalysisDoc; cohort: string; attribute?: string; gene?: string; oql?: string[]; name?: string; maxArms?: number; minCount?: number }) => {
