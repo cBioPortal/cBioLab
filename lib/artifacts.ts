@@ -44,7 +44,10 @@ function migrate(kind: ArtifactKind, definition: unknown, fromVersion: number): 
   return definition;
 }
 
-interface Row { id: string; kind: ArtifactKind; name: string; schema_version: number; definition: unknown; owner?: string | null; created_at: string; updated_at: string }
+interface Row { id: string; kind: ArtifactKind; name: string; schema_version: number; definition: unknown; owner?: string | null; created_at: string | Date; updated_at: string | Date }
+
+/** Postgres hands back timestamps as Date, the memory backend as ISO text: both become ISO text. */
+const iso = (t: string | Date): string => new Date(t).toISOString();
 
 /** An owner column of null predates the login and is read as the shared principal's. */
 const ownerOf = (r: Row) => r.owner ?? SHARED_PRINCIPAL;
@@ -54,7 +57,7 @@ function fromRow(r: Row): SavedArtifact {
     id: r.id, kind: r.kind, name: r.name,
     schemaVersion: CURRENT_SCHEMA_VERSION,
     definition: migrate(r.kind, r.definition, r.schema_version),
-    createdAt: r.created_at, updatedAt: r.updated_at
+    createdAt: iso(r.created_at), updatedAt: iso(r.updated_at)
   };
 }
 
@@ -91,7 +94,7 @@ const memoryBackend: Backend = {
   async list(kind) {
     return [...memoryRows.values()]
       .filter(r => !kind || r.kind === kind)
-      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+      .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
       .slice(0, 500);
   },
   async get(id) { return memoryRows.get(id) ?? null; },

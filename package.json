@@ -13,6 +13,7 @@
     "check:methods": "node --env-file=.env.local scripts/check-method-scripts.ts",
     "test": "node --test \"test/**/*.test.ts\"",
     "test:boundary": "node --test test/boundary.test.ts",
+    "test:db": "node --test test/postgres.db-test.ts",
     "test:python": "python/.venv/bin/python -m unittest discover -s python/tests -v",
     "check:genefacets": "node --env-file=.env.local scripts/check-gene-facets.ts",
     "check:values": "node --env-file=.env.local scripts/check-value-folding.ts",
@@ -36,6 +37,7 @@
   },
   "type": "module",
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.0",
     "@types/pg": "^8.23.1",

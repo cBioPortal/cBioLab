@@ -353,7 +353,11 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
 - Test: `npm test` — unit suites, no database needed (the patient-data boundary, the stats used by
   federated views, cohort-definition semantics, clinical-course semantics, and the SVG figure
   renderers, plots, gene tracks, template parameters and the panel-aware denominator;
-  252 checks across 40 suites).
+  252 checks across 40 suites). `npm run test:db` (~15 s, in `scripts/gate.sh`) runs the stores'
+  Postgres SQL, `db/migrations` and their triggers on an in-process Postgres (PGlite,
+  `test/postgres.db-test.ts`) — the e2e gate uses the in-memory fallback, so that is the only place
+  the database path is exercised. A store promise belongs in `test/support/store-contracts.ts`,
+  which runs on both backends.
   `node e2e.cjs` — 81 checks (Playwright + docs gate + the boundary suite + the
   denominator gate).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
