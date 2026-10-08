@@ -1,0 +1,11 @@
+.git
+node_modules
+.next
+.next-gate
+.next-demo
+.env*
+.vercel
+*.log
+nohup.out
+HANDOFF.local.md
+python/.venv
