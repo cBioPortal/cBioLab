@@ -504,7 +504,18 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .lollilist { display: flex; flex-wrap: wrap; gap: 0 0.9rem; font-size: var(--t-sm); margin-top: 0.2rem; }
 .lollilist b { font-weight: 600; }
 
+/* ---------------- Saved tab ---------------- */
+.flush, .card h2.flush { margin: 0; }
+.savedbar { align-items: center; gap: var(--s2); margin-bottom: var(--s0); }
+.card h2.savedsec { margin-top: var(--s4); }
+/* a list of named things, one per row, ruled between */
+.listrow { border-top: 1px solid var(--line); padding: var(--s3) 0; }
+.listrow-head { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: baseline; }
+.listrow-body { margin-top: var(--s1); }
+
 /* ---------------- Examples tab ---------------- */
+.exintro { margin-top: var(--s1); }
+.exactions { margin-top: auto; padding-top: var(--s2); gap: var(--s2); }
 .exgrid {
   display: grid; gap: 0.8rem;
   grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr));

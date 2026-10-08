@@ -125,8 +125,11 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   password, `LOGIN_PASSWORD`, guards custom data AND saved cohorts/analyses (`/api/artifacts`,
   owner-scoped; ownerless rows from before the login read as the shared principal's).
   `scripts/gate.sh` gives its e2e server a throwaway password. Per-user access is not built yet.
-- **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Cohorts /
-  Analysis / Examples. The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
+- **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Saved /
+  Analysis / Examples. Tabs move out into their own components as they are untangled
+  (`saved-tab.tsx`, `examples-tab.tsx`); state that must outlive a tab switch stays in the page,
+  since a tab unmounts when left. Server state goes through React Query, as analyses do
+  (`use-analysis.ts`): saved cohorts and analyses are `use-saved.ts`. The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
   demo pages were retired once the Analysis app subsumed them; `/` now redirects to `/lab`.
 - **WebMCP (`lib/webmcp.ts`)** — every page's tools for the researcher's assistant in the
   browser (Claude in the Chrome sidebar): registered with `document.modelContext` and published

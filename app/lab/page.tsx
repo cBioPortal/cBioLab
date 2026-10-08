@@ -12,7 +12,7 @@ import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 import { parameterize } from "../../lib/params.ts";
 import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve, PartitionDef } from "../../lib/types.ts";
-import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
+import type { DslExample } from "../../lib/dsl-reference.ts";
 import { survivalAxis } from "../../lib/stats.ts";
 import { MethodPanel } from "./method-panel.tsx";
 import { foldEventNames } from "../../lib/event-names.ts";
@@ -32,6 +32,9 @@ import { useAnalysis, seedAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { AxisPicker, useGearmenuOpen, ViewHelpButton, SplitByNote, PickMenu, CohortNode, CohortPicker, DrawnCohorts, CohortStudies, ViewHead, ViewMenu, CohortEditMenu, Latency, CAT_COLORS, Participation } from "./view-chrome.tsx";
 import { api } from "./api.ts";
+import { useSavedArtifacts } from "./use-saved.ts";
+import { SavedTab } from "./saved-tab.tsx";
+import { ExamplesTab } from "./examples-tab.tsx";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -343,7 +346,6 @@ export default function AnalysisPage() {
    *  between them ("manage on the Saved tab"); one tab, two sub-tabs instead. */
   const [cohortsSubTab, setCohortsSubTab] = useState<"cohorts" | "analyses">("cohorts");
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
-  const [copied, setCopied] = useState<string | null>(null);
   const [exMsg, setExMsg] = useState<string | null>(null);
   /** the facet whose "split by this" is waiting on the server's proposed arms */
   const [splittingBy, setSplittingBy] = useState<string | null>(null);
@@ -414,7 +416,6 @@ export default function AnalysisPage() {
   const [uiError, setError] = useState<string | null>(null);
   // a different document starts with nothing to apologise for
   useEffect(() => { setError(null); }, [docs.current.doc]);
-  const [saved, setSaved] = useState<Record<string, { id: string; def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null }>>({});
   const [cName, setCName] = useState("");
   const [cDefText, setCDefText] = useState(JSON.stringify({ all: [] }, null, 2));
   const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
@@ -522,24 +523,6 @@ export default function AnalysisPage() {
   }>({ aType: "", aOcc: "ANY", aLineOp: "=", aLineNo: "", rel: "NONE",
        bType: "", bOcc: "ANY", bLineOp: "=", bLineNo: "", days: "180", priorGuard: false, lineGap: 90 });
 
-  /**
-   * Saved workspaces. A workspace IS the analysis document — several views,
-   * their notes, and any template parameters — so persistence is deliberately
-   * schemaless: the whole document is stored verbatim under a name, exactly as
-   * saved cohorts already are. Nothing is normalised, so a document written by a
-   * newer build still loads, and anything the app cannot interpret survives a
-   * round trip instead of being dropped.
-   *
-   * Both this and saved cohorts now live in the shared Postgres artifact store
-   * (lib/artifacts.ts) rather than localStorage — server-side, so a save
-   * outlives the browser that made it, but SHARED: there is no per-user
-   * ownership yet (see HANDOFF.local.md), so anyone using the app can see,
-   * rename or delete anything saved here. Naming stays the identity a person
-   * types (upsert by name, matching the old localStorage behaviour); the real
-   * identity is the server-assigned id, kept alongside it.
-   */
-  type Workspace = { id: string; doc: AnalysisDoc; savedAt: string };
-  const [spaces, setSpaces] = useState<Record<string, Workspace>>({});
   const [wsName, setWsName] = useState("");
   const [wsError, setWsError] = useState<string | null>(null);
   const wsDialog = useRef<HTMLDialogElement | null>(null);
@@ -561,63 +544,10 @@ export default function AnalysisPage() {
   const [draftFilled, setDraftFilled] = useState(false);
   const viewNoteDialog = useRef<HTMLDialogElement | null>(null);
 
-  /** Postgres timestamptz -> the same "YYYY-MM-DD HH:MM" the app has always shown. */
-  const fmtDate = (iso: string) => iso.slice(0, 16).replace("T", " ");
-
-  async function apiSaveArtifact(kind: "cohort" | "workspace", existingId: string | undefined, name: string, definition: unknown) {
-    const res = existingId
-      ? await fetch("/api/artifacts/" + existingId, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, definition }) })
-      : await fetch("/api/artifacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, name, definition }) });
-    const j = await res.json();
-    if (!res.ok || j.error) throw new Error(j.error || res.statusText);
-    return j.artifact as { id: string; name: string; definition: unknown; updatedAt: string };
-  }
-  async function apiDeleteArtifact(id: string) {
-    const res = await fetch("/api/artifacts/" + id, { method: "DELETE" });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || res.statusText); }
-  }
-
-  const persistSpaces = async (name: string, docToSave: AnalysisDoc) => {
-    const a = await apiSaveArtifact("workspace", spaces[name]?.id, name, docToSave);
-    setSpaces(prev => ({ ...prev, [name]: { id: a.id, doc: a.definition as AnalysisDoc, savedAt: fmtDate(a.updatedAt) } }));
-  };
-  const removeSpace = async (name: string) => {
-    const id = spaces[name]?.id;
-    if (id) await apiDeleteArtifact(id);
-    setSpaces(prev => { const nx = { ...prev }; delete nx[name]; return nx; });
-  };
-
-  const persist = async (name: string, def: CohortDef, lastEval: { count: number; text?: string } | null) => {
-    const a = await apiSaveArtifact("cohort", saved[name]?.id, name, def);
-    setSaved(prev => ({ ...prev, [name]: { id: a.id, def: a.definition as CohortDef, savedAt: fmtDate(a.updatedAt), lastEval } }));
-  };
-  const removeSaved = async (name: string) => {
-    const id = saved[name]?.id;
-    if (id) await apiDeleteArtifact(id);
-    setSaved(prev => { const nx = { ...prev }; delete nx[name]; return nx; });
-  };
-
-  // Saved cohorts and analyses belong to the login (lib/auth.ts): read when it is in, cleared
-  // when it goes, so a logged-out page never shows someone's saved work.
+  // Saved cohorts and analyses belong to the login (lib/auth.ts): see use-saved.ts.
   const loggedIn = customState.unlocked;
-  useEffect(() => {
-    if (!loggedIn) { setSaved({}); setSpaces({}); return; }
-    // a reply that lands after logging out must not put the saved work back on the page
-    let live = true;
-    fetch("/api/artifacts?kind=cohort").then(r => r.json()).then(j => {
-      if (!live) return;
-      const map: typeof saved = {};
-      for (const a of j.artifacts || []) map[a.name] = { id: a.id, def: a.definition, savedAt: fmtDate(a.updatedAt), lastEval: null };
-      setSaved(map);
-    }).catch(() => {});
-    fetch("/api/artifacts?kind=workspace").then(r => r.json()).then(j => {
-      if (!live) return;
-      const map: typeof spaces = {};
-      for (const a of j.artifacts || []) map[a.name] = { id: a.id, doc: a.definition, savedAt: fmtDate(a.updatedAt) };
-      setSpaces(map);
-    }).catch(() => {});
-    return () => { live = false; };
-  }, [loggedIn]);
+  const savedArtifacts = useSavedArtifacts(loggedIn);
+  const { cohorts: saved, workspaces: spaces, saveCohort: persist, saveWorkspace: persistSpaces, removeWorkspace: removeSpace } = savedArtifacts;
   /** Saving needs the login: logged out, ask for it rather than fail. Returns true when saving may go ahead. */
   const canSave = (): boolean => {
     if (loggedIn) return true;
@@ -1828,11 +1758,6 @@ export default function AnalysisPage() {
     btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d))))
       .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-  const copyDocLink = async (ex: DslExample) => {
-    try { await navigator.clipboard.writeText(docLink(ex.doc)); setCopied(ex.title); setTimeout(() => setCopied(null), 1800); }
-    catch { setError("could not copy to clipboard"); }
-  };
-
   const previewExample = async (ex: any) => {
     setExEvals(s => ({ ...s, [ex.name]: { busy: true } }));
     try { const ev = await evalDef(ex.name, ex.def); setExEvals(s => ({ ...s, [ex.name]: ev })); }
@@ -3034,171 +2959,16 @@ export default function AnalysisPage() {
         </div>}
 
         {/* ================= Saved tab ================= */}
-        {tab === "cohorts" && !loggedIn && <div className="card">
-          <p style={{ margin: 0 }}>Saved cohorts and analyses belong to your login.{" "}
-            {customState.enabled
-              ? <><button className="primary" onClick={requestLogin}>Log in</button> to see and save them.</>
-              : "This deployment has no login, so nothing can be saved on it."}</p>
-        </div>}
-        {tab === "cohorts" && loggedIn && <div>
-          {/* Saved cohorts and saved analyses used to be two top-level tabs
-              ("Cohorts" and "Saved") with a cross-link between them ("manage
-              on the Saved tab") — one tab, two sub-tabs instead. */}
-          <div className="tabs">
-            <button className={cohortsSubTab === "cohorts" ? "active" : ""} onClick={() => setCohortsSubTab("cohorts")}>Cohorts</button>
-            <button className={cohortsSubTab === "analyses" ? "active" : ""} onClick={() => setCohortsSubTab("analyses")}>Analyses</button>
-          </div>
-          {cohortsSubTab === "cohorts" && <div>
-          <div className="card">
-            <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.2rem" }}>
-              <h2 style={{ margin: 0 }}>Cohorts <span className="plain">— tick any, then analyse them together</span></h2>
-              <span className="spacer" />
-              <span className="meta">
-                {picked.length === 0 ? "none selected"
-                  : picked.length + " selected" + (picked.length > 16 ? " — untick some first, an analysis takes at most 16" : "")}
-              </span>
-              <button className="primary" disabled={!picked.length} onClick={analyzePicked}
-                title={picked.length ? "analyse the ticked cohorts together (replaces the current document)" : "tick at least one cohort"}>
-                Analyze selected
-              </button>
-              {picked.length > 0 && <button className="linklike" onClick={() => setPicked([])}>clear</button>}
-            </div>
-            <h2 style={{ marginTop: "0.6rem" }}>Examples</h2>
-            {EXAMPLES.map(ex => {
-              const ev = exEvals[ex.name];
-              return (
-                <div key={ex.name} style={{ borderTop: "1px solid var(--line)", padding: "0.5rem 0" }}>
-                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                    <label className="pick">
-                      <input type="checkbox" checked={picked.includes("ex:" + ex.name)} onChange={() => togglePick("ex:" + ex.name)} />
-                      <strong>{ex.name}</strong>
-                    </label>
-                    <span className="meta">{ex.desc}</span>
-                    {ev && ev.count != null && <span className="meta"><strong>{ev.count.toLocaleString()}</strong> pts</span>}
-                    {ev && ev.busy && <span className="spinner" />}
-                    <span className="spacer" />
-                    <button className="linklike" onClick={() => previewExample(ex)}>preview</button>
-                    <button className="linklike" onClick={() => saveExample(ex)}>save</button>
-                  </div>
-                  {ev && ev.error && <div className="error">{ev.error}</div>}
-                </div>
-              );
-            })}
-            <h2 style={{ marginTop: "1.2rem" }}>
-              Saved cohorts <span className="plain">— everyone who logs in sees these: one shared login, no per-user ownership yet. Tick any to include above; delete here.</span>
-            </h2>
-            {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, build one on the Explore page, or ask chat.</p>}
-            {Object.entries(saved)
-              .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
-              .map(([n, s2]) => (
-              <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
-                <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                  <label className="pick">
-                    <input type="checkbox" checked={picked.includes("saved:" + n)} onChange={() => togglePick("saved:" + n)} />
-                    <strong>{n}</strong>
-                  </label>
-                  {s2.lastEval && <span className="meta">{s2.lastEval.count.toLocaleString()} pts</span>}
-                  <span className="meta">saved {s2.savedAt}</span>
-                  <span className="spacer" />
-                  <button className="linklike" onClick={() => removeSaved(n)}>delete</button>
-                </div>
-                <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} onCustomData={showClauseData(n)} /></div>
-              </div>
-            ))}
-          </div>
-          </div>}
-          {cohortsSubTab === "analyses" && <div className="grid2">
-            <div className="card">
-              <h2>Saved analyses <span className="plain">— everyone who logs in sees these: one shared login, no per-user ownership yet</span></h2>
-              {Object.keys(spaces).length === 0 && <p className="note">Nothing saved yet — build an analysis with at least one view, then "Save workspace" on the Analysis tab.</p>}
-              {Object.entries(spaces)
-                .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
-                .map(([n, w]) => (
-                  <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
-                    <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                      <strong>{n}</strong>
-                      <span className="meta">{(w.doc.views || []).length} view{(w.doc.views || []).length === 1 ? "" : "s"}</span>
-                      <span className="meta">saved {w.savedAt}</span>
-                      <span className="spacer" />
-                      <button className="linklike" onClick={() => openWorkspace(n)}>open</button>
-                      <button className="linklike" onClick={() => deleteWorkspace(n)}>delete</button>
-                    </div>
-                  </div>
-                ))}
-              {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
-            </div>
-          </div>}
-        </div>}
+        {tab === "cohorts" && <SavedTab login={customState} onLogin={requestLogin}
+          sub={cohortsSubTab} onSub={setCohortsSubTab} examples={EXAMPLES}
+          picked={picked} onTogglePick={togglePick} onClearPicked={() => setPicked([])} onAnalyze={analyzePicked}
+          evals={exEvals} onPreview={previewExample} onSaveExample={saveExample}
+          saved={savedArtifacts} onOpenWorkspace={openWorkspace} onDeleteWorkspace={deleteWorkspace}
+          wsError={wsError} onCustomData={showClauseData} />}
 
         {/* ================= Examples tab ================= */}
-        {tab === "examples" && (() => {
-          const tags = [...new Set(DOC_EXAMPLES.flatMap(e => e.tags || []))].sort();
-          const shown = exTag === "all" ? DOC_EXAMPLES : DOC_EXAMPLES.filter(e => (e.tags || []).includes(exTag));
-          const viewKinds = (ex: DslExample): string[] => [...new Set((ex.doc.views || []).map(v => String(v.kind)))];
-          return (
-            <div>
-              <div className="card">
-                <h2>Examples <span className="plain">— every one of these is executed by the test gate</span></h2>
-                <p className="note" style={{ marginTop: "0.2rem" }}>
-                  These are the same analysis documents that <code>docs/dsl.md</code> is generated from, and{" "}
-                  <code>npm run docs:check</code> runs each of them against the live compiler on every build — so an
-                  example that stopped working would fail the suite rather than sit here broken. Running one loads it
-                  into the Analysis tab, where you can edit the JSON and re-run.
-                </p>
-                <div className="extags">
-                  <button className={exTag === "all" ? "extag on" : "extag"} onClick={() => setExTag("all")}>
-                    all <span className="meta">{DOC_EXAMPLES.length}</span>
-                  </button>
-                  {tags.map(t => (
-                    <button key={t} className={exTag === t ? "extag on" : "extag"} onClick={() => setExTag(t)}>
-                      {t} <span className="meta">{DOC_EXAMPLES.filter(e => (e.tags || []).includes(t)).length}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="exgrid">
-                {shown.map(ex => {
-                  const cohortNames = Object.keys(ex.doc.cohorts || {});
-                  const studies = [...new Set(Object.values(ex.doc.cohorts || {})
-                    .flatMap((c: any) => (c && c.studies) || (c && c.study ? [c.study] : []))
-                    .concat(ex.doc.study ? [ex.doc.study] : []))];
-                  return (
-                    <div className="card excard" key={ex.title}>
-                      <h3>{ex.title}</h3>
-                      <div className="extags small">
-                        {viewKinds(ex).map(k => <span key={k} className="vkind">{k}</span>)}
-                        {(ex.tags || []).filter(t => !viewKinds(ex).includes(t)).map(t => <span key={t} className="extag static">{t}</span>)}
-                      </div>
-                      {ex.demonstrates && <p className="exdem">{ex.demonstrates}</p>}
-                      {ex.customData?.length ? <p className="meta" style={{ margin: 0 }}>
-                        <span className="customtag">custom</span>
-                        Runs on demo data bundled with the app: {ex.customData.map((d) => d.name + " (" + d.rows.length + " " + d.level + "s)").join(", ")}.
-                      </p> : null}
-                      <p className="exnote">{ex.note}</p>
-                      <div className="exmeta">
-                        <span title={studies.join(", ")}>
-                          {studies.length === 1 ? studies[0] : studies.length + " studies"}
-                        </span>
-                        <span>{cohortNames.length} cohort{cohortNames.length === 1 ? "" : "s"}: {cohortNames.join(", ")}</span>
-                      </div>
-                      <details>
-                        <summary className="meta">document</summary>
-                        <pre className="exjson">{JSON.stringify(ex.doc, null, 2)}</pre>
-                      </details>
-                      <div className="row" style={{ marginTop: "auto", paddingTop: "0.5rem", gap: "0.4rem" }}>
-                        <button onClick={() => runDocExample(ex)} disabled={busy}>Run</button>
-                        <button className="ghost" onClick={() => copyDocLink(ex)}>
-                          {copied === ex.title ? "copied" : "copy link"}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
+        {tab === "examples" && <ExamplesTab tag={exTag} onTag={setExTag} busy={busy}
+          onRun={runDocExample} link={(ex) => docLink(ex.doc)} onError={setError} />}
 
         {/* ================= Analysis tab ================= */}
         {tab === "analysis" && <div className="ana-grid">

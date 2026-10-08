@@ -992,6 +992,8 @@ async function main() {
 
   // the analysis page's requests finishing out of order (e2e-lab-races.cjs)
   await require("./e2e-lab-races.cjs").labRaces(browser, ok, BASE);
+  // the Saved tab's lists: loading, failed and empty said apart; a re-save updates (e2e-saved.cjs)
+  if (LOGIN) await require("./e2e-saved.cjs").savedLists(browser, ok, BASE, LOGIN);
 
   await browser.close();
 
