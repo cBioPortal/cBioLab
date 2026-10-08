@@ -39,7 +39,7 @@ async function catalogFor(study: string) {
   kRes.data.forEach((r) => { (keys[r.t] = keys[r.t] || []).push(r.k); });
   let totalPatients = tRes.data.reduce((m: number, t) => Math.max(m, Number(t.n_pat)), 0);
   if (!totalPatients) {
-    const pc = await chQuery("SELECT uniqExact(patient_unique_id) AS n FROM " + DB + ".sample_derived WHERE cancer_study_identifier = " + "'" + study.replace(/'/g, "") + "'", conn);
+    const pc = await chQuery(sqls.patientCount, conn);
     totalPatients = Number(pc.data[0].n);
   }
   // which time-to-event endpoints this study declares, so the survival

@@ -229,6 +229,7 @@ export function catalogSqls(db: string, study: string): Record<string, string> {
   const withBlock = "WITH\n" + mskCte(db, study) + "\n";
   return {
     studyCheck: "SELECT count() AS n FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(study),
+    patientCount: "SELECT uniqExact(patient_unique_id) AS n FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + sq(study),
     types: withBlock +
       "SELECT ce.event_type AS t, uniqExact(ce.patient_id) AS n_pat, count() AS n_ev\n" +
       "FROM " + db + ".clinical_event ce WHERE ce.patient_id IN (SELECT internal_id FROM msk)\n" +
