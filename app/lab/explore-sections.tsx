@@ -12,6 +12,9 @@ import { CAT_COLORS } from "./view-chrome.tsx";
 import { SaveCohortDialog } from "./dialogs.tsx";
 import type { ExploreState } from "./use-explore-state.ts";
 
+/** The most studies "add all" stages at once (each adds dozens of queries to Explore's facets). */
+export const ADD_ALL_LIMIT = 30;
+
 /**
  * Which clinical attributes draw as a pie rather than a table — a fixed
  * editorial choice, not a live count. It used to be "distinct values above
@@ -153,17 +156,23 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
                 </button>
               ))}
               <span className="meta">{hits.length.toLocaleString()} of {studies.length.toLocaleString()}</span>
-              {/* "all matches", not "all 200 drawn": the list renders the
-                  200 largest, and a button that silently selected only
-                  those would disagree with the count beside it. The number
-                  is on the button because selecting 546 studies is a
-                  minutes-long query, and that should be a decision rather
-                  than a surprise. */}
-              <button className="facet" disabled={!hits.length}
-                title={"adds the " + hits.length + " studies matching the current search to the staged set, keeping what is already staged — use clear first to replace"}
-                onClick={() => setExDraftStudies([...new Set([...staged, ...hits.map(h => h.id)])])}>
-                add all {hits.length.toLocaleString()} match{hits.length === 1 ? "" : "es"}
-              </button>
+              {/* "all matches", not "all 200 drawn": the list renders the 200 largest, and a button
+                  that selected only those would disagree with the count beside it. Refused, with the
+                  limit named, when it would stage more than ADD_ALL_LIMIT studies: every study adds
+                  dozens of queries to the facets, and a narrower search is the way through. */}
+              {(() => {
+                const after = new Set([...staged, ...hits.map(h => h.id)]).size;
+                const over = after > ADD_ALL_LIMIT;
+                return (
+                  <button className="facet" disabled={!hits.length || over}
+                    title={over
+                      ? "add all stages at most " + ADD_ALL_LIMIT + " studies; this would make " + after.toLocaleString() + " — narrow the search, or tick studies one by one"
+                      : "adds the " + hits.length + " studies matching the current search to the staged set, keeping what is already staged — use clear first to replace"}
+                    onClick={() => setExDraftStudies([...new Set([...staged, ...hits.map(h => h.id)])])}>
+                    add all {hits.length.toLocaleString()} match{hits.length === 1 ? "" : "es"}
+                  </button>
+                );
+              })()}
               <button className="facet" disabled={!staged.length}
                 onClick={() => setExDraftStudies([])}>clear</button>
             </div>
