@@ -504,6 +504,34 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .lollilist { display: flex; flex-wrap: wrap; gap: 0 0.9rem; font-size: var(--t-sm); margin-top: 0.2rem; }
 .lollilist b { font-weight: 600; }
 
+/* ---------------- view-card tables (app/lab/view-cards.tsx) ---------------- */
+.vscroll { overflow-x: auto; }
+.vtable { border-collapse: collapse; font-size: var(--t-md); width: 100%; }
+.vtable th, .vtable td { padding: 0.3rem 0.6rem; }
+.vtable .l { text-align: left; }
+.vtable .r { text-align: right; }
+.vtable .tnum { font-variant-numeric: tabular-nums; }
+.vtable .bold { font-weight: 600; }
+.vtable .muted { color: var(--muted); }
+.vtable .italic { font-style: italic; }
+.vtable .nowrap { white-space: nowrap; }
+.vtable .top { vertical-align: top; }
+.vtable tr.ruled { border-top: 1px solid var(--line); }
+/* a column header's second line ("driver / any") */
+.vtable .thsub { font-weight: 400; color: var(--muted); }
+/* a cell whose cohort lacks one of the data types it summarizes */
+.vtable .warnmark { color: var(--warn, #b45309); }
+
+.vtable .thlight { font-weight: 400; }
+/* the empty header over a column of bars keeps the browser's own cell padding */
+.vtable th.barhead { padding: 1px; }
+.basis.wraps { flex-wrap: wrap; }
+/* a regression view's covariates, one row each */
+.covlist { flex-basis: 100%; display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.3rem; }
+.covrow { display: inline-flex; align-items: center; gap: 0.3rem; }
+.covlist .covadd { align-self: flex-start; }
+.kmlegend { display: flex; flex-wrap: wrap; gap: 1.2rem; font-size: var(--t-sm); color: var(--muted); margin-top: 0.4rem; }
+
 /* ---------------- text dialogs (app/lab/dialogs.tsx) ---------------- */
 .dlgactions { margin-top: var(--s3); justify-content: flex-end; align-items: center; gap: var(--s2); }
 .dlgactions.split { justify-content: space-between; }

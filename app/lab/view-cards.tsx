@@ -142,6 +142,39 @@ function placement({ result, moveView, removeView, noteEdit }: ViewCtx, vi: numb
   };
 }
 
+/** A regression view's covariates: each an axis, with the reference level its ratio is measured
+ *  against once the fit has seen more than one level. */
+function CovariateList({ covariates, ratio, observedLevels, busy, attrs, profiles, loading, onChange, onRemove, onAdd }: {
+  covariates: any[]; ratio: "hazard" | "odds"; observedLevels: (ci: number) => string[]; busy: boolean;
+  attrs: { attribute: string; kind: string }[]; profiles: string[]; loading: boolean;
+  onChange: (ci: number, next: any) => void; onRemove: (ci: number) => void; onAdd: () => void;
+}) {
+  return (
+    <div className="covlist">
+      {covariates.map((c, ci) => {
+        const levels = observedLevels(ci);
+        return (
+          <span key={ci} className="covrow">
+            <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={attrs}
+              profiles={profiles} loading={loading} busy={busy}
+              onChange={(next) => onChange(ci, next)} />
+            {levels.length > 1 && <label className="tbfield" title={(ratio === "hazard" ? "the level a hazard ratio" : "the level an odds ratio") + " is measured against; unset uses this covariate's default (mutated/not always compares against 'Not mutated', other categoricals use whichever level is most frequent)"}>
+              ref <select value={c.reference && levels.includes(c.reference) ? c.reference : ""} disabled={busy}
+                onChange={e => onChange(ci, { ...c, reference: e.target.value || undefined })}>
+                <option value="">(default)</option>
+                {levels.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </label>}
+            <button type="button" className="tbbtn" disabled={busy} title="remove this covariate"
+              onClick={() => onRemove(ci)}>remove</button>
+          </span>
+        );
+      })}
+      <button type="button" className="tbbtn covadd" disabled={busy} onClick={onAdd}>+ add covariate</button>
+    </div>
+  );
+}
+
 /** One view of the analysis, as a card: the waiting cover, the kind's own body, its queries, its error. */
 export function ViewCard({ ctx, v, vi }: CardProps) {
   const { busy, pendingKeys, viewIds } = ctx;
@@ -192,17 +225,17 @@ function CompareCard({ ctx, v, vi }: CardProps) {
         actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
       {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
         style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
+      <div className="vscroll">
+        <table className="vtable">
           <thead><tr>
-            <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>gene</th>
-            {v.cohorts!.map((n, i: number) => <th key={n} style={{ textAlign: "right", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}<br /><span style={{ fontWeight: 400, color: "var(--muted)" }}>driver / any</span></th>)}
-            {v.rows![0] && v.rows![0].pAny != null && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p (any)</th>}
-            {v.rows![0] && v.rows![0].qAny != null && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q (any)</th>}
+            <th className="l">gene</th>
+            {v.cohorts!.map((n, i: number) => <th key={n} className="r" style={{ color: CAT_COLORS[i] }}>{n}<br /><span className="thsub">driver / any</span></th>)}
+            {v.rows![0] && v.rows![0].pAny != null && <th className="r">p (any)</th>}
+            {v.rows![0] && v.rows![0].qAny != null && <th className="r">q (any)</th>}
           </tr></thead>
           <tbody>{v.rows.map(r => (
-            <tr key={r.gene} style={{ borderTop: "1px solid var(--line)" }}>
-              <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600 }}>{r.gene}</td>
+            <tr key={r.gene} className="ruled">
+              <td className="bold">{r.gene}</td>
               {r.cells.map(c => {
                 const bt = c.byType;
                 const missing = bt && (["mutation", "cna", "structuralVariant"] as const)
@@ -213,13 +246,13 @@ function CompareCard({ ctx, v, vi }: CardProps) {
                   " · structural-variant " + bt.structuralVariant.altered + "/" + bt.structuralVariant.profiled +
                   (missing && missing.length ? " — no " + missing.map(t => label[t]).join("/") + " data for this cohort's study" : "") : undefined;
                 return (
-                  <td key={c.cohort} style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }} title={title}>
-                    {c.driverPct}% / {c.anyPct}%{missing && missing.length ? <sup style={{ color: "var(--warn, #b45309)" }}>*</sup> : null}
+                  <td key={c.cohort} className="r tnum" title={title}>
+                    {c.driverPct}% / {c.anyPct}%{missing && missing.length ? <sup className="warnmark">*</sup> : null}
                   </td>
                 );
               })}
-              {r.pAny != null && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: r.pAny < 0.001 ? 600 : 400 }}>{r.pAny < 1e-4 ? r.pAny.toExponential(1) : r.pAny.toFixed(3)}</td>}
-              {r.qAny != null && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: r.qAny < 0.05 ? 600 : 400 }}>{r.qAny < 1e-4 ? r.qAny.toExponential(1) : r.qAny.toFixed(3)}</td>}
+              {r.pAny != null && <td className={"r tnum" + (r.pAny < 0.001 ? " bold" : "")}>{r.pAny < 1e-4 ? r.pAny.toExponential(1) : r.pAny.toFixed(3)}</td>}
+              {r.qAny != null && <td className={"r tnum" + (r.qAny < 0.05 ? " bold" : "")}>{r.qAny < 1e-4 ? r.qAny.toExponential(1) : r.qAny.toFixed(3)}</td>}
             </tr>))}
           </tbody>
         </table>
@@ -259,32 +292,32 @@ function CoexpressionCard({ ctx, v, vi }: CardProps) {
           <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
         </>} />
       {v.note && <p className="note">{v.note}</p>}
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
+      <div className="vscroll">
+        <table className="vtable">
           <thead><tr>
-            <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>pair</th>
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>n</th>
-            <th style={{ width: "9rem" }} aria-label="correlation, visualised" />
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>r</th>
-            {v.coexpression.some(x => x.rMeta != null) && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>r (meta)</th>}
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p</th>
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q</th>
+            <th className="l">pair</th>
+            <th className="r">n</th>
+            <th className="barhead" style={{ width: "9rem" }} aria-label="correlation, visualised" />
+            <th className="r">r</th>
+            {v.coexpression.some(x => x.rMeta != null) && <th className="r">r (meta)</th>}
+            <th className="r">p</th>
+            <th className="r">q</th>
           </tr></thead>
           <tbody>{v.coexpression.map(r => (
-            <tr key={r.a + "|" + r.b} style={{ borderTop: "1px solid var(--line)" }}
+            <tr key={r.a + "|" + r.b} className="ruled"
               title={(r.perStudy || []).map(s2 => s2.study + ": r=" + s2.r + " (n=" + s2.n + ")").join("\n") || undefined}>
-              <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600 }}>{r.a} / {r.b}</td>
-              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{r.n.toLocaleString()}</td>
-              <td style={{ padding: "0.3rem 0.6rem" }}>
+              <td className="bold">{r.a} / {r.b}</td>
+              <td className="r tnum muted">{r.n.toLocaleString()}</td>
+              <td >
                 {r.r != null && <span className="rbar"><i style={{
                   width: Math.abs(r.r) * 50 + "%",
                   marginLeft: r.r < 0 ? (50 - Math.abs(r.r) * 50) + "%" : "50%",
                   background: r.r < 0 ? "#D55E00" : "#0072B2" }} /></span>}
               </td>
-              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: Math.abs(r.r ?? 0) > 0.5 ? 600 : 400 }}>{r.r ?? "—"}</td>
-              {v.coexpression!.some(x => x.rMeta != null) && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.rMeta ?? "—"}</td>}
-              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{pCell(r.pMeta ?? r.p)}</td>
-              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{pCell(r.q)}</td>
+              <td className={"r tnum" + (Math.abs(r.r ?? 0) > 0.5 ? " bold" : "")}>{r.r ?? "—"}</td>
+              {v.coexpression!.some(x => x.rMeta != null) && <td className="r tnum">{r.rMeta ?? "—"}</td>}
+              <td className="r tnum">{pCell(r.pMeta ?? r.p)}</td>
+              <td className="r tnum muted">{pCell(r.q)}</td>
             </tr>))}
           </tbody>
         </table>
@@ -304,38 +337,38 @@ function ClinicalCard({ ctx, v, vi }: CardProps) {
           chosen={(docView(vi).attributes || []).map(String)} min={1} max={20}
           onChange={(next) => setViewAttrs(vi, next)} />} />
       {v.note && <p className="note">{v.note}</p>}
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
+      <div className="vscroll">
+        <table className="vtable">
           <thead><tr>
-            <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>attribute</th>
-            {v.cohorts!.map((n, i: number) => <th key={n} style={{ textAlign: "left", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}</th>)}
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>test</th>
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p</th>
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q</th>
+            <th className="l">attribute</th>
+            {v.cohorts!.map((n, i: number) => <th key={n} className="l" style={{ color: CAT_COLORS[i] }}>{n}</th>)}
+            <th className="r">test</th>
+            <th className="r">p</th>
+            <th className="r">q</th>
           </tr></thead>
           <tbody>{v.clinical.map(r => (
-            <tr key={r.attribute} style={{ borderTop: "1px solid var(--line)" }}>
-              <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600, whiteSpace: "nowrap" }}>
-                {r.attribute}<br /><span className="meta" style={{ fontWeight: 400 }}>{r.per}-level · {r.kind === "num" ? "numeric" : (r.distinct ?? 0) + " values"}</span>
+            <tr key={r.attribute} className="ruled">
+              <td className="bold nowrap">
+                {r.attribute}<br /><span className="meta thlight">{r.per}-level · {r.kind === "num" ? "numeric" : (r.distinct ?? 0) + " values"}</span>
               </td>
               {r.skipped
-                ? <td colSpan={v.cohorts!.length + 3} style={{ padding: "0.3rem 0.6rem", color: "var(--muted)", fontStyle: "italic" }}>not compared — {r.skipped}</td>
+                ? <td colSpan={v.cohorts!.length + 3} className="muted italic">not compared — {r.skipped}</td>
                 : <>
                   {r.cells.map(c => (
-                    <td key={c.cohort} style={{ padding: "0.3rem 0.6rem", verticalAlign: "top" }}>
+                    <td key={c.cohort} className="top">
                       {r.kind === "num"
-                        ? <span style={{ fontVariantNumeric: "tabular-nums" }}>{c.mean} <span className="meta">± {c.sd} (n={c.n.toLocaleString()})</span>
+                        ? <span className="tnum">{c.mean} <span className="meta">± {c.sd} (n={c.n.toLocaleString()})</span>
                             {c.median != null && <><br /><span className="meta">median {c.median} ({c.q1}–{c.q3})</span></>}</span>
                         : <span className="meta">{(c.top || []).slice(0, 3).map(t2 => t2.v + " " + Math.round(1000 * t2.n / (c.n || 1)) / 10 + "%").join(" · ")}</span>}
                     </td>
                   ))}
-                  <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", whiteSpace: "nowrap" }}
+                  <td className="r nowrap"
                     title={r.statistic != null ? r.test + " = " + r.statistic + ", df = " + r.df + (r.df2 != null ? ", " + r.df2 : "") + (r.minExpected != null ? ", smallest expected cell = " + r.minExpected : "") +
                       (r.rankP != null ? "; " + (r.test === "Welch ANOVA" ? "Kruskal-Wallis H = " : "Mann-Whitney U = ") + r.rankStatistic + ", p = " + r.rankP + " (single-study only, not part of the q-value correction)" : "") : undefined}>
                     <span className="meta">{r.test}{r.rankP != null && "*"}</span>
                   </td>
-                  <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: (r.p ?? 1) < 0.001 ? 600 : 400 }}>{r.p != null ? pCell(r.p) : "—"}</td>
-                  <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{r.q != null ? pCell(r.q) : "—"}</td>
+                  <td className={"r tnum" + ((r.p ?? 1) < 0.001 ? " bold" : "")}>{r.p != null ? pCell(r.p) : "—"}</td>
+                  <td className="r tnum muted">{r.q != null ? pCell(r.q) : "—"}</td>
                 </>}
             </tr>))}
           </tbody>
@@ -352,35 +385,35 @@ function CooccurrenceCard({ ctx, v, vi }: CardProps) {
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi), 1)} sub="pairwise, among patients profiled for both genes" {...placement(ctx, vi)}
         actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
       {v.note && <p className="note">{v.note}</p>}
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
+      <div className="vscroll">
+        <table className="vtable">
           <thead><tr>
-            <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>pair</th>
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>both</th>
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>A only</th>
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>B only</th>
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>neither</th>
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>log<sub>2</sub> OR</th>
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p</th>
-            <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q</th>
-            <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>tendency</th>
+            <th className="l">pair</th>
+            <th className="r">both</th>
+            <th className="r">A only</th>
+            <th className="r">B only</th>
+            <th className="r">neither</th>
+            <th className="r">log<sub>2</sub> OR</th>
+            <th className="r">p</th>
+            <th className="r">q</th>
+            <th className="l">tendency</th>
           </tr></thead>
           <tbody>{v.pairs.map(r => {
             const lor = r.oddsRatioMH != null ? Math.log2(r.oddsRatioMH) : r.log2Odds;
             const pShown = r.pStratified ?? r.p;
             return (
-            <tr key={r.a + "|" + r.b} style={{ borderTop: "1px solid var(--line)" }}
+            <tr key={r.a + "|" + r.b} className="ruled"
               title={"profiled for both: " + r.profiled.toLocaleString() +
                 (r.pStratified != null ? "  ·  stratified over " + r.strata + " studies (CMH); pooled Fisher p=" + r.p.toExponential(1) : "")}>
-              <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600 }}>{r.a} / {r.b}</td>
-              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.both.toLocaleString()}</td>
-              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.onlyA.toLocaleString()}</td>
-              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.onlyB.toLocaleString()}</td>
-              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{r.neither.toLocaleString()}</td>
-              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{lor == null ? "—" : lor.toFixed(2)}</td>
-              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: pShown < 0.001 ? 600 : 400 }}>{pCell(pShown)}</td>
-              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{pCell(r.q)}</td>
-              <td style={{ padding: "0.3rem 0.6rem" }}>
+              <td className="bold">{r.a} / {r.b}</td>
+              <td className="r tnum">{r.both.toLocaleString()}</td>
+              <td className="r tnum">{r.onlyA.toLocaleString()}</td>
+              <td className="r tnum">{r.onlyB.toLocaleString()}</td>
+              <td className="r tnum muted">{r.neither.toLocaleString()}</td>
+              <td className="r tnum">{lor == null ? "—" : lor.toFixed(2)}</td>
+              <td className={"r tnum" + (pShown < 0.001 ? " bold" : "")}>{pCell(pShown)}</td>
+              <td className="r tnum muted">{pCell(r.q)}</td>
+              <td >
                 {r.tendency && <span className={r.tendency === "co-occurrence" ? "tend co" : "tend mx"}>{r.tendency}</span>}
               </td>
             </tr>); })}
@@ -470,7 +503,7 @@ function SurvivalCard({ ctx, v, vi }: CardProps) {
         );
       })()}
       <KMChart curves={v.curves!} cutoffMonths={v.cutoffMonths} tickMonths={v.tickMonths} incidence={v.display === "incidence"} />
-      <div style={{ display: "flex", gap: "1.2rem", fontSize: "var(--t-sm)", color: "var(--muted)", marginTop: "0.4rem", flexWrap: "wrap" }}>
+      <div className="kmlegend">
         {v.curves!.map((c, i: number) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: {v.display === "incidence" ? "50% incidence by " : "median "}{c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}
       </div>
       {v.logrank && (
@@ -480,7 +513,7 @@ function SurvivalCard({ ctx, v, vi }: CardProps) {
           {v.logrankPooled && (
             <span className="meta" title="the unstratified test, which pools risk sets across studies and assumes a common baseline hazard">
               {"  ·  pooled " + fmtP(v.logrankPooled.p)}
-              {crossesThreshold(v.logrank.p, v.logrankPooled.p) && <strong style={{ color: "var(--warn, #b45309)" }}> — the two disagree at p=0.05</strong>}
+              {crossesThreshold(v.logrank.p, v.logrankPooled.p) && <strong className="warnmark"> — the two disagree at p=0.05</strong>}
             </span>
           )}
         </div>
@@ -493,7 +526,7 @@ function SurvivalCard({ ctx, v, vi }: CardProps) {
           {v.logrankKPooled && (
             <span className="meta" title="the unstratified test, which pools risk sets across studies and assumes a common baseline hazard">
               {"  ·  pooled " + fmtP(v.logrankKPooled.p)}
-              {crossesThreshold(v.logrankK.p, v.logrankKPooled.p) && <strong style={{ color: "var(--warn, #b45309)" }}> — the two disagree at p=0.05</strong>}
+              {crossesThreshold(v.logrankK.p, v.logrankKPooled.p) && <strong className="warnmark"> — the two disagree at p=0.05</strong>}
             </span>
           )}
         </div>
@@ -535,7 +568,7 @@ function CoxCard({ ctx, v, vi }: CardProps) {
           return [...levels];
         };
         return (
-          <div className="basis" style={{ flexWrap: "wrap" }}>
+          <div className="basis wraps">
             <span className="meta">endpoint</span>
             <select value={sv.endpoint || "OS"} disabled={busy}
               onChange={e => patchView(vi, { endpoint: e.target.value })}>
@@ -558,29 +591,9 @@ function CoxCard({ ctx, v, vi }: CardProps) {
                 onChange={e => patchView(vi, { stratifyByCohort: e.target.checked || undefined })} />
               stratify by cohort
             </label>
-            <div style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "0.3rem", marginTop: "0.3rem" }}>
-              {covariates.map((c, ci) => {
-                const levels = observedLevels(ci);
-                return (
-                <span key={ci} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-                  <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={catalogAttrs()}
-                    profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-                    onChange={(next) => setCovariate(ci, next)} />
-                  {levels.length > 1 && <label className="tbfield" title="the level a hazard ratio is measured against; unset uses this covariate's default (mutated/not always compares against 'Not mutated', other categoricals use whichever level is most frequent)">
-                    ref <select value={c.reference && levels.includes(c.reference) ? c.reference : ""} disabled={busy}
-                      onChange={e => setCovariate(ci, { ...c, reference: e.target.value || undefined })}>
-                      <option value="">(default)</option>
-                      {levels.map(l => <option key={l} value={l}>{l}</option>)}
-                    </select>
-                  </label>}
-                  <button type="button" className="tbbtn" disabled={busy} title="remove this covariate"
-                    onClick={() => removeCovariate(ci)}>remove</button>
-                </span>
-                );
-              })}
-              <button type="button" className="tbbtn" disabled={busy} style={{ alignSelf: "flex-start" }}
-                onClick={addCovariate}>+ add covariate</button>
-            </div>
+            <CovariateList covariates={covariates} ratio="hazard" observedLevels={observedLevels} busy={busy}
+              attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()}
+              onChange={setCovariate} onRemove={removeCovariate} onAdd={addCovariate} />
           </div>
         );
       })()}
@@ -653,7 +666,7 @@ function LogisticCard({ ctx, v, vi }: CardProps) {
         ])];
         const outcomeIsAlteration = sv.outcome?.source === "alteration";
         return (
-          <div className="basis" style={{ flexWrap: "wrap" }}>
+          <div className="basis wraps">
             <span className="meta">outcome</span>
             <AxisPicker side="outcome" axis={sv.outcome || { source: "clinical", attribute: "" }} attrs={catalogAttrs()}
               profiles={profileOptions()} loading={attrsLoading()} busy={busy}
@@ -666,29 +679,9 @@ function LogisticCard({ ctx, v, vi }: CardProps) {
                 {outcomeLevels.map(l => <option key={l} value={l} />)}
               </datalist>
             </label>}
-            <div style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "0.3rem", marginTop: "0.3rem" }}>
-              {covariates.map((c, ci) => {
-                const levels = observedLevels(ci);
-                return (
-                <span key={ci} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-                  <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={catalogAttrs()}
-                    profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-                    onChange={(next) => setCovariate(ci, next)} />
-                  {levels.length > 1 && <label className="tbfield" title="the level an odds ratio is measured against; unset uses this covariate's default (mutated/not always compares against 'Not mutated', other categoricals use whichever level is most frequent)">
-                    ref <select value={c.reference && levels.includes(c.reference) ? c.reference : ""} disabled={busy}
-                      onChange={e => setCovariate(ci, { ...c, reference: e.target.value || undefined })}>
-                      <option value="">(default)</option>
-                      {levels.map(l => <option key={l} value={l}>{l}</option>)}
-                    </select>
-                  </label>}
-                  <button type="button" className="tbbtn" disabled={busy} title="remove this covariate"
-                    onClick={() => removeCovariate(ci)}>remove</button>
-                </span>
-                );
-              })}
-              <button type="button" className="tbbtn" disabled={busy} style={{ alignSelf: "flex-start" }}
-                onClick={addCovariate}>+ add covariate</button>
-            </div>
+            <CovariateList covariates={covariates} ratio="odds" observedLevels={observedLevels} busy={busy}
+              attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()}
+              onChange={setCovariate} onRemove={removeCovariate} onAdd={addCovariate} />
           </div>
         );
       })()}
@@ -827,7 +820,7 @@ function SequenceCard({ ctx, v, vi }: CardProps) {
       <DrawnCohorts drawn={cohortChoice(vi, docView(vi), 1).drawn} nodes={cohortChoice(vi, docView(vi), 1).nodes} />
       {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
       <SplitByNote v={v} />
-      <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
+      <div className="vscroll" dangerouslySetInnerHTML={{ __html: v.svg }} />
     </>}
   </>;
 }
@@ -923,7 +916,7 @@ function CourseCard({ ctx, v, vi }: CardProps) {
       <SplitByNote v={v} />
       {/* The same SVG MCP clients receive \u2014 one renderer,
           so the figure cannot differ between surfaces. */}
-      <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
+      <div className="vscroll" dangerouslySetInnerHTML={{ __html: v.svg }} />
     </>}
   </>;
 }
