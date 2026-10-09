@@ -3,16 +3,14 @@
 // cards. The page owns Explore's state (app/lab/use-explore.ts and the draft) and hands every
 // section the same ExploreCtx — what it reads and the edits it can make.
 import CohortPills from "./pills";
-import type { CohortDef, ExploreResult } from "../../lib/types.ts";
 import CustomDataPanel from "./custom-data-panel.tsx";
-import { ChartMenu, type SplitSpec } from "./partitions.tsx";
+import { ChartMenu } from "./partitions.tsx";
 import type { ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
 import { isCustomAttr } from "../../lib/custom-data-names.ts";
 import { CAT_COLORS } from "./view-chrome.tsx";
 import { SaveCohortDialog } from "./dialogs.tsx";
-import type { ExploreAsk } from "./use-explore.ts";
-
+import type { ExploreState } from "./use-explore-state.ts";
 
 /**
  * Which clinical attributes draw as a pie rather than a table — a fixed
@@ -42,74 +40,13 @@ const SHOW_DERIVED_FACETS = false;
 /** the synthetic eventType the server's derived treatment-line logic (lib/compiler.ts LINE_TYPE) recognizes */
 export const LINE_TYPE = "Treatment line (derived)";
 
-/** What Explore's sections read from the page and the edits they can make; the page builds one per render. */
-export interface ExploreCtx {
-  EXTRA_DERIVED_KINDS: { metric: "lines" | "treatmentSpan"; label: (name: string) => string; }[];
-  addChartDialog: React.RefObject<HTMLDialogElement | null>;
-  addClause: (clause: any) => void;
-  addClauses: (clauses: any[]) => void;
-  addMode: { ids: string[]; text: string; explore: ExploreAsk | null; } | null;
-  addSeqFilter: () => void;
-  analyzeDraft: () => void;
-  attrCoverage: number;
-  attrKey: (c: { per: string; attribute: string; }) => string;
-  chartGene: (raw: string) => void;
-  chartTab: "clinical" | "gene" | "derived" | "custom";
-  clearDraft: () => void;
-  clinFilter: string;
-  confirmSave: (name: string) => Promise<void>;
-  exDraftStudies: string[] | null;
-  exMsg: string | null;
-  exPanelOpen: boolean;
-  exSel: React.RefObject<string[]>;
-  exStudies: string[];
-  explore: ExploreResult | null;
-  exploreBusy: boolean;
-  extraDerivedOn: (metric: string) => boolean;
-  fetchExplore: (draftOverride?: CohortDef | null, studiesOverride?: string[] | string, attrsOverride?: string[]) => void;
-  geneChartInput: string;
-  geneCharts: string[];
-  geneFilter: Record<string, string>;
-  geneRowLimit: number;
-  geneStateClauses: (gene: string, type: "MUTATION" | "CNA", state: string) => any[];
-  hiddenAttrs: Set<string>;
+/** What Explore's sections read and the edits they can make: Explore's own state and actions
+ *  (use-explore-state.ts), plus the few page values they show. */
+export type ExploreCtx = ExploreState & {
   moreDerivedMenu: { ref: React.RefObject<HTMLDetailsElement | null>; onToggle: (e: React.SyntheticEvent<HTMLDetailsElement>) => Map<string, boolean>; };
-  openSaveDialog: () => void;
-  parseDraft: () => any;
-  removeDraftClause: (i: number) => void;
-  sCaps: Set<string>;
-  sQuery: string;
-  saveDraftAsFeature: () => Promise<void>;
-  saving: string | null;
-  selectionArmCount: (chart: ChartKey) => number;
-  seq: { aType: string; aOcc: "ANY" | "FIRST" | "LAST"; aLineOp: "=" | ">=" | "<="; aLineNo: string; rel: "NONE" | "BEFORE" | "DURING" | "NOT_FOLLOWED_BY"; bType: string; bOcc: "ANY" | "FIRST" | "LAST"; bLineOp: "=" | ">=" | "<="; bLineNo: string; days: string; priorGuard: boolean; lineGap: number; };
-  seqReady: boolean;
-  setAttrCoverage: React.Dispatch<React.SetStateAction<number>>;
-  setChartTab: React.Dispatch<React.SetStateAction<"clinical" | "gene" | "derived" | "custom">>;
-  setClinFilter: React.Dispatch<React.SetStateAction<string>>;
-  setExDraftStudies: React.Dispatch<React.SetStateAction<string[] | null>>;
-  setExPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setExploreStudies: (ids: string[]) => void;
-  setGeneChartInput: React.Dispatch<React.SetStateAction<string>>;
-  setGeneFilter: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  setGeneRowLimit: React.Dispatch<React.SetStateAction<number>>;
-  setHiddenAttrs: React.Dispatch<React.SetStateAction<Set<string>>>;
-  setSCaps: React.Dispatch<React.SetStateAction<Set<string>>>;
-  setSQuery: React.Dispatch<React.SetStateAction<string>>;
-  setSaving: React.Dispatch<React.SetStateAction<string | null>>;
-  setSeq: React.Dispatch<React.SetStateAction<{ aType: string; aOcc: "ANY" | "FIRST" | "LAST"; aLineOp: "=" | ">=" | "<="; aLineNo: string; rel: "NONE" | "BEFORE" | "DURING" | "NOT_FOLLOWED_BY"; bType: string; bOcc: "ANY" | "FIRST" | "LAST"; bLineOp: "=" | ">=" | "<="; bLineNo: string; days: string; priorGuard: boolean; lineGap: number; }>>;
-  setStudyChipsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   showClauseData: (cohort?: string) => OnCustomData;
-  splitDraftBy: (spec: SplitSpec, label: string) => Promise<void>;
-  splitDraftBySelection: (chart: ChartKey, label: string) => void;
-  splittingBy: string | null;
   studies: { id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string; }[];
-  studyChipsOpen: boolean;
-  toggleExtraDerived: (metric: "lines" | "treatmentSpan") => void;
-  treatmentEventType: () => { canonical: string; label: string; } | null;
-  unchartGene: (g: string) => void;
-  visibleClinical: (list: { attribute: string; per: string; studyCount?: number; }[]) => typeof list;
-}
+};
 
 export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
   const { addMode, analyzeDraft, exDraftStudies, exPanelOpen, exSel, exStudies, explore, exploreBusy, sCaps, sQuery, setExDraftStudies, setExPanelOpen, setExploreStudies, setSCaps, setSQuery, setStudyChipsOpen, studies, studyChipsOpen } = ctx;
