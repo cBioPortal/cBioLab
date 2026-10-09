@@ -11,7 +11,7 @@ import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { AnalysisDoc, AnalysisResult, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
 import { survivalAxis } from "../../lib/stats.ts";
 import { MethodPanel } from "./method-panel.tsx";
-import { AxisPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, CAT_COLORS, Participation } from "./view-chrome.tsx";
+import { AxisPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, CAT_COLORS, Participation, ServerSvg, ViewFigure } from "./view-chrome.tsx";
 
 
 type ResultView = AnalysisResult["views"][number];
@@ -597,9 +597,7 @@ function CoxCard({ ctx, v, vi }: CardProps) {
           </div>
         );
       })()}
-      {v.svg
-        ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
-        : !v.error && <p className="note">nothing to draw</p>}
+      <ViewFigure svg={v.svg} error={v.error} />
     </>}
   </>;
 }
@@ -622,9 +620,7 @@ function MoreCard({ ctx, v, vi }: CardProps) {
         return <>
           <MoreControls c={mc} />
           {v.note && <p className="note">{v.note}</p>}
-          {body || (v.svg
-            ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
-            : !v.error && <p className="note">nothing to draw</p>)}
+          {body || <ViewFigure svg={v.svg} error={v.error} />}
           {body && v.caveat && <p className="note vfoot">{v.caveat}</p>}
         </>;
       })()}
@@ -685,9 +681,7 @@ function LogisticCard({ ctx, v, vi }: CardProps) {
           </div>
         );
       })()}
-      {v.svg
-        ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
-        : !v.error && <p className="note">nothing to draw</p>}
+      <ViewFigure svg={v.svg} error={v.error} />
     </>}
   </>;
 }
@@ -755,9 +749,7 @@ function PlotCard({ ctx, v, vi }: CardProps) {
             onClick={() => updateView(vi, (vv: any) => ({ ...vv, x: vv.y, y: vv.x }))}>swap</button>
         </div>
       </div>
-      {v.svg
-        ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
-        : <p className="note">{v.plot?.note || "nothing to draw"}</p>}
+      <ViewFigure svg={v.svg} empty={v.plot?.note || "nothing to draw"} />
     </>}
   </>;
 }
@@ -820,7 +812,7 @@ function SequenceCard({ ctx, v, vi }: CardProps) {
       <DrawnCohorts drawn={cohortChoice(vi, docView(vi), 1).drawn} nodes={cohortChoice(vi, docView(vi), 1).nodes} />
       {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
       <SplitByNote v={v} />
-      <div className="vscroll" dangerouslySetInnerHTML={{ __html: v.svg }} />
+      <ServerSvg className="vscroll" html={v.svg} />
     </>}
   </>;
 }
@@ -916,7 +908,7 @@ function CourseCard({ ctx, v, vi }: CardProps) {
       <SplitByNote v={v} />
       {/* The same SVG MCP clients receive \u2014 one renderer,
           so the figure cannot differ between surfaces. */}
-      <div className="vscroll" dangerouslySetInnerHTML={{ __html: v.svg }} />
+      <ServerSvg className="vscroll" html={v.svg} />
     </>}
   </>;
 }

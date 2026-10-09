@@ -540,3 +540,13 @@ export function Latency({ v }: { v: any }) {
     </span>
   );
 }
+
+/** A figure the server drew (lib/view-svg*.ts, which escapes every label it writes), inlined as markup. */
+export const ServerSvg = ({ html, className = "viewfig" }: { html: string; className?: string }) =>
+  <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+
+/** A view's server-drawn figure; with none, says so in words — unless the view's error says why already. */
+export function ViewFigure({ svg, error, empty = "nothing to draw" }: { svg?: string | null; error?: string | null; empty?: string }) {
+  if (svg) return <ServerSvg html={svg} />;
+  return error ? null : <p className="note">{empty}</p>;
+}
