@@ -88,13 +88,17 @@ async function labRaces(browser, ok, BASE) {
       await page.waitForTimeout(300);
       const hidden = (await doc(page)).views[0].hide;
       await page.locator(".viewcard .genesbtn").first().click();
+      const pills = await page.locator("dialog.genedialog .pill", { hasText: "TP53" }).count();
       await page.locator("dialog.genedialog .pill", { hasText: "TP53" }).click(); // re-runs this view
       await page.locator("dialog.genedialog button.primary").click();
       await until(async () => !(await genesOf()).includes("TP53"), "the re-run without TP53", 60000).catch(() => {});
       const after = await genesOf();
+      // on a failure, whether the edit reached the document says which half went wrong
+      const docGenes = (await doc(page)).views[0].genes;
       ok("lab: a view changed in the browser, then re-run, shows the re-run's answer",
         before.includes("TP53") && Array.isArray(hidden) && hidden.length > 0 && !after.includes("TP53") && after.length === before.length - 1,
-        "before " + before.join(",") + " · hide " + JSON.stringify(hidden) + " · after " + after.join(","));
+        "before " + before.join(",") + " · hide " + JSON.stringify(hidden) + " · after " + after.join(",") +
+        " · TP53 pills " + pills + " · document genes " + JSON.stringify(docGenes));
     }
 
     // 4. What a reader is typing survives the page re-rendering around it: a control declared

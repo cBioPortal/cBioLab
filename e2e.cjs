@@ -616,7 +616,9 @@ async function main() {
       // code path — and the one most likely to be left behind. It is also the one view
       // the BROWSER draws, from the binary contract, so the card must hold a canvas and
       // the SQL that produced it. This document (default views) actually contains one.
-      const onco = await page.evaluate(() => {
+      // The oncoprint fetches its own contract after the document runs, so it can still be loading
+      // here; wait for it to draw (or give up and report what is on screen).
+      const oncoState = () => page.evaluate(() => {
         for (const card of document.querySelectorAll(".ana-grid .card")) {
           const h = card.querySelector("h2");
           if (!h || !h.textContent.trim().startsWith("Oncoprint")) continue;
@@ -631,6 +633,9 @@ async function main() {
         }
         return { found: false };
       });
+      let onco = await oncoState();
+      for (let t0 = Date.now(); !(onco.found && onco.queries > 0 && onco.drawn) && Date.now() - t0 < 120000; onco = await oncoState())
+        await page.waitForTimeout(300);
       // Views can be removed one at a time, and the document follows.
       let beforeN = 0, afterKinds = [];
       try {
