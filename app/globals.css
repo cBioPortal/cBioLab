@@ -504,6 +504,18 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .lollilist { display: flex; flex-wrap: wrap; gap: 0 0.9rem; font-size: var(--t-sm); margin-top: 0.2rem; }
 .lollilist b { font-weight: 600; }
 
+/* ---------------- text dialogs (app/lab/dialogs.tsx) ---------------- */
+.dlgactions { margin-top: var(--s3); justify-content: flex-end; align-items: center; gap: var(--s2); }
+.dlgactions.split { justify-content: space-between; }
+.dlggroup { gap: var(--s2); align-items: center; }
+.dlgsection { margin-top: var(--s3); }
+label.dlgsection { display: block; }
+.paramshead { align-items: baseline; }
+.paramshead strong { font-size: var(--t-md); }
+.note.flush-tight { margin: var(--s1) 0 0; }
+.note.flush-x { margin-left: 0; margin-right: 0; margin-bottom: 0; }
+.namedialog .error { margin-top: var(--s2); }
+
 /* ---------------- Saved tab ---------------- */
 .flush, .card h2.flush { margin: 0; }
 .savedbar { align-items: center; gap: var(--s2); margin-bottom: var(--s0); }

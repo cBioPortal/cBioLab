@@ -1,4 +1,4 @@
-// The Saved tab's lists (app/lab/use-saved.ts): loading, failed and empty are three states, each
+// The Saved tab's lists (app/lab/use-saved.ts) and the analysis page's text dialogs. The lists: loading, failed and empty are three states, each
 // said in words (CLAUDE.md, "waiting, and never hiding what isn't shown"), and saving under a name
 // that exists updates it. Each waiting state is checked by holding the request.
 //
@@ -69,6 +69,60 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       await page.waitForTimeout(2500);
       const stored = await savedCount(name), listed = await page.locator("label.pick", { hasText: name }).count() - 1;
       ok("saving a cohort under a name it has updates it", stored === 1 && listed === 1, "stored " + stored + ", listed " + listed);
+    }
+
+    // the analysis page's text dialogs (app/lab/dialogs.tsx): a workspace saved and reopened, a
+    // cohort rename refused onto a taken name, a view note added and emptied
+    {
+      const tool = (n, a = {}) => page.evaluate(([n, a]) => window.cohortLab.call(n, a), [n, a]);
+      const doc = async () => (await tool("analysis_get_document")).document;
+      const open = (cls) => page.locator("dialog." + cls + "[open]");
+      await page.goto(BASE + "/lab?tab=analysis", { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => window.cohortLab && window.cohortLab.call, null, { timeout: 120000 });
+      await tool("analysis_load_example", { title: "Genomic status via OQL, compared" });
+      const wsBtn = page.locator("button[title*='save this analysis'], button[title*='” — ']").first();
+      await wsBtn.waitFor({ timeout: 120000 });
+      for (let i = 0; i < 400 && await wsBtn.isDisabled(); i++) await page.waitForTimeout(300);
+      await wsBtn.click();
+      await open("wsdialog").waitFor();
+      const startsEmpty = (await open("wsdialog").locator("input").first().inputValue()) === "" && await open("wsdialog").locator("button.primary").isDisabled();
+      await open("wsdialog").locator("input").first().fill("e2e workspace");
+      await open("wsdialog").locator("button.primary").click();
+      await page.waitForFunction(() => /saved \d{4}/.test(document.querySelector("button[title*='” — ']")?.title || ""), null, { timeout: 60000 }).catch(() => {});
+      await wsBtn.click();
+      await open("wsdialog").waitFor();
+      const reopened = (await open("wsdialog").locator("input").first().inputValue()) === "e2e workspace" && /saved \d{4}/.test(await open("wsdialog").locator(".meta").first().innerText());
+      await page.keyboard.press("Escape");
+      ok("workspace dialog: starts unnamed, saves, reopens with its name and saved state", startsEmpty && reopened && (await doc()).title === "e2e workspace",
+        "starts empty " + startsEmpty + ", reopened " + reopened);
+
+      const names = Object.keys((await doc()).cohorts);
+      const gear = page.locator("details.cohortgear").first();
+      await gear.locator("summary").click();
+      await gear.getByRole("button", { name: "edit…" }).click();
+      await open("cohortdialog").waitFor();
+      await page.locator("#cename").fill(names[1]);
+      await open("cohortdialog").locator("button.primary").click();
+      const refused = /already exists/.test(await open("cohortdialog").locator(".error").innerText({ timeout: 5000 }).catch(() => ""));
+      await page.locator("#cename").fill("e2e renamed");
+      await open("cohortdialog").locator("button.primary").click();
+      await page.waitForTimeout(800);
+      const renamed = !!(await doc()).cohorts["e2e renamed"] && !(await doc()).cohorts[names[0]];
+      ok("cohort dialog: refuses a taken name, then renames", refused && renamed, "refused " + refused + ", renamed " + renamed);
+
+      const vgear = page.locator(".viewcard details.gearmenu:has(summary[title='reorder or remove this view'])").first();
+      await vgear.locator("summary").click();
+      await vgear.getByRole("button", { name: /add note…/ }).click();
+      await page.locator("#vntext").fill("  e2e note  ");
+      await open("cohortdialog").locator("button.primary").click();
+      await page.waitForTimeout(800);
+      const noted = (await doc()).views[0].note === "e2e note";
+      await vgear.locator("summary").click();
+      await vgear.getByRole("button", { name: /edit note…/ }).click();
+      await page.locator("#vntext").fill("");
+      await open("cohortdialog").locator("button.primary").click();
+      await page.waitForTimeout(800);
+      ok("view note dialog: saves the note trimmed, and emptying removes it", noted && (await doc()).views[0].note === undefined, "noted " + noted);
     }
 
     ok("Saved tab: no page errors", errors.length === 0, errors.join(" | ").slice(0, 200));

@@ -349,8 +349,9 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
 - **Keystrokes stay in the field.** A text field on the analysis page must not keep what is being
   typed in page state: `AnalysisPage` is one very large component, so every keystroke re-renders
   every view card, the oncoprint and the inlined figures (a dialog's textarea measured ~350 ms a
-  key). Use `DraftText` — local state, the page reads a ref on save — or a small component that
-  owns its own draft.
+  key). Give the field a small component that owns its own draft and hands the page the value on
+  save — the text dialogs in `app/lab/dialogs.tsx` are the pattern: mounted when opened, they start
+  from the values they are given and report the result.
 - **One way to change the document.** The analysis page's document lives in `app/lab/doc-store.ts`:
   `docs.set` for an edit, `docs.replace` for a different document (an example, a link, a new
   analysis), `docs.commit` for one the AI tools validated. It gives each view a stable id that keys

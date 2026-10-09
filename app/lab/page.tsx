@@ -32,6 +32,7 @@ import { useSavedArtifacts } from "./use-saved.ts";
 import { SavedTab } from "./saved-tab.tsx";
 import { ExamplesTab } from "./examples-tab.tsx";
 import { ViewCard, KMChart } from "./view-cards.tsx";
+import { SaveCohortDialog, CohortEditDialog, ViewNoteDialog, WorkspaceDialog } from "./dialogs.tsx";
 import { useExplore, type ExploreAsk } from "./use-explore.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
@@ -142,27 +143,6 @@ function AddCohortBar({ existing, ready, error, onAdd, onCancel }: {
 }
 
 
-/**
- * A dialog's text field that keeps its keystrokes to itself. As page state, every keystroke
- * re-rendered the whole analysis page — every view card, the oncoprint, the inlined figures —
- * about 350 ms a key with a few views open. The page reads the text from `draft` (a ref, so
- * writing it renders nothing) when the dialog is saved, and hears only when the field turns
- * empty or non-empty, which is all a Save button's disabled state needs. Give it a fresh `key`
- * each time its dialog opens so it starts from `initial`.
- */
-function DraftText({ draft, initial, multiline, onFilled, ...rest }: {
-  draft: React.MutableRefObject<string>; initial: string; multiline?: boolean; onFilled?: (filled: boolean) => void;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement> & React.TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange" | "defaultValue">) {
-  const [v, setV] = useState(() => { draft.current = initial; return initial; });
-  const change = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const next = e.target.value;
-    if (onFilled && !!next.trim() !== !!draft.current.trim()) onFilled(!!next.trim());
-    draft.current = next;
-    setV(next);
-  };
-  return multiline ? <textarea {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)} value={v} onChange={change} />
-    : <input {...(rest as React.InputHTMLAttributes<HTMLInputElement>)} value={v} onChange={change} />;
-}
 
 
 const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
@@ -210,58 +190,6 @@ const DEFAULT_VIEWS: View[] = [
   { kind: "oncoprint", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR"] }
 ];
 
-/**
- * One editable template parameter. The control follows the value's TYPE, so a
- * gene list edits as chips and a study edits as text — the point of a template
- * is that retargeting is a normal edit, not JSON surgery.
- */
-function ParamRow({ name, value, busy, onChange }:
-  { name: string; value: unknown; busy: boolean; onChange: (v: unknown) => void }) {
-  const [add, setAdd] = useState("");
-  if (Array.isArray(value)) {
-    const items = value.map(String);
-    return (
-      <div className="paramrow">
-        <code>${name}</code>
-        <div className="pillwrap">
-          {items.map(x => (
-            <button key={x} type="button" className="pill" disabled={busy}
-              title={"remove " + x} onClick={() => onChange(items.filter(y => y !== x))}>
-              {x} <span aria-hidden="true">×</span>
-            </button>
-          ))}
-          <input list="view-genes" placeholder="add…" value={add} disabled={busy}
-            style={{ width: "7rem" }}
-            onChange={e => setAdd(e.target.value.toUpperCase())}
-            onKeyDown={e => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              const v = add.trim().toUpperCase();
-              if (v && !items.includes(v)) onChange([...items, v]);
-              setAdd("");
-            }} />
-        </div>
-      </div>
-    );
-  }
-  if (typeof value === "number") {
-    return (
-      <div className="paramrow">
-        <code>${name}</code>
-        <input type="number" value={value} disabled={busy}
-          onChange={e => onChange(Number(e.target.value))} />
-      </div>
-    );
-  }
-  return (
-    <div className="paramrow">
-      <code>${name}</code>
-      <input value={String(value ?? "")} disabled={busy}
-        onChange={e => onChange(e.target.value)} />
-    </div>
-  );
-}
-
 export default function AnalysisPage() {
   // Read through useSearchParams, never `use(searchParams)`: every syncUrl() is a
   // history.replaceState, which hands the page a NEW searchParams promise, and
@@ -298,10 +226,10 @@ export default function AnalysisPage() {
   /** the `custom` tag on a cohort's pill: that clause's upload, scoped to the clause */
   const showClauseData = (cohort?: string): OnCustomData => (attribute, leaf, negated) =>
     setCdFocus({ datasets: referencedDatasets({ a: attribute }), clause: { attribute, leaf, cohort, negated } });
-  const [saveName, setSaveName] = useState("");
+  /** Explore's save dialog is open, prefilled with this name */
+  const [saving, setSaving] = useState<string | null>(null);
   const [genesFor, setGenesFor] = useState<number | null>(null);
   const genesDialog = useRef<HTMLDialogElement | null>(null);
-  const saveDialog = useRef<HTMLDialogElement | null>(null);   // Explore action-bar feedback
   /** Explore's "+ Add chart": clinical/gene/derived-timeline filter builders live
    *  here instead of as three permanent cards above the facet grid. */
   const addChartDialog = useRef<HTMLDialogElement | null>(null);
@@ -440,26 +368,14 @@ export default function AnalysisPage() {
   }>({ aType: "", aOcc: "ANY", aLineOp: "=", aLineNo: "", rel: "NONE",
        bType: "", bOcc: "ANY", bLineOp: "=", bLineNo: "", days: "180", priorGuard: false, lineGap: 90 });
 
-  const [wsName, setWsName] = useState("");
+  const [wsOpen, setWsOpen] = useState(false);
   const [wsError, setWsError] = useState<string | null>(null);
-  const wsDialog = useRef<HTMLDialogElement | null>(null);
 
   // ---- editing a cohort's name/note (the gear menu's "edit…") -------------
   const [cohortEditing, setCohortEditing] = useState<string | null>(null); // the name AS IT IS in doc.cohorts right now
-  const [ceName, setCeName] = useState("");
-  const [ceNotes, setCeNotes] = useState("");
-  const [ceError, setCeError] = useState<string | null>(null);
-  const cohortEditDialog = useRef<HTMLDialogElement | null>(null);
 
   // ---- editing a view's note (the gear menu's "add note…" / "edit note…") -
   const [viewNoteEditing, setViewNoteEditing] = useState<number | null>(null); // index into doc.views / result.views
-  const [vnText, setVnText] = useState("");
-  // what the text dialogs' fields hold while being typed in (see DraftText), a generation
-  // bumped on every open so each field starts fresh, and whether the gating field is non-empty
-  const saveDraft = useRef(""), wsDraft = useRef(""), ceNameDraft = useRef(""), ceNotesDraft = useRef(""), vnDraft = useRef("");
-  const [draftGen, setDraftGen] = useState(0);
-  const [draftFilled, setDraftFilled] = useState(false);
-  const viewNoteDialog = useRef<HTMLDialogElement | null>(null);
 
   // Saved cohorts and analyses belong to the login (lib/auth.ts): see use-saved.ts.
   const loggedIn = customState.unlocked;
@@ -638,15 +554,11 @@ export default function AnalysisPage() {
     if (!barDef()) { setExMsg("select at least one study first"); return; }
     if (!canSave()) return;
     setExMsg(null);
-    setSaveName(cName.trim() || barDefaultName());
-    setDraftFilled(!!(cName.trim() || barDefaultName()).trim()); setDraftGen((g) => g + 1);
-    saveDialog.current?.showModal();
+    setSaving(cName.trim() || barDefaultName());
   };
-  const confirmSave = async () => {
-    const name = saveDraft.current.trim();
+  const confirmSave = async (name: string) => {
     const def = barDef();
-    if (!name || !def) return;
-    saveDialog.current?.close();
+    if (!def) return;
     // Evaluated with the name and definition in hand rather than through the
     // shared cName/cDefText state, which React would not have flushed yet.
     try {
@@ -1257,19 +1169,9 @@ export default function AnalysisPage() {
   // ---- workspaces ----------------------------------------------------------
   const openWorkspaceSave = () => {
     if (!canSave()) return;
-    // Only ever prefills with the workspace's OWN name, if it already has
-    // one — never a cohort name or a generic fallback standing in for a
-    // real name, which read as though the app had already named it for you.
-    // An untitled workspace opens to an empty field with just the
-    // placeholder text.
-    setWsName(doc.title || "");
-    setDraftFilled(!!(doc.title || "").trim()); setDraftGen((g) => g + 1);
-    wsDialog.current?.showModal();
+    setWsOpen(true);
   };
-  const confirmWorkspaceSave = async () => {
-    const name = wsDraft.current.trim();
-    if (!name) return;
-    wsDialog.current?.close();
+  const confirmWorkspaceSave = async (name: string) => {
     const d = { ...doc, title: name };
     docs.set(d);
     setWsError(null);
@@ -1492,11 +1394,6 @@ export default function AnalysisPage() {
 
   const openCohortEdit = (name: string) => {
     setCohortEditing(name);
-    setCeName(name);
-    setCeNotes(doc.cohorts?.[name]?.notes || "");
-    setDraftFilled(!!name.trim()); setDraftGen((g) => g + 1);
-    setCeError(null);
-    cohortEditDialog.current?.showModal();
   };
 
   /** Rename a cohort and/or change its note, from the gear menu's "edit…" dialog.
@@ -1505,19 +1402,12 @@ export default function AnalysisPage() {
    *  the server keys everything (result.cohorts, every row/curve) by name,
    *  a rename re-runs the analysis, unlike a note-only edit, which changes no
    *  number and so re-runs nothing (use-analysis.ts leaves notes out of its keys). */
-  const confirmCohortEdit = () => {
+  const confirmCohortEdit = (newName: string, notes: string) => {
     if (!cohortEditing) return;
     const oldName = cohortEditing;
-    const newName = ceNameDraft.current.trim();
-    if (!newName) return;
-    if (newName !== oldName && doc.cohorts?.[newName]) {
-      setCeError("a cohort named “" + newName + "” already exists");
-      return;
-    }
-    cohortEditDialog.current?.close();
     const nextCohorts: Record<string, CohortDef> = {};
     for (const [k, v] of Object.entries(doc.cohorts || {})) {
-      nextCohorts[k === oldName ? newName : k] = k === oldName ? { ...v, notes: ceNotesDraft.current } : v;
+      nextCohorts[k === oldName ? newName : k] = k === oldName ? { ...v, notes } : v;
     }
     if (newName === oldName) {
       // a note-only edit re-runs nothing, so nothing else would put it in the shareable link
@@ -1538,9 +1428,6 @@ export default function AnalysisPage() {
   const openViewNoteEdit = (vi: number) => {
     if (!analysisSaved) return;
     setViewNoteEditing(vi);
-    setVnText((doc.views || [])[vi]?.note || "");
-    setDraftGen((g) => g + 1);
-    viewNoteDialog.current?.showModal();
   };
 
   /** A view's note is exactly like a cohort's or the workspace's: prose the
@@ -1549,11 +1436,9 @@ export default function AnalysisPage() {
    *  straight into `result.views[vi].annotationNote` (what ViewHead actually
    *  reads to display it), since nothing else would otherwise tell the
    *  already-rendered card that its own annotation changed. */
-  const confirmViewNoteEdit = () => {
+  const confirmViewNoteEdit = (trimmed: string) => {
     if (viewNoteEditing == null) return;
     const vi = viewNoteEditing;
-    viewNoteDialog.current?.close();
-    const trimmed = vnDraft.current.trim();
     const views = (doc.views || []).map((v: any, i: number) => {
       if (i !== vi) return v;
       const nv = { ...v };
@@ -1716,109 +1601,13 @@ export default function AnalysisPage() {
         {/* One popup shared by every gene-bearing view — a modal rather than a
             dropdown, because picking several genes is a task you settle into,
             and a menu that closes on an outside click fights that. */}
-        {/* The workspace editor: name, parameters, notes, and what to do with
-            it, all behind the "Save workspace" button on the Analysis tab.
-            Used to be a permanent card there; a dialog is read when setting
-            the workspace up, not while reading the figures it describes. */}
-        <dialog ref={wsDialog} className="namedialog wsdialog"
-          onClose={() => setWsName("")}
-          onClick={e => { if (e.target === wsDialog.current) wsDialog.current?.close(); }}>
-          <form method="dialog" onSubmit={e => { e.preventDefault(); confirmWorkspaceSave(); }}>
-            <h3>{doc.title && spaces[doc.title] ? "Workspace" : "Save workspace"}</h3>
-            <p className="meta">
-              {(doc.views || []).length} view{(doc.views || []).length === 1 ? "" : "s"}
-              {doc.params ? " · " + Object.keys(doc.params).length + " parameter" + (Object.keys(doc.params).length === 1 ? "" : "s") : ""}
-              {!doc.title || !spaces[doc.title]
-                ? " · not saved yet"
-                : JSON.stringify(spaces[doc.title].doc) !== JSON.stringify(doc)
-                  ? " · unsaved changes"
-                  : " · saved " + spaces[doc.title].savedAt}
-            </p>
-            <DraftText key={draftGen} draft={wsDraft} initial={wsName} onFilled={setDraftFilled} autoFocus placeholder="workspace name…" />
-
-            {doc.params && Object.keys(doc.params).length > 0 ? (
-              <div className="params" style={{ marginTop: "0.7rem" }}>
-                <div className="row" style={{ alignItems: "baseline" }}>
-                  <strong style={{ fontSize: "var(--t-md)" }}>Parameters</strong>
-                  <span className="meta">— change one here and every view that uses it re-runs</span>
-                </div>
-                {Object.entries(doc.params).map(([k, v]) => (
-                  <ParamRow key={k} name={k} value={v} busy={busy} onChange={val => setParam(k, val)} />
-                ))}
-                {result?.unusedParams?.length ? (
-                  <p className="note" style={{ margin: "0.3rem 0 0" }}>
-                    Declared but never used: {result.unusedParams.map(x => "$" + x).join(", ")} — usually a
-                    rename that missed a reference.
-                  </p>
-                ) : null}
-              </div>
-            ) : (doc.views || []).length > 0 && (
-              <p className="note" style={{ margin: "0.7rem 0 0" }}>
-                No parameters yet — “make a template” beside the document lifts the study and a
-                shared gene list out, so this workup can be re-pointed in one edit.
-              </p>
-            )}
-
-            <label className="wslabel" htmlFor="wsnotes" style={{ marginTop: "0.7rem", display: "block" }}>Notes</label>
-            <textarea id="wsnotes" value={doc.notes || ""} spellCheck
-              placeholder="What is this analysis for? What should a reader look at first?"
-              onChange={e => setNotes(e.target.value)} />
-
-            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "space-between", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
-              <div className="row" style={{ gap: "0.4rem" }}>
-                {doc.title && spaces[doc.title] && (
-                  <button type="button" className="linklike" disabled={busy}
-                    title={"delete the saved workspace “" + doc.title + "”"}
-                    onClick={() => deleteWorkspace(doc.title!)}>delete</button>
-                )}
-              </div>
-              <div className="row" style={{ gap: "0.4rem", alignItems: "center" }}>
-                <button type="button" className="linklike" onClick={() => wsDialog.current?.close()}>cancel</button>
-                <button className="primary" type="submit" disabled={!draftFilled}>
-                  {doc.title && spaces[doc.title] ? "Save changes" : "Save"}
-                </button>
-              </div>
-            </div>
-            {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
-          </form>
-        </dialog>
-        {/* The cohort gear menu's "edit…": name and note together, since
-            renaming is the one cohort-level edit this app supports without
-            reopening Explore or the JSON editor. */}
-        <dialog ref={cohortEditDialog} className="namedialog cohortdialog"
-          onClose={() => { setCohortEditing(null); setCeError(null); }}
-          onClick={e => { if (e.target === cohortEditDialog.current) cohortEditDialog.current?.close(); }}>
-          <form method="dialog" onSubmit={e => { e.preventDefault(); confirmCohortEdit(); }}>
-            <h3>Edit cohort</h3>
-            <label className="wslabel" htmlFor="cename">Name</label>
-            <DraftText key={"n" + draftGen} draft={ceNameDraft} initial={ceName} onFilled={setDraftFilled} id="cename" autoFocus />
-            <label className="wslabel" htmlFor="cenotes" style={{ marginTop: "0.6rem", display: "block" }}>Note</label>
-            <DraftText multiline key={"t" + draftGen} draft={ceNotesDraft} initial={ceNotes} id="cenotes" spellCheck
-              placeholder="What is this cohort? Why is it defined this way?" />
-            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
-              <button type="button" className="linklike" onClick={() => cohortEditDialog.current?.close()}>cancel</button>
-              <button className="primary" type="submit" disabled={!draftFilled}>Save</button>
-            </div>
-            {ceError && <p className="error" style={{ marginTop: "0.4rem" }}>{ceError}</p>}
-          </form>
-        </dialog>
-        {/* A view's gear menu's "add note…" / "edit note…": one line of prose
-            drawn below its title (see ViewHead) — what this figure shows, or
-            what to read first, not a second title. */}
-        <dialog ref={viewNoteDialog} className="namedialog cohortdialog"
-          onClose={() => setViewNoteEditing(null)}
-          onClick={e => { if (e.target === viewNoteDialog.current) viewNoteDialog.current?.close(); }}>
-          <form method="dialog" onSubmit={e => { e.preventDefault(); confirmViewNoteEdit(); }}>
-            <h3>View note</h3>
-            <label className="wslabel" htmlFor="vntext">Note</label>
-            <DraftText multiline key={draftGen} draft={vnDraft} initial={vnText} id="vntext" autoFocus spellCheck
-              placeholder="What does this figure show? What should a reader look at first?" />
-            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
-              <button type="button" className="linklike" onClick={() => viewNoteDialog.current?.close()}>cancel</button>
-              <button className="primary" type="submit">Save</button>
-            </div>
-          </form>
-        </dialog>
+        {wsOpen && <WorkspaceDialog doc={doc} saved={doc.title ? spaces[doc.title] : undefined} busy={busy}
+          unusedParams={result?.unusedParams} error={wsError} onParam={setParam} onNotes={setNotes}
+          onDelete={() => deleteWorkspace(doc.title!)} onSave={confirmWorkspaceSave} onClose={() => setWsOpen(false)} />}
+        {cohortEditing != null && <CohortEditDialog name={cohortEditing} notes={doc.cohorts?.[cohortEditing]?.notes || ""}
+          taken={(n) => !!doc.cohorts?.[n]} onSave={confirmCohortEdit} onClose={() => setCohortEditing(null)} />}
+        {viewNoteEditing != null && <ViewNoteDialog note={(doc.views || [])[viewNoteEditing]?.note || ""}
+          onSave={confirmViewNoteEdit} onClose={() => setViewNoteEditing(null)} />}
         <dialog ref={genesDialog} className="genedialog"
           onClose={() => setGenesFor(null)}
           onClick={e => { if (e.target === genesDialog.current) genesDialog.current?.close(); }}>
@@ -2052,21 +1841,8 @@ export default function AnalysisPage() {
                   {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} onCustomData={showClauseData()} />; })()}
                 </div>
                 {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
-                {/* A native <dialog> so Esc, focus trapping and the backdrop come
-                    from the platform rather than being re-implemented. */}
-                <dialog ref={saveDialog} className="namedialog savedialog"
-                  onClose={() => setSaveName("")}
-                  onClick={e => { if (e.target === saveDialog.current) saveDialog.current?.close(); }}>
-                  <form method="dialog" onSubmit={e => { e.preventDefault(); confirmSave(); }}>
-                    <h3>Save as a cohort</h3>
-                    <p className="meta">{clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies")}</p>
-                    <DraftText key={draftGen} draft={saveDraft} initial={saveName} onFilled={setDraftFilled} autoFocus placeholder="cohort name…" />
-                    <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
-                      <button type="button" className="linklike" onClick={() => saveDialog.current?.close()}>cancel</button>
-                      <button className="primary" type="submit" disabled={!draftFilled}>Save</button>
-                    </div>
-                  </form>
-                </dialog>
+                {saving != null && <SaveCohortDialog initial={saving} onSave={confirmSave} onClose={() => setSaving(null)}
+                  meta={clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies")} />}
               </div>
             );
           })()}
