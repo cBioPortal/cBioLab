@@ -127,7 +127,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   `scripts/gate.sh` gives its e2e server a throwaway password. Per-user access is not built yet.
 - **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Saved /
   Analysis / Examples. Tabs move out into their own components as they are untangled
-  (`saved-tab.tsx`, `examples-tab.tsx`); state that must outlive a tab switch stays in the page,
+  (`saved-tab.tsx`, `examples-tab.tsx`), and each view kind's card is its own component in
+  `view-cards.tsx`, reading the page through one `ViewCtx`; state that must outlive a tab switch stays in the page,
   since a tab unmounts when left. Server state goes through React Query, as analyses do
   (`use-analysis.ts`): saved cohorts and analyses are `use-saved.ts`, Explore's facets
   `use-explore.ts` (keyed by everything that decides the answer, so a superseded request is
@@ -298,7 +299,7 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
 - **A settings change that waits on the server shows the view waiting.** The header and its
   controls stay visible and usable, so the reader sees what they just changed and can change it
   again; the figure area below is covered by a skeleton with an "updating…" spinner until the
-  new answer lands (`Updating` in `app/lab/page.tsx`, `.view-updating`). A stale figure left on
+  new answer lands (`Updating` in `app/lab/view-cards.tsx`, `.view-updating`). A stale figure left on
   screen reads as the new answer. The same cover goes over every view during a full document
   run, and over the oncoprint's plot during its own contract fetch. A change applied in the
   browser alone (the oncoprint's display options, zoom) is instant and gets none.

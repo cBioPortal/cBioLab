@@ -8,7 +8,7 @@
 // a large monitor, and how many distinct font sizes and inline style objects the source still
 // carries. Needs a dev server with credentials; it draws a real figure.
 const { chromium } = require("/home/ubuntu/cohort-lab/node_modules/playwright");
-const { readFileSync } = require("node:fs");
+const { readFileSync, readdirSync } = require("node:fs");
 const { join } = require("node:path");
 
 const BASE = process.argv[2] || "http://localhost:3107";
@@ -35,7 +35,8 @@ const measure = () => ({
 function sourceCounts() {
   const root = join(__dirname, "..");
   const css = readFileSync(join(root, "app/globals.css"), "utf8");
-  const files = ["app/lab/page.tsx", "app/lab/view-chrome.tsx", "app/_oncoprint/OncoprintFigure.tsx"].map((f) => readFileSync(join(root, f), "utf8"));
+  const lab = readdirSync(join(root, "app/lab")).filter((f) => f.endsWith(".tsx")).map((f) => "app/lab/" + f);
+  const files = [...lab, "app/_oncoprint/OncoprintFigure.tsx"].map((f) => readFileSync(join(root, f), "utf8"));
   const sizes = new Set([...css.matchAll(/font-size: *([0-9.]+rem)/g)].map((m) => m[1]));
   for (const f of files) for (const m of f.matchAll(/fontSize: *"([0-9.]+rem)"/g)) sizes.add(m[1]);
   return { fontSizes: sizes.size, inlineStyles: files.reduce((n, f) => n + (f.match(/style=\{\{/g) || []).length, 0) };

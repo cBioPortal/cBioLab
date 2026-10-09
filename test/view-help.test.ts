@@ -9,7 +9,8 @@ import { readFileSync } from "node:fs";
 import { VIEW_HELP } from "../lib/view-help.ts";
 
 const types = readFileSync(new URL("../lib/types.ts", import.meta.url), "utf8");
-const page = readFileSync(new URL("../app/lab/page.tsx", import.meta.url), "utf8");
+// the view cards (app/lab/view-cards.tsx) are where course and sequence draw their own headers
+const cards = readFileSync(new URL("../app/lab/view-cards.tsx", import.meta.url), "utf8");
 const chrome = readFileSync(new URL("../app/lab/view-chrome.tsx", import.meta.url), "utf8");
 
 /** every kind in the View union, e.g. CompareView -> "compare" */
@@ -48,7 +49,7 @@ describe("VIEW_HELP: every view kind has a plain-language explanation", () => {
     // either path silently regressing back to no button at all.
     assert.match(chrome, /<ViewHelpButton kind=\{v\.kind\}/, "ViewHead itself must render the help button");
     for (const kind of ["course", "sequence"]) {
-      assert.match(page, new RegExp('<ViewHelpButton kind="' + kind + '"'),
+      assert.match(cards, new RegExp('<ViewHelpButton kind="' + kind + '"'),
         kind + "'s own custom header must call ViewHelpButton directly, since it doesn't use ViewHead");
     }
   });
