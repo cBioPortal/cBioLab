@@ -162,6 +162,85 @@ async function labRaces(browser, ok, BASE) {
       ok("lab: a browser-only edit is in the URL at once", Array.isArray(fromUrl) && JSON.stringify(fromUrl) === JSON.stringify(onPage),
         "url " + JSON.stringify(fromUrl) + " · page " + JSON.stringify(onPage));
     }
+
+    // 7. Explore: a facet request the reader has moved past must not replace the newer answer.
+    //    The first request is held; a newer draft is asked for and answered; then the held one
+    //    is released. Judged by what the page shows, against the API's own count for that draft.
+    {
+      const STUDY = "msk_chord_2024";
+      const clause = (value) => ({ kind: "clinical", attribute: "CANCER_TYPE", op: "=", value, per: "sample" });
+      const fire = (name, args) => page.evaluate(([n, a]) => { window.cohortLab.call(n, a).catch(() => {}); }, [name, args]);
+      const state = () => tool(page, "explore_get_state");
+      const apiCount = async (draft) => {
+        const j = await (await page.request.post(BASE + "/api/explore", { data: { studies: [STUDY], draft } })).json();
+        return j.draftCount ?? j.totals?.patients;
+      };
+      const shows = async (draft) => {
+        const want = await apiCount(draft);
+        const st = await until(async () => { const s = await state(); return !s.counting && s.draftPatients === want && s; },
+          "Explore to show " + want + " patients", 120000).catch(() => null);
+        await page.waitForTimeout(1500);   // the released request has had time to land
+        const after = await state();
+        return { ok: !!st && after.draftPatients === want && JSON.stringify(after.draftCohort) === JSON.stringify(draft || { all: [] }),
+          detail: "want " + want + ", page " + after.draftPatients + ", draft " + JSON.stringify(after.draftCohort.all.map((c) => c.value)) };
+      };
+
+      /** holdFirst, remembering the held request so a check can wait for its answer to land */
+      const holdExplore = () => {
+        const h = holdFirst();
+        let heldReq = null;
+        return { ...h, get held() { return h.held; },
+          handler: (route) => { if (!heldReq) heldReq = route.request(); return h.handler(route); },
+          releaseAndLand: async () => {
+            h.release();
+            await Promise.race([heldReq.response().catch(() => null), new Promise((r) => setTimeout(r, 60000))]);
+            await page.waitForTimeout(800);   // and for the page to render whatever it did with it
+          } };
+      };
+
+      await tool(page, "explore_select_studies", { studies: [STUDY] });
+      await tool(page, "explore_clear_filters");
+
+      // a. a filter, then cleared
+      let h = holdExplore();
+      await page.route("**/api/explore", h.handler);
+      await fire("explore_add_filter", { clause: clause("Breast Cancer") });
+      await until(async () => h.held, "the filtered request to be held");
+      await fire("explore_clear_filters", {});
+      await until(async () => (await state()).draftFilters.length === 0, "the draft to clear");
+      let r = await shows({ all: [] });
+      await h.releaseAndLand();
+      const afterA = await state();
+      await page.unroute("**/api/explore", h.handler);
+      ok("explore: a filter cleared while its count was in flight leaves the unfiltered count",
+        r.ok && afterA.draftPatients === (await apiCount({ all: [] })), r.detail + " · after release " + afterA.draftPatients);
+
+      // b. a filter, then a different one in its place
+      h = holdExplore();
+      await page.route("**/api/explore", h.handler);
+      await fire("explore_add_filter", { clause: clause("Breast Cancer") });
+      await until(async () => h.held, "the first filter's request to be held");
+      await fire("explore_clear_filters", {});
+      await until(async () => (await state()).draftFilters.length === 0, "the draft to clear");
+      await fire("explore_add_filter", { clause: clause("Prostate Cancer") });
+      await until(async () => (await state()).draftFilters.length === 1, "the second filter");
+      const draftB = (await state()).draftCohort;
+      r = await shows(draftB);
+      await h.releaseAndLand();
+      const afterB = await state();
+      await page.unroute("**/api/explore", h.handler);
+      ok("explore: the newer filter's count stays when the older one's request lands late",
+        r.ok && afterB.draftPatients === (await apiCount(draftB)), r.detail + " · after release " + afterB.draftPatients);
+
+      // c. a draft nobody matches: the charts say so (the density has nothing to bin)
+      await tool(page, "explore_clear_filters");
+      await tool(page, "explore_add_filter", { clause: clause("No such cancer type") });
+      await page.waitForTimeout(3000);   // the charts' own request lands
+      const empty = await state();
+      ok("explore: a draft that matches no one counts 0 and leaves the page working",
+        empty.draftPatients === 0 && !!(await page.evaluate(() => window.cohortLab)), "page " + empty.draftPatients);
+      await tool(page, "explore_clear_filters");
+    }
   } catch (e) {
     ok("lab: request-order checks", false, String(e.message).split("\n")[0].slice(0, 200));
   }

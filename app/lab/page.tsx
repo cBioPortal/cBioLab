@@ -35,6 +35,7 @@ import { api } from "./api.ts";
 import { useSavedArtifacts } from "./use-saved.ts";
 import { SavedTab } from "./saved-tab.tsx";
 import { ExamplesTab } from "./examples-tab.tsx";
+import { useExplore, type ExploreAsk } from "./use-explore.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -353,7 +354,7 @@ export default function AnalysisPage() {
    * Explore opened over the analysis to add one cohort to it ("+ Add cohort"), with the Explore
    * state it replaced, restored when it closes so the Explore tab is as the reader left it.
    */
-  const [addMode, setAddMode] = useState<null | { ids: string[]; text: string; explore: ExploreResult | null }>(null);
+  const [addMode, setAddMode] = useState<null | { ids: string[]; text: string; explore: ExploreAsk | null }>(null);
   /** set when an opened document was written for an older version and has been upgraded */
   const [upgradeNote, setUpgradeNote] = useState<DocUpgrade | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -374,8 +375,6 @@ export default function AnalysisPage() {
   const [chartTab, setChartTab] = useState<"clinical" | "gene" | "derived" | "custom">("clinical");
   const customState = useCustomDataState();
   const tabRef = useRef<string>(tabFromParams(sp));            // the tab syncUrl should record
-  const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
-  const exAbort = useRef<AbortController | null>(null);      // cancel a facet request the reader has moved past
   /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
   const menuOpenRef = useRef(new Map<string, boolean>());
   const moreDerivedMenu = useGearmenuOpen("explore:more-derivations", menuOpenRef.current);
@@ -445,8 +444,8 @@ export default function AnalysisPage() {
   const pendingKeys = analysis.pending;
   const busy = analysis.busy || validating || linkLoading;
   const error = uiError || normalizeError || analysis.error;
-  const [explore, setExplore] = useState<ExploreResult | null>(null);
-  const [exploreBusy, setExploreBusy] = useState(false);
+  const exploring = useExplore(setError);
+  const { explore, busy: exploreBusy } = exploring;
   const [trackAttrs, setTrackAttrs] = useState<{ key: string; attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[]; gaProfiles: string[] }>({ key: "", attrs: [], profiles: [], gaProfiles: [] }); // track picker options
   /** the clinical-attribute catalog above is being fetched — a picker shows a loader, not "none" */
   const [trackAttrsLoading, setTrackAttrsLoading] = useState(false);
@@ -458,21 +457,6 @@ export default function AnalysisPage() {
   const [exPanelOpen, setExPanelOpen] = useState(false);                // study panel expanded?
   const exSel = useRef<string[]>([]);                   // current selection (ref: immune to state races)
   const exFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);                                    // debounce for multi-toggle refetch
-  const exFetchSeq = useRef(0);
-  /** facets from the last UNNARROWED response — the bar is always computed from these */
-  const exFullAttrsRef = useRef<{ attribute: string; studyCount: number }[]>([]);                                         // stale-response guard for explore fetches
-  /**
-   * Clinical attribute order, pinned from the last response with NO facet
-   * selection applied. The server sorts attributes by priority then by
-   * coverage WITHIN the current draft (lib/explore.ts) — so two attributes
-   * with similar coverage overall can swap places the moment a selection
-   * changes who is being counted, and the whole page reshuffles under the
-   * reader even though no number is wrong. This is the reference point that
-   * stops that: it only moves when the draft is empty (a real re-scoping —
-   * changing studies, or clearing filters), never as a side effect of a
-   * click. Keyed by `per|attribute` to match the `data-attr` the DOM uses.
-   */
-  const attrOrderRef = useRef<string[] | null>(null);
   const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
   /**
    * Minimum share of the selected studies an attribute must appear in to be
@@ -994,84 +978,23 @@ export default function AnalysisPage() {
   };
 
   const attrsForBar = (bar: number, studiesOverride?: string[] | string): string[] => {
-    if (bar <= 0 || !exFullAttrsRef.current.length) return [];
+    if (bar <= 0 || !exploring.fullAttrs.current.length) return [];
     const n = (studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current).length;
-    return exFullAttrsRef.current.filter(a => a.studyCount >= Math.ceil(bar * n)).map(a => a.attribute);
+    return exploring.fullAttrs.current.filter(a => a.studyCount >= Math.ceil(bar * n)).map(a => a.attribute);
   };
 
-  const fetchExplore = async (draftOverride?: CohortDef | null, studiesOverride?: string[] | string, attrsOverride?: string[]) => {
-    // Several independent triggers can ask for the same facets at once (a
-    // ?tab=explore deep link, the tab button, and the catalog resolving the
-    // default study selection all fire on load). exFetchSeq supersedes stale
-    // RESULTS but does not stop duplicate REQUESTS, and each one is a full
-    // faceting pass over ClickHouse — so identical work already in flight is
-    // skipped rather than run twice and thrown away.
-    const inflightKey = JSON.stringify([
-      studiesOverride ?? exSel.current,
-      draftOverride !== undefined ? draftOverride : parseDraft(),
-      attrsOverride ?? attrsForBar(attrCoverage, studiesOverride),
-      geneChartsRef.current,
-      exExtraDerivedRef.current,
-      customDataKey()
-    ]);
-    if (exInflight.current === inflightKey) return;
-    exInflight.current = inflightKey;
-    // Ticking a facet makes the previous answer irrelevant, so stop paying for it. Discarding
-    // the RESULT (exFetchSeq, below) was never enough: the abandoned pass kept running all
-    // ~30 of its ClickHouse queries, and the answer the reader is waiting for queued behind
-    // them. Measured at four clicks 250ms apart, that doubled the wait for the last one.
-    exAbort.current?.abort();
-    const ac = new AbortController();
-    exAbort.current = ac;
-    const seq = ++exFetchSeq.current; // a later call (or an emptied selection) supersedes this one
-    setExploreBusy(true);
-    try {
-      const list = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current;
-      if (!list.length) { setExplore(null); exInflight.current = null; setExploreBusy(false); return; }
-      const draft = draftOverride !== undefined ? draftOverride : parseDraft();
-      const res = await api.explore({ studies: list, draft,
-          // Narrow the server's work to the attributes that will actually be
-          // shown. Only sent once a previous result has told us which those are.
-          ...((attrsOverride ?? attrsForBar(attrCoverage, studiesOverride)).length
-            ? { attributes: attrsOverride ?? attrsForBar(attrCoverage, studiesOverride) } : {}),
-          ...(geneChartsRef.current.length ? { geneCharts: geneChartsRef.current } : {}),
-          ...(exExtraDerivedRef.current.length ? { extraDerived: exExtraDerivedRef.current } : {}) }, { signal: ac.signal });
-      // 499 is this request being superseded server-side; it carries no body, and a newer
-      // request already owns the page. Never parse it as JSON.
-      if (res.status === 499 || seq !== exFetchSeq.current) return;
-      const j = await res.json();
-      if (seq !== exFetchSeq.current) return; // superseded while in flight — discard
-      if (!j.error) {
-        // Pin attribute order to the last selection-free response; see
-        // attrOrderRef's own comment for why the server's live order can't
-        // be trusted as-is once any facet is selected.
-        const noSelection = !draft || !Array.isArray(draft.all) || !draft.all.length;
-        if (noSelection) {
-          attrOrderRef.current = (j.clinical || []).map((c: { per: string; attribute: string }) => c.per + "|" + c.attribute);
-        } else if (attrOrderRef.current && j.clinical) {
-          const order = attrOrderRef.current;
-          const rank = (c: { per: string; attribute: string }) => {
-            const i = order.indexOf(c.per + "|" + c.attribute);
-            return i === -1 ? order.length : i;
-          };
-          j.clinical = [...j.clinical].sort((a: any, b: any) => rank(a) - rank(b));
-        }
-        setExplore(j);
-        // only a response that was NOT narrowed can define the full vocabulary
-        if (!(attrsOverride ?? []).length && !(attrCoverage > 0))
-          exFullAttrsRef.current = (j.clinical || [])
-            .map((c: { attribute: string; studyCount?: number }) => ({ attribute: c.attribute, studyCount: c.studyCount ?? 1 }));
-      } else setError(j.error);
-    } catch (e) {
-      // An abort is this code superseding itself, not a failure to report.
-      if ((e as Error)?.name !== "AbortError" && seq === exFetchSeq.current)
-        setError(String((e as Error)?.message || e));
-    } finally {
-      // `finally`, because the early returns above leave through the middle of the try — a 499
-      // on the newest request would otherwise leave the spinner running forever. Guarded on
-      // seq so an abandoned pass never clears the flags out from under its replacement.
-      if (seq === exFetchSeq.current) { exInflight.current = null; setExploreBusy(false); }
-    }
+  /** Ask Explore for the facets of the current selection (app/lab/use-explore.ts); each override
+   *  stands in for what the page holds, for a caller whose state has not landed yet. */
+  const fetchExplore = (draftOverride?: CohortDef | null, studiesOverride?: string[] | string, attrsOverride?: string[]) => {
+    const studies = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current;
+    exploring.ask({
+      studies,
+      draft: draftOverride !== undefined ? draftOverride : parseDraft(),
+      attributes: attrsOverride ?? attrsForBar(attrCoverage, studiesOverride),
+      geneCharts: geneChartsRef.current,
+      extraDerived: exExtraDerivedRef.current,
+      uploads: customDataKey(),
+    }, !(attrsOverride ?? []).length && !(attrCoverage > 0));
   };
 
   const addClause = (clause: any) => {
@@ -1293,7 +1216,7 @@ export default function AnalysisPage() {
     else { delete d.studies; if (ids.length === 1) d.study = ids[0]; else delete d.study; }
     setCDefText(JSON.stringify(d, null, 2));
     if (exFetchTimer.current) clearTimeout(exFetchTimer.current);
-    if (!ids.length) { exFetchSeq.current++; exAbort.current?.abort(); exInflight.current = null; setExplore(null); setExploreBusy(false); setExPanelOpen(true); return; } // empty selection: clear facets (and stop any in-flight fetch), keep the picker open
+    if (!ids.length) { exploring.clear(); setExPanelOpen(true); return; } // empty selection: clear facets (and drop any in-flight fetch), keep the picker open
     exFetchTimer.current = setTimeout(() => fetchExplore(d.all!.length ? d : null, ids), 350);
   };
 
@@ -1602,7 +1525,7 @@ export default function AnalysisPage() {
     return [...ids];
   };
   const openAddCohort = () => {
-    setAddMode({ ids: exSel.current, text: cDefText, explore });
+    setAddMode({ ids: exSel.current, text: cDefText, explore: exploring.current });
     const ids = analysisStudies();
     exSel.current = ids; setExStudies(ids);
     setCDefText(JSON.stringify(draftScaffold(ids), null, 2));
@@ -1612,7 +1535,7 @@ export default function AnalysisPage() {
   const closeAddCohort = () => {
     if (!addMode) return;
     exSel.current = addMode.ids; setExStudies(addMode.ids);
-    setCDefText(addMode.text); setExplore(addMode.explore);
+    setCDefText(addMode.text); exploring.restore(addMode.explore);
     setAddMode(null);
   };
   /** Add Explore's current selection to the open analysis as a new cohort, and close add mode. */

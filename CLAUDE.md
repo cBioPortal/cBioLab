@@ -129,7 +129,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   Analysis / Examples. Tabs move out into their own components as they are untangled
   (`saved-tab.tsx`, `examples-tab.tsx`); state that must outlive a tab switch stays in the page,
   since a tab unmounts when left. Server state goes through React Query, as analyses do
-  (`use-analysis.ts`): saved cohorts and analyses are `use-saved.ts`. The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
+  (`use-analysis.ts`): saved cohorts and analyses are `use-saved.ts`, Explore's facets
+  `use-explore.ts` (keyed by everything that decides the answer, so a superseded request is
+  cancelled and can never land; `e2e-lab-races.cjs` holds requests to prove it). The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
   demo pages were retired once the Analysis app subsumed them; `/` now redirects to `/lab`.
 - **WebMCP (`lib/webmcp.ts`)** — every page's tools for the researcher's assistant in the
   browser (Claude in the Chrome sidebar): registered with `document.modelContext` and published
