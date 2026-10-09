@@ -87,18 +87,33 @@ async function labRaces(browser, ok, BASE) {
       await page.locator(".lp-colname").first().click();                    // hide a column: applied in the browser
       await page.waitForTimeout(300);
       const hidden = (await doc(page)).views[0].hide;
+      // what the re-run did, reported if the check fails
+      let sent = 0, answered = 0, failed = 0;
+      const onReq = (r) => { if (r.url().includes("/api/analysis")) sent++; };
+      const onRes = (r) => { if (r.url().includes("/api/analysis")) answered++; };
+      const onFail = (r) => { if (r.url().includes("/api/analysis")) failed++; };
+      page.on("request", onReq); page.on("response", onRes); page.on("requestfailed", onFail);
       await page.locator(".viewcard .genesbtn").first().click();
       const pills = await page.locator("dialog.genedialog .pill", { hasText: "TP53" }).count();
       await page.locator("dialog.genedialog .pill", { hasText: "TP53" }).click(); // re-runs this view
       await page.locator("dialog.genedialog button.primary").click();
       await until(async () => !(await genesOf()).includes("TP53"), "the re-run without TP53", 60000).catch(() => {});
       const after = await genesOf();
-      // on a failure, whether the edit reached the document says which half went wrong
+      // on a failure, whether the edit reached the document says which half went wrong; a further
+      // minute says whether the answer was only slow
       const docGenes = (await doc(page)).views[0].genes;
+      let later = "";
+      if (after.includes("TP53")) {
+        await until(async () => !(await genesOf()).includes("TP53"), "", 60000).catch(() => {});
+        later = " · a minute later " + (await genesOf()).join(",") + ", covered " + (await page.locator(".viewcard .view-updating").count()) +
+          ", running " + (await tool(page, "analysis_get_document")).running;
+      }
+      page.off("request", onReq); page.off("response", onRes); page.off("requestfailed", onFail);
       ok("lab: a view changed in the browser, then re-run, shows the re-run's answer",
         before.includes("TP53") && Array.isArray(hidden) && hidden.length > 0 && !after.includes("TP53") && after.length === before.length - 1,
         "before " + before.join(",") + " · hide " + JSON.stringify(hidden) + " · after " + after.join(",") +
-        " · TP53 pills " + pills + " · document genes " + JSON.stringify(docGenes));
+        " · TP53 pills " + pills + " · document genes " + JSON.stringify(docGenes) +
+        " · analysis requests sent " + sent + ", answered " + answered + ", failed " + failed + later);
     }
 
     // 4. What a reader is typing survives the page re-rendering around it: a control declared
