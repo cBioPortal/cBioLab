@@ -86,8 +86,8 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
         CAP_FILTERS.every(([k, , pred]) => !sCaps.has(k) || pred(s)));
       return (
         <div className="card">
-          <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-            <h2 style={{ margin: 0 }}>Exploring <span className="plain">— {exStudies.length === 0 ? "no studies selected" :
+          <div className="row center g5">
+            <h2 className="flush">Exploring <span className="plain">— {exStudies.length === 0 ? "no studies selected" :
               exStudies.length + (exStudies.length === 1 ? " study" : " studies") + " · " +
               // While a fetch is in flight the PREVIOUS result's totals are
               // not this selection's. Submitting 560 studies takes about a
@@ -218,7 +218,7 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
       const ready = exStudies.length > 0;
       return (
         <div className="card exbar">
-          <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+          <div className="row center g5">
             <strong style={{ fontSize: "var(--t-md)" }}>{clauses + (clauses === 1 ? " filter" : " filters")}</strong>
             <span className="meta">
               {explore && explore.draftCount != null
@@ -280,7 +280,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                 {exStudies.length > 1 && <> An attribute marked <b>*</b> isn't carried by every
                 selected study — hover it for which share of the {exStudies.length} do.</>}
               </p>
-              <div className="row" style={{ alignItems: "baseline" }}>
+              <div className="row baseline">
                 <input className="genesearch" type="search" placeholder="find an attribute" value={clinFilter}
                   title="narrows this checklist by attribute name" autoFocus
                   onChange={e => setClinFilter(e.target.value)} />
@@ -346,7 +346,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
         })()}
         {chartTab === "gene" && (
           <div>
-            <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
+            <div className="row baseline g5">
               <input className="genesearch" type="search" placeholder="chart a gene (e.g. EGFR)" autoFocus
                 value={geneChartInput} disabled={exploreBusy}
                 onChange={e => setGeneChartInput(e.target.value)}
@@ -491,8 +491,8 @@ export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
   return <>
     {SHOW_DERIVED_FACETS && explore && explore.derived && explore.derived.length > 0 && (
       <div className="card">
-        <div className="row" style={{ alignItems: "baseline" }}>
-          <h2 style={{ margin: 0 }}>Derived <span className="plain">— computed from the data's shape, so these mean the same thing in any study</span></h2>
+        <div className="row baseline">
+          <h2 className="flush">Derived <span className="plain">— computed from the data's shape, so these mean the same thing in any study</span></h2>
           <span className="spacer" />
           <details className="gearmenu" ref={moreDerivedMenu.ref} onToggle={moreDerivedMenu.onToggle}>
             <summary className="tbbtn" title="more ways to derive a facet from this study's own timeline">show more derivations</summary>
@@ -537,7 +537,7 @@ export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
                     its total is the draft-minus-itself total. Say so, exactly
                     as the clinical facets do, rather than show a number that
                     cannot be reconciled with the draft. */}
-                <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }} title={d.note}>
+                <div className="facettitle" title={d.note}>
                   {d.label} <span className="meta">· {d.covered.toLocaleString()} patients
                     {(d as any).disjunctive ? " · not narrowed by its own filter" : ""}</span>
                 </div>
@@ -586,8 +586,8 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
             const shown = disj ? c.values.reduce((n: number, v: any) => n + v.n, 0) : c.patients;
             const unit = c.per === "sample" ? " samples" : " patients";
             return (
-              <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}
-                title={[c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
+              <div
+ className="facettitle"                title={[c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
                   .filter(Boolean).join(" — ") || undefined}>
                 {isCustomAttr(c.attribute) && <span className="customtag" title={c.description}>custom</span>}
                 {c.displayName || c.attribute}{" "}
@@ -736,7 +736,7 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
       const max = Math.max(...f.states.map(x => x.n), 1);
       return (
         <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type} className="card">
-          <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}>
+          <div className="facettitle">
             {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
             <span className="meta"> · patient-level · {f.total.toLocaleString()} patients</span>
           </div>
@@ -866,8 +866,8 @@ export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
       if (!all.length) return null;
       return (
         <div className="card wide" key={kind} data-genetable={kind}>
-          <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
-            <h2 style={{ margin: 0 }}>{meta.title} <span className="plain">— samples, panel-aware frequency</span></h2>
+          <div className="row baseline g5">
+            <h2 className="flush">{meta.title} <span className="plain">— samples, panel-aware frequency</span></h2>
             <span className="spacer" />
             <span className="meta">{needle
               ? rows.length.toLocaleString() + " of " + all.length.toLocaleString() + " loaded match"

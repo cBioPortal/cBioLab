@@ -818,7 +818,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             const setPrimary = (k: string | null) => onSortKeys(k ? [k, ...sortKeys.filter((x) => x.replace(/^-/, "") !== t.label)].slice(0, 4)
               : sortKeys.filter((x) => x.replace(/^-/, "") !== t.label));
             const item = (label: string, on: boolean, act: () => void, enabled = true) => (
-              <button className="linklike" disabled={!enabled || busy} style={{ fontWeight: on ? 600 : 400, textAlign: "left" }}
+              <button className={"linklike menuitem" + (on ? " on" : "")} disabled={!enabled || busy}
                 onClick={() => { act(); setTrackMenu(null); }}>{label}</button>
             );
             return (

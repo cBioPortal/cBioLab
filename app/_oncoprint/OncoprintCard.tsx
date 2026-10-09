@@ -217,12 +217,12 @@ export function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derive
     <details className="gearmenu">
       <summary className="tbbtn" title="add or remove tracks">tracks{chosen.length ? " (" + chosen.length + ")" : ""}</summary>
       <div className="gearmenu-items wide" style={{ minWidth: 340 }}>
-        <div className="row" style={{ gap: "0.5rem", alignItems: "center" }}>
-          <button className="linklike" style={{ fontWeight: tab === "clinical" ? 600 : 400 }} onClick={() => setTab("clinical")}>Clinical {studyAttrs.length ? "(" + studyAttrs.length + ")" : ""}</button>
-          <button className="linklike" style={{ fontWeight: tab === "custom" ? 600 : 400 }} onClick={() => setTab("custom")}
+        <div className="row center g5">
+          <button className={"linklike tabtoggle" + (tab === "clinical" ? " on" : "")} onClick={() => setTab("clinical")}>Clinical {studyAttrs.length ? "(" + studyAttrs.length + ")" : ""}</button>
+          <button className={"linklike tabtoggle" + (tab === "custom" ? " on" : "")} onClick={() => setTab("custom")}
             title="attributes from your uploads (Explore → Custom data)">Custom ({customAttrs.length})</button>
-          <button className="linklike" style={{ fontWeight: tab === "heatmap" ? 600 : 400 }} onClick={() => setTab("heatmap")}>Heatmap ({heatOptions.length})</button>
-          <button className="linklike" style={{ fontWeight: tab === "cohorts" ? 600 : 400 }} onClick={() => setTab("cohorts")}>Cohort rows ({cohorts.length})</button>
+          <button className={"linklike tabtoggle" + (tab === "heatmap" ? " on" : "")} onClick={() => setTab("heatmap")}>Heatmap ({heatOptions.length})</button>
+          <button className={"linklike tabtoggle" + (tab === "cohorts" ? " on" : "")} onClick={() => setTab("cohorts")}>Cohort rows ({cohorts.length})</button>
           <span className="spacer" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search…" style={{ fontSize: "var(--t-md)", width: 120 }} />
         </div>

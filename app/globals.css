@@ -504,6 +504,22 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .lollilist { display: flex; flex-wrap: wrap; gap: 0 0.9rem; font-size: var(--t-sm); margin-top: 0.2rem; }
 .lollilist b { font-weight: 600; }
 
+/* ---------------- small shared idioms ---------------- */
+.toplink { color: var(--accent-ink); font-size: var(--t-md); }
+.row.center { align-items: center; }
+.row.baseline { align-items: baseline; }
+.row.g5 { gap: 0.5rem; }
+.facettitle { font-size: var(--t-md); font-weight: 600; }
+/* a row of link-buttons that switch what a menu shows, the current one bold */
+.linklike.tabtoggle { font-weight: 400; }
+.linklike.tabtoggle.on { font-weight: 600; }
+/* a menu's items, the one in effect bold */
+.linklike.menuitem { text-align: left; font-weight: 400; }
+.linklike.menuitem.on { font-weight: 600; }
+/* the document dialog's JSON and its compiled SQL */
+.docjson { width: 100%; height: 20rem; font: 0.72rem 'IBM Plex Mono', monospace; background: var(--code-bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem; }
+.sqlpre { max-height: 16rem; overflow: auto; background: var(--code-bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem; font-size: var(--t-xs); white-space: pre; }
+
 /* ---------------- view-card tables (app/lab/view-cards.tsx) ---------------- */
 .vscroll { overflow-x: auto; }
 .vtable { border-collapse: collapse; font-size: var(--t-md); width: 100%; }
@@ -545,7 +561,7 @@ label.dlgsection { display: block; }
 .namedialog .error { margin-top: var(--s2); }
 
 /* ---------------- Saved tab ---------------- */
-.flush, .card h2.flush { margin: 0; }
+.flush, .card h2.flush, dialog h3.flush { margin: 0; }
 .savedbar { align-items: center; gap: var(--s2); margin-bottom: var(--s0); }
 .card h2.savedsec { margin-top: var(--s4); }
 /* a list of named things, one per row, ruled between */

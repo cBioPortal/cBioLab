@@ -969,10 +969,10 @@ export default function AnalysisPage() {
         <h1>cbio-lab</h1>
         <span className="sub">analysis documents — cohorts and views over one declarative object</span>
         <span className="spacer" />
-        <a href="/datasets" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>data sets</a>
-        <a href="/reproductions" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>paper reproductions</a>
-        <a href="/campaign" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>hypothesis campaigns</a>
-        <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>rationale</a>
+        <a className="toplink" href="/datasets">data sets</a>
+        <a className="toplink" href="/reproductions">paper reproductions</a>
+        <a className="toplink" href="/campaign">hypothesis campaigns</a>
+        <a className="toplink" href="/rationale">rationale</a>
         <AgentToolsMenu page="analysis" tools={LAB_TOOL_NAMES} webmcp={webmcp}
           intro="Your AI assistant — Claude in the Chrome sidebar — can read and edit this analysis with these tools. Every edit is run by the engine first and reaches the page only if it is accepted; analysis_undo reverts the assistant's edits." />
         <LoginButton />
@@ -1023,11 +1023,11 @@ export default function AnalysisPage() {
           const names = (ids: string[]) => ids.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>);
           return unresolved.length > 0 && (
             <div className="card customwarn">
-              {of("locked").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data ({names(of("locked"))}).{" "}
+              {of("locked").length > 0 && <p className="flush">This analysis uses custom data ({names(of("locked"))}).{" "}
                 <button className="linklike" onClick={requestLogin}>Log in</button> to run it.</p>}
-              {of("deleted").length > 0 && <p style={{ margin: 0 }}>This analysis is pinned to custom data that has since been deleted: {names(of("deleted"))}.</p>}
-              {of("missing").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data that is not on the server: {names(of("missing"))}.</p>}
-              {of("unavailable").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data ({names(of("unavailable"))}), which this deployment does not store.</p>}
+              {of("deleted").length > 0 && <p className="flush">This analysis is pinned to custom data that has since been deleted: {names(of("deleted"))}.</p>}
+              {of("missing").length > 0 && <p className="flush">This analysis uses custom data that is not on the server: {names(of("missing"))}.</p>}
+              {of("unavailable").length > 0 && <p className="flush">This analysis uses custom data ({names(of("unavailable"))}), which this deployment does not store.</p>}
             </div>
           );
         })()}
@@ -1183,14 +1183,14 @@ export default function AnalysisPage() {
           <dialog ref={docDialog} className="docdialog"
             onClick={e => { if (e.target === docDialog.current) docDialog.current?.close(); }}>
             <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.5rem" }}>
-              <h3 style={{ margin: 0 }}>The document <span className="plain">— views</span></h3>
+              <h3 className="flush">The document <span className="plain">— views</span></h3>
               <button className="linklike" onClick={() => docDialog.current?.close()}>close</button>
             </div>
             {/* id, because the notes textarea above it also matches "textarea" —
                 anything reading the document from outside React needs to be
                 able to say WHICH one. */}
-            <textarea id="docjson" value={docText} onChange={e => docs.setText(e.target.value)} spellCheck={false}
-              style={{ width: "100%", height: "20rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
+            <textarea className="docjson" id="docjson" value={docText} onChange={e => docs.setText(e.target.value)} spellCheck={false}
+              />
             <div className="row" style={{ marginTop: "0.6rem" }}>
               <button className="primary" disabled={busy} onClick={applyText}>{busy && <span className="spinner onprimary" />}{busy ? "Running…" : "Run document"}</button>
               {doc.cohorts && Object.keys(doc.cohorts).length > 0 &&
@@ -1206,7 +1206,7 @@ export default function AnalysisPage() {
                 {Object.entries(result.cohorts).map(([n, c]) => (
                   <div key={n} style={{ marginTop: "0.5rem" }}>
                     <p className="meta" style={{ margin: "0 0 0.25rem" }}><strong>{n}</strong> — {c.count.toLocaleString()} patients{c.studies && c.studies.length > 1 ? " across " + c.studies.length + " studies" : ""}</p>
-                    <pre style={{ maxHeight: "16rem", overflow: "auto", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem", fontSize: "var(--t-xs)", whiteSpace: "pre" }}>{c.sql}</pre>
+                    <pre className="sqlpre">{c.sql}</pre>
                   </div>
                 ))}
               </details>
