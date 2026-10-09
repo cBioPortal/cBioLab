@@ -3,7 +3,7 @@
 // selected studies, and manage what is stored on the server (the only place uploads live). Owns its own draft state, so
 // typing into the paste box never re-renders the analysis page (see "Keystrokes stay in the
 // field" in CLAUDE.md).
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   onCustomDataChange, loadCustomData, parseUpload, buildDataset, datasetToTsv, serverState, requestLogin, saveToServer,
   deleteServerDataset, serverBySlug, fetchServerVersion, type ParsedUpload, type ResolveResponse, type ServerState, type StoredDataset
@@ -15,18 +15,12 @@ const EXAMPLE = "PATIENT_ID\tMET_SITE\tKPS\nP-0000012\tBrain\t80\nP-0000015\tPri
 /** a match rate under this needs a deliberate second click: the ids are probably the wrong kind */
 const LOW_MATCH = 0.5;
 
-/** What the server holds for this browser; re-renders whenever that changes. */
-/** The server's login and custom-data state, loaded once per page by whichever component asks
- *  first — not left to the first engine request, which a page may never make (Explore with no
- *  study chosen, the Saved tab). */
+/** The server's login and custom-data state, re-rendering whenever it changes. Loaded once per
+ *  page by whichever component asks first — not left to the first engine request, which a page
+ *  may never make (Explore with no study chosen, the Saved tab). */
 export function useCustomDataState(): ServerState {
-  const [, bump] = useState(0);
-  useEffect(() => {
-    const off = onCustomDataChange(() => bump((n) => n + 1));
-    loadCustomData();
-    return off;
-  }, []);
-  return serverState();
+  useEffect(() => { loadCustomData(); }, []);
+  return useSyncExternalStore(onCustomDataChange, serverState, serverState);
 }
 
 export default function CustomDataPanel({ studies, onChanged }: { studies: string[]; onChanged: () => void }) {
