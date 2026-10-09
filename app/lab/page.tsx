@@ -21,10 +21,10 @@ import { PartitionPanel, SplitForm, type SplitSpec } from "./partitions.tsx";
 import { withoutPartition, renamePartitionChild, expandSplits, flattenSplits, editSplits, splitKey, renameInViews, type PartitionShape } from "../../lib/partition-arms.ts";
 import { DOC_VERSION, upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
-import { saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, unresolvedUploads, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
-import { isCustomAttr } from "../../lib/custom-data-names.ts";
+import { saveToServer, requestLogin, referencedDatasets, bindUploads, unresolvedUploads, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
 import { useDocStore, DEFAULT_VIEWS } from "./doc-store.ts";
 import { useExploreState } from "./use-explore-state.ts";
+import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
 import { useAnalysis, seedAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGearmenuOpen, CohortNode, CohortStudies, ViewHead, CohortEditMenu, CAT_COLORS } from "./view-chrome.tsx";
@@ -180,7 +180,6 @@ export default function AnalysisPage() {
   /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
   const menuOpenRef = useRef(new Map<string, boolean>());
   const moreDerivedMenu = useGearmenuOpen("explore:more-derivations", menuOpenRef.current);
-  const [cat, setCat] = useState<any>(null);                 // event/endpoint catalog for the survival control
   const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>"
   /**
    * The document's raw JSON is a place to inspect and share what was asked, not something to
@@ -218,7 +217,7 @@ export default function AnalysisPage() {
   // a different document starts with nothing to apologise for
   useEffect(() => { setError(null); }, [docs.current.doc]);
   const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
-  const [studies, setStudies] = useState<{ id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string }[]>([]);
+  const studies = useStudies();
   const studyNames = useMemo(() => new Map(studies.map((s) => [s.id, s.name] as const)), [studies]);
   const [study, setStudy] = useState("msk_chord_2024");
 
@@ -244,11 +243,11 @@ export default function AnalysisPage() {
   const pendingKeys = analysis.pending;
   const busy = analysis.busy || validating || linkLoading;
   const error = uiError || normalizeError || analysis.error;
-  const [trackAttrs, setTrackAttrs] = useState<{ key: string; attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[]; gaProfiles: string[] }>({ key: "", attrs: [], profiles: [], gaProfiles: [] }); // track picker options
-  /** the clinical-attribute catalog above is being fetched — a picker shows a loader, not "none" */
-  const [trackAttrsLoading, setTrackAttrsLoading] = useState(false);
-  /** the study catalog (`cat`: endpoints, event types) is being fetched */
-  const [catLoading, setCatLoading] = useState(false);
+  // what the pickers offer (app/lab/use-catalogs.ts): the study's timeline and survival endpoints,
+  // and the clinical attributes and profiles across the result's studies; while either is being
+  // fetched a picker shows a loader, not "none"
+  const { cat, catLoading } = useStudyCatalog(study);
+  const { trackAttrs, trackAttrsLoading } = useTrackAttrs(result);
 
   const [wsOpen, setWsOpen] = useState(false);
   const [wsError, setWsError] = useState<string | null>(null);
@@ -271,16 +270,17 @@ export default function AnalysisPage() {
     return false;
   };
 
+  // A selection (from a ?doc= link) may name studies this deployment does not hold; once the list
+  // arrives, keep only what is reachable. Nothing is chosen for the reader: with no selection
+  // Explore asks.
   useEffect(() => {
-    fetch("/api/studies").then(r => r.json()).then(j => {
-      const list = j.studies || [];
-      setStudies(list);
-      // A selection (from a ?doc= link) may name studies this deployment does not hold; keep only
-      // what is reachable. Nothing is chosen for the reader: with no selection Explore asks.
-      const have = new Set(list.map((s: { id: string }) => s.id));
-      const keep = exSel.current.filter((id) => have.has(id));
-      if (list.length && keep.join(",") !== exSel.current.join(",")) setExploreStudies(keep);
-    }).catch(() => {});
+    if (!studies.length) return;
+    const have = new Set(studies.map((s) => s.id));
+    const keep = exSel.current.filter((id) => have.has(id));
+    if (keep.join(",") !== exSel.current.join(",")) setExploreStudies(keep);
+  }, [studies]); // eslint-disable-line
+
+  useEffect(() => {
     // tab itself is already correct from the initial render (see initialTab()) — this
     // only needs to fetch what that landing tab needs and hydrate a shared ?doc= link.
     // A ?doc= link's study must land in exSel BEFORE fetchExplore reads it: doing
@@ -541,59 +541,6 @@ export default function AnalysisPage() {
     // only the new view is asked for: every other card's answer is already cached under its key
     docs.set({ ...doc, views: [v, ...(doc.views || [])] });
   };
-
-  // clinical-attribute catalog: union of attribute names across the result's involved
-  // studies (an attribute absent in one study just renders gaps there). Every kind that
-  // offers a clinical-attribute picker shares this one fetch — the oncoprint's track menu,
-  // a plot's axis pickers, the clinical view's attribute menu, Cox's covariate picker — and so
-  // do the add-view buttons, which is why it runs for any result rather than waiting for one of
-  // those views to exist.
-  const trackAttrsWant = useRef("");
-  useEffect(() => {
-    if (!result) return;
-    const studies = result.involvedStudies && result.involvedStudies.length ? result.involvedStudies : [result.study];
-    // an upload adds attributes to the same studies, so the datasets are part of what was asked
-    const key = studies.join(",") + "|" + customDataKey();
-    if (trackAttrs.key === key || trackAttrsWant.current === key) return;
-    trackAttrsWant.current = key;
-    setTrackAttrsLoading(true);
-    Promise.all(studies.map(s =>
-      api.explore({ study: s })
-        .then(r => r.json()).catch(() => null)))
-      .then(js => {
-        const seen = new Map<string, { kind: string; patients: number }>(); // attribute -> kind + how many carry it
-        const profs = new Set<string>(); // continuous molecular profiles (for heatmap tracks)
-        const gas = new Set<string>(); // generic-assay profiles (for the assays view)
-        for (const j of js) if (j) {
-          if (j.clinical) for (const a of j.clinical) {
-            const prev = seen.get(a.attribute);
-            seen.set(a.attribute, { kind: prev?.kind || a.kind, patients: (prev?.patients || 0) + (a.patients || 0) });
-          }
-          for (const p of j.profiles || []) if (p !== "cna") profs.add(p); // discrete cna isn't a heatmap
-          for (const p of j.gaProfiles || []) gas.add(p);
-        }
-        // the reader's own uploads first, then most-covered first, the way the portal orders its picker
-        if (trackAttrsWant.current !== key) return; // a newer study set was asked for meanwhile
-        setTrackAttrs({ key, attrs: [...seen.entries()].map(([attribute, v]) => ({ attribute, ...v }))
-          .sort((x, y) => Number(isCustomAttr(y.attribute)) - Number(isCustomAttr(x.attribute)) ||
-            y.patients - x.patients || (x.attribute < y.attribute ? -1 : 1)), profiles: [...profs].sort(), gaProfiles: [...gas].sort() });
-      })
-      .finally(() => { if (trackAttrsWant.current === key) setTrackAttrsLoading(false); });
-  }, [result, customState]); // eslint-disable-line
-
-  // the survival "measured from" control needs this study's event types,
-  // their attributes, and the endpoints it declares
-  useEffect(() => {
-    // a templated document holds "$study" until its parameter is resolved; asking the warehouse
-    // for a study by that name is a question with no answer, so it is not asked
-    if (!study || study.startsWith("$")) return;
-    let dead = false;
-    setCatLoading(true);
-    fetch("/api/catalog?study=" + encodeURIComponent(study))
-      .then(r => r.json()).then(j => { if (!dead && !j.error) setCat(j); }).catch(() => {})
-      .finally(() => { if (!dead) setCatLoading(false); });
-    return () => { dead = true; };
-  }, [study]);
 
   /** Rewrite one view in the document; only its own query re-runs (use-analysis.ts) — editing this
    *  view's settings can't change any OTHER view's answer. */

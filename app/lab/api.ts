@@ -57,6 +57,12 @@ export const api = {
   /** The table download's payload: it is a form post, so the browser can save the file as it streams. */
   tablePayload: async (body: TableBody): Promise<string> => JSON.stringify(await withCustomData(body)),
 
+  /** Every study this deployment can reach, with its counts and capabilities. */
+  studies: (opts: Opts = {}) => fetch("/api/studies", { signal: opts.signal }),
+
+  /** One study's timeline vocabulary and declared survival endpoints. */
+  catalog: (study: string, opts: Opts = {}) => fetch("/api/catalog?study=" + encodeURIComponent(study), { signal: opts.signal }),
+
   /** Saved cohorts and analyses (lib/artifacts.ts): the logged-in reader's, by kind. */
   artifacts: {
     list: (kind: ArtifactKind, opts: Opts = {}) => fetch("/api/artifacts?kind=" + kind, { signal: opts.signal }),
