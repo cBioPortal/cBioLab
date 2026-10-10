@@ -259,6 +259,16 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         inc.horizons.map((h) => `  at ${h.months} months: ` + h.cells.map((c) => `${c.cohort} ${(100 * c.f1).toFixed(1)}% (95% CI ${(100 * c.lo).toFixed(1)}-${(100 * c.hi).toFixed(1)}; 1-KM would say ${(100 * c.naive).toFixed(1)}%)`).join(" | ")).join("\n") +
         (inc.gray ? `\n  Gray's test: statistic ${inc.gray.statistic.toFixed(2)}, permutation p=${pFmt(inc.gray.p)} (${inc.gray.permutations} shuffles)` : "") +
         caveatOf(v) + noteOf(v));
+    } else if (v.kind === "riskmodel" && v.riskmodel) {
+      const m = v.riskmodel;
+      out.push(`Risk model (elastic-net Cox, ${m.runs} held-out splits, alpha ${m.alpha}, seed ${m.seed}; ${m.n.toLocaleString()} patients, ${m.events.toLocaleString()} events, ` +
+        `${m.candidates} candidate genes${m.strata ? ", stratified by " + m.strata : ""}):\n` +
+        `  held-out C-index ${m.cIndex.median.toFixed(3)} (IQR ${m.cIndex.q1.toFixed(3)}–${m.cIndex.q3.toFixed(3)})\n` +
+        m.groups.map((g) => `  ${g.name}: n=${g.curve.n}, ${g.curve.events} events, median ${g.curve.median == null ? "not reached" : g.curve.median.toFixed(1) + "mo"}`).join("\n") +
+        (m.logrank ? `\n  log-rank p=${pFmt(m.logrank.p)}` : "") +
+        "\n  genes kept most often: " + m.features.slice(0, 15).map((f) => `${f.gene} ${Math.round(f.selected * 100)}% HR ${f.hr.toFixed(2)}`).join(", ") +
+        (m.neverHeldOut ? `\n  ${m.neverHeldOut} patients were never held out, so have no score` : "") +
+        caveatOf(v) + methodOf(v) + noteOf(v));
     } else if (v.kind === "labs") {
       const lb = v.labs!;
       out.push(`Lab course: ${lb.test} % change from baseline, weeks from ${lb.anchoredTo}:\n` +

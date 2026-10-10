@@ -904,3 +904,80 @@ export function geneCytobandsSql(genes: string[], study: string, db: string): st
     "  AND g.hugo_gene_symbol IN (" + (genes.length ? genes.map(sq).join(",") : "''") + ")\n" +
     "GROUP BY gene";
 }
+
+// ---------------------------------------------------------------------------
+// riskmodel: an elastic-net Cox ensemble over the cohort's mutated genes (lib/coxnet.ts)
+
+/**
+ * One row per patient of the cohort with a survival time: months, event, the gene panels their
+ * samples were sequenced on (for mutations), the genes mutated in them (OncoKB drivers only with
+ * `driver`), and the value of `strata` (a patient attribute, or the first sample's for a
+ * sample attribute) when one is asked for. Values only — the patient id is a join key and never
+ * leaves the CTEs — and run only through PatientLevelResolver.moreRows, since a model of
+ * individual patients needs their rows.
+ */
+export function riskmodelRowsSql(
+  cohortSql: string, study: string, db: string, endpoint: string,
+  columns: { months: string; status: string } | undefined, strata: string | null, driverPin: string | null
+): string {
+  if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
+  if (strata && !/^[A-Za-z0-9_]{1,64}$/.test(strata)) throw new Error("bad strata attribute '" + String(strata).slice(0, 40) + "'");
+  const months = columns?.months || (endpoint + "_MONTHS"), status = columns?.status || (endpoint + "_STATUS");
+  const pid = pidOf("patient_unique_id", study);
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "os AS (\n" +
+    "  SELECT " + pid + " AS pid,\n" +
+    "         toFloat64OrNull(anyIf(attribute_value, attribute_name=" + sq(months) + ")) AS months,\n" +
+    "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
+    "  FROM " + clinicalTable(db, [months, status]) + "\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
+    "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    "),\n" +
+    "panels AS (\n" +
+    "  SELECT " + pidOf("sd.patient_unique_id", study) + " AS pid, groupUniqArray(toString(sp.gene_panel_id)) AS panels\n" +
+    "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
+    "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
+    "    AND " + pidOf("sd.patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    "),\n" +
+    "mut AS (\n" +
+    "  SELECT " + pidOf("g.patient_unique_id", study) + " AS pid, groupUniqArray(g.hugo_gene_symbol) AS genes\n" +
+    "  FROM " + db + ".genomic_event_derived g\n" +
+    (driverPin ? driverJoin(driverPin) : "") +
+    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation' AND " + ALTERED_COND + "\n" +
+    (driverPin ? "    AND ann.is_driver = 1\n" : "") +
+    "    AND " + pidOf("g.patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    ")" +
+    (strata ?
+      ",\nstrat AS (\n" +
+      "  SELECT " + pid + " AS pid, argMin(attribute_value, sample_unique_id) AS v\n" +
+      "  FROM " + clinicalTable(db, [strata]) + "\n" +
+      "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(strata) + " AND attribute_value != ''\n" +
+      "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+      "  GROUP BY pid\n" +
+      ")" : "") + "\n" +
+    "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, panels.panels AS panels, mut.genes AS genes" +
+    (strata ? ", strat.v AS stratum" : "") + "\n" +
+    "FROM os\n" +
+    "  LEFT JOIN panels ON panels.pid = os.pid\n" +
+    "  LEFT JOIN mut ON mut.pid = os.pid\n" +
+    (strata ? "  LEFT JOIN strat ON strat.pid = os.pid\n" : "") +
+    "WHERE os.months IS NOT NULL AND os.months > 0"
+  );
+}
+
+/** The genes on each mutation panel this study uses (study metadata; no cohort, no patient). */
+export function riskmodelPanelGenesSql(study: string, db: string): string {
+  return (
+    "SELECT toString(pg.gene_panel_id) AS panel, groupUniqArray(pg.gene) AS genes\n" +
+    "FROM " + db + ".gene_panel_to_gene_derived pg\n" +
+    "WHERE pg.gene_panel_id IN (SELECT DISTINCT gene_panel_id FROM " + db + ".sample_to_gene_panel_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND alteration_type = 'MUTATION_EXTENDED')\n" +
+    "GROUP BY panel"
+  );
+}

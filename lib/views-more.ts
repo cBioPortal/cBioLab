@@ -6,7 +6,7 @@
 import type { AnalysisDoc, CohortDef, ViewResult, ViewParticipation, AttritionView, AttritionPanel,
   GenomeView, GenomeSeries, PathwaysView, PathwayRow, PathwayCell, DiffexprView, DiffexprGene,
   PairedView, PairedPanel, ClonalityView, ClonalityPanel, IncidenceView, IncidenceCurve,
-  LabsView, LabsPanel } from "./types.ts";
+  LabsView, LabsPanel, RiskmodelView, RiskmodelResult } from "./types.ts";
 import { SANCHEZ_VEGA_2018, PATHWAY_NAMES, type PathwayRole } from "./pathways.ts";
 import { cohortClauses, describeClause } from "./cohort2.ts";
 import { hasMoreAggregates, isPatientLevel, type Resolver, type MoreAggregateCapable } from "./federation.ts";
@@ -14,13 +14,15 @@ import { genomeBinsSql, genomeCoverageSql, studyGenomeSql, geneSetCountsSql, pro
   pairedCountsSql, pairedPatientsSql, sampleAttributeValuesSql,
   clonalityGenesSql, facetsSummarySql, facetsHistogramSql, ascnStudiesSql, incidenceCountsSql,
   labCourseSql, labBestSql, labWaterfallSql, labTestsSql, LAB_PCT_BIN, LAB_PCT_MIN, LAB_PCT_MAX, LAB_PCT_BINS,
-  CHROM_LENGTHS, GENOME_CHROMS } from "./federation-more.ts";
+  CHROM_LENGTHS, GENOME_CHROMS, riskmodelRowsSql, riskmodelPanelGenesSql } from "./federation-more.ts";
+import { coxnetEnsemble, type CoxSubject, type CoxDesign } from "./coxnet.ts";
 import { fisherExact, benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea, mcnemarExact, Z_975,
-  aalenJohansen, cifAt, grayPermutationTest, kaplanMeier, quantilesFromHistogram, type CrRecord } from "./stats.ts";
+  aalenJohansen, cifAt, grayPermutationTest, kaplanMeier, quantilesFromHistogram, logRankK, type CrRecord } from "./stats.ts";
 import { geneSymbols } from "./gene-tracks.ts";
 import { PORTAL_VIEW_KINDS, isPortalViewKind, runPortalView } from "./views-portal.ts";
 import { viewToSvg } from "./view-svg.ts";
 import { LAB_MIN_POINT_N } from "./view-svg-more.ts";
+import { riskmodelMethod } from "./method.ts";
 import { diffexprMethod, incidenceMethod, pairedMethod, genomeMethod, pathwaysMethod, attritionMethod, clonalityMethod, labsMethod, type IncidenceTrace, type LabsTrace, type PairedTrace } from "./method.ts";
 
 export interface EvaluatedCohort {
@@ -50,7 +52,7 @@ export interface ViewCtx {
   values?: string;
 }
 
-export const MORE_VIEW_KINDS = ["attrition", "genome", "pathways", "diffexpr", "paired", "clonality", "incidence", "labs", ...PORTAL_VIEW_KINDS] as const;
+export const MORE_VIEW_KINDS = ["attrition", "genome", "pathways", "diffexpr", "paired", "clonality", "incidence", "labs", "riskmodel", ...PORTAL_VIEW_KINDS] as const;
 
 export function isMoreViewKind(kind: unknown): boolean {
   return (MORE_VIEW_KINDS as readonly string[]).includes(String(kind));
@@ -67,6 +69,7 @@ export async function runMoreView(view: { kind: string }, ctx: ViewCtx): Promise
     else if (view.kind === "clonality") r = await clonalityView(view as ClonalityView, ctx);
     else if (view.kind === "incidence") r = await incidenceView(view as IncidenceView, ctx);
     else if (view.kind === "labs") r = await labsView(view as LabsView, ctx);
+    else if (view.kind === "riskmodel") r = await riskmodelView(view as RiskmodelView, ctx);
     else if (isPortalViewKind(view.kind)) r = await runPortalView(view, ctx);
     else r = { kind: view.kind, error: "unknown view kind" };
   } catch (e) {
@@ -1076,5 +1079,122 @@ async function labsView(view: LabsView, ctx: ViewCtx): Promise<ViewResult> {
       (responseP != null ? "Response rates compared with a two-sided Fisher test. " : "") +
       (multi ? "Pooled across " + ctx.vStudies.length + " studies; units and assays are not harmonised. " : "") +
       (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
+  };
+}
+
+// ---------------------------------------------------------------------------
+// riskmodel: an elastic-net Cox ensemble over the cohort's mutated genes, and its risk groups
+
+const RISK_MAX_RUNS = 100;
+/** patients x runs past which one request would not finish inside the analysis route's time limit */
+const RISK_WORK_LIMIT = 300_000;
+const RISK_LAMBDAS = 25, RISK_FOLDS = 3, RISK_TEST_SHARE = 1 / 3;
+
+async function riskmodelView(view: RiskmodelView, ctx: ViewCtx): Promise<ViewResult> {
+  const { doc, cohorts, vNames } = ctx;
+  if (vNames.length !== 1) return refuse("riskmodel", ctx, "a risk model is fitted to one cohort; this view names " + vNames.length + " — choose one");
+  const name = vNames[0];
+  const studies = cohorts[name].studies;
+  if (studies.length !== 1) return refuse("riskmodel", ctx, "a risk model is fitted within one study; “" + name + "” spans " + studies.length + " (" + studies.join(", ") + ")");
+  const study = studies[0];
+  const r0 = ctx.resolvers[study];
+  if (!isPatientLevel(r0) || !hasMoreAggregates(r0)) return refuse("riskmodel", ctx, study + " answers in aggregate only; a risk model needs each patient's rows, which only a patient-level participant returns");
+  const endpoint = String(view.endpoint || "OS").toUpperCase();
+  if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) return refuse("riskmodel", ctx, "endpoint is a name like OS or PFS");
+  if (!!view.monthsAttribute !== !!view.statusAttribute) return refuse("riskmodel", ctx, "monthsAttribute and statusAttribute go together");
+  const columns = view.monthsAttribute ? { months: String(view.monthsAttribute), status: String(view.statusAttribute) } : undefined;
+  const measure = view.measure === "driver" ? "driver" as const : "any" as const;
+  if (measure === "driver" && !ctx.pin) return refuse("riskmodel", ctx, "measure \"driver\" needs the OncoKB annotation, which this server has no pinned version of");
+  const num = (x: unknown, d: number) => x == null ? d : Number(x);
+  const alpha = num(view.alpha, 0.5), runs = num(view.runs, 10), nGroups = num(view.groups, 3), minMutated = num(view.minMutated, 30), seed = num(view.seed, 1);
+  if (!(alpha >= 0 && alpha <= 1)) return refuse("riskmodel", ctx, "alpha, the l1 share of the penalty, is 0 (ridge) to 1 (lasso)");
+  if (!(Number.isInteger(runs) && runs >= 1 && runs <= RISK_MAX_RUNS)) return refuse("riskmodel", ctx, "runs is a whole number from 1 to " + RISK_MAX_RUNS);
+  if (!(Number.isInteger(nGroups) && nGroups >= 2 && nGroups <= 5)) return refuse("riskmodel", ctx, "groups is 2 to 5");
+  if (!(Number.isInteger(minMutated) && minMutated >= 5)) return refuse("riskmodel", ctx, "minMutated is a whole number of patients, at least 5");
+  if (!Number.isInteger(seed)) return refuse("riskmodel", ctx, "seed is a whole number");
+  const strata = view.strata ? String(view.strata) : null;
+  if (strata && !/^[A-Za-z0-9_]{1,64}$/.test(strata)) return refuse("riskmodel", ctx, "strata is a clinical attribute's name");
+  if (cohorts[name].count * runs > RISK_WORK_LIMIT)
+    return refuse("riskmodel", ctx, "a risk model fits at most " + RISK_WORK_LIMIT.toLocaleString("en-US") + " patients × runs in one request; “" + name + "” has " +
+      cohorts[name].count.toLocaleString("en-US") + " patients, so at most " + Math.max(1, Math.floor(RISK_WORK_LIMIT / Math.max(1, cohorts[name].count))) + " runs (or narrow the cohort)");
+
+  const r = r0;
+  const def = doc.cohorts[name];
+  const [rows, panelRows] = await Promise.all([
+    r.moreRows("riskmodel:rows", def, (c, s, d) => riskmodelRowsSql(c, s, d, endpoint, columns, strata, measure === "driver" ? ctx.pin : null)),
+    r.moreMeta("riskmodel:panels", (s, d) => riskmodelPanelGenesSql(s, d)),
+  ]);
+  const panelGenes = new Map(panelRows.map((x) => [String(x.panel), new Set((x.genes as unknown as string[]) || [])] as const));
+  // a patient's coverage is the union of their samples' panels (WES covers everything); a gene is
+  // a candidate only if every modelled patient is covered for it
+  let notProfiled = 0, noStratum = 0;
+  const kept: { t: number; ev: boolean; stratum: string; genes: string[]; panels: string[] }[] = [];
+  for (const x of rows) {
+    const panels = ((x.panels as unknown as string[]) || []).map(String);
+    if (!panels.length) { notProfiled++; continue; }
+    const st = strata ? (x.stratum == null || x.stratum === "" ? null : String(x.stratum)) : "";
+    if (st === null) { noStratum++; continue; }
+    kept.push({ t: Number(x.m), ev: Number(x.ev) === 1, stratum: st, genes: ((x.genes as unknown as string[]) || []).map(String), panels });
+  }
+  if (kept.length < 50) return refuse("riskmodel", ctx, "“" + name + "” has " + kept.length + " patients with a survival time and a mutation panel on record; a risk model needs at least 50");
+  let covered = null as Set<string> | null;
+  for (const key of new Set(kept.map((k) => [...k.panels].sort().join("|")))) {
+    const ps = key.split("|");
+    if (ps.includes("WES")) continue;
+    const union = new Set<string>();
+    for (const p of ps) for (const g of panelGenes.get(p) || []) union.add(g);
+    covered = covered ? new Set([...covered].filter((g) => union.has(g))) : union;
+  }
+  const mutated = new Map<string, number[]>();
+  kept.forEach((k, i) => { for (const g of k.genes) if (!covered || covered.has(g)) { let l = mutated.get(g); if (!l) mutated.set(g, l = []); l.push(i); } });
+  const cands = [...mutated].filter(([, l]) => l.length >= minMutated).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+  if (!cands.length) return refuse("riskmodel", ctx, "no gene covered for every patient is mutated in at least " + minMutated + " of them; lower minMutated");
+  const strataLevels = [...new Set(kept.map((k) => k.stratum))].sort();
+  const stratumIndex = new Map(strataLevels.map((v, i) => [v, i] as const));
+  const subj: CoxSubject[] = kept.map((k) => ({ time: k.t, event: k.ev, entry: 0, stratum: stratumIndex.get(k.stratum)! }));
+  const X: CoxDesign = { n: kept.length, binary: cands.map(([g, l]) => ({ name: g, rows: Int32Array.from(l) })), dense: [] };
+  const fit = coxnetEnsemble(subj, X, { runs, alpha, seed, folds: RISK_FOLDS, testShare: RISK_TEST_SHARE, nLambda: RISK_LAMBDAS });
+
+  // risk groups at equal quantiles of the held-out score
+  const scored = [...fit.risk.keys()].filter((i) => !Number.isNaN(fit.risk[i]));
+  const sorted = scored.map((i) => fit.risk[i]).sort((a, b) => a - b);
+  const q = (f: number) => sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))];
+  const cuts = Array.from({ length: nGroups - 1 }, (_, k) => q((k + 1) / nGroups));
+  const groupOf = (v: number) => { let g = 0; while (g < cuts.length && v > cuts[g]) g++; return g; };
+  const label = nGroups === 2 ? ["Low risk", "High risk"] : nGroups === 3 ? ["Low risk", "Intermediate risk", "High risk"]
+    : Array.from({ length: nGroups }, (_, g) => "Risk group " + (g + 1) + " of " + nGroups);
+  const members: number[][] = Array.from({ length: nGroups }, () => []);
+  for (const i of scored) members[groupOf(fit.risk[i])].push(i);
+  const groups = members.map((m, g) => ({ name: label[g], from: g ? cuts[g - 1] : null, to: g < cuts.length ? cuts[g] : null,
+    curve: kaplanMeier(m.map((i) => ({ t: subj[i].time, event: subj[i].event ? 1 : 0 }))) }));
+  let logrank = null;
+  try {
+    logrank = logRankK(strataLevels.map((_, s) => ({ groups: members.map((m) => m.filter((i) => subj[i].stratum === s).map((i) => ({ t: subj[i].time, event: subj[i].event ? 1 : 0 }))) })));
+  } catch { logrank = null; }
+  const cs = fit.runs.map((x) => x.cIndex).filter((c) => Number.isFinite(c)).sort((a, b) => a - b);
+  const pct = (f: number) => cs.length ? cs[Math.min(cs.length - 1, Math.round(f * (cs.length - 1)))] : NaN;
+  const features = cands.map(([g, l], j) => ({ gene: g, selected: fit.selected[j], meanCoef: fit.meanCoef[j], hr: Math.exp(fit.meanCoef[j]), mutated: l.length }))
+    .filter((f) => f.selected > 0).sort((a, b) => b.selected - a.selected || Math.abs(b.meanCoef) - Math.abs(a.meanCoef));
+  const lo = sorted[0], hi = sorted[sorted.length - 1], nb = 30, w = (hi - lo) / nb || 1;
+  const counts = new Array(nb).fill(0);
+  for (const v of sorted) counts[Math.min(nb - 1, Math.floor((v - lo) / w))]++;
+  const result: RiskmodelResult = {
+    study, n: kept.length, events: kept.filter((k) => k.ev).length, notProfiled, noStratum,
+    neverHeldOut: kept.length - scored.length, genesCovered: covered ? covered.size : -1, candidates: cands.length, minMutated,
+    strata, strataLevels: strataLevels.length, alpha, runs, seed, measure,
+    cIndex: { median: pct(0.5), q1: pct(0.25), q3: pct(0.75), values: fit.runs.map((x) => x.cIndex) },
+    features, groups, logrank, histogram: { edges: Array.from({ length: nb + 1 }, (_, k) => lo + k * w), counts },
+  };
+  return {
+    kind: "riskmodel", cohorts: vNames, riskmodel: result,
+    method: riskmodelMethod({ study, cohort: name, cohortPatients: cohorts[name].count, rowsReturned: rows.length, r: result,
+      lambdas: RISK_LAMBDAS, folds: RISK_FOLDS, testShare: RISK_TEST_SHARE }),
+    participation: ctx.participationFor([study], true),
+    caveat: "Association, not cause: a gene's weight is its link to " + endpoint + " with the other candidates held fixed, in this cohort" +
+      (strata ? ", within each " + strata : "") + ". " +
+      (strata ? "" : "Without strata, a gene that marks a cancer type carries that type's prognosis; on a cohort of several cancer types, stratify by CANCER_TYPE. ") +
+      "Each patient is scored only by models that did not train on them, and the group cuts are quantiles of the score, chosen without the outcome. " +
+      "Genes outside the panels every patient was sequenced on are not candidates, so a patient is never counted as wild-type for a gene they were not tested for. " +
+      "The penalty path and folds are seeded (seed " + seed + "), so the same document gives the same model.",
   };
 }

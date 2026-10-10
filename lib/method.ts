@@ -2067,3 +2067,46 @@ export function mutationsMethod(t: { gene: string; cohorts: string[]; oncokbPin:
   return { steps, implementation: { functions: ["mutationRowSource", "pageSql", "countsSql"], file: "lib/mutation-table.ts, lib/table-query.ts", commit: BUILD_COMMIT },
     verification: "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
 }
+
+// ---- riskmodel ------------------------------------------------------------------------------
+
+export interface RiskmodelTrace {
+  study: string; cohort: string; cohortPatients: number; rowsReturned: number;
+  r: import("./types.ts").RiskmodelResult;
+  lambdas: number; folds: number; testShare: number;
+}
+
+/**
+ * The risk model's steps. No script recomputes it: the ensemble draws thousands of fits from a
+ * seeded generator, and the fit itself is what test/coxnet-golden.test.ts pins against
+ * scikit-survival and lifelines. The record names that test instead.
+ */
+export function riskmodelMethod(t: RiskmodelTrace): MethodRecord {
+  const r = t.r;
+  const steps: MethodStep[] = [
+    { kind: "fetch", title: "One row per patient", scope: t.cohort + " · " + t.study, rowsIn: t.cohortPatients, rowsOut: t.rowsReturned,
+      detail: "The riskmodel:rows query above: each patient's survival time and event, the panels their samples were sequenced on for mutations, " +
+        "the genes " + (r.measure === "driver" ? "with an OncoKB driver mutation" : "mutated") + " in them" + (r.strata ? ", and their " + r.strata : "") +
+        ". Patient-level: the rows never leave this server's engine, and no identifier is returned." },
+    { kind: "transform", title: "Panel-aware candidate genes",
+      detail: "A gene is a candidate only if every patient's panels cover it, so no patient is counted as wild-type for a gene they were never tested for, " +
+        "and only if at least " + r.minMutated + " patients have it mutated.",
+      params: [["genes covered for every patient", String(r.genesCovered)], ["candidates", String(r.candidates)],
+        ["left out: no mutation panel on record", String(r.notProfiled)], ...(r.strata ? [["left out: no " + r.strata, String(r.noStratum)] as [string, string]] : [])] },
+    { kind: "statistic", title: "Elastic-net Cox, " + r.runs + " random splits",
+      detail: "Each run holds out a random " + Math.round(t.testShare * 100) + "% of the patients; on the rest, the penalty is chosen from a path of " + t.lambdas +
+        " by " + t.folds + "-fold cross-validated partial likelihood (Verweij & van Houwelingen), and the model at that penalty scores the held-out patients. " +
+        "Genes are scaled to unit variance before fitting; Breslow ties" + (r.strata ? "; a separate baseline hazard per " + r.strata : "") +
+        ". A patient's risk score is the mean of the scores they got while held out (OncoCast's ensemble, Martin et al.).",
+      params: [["l1 share of the penalty (alpha)", String(r.alpha)], ["runs", String(r.runs)], ["seed", String(r.seed)],
+        ["test-set C-index, median (IQR)", r.cIndex.median.toFixed(3) + " (" + r.cIndex.q1.toFixed(3) + "–" + r.cIndex.q3.toFixed(3) + ")"],
+        ["never held out, so unscored", String(r.neverHeldOut)]] },
+    { kind: "statistic", title: "Risk groups",
+      detail: "Patients are cut into " + r.groups.length + " groups at equal quantiles of the risk score — the cuts use no outcome — then drawn as Kaplan–Meier curves and " +
+        "compared with a " + (r.strata ? "stratified " : "") + "log-rank test.",
+      params: r.groups.map((g) => [g.name, g.curve.n.toLocaleString() + " patients, " + g.curve.events.toLocaleString() + " events, median " +
+        (g.curve.median == null ? "not reached" : g.curve.median.toFixed(1) + " months")] as [string, string]) },
+  ];
+  return { steps, implementation: { functions: ["coxnetEnsemble", "coxnetPath", "cvLambda", "concordance"], file: "lib/coxnet.ts", commit: BUILD_COMMIT },
+    verification: "lib/coxnet.ts's path is checked against scikit-survival's CoxnetSurvivalAnalysis, and its delayed-entry, stratified fit and C-index against lifelines, by test/coxnet-golden.test.ts (fixtures from python/golden/coxnet.py)." };
+}

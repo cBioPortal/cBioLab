@@ -910,6 +910,52 @@ export interface IncidenceResult {
  * (median and interquartile band per bin), the best response and the share responding (e.g.
  * PSA50, PCWG3), and — from a participant entitled to patient-level values — a waterfall.
  */
+/**
+ * A risk model in the manner of OncoCast (Martin et al., github.com/AxelitoMartin/OncoCast): an
+ * elastic-net Cox model of one cohort's survival on the genes mutated in it, fitted `runs` times
+ * on random two-thirds of the patients and scored on the held-out third. Each patient's risk score
+ * is the mean of the scores they got while held out; the patients are then cut into risk groups at
+ * quantiles of that score (no outcome is used to place the cuts) and drawn as Kaplan–Meier curves.
+ * Patient-level studies only: a model of individual patients needs their rows.
+ */
+export interface RiskmodelView {
+  note?: string;
+  kind: "riskmodel"; cohorts?: string[];
+  endpoint?: string; monthsAttribute?: string; statusAttribute?: string;
+  /** "any" mutation (default) or OncoKB drivers only */
+  measure?: "any" | "driver";
+  /** only genes mutated in at least this many patients are candidates (default 30) */
+  minMutated?: number;
+  /** a clinical attribute to stratify by (each stratum its own baseline hazard), e.g. CANCER_TYPE */
+  strata?: string;
+  /** l1 share of the penalty: 1 lasso, 0 ridge (default 0.5, elastic net) */
+  alpha?: number;
+  /** random splits (default 20, at most 100) */
+  runs?: number;
+  /** risk groups, cut at equal quantiles of the score (default 3, 2 to 5) */
+  groups?: number;
+  seed?: number;
+}
+
+export interface RiskmodelResult {
+  study: string;
+  /** patients modelled, their events, and those left out with why */
+  n: number; events: number;
+  notProfiled: number; noStratum: number; neverHeldOut: number;
+  /** genes every patient was sequenced for (mutations), and of those the candidates */
+  genesCovered: number; candidates: number; minMutated: number;
+  strata: string | null; strataLevels: number;
+  alpha: number; runs: number; seed: number; measure: "any" | "driver";
+  /** test-set C-index across runs */
+  cIndex: { median: number; q1: number; q3: number; values: number[] };
+  /** candidates kept in at least one run, by how often: share of runs, mean coefficient where kept, patients mutated */
+  features: { gene: string; selected: number; meanCoef: number; hr: number; mutated: number }[];
+  groups: { name: string; from: number | null; to: number | null; curve: Omit<KmCurve, "cohort"> }[];
+  logrank: LogRankK | null;
+  /** the scores' distribution, for the histogram: bin edges and counts */
+  histogram: { edges: number[]; counts: number[] };
+}
+
 export interface LabsView {
   note?: string;
   kind: "labs"; cohorts?: string[];
@@ -1202,7 +1248,7 @@ import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView
-  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CorrelatesView | TableView | MutationsView;
+  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CorrelatesView | TableView | MutationsView | RiskmodelView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -1497,6 +1543,7 @@ export interface ViewResult {
   clonality?: ClonalityResult;              // FACETS clonality, WGD, purity/ploidy
   incidence?: IncidenceResult;              // competing-risks cumulative incidence
   labs?: LabsResult;                        // lab-value course and response
+  riskmodel?: RiskmodelResult;              // elastic-net Cox ensemble and its risk groups
   cancertypes?: CancertypesResult;          // alteration frequency per cancer type
   overlap?: OverlapResult;                  // how cohorts intersect (UpSet)
   enrichment?: EnrichmentResult;            // genome-wide alteration enrichment

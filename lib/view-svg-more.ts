@@ -588,7 +588,74 @@ export function labsSvg(v: ViewResult, o: SvgOpts): string {
   return frame(W, yy + cap.height + 10, out.join("") + cap.svg, p.bg);
 }
 
+/** a hazard ratio below 1 and above it take the shared series' blue and vermillion */
+const FAVOURABLE = SERIES[0], ADVERSE = SERIES[4];
+
+/** How many of the model's genes the figure lists; the rest are in the result and said in the caption. */
+export const RISK_FIGURE_GENES = 15;
+
+/**
+ * The risk model: Kaplan–Meier curves of the risk groups, then the genes the model kept most
+ * often with their mean hazard ratio (a bar on a log scale about 1), then what the numbers rest on.
+ */
+export function riskmodelSvg(v: ViewResult, o: SvgOpts): string {
+  const m = v.riskmodel!;
+  const p = palette(o.theme), W = o.width || 720;
+  const L = 46, R = 12, T = 12, PLOT = 230;
+  const curves = m.groups.map((g) => g.curve);
+  const tMax = Math.max(1, ...curves.flatMap((c) => c.points.map((q) => q.t)));
+  const step = tMax > 120 ? 24 : tMax > 60 ? 12 : 6;
+  const x = (t: number) => L + (W - L - R) * t / tMax;
+  const y = (sv: number) => T + PLOT * (1 - sv);
+  const out: string[] = [];
+  for (const sv of [0, 0.25, 0.5, 0.75, 1]) {
+    out.push(`<line x1="${L}" y1="${num(y(sv))}" x2="${W - R}" y2="${num(y(sv))}" stroke="${p.line}" stroke-width="1"/>`);
+    out.push(`<text x="8" y="${num(y(sv) + 3)}" font-size="10" fill="${p.muted}">${Math.round(sv * 100)}%</text>`);
+  }
+  for (let t = 0; t <= tMax; t += step) out.push(`<text x="${num(x(t) - 8)}" y="${T + PLOT + 14}" font-size="10" fill="${p.muted}">${t}mo</text>`);
+  curves.forEach((c, i) => {
+    let d = `M ${num(x(0))} ${num(y(1))}`, py = y(1);
+    for (const q of c.points) { d += ` L ${num(x(q.t))} ${num(py)} L ${num(x(q.t))} ${num(y(q.s))}`; py = y(q.s); }
+    d += ` L ${num(x(tMax))} ${num(py)}`;
+    out.push(`<path d="${d}" fill="none" stroke="${SERIES[i % SERIES.length]}" stroke-width="2"/>`);
+  });
+  let yy = T + PLOT + 24;
+  m.groups.forEach((g, i) => {
+    out.push(`<rect x="8" y="${yy}" width="9" height="9" rx="2" fill="${SERIES[i % SERIES.length]}"/>`);
+    out.push(`<text x="22" y="${yy + 8}" font-size="11" fill="${p.ink}">${esc(g.name)}: median ${g.curve.median == null ? "not reached" : num(g.curve.median) + "mo"} ` +
+      `(n=${fmt(g.curve.n)}, ${fmt(g.curve.events)} events)</text>`);
+    yy += 16;
+  });
+  if (m.logrank) { out.push(`<text x="8" y="${yy + 8}" font-size="11" fill="${p.ink}">log-rank χ²=${num(m.logrank.chi2)} (${m.logrank.df} df) · ${esc(pFmt(m.logrank.p))}` +
+    (m.logrank.strata > 1 ? ` · stratified by ${esc(m.strata || "")}, ${m.logrank.strata} strata` : "") + `</text>`); yy += 16; }
+  out.push(`<text x="8" y="${yy + 8}" font-size="11" fill="${p.ink}">held-out C-index ${m.cIndex.median.toFixed(3)} (IQR ${m.cIndex.q1.toFixed(3)}–${m.cIndex.q3.toFixed(3)}) over ${m.runs} runs</text>`);
+  yy += 28;
+  // genes kept most often: selection share, and the mean hazard ratio as a bar about HR = 1 on a log scale
+  const shown = m.features.slice(0, RISK_FIGURE_GENES);
+  out.push(`<text x="8" y="${yy}" font-size="11" font-weight="600" fill="${p.ink}">Genes kept most often (share of runs · mean hazard ratio where kept)</text>`);
+  yy += 8;
+  const LEFT = 150, RIGHT = 120, mid = LEFT + (W - LEFT - RIGHT) / 2, half = (W - LEFT - RIGHT) / 2;
+  const span = Math.max(Math.log(2), ...shown.map((f) => Math.abs(Math.log(f.hr))));
+  shown.forEach((f) => {
+    const w = Math.max(1, Math.abs(Math.log(f.hr)) / span * half);
+    out.push(`<text x="8" y="${yy + 11}" font-size="10" fill="${p.ink}">${esc(f.gene)} <tspan fill="${p.muted}">${Math.round(f.selected * 100)}% · ${fmt(f.mutated)} mutated</tspan></text>`);
+    out.push(`<rect x="${num(f.hr < 1 ? mid - w : mid)}" y="${yy + 3}" width="${num(w)}" height="8" rx="2" fill="${f.hr < 1 ? FAVOURABLE : ADVERSE}" opacity="0.85"/>`);
+    out.push(`<line x1="${num(mid)}" y1="${yy + 1}" x2="${num(mid)}" y2="${yy + 13}" stroke="${p.muted}" stroke-width="1" opacity="0.5"/>`);
+    out.push(`<text x="${W - 8}" y="${yy + 11}" font-size="10" fill="${p.muted}" text-anchor="end">HR ${f.hr.toFixed(2)}</text>`);
+    yy += 16;
+  });
+  const left = [m.notProfiled ? fmt(m.notProfiled) + " with no mutation panel on record" : "", m.noStratum ? fmt(m.noStratum) + " with no " + m.strata : "",
+    m.neverHeldOut ? fmt(m.neverHeldOut) + " never held out (so unscored and in no group)" : ""].filter(Boolean);
+  const text = fmt(m.n) + " patients, " + fmt(m.events) + " events; " + m.candidates + " candidate genes (of " + m.genesCovered + " covered for every patient, mutated in ≥" +
+    m.minMutated + "); elastic net, alpha " + m.alpha + ", seed " + m.seed + "." + (left.length ? " Left out: " + left.join("; ") + "." : "") +
+    (m.features.length > shown.length ? " " + (m.features.length - shown.length) + " more genes were kept in at least one run; they are in the result, not drawn." : "") +
+    " " + (v.caveat || "");
+  const cap = caption(text, W, yy + 8, p.muted, Math.floor(W / 7.2));
+  return frame(W, yy + cap.height + 18, out.join("") + cap.svg, p.bg);
+}
+
 export function moreViewToSvg(v: ViewResult, o: SvgOpts): string | null {
+  if (v.kind === "riskmodel" && v.riskmodel) return riskmodelSvg(v, o);
   if (v.kind === "attrition" && v.attrition && v.attrition.length) return attritionSvg(v, o);
   if (v.kind === "genome" && v.genome && v.genome.series.length) return genomeSvg(v, o);
   if (v.kind === "pathways" && v.pathways && v.pathways.rows.length) return pathwaysSvg(v, o);
@@ -602,6 +669,7 @@ export function moreViewToSvg(v: ViewResult, o: SvgOpts): string | null {
 
 export function moreViewTitle(v: ViewResult): string | null {
   if (v.kind === "attrition") return "Cohort attrition";
+  if (v.kind === "riskmodel") return "Risk model" + (v.riskmodel ? " — elastic-net Cox, " + v.riskmodel.runs + " runs" : "");
   if (v.kind === "genome") return "Genome-wide copy number";
   if (v.kind === "pathways") return "Oncogenic signalling pathways";
   if (v.kind === "clonality") return "Clonality (FACETS)";

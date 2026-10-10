@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-10-05",
+  "generated": "2026-10-10",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -195,6 +195,9 @@
     "PSA response to hormone therapy, by TP53 status": {
       "Prostate, TP53 mutant": 849,
       "Prostate, TP53 wild-type": 2284
+    },
+    "A survival risk model from mutated genes in lung cancer": {
+      "NSCLC": 7809
     },
     "Custom data: a curated biopsy site on every sample": {
       "all patients": 93,

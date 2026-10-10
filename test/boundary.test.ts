@@ -339,6 +339,9 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "labBestSql": () => federation.labBestSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS, 50),
     // one row per patient — its best % change — but no identifier; run only by PatientLevelResolver.moreRows
     "labWaterfallSql": () => federation.labWaterfallSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS, 5000),
+    // run only by PatientLevelResolver.moreRows: one row per patient, values only
+    "riskmodelRowsSql": () => federation.riskmodelRowsSql(cohortSql, "x", "db", "OS", undefined, "CANCER_TYPE", "v7"),
+    "riskmodelPanelGenesSql": () => federation.riskmodelPanelGenesSql("x", "db"),
     "labTestsSql": () => federation.labTestsSql(cohortSql, "x", "db", "Lab_Test", "TEST"),
     // cancertypes: `alt`/`per`/`covered` hold samples; the outer SELECT counts them per group
     "cancerTypesSql": () => federation.cancerTypesSql(cohortSql, "x", "db", ["KRAS", "NRAS"], "CANCER_TYPE", "v7.5", "driver"),
