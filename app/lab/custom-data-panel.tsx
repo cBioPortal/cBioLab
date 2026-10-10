@@ -6,7 +6,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   onCustomDataChange, loadCustomData, parseUpload, buildDataset, datasetToTsv, serverState, requestLogin, saveToServer,
-  deleteServerDataset, serverBySlug, fetchServerVersion, type ParsedUpload, type ResolveResponse, type ServerState, type StoredDataset
+  deleteServerDataset, serverBySlug, fetchServerVersion, resolveIds, type ParsedUpload, type ResolveResponse, type ServerState, type StoredDataset
 } from "./custom-data-client.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
 import { LIMITS } from "../../lib/custom-data-names.ts";
@@ -47,11 +47,7 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
     if (!studies.length) { setErr("select a study above first: ids are matched against the studies being explored"); return; }
     setBusy(true);
     try {
-      const res = await fetch("/api/custom-data/resolve", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studies, level: p.level, ids: p.rows.map((r) => r[0]) }) });
-      const j = await res.json();
-      if (j.error) throw new Error(j.error);
-      setResolved(j);
+      setResolved(await resolveIds(studies, p.level, p.rows.map((r) => r[0])));
       setMatchedStudies([...studies]);
     } catch (e) { setErr(String((e as Error).message || e)); }
     finally { setBusy(false); }

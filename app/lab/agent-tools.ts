@@ -10,6 +10,7 @@ import { analysisText } from "../../lib/result-text.ts";
 import { AGENT_GRAMMAR, EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, ExploreResult, PartitionDef } from "../../lib/types.ts";
 import { withoutPartition, editSplits, splitKey } from "../../lib/partition-arms.ts";
+import { api } from "./api.ts";
 
 export interface LabBridge {
   doc: AnalysisDoc;
@@ -190,11 +191,11 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
       run: async () => AGENT_GRAMMAR },
     { name: "study_vocabulary", description: "A study's real vocabulary: clinical attributes and values, timeline event types and attributes. Use only names that appear here. Defaults to the document's study.",
       inputSchema: { type: "object", properties: { study: { type: "string" } } },
-      run: async ({ study }) => (await fetch(`/api/catalog?study=${encodeURIComponent(study || get().doc.study || get().study)}`)).json() },
+      run: async ({ study }) => (await api.catalog(study || get().doc.study || get().study)).json() },
     { name: "list_studies", description: "The studies this instance can analyse: id, name, patient and sample counts, and which data they carry.",
       inputSchema: { type: "object", properties: {} },
       run: async () => {
-        const j = await (await fetch("/api/studies")).json();
+        const j = await (await api.studies()).json();
         return (j.studies || j).map((s: any) => ({ id: s.id, name: s.name, cancerType: s.cancerType, patients: s.patients, samples: s.samples, timelinePatients: s.timelinePatients }));
       } },
     { name: "list_examples", description: "The worked example analyses in the gallery: title and what each demonstrates. Load one with analysis_load_example.",

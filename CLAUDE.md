@@ -105,7 +105,10 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   parse the same envelope (`parseBody`), so a change to either side is a type error in the other.
   An envelope checks only the route's own parameters (which view, which page, which uploads) and
   passes the document, definition or spec it carries to the engine — don't grow it into a second
-  schema of the DSL. A new endpoint the pages call gets an envelope and an `api` function.
+  schema of the DSL. A new endpoint the pages call gets an envelope and an `api` function. The one
+  exception is the login and custom-data endpoints (`/api/login`, `/api/custom-data/*`): they
+  belong to `app/lab/custom-data-client.ts`, which owns that state and which `api.ts` itself
+  imports, so it calls them directly — through it, never from a component.
 - **Custom data** — a researcher's uploaded annotations, named `custom:<dataset>/<COLUMN>` and
   usable anywhere a clinical attribute is, stored on the server only (below; the browser keeps
   nothing — `app/lab/custom-data-client.ts` attaches references). **`lib/custom-data.ts`**: for
