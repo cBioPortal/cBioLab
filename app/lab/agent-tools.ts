@@ -11,6 +11,7 @@ import { AGENT_GRAMMAR, EXAMPLES, type DslExample } from "../../lib/dsl-referenc
 import type { AnalysisDoc, AnalysisResult, CohortDef, ExploreResult, PartitionDef } from "../../lib/types.ts";
 import { withoutPartition, editSplits, splitKey } from "../../lib/partition-arms.ts";
 import { api } from "./api.ts";
+import { useEffect, useRef, useState } from "react";
 
 export interface LabBridge {
   doc: AnalysisDoc;
@@ -475,3 +476,20 @@ export const LAB_TOOL_NAMES = [
   ["cohorts_list_saved", "listSaved()"], ["cohorts_add_saved_to_analysis", "addSavedToAnalysis([names])"],
   ["analysis_open_saved", "openSaved(name)"]
 ] as const;
+
+/**
+ * Install the page's tools once and keep what they see current: `bridge` is rebuilt every render,
+ * so a tool always reads the document as it is now. Says whether WebMCP (the browser's assistant
+ * API) took them; null until the tools are installed.
+ */
+export function useLabTools(bridge: LabBridge): boolean | null {
+  const ref = useRef<LabBridge | null>(null);
+  ref.current = bridge;
+  const [webmcp, setWebmcp] = useState<boolean | null>(null);
+  useEffect(() => {
+    const t = installLabTools(() => ref.current!);
+    setWebmcp(t.webmcp);
+    return t.cleanup;
+  }, []);
+  return webmcp;
+}

@@ -3,9 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ExploreCharts } from "./explore-charts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, PartitionDef } from "../../lib/types.ts";
-import type { DslExample } from "../../lib/dsl-reference.ts";
-import { installLabTools, LAB_TOOL_NAMES, type LabBridge } from "./agent-tools.ts";
+import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
+import { useLabTools, LAB_TOOL_NAMES } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
@@ -13,10 +12,10 @@ import LoginButton from "./login-button.tsx";
 import { upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
 import { requestLogin, referencedDatasets, bindUploads, unresolvedUploads } from "./custom-data-client.ts";
-import { useDocStore, DEFAULT_VIEWS, EMPTY_DOC } from "./doc-store.ts";
+import { useDocStore, EMPTY_DOC } from "./doc-store.ts";
 import { useExploreState } from "./use-explore-state.ts";
 import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
-import { useAnalysis, seedAnalysis, rerunAnalysis } from "./use-analysis.ts";
+import { useAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGearmenuOpen } from "./view-chrome.tsx";
 import { api } from "./api.ts";
@@ -27,11 +26,12 @@ import { KMChart } from "./view-cards.tsx";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
 import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
 import { CohortEditDialog, ViewNoteDialog, WorkspaceDialog } from "./dialogs.tsx";
-import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { useViewOptions } from "./use-view-options.ts";
 import { useViewEdits } from "./use-view-edits.ts";
 import { useCohortEdits } from "./use-cohort-edits.ts";
 import { useWorkspace } from "./use-workspace.ts";
+import { useLibrary, EXAMPLES } from "./use-library.ts";
+import { useToolActions } from "./use-tool-actions.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -114,34 +114,6 @@ function AddCohortBar({ existing, ready, error, onAdd, onCancel }: {
   );
 }
 
-const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
-
-interface Example { name: string; desc: string; def: CohortDef }
-const EXAMPLES: Example[] = [
-  { name: "Immuno-treated", desc: "any immunotherapy on the timeline",
-    def: { all: [IMMUNO_EVENT] } },
-  { name: "STK11-driver", desc: "OQL: STK11 with an OncoKB driver call",
-    def: { all: [{ kind: "oql", q: "STK11: DRIVER" }] } },
-  { name: "OQL: KRAS G12C or STK11 driver", desc: "portal OQL syntax as a clause",
-    def: { all: [{ kind: "oql", q: "KRAS: MUT=G12C; STK11: DRIVER" }] } },
-  { name: "Never smokers", desc: "clinical attribute predicate",
-    def: { all: [{ kind: "clinical", attribute: "SMOKING_PREDICTIONS_3_CLASSES", op: "=", value: "Never" }] } },
-  { name: "Progressed ≤180d post-immuno", desc: "temporal relation on the timeline",
-    def: { all: [{ kind: "event", a: IMMUNO_EVENT.a, b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] }, rel: { type: "BEFORE", minDays: 0, maxDays: 180 } }] } },
-  { name: "True 1L immuno (naïve)", desc: "first immuno, prior-treatment guard on",
-    def: { all: [{ kind: "event", a: { ...IMMUNO_EVENT.a, occurrence: "FIRST" }, rel: { type: "NONE" }, priorGuard: true }] } },
-  { name: "Reached 2nd line", desc: "derived treatment-line event",
-    def: { all: [{ kind: "event", a: { eventType: LINE_TYPE, attrs: [{ key: "LINE_NO", value: "2" }] }, rel: { type: "NONE" } }] } },
-  { name: "STK11-driver in IMPACT-50k", desc: "study override: runs in IMPACT-50k regardless of the picker",
-    def: { study: "msk_impact_50k_2026", all: [{ kind: "oql", q: "STK11: DRIVER" }] } },
-  { name: "TP53-mut across CHORD + MET", desc: "two-study union (overlap not deduplicated)",
-    def: { studies: ["msk_chord_2024", "msk_met_2021"], all: [{ kind: "oql", q: "TP53: MUT" }] } },
-  { name: "EGFR-driver pan-MSK", desc: "union across three MSK studies",
-    def: { studies: ["msk_chord_2024", "msk_met_2021", "msk_impact_50k_2026"], all: [{ kind: "oql", q: "EGFR: DRIVER" }] } },
-  { name: "ERBB2 over-expressed (TCGA BRCA)", desc: "study override: OQL EXP>2 in TCGA BRCA, where mRNA exists",
-    def: { study: "brca_tcga_pan_can_atlas_2018", all: [{ kind: "oql", q: "ERBB2: EXP>2" }] } }
-];
-
 export default function AnalysisPage() {
   // Read through useSearchParams, never `use(searchParams)`: every syncUrl() is a
   // history.replaceState, which hands the page a NEW searchParams promise, and
@@ -155,11 +127,6 @@ export default function AnalysisPage() {
   // document store may already have written the URL
   const openedWith = useRef(typeof sp.doc === "string" ? sp.doc : null);
   const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">(() => tabFromParams(sp));
-  /** The "Saved" tab's own sub-tabs (Cohorts / Analyses) — these used to be
-   *  two separate top-level tabs ("Cohorts" and "Saved") with a cross-link
-   *  between them ("manage on the Saved tab"); one tab, two sub-tabs instead. */
-  const [cohortsSubTab, setCohortsSubTab] = useState<"cohorts" | "analyses">("cohorts");
-  const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   /** set when an opened document was written for an older version and has been upgraded */
   const [upgradeNote, setUpgradeNote] = useState<DocUpgrade | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -174,7 +141,6 @@ export default function AnalysisPage() {
   /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
   const menuOpenRef = useRef(new Map<string, boolean>());
   const moreDerivedMenu = useGearmenuOpen("explore:more-derivations", menuOpenRef.current);
-  const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>"
   /**
    * The document's raw JSON is a place to inspect and share what was asked, not something to
    * read while interpreting a figure — so it lives behind a button, in a dialog, rather than
@@ -210,7 +176,6 @@ export default function AnalysisPage() {
   const [uiError, setError] = useState<string | null>(null);
   // a different document starts with nothing to apologise for
   useEffect(() => { setError(null); }, [docs.current.doc]);
-  const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
   const studies = useStudies();
   const studyNames = useMemo(() => new Map(studies.map((s) => [s.id, s.name] as const)), [studies]);
   const [study, setStudy] = useState("msk_chord_2024");
@@ -316,7 +281,7 @@ export default function AnalysisPage() {
     catch (e) { setError("document JSON: " + String((e as Error)?.message || e)); }
   };
 
-  // ---- cohort creator / library -----------------------------------------
+  /** a cohort definition's size and readback, for previews and saving */
   const evalDef = async (name: string, def: CohortDef) => {
     const res = await api.analysis({ study, cohorts: { [name || "preview"]: def }, views: [] });
     const j = await res.json();
@@ -327,88 +292,11 @@ export default function AnalysisPage() {
 
   const openGenes = (vi: number) => { setGenesFor(vi); genesDialog.current?.showModal(); };
 
-  /**
-   * Cohorts tab: analyse the ticked cohorts together. Like Explore's Analyze it
-   * REPLACES the document — the selection is the analysis, not an addition to
-   * whatever was there before.
-   */
-  const analyzePicked = () => {
-    const chosen: [string, CohortDef][] = [];
-    for (const key of picked) {
-      const name = key.slice(key.indexOf(":") + 1);
-      const def = key.startsWith("ex:")
-        ? (EXAMPLES.find((e) => e.name === name) || {}).def
-        : (saved[name] || {}).def;
-      if (def) chosen.push([name, def]);
-    }
-    if (!chosen.length) return;
-    // refused rather than cut to the first sixteen: the reader ticked these, so analysing some
-    // of them without saying which would answer a different question than the one asked
-    if (chosen.length > 16) {
-      setError("an analysis takes at most 16 cohorts; " + chosen.length + " are ticked — untick " + (chosen.length - 16) + " and analyse again");
-      return;
-    }
-    const nd: AnalysisDoc = { study, cohorts: Object.fromEntries(chosen), views: DEFAULT_VIEWS };
-    docs.replace(nd);
-    setError(null);
-    goTab("analysis");
-  };
-  const togglePick = (key: string) =>
-    setPicked((p) => p.includes(key) ? p.filter((x) => x !== key) : [...p, key]);
-
-  /** Load a documented example into the Analysis tab and run it. */
-  const runDocExample = (ex: DslExample) => {
-    const d = JSON.parse(JSON.stringify(ex.doc)) as AnalysisDoc;   // never hand the shared object to the editor
-    docs.replace(d);
-    setStudy(d.study || study);
-    setError(null);
-    goTab("analysis");
-  };
-
-  // Accepts the authored form: this only serialises, and a template is exactly
-  // what you want to share when the point is that it can be re-pointed.
-  const docLink = (d: AnalysisDoc | TemplateDoc): string =>
-    location.origin + location.pathname + "?doc=" +
-    btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d))))
-      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-  const previewExample = async (ex: any) => {
-    setExEvals(s => ({ ...s, [ex.name]: { busy: true } }));
-    try { const ev = await evalDef(ex.name, ex.def); setExEvals(s => ({ ...s, [ex.name]: ev })); }
-    catch (e) { setExEvals(s => ({ ...s, [ex.name]: { error: String((e as Error)?.message || e) } })); }
-  };
-
-  const saveExample = async (ex: any) => {
-    let ev: { count?: number; error?: string; busy?: boolean } | null = exEvals[ex.name] && exEvals[ex.name]!.count != null ? exEvals[ex.name] : null;
-    if (!ev) { try { ev = await evalDef(ex.name, ex.def); setExEvals(s => ({ ...s, [ex.name]: ev })); } catch { ev = null; } }
-    const lastEval = ev && ev.count != null ? { count: ev.count } : null;
-    try { await persist(ex.name, ex.def, lastEval); } catch { /* the Examples tab has no error banner of its own */ }
-  };
-
-  // ---- AI tools ----------------------------------------------------------
-  // The page's analysis as WebMCP tools and window.cohortLab (app/lab/agent-tools.ts), for the
-  // researcher's assistant in the browser. The bridge is rebuilt every render, so a tool always
-  // sees the current document; edits are validated by the engine before they reach the page.
-  const validateDoc = async (d: AnalysisDoc): Promise<AnalysisResult> => {
-    setValidating(true);
-    try {
-      const res = await api.analysis({ study: d.study || study, ...d }, { query: "?oncoprint=spec" });
-      const j = await res.json();
-      if (j.error) throw new Error(j.error);
-      return j as AnalysisResult;
-    } finally {
-      // released whatever happens next: an edit the tool then rejects never reaches commitDoc
-      setValidating(false);
-    }
-  };
-  /** the server's proposed arms for "split this cohort by X" — see proposePartition in lib/analysis.ts */
-  const proposePartition = async (req: { doc: AnalysisDoc; cohort: string; attribute?: string; gene?: string; oql?: string[]; name?: string; maxArms?: number; minCount?: number }) => {
-    const res = await api.partition({ ...req, doc: { study: req.doc.study || study, ...req.doc } });
-    const j = await res.json();
-    if (j.error) throw new Error(j.error);
-    return j as { name: string; def: PartitionDef; note?: string };
-  };
-  // ---- Explore (app/lab/use-explore-state.ts) ------------------------------
+  // ---- the page's actions, each group in its own hook; later groups use earlier ones ----------
+  const toolActions = useToolActions({ doc, docs, goTab, persistSpaces, queryClient, setError, setStudy, setValidating, study });
+  const { commitDoc, proposePartition, saveAs, validateDoc } = toolActions;
+  const library = useLibrary({ docs, evalDef, goTab, persist, saved, setError, setStudy, study });
+  const { analyzePicked, cohortsSubTab, docLink, exEvals, exTag, picked, previewExample, runDocExample, saveExample, setCohortsSubTab, setExTag, setPicked, togglePick } = library;
   const workspace = useWorkspace({ canSave, doc, docs, goTab, persistSpaces, removeSpace, setError, setStudy, spaces, study });
   const { analysisSaved, clearAnalysis, confirmViewNoteEdit, confirmWorkspaceSave, deleteWorkspace, noteEdit, openWorkspace, openWorkspaceSave, setNotes, setParam, setViewNoteEditing, setWsOpen, viewNoteEditing, wsError, wsOpen } = workspace;
   const cohortEdits = useCohortEdits({ doc, docs, proposePartition, setError, setToast, study });
@@ -419,29 +307,16 @@ export default function AnalysisPage() {
   const { VIEW_KINDS, assayOptions, attrsLoading, catalogAttrs, contProfile, drawsOwnHead, geneChoices, numericAttrs, profileOptions, viewAttrs, viewEvents, viewGenes } = viewOptions;
   const viewEdits = useViewEdits({ assayOptions, busy, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, viewAttrs, viewEvents, viewGenes, viewIds });
   const { addView, cohortChoice, docView, moveView, ocView, patchView, removeView, removeViews, setViewAttrs, setViewCohorts, setViewGenes, updateView, updateViewLocal } = viewEdits;
+
+  // ---- what the sections read ------------------------------------------------------------
   /** what Explore's sections read and the edits they can make (app/lab/explore-sections.tsx) */
   const exploreCtx: ExploreCtx = { ...exploreState, moreDerivedMenu, showClauseData, studies };
   /** what every view card reads and the edits it can make (app/lab/view-cards.tsx) */
   const viewCtx = { VIEW_KINDS, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, menuOpenRef, moveView, noteEdit, ocView, openGenes, patchView, pendingKeys, profileOptions, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
   /** what the Analysis tab's sections read and the actions they take (app/lab/analysis-sections.tsx) */
   const analysisCtx: AnalysisCtx = { VIEW_KINDS, addView, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, genesDialog, genesFor, goTab, menuOpenRef, openAddCohort, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeViews, renamePartitionRow, result, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, upgradeNote, viewCtx, viewIds };
-  const commitDoc = (d0: AnalysisDoc, r: AnalysisResult) => {
-    const d = upgradeDocument(d0).doc;
-    // the engine has already answered this document: the page's queries find that answer
-    // instead of asking again, and an unchanged view keeps its id, so its card is not remounted
-    seedAnalysis(queryClient, d, d.study || study, r);
-    docs.commit(d);
-    if (d.study && d.study !== study) setStudy(d.study);
-    setError(null);
-    goTab("analysis");
-  };
-  const saveAs = async (name: string) => {
-    const d = { ...doc, title: name };
-    docs.set(d);
-    await persistSpaces(name, d);
-  };
-  const labBridge = useRef<LabBridge | null>(null);
-  labBridge.current = {
+  // what the page offers the researcher's AI assistant (app/lab/agent-tools.ts), current every render
+  const webmcp = useLabTools({
     doc, result, busy, error, tab, study, savedAs: analysisSaved ? doc.title || null : null,
     validate: validateDoc, proposePartition, commit: commitDoc, goTab: (t) => goTab(t as typeof TABS[number]),
     runExample: runDocExample, save: saveAs, link: docLink,
@@ -455,13 +330,7 @@ export default function AnalysisPage() {
       return { count: ev.count };
     },
     savedCohorts: saved, savedAnalyses: spaces, openSaved: openWorkspace
-  };
-  const [webmcp, setWebmcp] = useState<boolean | null>(null);
-  useEffect(() => {
-    const t = installLabTools(() => labBridge.current!);
-    setWebmcp(t.webmcp);
-    return t.cleanup;
-  }, []);
+  });
 
   return (
     <>

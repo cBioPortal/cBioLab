@@ -135,8 +135,13 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   add-chart dialog, facet cards) are `explore-sections.tsx`, reading Explore's state and actions
   from `use-explore-state.ts` (the draft, the selection, add-cohort mode) through `ExploreCtx`; the
   Analysis tab's cohort column, view column, document and genes dialogs are `analysis-sections.tsx`,
-  through one `AnalysisCtx`; state that must outlive a tab switch stays in the page,
-  since a tab unmounts when left. Server state goes through React Query, as analyses do
+  through one `AnalysisCtx`. The page itself holds only its own state and wires the rest: its
+  actions are hooks, called in dependency order — `use-tool-actions.ts` (what the AI tools do to
+  the document), `use-library.ts` (the Saved and Examples tabs), `use-workspace.ts`,
+  `use-cohort-edits.ts`, `use-explore-state.ts`, `use-view-options.ts` (what building a view
+  offers), `use-view-edits.ts`; the AI tools' bridge is `useLabTools` in `agent-tools.ts`. A new
+  action goes in the hook for its kind, not in the page. State that must outlive a tab switch
+  lives in those hooks, not in the tabs, since a tab unmounts when left. Server state goes through React Query, as analyses do
   (`use-analysis.ts`): saved cohorts and analyses are `use-saved.ts`, Explore's facets
   `use-explore.ts` (keyed by everything that decides the answer, so a superseded request is
   cancelled and can never land; `e2e-lab-races.cjs` holds requests to prove it). The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
