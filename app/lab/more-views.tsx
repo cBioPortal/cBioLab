@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 import { CancertypesBody, EnrichmentBody, CorrelatesBody, AssaysBody, MutationsBody } from "./portal-bodies";
+import { PickMenu } from "./view-chrome.tsx";
 
 /**
  * A text field that keeps what is being typed to itself and hands the page the value only on
@@ -63,6 +64,7 @@ export const MORE_KINDS: Record<string, MoreKindUi> = {
     why: (k) => k.events.length ? null : "this study records no timeline events to estimate the incidence of" },
   clonality: { label: "Clonality (FACETS)", title: "Clonality", genes: true, maxCohorts: 3 },
   paired: { label: "Paired samples (primary vs metastasis, before vs after)", title: "Paired samples", genes: true, maxCohorts: 3 },
+  riskmodel: { label: "Risk model (elastic-net Cox, OncoCast-style)", title: "Risk model", maxCohorts: 1 },
   diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2,
     why: (k) => k.cohorts.length < 2 ? "compares exactly two cohorts — this analysis has one"
       : !k.profiles.length ? "this study has no molecular profile to compare expression on" : null }
@@ -100,6 +102,9 @@ export interface MoreCtx {
   locked?: string[];
 }
 
+/** the risk model's covariate menus, open or shut, by view (a viewport state, not the document's) */
+const RISK_MENUS = new Map<string, boolean>();
+
 /** A one-line subtitle for the card header. */
 export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "attrition") return "patients left after each clause, in order";
@@ -111,6 +116,10 @@ export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "correlates") return (spec.gene || "no gene") + " on " + (spec.profileType || "no profile") + (spec.otherProfile && spec.otherProfile !== spec.profileType ? " against " + spec.otherProfile : "") + " · Spearman ρ, every gene";
   if (kind === "assays") return (v.assays ? v.assays.profileName + " · " + v.assays.test : spec.profileType || "no profile chosen") + ", per " + (v.assays ? v.assays.unit.replace(/s$/, "") : "sample");
   if (kind === "cancertypes") return "by " + (spec.groupBy || "CANCER_TYPE") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled samples";
+  if (kind === "riskmodel") return (spec.endpoint || "OS") + (spec.anchor?.eventType ? " from first " + spec.anchor.eventType + (spec.anchor.key ? " [" + spec.anchor.key + "=" + spec.anchor.value + "]" : "") : "") +
+    " on " + (spec.measure === "driver" ? "driver mutations" : "mutated genes") +
+    (spec.covariates?.length ? " + " + spec.covariates.length + " covariate" + (spec.covariates.length === 1 ? "" : "s") : "") +
+    (spec.strata ? ", stratified by " + spec.strata : "") + " · " + (spec.runs ?? 10) + " held-out splits" + (spec.validate ? ", validated on the held-out half" : "");
   if (kind === "labs") {
     const an = spec.anchor || {};
     return (spec.test || "no test chosen") + " from first " + (an.eventType || "?") + (an.key ? " [" + an.key + "=" + an.value + "]" : "") +
@@ -304,6 +313,71 @@ export function MoreControls({ c }: { c: MoreCtx }) {
           <label className="tbfield" title="the y axis: each group's altered share, or its altered count">
             y-axis <select value={spec.show === "count" ? "count" : "frequency"} disabled={busy} onChange={(e) => patch({ show: e.target.value === "count" ? "count" : undefined })}>
               <option value="frequency">Alteration Frequency</option><option value="count">Absolute Counts</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    );
+  }
+  if (spec.kind === "riskmodel") {
+    const cats = c.attrs.filter((a) => a.kind !== "num").map((a) => a.attribute);
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="mutations counted as a gene's feature">
+            genes <select value={spec.measure || "any"} disabled={busy} onChange={(e) => patch({ measure: e.target.value })}>
+              <option value="any">any mutation</option><option value="driver">OncoKB drivers</option>
+            </select>
+          </label>
+          <label className="tbfield" title="a separate baseline hazard per value — use CANCER_TYPE on a cohort of several cancers, or a gene that marks a type carries its prognosis">
+            stratify by <select value={spec.strata || ""} disabled={busy} onChange={(e) => patch({ strata: e.target.value || undefined })}>
+              <option value="">nothing</option>
+              {!cats.includes(spec.strata) && spec.strata && <option value={spec.strata}>{spec.strata}</option>}
+              {cats.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="tbz"><span className="tbl">adjust</span>
+          <PickMenu label="covariates" title="clinical attributes always kept in the model, never penalised (at most 6): numbers as they are, categories against their commonest value. Prefer an age at diagnosis to an age at last contact, which makes longer survivors look older"
+            options={c.attrs.filter((a) => a.attribute !== spec.strata).map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind === "num" ? "number" : "category" }))}
+            chosen={spec.covariates || []} max={6} busy={busy} menuId={"risk-cov:" + c.vi} menuStore={RISK_MENUS}
+            onChange={(next) => patch({ covariates: next.length ? next : undefined })} />
+          <label className="tbfield" title="start each patient's clock at a timeline event instead of the study's day 0; they then enter the risk set at day 0 (delayed entry)">
+            clock from <select value={spec.anchor?.eventType || ""} disabled={busy}
+              onChange={(e) => patch({ anchor: e.target.value ? { ...(spec.anchor || {}), eventType: e.target.value } : undefined })}>
+              <option value="">study's day 0</option>
+              {spec.anchor?.eventType && !c.events.some((x) => x.label === spec.anchor.eventType) && <option value={spec.anchor.eventType}>{spec.anchor.eventType}</option>}
+              {c.events.map((x) => <option key={x.label} value={x.label}>first {x.label}</option>)}
+            </select>
+          </label>
+          {spec.anchor?.eventType && <>
+            <label className="tbfield" title="only anchor events with this attribute (e.g. SUBTYPE); empty for any">
+              where <DraftInput value={spec.anchor.key || ""} disabled={busy} width="6rem" placeholder="attribute"
+                onCommit={(t) => patch({ anchor: { eventType: spec.anchor.eventType, ...(t.trim() ? { key: t.trim(), value: spec.anchor.value || "" } : {}) } })} />
+            </label>
+            <label className="tbfield" title="the value that attribute must take (e.g. Immuno)">
+              = <DraftInput value={spec.anchor.value || ""} disabled={busy} width="6rem" placeholder="value"
+                onCommit={(t) => patch({ anchor: { ...spec.anchor, value: t } })} />
+            </label>
+          </>}
+        </div>
+        <div className="tbz"><span className="tbl">model</span>
+          <label className="chk" title="train only on the discovery half of the engine's fixed held-out split, and report the groups, table and C-index on the validation half, which the model never saw">
+            <input type="checkbox" checked={!!spec.validate} disabled={busy} onChange={(e) => patch({ validate: e.target.checked || undefined })} /> validate on held-out half
+          </label>
+          <label className="tbfield" title="the l1 share of the penalty: lasso keeps fewer genes, ridge keeps all of them shrunk">
+            penalty <select value={String(spec.alpha ?? 0.5)} disabled={busy} onChange={(e) => patch({ alpha: Number(e.target.value) })}>
+              <option value="1">lasso</option><option value="0.5">elastic net</option><option value="0.1">mostly ridge</option>
+            </select>
+          </label>
+          <label className="tbfield" title="random two-thirds / one-third splits; each patient's score is the mean over the runs that held them out (OncoCast recommends 50 or more)">
+            runs <select value={String(spec.runs ?? 10)} disabled={busy} onChange={(e) => patch({ runs: Number(e.target.value) })}>
+              {[5, 10, 20, 50].map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </label>
+          <label className="tbfield" title="risk groups, cut at equal quantiles of the score">
+            groups <select value={String(spec.groups ?? 3)} disabled={busy} onChange={(e) => patch({ groups: Number(e.target.value) })}>
+              {[2, 3, 4, 5].map((g) => <option key={g} value={g}>{g}</option>)}
             </select>
           </label>
         </div>

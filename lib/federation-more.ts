@@ -6,6 +6,7 @@ import { sq } from "./compiler.ts";
 import { ALTERED_COND, driverJoin } from "./federation.ts";
 import { clinicalValueFoldSql, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { clinicalTable } from "./custom-data.ts";
+import { splitBucketSql } from "./cohort2.ts";
 
 /** bare patient id for a *_unique_id column of this study */
 const pidOf = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
@@ -903,4 +904,115 @@ export function geneCytobandsSql(genes: string[], study: string, db: string): st
     "WHERE rgg.reference_genome_id = (SELECT reference_genome_id FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(study) + ")\n" +
     "  AND g.hugo_gene_symbol IN (" + (genes.length ? genes.map(sq).join(",") : "''") + ")\n" +
     "GROUP BY gene";
+}
+
+// ---------------------------------------------------------------------------
+// riskmodel: an elastic-net Cox ensemble over the cohort's mutated genes (lib/coxnet.ts)
+
+export interface RiskmodelRowsOpts {
+  endpoint: string;
+  columns?: { months: string; status: string };
+  /** a clinical attribute giving each patient a stratum (patient value, or the first sample's) */
+  strata?: string | null;
+  /** clinical attributes returned as c0, c1, … (patient value, or the first sample's) */
+  covariates?: string[];
+  /** count only OncoKB drivers, at this pin */
+  driverPin?: string | null;
+  /** re-anchor the clock at a timeline event, with the delayed entry that implies */
+  anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" } | null;
+}
+
+/**
+ * One row per patient of the cohort with a survival time: months and event (from the anchor, with
+ * `entry` its offset to the study's day 0, when one is given; `anchored` 0 for a patient without
+ * the anchor event), the gene panels their samples were sequenced on for mutations, the genes
+ * mutated in them (OncoKB drivers only with `driverPin`), their stratum and covariate values, and
+ * which half of the engine's fixed held-out split they are in (`half`, the split leaf's own
+ * expression). Values only: the patient id is a join key and never leaves the CTEs. Run only
+ * through PatientLevelResolver.moreRows, since a model of individual patients needs their rows.
+ */
+export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o: RiskmodelRowsOpts): string {
+  const { endpoint, columns, strata = null, covariates = [], driverPin = null, anchor = null } = o;
+  if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
+  for (const a of [strata, ...covariates]) if (a && !/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) throw new Error("bad attribute name '" + String(a).slice(0, 40) + "'");
+  const months = columns?.months || (endpoint + "_MONTHS"), status = columns?.status || (endpoint + "_STATUS");
+  const pid = pidOf("patient_unique_id", study);
+  const attrs = [...(strata ? [strata] : []), ...covariates];
+  const pick = anchor?.occurrence === "LAST" ? "max" : "min";
+  const anchorAttr = anchor?.key
+    ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data\n" +
+      "        WHERE " + foldedEqualsSql("key", anchor.key) + " AND " + foldedEqualsSql("value", String(anchor.value ?? "")) + ")\n"
+    : "";
+  return (
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "os AS (\n" +
+    "  SELECT " + pid + " AS pid,\n" +
+    "         toFloat64OrNull(anyIf(attribute_value, attribute_name=" + sq(months) + ")) AS months,\n" +
+    "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status,\n" +
+    "         " + splitBucketSql(pid, study) + " AS half\n" +
+    "  FROM " + clinicalTable(db, [months, status]) + "\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
+    "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    "),\n" +
+    "panels AS (\n" +
+    "  SELECT " + pidOf("sd.patient_unique_id", study) + " AS pid, groupUniqArray(toString(sp.gene_panel_id)) AS panels\n" +
+    "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
+    "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
+    "    AND " + pidOf("sd.patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    "),\n" +
+    "mut AS (\n" +
+    "  SELECT " + pidOf("g.patient_unique_id", study) + " AS pid, groupUniqArray(g.hugo_gene_symbol) AS genes\n" +
+    "  FROM " + db + ".genomic_event_derived g\n" +
+    (driverPin ? driverJoin(driverPin) : "") +
+    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation' AND " + ALTERED_COND + "\n" +
+    (driverPin ? "    AND ann.is_driver = 1\n" : "") +
+    "    AND " + pidOf("g.patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    ")" +
+    (attrs.length ?
+      ",\nattrs AS (\n" +
+      "  SELECT " + pid + " AS pid,\n" +
+      attrs.map((a, k) => "         argMinIf(attribute_value, sample_unique_id, attribute_name = " + sq(a) + ") AS a" + k).join(",\n") + "\n" +
+      "  FROM " + clinicalTable(db, attrs) + "\n" +
+      "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name IN (" + attrs.map(sq).join(",") + ") AND attribute_value != ''\n" +
+      "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+      "  GROUP BY pid\n" +
+      ")" : "") +
+    (anchor ?
+      ",\nanch AS (\n" +
+      "  SELECT p.stable_id AS pid, " + pick + "(ce.start_date) AS day, 1 AS hit\n" +
+      "  FROM " + db + ".clinical_event ce\n" +
+      "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+      "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+      "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+      "    AND " + foldedEqualsSql("ce.event_type", anchor.eventType) + "\n" + anchorAttr +
+      "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+      "  GROUP BY pid\n" +
+      ")" : "") + "\n" +
+    "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, os.half AS half, panels.panels AS panels, mut.genes AS genes" +
+    (strata ? ", attrs.a0 AS stratum" : "") +
+    covariates.map((_, k) => ", attrs.a" + (k + (strata ? 1 : 0)) + " AS c" + k).join("") +
+    (anchor ? ", anch.hit AS anchored, round(anch.day / 30.4375, 4) AS anchor_months" : "") + "\n" +
+    "FROM os\n" +
+    "  LEFT JOIN panels ON panels.pid = os.pid\n" +
+    "  LEFT JOIN mut ON mut.pid = os.pid\n" +
+    (attrs.length ? "  LEFT JOIN attrs ON attrs.pid = os.pid\n" : "") +
+    (anchor ? "  LEFT JOIN anch ON anch.pid = os.pid\n" : "") +
+    "WHERE os.months IS NOT NULL AND os.months > 0"
+  );
+}
+
+/** The genes on each mutation panel this study uses (study metadata; no cohort, no patient). */
+export function riskmodelPanelGenesSql(study: string, db: string): string {
+  return (
+    "SELECT toString(pg.gene_panel_id) AS panel, groupUniqArray(pg.gene) AS genes\n" +
+    "FROM " + db + ".gene_panel_to_gene_derived pg\n" +
+    "WHERE pg.gene_panel_id IN (SELECT DISTINCT gene_panel_id FROM " + db + ".sample_to_gene_panel_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND alteration_type = 'MUTATION_EXTENDED')\n" +
+    "GROUP BY panel"
+  );
 }

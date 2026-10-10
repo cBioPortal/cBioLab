@@ -910,6 +910,75 @@ export interface IncidenceResult {
  * (median and interquartile band per bin), the best response and the share responding (e.g.
  * PSA50, PCWG3), and — from a participant entitled to patient-level values — a waterfall.
  */
+/**
+ * A risk model in the manner of OncoCast (Martin et al., github.com/AxelitoMartin/OncoCast): an
+ * elastic-net Cox model of one cohort's survival on the genes mutated in it, fitted `runs` times
+ * on random two-thirds of the patients and scored on the held-out third. Each patient's risk score
+ * is the mean of the scores they got while held out; the patients are then cut into risk groups at
+ * quantiles of that score (no outcome is used to place the cuts) and drawn as Kaplan–Meier curves.
+ * Patient-level studies only: a model of individual patients needs their rows.
+ */
+export interface RiskmodelView {
+  note?: string;
+  kind: "riskmodel"; cohorts?: string[];
+  endpoint?: string; monthsAttribute?: string; statusAttribute?: string;
+  /** "any" mutation (default) or OncoKB drivers only */
+  measure?: "any" | "driver";
+  /** only genes mutated in at least this many patients are candidates (default 30) */
+  minMutated?: number;
+  /** a clinical attribute to stratify by (each stratum its own baseline hazard), e.g. CANCER_TYPE */
+  strata?: string;
+  /** l1 share of the penalty: 1 lasso, 0 ridge (default 0.5, elastic net) */
+  alpha?: number;
+  /** random splits (default 20, at most 100) */
+  runs?: number;
+  /** risk groups, cut at equal quantiles of the score (default 3, 2 to 5) */
+  groups?: number;
+  seed?: number;
+  /** clinical attributes always in the model, never penalised (at most 6): numbers as they are,
+   *  categories as indicators against the commonest value */
+  covariates?: string[];
+  /** start each patient's clock at a timeline event (as the survival view), with delayed entry */
+  anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
+  /** train on the discovery half of the engine's fixed split only, and report on the validation half */
+  validate?: boolean;
+}
+
+export interface RiskmodelResult {
+  study: string;
+  /** patients modelled, their events, and those left out with why */
+  n: number; events: number;
+  notProfiled: number; noStratum: number; neverHeldOut: number;
+  noCovariate: number; noAnchor: number; anchorAfterStart: number; noFollowUp: number;
+  /** "Treatment (FIRST)" etc. when the clock starts at a timeline event */
+  anchoredTo: string | null;
+  /** the always-in covariates as fitted columns (a category's indicator per non-reference level), with
+   *  the share of runs they ended non-zero in (always 1 unless no variation) and their mean coefficient */
+  covariates: { name: string; meanCoef: number; hr: number }[];
+  /** with `validate`: the patients trained on (discovery) and reported on (validation) */
+  validation: { discovery: number; validation: number; validationEvents: number; cIndex: number } | null;
+  /** what the groups, table and refit below are computed on */
+  reportedOn: "held-out scores" | "validation half";
+  /** genes every patient was sequenced for (mutations), and of those the candidates */
+  genesCovered: number; candidates: number; minMutated: number;
+  strata: string | null; strataLevels: number;
+  alpha: number; runs: number; seed: number; measure: "any" | "driver";
+  /** test-set C-index across runs */
+  cIndex: { median: number; q1: number; q3: number; values: number[] };
+  /** candidates kept in at least one run, by how often: share of runs, mean coefficient where kept, patients mutated */
+  features: { gene: string; selected: number; meanCoef: number; hr: number; mutated: number }[];
+  groups: { name: string; from: number | null; to: number | null; curve: Omit<KmCurve, "cohort">;
+    /** Kaplan-Meier survival at 12 and 36 months; null past the group's follow-up */
+    at12: number | null; at36: number | null;
+    /** hazard ratio against the lowest-risk group (null for that group), 95% Wald interval, p */
+    hr: number | null; ciLow: number | null; ciHigh: number | null; p: number | null }[];
+  logrank: LogRankK | null;
+  /** a Cox model of the outcome on the risk score alone (per standard deviation of the score) */
+  refit: { hr: number; ciLow: number; ciHigh: number; p: number } | null;
+  /** the scores' distribution, for the histogram: bin edges and counts */
+  histogram: { edges: number[]; counts: number[] };
+}
+
 export interface LabsView {
   note?: string;
   kind: "labs"; cohorts?: string[];
@@ -1202,7 +1271,7 @@ import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView
-  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CorrelatesView | TableView | MutationsView;
+  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CorrelatesView | TableView | MutationsView | RiskmodelView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -1497,6 +1566,7 @@ export interface ViewResult {
   clonality?: ClonalityResult;              // FACETS clonality, WGD, purity/ploidy
   incidence?: IncidenceResult;              // competing-risks cumulative incidence
   labs?: LabsResult;                        // lab-value course and response
+  riskmodel?: RiskmodelResult;              // elastic-net Cox ensemble and its risk groups
   cancertypes?: CancertypesResult;          // alteration frequency per cancer type
   overlap?: OverlapResult;                  // how cohorts intersect (UpSet)
   enrichment?: EnrichmentResult;            // genome-wide alteration enrichment

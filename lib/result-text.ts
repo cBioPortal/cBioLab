@@ -259,6 +259,22 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         inc.horizons.map((h) => `  at ${h.months} months: ` + h.cells.map((c) => `${c.cohort} ${(100 * c.f1).toFixed(1)}% (95% CI ${(100 * c.lo).toFixed(1)}-${(100 * c.hi).toFixed(1)}; 1-KM would say ${(100 * c.naive).toFixed(1)}%)`).join(" | ")).join("\n") +
         (inc.gray ? `\n  Gray's test: statistic ${inc.gray.statistic.toFixed(2)}, permutation p=${pFmt(inc.gray.p)} (${inc.gray.permutations} shuffles)` : "") +
         caveatOf(v) + noteOf(v));
+    } else if (v.kind === "riskmodel" && v.riskmodel) {
+      const m = v.riskmodel;
+      const pc = (x: number | null) => x == null ? "n/a" : Math.round(x * 100) + "%";
+      out.push(`Risk model (elastic-net Cox, ${m.runs} held-out splits, alpha ${m.alpha}, seed ${m.seed}; ${m.n.toLocaleString()} patients, ${m.events.toLocaleString()} events, ` +
+        `${m.candidates} candidate genes${m.strata ? ", stratified by " + m.strata : ""}${m.anchoredTo ? ", clock from " + m.anchoredTo : ""}):\n` +
+        `  held-out C-index ${m.cIndex.median.toFixed(3)} (IQR ${m.cIndex.q1.toFixed(3)}–${m.cIndex.q3.toFixed(3)})` +
+        (m.validation ? `; trained on the discovery half only (${m.validation.discovery} patients), C-index on the validation half ${m.validation.cIndex.toFixed(3)} (${m.validation.validation} patients)` : "") + "\n" +
+        (m.covariates.length ? "  adjusted for: " + m.covariates.map((c) => `${c.name} HR ${c.hr.toFixed(3)}`).join(", ") + "\n" : "") +
+        `  risk groups (${m.reportedOn}):\n` +
+        m.groups.map((g) => `    ${g.name}: n=${g.curve.n}, ${g.curve.events} events, median ${g.curve.median == null ? "not reached" : g.curve.median.toFixed(1) + "mo"}, ` +
+          `12-month ${pc(g.at12)}, 36-month ${pc(g.at36)}` + (g.hr != null ? `, HR vs lowest ${g.hr.toFixed(2)} (95% CI ${g.ciLow!.toFixed(2)}–${g.ciHigh!.toFixed(2)}, ${pFmt(g.p!)})` : "")).join("\n") +
+        (m.logrank ? `\n  log-rank p=${pFmt(m.logrank.p)}` : "") +
+        (m.refit ? `\n  risk score alone: HR ${m.refit.hr.toFixed(2)} per SD (95% CI ${m.refit.ciLow.toFixed(2)}–${m.refit.ciHigh.toFixed(2)}, ${pFmt(m.refit.p)})` : "") +
+        "\n  genes kept most often: " + m.features.slice(0, 15).map((f) => `${f.gene} ${Math.round(f.selected * 100)}% HR ${f.hr.toFixed(2)}`).join(", ") +
+        (m.neverHeldOut ? `\n  ${m.neverHeldOut} patients were never held out, so have no score` : "") +
+        caveatOf(v) + methodOf(v) + noteOf(v));
     } else if (v.kind === "labs") {
       const lb = v.labs!;
       out.push(`Lab course: ${lb.test} % change from baseline, weeks from ${lb.anchoredTo}:\n` +

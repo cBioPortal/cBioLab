@@ -241,6 +241,7 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | `paired` | `genes?:[≤20], top?:1-40, pairBy?:{attribute, a, b, studies?:{<study>:{attribute, a, b}}, labels?:{a, b}}, measure?:"driver"|"any", cohorts?:[names] (≤3)` | **paired samples within patients**: among patients with at least one sample on each side of `pairBy` (a SAMPLE-level attribute and its values for side a and side b — default `SAMPLE_TYPE` Primary / Metastasis; values fold on case and whitespace like every clinical predicate), per gene, the patients with a driver (or, with `measure:"any"`, any alteration) on both sides, on side a only, on side b only — counted only among patients profiled for that gene on BOTH sides by each side's own panels, so a gene one side never assayed never reads as discordant. A patient with several samples on a side is altered there if any is. Concordance = both ÷ altered anywhere; an exact McNemar test (two-sided binomial on the discordant patients) asks whether discordance runs one way, BH q across the genes of each cohort. When no patient has both sides, the refusal lists the values the attribute actually takes. Sample type records where tissue came from, not when — the caption says "metastasis-only" is not "acquired later". Counts only; a remote peer cannot answer yet and is named. **Without `genes` it scans**: every gene with a driver (or any alteration) in some paired patient is tested, q is Benjamini–Hochberg across all of them, and the `top` (default 20) most one-sided are drawn, ordered by McNemar p — how to ask "what is acquired after treatment" without naming genes first. **`pairBy.studies`** gives each study its own attribute and values (PRE-TX / POST-TX in one, pre-treatment / post-treatment in another) so their patients pool into one count; a study not listed uses the top-level attribute, and `labels` names the two sides in the figure (default: their values). With an attribute other than a sample site, the caption says the sides are as each study labels them, and that a side-only call can also be a subclone one biopsy missed or a lower-purity sample under-calling |
 | `clonality` | `genes:[≤12], measure?:"driver"|"any", qc?:true, cohorts?:[names] (≤3)` | **clonality from FACETS allele-specific copy number** (only studies that carry it — the refusal names them): per gene, the cohort's mutation CALLS (one mutation in one sample; OncoKB drivers by default) that FACETS called clonal, subclonal or indeterminate, LOH at the locus (minor copy number 0, of calls where it was estimated) and the cancer-cell fraction in ten bins; per cohort, FACETS's own whole-genome-doubling, purity and ploidy calls. `qc` (default true) uses only samples whose `FACETS_QC` is Pass, with the pass/fail counts reported. Only the study's current mutation profile is read (the table also holds rows orphaned by superseded loads). Two cohorts add Fisher tests on clonal vs subclonal per gene (BH across genes) and on WGD. Counts only; a remote peer cannot answer yet and is named |
 | `incidence` | `event:{eventType, attrs?:[{key,value} ×≤3], label?}, anchor?:{eventType,key?,value?,occurrence?}, horizons?:[12,24,60], cohorts?:[names] (≤6)` | **cumulative incidence with a competing risk**: time from the anchor (default the study's day 0) to the FIRST `event` after it, with death (`OS_STATUS`) as the competing event and `OS_MONTHS` as follow-up — Aalen–Johansen, with 95% intervals from its delta-method standard error (checked against R's cmprsk: estimates identical to five decimals, SEs within 3%). Not 1 − Kaplan–Meier, which censors the dead as if still at risk and overstates incidence wherever death is common; the view reports both at each of `horizons`, so the difference is on the page. Left truncation as in `survival`: a patient anchored before day 0 enters the risk set at day 0. Patients who cannot be at risk are counted by reason, never read as event-free: already had the event at or before the anchor, had it before observation began, no follow-up, no anchor event. Two or more cohorts: Gray's test (weight 1) by permutation of cohort labels over the pooled records — exact under the null, seeded, and computable from the (entry, time, cause) tallies each site sends, which are counts |
+| `riskmodel` | `cohorts:[one name], endpoint?, monthsAttribute?/statusAttribute?, measure?:"any"|"driver", minMutated?:30, strata?:"<attribute>", covariates?:["<attribute>" ×≤6], anchor?:{eventType,key?,value?,occurrence?}, validate?:false, alpha?:0.5, runs?:10 (≤100), groups?:3 (2-5), seed?:1` | **a survival risk model from mutated genes**, in the manner of OncoCast (Martin et al.): an elastic-net Cox model (glmnet's algorithm, checked against scikit-survival; Breslow ties; `alpha` the l1 share of the penalty) of one cohort's survival on every gene that the panels of EVERY patient cover — so no patient counts as wild-type for a gene never tested — and that is mutated in at least `minMutated` patients. Fitted `runs` times, each on a random two-thirds of the patients with the penalty chosen by 3-fold cross-validated partial likelihood, scoring the held-out third; a patient's risk score is the mean of their held-out scores, so no one is scored by a model trained on them (a patient never held out has no score and is counted). `covariates` are clinical attributes always in the model and never penalised (numbers as they are, categories as indicators against the commonest value, at most 10 values); a patient missing one is left out and counted. `anchor` starts each patient's clock at a timeline event, as the survival view does, with the delayed entry that implies (patients without the event, or whose event follows the study's day 0, are counted out). `validate` trains only on the discovery half of the engine's fixed split (the `split` leaf's halves) and reports everything below on the validation half, which no model saw, cut at the discovery half's quantiles. Reports the held-out C-index across runs (and on the validation half), each gene's share of runs kept and mean hazard ratio, the covariates' hazard ratios, Kaplan-Meier curves of `groups` risk groups cut at equal quantiles of the score (no outcome used; a cut moves to the nearer edge of a run of tied scores, so equal scores share a group, and groups merge when the scores cannot fill them) with a log-rank test, each group's 12- and 36-month survival and hazard ratio against the lowest (95% Wald interval), the hazard ratio per standard deviation of the score, and the score's histogram. `strata` gives each value its own baseline hazard — use CANCER_TYPE on a mixed cohort, or a gene marking a type carries that type's prognosis. One cohort in one patient-level study; at most 300,000 patients × runs per request (refused, naming the limit). Seeded: the same document gives the same model |
 | `labs` | `test, anchor:{eventType,key?,value?,occurrence?}, eventType?:"Lab_Test", testKey?:"TEST", resultKey?:"RESULT", baselineDays?:90, fromWeeks?:-12, toWeeks?:52, binWeeks?:4, responseDrop?:50, cohorts?:[names] (≤4)` | **a lab value's course from a treatment start**: each patient's `test` results (timeline events of `eventType` whose `testKey` names the test, value in `resultKey`) as % change from their own baseline — the last value in the `baselineDays` up to and including the anchor; a non-positive baseline is left out — per `binWeeks` bin from `fromWeeks` to `toWeeks`, drawn as median and interquartile band (from 2-point histograms, exact to within a point; a patient counts once per bin, at their mean; the baseline reading itself is not drawn). Best response is each patient's lowest value after the anchor; the share falling by at least `responseDrop`% is counted exactly (50 on PSA is PCWG3's PSA50), and two cohorts get a Fisher test on it. A **waterfall** of every patient's best change is drawn only from participants entitled to patient-level values (a method only PatientLevelResolver has, like a plot's points); an aggregate-only participant's patients stay in the histograms and the rate and are counted as withheld from the bars. With no evaluable patient, the refusal lists the tests the study records |
 | `cancertypes` | `genes:[≤30], groupBy?:"CANCER_TYPE"|<sample attribute>|"study", measure?:"any"|"driver", minSamples?:10, show?:"frequency"|"count", unit?:"patient"|"sample", cohorts?:[names] (≤2)` | **Cancer Types Summary**, cBioPortal's results-view tab: per group of the cohort's PATIENTS (the portal's default; `unit:"sample"` counts samples — a patient counts in each group one of their samples is in) — a sample attribute's value (folded on case and whitespace like every clinical predicate; samples with no value form their own group) or the study — the share altered in at least one of `genes`, split by kind: only mutations, only amplifications, only deep deletions, only structural variants, or more than one kind. A group's denominator is its samples profiled for at least one of the genes (the union of their panels, as an oncoprint's merged row counts it); its total sample count is shown beside it. `measure:"driver"` counts OncoKB drivers only. Groups with fewer than `minSamples` profiled samples are pooled into one bar, named and counted, never dropped. Counts only, so every local participant can answer; a remote peer cannot yet and is named |
 | `overlap` | `cohorts?:[names] (2–6)` | **how cohorts' patients intersect**, cBioPortal's group-comparison Overlap tab: for every combination of the cohorts, the patients — and their samples — in exactly those cohorts and none of the others, with each cohort's own size. Two or three cohorts are drawn as the portal draws them, area-proportional diagrams of samples and of patients side by side; more as an UpSet plot. A cohort is a set of patients, so a patient's samples go wherever the patient does. Each study's database answers with one count per combination (a bitmask of membership) — counts only — and a cohort's size here must equal its own count, or the view says the definition gave two answers. Ids are study-qualified, so patients only ever overlap within a study |
@@ -3290,7 +3291,40 @@ Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a med
 }
 ```
 
-### Example 52: Custom data: a curated biopsy site on every sample
+### Example 52: A survival risk model from mutated genes in lung cancer
+
+Non-small cell lung cancer in MSK-CHORD. The model keeps KEAP1, STK11, SMARCA4 and TP53 as adverse and EGFR as favourable, as the literature does, and its risk thirds separate clearly; a held-out C-index near 0.61 says mutations alone predict survival only modestly. Five runs keep the example quick; OncoCast recommends fifty.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "NSCLC": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ],
+          "per": "sample"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "riskmodel",
+      "cohorts": [
+        "NSCLC"
+      ],
+      "runs": 5
+    }
+  ]
+}
+```
+
+### Example 53: Custom data: a curated biopsy site on every sample
 
 luad_mskimpact_2021 is 93 EGFR-mutant lung adenocarcinomas with 186 primary and metastatic samples. The demo upload gives every sample a BIOPSY_SITE, grouped from the study's own SAMPLE_TYPE and free-text METASTATIC_SITE the way a reviewer would (scripts/gen-custom-demo.ts), standing in for a clinician-curated annotation. "CNS met" filters on it: 8 patients. Ordered by site, the oncoprint puts each patient's primary and metastases in their own groups. Fraction of the genome altered has a median of 0.47 in the 11 CNS samples and 0.36 in liver, against 0.21 in the 76 primaries. Split by site, TP53 is altered in 7 of 8 CNS-met patients (87.5%) against 65.6% of the patients with a primary sample. The split arms overlap, because a patient whose primary and metastasis were both sequenced belongs to both arms. With 8 to 61 patients per arm, these are illustrations, not findings.
 
@@ -3373,7 +3407,7 @@ Runs on custom data: `luad-biopsy-site` (LUAD biopsy site (demo), 186 samples, c
 }
 ```
 
-### Example 53: Cancer types summary: RAS genes across 50,000 tumours
+### Example 54: Cancer types summary: RAS genes across 50,000 tumours
 
 KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appendiceal and colorectal follow, and the bars show where RAS is amplified rather than mutated — germ cell tumours and esophagogastric cancer.
 
@@ -3399,7 +3433,7 @@ KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appen
 }
 ```
 
-### Example 54: Cohort overlap: how four groups share their patients
+### Example 55: Cohort overlap: how four groups share their patients
 
 TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD. 5,314 TP53-mutant patients belong to none of the other three groups; 435 are in all four.
 
@@ -3463,7 +3497,7 @@ TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD.
 }
 ```
 
-### Example 55: Alteration enrichment: what separates colorectal from pancreatic tumours
+### Example 56: Alteration enrichment: what separates colorectal from pancreatic tumours
 
 Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TCF7L2, PIK3CA, FBXW7 and SOX9 mark colorectal cancer; KRAS and CDKN2A mark pancreatic cancer.
 
@@ -3524,7 +3558,7 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
 }
 ```
 
-### Example 56: Mutational signatures: what UV light and tobacco leave behind
+### Example 57: Mutational signatures: what UV light and tobacco leave behind
 
 Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature (7) makes up about half of a melanoma's mutations and almost none of a lung cancer's; the smoking signature (4) is the reverse.
 
@@ -3566,7 +3600,7 @@ Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature 
 }
 ```
 
-### Example 57: Co-expression: the genes that rise and fall with ESR1
+### Example 58: Co-expression: the genes that rise and fall with ESR1
 
 TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up behind ESR1 — CCDC170 (its neighbour on 6q25, often co-amplified), THSD4, FOXA1, TBC1D9 — and the genes of basal-like tumours fall away from it.
 
@@ -3588,7 +3622,7 @@ TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up be
 }
 ```
 
-### Example 58: Clinical data: every pancreatic cancer sample, oldest patients first
+### Example 59: Clinical data: every pancreatic cancer sample, oldest patients first
 
 Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 
@@ -3622,7 +3656,7 @@ Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 }
 ```
 
-### Example 59: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
+### Example 60: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
 
 MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at an allele frequency of 0.2 or more, highest first.
 
