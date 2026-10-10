@@ -2,9 +2,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ExploreCharts } from "./explore-charts";
-import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import { parameterize } from "../../lib/params.ts";
 import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, PartitionDef } from "../../lib/types.ts";
 import type { DslExample } from "../../lib/dsl-reference.ts";
 import { installLabTools, LAB_TOOL_NAMES, type LabBridge } from "./agent-tools.ts";
@@ -12,17 +10,15 @@ import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import LoginButton from "./login-button.tsx";
-import type { SplitSpec } from "./partitions.tsx";
-import { withoutPartition, renamePartitionChild, flattenSplits, editSplits, splitKey, renameInViews } from "../../lib/partition-arms.ts";
-import { DOC_VERSION, upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
+import { upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
-import { saveToServer, requestLogin, referencedDatasets, bindUploads, unresolvedUploads, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
-import { useDocStore, DEFAULT_VIEWS } from "./doc-store.ts";
+import { requestLogin, referencedDatasets, bindUploads, unresolvedUploads } from "./custom-data-client.ts";
+import { useDocStore, DEFAULT_VIEWS, EMPTY_DOC } from "./doc-store.ts";
 import { useExploreState } from "./use-explore-state.ts";
 import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
 import { useAnalysis, seedAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
-import { useGearmenuOpen, ViewHead } from "./view-chrome.tsx";
+import { useGearmenuOpen } from "./view-chrome.tsx";
 import { api } from "./api.ts";
 import { useSavedArtifacts } from "./use-saved.ts";
 import { SavedTab } from "./saved-tab.tsx";
@@ -34,6 +30,8 @@ import { CohortEditDialog, ViewNoteDialog, WorkspaceDialog } from "./dialogs.tsx
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { useViewOptions } from "./use-view-options.ts";
 import { useViewEdits } from "./use-view-edits.ts";
+import { useCohortEdits } from "./use-cohort-edits.ts";
+import { useWorkspace } from "./use-workspace.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -144,9 +142,6 @@ const EXAMPLES: Example[] = [
     def: { study: "brca_tcga_pan_can_atlas_2018", all: [{ kind: "oql", q: "ERBB2: EXP>2" }] } }
 ];
 
-// already the current version, so opening the page normalizes (and writes into the URL) nothing
-const EMPTY_DOC: AnalysisDoc = { dsl: DOC_VERSION, cohorts: {}, views: [] };
-
 export default function AnalysisPage() {
   // Read through useSearchParams, never `use(searchParams)`: every syncUrl() is a
   // history.replaceState, which hands the page a NEW searchParams promise, and
@@ -248,15 +243,6 @@ export default function AnalysisPage() {
   const { cat, catLoading } = useStudyCatalog(study);
   const { trackAttrs, trackAttrsLoading } = useTrackAttrs(result);
 
-  const [wsOpen, setWsOpen] = useState(false);
-  const [wsError, setWsError] = useState<string | null>(null);
-
-  // ---- editing a cohort's name/note (the gear menu's "edit…") -------------
-  const [cohortEditing, setCohortEditing] = useState<string | null>(null); // the name AS IT IS in doc.cohorts right now
-
-  // ---- editing a view's note (the gear menu's "add note…" / "edit note…") -
-  const [viewNoteEditing, setViewNoteEditing] = useState<number | null>(null); // index into doc.views / result.views
-
   // Saved cohorts and analyses belong to the login (lib/auth.ts): see use-saved.ts.
   const loggedIn = customState.unlocked;
   const savedArtifacts = useSavedArtifacts(loggedIn);
@@ -339,211 +325,7 @@ export default function AnalysisPage() {
     return { count: c.count, text: c.text };
   };
 
-  // ---- save as feature: a selection frozen into a yes/no custom attribute ----
-  const featureSaved = (d: StoredDataset) => {
-    const yes = d.rows.filter((r) => r.values[0] === "Yes").length;
-    return "saved feature \u201c" + d.name + "\u201d (custom:" + d.id + "/" + d.columns[0].name + "): " +
-      yes.toLocaleString() + " " + d.level + "s Yes, " + (d.rows.length - yes).toLocaleString() + " No";
-  };
-  const featureFromSelection = async (sel: ColumnSelection, all: string[], studies: string[]) => {
-    const d = await featureFromColumns(sel.name || "selection", sel.unit, sel.ids, all, studies);
-    await saveToServer(d);
-    setToast(featureSaved(d) + " \u2014 add it as a track, a split or a filter like any attribute");
-    setTimeout(() => setToast(null), 6000);
-  };
-  // ---- workspaces ----------------------------------------------------------
-  const openWorkspaceSave = () => {
-    if (!canSave()) return;
-    setWsOpen(true);
-  };
-  const confirmWorkspaceSave = async (name: string) => {
-    const d = { ...doc, title: name };
-    docs.set(d);
-    setWsError(null);
-    try {
-      await persistSpaces(name, d);
-    } catch (e) { setWsError("could not save: " + String((e as Error)?.message || e)); }
-  };
-  const openWorkspace = (name: string) => {
-    const w = spaces[name];
-    if (!w) return;
-    const d = w.doc;
-    docs.replace(d);
-    setError(null);
-    if (d.study) setStudy(d.study);
-    goTab("analysis");
-  };
-  const deleteWorkspace = async (name: string) => {
-    setWsError(null);
-    try { await removeSpace(name); }
-    catch (e) { setWsError("could not delete: " + String((e as Error)?.message || e)); }
-  };
-  /** Lift the study and a shared gene list into parameters — see lib/params.ts. */
-  const makeTemplate = () => {
-    // parameterize returns the AUTHORED form, where a `genes` field may hold
-    // "$genes". The editor state is typed as the resolved document because
-    // every other reader wants that; this is the one place a reference enters,
-    // so it is the one place that says so.
-    const d = parameterize(doc) as AnalysisDoc;
-    if (d === doc) { setError("nothing to lift: a template needs a study, or a gene list that every gene view shares"); return; }
-    setError(null);
-    docs.set(d);
-  };
-  /** Change one parameter and re-run — the whole point of a template. */
-  const setParam = (key: string, value: unknown) => {
-    const d = { ...doc, params: { ...(doc.params || {}), [key]: value } };
-    docs.set(d);
-  };
-  const setNotes = (text: string) => {
-    const d = { ...doc, notes: text };
-    docs.set(d);   // no re-run: prose changes no numbers
-  };
-
   const openGenes = (vi: number) => { setGenesFor(vi); genesDialog.current?.showModal(); };
-
-  /**
-   * A drag across an oncoprint becomes a cohort of exactly those patients — an explicit list,
-   * not a rule, so the document says plainly that it was picked by hand.
-   *
-   * Sample columns are resolved to their patients first: a cohort selects patients, so a
-   * cohort named from a sample selection carries those patients (and therefore their other
-   * samples too). Throwing is how the figure's dialog is told why it cannot be done.
-   */
-  const cohortFromSelection = async (sel: ColumnSelection, studies: string[]) => {
-    const one = studies.length === 1 ? studies[0] : null;
-    if (!one) throw new Error("a cohort is evaluated against one study; this figure pools " +
-      studies.length + " (" + studies.join(", ") + "), and the columns are study-qualified — select within a single-study figure");
-    let ids = sel.ids;
-    if (sel.unit === "sample") {
-      const res = await api.patientsOf({ study: one, samples: ids });
-      const j = await res.json();
-      if (!res.ok || j.error) throw new Error(j.error || res.statusText);
-      ids = j.patients as string[];
-      if (!ids.length) throw new Error("no patients found for those samples");
-    }
-    const taken = new Set(Object.keys(doc.cohorts || {}));
-    let name = sel.name || "selection";
-    for (let i = 2; taken.has(name); i++) name = (sel.name || "selection") + " " + i;
-    const qualified = ids.map(id => one + ":" + id);
-    const d: AnalysisDoc = { ...doc, cohorts: { ...doc.cohorts, [name]: { all: [{ kind: "patientList", ids: qualified }] } } };
-    docs.set(d);
-  };
-
-  const removeCohort = (name: string) => {
-    // its splits go with it (they are stored on it), and so does every view reference to their arms
-    const base: AnalysisDoc = doc;
-    const cs = { ...base.cohorts }; delete cs[name];
-    // views naming the cohort explicitly drop it; a view with no cohorts left goes too
-    const views = (base.views || [])
-      .map(v => Array.isArray(v.cohorts) ? { ...v, cohorts: v.cohorts.filter(c => c !== name && !c.startsWith(name + " / ")) } : v)
-      .filter(v => !Array.isArray(v.cohorts) || v.cohorts.length);
-    const d = { ...base, cohorts: cs, views };
-    docs.set(d);
-  };
-
-  // ---- partitions: a cohort split into arms that add up to it ------------------------------
-  const runEdited = (d: AnalysisDoc) => { docs.set(d); };
-  // the page edits splits in their flat form (keyed "<cohort> / <split>") and writes them back
-  // onto their cohorts as a tree (editSplits)
-  const splitsFlat = () => flattenSplits(doc.cohorts || {});
-  const setPartitionDef = (name: string, def: PartitionDef) =>
-    runEdited(editSplits(doc, (f) => ({ ...f, partitions: { ...f.partitions, [name]: def } })));
-  const removePartitionNamed = (name: string) => runEdited(editSplits(doc, (f) => withoutPartition(f, name).doc));
-  const renamePartitionRow = (name: string, from: string, to: string) => {
-    try { runEdited(editSplits(doc, (f) => renamePartitionChild(f, name, from, to))); }
-    catch (e) { setError(String((e as Error)?.message || e)); }
-  };
-  /** Split a cohort (or an arm) by what the server proposes from the data, and switch the views
-   *  that were showing only it to the new split — an edit to their lists, which each view's
-   *  cohorts menu can change back. */
-  const splitCohortBy = async (cohort: string, spec: SplitSpec) => {
-    const { name, def } = await proposePartition({ doc, cohort, ...spec });
-    const key = splitKey(cohort, name);
-    const withSplit = editSplits(doc, (f) => ({ ...f, partitions: { ...f.partitions, [key]: { ...def, split: name } } }));
-    // only a view showing just this cohort switches: one showing other cohorts too would then mix
-    // whole cohorts with a split's groups, which a view does not draw
-    const authored = Object.keys(doc.cohorts || {});
-    const views = (withSplit.views || []).map((v) => {
-      const list = Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored;
-      return list.length === 1 && list[0] === cohort ? { ...v, cohorts: [key] } : v;
-    });
-    runEdited({ ...withSplit, views });
-  };
-
-  // ---- "+ Add cohort": Explore over the analysis, adding to it instead of replacing it ---------
-  /** the studies the analysis already uses: its default study and every cohort's own */
-  const analysisStudies = (): string[] => {
-    const ids = new Set<string>();
-    if (doc.study) ids.add(doc.study);
-    for (const c of Object.values(doc.cohorts || {})) {
-      if (c.study) ids.add(c.study);
-      for (const st of c.studies || []) ids.add(st);
-    }
-    if (!ids.size && study) ids.add(study);
-    return [...ids];
-  };
-
-  const openCohortEdit = (name: string) => {
-    setCohortEditing(name);
-  };
-
-  /** Rename a cohort and/or change its note, from the gear menu's "edit…" dialog.
-   *  Renaming rewrites every `view.cohorts` reference too, so a view already
-   *  scoped to this cohort keeps drawing it under its new name — and since
-   *  the server keys everything (result.cohorts, every row/curve) by name,
-   *  a rename re-runs the analysis, unlike a note-only edit, which changes no
-   *  number and so re-runs nothing (use-analysis.ts leaves notes out of its keys). */
-  const confirmCohortEdit = (newName: string, notes: string) => {
-    if (!cohortEditing) return;
-    const oldName = cohortEditing;
-    const nextCohorts: Record<string, CohortDef> = {};
-    for (const [k, v] of Object.entries(doc.cohorts || {})) {
-      nextCohorts[k === oldName ? newName : k] = k === oldName ? { ...v, notes } : v;
-    }
-    if (newName === oldName) {
-      // a note-only edit re-runs nothing, so nothing else would put it in the shareable link
-      const d = { ...doc, cohorts: nextCohorts };
-      docs.set(d);
-      return;
-    }
-    // its splits travel with it; their arms are named after it, so views naming them follow too
-    const views = renameInViews(doc.views, oldName, newName) as AnalysisDoc["views"];
-    const d = { ...doc, cohorts: nextCohorts, views };
-    docs.set(d);
-  };
-
-  /** the analysis exists as a saved workspace — what a view's note, like a cohort's, belongs to */
-  const analysisSaved = !!(doc.title && spaces[doc.title]);
-  /** a view's note belongs to a saved analysis, so its menu item exists only once there is one */
-  const noteEdit = (vi: number) => analysisSaved ? () => openViewNoteEdit(vi) : undefined;
-  const openViewNoteEdit = (vi: number) => {
-    if (!analysisSaved) return;
-    setViewNoteEditing(vi);
-  };
-
-  /** A view's note is exactly like a cohort's or the workspace's: prose the
-   *  server never computes anything from, so this never re-runs — it patches
-   *  `doc.views[vi].note` (what gets saved/shared) AND mirrors the same text
-   *  straight into `result.views[vi].annotationNote` (what ViewHead actually
-   *  reads to display it), since nothing else would otherwise tell the
-   *  already-rendered card that its own annotation changed. */
-  const confirmViewNoteEdit = (trimmed: string) => {
-    if (viewNoteEditing == null) return;
-    const vi = viewNoteEditing;
-    const views = (doc.views || []).map((v: any, i: number) => {
-      if (i !== vi) return v;
-      const nv = { ...v };
-      if (trimmed) nv.note = trimmed; else delete nv.note;
-      return nv;
-    });
-    // the note is read from the document (use-analysis.ts): nothing re-runs
-    docs.set({ ...doc, views });
-  };
-
-  const clearAnalysis = () => {
-    const d = { ...EMPTY_DOC, study };
-    docs.set(d); setError(null);
-  };
 
   /**
    * Cohorts tab: analyse the ticked cohorts together. Like Explore's Analyze it
@@ -627,6 +409,10 @@ export default function AnalysisPage() {
     return j as { name: string; def: PartitionDef; note?: string };
   };
   // ---- Explore (app/lab/use-explore-state.ts) ------------------------------
+  const workspace = useWorkspace({ canSave, doc, docs, goTab, persistSpaces, removeSpace, setError, setStudy, spaces, study });
+  const { analysisSaved, clearAnalysis, confirmViewNoteEdit, confirmWorkspaceSave, deleteWorkspace, noteEdit, openWorkspace, openWorkspaceSave, setNotes, setParam, setViewNoteEditing, setWsOpen, viewNoteEditing, wsError, wsOpen } = workspace;
+  const cohortEdits = useCohortEdits({ doc, docs, proposePartition, setError, setToast, study });
+  const { analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat } = cohortEdits;
   const exploreState = useExploreState({ analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
   const { addChartDialog, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setChartTab, setExStudies, setExploreStudies } = exploreState;
   const viewOptions = useViewOptions({ cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading });
