@@ -3,7 +3,7 @@
 // CNA-only gene as a false negative instead of refusing/disclosing it.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { missingAlterationTypes, type AlterationType } from "../lib/analysis.ts";
+import { missingAlterationTypes, type AlterationType } from "../lib/views/compare.ts";
 
 const tc = (profiled: number, altered = 0) => ({ profiled, altered });
 const cell = (mutation: ReturnType<typeof tc>, cna: ReturnType<typeof tc>, structuralVariant: ReturnType<typeof tc>) =>

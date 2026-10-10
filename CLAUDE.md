@@ -27,7 +27,12 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 - **`lib/compiler.ts`** — v1 timeline/event sub-DSL (BEFORE/DURING/NOT_FOLLOWED_BY,
   observability guard, priorGuard, derived treatment lines).
 - **`lib/analysis.ts`** — `runAnalysis(doc)`: evaluates cohorts (per-study; cross-study
-  federation via study-qualified member ids), runs views (compare/survival/oncoprint).
+  federation via study-qualified member ids), then hands each view to its kind's runner.
+  **`lib/views/<kind>.ts`** holds one runner per view kind (compare, survival, cox, …), registered
+  in `lib/views/index.ts`; each gets the run's context (`ViewRun` in `lib/views/run.ts`: the
+  document, evaluated cohorts, resolvers, the view's cohorts and studies) and returns its result.
+  The kinds in `lib/views-more.ts` (below) are still dispatched through `runMoreView`, with the
+  same context.
 - **`lib/oncoprint.ts`** — spec → rows (ClickHouse fetch); **`lib/oncoprint-assemble.ts`** — rows →
   render contract, pure (bitmask cells, NOT_PROFILED=-1, panel-aware denominators, staircase +
   declarative `sort`, clinical tracks incl. numeric heat, `heatmap` molecular tracks incl. synthetic
