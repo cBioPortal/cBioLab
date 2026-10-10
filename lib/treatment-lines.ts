@@ -34,6 +34,9 @@ export const SYSTEMIC_LINE_CLASSES = [
 ] as const;
 
 export const DEFAULT_LINE_GAP = 90;
+/** The synthetic event type a derived treatment line is, wherever an event clause can name one
+ *  (the compiler, the cohort DSL, Explore's timeline builder, the pills that read a clause back). */
+export const LINE_TYPE = "Treatment line (derived)";
 /** The event type treatment records carry, and the keys their class is read from, in precedence order. */
 export const TREATMENT_EVENT = "Treatment";
 export const CLASS_KEYS = ["subtype", "treatment_type"] as const;

@@ -4,6 +4,7 @@
 // get an × on each top-level clause (creator mode).
 import { Fragment } from "react";
 import { isCustomAttr, attributeLabel } from "../../lib/custom-data-names.ts";
+import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 
 /** opens the uploaded data behind a clause (see custom-data-dialog.tsx) */
 export type OnCustomData = (attribute: string, leaf: any, negated: boolean) => void;
@@ -29,7 +30,6 @@ function leafKind(leaf: any) {
   return "clinical";
 }
 
-const LINE_TYPE = "Treatment line (derived)";
 const NUM_SYM: Record<string, string> = { ">": ">", ">=": "≥", "<": "<", "<=": "≤", "=": "" };
 
 function selText(s: any) {

@@ -6,7 +6,7 @@
 // They return the Response, as fetch does: a caller still decides how to read it (JSON, the
 // binary contract, a file) and what an error status means for it.
 import type {
-  AnalysisBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, MembersBody, ViewPageBody, TableBody,
+  AnalysisBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, ViewPageBody, TableBody,
 } from "../../lib/api-schemas.ts";
 import { withCustomData, type UploadBinding } from "./custom-data-client.ts";
 import type { ArtifactKind } from "../../lib/artifacts.ts";
@@ -45,10 +45,6 @@ export const api = {
   /** Proposed arms for splitting a cohort. */
   partition: async (body: PartitionBody, opts: Opts = {}) =>
     post("/api/partition", await withCustomData(body), opts.signal),
-
-  /** A cohort's patients and the rest of each study, for "save as feature". */
-  members: async (body: MembersBody, opts: Opts = {}) =>
-    post("/api/custom-data/members", await withCustomData(body), opts.signal),
 
   /** One page of a table view, or the values one of its columns takes. */
   viewPage: async (body: ViewPageBody, opts: Opts = {}) =>

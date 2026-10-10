@@ -27,7 +27,12 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 - **`lib/compiler.ts`** — v1 timeline/event sub-DSL (BEFORE/DURING/NOT_FOLLOWED_BY,
   observability guard, priorGuard, derived treatment lines).
 - **`lib/analysis.ts`** — `runAnalysis(doc)`: evaluates cohorts (per-study; cross-study
-  federation via study-qualified member ids), runs views (compare/survival/oncoprint).
+  federation via study-qualified member ids), then hands each view to its kind's runner.
+  **`lib/views/<kind>.ts`** holds one runner per view kind (compare, survival, cox, …), registered
+  in `lib/views/index.ts`; each gets the run's context (`ViewRun` in `lib/views/run.ts`: the
+  document, evaluated cohorts, resolvers, the view's cohorts and studies) and returns its result.
+  The kinds in `lib/views-more.ts` (below) are still dispatched through `runMoreView`, with the
+  same context.
 - **`lib/oncoprint.ts`** — spec → rows (ClickHouse fetch); **`lib/oncoprint-assemble.ts`** — rows →
   render contract, pure (bitmask cells, NOT_PROFILED=-1, panel-aware denominators, staircase +
   declarative `sort`, clinical tracks incl. numeric heat, `heatmap` molecular tracks incl. synthetic
@@ -105,7 +110,10 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   parse the same envelope (`parseBody`), so a change to either side is a type error in the other.
   An envelope checks only the route's own parameters (which view, which page, which uploads) and
   passes the document, definition or spec it carries to the engine — don't grow it into a second
-  schema of the DSL. A new endpoint the pages call gets an envelope and an `api` function.
+  schema of the DSL. A new endpoint the pages call gets an envelope and an `api` function. The one
+  exception is the login and custom-data endpoints (`/api/login`, `/api/custom-data/*`): they
+  belong to `app/lab/custom-data-client.ts`, which owns that state and which `api.ts` itself
+  imports, so it calls them directly — through it, never from a component.
 - **Custom data** — a researcher's uploaded annotations, named `custom:<dataset>/<COLUMN>` and
   usable anywhere a clinical attribute is, stored on the server only (below; the browser keeps
   nothing — `app/lab/custom-data-client.ts` attaches references). **`lib/custom-data.ts`**: for
@@ -130,8 +138,15 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   (`saved-tab.tsx`, `examples-tab.tsx`), and each view kind's card is its own component in
   `view-cards.tsx`, reading the page through one `ViewCtx`; Explore's sections (study picker, bar,
   add-chart dialog, facet cards) are `explore-sections.tsx`, reading Explore's state and actions
-  from `use-explore-state.ts` (the draft, the selection, add-cohort mode) through `ExploreCtx`; state that must outlive a tab switch stays in the page,
-  since a tab unmounts when left. Server state goes through React Query, as analyses do
+  from `use-explore-state.ts` (the draft, the selection, add-cohort mode) through `ExploreCtx`; the
+  Analysis tab's cohort column, view column, document and genes dialogs are `analysis-sections.tsx`,
+  through one `AnalysisCtx`. The page itself holds only its own state and wires the rest: its
+  actions are hooks, called in dependency order — `use-tool-actions.ts` (what the AI tools do to
+  the document), `use-library.ts` (the Saved and Examples tabs), `use-workspace.ts`,
+  `use-cohort-edits.ts`, `use-explore-state.ts`, `use-view-options.ts` (what building a view
+  offers), `use-view-edits.ts`; the AI tools' bridge is `useLabTools` in `agent-tools.ts`. A new
+  action goes in the hook for its kind, not in the page. State that must outlive a tab switch
+  lives in those hooks, not in the tabs, since a tab unmounts when left. Server state goes through React Query, as analyses do
   (`use-analysis.ts`): saved cohorts and analyses are `use-saved.ts`, Explore's facets
   `use-explore.ts` (keyed by everything that decides the answer, so a superseded request is
   cancelled and can never land; `e2e-lab-races.cjs` holds requests to prove it). The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)

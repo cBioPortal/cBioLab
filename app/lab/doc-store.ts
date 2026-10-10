@@ -17,6 +17,7 @@
 // in the same handler; React re-renders from it, and every change is announced once (URL sync).
 import { useRef, useState } from "react";
 import type { AnalysisDoc, View } from "../../lib/types.ts";
+import { DOC_VERSION } from "../../lib/doc-version.ts";
 
 /** `epoch` counts replace()s: a different document, whose numbers must never stand in for this one's */
 export interface DocState { doc: AnalysisDoc; ids: number[]; text: string; nextId: number; epoch: number }
@@ -114,3 +115,7 @@ export const DEFAULT_VIEWS: View[] = [
   { kind: "survival" },
   { kind: "oncoprint", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR"] }
 ];
+
+/** The document a new page starts from: already the current version, so opening the page
+ *  upgrades (and writes into the URL) nothing. */
+export const EMPTY_DOC: AnalysisDoc = { dsl: DOC_VERSION, cohorts: {}, views: [] };

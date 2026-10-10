@@ -1,7 +1,7 @@
 // DSL -> ClickHouse SQL compiler. Server-side only.
 import type { EventSelector, EventRel, Occurrence, ClinicalOp } from "./types.ts";
 import { foldedEqualsSql, canonicalEventName } from "./event-names.ts";
-import { linesCtes, compositionKeySql, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
+import { linesCtes, compositionKeySql, DEFAULT_LINE_GAP, LINE_TYPE } from "./treatment-lines.ts";
 
 /** A selector after runtime validation: defaults applied, fields narrowed. */
 export interface ValidSelector {
@@ -162,7 +162,7 @@ export function compileCohort({ db, study, a: aIn, b: bIn, rel, priorGuard, line
   return { countSql, patientsSql, histSql, histBucket };
 }
 
-export const LINE_TYPE = "Treatment line (derived)";
+export { LINE_TYPE };
 
 /** The shared line definition (lib/treatment-lines.ts) for this study's patients, as `line_events`. */
 function linesCoreCtes(db: string, study: string, gap: number, priorGuard: boolean): string[] {

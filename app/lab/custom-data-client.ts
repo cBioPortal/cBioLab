@@ -292,6 +292,15 @@ export function uniqueSlug(name: string): string {
   return id;
 }
 
+/** Match uploaded ids to the studies' cases, as an upload's preview and a drag selection both do. */
+export async function resolveIds(studies: string[], level: CustomLevel, ids: string[]): Promise<ResolveResponse> {
+  const res = await fetch("/api/custom-data/resolve", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ studies, level, ids }) });
+  const j = await res.json() as ResolveResponse & { error?: string };
+  if (!res.ok || j.error) throw new Error(j.error || res.statusText);
+  return j;
+}
+
 export interface ResolveResponse { matches: { study: string; patient: string; sample?: string }[][]; unmatched: number; multiStudy: number; refused: { study: string; reason: string }[] }
 
 /** The parsed upload, matched to the studies, as a dataset ready to save. */
@@ -386,10 +395,7 @@ export async function featureFromColumns(name: string, unit: string, selected: s
     const s = studies.filter((st) => id.startsWith(st + "_")).sort((a, b) => b.length - a.length)[0];
     return s ? s + ":" + id.slice(s.length + 1) : id;
   };
-  const res = await fetch("/api/custom-data/resolve", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ studies, level, ids: all.map(qualified) }) });
-  const j = await res.json() as ResolveResponse & { error?: string };
-  if (!res.ok || j.error) throw new Error(j.error || res.statusText);
+  const j = await resolveIds(studies, level, all.map(qualified));
   if (j.unmatched) throw new Error(j.unmatched.toLocaleString() + " of the figure's columns could not be matched to a " + level + "; nothing was saved");
   const cases = all.flatMap((id, i) => j.matches[i].map((m) => ({ ...m, selected: picked.has(id) })));
   return buildFeature(name, level, cases, studies);

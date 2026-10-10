@@ -1593,3 +1593,36 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
   cursor: pointer; visibility: hidden; }
 .lp-grid tr:hover .lp-only, .lp-grid thead th:hover .lp-only, .lp-only:focus-visible { visibility: visible; }
 .lp-grid thead tr:hover th:not(:hover) .lp-only { visibility: hidden; }
+
+/* ---------------- spacing and layout utilities, on the scale ----------------
+   Last in the file, so a utility on an element wins over a general rule of the same weight. */
+.mt-0 { margin-top: 0; }
+.mt-1 { margin-top: var(--s1); }
+.mt-2 { margin-top: var(--s2); }
+.mt-3 { margin-top: var(--s3); }
+.mt-4 { margin-top: var(--s4); }
+.mb-1 { margin-bottom: var(--s1); }
+.mb-2 { margin-bottom: var(--s2); }
+.mb-3 { margin-bottom: var(--s3); }
+.mb-4 { margin-bottom: var(--s4); }
+.ml-1 { margin-left: var(--s1); }
+.ml-2 { margin-left: var(--s2); }
+.mr-1 { margin-right: var(--s1); }
+.pad-tight { padding: var(--s0) var(--s1); }
+.t-md { font-size: var(--t-md); }
+.hflex { display: flex; }
+.iflex { display: inline-flex; }
+.items-center { align-items: center; }
+.wrap { flex-wrap: wrap; }
+.gap-1 { gap: var(--s1); }
+.gap-2 { gap: var(--s2); }
+.gap-3 { gap: var(--s3); }
+.row.g2 { gap: var(--s2); }
+.row.end { justify-content: flex-end; }
+.row.between { justify-content: space-between; }
+.fullrow { flex-basis: 100%; }
+.scrollbox { max-height: 22rem; overflow-y: auto; }
+.clickable { cursor: pointer; }
+.accentink { color: var(--accent-ink); }
+/* a numeric facet's "NA n", set against the bars' baseline */
+.nacount { align-self: end; padding-left: var(--s1); }
