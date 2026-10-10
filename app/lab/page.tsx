@@ -35,6 +35,7 @@ import { ExamplesTab } from "./examples-tab.tsx";
 import { ViewCard, KMChart } from "./view-cards.tsx";
 import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
 import { CohortEditDialog, ViewNoteDialog, WorkspaceDialog } from "./dialogs.tsx";
+import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -134,7 +135,7 @@ const EXAMPLES: Example[] = [
   { name: "True 1L immuno (naïve)", desc: "first immuno, prior-treatment guard on",
     def: { all: [{ kind: "event", a: { ...IMMUNO_EVENT.a, occurrence: "FIRST" }, rel: { type: "NONE" }, priorGuard: true }] } },
   { name: "Reached 2nd line", desc: "derived treatment-line event",
-    def: { all: [{ kind: "event", a: { eventType: "Treatment line (derived)", attrs: [{ key: "LINE_NO", value: "2" }] }, rel: { type: "NONE" } }] } },
+    def: { all: [{ kind: "event", a: { eventType: LINE_TYPE, attrs: [{ key: "LINE_NO", value: "2" }] }, rel: { type: "NONE" } }] } },
   { name: "STK11-driver in IMPACT-50k", desc: "study override: runs in IMPACT-50k regardless of the picker",
     def: { study: "msk_impact_50k_2026", all: [{ kind: "oql", q: "STK11: DRIVER" }] } },
   { name: "TP53-mut across CHORD + MET", desc: "two-study union (overlap not deduplicated)",
@@ -383,7 +384,7 @@ export default function AnalysisPage() {
     // report "no timeline events" for a study that has plenty. The derived treatment-line type is
     // the catalog's own synthesis, not a recorded event type, so it isn't offered here.
     const raw: { type: string; n: number }[] = (explore && explore.events && explore.events.length) ? explore.events
-      : ((cat && cat.types) || []).filter((t: any) => t.t !== "Treatment line (derived)").map((t: any) => ({ type: String(t.t), n: Number(t.n_pat) || 0 }));
+      : ((cat && cat.types) || []).filter((t: any) => t.t !== LINE_TYPE).map((t: any) => ({ type: String(t.t), n: Number(t.n_pat) || 0 }));
     return foldEventNames(raw.map((e) => ({ name: String(e.type), n: e.n })))
       .map((f) => ({ canonical: f.canonical, label: f.label, n: f.n }));
   };

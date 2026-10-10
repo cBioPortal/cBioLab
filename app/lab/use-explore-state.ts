@@ -13,7 +13,7 @@ import { armsFromSelection, editSplits, splitKey, type ChartKey } from "../../li
 import { DOC_VERSION } from "../../lib/doc-version.ts";
 import { saveToServer, customDataKey, featureFromCohort, type StoredDataset } from "./custom-data-client.ts";
 import { DEFAULT_VIEWS } from "./doc-store.ts";
-import { LINE_TYPE } from "./explore-sections.tsx";
+import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { useExplore, type ExploreAsk } from "./use-explore.ts";
 
 import type { DocStore } from "./doc-store.ts";

@@ -11,6 +11,7 @@ import { isCustomAttr } from "../../lib/custom-data-names.ts";
 import { CAT_COLORS } from "./view-chrome.tsx";
 import { SaveCohortDialog } from "./dialogs.tsx";
 import type { ExploreState } from "./use-explore-state.ts";
+import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 
 /** The most studies "add all" stages at once (each adds dozens of queries to Explore's facets). */
 export const ADD_ALL_LIMIT = 30;
@@ -40,8 +41,6 @@ const PIE_ATTRIBUTES = new Set([
  *  the render, since the underlying facets/logic are unaffected. */
 const SHOW_DERIVED_FACETS = false;
 
-/** the synthetic eventType the server's derived treatment-line logic (lib/compiler.ts LINE_TYPE) recognizes */
-export const LINE_TYPE = "Treatment line (derived)";
 
 /** What Explore's sections read and the edits they can make: Explore's own state and actions
  *  (use-explore-state.ts), plus the few page values they show. */
