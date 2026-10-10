@@ -504,7 +504,74 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .lollilist { display: flex; flex-wrap: wrap; gap: 0 0.9rem; font-size: var(--t-sm); margin-top: 0.2rem; }
 .lollilist b { font-weight: 600; }
 
+/* ---------------- small shared idioms ---------------- */
+.toplink { color: var(--accent-ink); font-size: var(--t-md); }
+.row.center { align-items: center; }
+.row.baseline { align-items: baseline; }
+.row.g5 { gap: 0.5rem; }
+.facettitle { font-size: var(--t-md); font-weight: 600; }
+/* a row of link-buttons that switch what a menu shows, the current one bold */
+.linklike.tabtoggle { font-weight: 400; }
+.linklike.tabtoggle.on { font-weight: 600; }
+/* a menu's items, the one in effect bold */
+.linklike.menuitem { text-align: left; font-weight: 400; }
+.linklike.menuitem.on { font-weight: 600; }
+/* the document dialog's JSON and its compiled SQL */
+.docjson { width: 100%; height: 20rem; font: 0.72rem 'IBM Plex Mono', monospace; background: var(--code-bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem; }
+.sqlpre { max-height: 16rem; overflow: auto; background: var(--code-bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem; font-size: var(--t-xs); white-space: pre; }
+
+/* ---------------- view-card tables (app/lab/view-cards.tsx) ---------------- */
+.vscroll { overflow-x: auto; }
+.vtable { border-collapse: collapse; font-size: var(--t-md); width: 100%; }
+.vtable th, .vtable td { padding: 0.3rem 0.6rem; }
+.vtable .l { text-align: left; }
+.vtable .r { text-align: right; }
+.vtable .tnum { font-variant-numeric: tabular-nums; }
+.vtable .bold { font-weight: 600; }
+.vtable .muted { color: var(--muted); }
+.vtable .italic { font-style: italic; }
+.vtable .nowrap { white-space: nowrap; }
+.vtable .top { vertical-align: top; }
+.vtable tr.ruled { border-top: 1px solid var(--line); }
+/* a column header's second line ("driver / any") */
+.vtable .thsub { font-weight: 400; color: var(--muted); }
+/* a cell whose cohort lacks one of the data types it summarizes */
+.vtable .warnmark { color: var(--warn, #b45309); }
+
+.vtable .thlight { font-weight: 400; }
+/* the empty header over a column of bars keeps the browser's own cell padding */
+.vtable th.barhead { padding: 1px; }
+.basis.wraps { flex-wrap: wrap; }
+/* a regression view's covariates, one row each */
+.covlist { flex-basis: 100%; display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.3rem; }
+.covrow { display: inline-flex; align-items: center; gap: 0.3rem; }
+.covlist .covadd { align-self: flex-start; }
+.kmlegend { display: flex; flex-wrap: wrap; gap: 1.2rem; font-size: var(--t-sm); color: var(--muted); margin-top: 0.4rem; }
+
+/* ---------------- text dialogs (app/lab/dialogs.tsx) ---------------- */
+.dlgactions { margin-top: var(--s3); justify-content: flex-end; align-items: center; gap: var(--s2); }
+.dlgactions.split { justify-content: space-between; }
+.dlggroup { gap: var(--s2); align-items: center; }
+.dlgsection { margin-top: var(--s3); }
+label.dlgsection { display: block; }
+.paramshead { align-items: baseline; }
+.paramshead strong { font-size: var(--t-md); }
+.note.flush-tight { margin: var(--s1) 0 0; }
+.note.flush-x { margin-left: 0; margin-right: 0; margin-bottom: 0; }
+.namedialog .error { margin-top: var(--s2); }
+
+/* ---------------- Saved tab ---------------- */
+.flush, .card h2.flush, dialog h3.flush { margin: 0; }
+.savedbar { align-items: center; gap: var(--s2); margin-bottom: var(--s0); }
+.card h2.savedsec { margin-top: var(--s4); }
+/* a list of named things, one per row, ruled between */
+.listrow { border-top: 1px solid var(--line); padding: var(--s3) 0; }
+.listrow-head { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: baseline; }
+.listrow-body { margin-top: var(--s1); }
+
 /* ---------------- Examples tab ---------------- */
+.exintro { margin-top: var(--s1); }
+.exactions { margin-top: auto; padding-top: var(--s2); gap: var(--s2); }
 .exgrid {
   display: grid; gap: 0.8rem;
   grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr));

@@ -125,8 +125,16 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   password, `LOGIN_PASSWORD`, guards custom data AND saved cohorts/analyses (`/api/artifacts`,
   owner-scoped; ownerless rows from before the login read as the shared principal's).
   `scripts/gate.sh` gives its e2e server a throwaway password. Per-user access is not built yet.
-- **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Cohorts /
-  Analysis / Examples. The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
+- **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Saved /
+  Analysis / Examples. Tabs move out into their own components as they are untangled
+  (`saved-tab.tsx`, `examples-tab.tsx`), and each view kind's card is its own component in
+  `view-cards.tsx`, reading the page through one `ViewCtx`; Explore's sections (study picker, bar,
+  add-chart dialog, facet cards) are `explore-sections.tsx`, reading Explore's state and actions
+  from `use-explore-state.ts` (the draft, the selection, add-cohort mode) through `ExploreCtx`; state that must outlive a tab switch stays in the page,
+  since a tab unmounts when left. Server state goes through React Query, as analyses do
+  (`use-analysis.ts`): saved cohorts and analyses are `use-saved.ts`, Explore's facets
+  `use-explore.ts` (keyed by everything that decides the answer, so a superseded request is
+  cancelled and can never land; `e2e-lab-races.cjs` holds requests to prove it). The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
   demo pages were retired once the Analysis app subsumed them; `/` now redirects to `/lab`.
 - **WebMCP (`lib/webmcp.ts`)** — every page's tools for the researcher's assistant in the
   browser (Claude in the Chrome sidebar): registered with `document.modelContext` and published
@@ -293,7 +301,7 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
 - **A settings change that waits on the server shows the view waiting.** The header and its
   controls stay visible and usable, so the reader sees what they just changed and can change it
   again; the figure area below is covered by a skeleton with an "updating…" spinner until the
-  new answer lands (`Updating` in `app/lab/page.tsx`, `.view-updating`). A stale figure left on
+  new answer lands (`Updating` in `app/lab/view-cards.tsx`, `.view-updating`). A stale figure left on
   screen reads as the new answer. The same cover goes over every view during a full document
   run, and over the oncoprint's plot during its own contract fetch. A change applied in the
   browser alone (the oncoprint's display options, zoom) is instant and gets none.
@@ -343,8 +351,9 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
 - **Keystrokes stay in the field.** A text field on the analysis page must not keep what is being
   typed in page state: `AnalysisPage` is one very large component, so every keystroke re-renders
   every view card, the oncoprint and the inlined figures (a dialog's textarea measured ~350 ms a
-  key). Use `DraftText` — local state, the page reads a ref on save — or a small component that
-  owns its own draft.
+  key). Give the field a small component that owns its own draft and hands the page the value on
+  save — the text dialogs in `app/lab/dialogs.tsx` are the pattern: mounted when opened, they start
+  from the values they are given and report the result.
 - **One way to change the document.** The analysis page's document lives in `app/lab/doc-store.ts`:
   `docs.set` for an edit, `docs.replace` for a different document (an example, a link, a new
   analysis), `docs.commit` for one the AI tools validated. It gives each view a stable id that keys

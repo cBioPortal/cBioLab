@@ -9,6 +9,7 @@ import type {
   AnalysisBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, MembersBody, ViewPageBody, TableBody,
 } from "../../lib/api-schemas.ts";
 import { withCustomData, type UploadBinding } from "./custom-data-client.ts";
+import type { ArtifactKind } from "../../lib/artifacts.ts";
 
 interface Opts { signal?: AbortSignal }
 
@@ -55,4 +56,19 @@ export const api = {
 
   /** The table download's payload: it is a form post, so the browser can save the file as it streams. */
   tablePayload: async (body: TableBody): Promise<string> => JSON.stringify(await withCustomData(body)),
+
+  /** Every study this deployment can reach, with its counts and capabilities. */
+  studies: (opts: Opts = {}) => fetch("/api/studies", { signal: opts.signal }),
+
+  /** One study's timeline vocabulary and declared survival endpoints. */
+  catalog: (study: string, opts: Opts = {}) => fetch("/api/catalog?study=" + encodeURIComponent(study), { signal: opts.signal }),
+
+  /** Saved cohorts and analyses (lib/artifacts.ts): the logged-in reader's, by kind. */
+  artifacts: {
+    list: (kind: ArtifactKind, opts: Opts = {}) => fetch("/api/artifacts?kind=" + kind, { signal: opts.signal }),
+    create: (body: { kind: ArtifactKind; name: string; definition: unknown }) => post("/api/artifacts", body),
+    update: (id: string, body: { name: string; definition: unknown }) =>
+      fetch("/api/artifacts/" + id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+    remove: (id: string) => fetch("/api/artifacts/" + id, { method: "DELETE" }),
+  },
 };

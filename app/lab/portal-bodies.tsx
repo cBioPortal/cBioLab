@@ -11,11 +11,11 @@ export { usePages, Pager } from "../_table/DataTable.tsx";
 import { cancertypesPanelSvg, enrichmentVolcanoSvg, enrichmentScatterSvg, enrichmentTopSvg } from "../../lib/view-svg-portal";
 import { frame, palette, SERIES } from "../../lib/svg-kit";
 import { api } from "./api.ts";
+import { ServerSvg as Svg } from "./view-chrome.tsx";
 
 const framed = (c: { body: string; width: number; height: number } | null) => c ? frame(c.width, c.height, c.body, palette("auto").bg, true) : null;
 export const pFmt = (x: number) => x === 0 ? "< 1e-300" : x < 1e-3 ? x.toExponential(2) : x.toFixed(3);
 
-const Svg = ({ html }: { html: string }) => <div className="viewfig" dangerouslySetInnerHTML={{ __html: html }} />;
 
 /** Pills over a body, the portal's gene / group selectors. */
 function Pills({ items, on, set }: { items: string[]; on: string; set: (x: string) => void }) {

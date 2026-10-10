@@ -16,7 +16,7 @@
 // The store updates synchronously (a ref), so an edit's view id is known to the request it starts
 // in the same handler; React re-renders from it, and every change is announced once (URL sync).
 import { useRef, useState } from "react";
-import type { AnalysisDoc } from "../../lib/types.ts";
+import type { AnalysisDoc, View } from "../../lib/types.ts";
 
 /** `epoch` counts replace()s: a different document, whose numbers must never stand in for this one's */
 export interface DocState { doc: AnalysisDoc; ids: number[]; text: string; nextId: number; epoch: number }
@@ -106,3 +106,11 @@ export function useDocStore(initial: AnalysisDoc, onChange: (d: AnalysisDoc) => 
   }
   return store.current;
 }
+
+/** The views a new analysis starts with. "compare" is left out: computing driver/any/p for every
+ *  gene across every cohort is by far the slowest view, and this set exists to make Analyze feel
+ *  instant — add it per document with "+ Compare genes". */
+export const DEFAULT_VIEWS: View[] = [
+  { kind: "survival" },
+  { kind: "oncoprint", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR"] }
+];

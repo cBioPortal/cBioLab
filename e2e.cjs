@@ -616,7 +616,9 @@ async function main() {
       // code path — and the one most likely to be left behind. It is also the one view
       // the BROWSER draws, from the binary contract, so the card must hold a canvas and
       // the SQL that produced it. This document (default views) actually contains one.
-      const onco = await page.evaluate(() => {
+      // The oncoprint fetches its own contract after the document runs, so it can still be loading
+      // here; wait for it to draw (or give up and report what is on screen).
+      const oncoState = () => page.evaluate(() => {
         for (const card of document.querySelectorAll(".ana-grid .card")) {
           const h = card.querySelector("h2");
           if (!h || !h.textContent.trim().startsWith("Oncoprint")) continue;
@@ -631,6 +633,9 @@ async function main() {
         }
         return { found: false };
       });
+      let onco = await oncoState();
+      for (let t0 = Date.now(); !(onco.found && onco.queries > 0 && onco.drawn) && Date.now() - t0 < 120000; onco = await oncoState())
+        await page.waitForTimeout(300);
       // Views can be removed one at a time, and the document follows.
       let beforeN = 0, afterKinds = [];
       try {
@@ -965,12 +970,21 @@ async function main() {
       sp.on("request", (r) => { if (/\/api\/(explore|cohort)/.test(r.url())) apiCalls++; });
       await sp.locator('button:has-text("add / change studies")').click();
       await sp.waitForSelector(".applybar", { timeout: 60000 });
+      // "add all" over every study is refused, naming the limit: each study adds dozens of
+      // facet queries, and nothing here needs more than a handful
+      const addAll = sp.locator('button.facet:has-text("add all")').first();
+      const refused = await addAll.isDisabled();
+      const refusedWhy = (await addAll.getAttribute("title")) || "";
+      ok("add all is refused past 30 studies, saying so", refused && /at most 30 studies/.test(refusedWhy), refusedWhy.slice(0, 90));
+      // a narrow search: two ticks, then add all picks up the rest of it
+      await sp.locator('input[placeholder^="search name"]').fill("thymoma");
+      await sp.waitForTimeout(300);
       const boxes = sp.locator('.study-row input[type=checkbox]');
-      for (let i = 0; i < 4; i++) { await boxes.nth(i).click(); await sp.waitForTimeout(250); }
-      await sp.locator('button.facet:has-text("add all")').first().click();
+      for (let i = 0; i < 2; i++) { await boxes.nth(i).click(); await sp.waitForTimeout(250); }
+      await addAll.click();
       await sp.waitForTimeout(2500);                  // well past the 350ms fetch debounce
       ok("staging studies queries nothing", apiCalls === 0,
-        apiCalls === 0 ? "0 requests over 4 ticks + add-all" : apiCalls + " request(s) fired before submit");
+        apiCalls === 0 ? "0 requests over 2 ticks + add-all" : apiCalls + " request(s) fired before submit");
       const bar = (await sp.locator(".applybar").innerText()).replace(/\s+/g, " ");
       ok("the staged bar distinguishes staged from applied", /not queried yet/.test(bar), bar.slice(0, 80));
       // and submit must actually apply it
@@ -992,6 +1006,8 @@ async function main() {
 
   // the analysis page's requests finishing out of order (e2e-lab-races.cjs)
   await require("./e2e-lab-races.cjs").labRaces(browser, ok, BASE);
+  // the Saved tab's lists: loading, failed and empty said apart; a re-save updates (e2e-saved.cjs)
+  if (LOGIN) await require("./e2e-saved.cjs").savedLists(browser, ok, BASE, LOGIN);
 
   await browser.close();
 

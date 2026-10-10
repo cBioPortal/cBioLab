@@ -87,7 +87,9 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
             ? res.plot.data.n.toLocaleString() + " of " + res.plot.data.coverage.total.toLocaleString() + " samples have both · " : ""}drag a box to filter</span>
         </div>
         <div className="xc-body">
-          {res && res.plot && res.plot.data && res.plot.data.shape === "scatter" &&
+          {res && res.plot && res.plot.data && res.plot.data.shape === "scatter" && !res.plot.data.grid &&
+            <p className="note">no sample in the selection has both values</p>}
+          {res && res.plot && res.plot.data && res.plot.data.shape === "scatter" && res.plot.data.grid &&
             <Density data={res.plot.data} onSelect={(x0, x1, y0, y1) => addClauses([
               // the x axis is log10(count + 1): back to whole counts, the box's inside edges
               { kind: "clinical", attribute: X_ATTR, range: { gte: Math.ceil(10 ** x0 - 1 - 1e-9), lte: Math.floor(10 ** x1 - 1 + 1e-9) }, per: "sample" },

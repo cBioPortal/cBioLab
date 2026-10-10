@@ -1,37 +1,40 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import CohortPills, { normalizeDef } from "./pills";
-import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
-import { MORE_KINDS, isMoreKind, moreSub, MoreControls, MoreBody, defaultMoreView, drawsOwnWaiting } from "./more-views";
+import CohortPills from "./pills";
+import { MORE_KINDS, isMoreKind, defaultMoreView } from "./more-views";
 import { ExploreCharts } from "./explore-charts";
 import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
-import { OncoprintCard, Waiting, GeneListEditor, pruneSort } from "../_oncoprint/OncoprintCard.tsx";
-import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
+import { GeneListEditor, pruneSort } from "../_oncoprint/OncoprintCard.tsx";
+import { type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 import { parameterize } from "../../lib/params.ts";
-import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, View, OncoprintView, ExploreResult, KmCurve, PartitionDef } from "../../lib/types.ts";
-import { EXAMPLES as DOC_EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
-import { survivalAxis } from "../../lib/stats.ts";
-import { MethodPanel } from "./method-panel.tsx";
+import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, OncoprintView, PartitionDef } from "../../lib/types.ts";
+import type { DslExample } from "../../lib/dsl-reference.ts";
 import { foldEventNames } from "../../lib/event-names.ts";
 import { installLabTools, LAB_TOOL_NAMES, type LabBridge } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
-import CustomDataPanel, { useCustomDataState } from "./custom-data-panel.tsx";
+import { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import LoginButton from "./login-button.tsx";
-import { PartitionPanel, SplitForm, ChartMenu, type SplitSpec } from "./partitions.tsx";
-import { withoutPartition, armsFromSelection, renamePartitionChild, expandSplits, flattenSplits, editSplits, splitKey, renameInViews, type ChartKey, type PartitionShape } from "../../lib/partition-arms.ts";
+import { PartitionPanel, SplitForm, type SplitSpec } from "./partitions.tsx";
+import { withoutPartition, renamePartitionChild, expandSplits, flattenSplits, editSplits, splitKey, renameInViews, type PartitionShape } from "../../lib/partition-arms.ts";
 import { DOC_VERSION, upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
-import { saveToServer, requestLogin, referencedDatasets, customDataKey, bindUploads, unresolvedUploads, featureFromCohort, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
-import { isCustomAttr, parseCustomAttr } from "../../lib/custom-data-names.ts";
-import { useDocStore } from "./doc-store.ts";
+import { saveToServer, requestLogin, referencedDatasets, bindUploads, unresolvedUploads, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
+import { useDocStore, DEFAULT_VIEWS } from "./doc-store.ts";
+import { useExploreState } from "./use-explore-state.ts";
+import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
 import { useAnalysis, seedAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
-import { AxisPicker, useGearmenuOpen, ViewHelpButton, SplitByNote, PickMenu, CohortNode, CohortPicker, DrawnCohorts, CohortStudies, ViewHead, ViewMenu, CohortEditMenu, Latency, CAT_COLORS, Participation } from "./view-chrome.tsx";
+import { useGearmenuOpen, CohortNode, CohortStudies, ViewHead, CohortEditMenu, CAT_COLORS } from "./view-chrome.tsx";
 import { api } from "./api.ts";
+import { useSavedArtifacts } from "./use-saved.ts";
+import { SavedTab } from "./saved-tab.tsx";
+import { ExamplesTab } from "./examples-tab.tsx";
+import { ViewCard, KMChart } from "./view-cards.tsx";
+import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
+import { CohortEditDialog, ViewNoteDialog, WorkspaceDialog } from "./dialogs.tsx";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -53,37 +56,6 @@ function tabFromParams(sp: SearchParams): typeof TABS[number] {
   return typeof sp.doc === "string" ? "analysis" : "explore";
 }
 
-/**
- * Which clinical attributes draw as a pie rather than a table — a fixed
- * editorial choice, not a live count. It used to be "distinct values above
- * some limit renders as a table", computed from whichever studies happen to
- * be selected — so the SAME attribute could be a table in one study and a
- * pie in another, or flip mid-session the moment the study selection
- * changed: msk_chord_2024 alone has few enough Cancer Type values to clear
- * that bar, add genie_public and it doesn't. A chart's TYPE changing under
- * the reader is worse than a chart being the "wrong" shape for a given
- * study, so this is now a name-based allowlist, frozen regardless of the
- * data. Anything not listed here draws as a table — the safe default,
- * since a table degrades gracefully to any cardinality and a pie with 30
- * slices does not. Extend this list rather than reintroducing a threshold.
- */
-const PIE_ATTRIBUTES = new Set([
-  "SEX", "GENDER",
-  "OS_STATUS", "DFS_STATUS", "DSS_STATUS", "PFS_STATUS", "RFS_STATUS",
-  "SAMPLE_TYPE", "SOMATIC_STATUS"
-]);
-
-/** Explore's "Derived" card (data-shape facets: follow-up, history, distinct altered
- *  genes) is hidden for now, at the user's request — flip back on rather than delete
- *  the render, since the underlying facets/logic are unaffected. */
-const SHOW_DERIVED_FACETS = false;
-
-
-/** p-values: exponent notation once fixed notation would round to zero, and an
- *  honest floor when the true value underflows double precision. Returns the
- *  whole "p=..." / "p<..." label so the relation stays attached to the number. */
-const fmtP = (p: number): string =>
-  p === 0 ? "p < 1e-300" : p < 1e-4 ? "p=" + p.toExponential(1) : "p=" + p.toFixed(4);
 /**
  * Says, on every visualization, whether patient-level data was involved in
  * producing it. "aggregate-only" means no participant returned an identifier —
@@ -145,63 +117,7 @@ function AddCohortBar({ existing, ready, error, onAdd, onCancel }: {
   );
 }
 
-function Updating() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [top, setTop] = useState(0);
-  useLayoutEffect(() => {
-    const card = ref.current?.parentElement;
-    if (!card) return;
-    const measure = () => {
-      const at = card.getBoundingClientRect().top;
-      let bottom = 0;
-      card.querySelectorAll(":scope > .vhead, :scope > .viewtb, :scope > .viewtb-more, :scope > .basis")
-        .forEach((n) => { bottom = Math.max(bottom, n.getBoundingClientRect().bottom - at); });
-      setTop(bottom ? bottom + 6 : 0);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(card);
-    return () => ro.disconnect();
-  }, []);
-  return (
-    <div ref={ref} className="view-updating" style={{ top }} role="status" aria-live="polite">
-      <div className="loading-block"><span className="spinner" /> updating…</div>
-      <div className="skeleton" />
-    </div>
-  );
-}
-
-/**
- * A dialog's text field that keeps its keystrokes to itself. As page state, every keystroke
- * re-rendered the whole analysis page — every view card, the oncoprint, the inlined figures —
- * about 350 ms a key with a few views open. The page reads the text from `draft` (a ref, so
- * writing it renders nothing) when the dialog is saved, and hears only when the field turns
- * empty or non-empty, which is all a Save button's disabled state needs. Give it a fresh `key`
- * each time its dialog opens so it starts from `initial`.
- */
-function DraftText({ draft, initial, multiline, onFilled, ...rest }: {
-  draft: React.MutableRefObject<string>; initial: string; multiline?: boolean; onFilled?: (filled: boolean) => void;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement> & React.TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange" | "defaultValue">) {
-  const [v, setV] = useState(() => { draft.current = initial; return initial; });
-  const change = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const next = e.target.value;
-    if (onFilled && !!next.trim() !== !!draft.current.trim()) onFilled(!!next.trim());
-    draft.current = next;
-    setV(next);
-  };
-  return multiline ? <textarea {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)} value={v} onChange={change} />
-    : <input {...(rest as React.InputHTMLAttributes<HTMLInputElement>)} value={v} onChange={change} />;
-}
-
-
-/** the same value for a table cell, where the column header already says "p" */
-const pCell = (p: number): string =>
-  p === 0 ? "< 1e-300" : p < 1e-4 ? p.toExponential(1) : p.toFixed(4);
-/** true when two p-values land on opposite sides of the conventional threshold */
-const crossesThreshold = (a: number, b: number): boolean => (a < 0.05) !== (b < 0.05);
 const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
-/** the synthetic eventType the server's derived treatment-line logic (lib/compiler.ts LINE_TYPE) recognizes */
-const LINE_TYPE = "Treatment line (derived)";
 
 interface Example { name: string; desc: string; def: CohortDef }
 const EXAMPLES: Example[] = [
@@ -229,101 +145,8 @@ const EXAMPLES: Example[] = [
     def: { study: "brca_tcga_pan_can_atlas_2018", all: [{ kind: "oql", q: "ERBB2: EXP>2" }] } }
 ];
 
-function KMChart({ curves, cutoffMonths, tickMonths, incidence }:
-  { curves: KmCurve[]; cutoffMonths?: number; tickMonths?: number; incidence?: boolean }) {
-  const ref = useRef<HTMLCanvasElement | null>(null);
-  useEffect(() => {
-    const c = ref.current; if (!c) return;
-    const dpr = window.devicePixelRatio || 1;
-    const W = c.clientWidth, H = 260;
-    c.width = W * dpr; c.height = H * dpr; c.style.height = H + "px";
-    const ctx = c.getContext("2d"); if (!ctx) return; ctx.scale(dpr, dpr);
-    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const grid = dark ? "#2a353c" : "#dde4e8", muted = dark ? "#93a3ad" : "#5b6b76";
-    const L = 44, R = 10, T = 10, B = 28;
-    const { tMax, step } = survivalAxis(curves, { cutoffMonths, tickMonths });
-    const x = (t: number) => L + (W - L - R) * t / tMax, y = (s: number) => T + (H - T - B) * (1 - s);
-    ctx.strokeStyle = grid; ctx.fillStyle = muted; ctx.font = "10px 'IBM Plex Sans',sans-serif";
-    for (const s of [0, 0.25, 0.5, 0.75, 1]) {
-      ctx.beginPath(); ctx.moveTo(L, y(s)); ctx.lineTo(W - R, y(s)); ctx.stroke();
-      ctx.fillText(Math.round(s * 100) + "%", 8, y(s) + 3);
-    }
-    for (let t = 0; t <= tMax; t += step) ctx.fillText(t + "mo", x(t) - 8, H - 10);
-    curves.forEach((cv, i: number) => {
-      ctx.strokeStyle = CAT_COLORS[i % CAT_COLORS.length]; ctx.lineWidth = 2; ctx.beginPath();
-      let py = y(incidence ? 0 : 1); ctx.moveTo(x(0), py);
-      for (const p of cv.points) { const nx = x(p.t), ny = y(p.s); ctx.lineTo(nx, py); ctx.lineTo(nx, ny); py = ny; }
-      ctx.lineTo(x(tMax), py); ctx.stroke();
-    });
-  }, [curves, cutoffMonths, tickMonths, incidence]);
-  return <canvas ref={ref} style={{ width: "100%", display: "block" }} />;
-}
-
-/** Explore opens on these: one deeply-annotated MSK study and one large
- *  consortium cohort on the peer instance, so federation is visible up front. */
-
 // already the current version, so opening the page normalizes (and writes into the URL) nothing
 const EMPTY_DOC: AnalysisDoc = { dsl: DOC_VERSION, cohorts: {}, views: [] };
-// "compare" dropped from the default set: computing driver/any/p for 7 genes
-// across every cohort is by far the slowest of the three, and this set exists
-// to make Analyze feel instant, not to be exhaustive — add it back per-document
-// with "+ Compare genes" when you actually want it.
-const DEFAULT_VIEWS: View[] = [
-  { kind: "survival" },
-  { kind: "oncoprint", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR"] }
-];
-
-/**
- * One editable template parameter. The control follows the value's TYPE, so a
- * gene list edits as chips and a study edits as text — the point of a template
- * is that retargeting is a normal edit, not JSON surgery.
- */
-function ParamRow({ name, value, busy, onChange }:
-  { name: string; value: unknown; busy: boolean; onChange: (v: unknown) => void }) {
-  const [add, setAdd] = useState("");
-  if (Array.isArray(value)) {
-    const items = value.map(String);
-    return (
-      <div className="paramrow">
-        <code>${name}</code>
-        <div className="pillwrap">
-          {items.map(x => (
-            <button key={x} type="button" className="pill" disabled={busy}
-              title={"remove " + x} onClick={() => onChange(items.filter(y => y !== x))}>
-              {x} <span aria-hidden="true">×</span>
-            </button>
-          ))}
-          <input list="view-genes" placeholder="add…" value={add} disabled={busy}
-            style={{ width: "7rem" }}
-            onChange={e => setAdd(e.target.value.toUpperCase())}
-            onKeyDown={e => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              const v = add.trim().toUpperCase();
-              if (v && !items.includes(v)) onChange([...items, v]);
-              setAdd("");
-            }} />
-        </div>
-      </div>
-    );
-  }
-  if (typeof value === "number") {
-    return (
-      <div className="paramrow">
-        <code>${name}</code>
-        <input type="number" value={value} disabled={busy}
-          onChange={e => onChange(Number(e.target.value))} />
-      </div>
-    );
-  }
-  return (
-    <div className="paramrow">
-      <code>${name}</code>
-      <input value={String(value ?? "")} disabled={busy}
-        onChange={e => onChange(e.target.value)} />
-    </div>
-  );
-}
 
 export default function AnalysisPage() {
   // Read through useSearchParams, never `use(searchParams)`: every syncUrl() is a
@@ -343,41 +166,20 @@ export default function AnalysisPage() {
    *  between them ("manage on the Saved tab"); one tab, two sub-tabs instead. */
   const [cohortsSubTab, setCohortsSubTab] = useState<"cohorts" | "analyses">("cohorts");
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
-  const [copied, setCopied] = useState<string | null>(null);
-  const [exMsg, setExMsg] = useState<string | null>(null);
-  /** the facet whose "split by this" is waiting on the server's proposed arms */
-  const [splittingBy, setSplittingBy] = useState<string | null>(null);
-  /**
-   * Explore opened over the analysis to add one cohort to it ("+ Add cohort"), with the Explore
-   * state it replaced, restored when it closes so the Explore tab is as the reader left it.
-   */
-  const [addMode, setAddMode] = useState<null | { ids: string[]; text: string; explore: ExploreResult | null }>(null);
   /** set when an opened document was written for an older version and has been upgraded */
   const [upgradeNote, setUpgradeNote] = useState<DocUpgrade | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [cdFocus, setCdFocus] = useState<CustomDataFocus | null>(null);
-  // Explore → Custom data lives in the add-chart dialog, which exists only once Explore has
-  // facets; asked for from elsewhere (a banner, the data dialog) it opens when they arrive
-  const [wantCustomManager, setWantCustomManager] = useState(false);
   /** the `custom` tag on a cohort's pill: that clause's upload, scoped to the clause */
   const showClauseData = (cohort?: string): OnCustomData => (attribute, leaf, negated) =>
     setCdFocus({ datasets: referencedDatasets({ a: attribute }), clause: { attribute, leaf, cohort, negated } });
-  const [saveName, setSaveName] = useState("");
   const [genesFor, setGenesFor] = useState<number | null>(null);
   const genesDialog = useRef<HTMLDialogElement | null>(null);
-  const saveDialog = useRef<HTMLDialogElement | null>(null);   // Explore action-bar feedback
-  /** Explore's "+ Add chart": clinical/gene/derived-timeline filter builders live
-   *  here instead of as three permanent cards above the facet grid. */
-  const addChartDialog = useRef<HTMLDialogElement | null>(null);
-  const [chartTab, setChartTab] = useState<"clinical" | "gene" | "derived" | "custom">("clinical");
   const customState = useCustomDataState();
   const tabRef = useRef<string>(tabFromParams(sp));            // the tab syncUrl should record
-  const exInflight = useRef<string | null>(null);            // dedupe identical in-flight facet requests
-  const exAbort = useRef<AbortController | null>(null);      // cancel a facet request the reader has moved past
   /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
   const menuOpenRef = useRef(new Map<string, boolean>());
   const moreDerivedMenu = useGearmenuOpen("explore:more-derivations", menuOpenRef.current);
-  const [cat, setCat] = useState<any>(null);                 // event/endpoint catalog for the survival control
   const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>"
   /**
    * The document's raw JSON is a place to inspect and share what was asked, not something to
@@ -414,11 +216,8 @@ export default function AnalysisPage() {
   const [uiError, setError] = useState<string | null>(null);
   // a different document starts with nothing to apologise for
   useEffect(() => { setError(null); }, [docs.current.doc]);
-  const [saved, setSaved] = useState<Record<string, { id: string; def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null }>>({});
-  const [cName, setCName] = useState("");
-  const [cDefText, setCDefText] = useState(JSON.stringify({ all: [] }, null, 2));
   const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
-  const [studies, setStudies] = useState<{ id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string }[]>([]);
+  const studies = useStudies();
   const studyNames = useMemo(() => new Map(studies.map((s) => [s.id, s.name] as const)), [studies]);
   const [study, setStudy] = useState("msk_chord_2024");
 
@@ -444,180 +243,25 @@ export default function AnalysisPage() {
   const pendingKeys = analysis.pending;
   const busy = analysis.busy || validating || linkLoading;
   const error = uiError || normalizeError || analysis.error;
-  const [explore, setExplore] = useState<ExploreResult | null>(null);
-  const [exploreBusy, setExploreBusy] = useState(false);
-  const [trackAttrs, setTrackAttrs] = useState<{ key: string; attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[]; gaProfiles: string[] }>({ key: "", attrs: [], profiles: [], gaProfiles: [] }); // track picker options
-  /** the clinical-attribute catalog above is being fetched — a picker shows a loader, not "none" */
-  const [trackAttrsLoading, setTrackAttrsLoading] = useState(false);
-  /** the study catalog (`cat`: endpoints, event types) is being fetched */
-  const [catLoading, setCatLoading] = useState(false);
-  const [sQuery, setSQuery] = useState("");                             // study-panel search
-  const [sCaps, setSCaps] = useState<Set<string>>(() => new Set());                  // study-panel capability filters
-  const [exStudies, setExStudies] = useState<string[]>([]); // studies being explored (checkboxes); none until the reader picks
-  const [exPanelOpen, setExPanelOpen] = useState(false);                // study panel expanded?
-  const exSel = useRef<string[]>([]);                   // current selection (ref: immune to state races)
-  const exFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);                                    // debounce for multi-toggle refetch
-  const exFetchSeq = useRef(0);
-  /** facets from the last UNNARROWED response — the bar is always computed from these */
-  const exFullAttrsRef = useRef<{ attribute: string; studyCount: number }[]>([]);                                         // stale-response guard for explore fetches
-  /**
-   * Clinical attribute order, pinned from the last response with NO facet
-   * selection applied. The server sorts attributes by priority then by
-   * coverage WITHIN the current draft (lib/explore.ts) — so two attributes
-   * with similar coverage overall can swap places the moment a selection
-   * changes who is being counted, and the whole page reshuffles under the
-   * reader even though no number is wrong. This is the reference point that
-   * stops that: it only moves when the draft is empty (a real re-scoping —
-   * changing studies, or clearing filters), never as a side effect of a
-   * click. Keyed by `per|attribute` to match the `data-attr` the DOM uses.
-   */
-  const attrOrderRef = useRef<string[] | null>(null);
-  const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
-  /**
-   * Minimum share of the selected studies an attribute must appear in to be
-   * shown. Across 64 studies the union of vocabularies is 1,634 facets, and the
-   * ones every study shares — CANCER_TYPE, SEX, OS_STATUS — are lost in it. This
-   * also narrows the NEXT request: the server is told which attributes to facet,
-   * so it stops computing the ones being hidden.
-   */
-  /**
-   * The study picker's STAGED selection. null means "not staging" — the picker
-   * is closed and the applied set is authoritative.
-   *
-   * Ticking a box used to call setExploreStudies, which debounces a facet fetch
-   * 350ms later: assembling a ten-study selection fired ten requests, nine of
-   * them for a selection the reader was still in the middle of describing, and
-   * at this scale each one is seconds of ClickHouse work. Staging makes the
-   * cost proportional to intent — one request when they say they are done.
-   */
-  const [exDraftStudies, setExDraftStudies] = useState<string[] | null>(null);
-  /** genes charted as their own alteration facet (the portal's per-gene charts) */
-  const [geneCharts, setGeneCharts] = useState<string[]>([]);
-  const geneChartsRef = useRef<string[]>([]);   // fetchExplore reads this, not the closure
-  /** derived facets beyond the fixed three, switched on from "show more derivations" */
-  const [exExtraDerived, setExExtraDerived] = useState<{ metric: "lines" | "treatmentSpan"; eventType: string; lineGap?: number }[]>([]);
-  const exExtraDerivedRef = useRef<typeof exExtraDerived>([]);   // fetchExplore reads this, not the closure
-  const [geneChartInput, setGeneChartInput] = useState("");
-  /** the header lists selected studies as chips; past a handful it is summarised */
-  const [studyChipsOpen, setStudyChipsOpen] = useState(false);
-  const [geneFilter, setGeneFilter] = useState<Record<string, string>>({});   // per-table gene box, client-side
-  const [clinFilter, setClinFilter] = useState("");                            // narrows the attribute checklist in "+ Add chart", not the grid itself
-  /** attributes unchecked in the "+ Add chart" > Clinical picker — keyed "per|attribute",
-   *  matching data-attr. Empty means every attribute shows, the same default as before
-   *  there was a picker at all. */
-  const [hiddenAttrs, setHiddenAttrs] = useState<Set<string>>(new Set());
-  const [attrCoverage, setAttrCoverage] = useState(0);                       // clinical attributes shown
-  /**
-   * The "sequence / line filter" popover's draft — an A/[B] pair plus a
-   * temporal relation, built into one `event` clause on submit. Kept as its
-   * own form state (not applied to the draft until "add filter") because,
-   * unlike every other facet, it has several fields that only mean something
-   * together — a lone eventType pick here is not itself a valid clause.
-   */
-  const [seq, setSeq] = useState<{
-    aType: string; aOcc: "ANY" | "FIRST" | "LAST"; aLineOp: "=" | ">=" | "<="; aLineNo: string;
-    rel: "NONE" | "BEFORE" | "DURING" | "NOT_FOLLOWED_BY";
-    bType: string; bOcc: "ANY" | "FIRST" | "LAST"; bLineOp: "=" | ">=" | "<="; bLineNo: string;
-    days: string; priorGuard: boolean; lineGap: number;
-  }>({ aType: "", aOcc: "ANY", aLineOp: "=", aLineNo: "", rel: "NONE",
-       bType: "", bOcc: "ANY", bLineOp: "=", bLineNo: "", days: "180", priorGuard: false, lineGap: 90 });
+  // what the pickers offer (app/lab/use-catalogs.ts): the study's timeline and survival endpoints,
+  // and the clinical attributes and profiles across the result's studies; while either is being
+  // fetched a picker shows a loader, not "none"
+  const { cat, catLoading } = useStudyCatalog(study);
+  const { trackAttrs, trackAttrsLoading } = useTrackAttrs(result);
 
-  /**
-   * Saved workspaces. A workspace IS the analysis document — several views,
-   * their notes, and any template parameters — so persistence is deliberately
-   * schemaless: the whole document is stored verbatim under a name, exactly as
-   * saved cohorts already are. Nothing is normalised, so a document written by a
-   * newer build still loads, and anything the app cannot interpret survives a
-   * round trip instead of being dropped.
-   *
-   * Both this and saved cohorts now live in the shared Postgres artifact store
-   * (lib/artifacts.ts) rather than localStorage — server-side, so a save
-   * outlives the browser that made it, but SHARED: there is no per-user
-   * ownership yet (see HANDOFF.local.md), so anyone using the app can see,
-   * rename or delete anything saved here. Naming stays the identity a person
-   * types (upsert by name, matching the old localStorage behaviour); the real
-   * identity is the server-assigned id, kept alongside it.
-   */
-  type Workspace = { id: string; doc: AnalysisDoc; savedAt: string };
-  const [spaces, setSpaces] = useState<Record<string, Workspace>>({});
-  const [wsName, setWsName] = useState("");
+  const [wsOpen, setWsOpen] = useState(false);
   const [wsError, setWsError] = useState<string | null>(null);
-  const wsDialog = useRef<HTMLDialogElement | null>(null);
 
   // ---- editing a cohort's name/note (the gear menu's "edit…") -------------
   const [cohortEditing, setCohortEditing] = useState<string | null>(null); // the name AS IT IS in doc.cohorts right now
-  const [ceName, setCeName] = useState("");
-  const [ceNotes, setCeNotes] = useState("");
-  const [ceError, setCeError] = useState<string | null>(null);
-  const cohortEditDialog = useRef<HTMLDialogElement | null>(null);
 
   // ---- editing a view's note (the gear menu's "add note…" / "edit note…") -
   const [viewNoteEditing, setViewNoteEditing] = useState<number | null>(null); // index into doc.views / result.views
-  const [vnText, setVnText] = useState("");
-  // what the text dialogs' fields hold while being typed in (see DraftText), a generation
-  // bumped on every open so each field starts fresh, and whether the gating field is non-empty
-  const saveDraft = useRef(""), wsDraft = useRef(""), ceNameDraft = useRef(""), ceNotesDraft = useRef(""), vnDraft = useRef("");
-  const [draftGen, setDraftGen] = useState(0);
-  const [draftFilled, setDraftFilled] = useState(false);
-  const viewNoteDialog = useRef<HTMLDialogElement | null>(null);
 
-  /** Postgres timestamptz -> the same "YYYY-MM-DD HH:MM" the app has always shown. */
-  const fmtDate = (iso: string) => iso.slice(0, 16).replace("T", " ");
-
-  async function apiSaveArtifact(kind: "cohort" | "workspace", existingId: string | undefined, name: string, definition: unknown) {
-    const res = existingId
-      ? await fetch("/api/artifacts/" + existingId, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, definition }) })
-      : await fetch("/api/artifacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, name, definition }) });
-    const j = await res.json();
-    if (!res.ok || j.error) throw new Error(j.error || res.statusText);
-    return j.artifact as { id: string; name: string; definition: unknown; updatedAt: string };
-  }
-  async function apiDeleteArtifact(id: string) {
-    const res = await fetch("/api/artifacts/" + id, { method: "DELETE" });
-    if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || res.statusText); }
-  }
-
-  const persistSpaces = async (name: string, docToSave: AnalysisDoc) => {
-    const a = await apiSaveArtifact("workspace", spaces[name]?.id, name, docToSave);
-    setSpaces(prev => ({ ...prev, [name]: { id: a.id, doc: a.definition as AnalysisDoc, savedAt: fmtDate(a.updatedAt) } }));
-  };
-  const removeSpace = async (name: string) => {
-    const id = spaces[name]?.id;
-    if (id) await apiDeleteArtifact(id);
-    setSpaces(prev => { const nx = { ...prev }; delete nx[name]; return nx; });
-  };
-
-  const persist = async (name: string, def: CohortDef, lastEval: { count: number; text?: string } | null) => {
-    const a = await apiSaveArtifact("cohort", saved[name]?.id, name, def);
-    setSaved(prev => ({ ...prev, [name]: { id: a.id, def: a.definition as CohortDef, savedAt: fmtDate(a.updatedAt), lastEval } }));
-  };
-  const removeSaved = async (name: string) => {
-    const id = saved[name]?.id;
-    if (id) await apiDeleteArtifact(id);
-    setSaved(prev => { const nx = { ...prev }; delete nx[name]; return nx; });
-  };
-
-  // Saved cohorts and analyses belong to the login (lib/auth.ts): read when it is in, cleared
-  // when it goes, so a logged-out page never shows someone's saved work.
+  // Saved cohorts and analyses belong to the login (lib/auth.ts): see use-saved.ts.
   const loggedIn = customState.unlocked;
-  useEffect(() => {
-    if (!loggedIn) { setSaved({}); setSpaces({}); return; }
-    // a reply that lands after logging out must not put the saved work back on the page
-    let live = true;
-    fetch("/api/artifacts?kind=cohort").then(r => r.json()).then(j => {
-      if (!live) return;
-      const map: typeof saved = {};
-      for (const a of j.artifacts || []) map[a.name] = { id: a.id, def: a.definition, savedAt: fmtDate(a.updatedAt), lastEval: null };
-      setSaved(map);
-    }).catch(() => {});
-    fetch("/api/artifacts?kind=workspace").then(r => r.json()).then(j => {
-      if (!live) return;
-      const map: typeof spaces = {};
-      for (const a of j.artifacts || []) map[a.name] = { id: a.id, doc: a.definition, savedAt: fmtDate(a.updatedAt) };
-      setSpaces(map);
-    }).catch(() => {});
-    return () => { live = false; };
-  }, [loggedIn]);
+  const savedArtifacts = useSavedArtifacts(loggedIn);
+  const { cohorts: saved, workspaces: spaces, saveCohort: persist, saveWorkspace: persistSpaces, removeWorkspace: removeSpace } = savedArtifacts;
   /** Saving needs the login: logged out, ask for it rather than fail. Returns true when saving may go ahead. */
   const canSave = (): boolean => {
     if (loggedIn) return true;
@@ -626,16 +270,17 @@ export default function AnalysisPage() {
     return false;
   };
 
+  // A selection (from a ?doc= link) may name studies this deployment does not hold; once the list
+  // arrives, keep only what is reachable. Nothing is chosen for the reader: with no selection
+  // Explore asks.
   useEffect(() => {
-    fetch("/api/studies").then(r => r.json()).then(j => {
-      const list = j.studies || [];
-      setStudies(list);
-      // A selection (from a ?doc= link) may name studies this deployment does not hold; keep only
-      // what is reachable. Nothing is chosen for the reader: with no selection Explore asks.
-      const have = new Set(list.map((s: { id: string }) => s.id));
-      const keep = exSel.current.filter((id) => have.has(id));
-      if (list.length && keep.join(",") !== exSel.current.join(",")) setExploreStudies(keep);
-    }).catch(() => {});
+    if (!studies.length) return;
+    const have = new Set(studies.map((s) => s.id));
+    const keep = exSel.current.filter((id) => have.has(id));
+    if (keep.join(",") !== exSel.current.join(",")) setExploreStudies(keep);
+  }, [studies]); // eslint-disable-line
+
+  useEffect(() => {
     // tab itself is already correct from the initial render (see initialTab()) — this
     // only needs to fetch what that landing tab needs and hydrate a shared ?doc= link.
     // A ?doc= link's study must land in exSel BEFORE fetchExplore reads it: doing
@@ -695,155 +340,11 @@ export default function AnalysisPage() {
     return { count: c.count, text: c.text };
   };
 
-  /** Explore's top action bar: acting on the draft you have built by clicking facets. */
-  /**
-   * What the top bar acts on. With no clauses that is every patient in the
-   * selected studies — a real cohort, and the denominator for everything else —
-   * so exploring a study and hitting Analyze works without filtering first.
-   */
-  const barDef = (): CohortDef | null => {
-    if (!exSel.current.length) return null;
-    return parseDraft() || draftScaffold(exSel.current);
-  };
-  const barDefaultName = () =>
-    parseDraft() ? "explored cohort"
-      : exSel.current.length === 1 ? "all of " + exSel.current[0] : "all selected studies";
-  /**
-   * Analyze starts a FRESH analysis of the explored cohort: it replaces the
-   * document rather than merging into it, because that is what the word means —
-   * you asked to analyse this, not to add it to whatever was there before.
-   * Build a multi-cohort comparison by ticking cohorts in the Cohorts tab and
-   * hitting "Analyze selected".
-   */
-  const analyzeDraft = () => {
-    const d = barDef();
-    if (!d) { setExMsg("select at least one study first"); return; }
-    setExMsg(null);
-    // Named from the draft, not from cName: that field lives on the Cohorts tab
-    // and is invisible here, so inheriting it made the analysis arrive under a
-    // name with no on-screen explanation.
-    const name = barDefaultName();
-    const nextStudy = exSel.current[0] || study;
-    const nd: AnalysisDoc = { study: nextStudy, cohorts: { [name]: d }, views: DEFAULT_VIEWS };
-    setStudy(nextStudy);
-    docs.replace(nd);
-    setError(null);     // never leave the previous run's numbers on screen
-    goTab("analysis");
-  };
-  /**
-   * Analyze the selection split by one facet: the same fresh analysis as Analyze, with the
-   * selection divided into arms that add up to it and every view comparing the arms. The arms
-   * come from the server (counted per patient within the selection), not from the facet's own
-   * bars, which may count samples or show only the top values.
-   */
-  const splitDraftBy = async (spec: SplitSpec, label: string) => {
-    const d = barDef();
-    if (!d) { setExMsg("select at least one study first"); return; }
-    setExMsg(null); setSplittingBy(label);
-    const name = barDefaultName();
-    const nextStudy = exSel.current[0] || study;
-    const base: AnalysisDoc = { study: nextStudy, cohorts: { [name]: d }, views: DEFAULT_VIEWS };
-    try {
-      const { name: sn, def } = await proposePartition({ doc: base, cohort: name, ...spec });
-      const nd: AnalysisDoc = editSplits({ ...base, dsl: DOC_VERSION, views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, sn)] })) },
-        (f) => ({ ...f, partitions: { [splitKey(name, sn)]: { ...def, split: sn } } }));
-      setStudy(nextStudy);
-      docs.replace(nd);
-      setError(null);
-      goTab("analysis");
-    } catch (e) { setExMsg("Could not split by " + label + ": " + String((e as Error)?.message || e)); }
-    setSplittingBy(null);
-  };
-  /**
-   * Analyze the selection with one chart's selected items as the arms: each item an arm, in the
-   * order clicked, and the rest of the selection as the cohort being split. No server proposal —
-   * the arms are the clauses already on screen.
-   */
-  const selectionArmCount = (chart: ChartKey): number => {
-    const d = parseDraft();
-    if (!d) return 0;
-    try { return armsFromSelection(d, chart)?.arms.length ?? 0; } catch { return 9; }
-  };
-  const splitDraftBySelection = (chart: ChartKey, label: string) => {
-    const d = parseDraft();
-    if (!d) return;
-    let r: ReturnType<typeof armsFromSelection>;
-    try { r = armsFromSelection(d, chart); } catch (e) { setExMsg("Could not split by the selected " + label + ": " + String((e as Error)?.message || e)); return; }
-    if (!r) return;
-    setExMsg(null);
-    const name = r.base.all.length ? "explored cohort"
-      : exSel.current.length === 1 ? "all of " + exSel.current[0] : "all selected studies";
-    const parent: CohortDef = r.base.all.length ? { ...d, all: r.base.all } : { ...(draftScaffold(exSel.current) as CohortDef) };
-    const nextStudy = exSel.current[0] || study;
-    const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: { ...parent, splits: { [label]: { arms: r.arms } } } },
-      views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, label)] })) };
-    setStudy(nextStudy);
-    docs.replace(nd);
-    setError(null);
-    goTab("analysis");
-  };
-  /**
-   * Saving asks for a name when you ask to save, rather than keeping a field in
-   * the bar. The bar's job is Analyze; a permanent name box next to it implied
-   * Analyze wanted one too.
-   */
-  const openSaveDialog = () => {
-    if (!barDef()) { setExMsg("select at least one study first"); return; }
-    if (!canSave()) return;
-    setExMsg(null);
-    setSaveName(cName.trim() || barDefaultName());
-    setDraftFilled(!!(cName.trim() || barDefaultName()).trim()); setDraftGen((g) => g + 1);
-    saveDialog.current?.showModal();
-  };
-  const confirmSave = async () => {
-    const name = saveDraft.current.trim();
-    const def = barDef();
-    if (!name || !def) return;
-    saveDialog.current?.close();
-    // Evaluated with the name and definition in hand rather than through the
-    // shared cName/cDefText state, which React would not have flushed yet.
-    try {
-      const ev = await evalDef(name, def);
-      setCName(name);
-      await persist(name, def, ev);
-      setExMsg("saved \u201c" + name + "\u201d to Cohorts \u2014 " + ev.count.toLocaleString() + " patients");
-    } catch (e) {
-      setExMsg("could not save: " + String((e as Error)?.message || e));
-    }
-    setTimeout(() => setExMsg(null), 3200);
-  };
-
-  const openCustomManager = () => {
-    goTab("explore");
-    if (!explore) fetchExplore();
-    setChartTab("custom");
-    setWantCustomManager(true);
-  };
-  useEffect(() => {
-    if (!wantCustomManager || tab !== "explore" || !explore || !addChartDialog.current) return;
-    if (!addChartDialog.current.open) addChartDialog.current.showModal();
-    setWantCustomManager(false);
-  }, [wantCustomManager, tab, explore]);
-
   // ---- save as feature: a selection frozen into a yes/no custom attribute ----
   const featureSaved = (d: StoredDataset) => {
     const yes = d.rows.filter((r) => r.values[0] === "Yes").length;
     return "saved feature \u201c" + d.name + "\u201d (custom:" + d.id + "/" + d.columns[0].name + "): " +
       yes.toLocaleString() + " " + d.level + "s Yes, " + (d.rows.length - yes).toLocaleString() + " No";
-  };
-  const saveDraftAsFeature = async () => {
-    const def = barDef();
-    if (!def) { setExMsg("select at least one study first"); return; }
-    const name = window.prompt("Name this feature. Patients matching the current filters are Yes, every other patient of the selected studies No.",
-      parseDraft() ? "explored cohort" : "selected studies");
-    if (!name || !name.trim()) return;
-    setExMsg("saving feature\u2026");
-    try {
-      const d = await featureFromCohort(name.trim(), def, exSel.current);
-      await saveToServer(d);
-      setExMsg(featureSaved(d) + " \u2014 charted below");
-      fetchExplore();
-    } catch (e) { setExMsg("could not save the feature: " + String((e as Error)?.message || e)); }
   };
   const featureFromSelection = async (sel: ColumnSelection, all: string[], studies: string[]) => {
     const d = await featureFromColumns(sel.name || "selection", sel.unit, sel.ids, all, studies);
@@ -1041,385 +542,6 @@ export default function AnalysisPage() {
     docs.set({ ...doc, views: [v, ...(doc.views || [])] });
   };
 
-  const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
-
-  /** "per|attribute", matching data-attr — the one key format every attribute lookup here uses */
-  const attrKey = (c: { per: string; attribute: string }) => c.per + "|" + c.attribute;
-
-  /**
-   * Which clinical facets are on screen. ONE definition, because this was two
-   * copies — one computing the header's count, one filtering the render — and
-   * they disagreed the moment a search box was added: the header read
-   * "8 attributes" while all 20 were still drawn.
-   *
-   * Coverage (carried by enough of the selected studies) and the reader's own
-   * checklist (hiddenAttrs, set from "+ Add chart" > Clinical) are both "is this
-   * attribute allowed to show" concerns, so both live here; clinFilter is a
-   * different thing now — it narrows the CHECKLIST's own rows, not this.
-   */
-  const visibleClinical = (list: { attribute: string; per: string; studyCount?: number }[]): typeof list => {
-    const coverageOk = (c: { studyCount?: number }) =>
-      attrCoverage === 0 || (c.studyCount ?? 1) >= Math.ceil(attrCoverage * exStudies.length);
-    return list.filter((c) => coverageOk(c) && !hiddenAttrs.has(attrKey(c)));
-  };
-
-  const attrsForBar = (bar: number, studiesOverride?: string[] | string): string[] => {
-    if (bar <= 0 || !exFullAttrsRef.current.length) return [];
-    const n = (studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current).length;
-    return exFullAttrsRef.current.filter(a => a.studyCount >= Math.ceil(bar * n)).map(a => a.attribute);
-  };
-
-  const fetchExplore = async (draftOverride?: CohortDef | null, studiesOverride?: string[] | string, attrsOverride?: string[]) => {
-    // Several independent triggers can ask for the same facets at once (a
-    // ?tab=explore deep link, the tab button, and the catalog resolving the
-    // default study selection all fire on load). exFetchSeq supersedes stale
-    // RESULTS but does not stop duplicate REQUESTS, and each one is a full
-    // faceting pass over ClickHouse — so identical work already in flight is
-    // skipped rather than run twice and thrown away.
-    const inflightKey = JSON.stringify([
-      studiesOverride ?? exSel.current,
-      draftOverride !== undefined ? draftOverride : parseDraft(),
-      attrsOverride ?? attrsForBar(attrCoverage, studiesOverride),
-      geneChartsRef.current,
-      exExtraDerivedRef.current,
-      customDataKey()
-    ]);
-    if (exInflight.current === inflightKey) return;
-    exInflight.current = inflightKey;
-    // Ticking a facet makes the previous answer irrelevant, so stop paying for it. Discarding
-    // the RESULT (exFetchSeq, below) was never enough: the abandoned pass kept running all
-    // ~30 of its ClickHouse queries, and the answer the reader is waiting for queued behind
-    // them. Measured at four clicks 250ms apart, that doubled the wait for the last one.
-    exAbort.current?.abort();
-    const ac = new AbortController();
-    exAbort.current = ac;
-    const seq = ++exFetchSeq.current; // a later call (or an emptied selection) supersedes this one
-    setExploreBusy(true);
-    try {
-      const list = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current;
-      if (!list.length) { setExplore(null); exInflight.current = null; setExploreBusy(false); return; }
-      const draft = draftOverride !== undefined ? draftOverride : parseDraft();
-      const res = await api.explore({ studies: list, draft,
-          // Narrow the server's work to the attributes that will actually be
-          // shown. Only sent once a previous result has told us which those are.
-          ...((attrsOverride ?? attrsForBar(attrCoverage, studiesOverride)).length
-            ? { attributes: attrsOverride ?? attrsForBar(attrCoverage, studiesOverride) } : {}),
-          ...(geneChartsRef.current.length ? { geneCharts: geneChartsRef.current } : {}),
-          ...(exExtraDerivedRef.current.length ? { extraDerived: exExtraDerivedRef.current } : {}) }, { signal: ac.signal });
-      // 499 is this request being superseded server-side; it carries no body, and a newer
-      // request already owns the page. Never parse it as JSON.
-      if (res.status === 499 || seq !== exFetchSeq.current) return;
-      const j = await res.json();
-      if (seq !== exFetchSeq.current) return; // superseded while in flight — discard
-      if (!j.error) {
-        // Pin attribute order to the last selection-free response; see
-        // attrOrderRef's own comment for why the server's live order can't
-        // be trusted as-is once any facet is selected.
-        const noSelection = !draft || !Array.isArray(draft.all) || !draft.all.length;
-        if (noSelection) {
-          attrOrderRef.current = (j.clinical || []).map((c: { per: string; attribute: string }) => c.per + "|" + c.attribute);
-        } else if (attrOrderRef.current && j.clinical) {
-          const order = attrOrderRef.current;
-          const rank = (c: { per: string; attribute: string }) => {
-            const i = order.indexOf(c.per + "|" + c.attribute);
-            return i === -1 ? order.length : i;
-          };
-          j.clinical = [...j.clinical].sort((a: any, b: any) => rank(a) - rank(b));
-        }
-        setExplore(j);
-        // only a response that was NOT narrowed can define the full vocabulary
-        if (!(attrsOverride ?? []).length && !(attrCoverage > 0))
-          exFullAttrsRef.current = (j.clinical || [])
-            .map((c: { attribute: string; studyCount?: number }) => ({ attribute: c.attribute, studyCount: c.studyCount ?? 1 }));
-      } else setError(j.error);
-    } catch (e) {
-      // An abort is this code superseding itself, not a failure to report.
-      if ((e as Error)?.name !== "AbortError" && seq === exFetchSeq.current)
-        setError(String((e as Error)?.message || e));
-    } finally {
-      // `finally`, because the early returns above leave through the middle of the try — a 499
-      // on the newest request would otherwise leave the spinner running forever. Guarded on
-      // seq so an abandoned pass never clears the flags out from under its replacement.
-      if (seq === exFetchSeq.current) { exInflight.current = null; setExploreBusy(false); }
-    }
-  };
-
-  const addClause = (clause: any) => {
-    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
-    if (!d || !Array.isArray(d.all)) d = { all: [] };
-    if (clause.kind === "clinical" && clause.op === "=") {
-      const same = d.all.find((c: any) => c.kind === "clinical" && c.attribute === clause.attribute && (c.per || "patient") === (clause.per || "patient") && (c.op === "=" || c.values));
-      if (same) { // second value on the same attribute becomes an OR list
-        const vals = new Set([...(same.values || []), ...(same.op === "=" ? [same.value] : []), clause.value]);
-        delete same.op; delete same.value; same.values = [...vals];
-        const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d); return;
-      }
-    }
-    // Buckets of ONE derived metric are alternatives, not conjuncts: clicking a
-    // second bucket used to AND two mutually exclusive ranges, giving 0 patients
-    // — which then emptied every other facet, since a bucket with no patients is
-    // dropped. Same click also toggles a chosen bucket back off.
-    if (clause.kind === "derived") {
-      const sameRange = (a: any, b: any) =>
-        (a.range || {}).gte === (b.range || {}).gte && (a.range || {}).lt === (b.range || {}).lt;
-      const isMine = (l: any) => l && l.kind === "derived" && l.metric === clause.metric && (l.eventType || "") === (clause.eventType || "");
-      const idx = d.all.findIndex((c: any) => isMine(c) || (Array.isArray(c.any) && c.any.every(isMine) && c.any.length));
-      if (idx >= 0) {
-        const cur = d.all[idx];
-        const leaves: any[] = Array.isArray(cur.any) ? [...cur.any] : [cur];
-        const at = leaves.findIndex((l) => sameRange(l, clause));
-        if (at >= 0) leaves.splice(at, 1); else leaves.push(clause);
-        if (!leaves.length) d.all.splice(idx, 1);
-        else d.all[idx] = leaves.length === 1 ? leaves[0] : { any: leaves };
-        const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d.all.length ? d : null); return;
-      }
-    }
-    if (clause.kind === "oql") {
-      const same = d.all.find((c: any) => c.kind === "oql");
-      if (same) { same.q += "; " + clause.q; const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d); return; }
-    }
-    d.all.push(clause);
-    const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d);
-  };
-
-  /**
-   * Append several clauses as one action. A gene-state pick is two of them —
-   * "profiled for this gene" AND the alteration — and it has to be both: the
-   * facet counted 14,690 EGFR-mutant patients inside the profiled set, while
-   * the OQL clause alone selects 14,697, because 7 patients carry a call for a
-   * gene no panel of theirs covers. A facet whose number changed when you
-   * clicked it would be the worst of the options.
-   *
-   * Deliberately plainer than addClause: no kind-specific merging, because
-   * these clauses only mean what they mean together.
-   */
-  const addClauses = (clauses: any[]) => {
-    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
-    if (!d || !Array.isArray(d.all)) d = { all: [] };
-    for (const c of clauses) d.all.push(c);
-    setCDefText(JSON.stringify(d, null, 2));
-    fetchExplore(d);
-  };
-
-  /** the clauses that select one state of one gene's alteration facet */
-  const geneStateClauses = (gene: string, type: "MUTATION" | "CNA", state: string): any[] => {
-    const prof = { kind: "profiled", type, gene };
-    const oql = (q: string) => ({ kind: "oql", q: gene + ": " + q });
-    if (state === "notProfiled") return [{ not: prof }];
-    if (state === "altered") return [prof, oql("MUT")];
-    if (state === "amp") return [prof, oql("AMP")];
-    if (state === "del") return [prof, oql("HOMDEL")];
-    // unaltered: profiled and none of the calls this facet counts
-    return [prof, { not: oql(type === "CNA" ? "AMP HOMDEL" : "MUT") }];
-  };
-
-  const chartGene = (raw: string) => {
-    const g = String(raw || "").toUpperCase().trim();
-    if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(g)) return;
-    const next = geneCharts.includes(g) ? geneCharts : [...geneCharts, g].slice(-6);
-    geneChartsRef.current = next;
-    setGeneCharts(next);
-    setGeneChartInput("");
-    fetchExplore();
-  };
-  const unchartGene = (g: string) => {
-    const next = geneCharts.filter((x) => x !== g);
-    geneChartsRef.current = next;
-    setGeneCharts(next);
-    fetchExplore();
-  };
-
-  /** timeline event types this study's Explore facets actually have, folded by case */
-  const exploreEventTypes = (): { canonical: string; label: string; n: number }[] => {
-    const raw: { type: string; n: number }[] = (explore && explore.events) || [];
-    return foldEventNames(raw.map((e) => ({ name: String(e.type), n: e.n })))
-      .map((f) => ({ canonical: f.canonical, label: f.label, n: f.n }));
-  };
-  /** the study's own best guess at "a therapy" — the same heuristic addView's sequence default uses */
-  const treatmentEventType = (): { canonical: string; label: string } | null =>
-    exploreEventTypes().find((e) => /treat|therap|regimen|drug|medicat/.test(e.canonical)) || null;
-
-  // "lines" is not offered here: it is added automatically (see the effect
-  // below) once a treatment-like event is detected, because it is cheap
-  // enough to always compute (measured ~0-700ms on top of an Explore fetch
-  // that already takes 0.7-3s) and answers exactly what the "Derived timeline
-  // filters" card wants to show by default. "treatmentSpan" is a second,
-  // separate query with a narrower audience, so it stays opt-in.
-  const EXTRA_DERIVED_KINDS: { metric: "lines" | "treatmentSpan"; label: (name: string) => string }[] = [
-    { metric: "treatmentSpan", label: (name) => "Time in '" + name + "' records" }
-  ];
-  const extraDerivedOn = (metric: string) => exExtraDerived.some((x) => x.metric === metric);
-  const toggleExtraDerived = (metric: "lines" | "treatmentSpan") => {
-    const tx = treatmentEventType();
-    if (!tx) return;
-    const next = extraDerivedOn(metric)
-      ? exExtraDerived.filter((x) => x.metric !== metric)
-      : [...exExtraDerived, { metric, eventType: tx.label, ...(metric === "lines" ? { lineGap: 90 } : {}) }];
-    exExtraDerivedRef.current = next;
-    setExExtraDerived(next);
-    fetchExplore();
-  };
-
-  /**
-   * One side of the sequence-filter form -> an EventSelector, or null while
-   * that side is incomplete. A treatment-line pick reads LINE_NO as an
-   * attrs-equality (exact line) or a numeric predicate (>=/<=) — the same two
-   * shapes lib/compiler.ts's lineSelectorCte accepts, see EXAMPLES's
-   * "Reached 2nd line" for the equality form.
-   */
-  const seqSelector = (type: string, occ: "ANY" | "FIRST" | "LAST", lineOp: "=" | ">=" | "<=", lineNo: string): any => {
-    if (type === LINE_TYPE) {
-      const n = Number(lineNo);
-      if (!Number.isFinite(n) || lineNo.trim() === "") return null;
-      return lineOp === "="
-        ? { eventType: LINE_TYPE, attrs: [{ key: "LINE_NO", value: String(n) }] }
-        : { eventType: LINE_TYPE, numeric: { key: "LINE_NO", op: lineOp, value: n } };
-    }
-    if (!type) return null;
-    return { eventType: type, ...(occ !== "ANY" ? { occurrence: occ } : {}) };
-  };
-  const seqReady = (() => {
-    const a = seqSelector(seq.aType, seq.aOcc, seq.aLineOp, seq.aLineNo);
-    if (!a) return false;
-    if (seq.rel === "NONE") return true;
-    if ((seq.rel === "BEFORE" || seq.rel === "NOT_FOLLOWED_BY") && !(Number(seq.days) > 0)) return false;
-    return !!seqSelector(seq.bType, seq.bOcc, seq.bLineOp, seq.bLineNo);
-  })();
-  const addSeqFilter = () => {
-    const a = seqSelector(seq.aType, seq.aOcc, seq.aLineOp, seq.aLineNo);
-    if (!a) return;
-    const clause: any = { kind: "event", a, rel: { type: seq.rel } };
-    if (seq.rel !== "NONE") {
-      const b = seqSelector(seq.bType, seq.bOcc, seq.bLineOp, seq.bLineNo);
-      if (!b) return;
-      clause.b = b;
-      if (seq.rel === "BEFORE") clause.rel = { type: "BEFORE", maxDays: Number(seq.days) };
-      else if (seq.rel === "NOT_FOLLOWED_BY") clause.rel = { type: "NOT_FOLLOWED_BY", withinDays: Number(seq.days) };
-    }
-    if (seq.priorGuard) clause.priorGuard = true;
-    if (seq.lineGap !== 90 && (a.eventType === LINE_TYPE || (clause.b && clause.b.eventType === LINE_TYPE)))
-      clause.lineGap = seq.lineGap;
-    addClause(clause);
-    setSeq(s => ({ ...s, aType: "", aLineNo: "", rel: "NONE", bType: "", bLineNo: "" }));
-  };
-
-  /**
-   * The real, per-study "lines" bucket counts the "Derived timeline filters"
-   * card shows are just the existing "lines" derived metric — the same one
-   * "show more derivations" used to offer manually — kept in sync here
-   * instead: the study's own event vocabulary (and so `treatmentEventType()`)
-   * is only known once the FIRST Explore response lands, so this fires once
-   * that response reveals a treatment-like event, and again whenever it
-   * changes (switching studies). It is a no-op once `exExtraDerived` already
-   * matches, so it does not loop and does not refetch on every narrowing
-   * click — only on the transitions that actually change what "lines" means.
-   */
-  useEffect(() => {
-    if (!explore) return;
-    const tx = treatmentEventType();
-    const current = exExtraDerivedRef.current;
-    const inSync = tx
-      ? current.some((x) => x.metric === "lines" && x.eventType === tx.label)
-      : !current.some((x) => x.metric === "lines");
-    if (inSync) return;
-    const next = current.filter((x) => x.metric !== "lines");
-    if (tx) next.push({ metric: "lines", eventType: tx.label, lineGap: 90 });
-    exExtraDerivedRef.current = next;
-    setExExtraDerived(next);
-    fetchExplore();
-  }, [explore]); // eslint-disable-line
-
-  const removeDraftClause = (i: number) => {
-    try {
-      const d = normalizeDef(JSON.parse(cDefText));
-      d.all = d.all.filter((_: any, j: any) => j !== i);
-      setCDefText(JSON.stringify(d, null, 2));
-      fetchExplore(d.all.length ? d : null);
-    } catch {}
-  };
-
-  // studies-explicit draft scaffold for the current explore selection
-  const draftScaffold = (ids: string[]): CohortDef => {
-    const d: CohortDef = { all: [] };
-    if (ids.length > 1) d.studies = ids; else if (ids.length === 1) d.study = ids[0];
-    return d;
-  };
-
-  const clearDraft = () => { setCDefText(JSON.stringify(draftScaffold(exSel.current), null, 2)); fetchExplore(null); };
-
-  // toggle a study in the explore selection. The draft def is STUDY-EXPLICIT —
-  // it carries "study" (one selected) or "studies" (several) itself, so Save /
-  // Preview / Add-to-analysis evaluate against the selection with no separate
-  // "working study" concept. exSel (ref) is the always-current selection so
-  // rapid checkbox toggles don't race on stale render-time state; the refetch
-  // is debounced so checking many boxes fires one request.
-  const setExploreStudies = (ids: string[]) => {
-    exSel.current = ids;
-    setExStudies(ids);
-    if (ids.length) setStudy(ids[0]); // doc-level default for study-less defs (examples, hand edits)
-    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
-    if (!d || !Array.isArray(d.all)) d = { all: [] };
-    if (ids.length > 1) { d.studies = ids; delete d.study; }
-    else { delete d.studies; if (ids.length === 1) d.study = ids[0]; else delete d.study; }
-    setCDefText(JSON.stringify(d, null, 2));
-    if (exFetchTimer.current) clearTimeout(exFetchTimer.current);
-    if (!ids.length) { exFetchSeq.current++; exAbort.current?.abort(); exInflight.current = null; setExplore(null); setExploreBusy(false); setExPanelOpen(true); return; } // empty selection: clear facets (and stop any in-flight fetch), keep the picker open
-    exFetchTimer.current = setTimeout(() => fetchExplore(d.all!.length ? d : null, ids), 350);
-  };
-
-  // clinical-attribute catalog: union of attribute names across the result's involved
-  // studies (an attribute absent in one study just renders gaps there). Every kind that
-  // offers a clinical-attribute picker shares this one fetch — the oncoprint's track menu,
-  // a plot's axis pickers, the clinical view's attribute menu, Cox's covariate picker — and so
-  // do the add-view buttons, which is why it runs for any result rather than waiting for one of
-  // those views to exist.
-  const trackAttrsWant = useRef("");
-  useEffect(() => {
-    if (!result) return;
-    const studies = result.involvedStudies && result.involvedStudies.length ? result.involvedStudies : [result.study];
-    // an upload adds attributes to the same studies, so the datasets are part of what was asked
-    const key = studies.join(",") + "|" + customDataKey();
-    if (trackAttrs.key === key || trackAttrsWant.current === key) return;
-    trackAttrsWant.current = key;
-    setTrackAttrsLoading(true);
-    Promise.all(studies.map(s =>
-      api.explore({ study: s })
-        .then(r => r.json()).catch(() => null)))
-      .then(js => {
-        const seen = new Map<string, { kind: string; patients: number }>(); // attribute -> kind + how many carry it
-        const profs = new Set<string>(); // continuous molecular profiles (for heatmap tracks)
-        const gas = new Set<string>(); // generic-assay profiles (for the assays view)
-        for (const j of js) if (j) {
-          if (j.clinical) for (const a of j.clinical) {
-            const prev = seen.get(a.attribute);
-            seen.set(a.attribute, { kind: prev?.kind || a.kind, patients: (prev?.patients || 0) + (a.patients || 0) });
-          }
-          for (const p of j.profiles || []) if (p !== "cna") profs.add(p); // discrete cna isn't a heatmap
-          for (const p of j.gaProfiles || []) gas.add(p);
-        }
-        // the reader's own uploads first, then most-covered first, the way the portal orders its picker
-        if (trackAttrsWant.current !== key) return; // a newer study set was asked for meanwhile
-        setTrackAttrs({ key, attrs: [...seen.entries()].map(([attribute, v]) => ({ attribute, ...v }))
-          .sort((x, y) => Number(isCustomAttr(y.attribute)) - Number(isCustomAttr(x.attribute)) ||
-            y.patients - x.patients || (x.attribute < y.attribute ? -1 : 1)), profiles: [...profs].sort(), gaProfiles: [...gas].sort() });
-      })
-      .finally(() => { if (trackAttrsWant.current === key) setTrackAttrsLoading(false); });
-  }, [result, customState]); // eslint-disable-line
-
-  // the survival "measured from" control needs this study's event types,
-  // their attributes, and the endpoints it declares
-  useEffect(() => {
-    // a templated document holds "$study" until its parameter is resolved; asking the warehouse
-    // for a study by that name is a question with no answer, so it is not asked
-    if (!study || study.startsWith("$")) return;
-    let dead = false;
-    setCatLoading(true);
-    fetch("/api/catalog?study=" + encodeURIComponent(study))
-      .then(r => r.json()).then(j => { if (!dead && !j.error) setCat(j); }).catch(() => {})
-      .finally(() => { if (!dead) setCatLoading(false); });
-    return () => { dead = true; };
-  }, [study]);
-
   /** Rewrite one view in the document; only its own query re-runs (use-analysis.ts) — editing this
    *  view's settings can't change any OTHER view's answer. */
   const patchView = (i: number, patch: Record<string, unknown>) => {
@@ -1428,11 +550,6 @@ export default function AnalysisPage() {
     for (const v of views as any[]) if (v.anchor == null) delete v.anchor;   // null means "study baseline"
     docs.set({ ...doc, views });
   };
-
-  // the creator's quick-add row needs the study catalog even before Explore is visited
-  useEffect(() => {
-    if (tab === "cohorts" && !explore && !exploreBusy && exStudies.length) fetchExplore(null);
-  }, [tab, study, explore]); // eslint-disable-line
 
   const updateView = (vi: number, patch: (v: any) => any) => {
     // the edited view keeps its id (app/lab/doc-store.ts): its card is not remounted, and the
@@ -1471,19 +588,9 @@ export default function AnalysisPage() {
   // ---- workspaces ----------------------------------------------------------
   const openWorkspaceSave = () => {
     if (!canSave()) return;
-    // Only ever prefills with the workspace's OWN name, if it already has
-    // one — never a cohort name or a generic fallback standing in for a
-    // real name, which read as though the app had already named it for you.
-    // An untitled workspace opens to an empty field with just the
-    // placeholder text.
-    setWsName(doc.title || "");
-    setDraftFilled(!!(doc.title || "").trim()); setDraftGen((g) => g + 1);
-    wsDialog.current?.showModal();
+    setWsOpen(true);
   };
-  const confirmWorkspaceSave = async () => {
-    const name = wsDraft.current.trim();
-    if (!name) return;
-    wsDialog.current?.close();
+  const confirmWorkspaceSave = async (name: string) => {
     const d = { ...doc, title: name };
     docs.set(d);
     setWsError(null);
@@ -1549,9 +656,6 @@ export default function AnalysisPage() {
   const setViewGenes = (vi: number, genes: GeneTrackSpec[]) =>
     updateView(vi, v => pruneSort({ ...v, genes }));
 
-
-
-
   /** the document's view at vi, whatever its kind */
   const docView = (vi: number): any => ((doc.views || [])[vi] || {});
 
@@ -1585,7 +689,6 @@ export default function AnalysisPage() {
     const drawn = expandSplits(chosen, shapes).filter((n) => !result || result.cohorts[n]);
     return { chosen, all, nodes, drawn, max, busy, viewKey: viewIds[vi] ?? vi, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
   };
-
 
   /** the view at index vi, read as an oncoprint view (its editor only renders there) */
   const ocView = (vi: number): OncoprintView => ((doc.views || [])[vi] || {}) as OncoprintView;
@@ -1671,46 +774,9 @@ export default function AnalysisPage() {
     if (!ids.size && study) ids.add(study);
     return [...ids];
   };
-  const openAddCohort = () => {
-    setAddMode({ ids: exSel.current, text: cDefText, explore });
-    const ids = analysisStudies();
-    exSel.current = ids; setExStudies(ids);
-    setCDefText(JSON.stringify(draftScaffold(ids), null, 2));
-    setExMsg(null);
-    fetchExplore(null, ids);
-  };
-  const closeAddCohort = () => {
-    if (!addMode) return;
-    exSel.current = addMode.ids; setExStudies(addMode.ids);
-    setCDefText(addMode.text); setExplore(addMode.explore);
-    setAddMode(null);
-  };
-  /** Add Explore's current selection to the open analysis as a new cohort, and close add mode. */
-  const addDraftToAnalysis = (name: string) => {
-    const def = barDef();
-    if (!def) { setExMsg("select at least one study first"); return; }
-    const n = name.trim();
-    if (!n) { setExMsg("give the cohort a name"); return; }
-    if (doc.cohorts?.[n]) { setExMsg("this analysis already has a cohort named “" + n + "”"); return; }
-    const nd: AnalysisDoc = { ...doc, ...(doc.study ? {} : { study: exSel.current[0] || study }),
-      cohorts: { ...(doc.cohorts || {}), [n]: def },
-      ...(doc.views && doc.views.length ? {} : { views: DEFAULT_VIEWS }) };
-    // a view that lists its own cohorts keeps its list; say so, rather than leave the reader to
-    // wonder why the new cohort is missing from it
-    const listed = (doc.views || []).filter((v) => Array.isArray(v.cohorts) && v.cohorts.length).length;
-    closeAddCohort();
-    runEdited(nd);
-    if (listed) setToast("Added “" + n + "”. " + listed + " view" + (listed === 1 ? " lists" : "s list") +
-      " its own cohorts — tick “" + n + "” in " + (listed === 1 ? "its" : "their") + " cohorts menu to show it there.");
-  };
 
   const openCohortEdit = (name: string) => {
     setCohortEditing(name);
-    setCeName(name);
-    setCeNotes(doc.cohorts?.[name]?.notes || "");
-    setDraftFilled(!!name.trim()); setDraftGen((g) => g + 1);
-    setCeError(null);
-    cohortEditDialog.current?.showModal();
   };
 
   /** Rename a cohort and/or change its note, from the gear menu's "edit…" dialog.
@@ -1719,19 +785,12 @@ export default function AnalysisPage() {
    *  the server keys everything (result.cohorts, every row/curve) by name,
    *  a rename re-runs the analysis, unlike a note-only edit, which changes no
    *  number and so re-runs nothing (use-analysis.ts leaves notes out of its keys). */
-  const confirmCohortEdit = () => {
+  const confirmCohortEdit = (newName: string, notes: string) => {
     if (!cohortEditing) return;
     const oldName = cohortEditing;
-    const newName = ceNameDraft.current.trim();
-    if (!newName) return;
-    if (newName !== oldName && doc.cohorts?.[newName]) {
-      setCeError("a cohort named “" + newName + "” already exists");
-      return;
-    }
-    cohortEditDialog.current?.close();
     const nextCohorts: Record<string, CohortDef> = {};
     for (const [k, v] of Object.entries(doc.cohorts || {})) {
-      nextCohorts[k === oldName ? newName : k] = k === oldName ? { ...v, notes: ceNotesDraft.current } : v;
+      nextCohorts[k === oldName ? newName : k] = k === oldName ? { ...v, notes } : v;
     }
     if (newName === oldName) {
       // a note-only edit re-runs nothing, so nothing else would put it in the shareable link
@@ -1752,9 +811,6 @@ export default function AnalysisPage() {
   const openViewNoteEdit = (vi: number) => {
     if (!analysisSaved) return;
     setViewNoteEditing(vi);
-    setVnText((doc.views || [])[vi]?.note || "");
-    setDraftGen((g) => g + 1);
-    viewNoteDialog.current?.showModal();
   };
 
   /** A view's note is exactly like a cohort's or the workspace's: prose the
@@ -1763,11 +819,9 @@ export default function AnalysisPage() {
    *  straight into `result.views[vi].annotationNote` (what ViewHead actually
    *  reads to display it), since nothing else would otherwise tell the
    *  already-rendered card that its own annotation changed. */
-  const confirmViewNoteEdit = () => {
+  const confirmViewNoteEdit = (trimmed: string) => {
     if (viewNoteEditing == null) return;
     const vi = viewNoteEditing;
-    viewNoteDialog.current?.close();
-    const trimmed = vnDraft.current.trim();
     const views = (doc.views || []).map((v: any, i: number) => {
       if (i !== vi) return v;
       const nv = { ...v };
@@ -1828,11 +882,6 @@ export default function AnalysisPage() {
     btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d))))
       .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-  const copyDocLink = async (ex: DslExample) => {
-    try { await navigator.clipboard.writeText(docLink(ex.doc)); setCopied(ex.title); setTimeout(() => setCopied(null), 1800); }
-    catch { setError("could not copy to clipboard"); }
-  };
-
   const previewExample = async (ex: any) => {
     setExEvals(s => ({ ...s, [ex.name]: { busy: true } }));
     try { const ev = await evalDef(ex.name, ex.def); setExEvals(s => ({ ...s, [ex.name]: ev })); }
@@ -1869,6 +918,13 @@ export default function AnalysisPage() {
     if (j.error) throw new Error(j.error);
     return j as { name: string; def: PartitionDef; note?: string };
   };
+  // ---- Explore (app/lab/use-explore-state.ts) ------------------------------
+  const exploreState = useExploreState({ analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
+  const { addChartDialog, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setChartTab, setExStudies, setExploreStudies } = exploreState;
+  /** what Explore's sections read and the edits they can make (app/lab/explore-sections.tsx) */
+  const exploreCtx: ExploreCtx = { ...exploreState, moreDerivedMenu, showClauseData, studies };
+  /** what every view card reads and the edits it can make (app/lab/view-cards.tsx) */
+  const viewCtx = { VIEW_KINDS, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, menuOpenRef, moveView, noteEdit, ocView, openGenes, patchView, pendingKeys, profileOptions, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
   const commitDoc = (d0: AnalysisDoc, r: AnalysisResult) => {
     const d = upgradeDocument(d0).doc;
     // the engine has already answered this document: the page's queries find that answer
@@ -1907,17 +963,16 @@ export default function AnalysisPage() {
     return t.cleanup;
   }, []);
 
-
   return (
     <>
       <header>
         <h1>cbio-lab</h1>
         <span className="sub">analysis documents — cohorts and views over one declarative object</span>
         <span className="spacer" />
-        <a href="/datasets" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>data sets</a>
-        <a href="/reproductions" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>paper reproductions</a>
-        <a href="/campaign" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>hypothesis campaigns</a>
-        <a href="/rationale" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>rationale</a>
+        <a className="toplink" href="/datasets">data sets</a>
+        <a className="toplink" href="/reproductions">paper reproductions</a>
+        <a className="toplink" href="/campaign">hypothesis campaigns</a>
+        <a className="toplink" href="/rationale">rationale</a>
         <AgentToolsMenu page="analysis" tools={LAB_TOOL_NAMES} webmcp={webmcp}
           intro="Your AI assistant — Claude in the Chrome sidebar — can read and edit this analysis with these tools. Every edit is run by the engine first and reaches the page only if it is accepted; analysis_undo reverts the assistant's edits." />
         <LoginButton />
@@ -1932,109 +987,13 @@ export default function AnalysisPage() {
         {/* One popup shared by every gene-bearing view — a modal rather than a
             dropdown, because picking several genes is a task you settle into,
             and a menu that closes on an outside click fights that. */}
-        {/* The workspace editor: name, parameters, notes, and what to do with
-            it, all behind the "Save workspace" button on the Analysis tab.
-            Used to be a permanent card there; a dialog is read when setting
-            the workspace up, not while reading the figures it describes. */}
-        <dialog ref={wsDialog} className="namedialog wsdialog"
-          onClose={() => setWsName("")}
-          onClick={e => { if (e.target === wsDialog.current) wsDialog.current?.close(); }}>
-          <form method="dialog" onSubmit={e => { e.preventDefault(); confirmWorkspaceSave(); }}>
-            <h3>{doc.title && spaces[doc.title] ? "Workspace" : "Save workspace"}</h3>
-            <p className="meta">
-              {(doc.views || []).length} view{(doc.views || []).length === 1 ? "" : "s"}
-              {doc.params ? " · " + Object.keys(doc.params).length + " parameter" + (Object.keys(doc.params).length === 1 ? "" : "s") : ""}
-              {!doc.title || !spaces[doc.title]
-                ? " · not saved yet"
-                : JSON.stringify(spaces[doc.title].doc) !== JSON.stringify(doc)
-                  ? " · unsaved changes"
-                  : " · saved " + spaces[doc.title].savedAt}
-            </p>
-            <DraftText key={draftGen} draft={wsDraft} initial={wsName} onFilled={setDraftFilled} autoFocus placeholder="workspace name…" />
-
-            {doc.params && Object.keys(doc.params).length > 0 ? (
-              <div className="params" style={{ marginTop: "0.7rem" }}>
-                <div className="row" style={{ alignItems: "baseline" }}>
-                  <strong style={{ fontSize: "var(--t-md)" }}>Parameters</strong>
-                  <span className="meta">— change one here and every view that uses it re-runs</span>
-                </div>
-                {Object.entries(doc.params).map(([k, v]) => (
-                  <ParamRow key={k} name={k} value={v} busy={busy} onChange={val => setParam(k, val)} />
-                ))}
-                {result?.unusedParams?.length ? (
-                  <p className="note" style={{ margin: "0.3rem 0 0" }}>
-                    Declared but never used: {result.unusedParams.map(x => "$" + x).join(", ")} — usually a
-                    rename that missed a reference.
-                  </p>
-                ) : null}
-              </div>
-            ) : (doc.views || []).length > 0 && (
-              <p className="note" style={{ margin: "0.7rem 0 0" }}>
-                No parameters yet — “make a template” beside the document lifts the study and a
-                shared gene list out, so this workup can be re-pointed in one edit.
-              </p>
-            )}
-
-            <label className="wslabel" htmlFor="wsnotes" style={{ marginTop: "0.7rem", display: "block" }}>Notes</label>
-            <textarea id="wsnotes" value={doc.notes || ""} spellCheck
-              placeholder="What is this analysis for? What should a reader look at first?"
-              onChange={e => setNotes(e.target.value)} />
-
-            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "space-between", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
-              <div className="row" style={{ gap: "0.4rem" }}>
-                {doc.title && spaces[doc.title] && (
-                  <button type="button" className="linklike" disabled={busy}
-                    title={"delete the saved workspace “" + doc.title + "”"}
-                    onClick={() => deleteWorkspace(doc.title!)}>delete</button>
-                )}
-              </div>
-              <div className="row" style={{ gap: "0.4rem", alignItems: "center" }}>
-                <button type="button" className="linklike" onClick={() => wsDialog.current?.close()}>cancel</button>
-                <button className="primary" type="submit" disabled={!draftFilled}>
-                  {doc.title && spaces[doc.title] ? "Save changes" : "Save"}
-                </button>
-              </div>
-            </div>
-            {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
-          </form>
-        </dialog>
-        {/* The cohort gear menu's "edit…": name and note together, since
-            renaming is the one cohort-level edit this app supports without
-            reopening Explore or the JSON editor. */}
-        <dialog ref={cohortEditDialog} className="namedialog cohortdialog"
-          onClose={() => { setCohortEditing(null); setCeError(null); }}
-          onClick={e => { if (e.target === cohortEditDialog.current) cohortEditDialog.current?.close(); }}>
-          <form method="dialog" onSubmit={e => { e.preventDefault(); confirmCohortEdit(); }}>
-            <h3>Edit cohort</h3>
-            <label className="wslabel" htmlFor="cename">Name</label>
-            <DraftText key={"n" + draftGen} draft={ceNameDraft} initial={ceName} onFilled={setDraftFilled} id="cename" autoFocus />
-            <label className="wslabel" htmlFor="cenotes" style={{ marginTop: "0.6rem", display: "block" }}>Note</label>
-            <DraftText multiline key={"t" + draftGen} draft={ceNotesDraft} initial={ceNotes} id="cenotes" spellCheck
-              placeholder="What is this cohort? Why is it defined this way?" />
-            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
-              <button type="button" className="linklike" onClick={() => cohortEditDialog.current?.close()}>cancel</button>
-              <button className="primary" type="submit" disabled={!draftFilled}>Save</button>
-            </div>
-            {ceError && <p className="error" style={{ marginTop: "0.4rem" }}>{ceError}</p>}
-          </form>
-        </dialog>
-        {/* A view's gear menu's "add note…" / "edit note…": one line of prose
-            drawn below its title (see ViewHead) — what this figure shows, or
-            what to read first, not a second title. */}
-        <dialog ref={viewNoteDialog} className="namedialog cohortdialog"
-          onClose={() => setViewNoteEditing(null)}
-          onClick={e => { if (e.target === viewNoteDialog.current) viewNoteDialog.current?.close(); }}>
-          <form method="dialog" onSubmit={e => { e.preventDefault(); confirmViewNoteEdit(); }}>
-            <h3>View note</h3>
-            <label className="wslabel" htmlFor="vntext">Note</label>
-            <DraftText multiline key={draftGen} draft={vnDraft} initial={vnText} id="vntext" autoFocus spellCheck
-              placeholder="What does this figure show? What should a reader look at first?" />
-            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
-              <button type="button" className="linklike" onClick={() => viewNoteDialog.current?.close()}>cancel</button>
-              <button className="primary" type="submit">Save</button>
-            </div>
-          </form>
-        </dialog>
+        {wsOpen && <WorkspaceDialog doc={doc} saved={doc.title ? spaces[doc.title] : undefined} busy={busy}
+          unusedParams={result?.unusedParams} error={wsError} onParam={setParam} onNotes={setNotes}
+          onDelete={() => deleteWorkspace(doc.title!)} onSave={confirmWorkspaceSave} onClose={() => setWsOpen(false)} />}
+        {cohortEditing != null && <CohortEditDialog name={cohortEditing} notes={doc.cohorts?.[cohortEditing]?.notes || ""}
+          taken={(n) => !!doc.cohorts?.[n]} onSave={confirmCohortEdit} onClose={() => setCohortEditing(null)} />}
+        {viewNoteEditing != null && <ViewNoteDialog note={(doc.views || [])[viewNoteEditing]?.note || ""}
+          onSave={confirmViewNoteEdit} onClose={() => setViewNoteEditing(null)} />}
         <dialog ref={genesDialog} className="genedialog"
           onClose={() => setGenesFor(null)}
           onClick={e => { if (e.target === genesDialog.current) genesDialog.current?.close(); }}>
@@ -2064,11 +1023,11 @@ export default function AnalysisPage() {
           const names = (ids: string[]) => ids.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>);
           return unresolved.length > 0 && (
             <div className="card customwarn">
-              {of("locked").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data ({names(of("locked"))}).{" "}
+              {of("locked").length > 0 && <p className="flush">This analysis uses custom data ({names(of("locked"))}).{" "}
                 <button className="linklike" onClick={requestLogin}>Log in</button> to run it.</p>}
-              {of("deleted").length > 0 && <p style={{ margin: 0 }}>This analysis is pinned to custom data that has since been deleted: {names(of("deleted"))}.</p>}
-              {of("missing").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data that is not on the server: {names(of("missing"))}.</p>}
-              {of("unavailable").length > 0 && <p style={{ margin: 0 }}>This analysis uses custom data ({names(of("unavailable"))}), which this deployment does not store.</p>}
+              {of("deleted").length > 0 && <p className="flush">This analysis is pinned to custom data that has since been deleted: {names(of("deleted"))}.</p>}
+              {of("missing").length > 0 && <p className="flush">This analysis uses custom data that is not on the server: {names(of("missing"))}.</p>}
+              {of("unavailable").length > 0 && <p className="flush">This analysis uses custom data ({names(of("unavailable"))}), which this deployment does not store.</p>}
             </div>
           );
         })()}
@@ -2078,214 +1037,11 @@ export default function AnalysisPage() {
           role={addMode ? "dialog" : undefined} aria-modal={addMode ? true : undefined} aria-label={addMode ? "add a cohort to this analysis" : undefined}>
           {addMode && <AddCohortBar existing={Object.keys(doc.cohorts || {})} ready={exStudies.length > 0} error={exMsg}
             onAdd={addDraftToAnalysis} onCancel={closeAddCohort} />}
-          {(() => {
-            const CAP_FILTERS: [string, string, (s: any) => boolean][] = [
-              ["timeline", "timeline events", (s: any) => s.timelinePatients > 0],
-              ["mrna", "mRNA", (s: any) => s.caps && s.caps.mrna],
-              ["protein", "protein", (s: any) => s.caps && s.caps.protein],
-              ["ga", "generic assay", (s: any) => s.caps && s.caps.ga],
-              ["oncokb", "OncoKB-synced", (s: any) => s.oncokb],
-              ["peer", "other instance", (s: any) => s.instance && s.instance !== "a"]
-            ];
-            const byId = new Map(studies.map((s) => [s.id, s] as const));
-            const selPts = exStudies.reduce((n: number, id: string) => n + (byId.get(id)?.patients ?? 0), 0);
-            const ready = exStudies.length > 0;      // a study alone is enough to analyse
-            // Two toggles on purpose. The chips in the header are an edit to a
-            // selection the reader has already committed, so they apply at once.
-            // The checkboxes below are them composing a new one, so they stage.
-            const toggle = (id: any) => {
-              const cur = exSel.current;
-              setExploreStudies(cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
-            };
-            const staged = exDraftStudies ?? exStudies;
-            const toggleStaged = (id: string) =>
-              setExDraftStudies(staged.includes(id) ? staged.filter(x => x !== id) : [...staged, id]);
-            const dirty = exDraftStudies != null &&
-              (staged.length !== exStudies.length || staged.some(x => !exStudies.includes(x)));
-            const applyStaged = () => {
-              setExDraftStudies(null);
-              setExPanelOpen(false);
-              setExploreStudies(staged);
-            };
-            const q = sQuery.trim().toLowerCase();
-            const hits = studies.filter(s =>
-              (!q || (s.name + " " + s.id + " " + (s.cancerType || "")).toLowerCase().includes(q)) &&
-              CAP_FILTERS.every(([k, , pred]) => !sCaps.has(k) || pred(s)));
-            return (
-              <div className="card">
-                <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <h2 style={{ margin: 0 }}>Exploring <span className="plain">— {exStudies.length === 0 ? "no studies selected" :
-                    exStudies.length + (exStudies.length === 1 ? " study" : " studies") + " · " +
-                    // While a fetch is in flight the PREVIOUS result's totals are
-                    // not this selection's. Submitting 560 studies takes about a
-                    // minute, and showing the old 267,816 as though it described
-                    // the new set is worse than showing the study list's own sum
-                    // and saying it is still counting.
-                    (exploreBusy || !explore?.totals ? ""
-                      : explore.totals.patients.toLocaleString() + " patients · " + explore.totals.samples.toLocaleString() + " samples" +
-                        (exStudies.length > 1 ? " (overlap not deduplicated)" : ""))}
-                    {/* the counts arrive with the facets; until then a placeholder holds their
-                        place, so the header neither shows a wrong number nor jumps */}
-                    {exStudies.length > 0 && (exploreBusy || !explore?.totals) &&
-                      <span className="skeleton skeleton-counts" title={selPts ? "counting… (the selected studies hold " + selPts.toLocaleString() + " patients before deduplication)" : "counting…"} />}
-                  </span></h2>
-                  {/* One chip per study is fine for a handful and unreadable for
-                      560 — the header became a wall of identifiers that pushed
-                      everything else off screen. Past CHIP_CAP it summarises,
-                      with the full list in the tooltip and expandable in place.
-                      Expanded, the list scrolls rather than growing the header. */}
-                  {(() => {
-                    const CHIP_CAP = 5;
-                    const over = exStudies.length - CHIP_CAP;
-                    const shown = studyChipsOpen || over <= 1 ? exStudies : exStudies.slice(0, CHIP_CAP);
-                    const nameOf = (id: string) => byId.get(id)?.name ? id + " — " + byId.get(id)!.name : id;
-                    return (
-                      <span className={"studychips" + (studyChipsOpen ? " open" : "")}>
-                        {shown.map(id => (
-                          <span key={id} className="qchip" title={nameOf(id)}>
-                            {id}
-                            <button className="linklike" style={{ marginLeft: "0.3rem" }}
-                              title={"remove " + id + " from the selection"}
-                              onClick={() => toggle(id)}>×</button>
-                          </span>
-                        ))}
-                        {over > 1 && (
-                          <button className="qchip morechip" onClick={() => setStudyChipsOpen(!studyChipsOpen)}
-                            title={studyChipsOpen ? "collapse the list" : exStudies.map(nameOf).join("\n")}>
-                            {studyChipsOpen ? "show fewer" : "+" + over.toLocaleString() + " more"}
-                          </button>
-                        )}
-                      </span>
-                    );
-                  })()}
-                  <span className="spacer" />
-                  {!addMode && <button className="primary" onClick={analyzeDraft} disabled={!ready}
-                    title={ready ? "start a fresh analysis of this cohort (replaces the current document)" : "select a study first"}>
-                    Analyze
-                  </button>}
-                  {exStudies.length > 0 && <button onClick={() => {
-                    if (exPanelOpen) { setExDraftStudies(null); setExPanelOpen(false); }   // close discards
-                    else { setExDraftStudies(exStudies); setExPanelOpen(true); }           // open seeds
-                  }}>{exPanelOpen ? "cancel" : "add / change studies"}</button>}
-                </div>
-                {/* with nothing selected the picker is simply open: there is nothing else to do here */}
-                {(exPanelOpen || exStudies.length === 0) && <>
-                  <div className="row" style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "center", margin: "0.6rem 0" }}>
-                    <input placeholder="search name, id, or cancer type…" value={sQuery} onChange={e => setSQuery(e.target.value)}
-                      style={{ flex: 1, minWidth: "16rem" }} />
-                    {CAP_FILTERS.map(([k, label]) => (
-                      <button key={k} className={"facet" + (sCaps.has(k) ? " on" : "")}
-                        onClick={() => setSCaps(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; })}>
-                        {label}
-                      </button>
-                    ))}
-                    <span className="meta">{hits.length.toLocaleString()} of {studies.length.toLocaleString()}</span>
-                    {/* "all matches", not "all 200 drawn": the list renders the
-                        200 largest, and a button that silently selected only
-                        those would disagree with the count beside it. The number
-                        is on the button because selecting 546 studies is a
-                        minutes-long query, and that should be a decision rather
-                        than a surprise. */}
-                    <button className="facet" disabled={!hits.length}
-                      title={"adds the " + hits.length + " studies matching the current search to the staged set, keeping what is already staged — use clear first to replace"}
-                      onClick={() => setExDraftStudies([...new Set([...staged, ...hits.map(h => h.id)])])}>
-                      add all {hits.length.toLocaleString()} match{hits.length === 1 ? "" : "es"}
-                    </button>
-                    <button className="facet" disabled={!staged.length}
-                      onClick={() => setExDraftStudies([])}>clear</button>
-                  </div>
-                  <div className="row applybar" style={{ alignItems: "center", gap: "0.5rem" }}>
-                    <strong>{staged.length.toLocaleString()}</strong>
-                    <span className="meta">
-                      {staged.length === 1 ? "study staged" : "studies staged"}
-                      {staged.length ? " · " + staged.reduce((n: number, id: string) => n + (byId.get(id)?.patients ?? 0), 0).toLocaleString() + " patients" : ""}
-                      {dirty ? " · not queried yet" : " · matches what is shown"}
-                    </span>
-                    <span className="spacer" />
-                    <button className="primary" disabled={!dirty || !staged.length} onClick={applyStaged}
-                      title={staged.length ? "run the facets for these " + staged.length + " studies" : "stage at least one study"}>
-                      submit
-                    </button>
-                  </div>
-                  {!studies.length && <div className="loading-block"><span className="spinner" /> Loading studies…</div>}
-                  <div style={{ maxHeight: "22rem", overflowY: "auto" }}>
-                    {hits.slice(0, 200).map(s => (
-                      <label key={s.id} title={s.name} className={"study-row" + (staged.includes(s.id) ? " sel" : "")}>
-                        <input type="checkbox" checked={staged.includes(s.id)} onChange={() => toggleStaged(s.id)} />
-                        <strong>{s.name}</strong>
-                        <span className="meta mono">{s.id}</span>
-                        <span className="meta">{s.cancerType}</span>
-                        {s.instance && s.instance !== "a" &&
-                          <span className="meta" style={{ color: "var(--accent-ink)" }} title={"held by " + s.instanceLabel}>⧉ {s.instanceLabel}</span>}
-                        <span className="meta pts">{s.patients.toLocaleString()}</span>
-                        <span className="meta caps">{[
-                          s.timelinePatients > 0 ? "timeline" : null,
-                          s.caps && s.caps.mrna ? "mRNA" : null,
-                          s.caps && s.caps.protein ? "protein" : null,
-                          s.oncokb ? "OncoKB ✓" : null
-                        ].filter(Boolean).join(" · ")}</span>
-                      </label>
-                    ))}
-                    {hits.length > 200 && <p className="note">Showing the 200 largest of {hits.length.toLocaleString()} matches — refine the search.</p>}
-                  </div>
-                </>}
-              </div>
-            );
-          })()}
+          <StudyPicker ctx={exploreCtx} />
           {/* Underneath study selection, and only present once there's something to
               show — Analyze lives in the studies card above regardless of whether any
               filters exist, so this block's whole job now is the filters themselves. */}
-          {(() => {
-            const d = parseDraft();
-            const clauses = d && Array.isArray(d.all) ? d.all.length : 0;
-            if (!clauses) return null;
-            const ready = exStudies.length > 0;
-            return (
-              <div className="card exbar">
-                <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <strong style={{ fontSize: "var(--t-md)" }}>{clauses + (clauses === 1 ? " filter" : " filters")}</strong>
-                  <span className="meta">
-                    {explore && explore.draftCount != null
-                      ? "· " + explore.draftCount.toLocaleString() + " patients match"
-                      : "· counting…"}
-                  </span>
-                  {exploreBusy && <span className="spinner" />}
-                  <span className="spacer" />
-                  {/* Naming is asked for on demand rather than sitting in the bar:
-                      Analyze needs no name, so a permanent field implied one was
-                      required for both. */}
-                  <button onClick={openSaveDialog} disabled={!ready}
-                    title={ready ? "keep this definition on the Saved tab without running anything" : "select a study first"}>
-                    Save as a Cohort
-                  </button>
-                  <button onClick={saveDraftAsFeature} disabled={!ready}
-                    title={ready ? "freeze who matches these filters into a yes/no custom attribute you can chart, split and filter on" : "select a study first"}>
-                    Save as feature
-                  </button>
-                  <button className="linklike" onClick={clearDraft}>clear</button>
-                </div>
-                <div className="row" style={{ marginTop: "0.4rem" }}>
-                  {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} onCustomData={showClauseData()} />; })()}
-                </div>
-                {exMsg && <p className="note" style={{ margin: "0.35rem 0 0" }}>{exMsg}</p>}
-                {/* A native <dialog> so Esc, focus trapping and the backdrop come
-                    from the platform rather than being re-implemented. */}
-                <dialog ref={saveDialog} className="namedialog savedialog"
-                  onClose={() => setSaveName("")}
-                  onClick={e => { if (e.target === saveDialog.current) saveDialog.current?.close(); }}>
-                  <form method="dialog" onSubmit={e => { e.preventDefault(); confirmSave(); }}>
-                    <h3>Save as a cohort</h3>
-                    <p className="meta">{clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies")}</p>
-                    <DraftText key={draftGen} draft={saveDraft} initial={saveName} onFilled={setDraftFilled} autoFocus placeholder="cohort name…" />
-                    <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", alignItems: "center", gap: "0.4rem" }}>
-                      <button type="button" className="linklike" onClick={() => saveDialog.current?.close()}>cancel</button>
-                      <button className="primary" type="submit" disabled={!draftFilled}>Save</button>
-                    </div>
-                  </form>
-                </dialog>
-              </div>
-            );
-          })()}
+          <ExploreBar ctx={exploreCtx} />
           {/* A facet click starts a recount, and a second click before it lands
               would race it — so the facets themselves greyscale until it does.
               The study picker above stays live: choosing studies is a staged,
@@ -2309,304 +1065,8 @@ export default function AnalysisPage() {
               {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
             </div>
           )}
-          {explore && (
-            <dialog ref={addChartDialog} className="addchartdialog"
-              onClick={e => { if (e.target === addChartDialog.current) addChartDialog.current?.close(); }}>
-              <h3>Add chart</h3>
-              <div className="tabs">
-                <button className={chartTab === "clinical" ? "active" : ""} onClick={() => setChartTab("clinical")}>Clinical</button>
-                <button className={chartTab === "gene" ? "active" : ""} onClick={() => setChartTab("gene")}>Gene status</button>
-                <button className={chartTab === "derived" ? "active" : ""} onClick={() => setChartTab("derived")}>Derived timeline filters</button>
-                <button className={chartTab === "custom" ? "active" : ""} onClick={() => setChartTab("custom")}>Custom data</button>
-              </div>
-              {chartTab === "custom" && <CustomDataPanel studies={exStudies} onChanged={() => fetchExplore()} />}
-              {chartTab === "clinical" && (() => {
-                const q = clinFilter.trim().toLowerCase();
-                const rows = !q ? explore.clinical : explore.clinical.filter((c) =>
-                  (c.attribute || "").toLowerCase().includes(q) || (c.displayName || "").toLowerCase().includes(q));
-                const shownCount = visibleClinical(explore.clinical as never).length;
-                return (
-                  <div>
-                    <p className="note" style={{ marginTop: 0 }}>
-                      Check an attribute to draw it as a tile in the facet grid below; uncheck to hide
-                      it. The search here only narrows this list — it doesn't touch the grid itself.
-                      {exStudies.length > 1 && <> An attribute marked <b>*</b> isn't carried by every
-                      selected study — hover it for which share of the {exStudies.length} do.</>}
-                    </p>
-                    <div className="row" style={{ alignItems: "baseline" }}>
-                      <input className="genesearch" type="search" placeholder="find an attribute" value={clinFilter}
-                        title="narrows this checklist by attribute name" autoFocus
-                        onChange={e => setClinFilter(e.target.value)} />
-                      <span className="meta">{shownCount} of {explore.clinical.length} checked</span>
-                      <button className="linklike" onClick={() => setHiddenAttrs(new Set())}>check all</button>
-                      <button className="linklike" onClick={() => setHiddenAttrs(new Set(explore.clinical.map(attrKey)))}>check none</button>
-                      {exStudies.length > 1 && (
-                        <select value={String(attrCoverage)} disabled={exploreBusy}
-                          title="attributes carried by only one study are that study's own vocabulary, not something the selection shares"
-                          onChange={e => {
-                            const v = Number(e.target.value);
-                            setAttrCoverage(v);
-                            // Refetch UNNARROWED so the bar can be lowered again
-                            // later; the filtering below is what the reader sees,
-                            // and subsequent fetches narrow the server's work.
-                            setTimeout(() => fetchExplore(undefined, undefined, []), 0);
-                          }}>
-                          <option value="0">every attribute</option>
-                          <option value="0.5">in most studies</option>
-                          <option value="1">in every study</option>
-                        </select>
-                      )}
-                    </div>
-                    {!rows.length && <p className="note">No attribute matches “{clinFilter}”.</p>}
-                    <div className="attrtablewrap">
-                      <table className="attrtable">
-                        <thead>
-                          <tr><th></th><th>Attribute</th><th>Type</th><th>Level</th></tr>
-                        </thead>
-                        <tbody>
-                          {rows.map((c) => {
-                            const toggle = () => setHiddenAttrs(prev => {
-                              const next = new Set(prev);
-                              if (next.has(attrKey(c))) next.delete(attrKey(c)); else next.add(attrKey(c));
-                              return next;
-                            });
-                            // Shown regardless — the checklist is the union across the
-                            // selection (see visibleClinical's own comment) — but an
-                            // attribute only SOME of the selected studies actually carry
-                            // reads as universal without this, so mark it rather than
-                            // leave the reader to discover the gap study by study.
-                            const partial = exStudies.length > 1 && (c.studyCount ?? 1) < exStudies.length;
-                            return (
-                              <tr key={attrKey(c)} onClick={(e) => { if ((e.target as HTMLElement).tagName !== "INPUT") toggle(); }}>
-                                <td><input type="checkbox" checked={!hiddenAttrs.has(attrKey(c))} onChange={toggle} /></td>
-                                <td>
-                                  {isCustomAttr(c.attribute) && <span className="customtag" title={c.description}>custom</span>}
-                                  {c.displayName || c.attribute}
-                                  {partial && (
-                                    <span className="meta" title={"carried by " + (c.studyCount ?? 1) + " of " + exStudies.length + " selected studies, not all of them"}> *</span>
-                                  )}
-                                </td>
-                                <td className="meta">{c.kind === "num" ? "numeric" : "categorical"}</td>
-                                <td className="meta">{c.per === "sample" ? "sample" : "patient"}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })()}
-              {chartTab === "gene" && (
-                <div>
-                  <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
-                    <input className="genesearch" type="search" placeholder="chart a gene (e.g. EGFR)" autoFocus
-                      value={geneChartInput} disabled={exploreBusy}
-                      onChange={e => setGeneChartInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") chartGene(geneChartInput); }} />
-                    <button disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}>add</button>
-                  </div>
-                  {!geneCharts.length && (
-                    <p className="note" style={{ margin: "0.4rem 0 0" }}>
-                      Name a gene to see how many patients are altered, unaltered, or <strong>never tested</strong> for
-                      it. The third is the one a frequency cannot show: in GENIE public, 86,353 patients are on no panel
-                      covering EGFR copy number.
-                    </p>
-                  )}
-                  {geneCharts.map(g => (
-                    <span key={g} className="qchip" style={{ marginRight: "0.3rem" }}>
-                      {g}
-                      <button className="linklike" style={{ marginLeft: "0.3rem" }} title={"stop charting " + g}
-                        onClick={() => unchartGene(g)}>×</button>
-                    </span>
-                  ))}
-                  {geneCharts.length > 0 && (
-                    <p className="note" style={{ margin: "0.4rem 0 0" }}>
-                      Each charted gene's mutation and copy-number status is drawn as its own tile in the
-                      facet grid, alongside the clinical attributes — close this dialog to see them.
-                    </p>
-                  )}
-                </div>
-              )}
-              {chartTab === "derived" && (explore.events.length === 0 ? (
-                <p className="note" style={{ marginTop: 0 }}>This study has no clinical timeline events to derive a filter from.</p>
-              ) : (() => {
-                const tx = treatmentEventType();
-                return (
-                  <div>
-                    <div className="customseq">
-                      <h4>Custom sequence filter</h4>
-                      <p className="note" style={{ margin: "0 0 0.2rem" }}>
-                        Build any A/B temporal relationship — followed-by, during, not-followed-by —
-                        with a duration constraint, from this study's own timeline.
-                      </p>
-                        <div className="setrow">
-                          <span className="meta">event</span>
-                          <select value={seq.aType} onChange={e => setSeq(s => ({ ...s, aType: e.target.value }))}>
-                            <option value="">choose…</option>
-                            {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
-                            {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
-                              <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
-                            ))}
-                          </select>
-                          {seq.aType === LINE_TYPE ? (
-                            <>
-                              <select value={seq.aLineOp} onChange={e => setSeq(s => ({ ...s, aLineOp: e.target.value as any }))}>
-                                <option value="=">line #</option>
-                                <option value=">=">line ≥</option>
-                                <option value="<=">line ≤</option>
-                              </select>
-                              <input type="number" min={1} placeholder="n" value={seq.aLineNo}
-                                onChange={e => setSeq(s => ({ ...s, aLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
-                            </>
-                          ) : seq.aType && (
-                            <select value={seq.aOcc} onChange={e => setSeq(s => ({ ...s, aOcc: e.target.value as any }))}>
-                              <option value="ANY">any occurrence</option>
-                              <option value="FIRST">first</option>
-                              <option value="LAST">last</option>
-                            </select>
-                          )}
-                        </div>
-                        <div className="setrow">
-                          <span className="meta">relationship</span>
-                          <select value={seq.rel} onChange={e => setSeq(s => ({ ...s, rel: e.target.value as any }))}>
-                            <option value="NONE">just has this event</option>
-                            <option value="BEFORE">→ followed by, within</option>
-                            <option value="DURING">happens during</option>
-                            <option value="NOT_FOLLOWED_BY">not followed by, within</option>
-                          </select>
-                          {(seq.rel === "BEFORE" || seq.rel === "NOT_FOLLOWED_BY") && (
-                            <>
-                              <input type="number" min={1} value={seq.days}
-                                onChange={e => setSeq(s => ({ ...s, days: e.target.value }))} style={{ width: "4rem" }} />
-                              <span className="meta">days</span>
-                            </>
-                          )}
-                        </div>
-                        {seq.rel !== "NONE" && (
-                          <div className="setrow">
-                            <span className="meta">{seq.rel === "DURING" ? "during" : "second event"}</span>
-                            <select value={seq.bType} onChange={e => setSeq(s => ({ ...s, bType: e.target.value }))}>
-                              <option value="">choose…</option>
-                              {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
-                              {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
-                                <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
-                              ))}
-                            </select>
-                            {seq.bType === LINE_TYPE ? (
-                              <>
-                                <select value={seq.bLineOp} onChange={e => setSeq(s => ({ ...s, bLineOp: e.target.value as any }))}>
-                                  <option value="=">line #</option>
-                                  <option value=">=">line ≥</option>
-                                  <option value="<=">line ≤</option>
-                                </select>
-                                <input type="number" min={1} placeholder="n" value={seq.bLineNo}
-                                  onChange={e => setSeq(s => ({ ...s, bLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
-                              </>
-                            ) : seq.bType && (
-                              <select value={seq.bOcc} onChange={e => setSeq(s => ({ ...s, bOcc: e.target.value as any }))}>
-                                <option value="ANY">any occurrence</option>
-                                <option value="FIRST">first</option>
-                                <option value="LAST">last</option>
-                              </select>
-                            )}
-                          </div>
-                        )}
-                        {(seq.aType === LINE_TYPE || seq.bType === LINE_TYPE) && (
-                          <div className="setrow">
-                            <span className="meta">new line after</span>
-                            <select value={String(seq.lineGap)} onChange={e => setSeq(s => ({ ...s, lineGap: Number(e.target.value) }))}>
-                              {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
-                            </select>
-                          </div>
-                        )}
-                        <label className="chk" title="restricts the first event to patients with no treatment recorded before it">
-                          <input type="checkbox" checked={seq.priorGuard}
-                            onChange={e => setSeq(s => ({ ...s, priorGuard: e.target.checked }))} />
-                          treatment-naive before the first event
-                        </label>
-                        <hr />
-                        <button className="facet" disabled={!seqReady} onClick={addSeqFilter}>add filter</button>
-                    </div>
-                  </div>
-                );
-              })())}
-              <div className="row" style={{ marginTop: "1rem", justifyContent: "flex-end" }}>
-                <button className="primary" onClick={() => addChartDialog.current?.close()}>Done</button>
-              </div>
-            </dialog>
-          )}
-          {SHOW_DERIVED_FACETS && explore && explore.derived && explore.derived.length > 0 && (
-            <div className="card">
-              <div className="row" style={{ alignItems: "baseline" }}>
-                <h2 style={{ margin: 0 }}>Derived <span className="plain">— computed from the data's shape, so these mean the same thing in any study</span></h2>
-                <span className="spacer" />
-                <details className="gearmenu" ref={moreDerivedMenu.ref} onToggle={moreDerivedMenu.onToggle}>
-                  <summary className="tbbtn" title="more ways to derive a facet from this study's own timeline">show more derivations</summary>
-                  <div className="gearmenu-items">
-                    <span className="meta">from this study's own timeline events</span>
-                    {(() => {
-                      const tx = treatmentEventType();
-                      return EXTRA_DERIVED_KINDS.map((k) => (
-                        <label key={k.metric} className="chk"
-                          title={tx ? "based on '" + tx.label + "' events" : "this study records no treatment-like timeline events, so this can't be derived here"}>
-                          <input type="checkbox" checked={extraDerivedOn(k.metric)} disabled={!tx}
-                            onChange={() => toggleExtraDerived(k.metric)} />
-                          {tx ? k.label(tx.label) : k.label("a treatment event")}
-                          {!tx && <span className="meta"> — not available for this study</span>}
-                        </label>
-                      ));
-                    })()}
-                  </div>
-                </details>
-              </div>
-              <div className="derivedgrid">
-                {/* "lines" is excluded here — it shows in its own "Derived timeline
-                    filters" card below (with the treatment-naive example and the
-                    custom builder alongside it) rather than twice on the page. */}
-                {explore.derived.filter(d => d.metric !== "lines").map(d => {
-                  const max = Math.max(...d.buckets.map(b => b.n), 1);
-                  const dEventType = (d as any).eventType as string | undefined;
-                  const dLineGap = (d as any).lineGap as number | undefined;
-                  const picked = (b: { gte?: number; lt?: number }) => {
-                    const dr = parseDraft();
-                    // Buckets OR together into an `any` group, so look inside one
-                    // as well as at top level or a second pick never highlights.
-                    const leaves = ((dr && dr.all) || []).flatMap((c: any) => Array.isArray(c.any) ? c.any : [c]);
-                    return leaves.some((c: any) => c && c.kind === "derived" && c.metric === d.metric
-                      && (c.eventType || undefined) === dEventType
-                      && (c.range || {}).gte === b.gte && (c.range || {}).lt === b.lt);
-                  };
-                  return (
-                    <div key={d.metric + "|" + (dEventType || "")} data-derived={d.metric} data-buckets={d.buckets.length}>
-                      {/* A metric already in the draft is counted WITHOUT its own
-                          clauses so its other buckets stay selectable, which means
-                          its total is the draft-minus-itself total. Say so, exactly
-                          as the clinical facets do, rather than show a number that
-                          cannot be reconciled with the draft. */}
-                      <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }} title={d.note}>
-                        {d.label} <span className="meta">· {d.covered.toLocaleString()} patients
-                          {(d as any).disjunctive ? " · not narrowed by its own filter" : ""}</span>
-                      </div>
-                      <div className="vallist">
-                        {d.buckets.map(b => (
-                          <button key={b.label} className={picked(b) ? "valrow on" : "valrow"}
-                            title={d.note + " — click to filter"}
-                            onClick={() => addClause({ kind: "derived", metric: d.metric,
-                              ...(dEventType ? { eventType: dEventType } : {}), ...(dLineGap != null ? { lineGap: dLineGap } : {}),
-                              range: { ...(b.gte != null ? { gte: b.gte } : {}), ...(b.lt != null ? { lt: b.lt } : {}) } })}>
-                            <span className="vname">{b.label}</span>
-                            <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * b.n / max)) + "%" }} /></span>
-                            <span className="vn">{b.n.toLocaleString()}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <AddChartDialog ctx={exploreCtx} />
+          <DerivedFacets ctx={exploreCtx} />
           {explore && <>
             <div className="facetgrid">
               <ExploreCharts studies={explore.studies && explore.studies.length ? explore.studies : [explore.study]} draft={parseDraft()}
@@ -2618,587 +1078,32 @@ export default function AnalysisPage() {
                   return eps.sort((a, b) => (a === "OS" ? -1 : b === "OS" ? 1 : a.localeCompare(b)));
                 })()}
                 addClauses={addClauses} km={(curves) => <KMChart curves={curves as any} />} />
-              {(visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical)
-                .map(c => (
-                /* data-attr / data-shape make the facet identifiable from outside
-                   React — the e2e suite asserts that an attribute's shape does not
-                   change when the draft does. One tile per attribute, the portal's
-                   own study-view density — see .facetgrid's own comment. */
-                <div key={c.per + c.attribute} data-attr={c.per + "|" + c.attribute}
-                  data-shape={c.kind === "cat" ? (PIE_ATTRIBUTES.has(c.attribute) ? "pie" : "list") : c.kind}
-                  className="card">
-                    {(() => {
-                      // A facet already in the draft is re-queried WITHOUT its own
-                      // clauses (disjunctive faceting) so its other values stay
-                      // selectable — so its total is the draft-minus-itself total,
-                      // not the draft total. Say so rather than show two numbers
-                      // that cannot be reconciled.
-                      const disj = c.kind === "cat" && (c as any).disjunctive;
-                      const shown = disj ? c.values.reduce((n: number, v: any) => n + v.n, 0) : c.patients;
-                      const unit = c.per === "sample" ? " samples" : " patients";
-                      return (
-                        <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}
-                          title={[c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
-                            .filter(Boolean).join(" — ") || undefined}>
-                          {isCustomAttr(c.attribute) && <span className="customtag" title={c.description}>custom</span>}
-                          {c.displayName || c.attribute}{" "}
-                          <span className="meta">
-                            {(c.per === "sample" ? "· sample-level · " : "· ") + shown.toLocaleString() + unit}
-                            {disj ? " · not narrowed by its own filter" : ""}
-                          </span>
-                          {(() => {
-                            const label = c.displayName || c.attribute;
-                            const chart: ChartKey = { kind: "clinical", attribute: c.attribute, per: c.per === "sample" ? "sample" : "patient" };
-                            const n = selectionArmCount(chart);
-                            return <ChartMenu label={label} actions={addMode ? [] : [
-                              { label: "Split by this", disabled: !!splittingBy, working: splittingBy === label,
-                                title: "Analyze the current selection split by " + label + (c.kind === "num"
-                                  ? ": below / at or above its median within the selection" : ": one arm per value with at least 10 patients, the rest in Other") +
-                                  " — arms that never overlap and add up to the selection",
-                                onClick: () => splitDraftBy({ attribute: c.attribute }, label) },
-                              ...(n > 0 ? [{ label: "Split by selected (" + (n > 8 ? "8+" : n) + ")",
-                                title: "Analyze with each selected " + (c.kind === "num" ? "range" : "value") + " of " + label +
-                                  " as its own arm (tested in the order you clicked them), the rest of your selection as the cohort they split, and everyone else in Other",
-                                onClick: () => splitDraftBySelection(chart, label) }] : [])
-                            ]} />;
-                          })()}
-                        </div>
-                      );
-                    })()}
-                    {c.kind === "cat" && (() => {
-                      const total = c.values.reduce((n: number, v: any) => n + v.n, 0) || 1;
-                      const d = parseDraft();
-                      const isSel = (v: any) => !!(d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === c.attribute &&
-                        ((cl.values || []).includes(v.v) || cl.value === v.v)));
-                      const clause = (v: any) => ({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v,
-                        ...(c.per === "sample" ? { per: "sample" } : {}) });
-                      // slice geometry: cumulative angles over the returned values.
-                      // The shape comes from PIE_ATTRIBUTES, a fixed allowlist — see
-                      // its own comment for why cardinality (the study's, or worse,
-                      // the draft's) can't be trusted to decide this.
-                      const asList = !PIE_ATTRIBUTES.has(c.attribute);
-                      let acc = 0;
-                      const R = 34, CX = 36, CY = 36;
-                      const arcs = c.values.map((v: any, i: number) => {
-                        const frac = v.n / total, a0 = acc * 2 * Math.PI - Math.PI / 2;
-                        acc += frac;
-                        const a1 = acc * 2 * Math.PI - Math.PI / 2;
-                        const large = frac > 0.5 ? 1 : 0;
-                        const p = (a: number) => [CX + R * Math.cos(a), CY + R * Math.sin(a)];
-                        const [x0, y0] = p(a0), [x1, y1] = p(a1);
-                        // a single value covering everything cannot be drawn as an arc
-                        const path = frac >= 0.999
-                          ? "M " + CX + " " + (CY - R) + " A " + R + " " + R + " 0 1 1 " + (CX - 0.01) + " " + (CY - R) + " Z"
-                          : "M " + CX + " " + CY + " L " + x0 + " " + y0 + " A " + R + " " + R + " 0 " + large + " 1 " + x1 + " " + y1 + " Z";
-                        return { v, path, color: CAT_COLORS[i % CAT_COLORS.length], frac };
-                      });
-                      if (asList) {
-                        const max = Math.max(...c.values.map((v: any) => v.n), 1);
-                        return (
-                          <div className="vallist">
-                            {c.values.map((v: any, i: number) => (
-                              <button key={i} className={isSel(v) ? "valrow on" : "valrow"} onClick={() => addClause(clause(v))}
-                                title={v.v + " — " + v.n.toLocaleString() + " (click to filter)"}>
-                                <span className="vname">{v.v}</span>
-                                <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * v.n / max)) + "%" }} /></span>
-                                <span className="vn">{v.n.toLocaleString()}</span>
-                                {/* share of the cases that HAVE a value for this
-                                    attribute, which is the facet's own total — not
-                                    the whole cohort, since that would make every
-                                    sparsely-recorded attribute look small. `total`,
-                                    not `c.patients`: once this attribute is itself
-                                    drafted, c.patients is the draft's (self-narrowed)
-                                    count, while `total` is the disjunctive-safe sum
-                                    of this facet's own values — the same one the pie
-                                    view's arcs already use, which is why only the
-                                    list view had every other value's share collapse
-                                    around whichever one you had just clicked. */}
-                                <span className="vpct">{(Math.round(1000 * v.n / total) / 10) + "%"}</span>
-                              </button>
-                            ))}
-                            {(c.distinct ?? 0) > c.values.length && (
-                              <span className="meta" style={{ padding: "0.1rem 0.3rem" }}>
-                                showing {c.values.length.toLocaleString()} of {c.distinct!.toLocaleString()} values
-                              </span>
-                            )}
-                          </div>
-                        );
-                      }
-                      return (
-                        <div className="piewrap">
-                          <svg viewBox="0 0 72 72" className="pie" role="img" aria-label={c.attribute + " distribution"}>
-                            {arcs.map((a: any, i: number) => (
-                              <path key={i} d={a.path} fill={a.color} className={isSel(a.v) ? "slice on" : "slice"}
-                                onClick={() => addClause(clause(a.v))}>
-                                <title>{a.v.v + " — " + a.v.n.toLocaleString() + " (" + Math.round(1000 * a.frac) / 10 + "%)"}</title>
-                              </path>
-                            ))}
-                          </svg>
-                          <div className="pielegend">
-                            {arcs.map((a: any, i: number) => (
-                              <button key={i} className={isSel(a.v) ? "pikey on" : "pikey"} onClick={() => addClause(clause(a.v))}
-                                title={"click to filter to " + a.v.v}>
-                                <span className="swatch" style={{ background: a.color }} />
-                                <span className="pname">{a.v.v}</span>
-                                <span className="pn">{a.v.n.toLocaleString()}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                    {c.kind === "num" && c.bins && c.bins.length > 1 && (() => {
-                      const maxN = Math.max(...c.bins.map((b: any) => b.count), 1);
-                      const clauseFor = (b: any) => {
-                        const per = c.per === "sample" ? { per: "sample" } : {};
-                        if (b.special === "<=") return { kind: "clinical", attribute: c.attribute, range: { lte: b.end }, ...per };
-                        if (b.special === ">") return { kind: "clinical", attribute: c.attribute, range: { gt: b.start }, ...per };
-                        return { kind: "clinical", attribute: c.attribute, range: { gt: b.start, lte: b.end }, ...per };
-                      };
-                      const label = (b: any) => b.special === "<=" ? "≤" + b.end : b.special === ">" ? ">" + b.start : b.start + "–" + b.end;
-                      return (
-                        <div className="histo" style={{ marginTop: "0.3rem" }}>
-                          {c.bins.map((b: any, i: number) => (
-                            <button key={i} className="hbar" title={label(b) + " · " + b.count.toLocaleString() + " " + (c.per === "sample" ? "samples" : "patients") + " — click to filter"}
-                              onClick={() => addClause(clauseFor(b))}>
-                              <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
-                              <span className="hlab">{b.special === "<=" ? "≤" + b.end : b.special === ">" ? ">" + b.start : b.start}</span>
-                            </button>
-                          ))}
-                          {!!c.naCount && <span className="meta" style={{ alignSelf: "end", paddingLeft: "0.3rem" }}>NA {c.naCount.toLocaleString()}</span>}
-                        </div>
-                      );
-                    })()}
-                    {c.kind === "num" && <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", marginTop: "0.25rem", flexWrap: "wrap" }}>
-                      <span className="meta">min {Math.round(c.min * 10) / 10} · median {Math.round(c.median * 10) / 10} · max {Math.round(c.max * 10) / 10}</span>
-                      <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>≥ median</button>
-                      <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>&lt; median</button>
-                    </div>}
-                </div>
-              ))}
+              <ClinicalFacets ctx={exploreCtx} />
               {/* Charted genes (added from "+ Add chart" > Gene status) — one tile per
                   gene per alteration type, the same tile shape a clinical attribute gets,
                   so a chart you configured actually reaches this grid rather than only
                   living inside the dialog that configured it. */}
-              {(explore.geneFacets || []).map(f => {
-                const max = Math.max(...f.states.map(x => x.n), 1);
-                return (
-                  <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type} className="card">
-                    <div style={{ fontSize: "var(--t-md)", fontWeight: 600 }}>
-                      {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
-                      <span className="meta"> · patient-level · {f.total.toLocaleString()} patients</span>
-                    </div>
-                    <div className="vallist">
-                      {f.states.map(st => (
-                        <button key={st.state} className="valrow"
-                          title={st.label + " — " + st.n.toLocaleString() + " patients (click to filter)"}
-                          onClick={() => addClauses(geneStateClauses(f.gene, f.type, st.state))}>
-                          <span className="vname" style={st.state === "notProfiled" ? { color: "var(--muted)" } : undefined}>
-                            {st.label}
-                          </span>
-                          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * st.n / max)) + "%" }} /></span>
-                          <span className="vn">{st.n.toLocaleString()}</span>
-                          <span className="vpct">{f.total ? (Math.round(1000 * st.n / f.total) / 10) + "%" : ""}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {f.overlap ? (
-                      <p className="note" style={{ margin: "0.25rem 0 0" }}>
-                        {f.overlap.toLocaleString()} patient{f.overlap === 1 ? " is" : "s are"} counted in both
-                        Amplified and Deleted — amplified in one sample, deleted in another — so these rows
-                        over-sum the cohort by that much.
-                      </p>
-                    ) : null}
-                    {f.alteredUnprofiled ? (
-                      <p className="note" style={{ margin: "0.25rem 0 0" }}>
-                        {f.alteredUnprofiled.toLocaleString()} patient{f.alteredUnprofiled === 1 ? " has" : "s have"} a
-                        call for {f.gene} but sit on no panel covering it — a contradiction in the source data. They are
-                        counted as not profiled.
-                      </p>
-                    ) : null}
-                  </div>
-                );
-              })}
-              {explore.studyBreakdown && explore.studyBreakdown.length > 0 && (
-                <div className="card wide">
-                  <h2>Studies <span className="plain">— how {explore.draftCount != null ? "the draft" : "the selection"} breaks down{exStudies.length > 1 ? " across the " + exStudies.length + " selected studies" : ""}</span></h2>
-                  {(() => {
-                    const rows = explore.studyBreakdown!;
-                    const total = rows.reduce((n, r) => n + r.n, 0) || 1;
-                    return rows.map((r) => (
-                      <div key={r.study} className="sbrow" title={r.instanceLabel}>
-                        <span className="mono">{r.study}</span>
-                        <span className="meta inst">{r.instance !== "a" ? "⧉ " + r.instanceLabel : ""}</span>
-                        <span className="bar"><i style={{ width: Math.max(1, Math.round(100 * r.n / total)) + "%" }} /></span>
-                        <span className="meta pct">{Math.round(1000 * r.n / total) / 10}%</span>
-                        <span className="n">{r.n.toLocaleString()}</span>
-                        <span>{exStudies.length > 1 && (
-                          <button className="linklike" title="explore only this study"
-                            onClick={() => setExploreStudies([r.study])}>only</button>
-                        )}</span>
-                      </div>
-                    ));
-                  })()}
-                  {exStudies.length > 1 && <p className="note" style={{ marginTop: "0.4rem" }}>
-                    Patients are counted per study; a person enrolled in two studies counts in both (overlap is not deduplicated).
-                  </p>}
-                </div>
-              )}
-              {explore.dataTypes && explore.dataTypes.length > 0 && (
-                <div className="card wide">
-                  <h2>Data types <span className="plain">— samples with each kind of molecular data</span></h2>
-                  {(() => {
-                    const FILTERABLE: Record<string, "MUTATION" | "CNA" | "SV"> = {
-                      MUTATION_EXTENDED: "MUTATION", COPY_NUMBER_ALTERATION: "CNA", STRUCTURAL_VARIANT: "SV"
-                    };
-                    const d = parseDraft();
-                    const selected = (t: string) => !!(d && d.all.some((cl: any) => cl.kind === "profiled" && cl.type === t));
-                    const max = Math.max(...explore.dataTypes!.map((x) => x.n), 1);
-                    return explore.dataTypes!.map((dt) => {
-                      const t = FILTERABLE[dt.alterationType];
-                      const row = (
-                        <>
-                          <span className="gname">{dt.profile}</span>
-                          <span className="meta dtlabel">{dt.label}</span>
-                          <span className="gbar"><i style={{ width: Math.max(2, Math.round(100 * dt.n / max)) + "%" }} /></span>
-                          <span className="gcount">{dt.n.toLocaleString()}</span>
-                        </>
-                      );
-                      return t ? (
-                        <button key={dt.profile} className={"generow dtrow" + (selected(t) ? " on" : "")}
-                          title={"click to require " + t + " data (profiled clause)"}
-                          onClick={() => addClause({ kind: "profiled", type: t })}>{row}</button>
-                      ) : (
-                        <div key={dt.profile} className="generow dtrow static"
-                          title="no membership filter for this data type in the DSL — shown for completeness">{row}</div>
-                      );
-                    });
-                  })()}
-                </div>
-              )}
-              {(["mutated", "cna", "sv"] as const).map((kind) => {
-                const meta = {
-                  mutated: { title: "Mutated Genes", rows: explore.mutatedGenes, total: explore.geneTotals?.mutated, oql: (g: any) => g.gene + ": MUT" },
-                  cna:     { title: "CNA Genes",     rows: explore.cnaGenes,     total: explore.geneTotals?.cna,     oql: (g: any) => g.gene + (g.cna === 2 ? ": AMP" : ": HOMDEL") },
-                  sv:      { title: "SV Genes",      rows: explore.svGenes,      total: explore.geneTotals?.sv,      oql: (g: any) => g.gene + ": FUSION" }
-                }[kind];
-                const all = meta.rows || [];
-                // Client-side, over the rows already loaded. The table is capped
-                // at GENE_TABLE_LIMIT server-side, so this finds a gene among the
-                // top 500 by alteration count and says so when it cannot — a box
-                // that silently searched less than it appeared to would be worse
-                // than no box.
-                const needle = (geneFilter[kind] || "").trim().toUpperCase();
-                const rows = needle ? all.filter((g: any) => g.gene.toUpperCase().includes(needle)) : all;
-                if (!all.length) return null;
-                return (
-                  <div className="card wide" key={kind} data-genetable={kind}>
-                    <div className="row" style={{ alignItems: "baseline", gap: "0.5rem" }}>
-                      <h2 style={{ margin: 0 }}>{meta.title} <span className="plain">— samples, panel-aware frequency</span></h2>
-                      <span className="spacer" />
-                      <span className="meta">{needle
-                        ? rows.length.toLocaleString() + " of " + all.length.toLocaleString() + " loaded match"
-                        : "showing " + Math.min(rows.length, geneRowLimit).toLocaleString() +
-                          " of " + (meta.total || rows.length).toLocaleString()}</span>
-                      <input className="genesearch" type="search" placeholder="find gene" value={geneFilter[kind] || ""}
-                        title={"filters the " + all.length + " genes loaded for this table, not all " + (meta.total || all.length)}
-                        onChange={e => setGeneFilter({ ...geneFilter, [kind]: e.target.value })} />
-                      {(() => {
-                        const chart: ChartKey = { kind: "genes", specs: kind === "mutated" ? [": MUT"] : kind === "cna" ? [": AMP", ": HOMDEL"] : [": FUSION"] };
-                        const n = selectionArmCount(chart);
-                        const exact = kind === "mutated" ? all.find((g: any) => g.gene.toUpperCase() === needle) : undefined;
-                        return <ChartMenu label={meta.title} actions={addMode ? [] : [
-                          ...(exact ? [{ label: "Split by " + exact.gene, disabled: !!splittingBy, working: splittingBy === exact.gene,
-                            title: "Analyze the current selection split into " + exact.gene + " mutated / wild-type / not profiled for " + exact.gene,
-                            onClick: () => splitDraftBy({ gene: exact.gene }, exact.gene) }] : []),
-                          ...(n > 0 ? [{ label: "Split by selected (" + (n > 8 ? "8+" : n) + ")",
-                            title: "Analyze with each selected gene in this table as its own arm (tested in the order you clicked them), the rest of your selection as the cohort they split, and everyone else in Other or Not profiled",
-                            onClick: () => splitDraftBySelection(chart, kind === "mutated" ? "mutated genes" : kind === "cna" ? "CNA genes" : "SV genes") }] : [])
-                        ]} />;
-                      })()}
-                    </div>
-                    <div className="generows">
-                      {rows.slice(0, geneRowLimit).map((g) => (
-                        <button key={g.gene + (g.cna ?? "")} className="generow" title={"click to add " + meta.oql(g)}
-                          onClick={() => addClause({ kind: "oql", q: meta.oql(g) })}>
-                          <span className="gname">{g.gene}</span>
-                          {/* altered / wild-type / NOT PROFILED, the three-way split
-                              the portal draws as a per-gene pie. The third segment is
-                              the point: a sample whose panel omits this gene is not
-                              wild-type for it, it was never tested, and that is
-                              invisible in "altered/profiled" alone. For CNA in
-                              genie_public it is 70,450 of 289,869 samples — a quarter
-                              of the cohort. Computed here from numbers already in the
-                              payload; no extra query. */}
-                          {(() => {
-                            const total = explore.totals?.samples ?? g.profiled;
-                            const wild = Math.max(0, g.profiled - g.altered);
-                            const unprofiled = Math.max(0, total - g.profiled);
-                            const sum = g.altered + wild + unprofiled || 1;
-                            const w = (n: number) => (100 * n / sum) + "%";
-                            return (
-                              <span className="gsplit" aria-hidden="true"
-                                title={g.altered.toLocaleString() + " altered · " + wild.toLocaleString() +
-                                  " profiled and unaltered · " + unprofiled.toLocaleString() + " not profiled for " + g.gene}>
-                                <i className="s-alt" style={{ width: w(g.altered) }} />
-                                <i className="s-wt" style={{ width: w(wild) }} />
-                                <i className="s-np" style={{ width: w(unprofiled) }} />
-                              </span>
-                            );
-                          })()}
-                          {/* cytoband for CNA and the event count for mutations were
-                              already in the payload and simply not drawn. The event
-                              count is not the same as the sample count: TP53 in
-                              genie_public has 125,303 mutations across 111,368
-                              samples, and only one of those is the frequency's
-                              numerator. */}
-                          {kind === "cna" && <span className="gcyto" title="cytoband">{g.cytoband || ""}</span>}
-                          {kind !== "cna" && <span className="gevents" title={g.events.toLocaleString() + " events across " + g.altered.toLocaleString() + " samples"}>{g.events.toLocaleString()}</span>}
-                          <span className={g.cna != null ? "cnatag " + (g.cna === 2 ? "amp" : "del") : "cnatag none"}>{g.cna != null ? (g.cna === 2 ? "AMP" : "HOMDEL") : ""}</span>
-                          <span className="gfreq">{g.freqPct != null ? g.freqPct + "%" : "—"}</span>
-                          <span className="gcount">{g.altered.toLocaleString()}<span className="meta">/{g.profiled.toLocaleString()}</span></span>
-                        </button>
-                      ))}
-                    </div>
-                    {needle && !rows.length && (
-                      <p className="note" style={{ margin: "0.4rem 0 0" }}>
-                        No match among the {all.length.toLocaleString()} genes loaded for this table
-                        {meta.total && meta.total > all.length ? " (of " + meta.total.toLocaleString() + " altered in this cohort)" : ""}.
-                      </p>
-                    )}
-                    {!needle && rows.length > geneRowLimit && (
-                      <button className="linklike" onClick={() => setGeneRowLimit(geneRowLimit + 50)}>show more</button>
-                    )}
-                  </div>
-                );
-              })}
-              <div className="card" style={{ display: "none" }}>
-                <h2>Genes <span className="plain">— most-altered (click = OQL clause)</span></h2>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                  {explore.genes.map(g => (
-                    <button key={g.gene} className="facet" onClick={() => addClause({ kind: "oql", q: g.gene + ":" })}>
-                      {g.gene} <span className="meta">{g.n.toLocaleString()}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="note">Bare gene = any alteration; edit the OQL pill afterwards for MUT/AMP/DRIVER specifics.</p>
-              </div>
-              <div className="card">
-                <h2>Timeline events</h2>
-                {explore.events.length === 0 && <p className="note">This study has no clinical timeline events.</p>}
-                {(() => {
-                  const max = Math.max(...explore.events.map(e => e.n), 1);
-                  const dr = parseDraft();
-                  const isSel = (type: string) => ((dr && dr.all) || []).some((c: any) =>
-                    c && c.kind === "event" && c.rel?.type === "NONE" && c.a?.eventType === type);
-                  return (
-                    <div className="vallist">
-                      {explore.events.map(e => (
-                        <button key={e.type} className={isSel(e.type) ? "valrow on" : "valrow"}
-                          title={"has " + e.type + " — " + e.n.toLocaleString() + " patients (click to filter)"}
-                          onClick={() => addClause({ kind: "event", a: { eventType: e.type }, rel: { type: "NONE" } })}>
-                          <span className="vname">has {e.type}</span>
-                          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * e.n / max)) + "%" }} /></span>
-                          <span className="vn">{e.n.toLocaleString()}</span>
-                        </button>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-              <div className="card">
-                <h2>Case lists</h2>
-                {(() => {
-                  const max = Math.max(...explore.caseLists.map(l => l.n), 1);
-                  const dr = parseDraft();
-                  const isSel = (id: string) => ((dr && dr.all) || []).some((c: any) => c && c.kind === "caseList" && c.id === id);
-                  return (
-                    <div className="vallist">
-                      {explore.caseLists.map(l => (
-                        <button key={l.id} className={isSel(l.id) ? "valrow on" : "valrow"}
-                          title={l.name + " — " + l.n.toLocaleString() + " patients (click to filter)"}
-                          onClick={() => addClause({ kind: "caseList", id: l.id })}>
-                          <span className="vname">{l.id}</span>
-                          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * l.n / max)) + "%" }} /></span>
-                          <span className="vn">{l.n.toLocaleString()}</span>
-                        </button>
-                      ))}
-                    </div>
-                  );
-                })()}
-                <p className="note">Profiles here: {(explore.profiles || []).join(", ") || "none"}{explore.gaProfiles && explore.gaProfiles.length ? " · assays: " + explore.gaProfiles.join(", ") : ""} · facet counts {explore.draftCount != null ? "narrowed to your draft" : "study-wide"} · {explore.stats.ms}ms</p>
-              </div>
+              <GeneFacets ctx={exploreCtx} />
+              <StudyBreakdown ctx={exploreCtx} />
+              <DataTypes ctx={exploreCtx} />
+              <AlteredGenes ctx={exploreCtx} />
+              <EventsAndCaseLists ctx={exploreCtx} />
             </div>
           </>}
           </div>
         </div>}
 
         {/* ================= Saved tab ================= */}
-        {tab === "cohorts" && !loggedIn && <div className="card">
-          <p style={{ margin: 0 }}>Saved cohorts and analyses belong to your login.{" "}
-            {customState.enabled
-              ? <><button className="primary" onClick={requestLogin}>Log in</button> to see and save them.</>
-              : "This deployment has no login, so nothing can be saved on it."}</p>
-        </div>}
-        {tab === "cohorts" && loggedIn && <div>
-          {/* Saved cohorts and saved analyses used to be two top-level tabs
-              ("Cohorts" and "Saved") with a cross-link between them ("manage
-              on the Saved tab") — one tab, two sub-tabs instead. */}
-          <div className="tabs">
-            <button className={cohortsSubTab === "cohorts" ? "active" : ""} onClick={() => setCohortsSubTab("cohorts")}>Cohorts</button>
-            <button className={cohortsSubTab === "analyses" ? "active" : ""} onClick={() => setCohortsSubTab("analyses")}>Analyses</button>
-          </div>
-          {cohortsSubTab === "cohorts" && <div>
-          <div className="card">
-            <div className="row" style={{ alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.2rem" }}>
-              <h2 style={{ margin: 0 }}>Cohorts <span className="plain">— tick any, then analyse them together</span></h2>
-              <span className="spacer" />
-              <span className="meta">
-                {picked.length === 0 ? "none selected"
-                  : picked.length + " selected" + (picked.length > 16 ? " — untick some first, an analysis takes at most 16" : "")}
-              </span>
-              <button className="primary" disabled={!picked.length} onClick={analyzePicked}
-                title={picked.length ? "analyse the ticked cohorts together (replaces the current document)" : "tick at least one cohort"}>
-                Analyze selected
-              </button>
-              {picked.length > 0 && <button className="linklike" onClick={() => setPicked([])}>clear</button>}
-            </div>
-            <h2 style={{ marginTop: "0.6rem" }}>Examples</h2>
-            {EXAMPLES.map(ex => {
-              const ev = exEvals[ex.name];
-              return (
-                <div key={ex.name} style={{ borderTop: "1px solid var(--line)", padding: "0.5rem 0" }}>
-                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                    <label className="pick">
-                      <input type="checkbox" checked={picked.includes("ex:" + ex.name)} onChange={() => togglePick("ex:" + ex.name)} />
-                      <strong>{ex.name}</strong>
-                    </label>
-                    <span className="meta">{ex.desc}</span>
-                    {ev && ev.count != null && <span className="meta"><strong>{ev.count.toLocaleString()}</strong> pts</span>}
-                    {ev && ev.busy && <span className="spinner" />}
-                    <span className="spacer" />
-                    <button className="linklike" onClick={() => previewExample(ex)}>preview</button>
-                    <button className="linklike" onClick={() => saveExample(ex)}>save</button>
-                  </div>
-                  {ev && ev.error && <div className="error">{ev.error}</div>}
-                </div>
-              );
-            })}
-            <h2 style={{ marginTop: "1.2rem" }}>
-              Saved cohorts <span className="plain">— everyone who logs in sees these: one shared login, no per-user ownership yet. Tick any to include above; delete here.</span>
-            </h2>
-            {Object.keys(saved).length === 0 && <p className="note">Nothing saved yet — save an example above, build one on the Explore page, or ask chat.</p>}
-            {Object.entries(saved)
-              .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
-              .map(([n, s2]) => (
-              <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
-                <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                  <label className="pick">
-                    <input type="checkbox" checked={picked.includes("saved:" + n)} onChange={() => togglePick("saved:" + n)} />
-                    <strong>{n}</strong>
-                  </label>
-                  {s2.lastEval && <span className="meta">{s2.lastEval.count.toLocaleString()} pts</span>}
-                  <span className="meta">saved {s2.savedAt}</span>
-                  <span className="spacer" />
-                  <button className="linklike" onClick={() => removeSaved(n)}>delete</button>
-                </div>
-                <div style={{ marginTop: "0.25rem" }}><CohortPills def={s2.def} onCustomData={showClauseData(n)} /></div>
-              </div>
-            ))}
-          </div>
-          </div>}
-          {cohortsSubTab === "analyses" && <div className="grid2">
-            <div className="card">
-              <h2>Saved analyses <span className="plain">— everyone who logs in sees these: one shared login, no per-user ownership yet</span></h2>
-              {Object.keys(spaces).length === 0 && <p className="note">Nothing saved yet — build an analysis with at least one view, then "Save workspace" on the Analysis tab.</p>}
-              {Object.entries(spaces)
-                .sort((a, b) => b[1].savedAt.localeCompare(a[1].savedAt))
-                .map(([n, w]) => (
-                  <div key={n} style={{ borderTop: "1px solid var(--line)", padding: "0.55rem 0" }}>
-                    <div style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                      <strong>{n}</strong>
-                      <span className="meta">{(w.doc.views || []).length} view{(w.doc.views || []).length === 1 ? "" : "s"}</span>
-                      <span className="meta">saved {w.savedAt}</span>
-                      <span className="spacer" />
-                      <button className="linklike" onClick={() => openWorkspace(n)}>open</button>
-                      <button className="linklike" onClick={() => deleteWorkspace(n)}>delete</button>
-                    </div>
-                  </div>
-                ))}
-              {wsError && <p className="error" style={{ marginTop: "0.4rem" }}>{wsError}</p>}
-            </div>
-          </div>}
-        </div>}
+        {tab === "cohorts" && <SavedTab login={customState} onLogin={requestLogin}
+          sub={cohortsSubTab} onSub={setCohortsSubTab} examples={EXAMPLES}
+          picked={picked} onTogglePick={togglePick} onClearPicked={() => setPicked([])} onAnalyze={analyzePicked}
+          evals={exEvals} onPreview={previewExample} onSaveExample={saveExample}
+          saved={savedArtifacts} onOpenWorkspace={openWorkspace} onDeleteWorkspace={deleteWorkspace}
+          wsError={wsError} onCustomData={showClauseData} />}
 
         {/* ================= Examples tab ================= */}
-        {tab === "examples" && (() => {
-          const tags = [...new Set(DOC_EXAMPLES.flatMap(e => e.tags || []))].sort();
-          const shown = exTag === "all" ? DOC_EXAMPLES : DOC_EXAMPLES.filter(e => (e.tags || []).includes(exTag));
-          const viewKinds = (ex: DslExample): string[] => [...new Set((ex.doc.views || []).map(v => String(v.kind)))];
-          return (
-            <div>
-              <div className="card">
-                <h2>Examples <span className="plain">— every one of these is executed by the test gate</span></h2>
-                <p className="note" style={{ marginTop: "0.2rem" }}>
-                  These are the same analysis documents that <code>docs/dsl.md</code> is generated from, and{" "}
-                  <code>npm run docs:check</code> runs each of them against the live compiler on every build — so an
-                  example that stopped working would fail the suite rather than sit here broken. Running one loads it
-                  into the Analysis tab, where you can edit the JSON and re-run.
-                </p>
-                <div className="extags">
-                  <button className={exTag === "all" ? "extag on" : "extag"} onClick={() => setExTag("all")}>
-                    all <span className="meta">{DOC_EXAMPLES.length}</span>
-                  </button>
-                  {tags.map(t => (
-                    <button key={t} className={exTag === t ? "extag on" : "extag"} onClick={() => setExTag(t)}>
-                      {t} <span className="meta">{DOC_EXAMPLES.filter(e => (e.tags || []).includes(t)).length}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="exgrid">
-                {shown.map(ex => {
-                  const cohortNames = Object.keys(ex.doc.cohorts || {});
-                  const studies = [...new Set(Object.values(ex.doc.cohorts || {})
-                    .flatMap((c: any) => (c && c.studies) || (c && c.study ? [c.study] : []))
-                    .concat(ex.doc.study ? [ex.doc.study] : []))];
-                  return (
-                    <div className="card excard" key={ex.title}>
-                      <h3>{ex.title}</h3>
-                      <div className="extags small">
-                        {viewKinds(ex).map(k => <span key={k} className="vkind">{k}</span>)}
-                        {(ex.tags || []).filter(t => !viewKinds(ex).includes(t)).map(t => <span key={t} className="extag static">{t}</span>)}
-                      </div>
-                      {ex.demonstrates && <p className="exdem">{ex.demonstrates}</p>}
-                      {ex.customData?.length ? <p className="meta" style={{ margin: 0 }}>
-                        <span className="customtag">custom</span>
-                        Runs on demo data bundled with the app: {ex.customData.map((d) => d.name + " (" + d.rows.length + " " + d.level + "s)").join(", ")}.
-                      </p> : null}
-                      <p className="exnote">{ex.note}</p>
-                      <div className="exmeta">
-                        <span title={studies.join(", ")}>
-                          {studies.length === 1 ? studies[0] : studies.length + " studies"}
-                        </span>
-                        <span>{cohortNames.length} cohort{cohortNames.length === 1 ? "" : "s"}: {cohortNames.join(", ")}</span>
-                      </div>
-                      <details>
-                        <summary className="meta">document</summary>
-                        <pre className="exjson">{JSON.stringify(ex.doc, null, 2)}</pre>
-                      </details>
-                      <div className="row" style={{ marginTop: "auto", paddingTop: "0.5rem", gap: "0.4rem" }}>
-                        <button onClick={() => runDocExample(ex)} disabled={busy}>Run</button>
-                        <button className="ghost" onClick={() => copyDocLink(ex)}>
-                          {copied === ex.title ? "copied" : "copy link"}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
+        {tab === "examples" && <ExamplesTab tag={exTag} onTag={setExTag} busy={busy}
+          onRun={runDocExample} link={(ex) => docLink(ex.doc)} onError={setError} />}
 
         {/* ================= Analysis tab ================= */}
         {tab === "analysis" && <div className="ana-grid">
@@ -3278,14 +1183,14 @@ export default function AnalysisPage() {
           <dialog ref={docDialog} className="docdialog"
             onClick={e => { if (e.target === docDialog.current) docDialog.current?.close(); }}>
             <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.5rem" }}>
-              <h3 style={{ margin: 0 }}>The document <span className="plain">— views</span></h3>
+              <h3 className="flush">The document <span className="plain">— views</span></h3>
               <button className="linklike" onClick={() => docDialog.current?.close()}>close</button>
             </div>
             {/* id, because the notes textarea above it also matches "textarea" —
                 anything reading the document from outside React needs to be
                 able to say WHICH one. */}
-            <textarea id="docjson" value={docText} onChange={e => docs.setText(e.target.value)} spellCheck={false}
-              style={{ width: "100%", height: "20rem", font: "0.72rem 'IBM Plex Mono',monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem" }} />
+            <textarea className="docjson" id="docjson" value={docText} onChange={e => docs.setText(e.target.value)} spellCheck={false}
+              />
             <div className="row" style={{ marginTop: "0.6rem" }}>
               <button className="primary" disabled={busy} onClick={applyText}>{busy && <span className="spinner onprimary" />}{busy ? "Running…" : "Run document"}</button>
               {doc.cohorts && Object.keys(doc.cohorts).length > 0 &&
@@ -3301,7 +1206,7 @@ export default function AnalysisPage() {
                 {Object.entries(result.cohorts).map(([n, c]) => (
                   <div key={n} style={{ marginTop: "0.5rem" }}>
                     <p className="meta" style={{ margin: "0 0 0.25rem" }}><strong>{n}</strong> — {c.count.toLocaleString()} patients{c.studies && c.studies.length > 1 ? " across " + c.studies.length + " studies" : ""}</p>
-                    <pre style={{ maxHeight: "16rem", overflow: "auto", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 8, padding: "0.6rem", fontSize: "var(--t-xs)", whiteSpace: "pre" }}>{c.sql}</pre>
+                    <pre className="sqlpre">{c.sql}</pre>
                   </div>
                 ))}
               </details>
@@ -3403,745 +1308,7 @@ export default function AnalysisPage() {
               </div>
             )}
             {result && result.views.map((v, vi) => (
-              <div className="card viewcard" key={viewIds[vi] ?? vi}>
-                {/* recomputing this view (a settings change), or the whole document */}
-                {!(v as any).pending && !(drawsOwnWaiting(v.kind) && !v.error) && (busy || pendingKeys.has(viewIds[vi])) && <Updating />}
-                {/* addView's placeholder for a brand-new view that has no prior
-                    result to keep showing while its own delta request is in
-                    flight (see addView) — every v.kind===… block below is
-                    already guarded on a kind-specific data field, so this
-                    placeholder object just falls through all of them silently;
-                    this is the only thing that needs to render for it. */}
-                {(v as any).pending && <div className="skeleton skeleton-view" />}
-                {v.kind === "compare" && v.rows && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
-                    actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
-                  {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
-                    style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
-                      <thead><tr>
-                        <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>gene</th>
-                        {v.cohorts!.map((n, i: number) => <th key={n} style={{ textAlign: "right", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}<br /><span style={{ fontWeight: 400, color: "var(--muted)" }}>driver / any</span></th>)}
-                        {v.rows![0] && v.rows![0].pAny != null && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p (any)</th>}
-                        {v.rows![0] && v.rows![0].qAny != null && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q (any)</th>}
-                      </tr></thead>
-                      <tbody>{v.rows.map(r => (
-                        <tr key={r.gene} style={{ borderTop: "1px solid var(--line)" }}>
-                          <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600 }}>{r.gene}</td>
-                          {r.cells.map(c => {
-                            const bt = c.byType;
-                            const missing = bt && (["mutation", "cna", "structuralVariant"] as const)
-                              .filter(t => bt[t].profiled === 0 && (bt.mutation.profiled > 0 || bt.cna.profiled > 0 || bt.structuralVariant.profiled > 0));
-                            const label = { mutation: "mutation", cna: "copy-number", structuralVariant: "structural-variant" };
-                            const title = bt ? "mutation " + bt.mutation.altered + "/" + bt.mutation.profiled +
-                              " · copy-number " + bt.cna.altered + "/" + bt.cna.profiled +
-                              " · structural-variant " + bt.structuralVariant.altered + "/" + bt.structuralVariant.profiled +
-                              (missing && missing.length ? " — no " + missing.map(t => label[t]).join("/") + " data for this cohort's study" : "") : undefined;
-                            return (
-                              <td key={c.cohort} style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }} title={title}>
-                                {c.driverPct}% / {c.anyPct}%{missing && missing.length ? <sup style={{ color: "var(--warn, #b45309)" }}>*</sup> : null}
-                              </td>
-                            );
-                          })}
-                          {r.pAny != null && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: r.pAny < 0.001 ? 600 : 400 }}>{r.pAny < 1e-4 ? r.pAny.toExponential(1) : r.pAny.toFixed(3)}</td>}
-                          {r.qAny != null && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: r.qAny < 0.05 ? 600 : 400 }}>{r.qAny < 1e-4 ? r.qAny.toExponential(1) : r.qAny.toFixed(3)}</td>}
-                        </tr>))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>}
-                {v.kind === "hotspots" && v.hotspots && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi), 1)} sub="lollipop by protein position, as the portal's mutation tab draws it" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
-                    actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
-                  {/* the plot from the same renderer MCP uses (lib/view-svg.ts), with the gene summary and the
-                      alteration grid beside it as controls; the grid's selection re-runs nothing */}
-                  <HotspotsBody v={v} hide={docView(vi).hide} onHide={(h) => updateViewLocal(vi, (vv: any) => {
-                    const nx = { ...vv }; if (h) nx.hide = h; else delete nx.hide; return nx;
-                  })} />
-                </>}
-                {v.kind === "coexpression" && v.coexpression && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi), 1)} sub="Pearson correlation from per-site sums" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
-                    actions={<>
-                      <label className="tbfield" title="the molecular profile the correlation is computed over">profile <select
-                        value={docView(vi).profileType || ""} disabled={busy}
-                        onChange={(e) => updateView(vi, (vv: any) => ({ ...vv, profileType: e.target.value }))}>
-                        {!((explore && explore.profiles) || []).includes(docView(vi).profileType || "") &&
-                          <option value={docView(vi).profileType || ""}>{docView(vi).profileType || "(none)"}</option>}
-                        {((explore && explore.profiles) || []).map((pt: string) => <option key={pt} value={pt}>{pt}</option>)}
-                      </select></label>
-                      <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
-                    </>} />
-                  {v.note && <p className="note">{v.note}</p>}
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
-                      <thead><tr>
-                        <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>pair</th>
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>n</th>
-                        <th style={{ width: "9rem" }} aria-label="correlation, visualised" />
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>r</th>
-                        {v.coexpression.some(x => x.rMeta != null) && <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>r (meta)</th>}
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p</th>
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q</th>
-                      </tr></thead>
-                      <tbody>{v.coexpression.map(r => (
-                        <tr key={r.a + "|" + r.b} style={{ borderTop: "1px solid var(--line)" }}
-                          title={(r.perStudy || []).map(s2 => s2.study + ": r=" + s2.r + " (n=" + s2.n + ")").join("\n") || undefined}>
-                          <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600 }}>{r.a} / {r.b}</td>
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{r.n.toLocaleString()}</td>
-                          <td style={{ padding: "0.3rem 0.6rem" }}>
-                            {r.r != null && <span className="rbar"><i style={{
-                              width: Math.abs(r.r) * 50 + "%",
-                              marginLeft: r.r < 0 ? (50 - Math.abs(r.r) * 50) + "%" : "50%",
-                              background: r.r < 0 ? "#D55E00" : "#0072B2" }} /></span>}
-                          </td>
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: Math.abs(r.r ?? 0) > 0.5 ? 600 : 400 }}>{r.r ?? "—"}</td>
-                          {v.coexpression!.some(x => x.rMeta != null) && <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.rMeta ?? "—"}</td>}
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{pCell(r.pMeta ?? r.p)}</td>
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{pCell(r.q)}</td>
-                        </tr>))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>}
-                {v.kind === "clinical" && v.clinical && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Clinical comparison" cohorts={cohortChoice(vi, docView(vi))} sub="attribute distributions across cohorts" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
-                    actions={<PickMenu label="attributes" title="which clinical attributes this view compares" busy={busy}
-                      menuId={"attrs:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} loading={attrsLoading()}
-                      options={catalogAttrs().map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind }))}
-                      chosen={(docView(vi).attributes || []).map(String)} min={1} max={20}
-                      onChange={(next) => setViewAttrs(vi, next)} />} />
-                  {v.note && <p className="note">{v.note}</p>}
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
-                      <thead><tr>
-                        <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>attribute</th>
-                        {v.cohorts!.map((n, i: number) => <th key={n} style={{ textAlign: "left", padding: "0.3rem 0.6rem", color: CAT_COLORS[i] }}>{n}</th>)}
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>test</th>
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p</th>
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q</th>
-                      </tr></thead>
-                      <tbody>{v.clinical.map(r => (
-                        <tr key={r.attribute} style={{ borderTop: "1px solid var(--line)" }}>
-                          <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600, whiteSpace: "nowrap" }}>
-                            {r.attribute}<br /><span className="meta" style={{ fontWeight: 400 }}>{r.per}-level · {r.kind === "num" ? "numeric" : (r.distinct ?? 0) + " values"}</span>
-                          </td>
-                          {r.skipped
-                            ? <td colSpan={v.cohorts!.length + 3} style={{ padding: "0.3rem 0.6rem", color: "var(--muted)", fontStyle: "italic" }}>not compared — {r.skipped}</td>
-                            : <>
-                              {r.cells.map(c => (
-                                <td key={c.cohort} style={{ padding: "0.3rem 0.6rem", verticalAlign: "top" }}>
-                                  {r.kind === "num"
-                                    ? <span style={{ fontVariantNumeric: "tabular-nums" }}>{c.mean} <span className="meta">± {c.sd} (n={c.n.toLocaleString()})</span>
-                                        {c.median != null && <><br /><span className="meta">median {c.median} ({c.q1}–{c.q3})</span></>}</span>
-                                    : <span className="meta">{(c.top || []).slice(0, 3).map(t2 => t2.v + " " + Math.round(1000 * t2.n / (c.n || 1)) / 10 + "%").join(" · ")}</span>}
-                                </td>
-                              ))}
-                              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", whiteSpace: "nowrap" }}
-                                title={r.statistic != null ? r.test + " = " + r.statistic + ", df = " + r.df + (r.df2 != null ? ", " + r.df2 : "") + (r.minExpected != null ? ", smallest expected cell = " + r.minExpected : "") +
-                                  (r.rankP != null ? "; " + (r.test === "Welch ANOVA" ? "Kruskal-Wallis H = " : "Mann-Whitney U = ") + r.rankStatistic + ", p = " + r.rankP + " (single-study only, not part of the q-value correction)" : "") : undefined}>
-                                <span className="meta">{r.test}{r.rankP != null && "*"}</span>
-                              </td>
-                              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: (r.p ?? 1) < 0.001 ? 600 : 400 }}>{r.p != null ? pCell(r.p) : "—"}</td>
-                              <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{r.q != null ? pCell(r.q) : "—"}</td>
-                            </>}
-                        </tr>))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>}
-                {v.kind === "cooccurrence" && v.pairs && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi), 1)} sub="pairwise, among patients profiled for both genes" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
-                    actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
-                  {v.note && <p className="note">{v.note}</p>}
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ borderCollapse: "collapse", fontSize: "var(--t-md)", width: "100%" }}>
-                      <thead><tr>
-                        <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>pair</th>
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>both</th>
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>A only</th>
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>B only</th>
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>neither</th>
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>log<sub>2</sub> OR</th>
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>p</th>
-                        <th style={{ textAlign: "right", padding: "0.3rem 0.6rem" }}>q</th>
-                        <th style={{ textAlign: "left", padding: "0.3rem 0.6rem" }}>tendency</th>
-                      </tr></thead>
-                      <tbody>{v.pairs.map(r => {
-                        const lor = r.oddsRatioMH != null ? Math.log2(r.oddsRatioMH) : r.log2Odds;
-                        const pShown = r.pStratified ?? r.p;
-                        return (
-                        <tr key={r.a + "|" + r.b} style={{ borderTop: "1px solid var(--line)" }}
-                          title={"profiled for both: " + r.profiled.toLocaleString() +
-                            (r.pStratified != null ? "  ·  stratified over " + r.strata + " studies (CMH); pooled Fisher p=" + r.p.toExponential(1) : "")}>
-                          <td style={{ padding: "0.3rem 0.6rem", fontWeight: 600 }}>{r.a} / {r.b}</td>
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.both.toLocaleString()}</td>
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.onlyA.toLocaleString()}</td>
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{r.onlyB.toLocaleString()}</td>
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{r.neither.toLocaleString()}</td>
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums" }}>{lor == null ? "—" : lor.toFixed(2)}</td>
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", fontWeight: pShown < 0.001 ? 600 : 400 }}>{pCell(pShown)}</td>
-                          <td style={{ textAlign: "right", padding: "0.3rem 0.6rem", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>{pCell(r.q)}</td>
-                          <td style={{ padding: "0.3rem 0.6rem" }}>
-                            {r.tendency && <span className={r.tendency === "co-occurrence" ? "tend co" : "tend mx"}>{r.tendency}</span>}
-                          </td>
-                        </tr>); })}
-                      </tbody>
-                    </table>
-                  </div>
-                </>}
-                {v.kind === "survival" && v.curves && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
-                    sub={<>Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}{v.anchoredTo && <> — from {v.anchoredTo}</>}</>}
-                    chips={v.truncated ? <span className="trunc" title={
-                      "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
-                      (v.entryMonths ? "\n\nMedian " + v.entryMonths.median + " months from anchor to entry; 90th percentile "
-                        + v.entryMonths.p90 + "; longest " + v.entryMonths.max + "." : "")}>left-truncated</span> : null} />
-                  {(() => {
-                    // The basis of a survival analysis — which endpoint, and what
-                    // the clock starts from — is the thing people most want to
-                    // change, so it is a control rather than a JSON edit.
-                    const sv: any = (doc.views || [])[vi] || {};
-                    const a = sv.anchor || null;
-                    const eps: string[] = (cat && cat.survivalEndpoints) || [];
-                    const types: string[] = ((cat && cat.types) || []).map((t: any) => t.t);
-                    const keys: string[] = (cat && a && cat.keys && cat.keys[a.eventType]) || [];
-                    const vals: string[] = (cat && a && a.key && cat.values && cat.values[a.eventType]
-                      && cat.values[a.eventType][a.key]) || [];
-                    return (
-                      <div className="basis">
-                        <span className="meta">endpoint</span>
-                        <select value={sv.endpoint || "OS"} disabled={busy}
-                          onChange={e => patchView(vi, { endpoint: e.target.value })}>
-                          {(eps.length ? eps : [sv.endpoint || "OS"]).map(x => <option key={x} value={x}>{x}</option>)}
-                        {!cat && <option disabled>loading…</option>}
-                        </select>
-                        {catLoading && !cat && <Waiting what="endpoints" />}
-                        <span className="meta">measured from</span>
-                        <select value={a ? a.eventType : ""} disabled={busy}
-                          onChange={e => patchView(vi, { anchor: e.target.value
-                            ? { eventType: e.target.value, occurrence: "FIRST" } : null })}>
-                          <option value="">study baseline (day 0)</option>
-                          {!cat && <option disabled>loading this study's events…</option>}
-                          {types.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                        {a && <>
-                          <select value={a.occurrence || "FIRST"} disabled={busy}
-                            onChange={e => patchView(vi, { anchor: { ...a, occurrence: e.target.value } })}>
-                            <option value="FIRST">first</option><option value="LAST">last</option>
-                          </select>
-                          <span className="meta">where</span>
-                          <select value={a.key || ""} disabled={busy}
-                            onChange={e => patchView(vi, { anchor: e.target.value
-                              ? { ...a, key: e.target.value, value: (cat.values[a.eventType] || {})[e.target.value]?.[0] ?? "" }
-                              : { eventType: a.eventType, occurrence: a.occurrence || "FIRST" } })}>
-                            <option value="">(any)</option>
-                            {keys.map(k => <option key={k} value={k}>{k}</option>)}
-                          </select>
-                          {a.key && (
-                            <select value={a.value ?? ""} disabled={busy}
-                              onChange={e => patchView(vi, { anchor: { ...a, value: e.target.value } })}>
-                              {vals.map(x => <option key={x} value={x}>{x}</option>)}
-                            </select>
-                          )}
-                        </>}
-                        <span className="meta">display</span>
-                        <select value={sv.display === "incidence" ? "incidence" : "survival"} disabled={busy}
-                          onChange={e => patchView(vi, { display: e.target.value === "incidence" ? "incidence" : undefined })}>
-                          <option value="survival">survival</option>
-                          <option value="incidence">cumulative incidence</option>
-                        </select>
-                        <span className="meta">ticks</span>
-                        <select value={sv.tickMonths || ""} disabled={busy}
-                          onChange={e => patchView(vi, { tickMonths: e.target.value ? Number(e.target.value) : undefined })}>
-                          <option value="">auto</option>
-                          {[6, 12, 24, 60].map(m => <option key={m} value={m}>{m}mo</option>)}
-                        </select>
-                        <span className="meta">cutoff</span>
-                        <input type="number" min={1} placeholder="none" disabled={busy}
-                          value={sv.cutoffMonths ?? ""} style={{ width: "5rem" }}
-                          onChange={e => patchView(vi, { cutoffMonths: e.target.value ? Number(e.target.value) : undefined })} />
-                        <span className="meta">mo</span>
-                      </div>
-                    );
-                  })()}
-                  <KMChart curves={v.curves!} cutoffMonths={v.cutoffMonths} tickMonths={v.tickMonths} incidence={v.display === "incidence"} />
-                  <div style={{ display: "flex", gap: "1.2rem", fontSize: "var(--t-sm)", color: "var(--muted)", marginTop: "0.4rem", flexWrap: "wrap" }}>
-                    {v.curves!.map((c, i: number) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: {v.display === "incidence" ? "50% incidence by " : "median "}{c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}
-                  </div>
-                  {v.logrank && (
-                    <div className="logrank" title={"observed " + v.logrank.observed.join(" / ") + " events vs expected " + v.logrank.expected.join(" / ") + " under the null"}>
-                      <strong>log-rank</strong> χ²={v.logrank.chi2.toFixed(2)} ({v.logrank.df} df) · <strong>{fmtP(v.logrank.p)}</strong>
-                      {v.logrank.strata > 1 && <span className="meta"> · stratified by study, {v.logrank.strata} strata</span>}
-                      {v.logrankPooled && (
-                        <span className="meta" title="the unstratified test, which pools risk sets across studies and assumes a common baseline hazard">
-                          {"  ·  pooled " + fmtP(v.logrankPooled.p)}
-                          {crossesThreshold(v.logrank.p, v.logrankPooled.p) && <strong style={{ color: "var(--warn, #b45309)" }}> — the two disagree at p=0.05</strong>}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {v.logrankK && (
-                    <div className="logrank" title={"observed " + v.logrankK.observed.join(" / ") + " events vs expected " + v.logrankK.expected.join(" / ") + " under the null, across " + v.logrankK.groups + " groups"}>
-                      <strong>{v.logrankK.groups}-group log-rank</strong> χ²={v.logrankK.chi2.toFixed(2)} ({v.logrankK.df} df) · <strong>{fmtP(v.logrankK.p)}</strong>
-                      <span className="meta"> — tests whether the groups differ at all, not which pair does</span>
-                      {v.logrankK.strata > 1 && <span className="meta"> · stratified by study, {v.logrankK.strata} strata</span>}
-                      {v.logrankKPooled && (
-                        <span className="meta" title="the unstratified test, which pools risk sets across studies and assumes a common baseline hazard">
-                          {"  ·  pooled " + fmtP(v.logrankKPooled.p)}
-                          {crossesThreshold(v.logrankK.p, v.logrankKPooled.p) && <strong style={{ color: "var(--warn, #b45309)" }}> — the two disagree at p=0.05</strong>}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  <p className="note">{v.caveat}</p>
-                </>}
-                {v.kind === "cox" && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Cox regression" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
-                    sub={<>Multivariate Cox, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}</>} />
-                  {(() => {
-                    const sv: any = (doc.views || [])[vi] || {};
-                    const covariates: any[] = Array.isArray(sv.covariates) ? sv.covariates : [];
-                    const eps: string[] = (cat && cat.survivalEndpoints) || [];
-                    const setCovariate = (ci: number, next: any) => {
-                      const nc = covariates.map((c, j) => j === ci ? next : c);
-                      patchView(vi, { covariates: nc });
-                    };
-                    const removeCovariate = (ci: number) => patchView(vi, { covariates: covariates.filter((_, j) => j !== ci) });
-                    const addCovariate = () => patchView(vi, { covariates: [...covariates, { source: "clinical", attribute: (trackAttrs.attrs[0] || {}).attribute || "" }] });
-                    // The reference level for a categorical covariate is picked from the levels
-                    // this run actually observed (v.cox.coefficients), not re-derived client-side —
-                    // a covariate the fit dropped (only one level, or no result yet) simply gets no
-                    // picker rather than a guess at what the data might contain.
-                    const observedLevels = (ci: number): string[] => {
-                      // when stratified by cohort there's no single pooled coefficients array —
-                      // union the levels each cohort's own fit happened to observe instead
-                      const coefs = (v.cox && v.cox.coefficients.length) ? v.cox.coefficients
-                        : (v.cox?.byCohort || []).flatMap((c: any) => c.coefficients);
-                      const mine = coefs.filter((c: any) => c.axisIndex === ci);
-                      if (!mine.length) return [];
-                      const levels = new Set<string>();
-                      for (const c of mine) { if (c.reference) levels.add(c.reference); if (c.level) levels.add(c.level); }
-                      return [...levels];
-                    };
-                    return (
-                      <div className="basis" style={{ flexWrap: "wrap" }}>
-                        <span className="meta">endpoint</span>
-                        <select value={sv.endpoint || "OS"} disabled={busy}
-                          onChange={e => patchView(vi, { endpoint: e.target.value })}>
-                          {(eps.length ? eps : [sv.endpoint || "OS"]).map(x => <option key={x} value={x}>{x}</option>)}
-                          {!cat && <option disabled>loading…</option>}
-                        </select>
-                        {catLoading && !cat && <Waiting what="endpoints" />}
-                        <span className="meta">cutoff</span>
-                        <input type="number" min={1} placeholder="none" disabled={busy}
-                          value={sv.cutoffMonths ?? ""} style={{ width: "5rem" }}
-                          onChange={e => patchView(vi, { cutoffMonths: e.target.value ? Number(e.target.value) : undefined })} />
-                        <span className="meta">mo</span>
-                        <label className="chk" title="fit a separate baseline hazard per study instead of pooling them">
-                          <input type="checkbox" checked={!!sv.stratifyByStudy} disabled={busy}
-                            onChange={e => patchView(vi, { stratifyByStudy: e.target.checked || undefined })} />
-                          stratify by study
-                        </label>
-                        <label className="chk" title="fit each cohort as its own separate model — own coefficients, own reference levels — instead of pooling them into one fit; a no-op with only one cohort">
-                          <input type="checkbox" checked={!!sv.stratifyByCohort} disabled={busy}
-                            onChange={e => patchView(vi, { stratifyByCohort: e.target.checked || undefined })} />
-                          stratify by cohort
-                        </label>
-                        <div style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "0.3rem", marginTop: "0.3rem" }}>
-                          {covariates.map((c, ci) => {
-                            const levels = observedLevels(ci);
-                            return (
-                            <span key={ci} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-                              <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={catalogAttrs()}
-                                profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-                                onChange={(next) => setCovariate(ci, next)} />
-                              {levels.length > 1 && <label className="tbfield" title="the level a hazard ratio is measured against; unset uses this covariate's default (mutated/not always compares against 'Not mutated', other categoricals use whichever level is most frequent)">
-                                ref <select value={c.reference && levels.includes(c.reference) ? c.reference : ""} disabled={busy}
-                                  onChange={e => setCovariate(ci, { ...c, reference: e.target.value || undefined })}>
-                                  <option value="">(default)</option>
-                                  {levels.map(l => <option key={l} value={l}>{l}</option>)}
-                                </select>
-                              </label>}
-                              <button type="button" className="tbbtn" disabled={busy} title="remove this covariate"
-                                onClick={() => removeCovariate(ci)}>remove</button>
-                            </span>
-                            );
-                          })}
-                          <button type="button" className="tbbtn" disabled={busy} style={{ alignSelf: "flex-start" }}
-                            onClick={addCovariate}>+ add covariate</button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  {v.svg
-                    ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
-                    : !v.error && <p className="note">nothing to draw</p>}
-                </>}
-                {isMoreKind(v.kind) && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title={MORE_KINDS[v.kind].title}
-                    sub={moreSub(v.kind, docView(vi), v)}
-                    cohorts={cohortChoice(vi, docView(vi), MORE_KINDS[v.kind].maxCohorts)}
-                    onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined}
-                    onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
-                    actions={MORE_KINDS[v.kind].genes
-                      ? <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
-                      : undefined} />
-                  {(() => {
-                    const mc = { vi, spec: docView(vi), v, busy, updating: busy || pendingKeys.has(viewIds[vi]), patch: (p: Record<string, unknown>) => patchView(vi, p),
-                      attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), docJson: () => JSON.stringify(doc) };
-                    const body = MoreBody({ c: mc });
-                    return <>
-                      <MoreControls c={mc} />
-                      {v.note && <p className="note">{v.note}</p>}
-                      {body || (v.svg
-                        ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
-                        : !v.error && <p className="note">nothing to draw</p>)}
-                      {body && v.caveat && <p className="note vfoot">{v.caveat}</p>}
-                    </>;
-                  })()}
-                </>}
-                {v.kind === "logistic" && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Logistic regression" cohorts={cohortChoice(vi, docView(vi))} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
-                    sub={<>Multivariate logistic, odds ratios</>} />
-                  {(() => {
-                    const sv: any = (doc.views || [])[vi] || {};
-                    const covariates: any[] = Array.isArray(sv.covariates) ? sv.covariates : [];
-                    const setCovariate = (ci: number, next: any) => {
-                      const nc = covariates.map((c, j) => j === ci ? next : c);
-                      patchView(vi, { covariates: nc });
-                    };
-                    const removeCovariate = (ci: number) => patchView(vi, { covariates: covariates.filter((_, j) => j !== ci) });
-                    const addCovariate = () => patchView(vi, { covariates: [...covariates, { source: "clinical", attribute: (trackAttrs.attrs[0] || {}).attribute || "" }] });
-                    // Same idea as the Cox picker's observedLevels, but there's only ever one
-                    // pooled fit here (logistic has no stratifyByCohort yet).
-                    const observedLevels = (ci: number): string[] => {
-                      const coefs = (v.logistic && v.logistic.coefficients) || [];
-                      const mine = coefs.filter((c: any) => c.axisIndex === ci);
-                      if (!mine.length) return [];
-                      const levels = new Set<string>();
-                      for (const c of mine) { if (c.reference) levels.add(c.reference); if (c.level) levels.add(c.level); }
-                      return [...levels];
-                    };
-                    // The outcome's own observed levels, for the outcomeEvent picker: the
-                    // currently-chosen event (if the fit succeeded) plus whatever got collapsed
-                    // into "not event" (outcomeOther) — together, everything this run has seen.
-                    const outcomeLevels = [...new Set([
-                      ...(sv.outcomeEvent ? [String(sv.outcomeEvent)] : []),
-                      ...((v.logistic && v.logistic.outcomeOther) || [])
-                    ])];
-                    const outcomeIsAlteration = sv.outcome?.source === "alteration";
-                    return (
-                      <div className="basis" style={{ flexWrap: "wrap" }}>
-                        <span className="meta">outcome</span>
-                        <AxisPicker side="outcome" axis={sv.outcome || { source: "clinical", attribute: "" }} attrs={catalogAttrs()}
-                          profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-                          onChange={(next) => patchView(vi, { outcome: next })} />
-                        {!outcomeIsAlteration && <label className="tbfield" title="which observed value of the outcome counts as the event (1); every other observed value is treated as 'not event' and disclosed in the caveat. Required for a categorical outcome; not used for a numeric one, which must already be coded 0/1">
-                          event <input type="text" list={"outcome-levels-" + vi} disabled={busy} style={{ width: "9rem" }}
-                            placeholder="e.g. Responder" value={sv.outcomeEvent || ""}
-                            onChange={e => patchView(vi, { outcomeEvent: e.target.value || undefined })} />
-                          <datalist id={"outcome-levels-" + vi}>
-                            {outcomeLevels.map(l => <option key={l} value={l} />)}
-                          </datalist>
-                        </label>}
-                        <div style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: "0.3rem", marginTop: "0.3rem" }}>
-                          {covariates.map((c, ci) => {
-                            const levels = observedLevels(ci);
-                            return (
-                            <span key={ci} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-                              <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={catalogAttrs()}
-                                profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-                                onChange={(next) => setCovariate(ci, next)} />
-                              {levels.length > 1 && <label className="tbfield" title="the level an odds ratio is measured against; unset uses this covariate's default (mutated/not always compares against 'Not mutated', other categoricals use whichever level is most frequent)">
-                                ref <select value={c.reference && levels.includes(c.reference) ? c.reference : ""} disabled={busy}
-                                  onChange={e => setCovariate(ci, { ...c, reference: e.target.value || undefined })}>
-                                  <option value="">(default)</option>
-                                  {levels.map(l => <option key={l} value={l}>{l}</option>)}
-                                </select>
-                              </label>}
-                              <button type="button" className="tbbtn" disabled={busy} title="remove this covariate"
-                                onClick={() => removeCovariate(ci)}>remove</button>
-                            </span>
-                            );
-                          })}
-                          <button type="button" className="tbbtn" disabled={busy} style={{ alignSelf: "flex-start" }}
-                            onClick={addCovariate}>+ add covariate</button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  {v.svg
-                    ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
-                    : !v.error && <p className="note">nothing to draw</p>}
-                </>}
-                {v.kind === "sequence" && !v.svg && v.error && v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
-                  <div className="basis">
-                    <span className="meta">label lines by</span>
-                    <select value={v.sequence.labelKey} disabled={busy}
-                      onChange={e => patchView(vi, { labelKey: e.target.value })}>
-                      {v.sequence.keyOptions.map(k => (
-                        <option key={k.key} value={k.label}>{k.label} — {k.values} value{k.values === 1 ? "" : "s"}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                {v.kind === "plot" && <>
-                  <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
-                    sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
-                  {/* Every control here changes what is DRAWN and costs a query, so there is one
-                      zone and it says so — the same toolbar the oncoprint uses. */}
-                  <div className="viewtb">
-                    <div className="tbz">
-                      <span className="tbl" title="these change what is drawn, and re-run the query">data</span>
-                      <AxisPicker side="x" axis={docView(vi).x} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-                        onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, x: a }))} />
-                    </div>
-                    <div className="tbz">
-                      <AxisPicker side="y" axis={docView(vi).y} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-                        onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, y: a }))} />
-                    </div>
-                    {/* colour/ring only affect a box plot's violin — a scatter's density and a
-                        contingency table have no per-case colour to split, so the controls would
-                        sit there doing nothing until a box shape is actually on screen */}
-                    {v.plot?.shape === "box" && <div className="tbz">
-                      <span className="tbl" title="colours each group's violin by a category">colour</span>
-                      <AxisPicker side="fill" axis={docView(vi).colorBy} allowNone categorical
-                        attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-                        onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
-                      <AxisPicker side="ring" axis={docView(vi).ringBy} allowNone categorical
-                        attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-                        onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
-                    </div>}
-                    <div className="tbz">
-                      <label className="tbfield" title="what a point is; patient mode averages a patient's samples">unit <select
-                        value={docView(vi).unit || "patient"} disabled={busy}
-                        onChange={(e) => updateView(vi, (vv: any) => ({ ...vv, unit: e.target.value }))}>
-                        <option value="patient">patients</option><option value="sample">samples</option>
-                      </select></label>
-                      {/* a box plot is always drawn categories-on-x, values-on-y regardless of
-                          which axis is which in the document (lib/federation.ts's box branch
-                          routes by kind, not by x/y) — swapping which is "x" changes nothing a
-                          reader can see, so the button is disabled rather than pretending to act */}
-                      <button className="tbbtn" disabled={busy || v.plot?.shape === "box"}
-                        title={v.plot?.shape === "box" ? "a box plot is always drawn by category, whichever axis holds it — nothing to swap"
-                          : "put the x axis on y and the y axis on x"}
-                        onClick={() => updateView(vi, (vv: any) => ({ ...vv, x: vv.y, y: vv.x }))}>swap</button>
-                    </div>
-                  </div>
-                  {v.svg
-                    ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} />
-                    : <p className="note">{v.plot?.note || "nothing to draw"}</p>}
-                </>}
-                {v.kind === "sequence" && v.svg && <>
-                  <div className="vhead">
-                    <h2 className="vtitle">Treatment sequence <span className="plain">
-                      — lines of therapy by {v.sequence ? v.sequence.labelKey : ""}
-                      {v.sequence ? " · " + v.sequence.lineGap + "-day line gap" : ""}</span></h2>
-                    <div className="vmeta">
-                      <ViewHelpButton kind="sequence" menuId={"help:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} />
-                      <CohortPicker nodes={cohortChoice(vi, docView(vi)).nodes} chosen={cohortChoice(vi, docView(vi)).chosen} max={1} busy={busy}
-                        menuId={"pick:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current}
-                        onChange={(next) => setViewCohorts(vi, next, cohortChoice(vi, docView(vi)).all)} />
-                    {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
-                      <details className="gearmenu inline">
-                        <summary title="treatment sequence options">settings</summary>
-                        {/* Label granularity is the choice that most changes this chart, and
-                            the keys are not interchangeable: in MSK-CHORD SUBTYPE has 10
-                            values, AGENT hundreds, TREATMENT_TYPE exactly one. So each option
-                            carries its value count rather than leaving the reader to discover
-                            a useless key by picking it. */}
-                        <div className="gearmenu-items wide">
-                          <div className="setrow">
-                            <span className="meta">label lines by</span>
-                            <select value={v.sequence.labelKey} disabled={busy}
-                              onChange={e => patchView(vi, { labelKey: e.target.value })}>
-                              {v.sequence.keyOptions.map(k => (
-                                <option key={k.key} value={k.label}>
-                                  {k.label} — {k.values} value{k.values === 1 ? "" : "s"}
-                                  {k.values === 1 ? " (unusable)" : k.values > 60 ? " (very granular)" : ""}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="setrow">
-                            <span className="meta">new line after</span>
-                            <select value={String(v.sequence.lineGap)} disabled={busy}
-                              onChange={e => patchView(vi, { lineGap: Number(e.target.value) })}>
-                              {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
-                            </select>
-                          </div>
-                          <div className="setrow">
-                            <span className="meta">lines shown</span>
-                            <select value={String(v.sequence.steps)} disabled={busy}
-                              onChange={e => patchView(vi, { maxSteps: Number(e.target.value) })}>
-                              {[2, 3, 4, 5].map(m => <option key={m} value={m}>{m}</option>)}
-                            </select>
-                          </div>
-                        </div>
-                      </details>
-                    )}
-                    <Latency v={v} /><Participation p={v.participation} />
-                    <ViewMenu menuId={"reorder:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)} hasNote={!!v.annotationNote} />
-                    </div>
-                  </div>
-                  <DrawnCohorts drawn={cohortChoice(vi, docView(vi), 1).drawn} nodes={cohortChoice(vi, docView(vi), 1).nodes} />
-                  {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
-      <SplitByNote v={v} />
-                  <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
-                </>}
-                {v.kind === "course" && v.svg && <>
-                  <div className="vhead">
-                    <h2 className="vtitle">Clinical course <span className="plain">
-                      — {[...new Set((v.course || []).map(c => c.eventType))].join(", ")}
-                      {v.anchoredTo ? "" : ""} · {v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
-                    <div className="vmeta">
-                      <ViewHelpButton kind="course" menuId={"help:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} />
-                      <CohortPicker nodes={cohortChoice(vi, docView(vi)).nodes} chosen={cohortChoice(vi, docView(vi)).chosen} busy={busy}
-                        menuId={"pick:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current}
-                        onChange={(next) => setViewCohorts(vi, next, cohortChoice(vi, docView(vi)).all)} />
-                    <details className="gearmenu inline">
-                      <summary title="clinical course options">settings</summary>
-                      {/* Every parameter of this chart is a choice, and the defaults are only a
-                        guess at a good one — so all of them are settable. They live behind
-                        the gear rather than above the figure because they are read when
-                        setting a chart up and rarely after. Each event type shows the two
-                        structural facts that decide whether it is worth plotting: how often
-                        it recurs, and whether it carries a duration. */}
-                  {v.eventOptions && v.eventOptions.length > 0 && (() => {
-                    const cv: any = (doc.views || [])[vi] || {};
-                    const chosen: string[] = (cv.eventTypes || []).map((x: string) => String(x).trim().toLowerCase());
-                    const anchor = cv.anchor || null;
-                    const toggle = (canon: string) => {
-                      const next = chosen.includes(canon) ? chosen.filter(x => x !== canon) : [...chosen, canon];
-                      if (next.length && next.length <= 6) patchView(vi, { eventTypes: next });
-                    };
-                    return (
-                      <div className="gearmenu-items wide">
-                        <div className="setcol"><span className="meta">measuring</span><div className="pillwrap">
-                        {v.eventOptions.map(e => (
-                          <button key={e.canonical} type="button" disabled={busy || (!chosen.includes(e.canonical) && chosen.length >= 6)}
-                            className={"pill" + (chosen.includes(e.canonical) ? " on" : "")}
-                            onClick={() => toggle(e.canonical)}
-                            title={(!chosen.includes(e.canonical) && chosen.length >= 6 ? "a course view measures at most 6 event types — drop one first. " : "") +
-                              e.patients.toLocaleString() + " patients · " + e.perPatient + " events each · " +
-                              (e.hasDurations ? "carries durations, so it is drawn as a state patients are IN"
-                                : e.perPatient < 1.5 ? "about one per patient and no duration — likely a filing record rather than a clinical course"
-                                : "no durations, so it is drawn as an event that HAPPENED")}>
-                            {e.label}{e.hasDurations ? " ⏱" : ""}
-                          </button>
-                        ))}
-                        </div></div>
-                        <hr />
-                        <div className="setrow"><span className="meta">aligned on</span>
-                        <select value={anchor ? String(anchor.eventType).trim().toLowerCase() : ""} disabled={busy}
-                          onChange={e => patchView(vi, { anchor: e.target.value
-                            ? { eventType: e.target.value, occurrence: anchor ? anchor.occurrence || "FIRST" : "FIRST" } : null })}>
-                          <option value="">study day 0 (single study only)</option>
-                          {v.eventOptions.map(e => <option key={e.canonical} value={e.canonical}>{e.label}</option>)}
-                        </select>
-                        {anchor && (
-                          <select style={{ flex: "none" }} value={anchor.occurrence || "FIRST"} disabled={busy}
-                            onChange={e => patchView(vi, { anchor: { ...anchor, occurrence: e.target.value } })}>
-                            <option value="FIRST">first</option>
-                            <option value="LAST">last</option>
-                          </select>
-                        )}
-                        </div>
-                        <div className="setrow"><span className="meta">bins</span>
-                        <select value={String(v.courseAxis ? v.courseAxis.binMonths : 3)} disabled={busy}
-                          onChange={e => patchView(vi, { binMonths: Number(e.target.value) })}>
-                          {[1, 3, 6, 12].map(b => <option key={b} value={b}>{b} month{b === 1 ? "" : "s"}</option>)}
-                        </select>
-                        </div>
-                        <div className="setrow"><span className="meta">window</span>
-                        <select value={String(v.courseAxis ? v.courseAxis.from : -12)} disabled={busy}
-                          onChange={e => patchView(vi, { fromMonths: Number(e.target.value) })}>
-                          {[0, -6, -12, -24, -60].map(f => <option key={f} value={f}>{f === 0 ? "the anchor" : f + "mo"}</option>)}
-                        </select>
-                        <span className="meta" style={{ minWidth: 0 }}>to</span>
-                        <select value={String(v.courseAxis ? v.courseAxis.to : 60)} disabled={busy}
-                          onChange={e => patchView(vi, { toMonths: Number(e.target.value) })}>
-                          {[12, 24, 60, 120, 240].map(t => <option key={t} value={t}>+{t}mo</option>)}
-                        </select>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                    </details>
-                    <Latency v={v} /><Participation p={v.participation} />
-                    <ViewMenu menuId={"reorder:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)} hasNote={!!v.annotationNote} />
-                    </div>
-                    </div>
-                  <DrawnCohorts drawn={cohortChoice(vi, docView(vi)).drawn} nodes={cohortChoice(vi, docView(vi)).nodes} />
-                  {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
-      <SplitByNote v={v} />
-                  {/* The same SVG MCP clients receive \u2014 one renderer,
-                      so the figure cannot differ between surfaces. */}
-                  <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: v.svg }} />
-                </>}
-                {v.kind === "oncoprint" && v.spec && (() => {
-                  const c = contracts[JSON.stringify(v.spec)];
-                  const vNames = v.cohorts || ocView(vi).cohorts || Object.keys(result.cohorts);
-                  const vStudies = [...new Set(vNames.flatMap(n => (result.cohorts[n] && result.cohorts[n].studies) || []))];
-                  return <>
-                    <ViewHead menuStore={menuOpenRef.current} v={{ ...v, ms: c ? c.stats.ms : v.ms }} title="Oncoprint" onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined} onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)}
-                      cohorts={cohortChoice(vi, docView(vi), 4)}
-                      sub={c ? <>{c.stats.nColumns.toLocaleString()} {c.unit}s · {c.conventions.annotation}</> : "loading…"} />
-                    <OncoprintCard
-                      view={ocView(vi) as any}
-                      spec={v.spec}
-                      uploads={doc.uploads}
-                      onSaveFeature={(sel, all) => featureFromSelection(sel, all, (c ? c.studies : vStudies) || vStudies)}
-                      busy={busy}
-                      cohortNames={Object.keys(result.cohorts)}
-                      catalog={{ attrs: trackAttrs.attrs, profiles: trackAttrs.profiles, loading: trackAttrsLoading }}
-                      onView={(next, rerun) => rerun ? updateView(vi, () => next) : updateViewLocal(vi, () => next)}
-                      onGenes={() => openGenes(vi)}
-                      onCreateCohort={(sel) => cohortFromSelection(sel, (c ? c.studies : vStudies) || vStudies)}
-                      onContract={(ct) => { const k = JSON.stringify(v.spec); setContracts((m) => m[k] === ct ? m : { ...m, [k]: ct }); }}
-                      contract={c || null}
-                      note={v.note} studies={v.studies}
-                    />
-                  </>;
-                })()}
-                {v.queries && v.queries.length > 0 && (
-                  <details className="provsql">
-                    <summary className="meta">
-                      how these numbers were computed — {v.queries.length} {v.queries.length === 1 ? "query" : "queries"}
-                      {v.ms != null && <> in {v.ms.toLocaleString()}ms</>}
-                      {v.method && <> · {v.method.steps.length} computation steps</>}
-                      {v.queries.some(q => q.remote) && <> · <span className="prem">{v.queries.filter(q => q.remote).length} ran on a peer</span></>}
-                    </summary>
-                    {v.queries.map((q, qi) => (
-                      <div className="provq" key={qi}>
-                        <div className="provhead">
-                          <code>{q.label}</code>
-                          <span className="meta">{q.study}</span>
-                          {q.ms != null && <span className="meta">{q.ms.toLocaleString()}ms</span>}
-                          {q.remote && <span className="prem" title="compiled and executed by the peer against its own schema; only aggregates came back">ran on peer</span>}
-                        </div>
-                        <pre>{q.sql}</pre>
-                      </div>
-                    ))}
-                    {v.method && <MethodPanel method={v.method} />}
-                  </details>
-                )}
-                {v.error && !drawsOwnHead(v) && <ViewHead menuStore={menuOpenRef.current} v={v}
-                  title={(VIEW_KINDS.find((k) => k.kind === v.kind) || { label: v.kind }).label}
-                  cohorts={cohortChoice(vi, docView(vi))}
-                  onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined}
-                  onMoveDown={vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined}
-                  onRemove={() => removeView(vi)} />}
-                {v.error && <div className="error">{v.kind}: {v.error}{v.participation ? <> <>{v.ms != null && (
-                      <span className="lat" title={
-                        "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
-                        (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
-                        {v.ms.toLocaleString()}ms
-                        {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
-                      </span>
-                    )}<Participation p={v.participation} /></></> : null}</div>}
-              </div>
+              <ViewCard key={viewIds[vi] ?? vi} ctx={{ ...viewCtx, result }} v={v} vi={vi} />
             ))}
           </div>
         </div>}

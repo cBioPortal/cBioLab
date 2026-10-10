@@ -1,0 +1,568 @@
+"use client";
+// Explore's state: the studies being explored, the draft cohort being built from facet clicks, the
+// facets' own view settings (filters, coverage, charted genes, the derived-timeline builder) and
+// add-cohort mode — and every action on them. The analysis page calls this once and hands the
+// result to Explore's sections (explore-sections.tsx); the facets themselves come from
+// use-explore.ts.
+import { useEffect, useRef, useState } from "react";
+import { normalizeDef } from "./pills";
+import type { AnalysisDoc, CohortDef, PartitionDef } from "../../lib/types.ts";
+import { foldEventNames } from "../../lib/event-names.ts";
+import { type SplitSpec } from "./partitions.tsx";
+import { armsFromSelection, editSplits, splitKey, type ChartKey } from "../../lib/partition-arms.ts";
+import { DOC_VERSION } from "../../lib/doc-version.ts";
+import { saveToServer, customDataKey, featureFromCohort, type StoredDataset } from "./custom-data-client.ts";
+import { DEFAULT_VIEWS } from "./doc-store.ts";
+import { LINE_TYPE } from "./explore-sections.tsx";
+import { useExplore, type ExploreAsk } from "./use-explore.ts";
+
+import type { DocStore } from "./doc-store.ts";
+import type { SavedCohort } from "./use-saved.ts";
+
+/** What Explore needs from the analysis page: the document, the study, and the page's own actions. */
+export interface ExplorePage {
+  doc: AnalysisDoc;
+  docs: DocStore;
+  study: string;
+  setStudy: React.Dispatch<React.SetStateAction<string>>;
+  tab: "explore" | "cohorts" | "analysis" | "examples";
+  goTab: (t: "explore" | "cohorts" | "analysis" | "examples") => void;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  setToast: React.Dispatch<React.SetStateAction<string | null>>;
+  /** saving needs the login; asks for it, and says whether saving may go ahead */
+  canSave: () => boolean;
+  evalDef: (name: string, def: CohortDef) => Promise<{ count: number; text: string }>;
+  persist: (name: string, def: CohortDef, lastEval: SavedCohort["lastEval"]) => Promise<void>;
+  featureSaved: (d: StoredDataset) => string;
+  /** the studies the open analysis reads — what add-cohort mode opens Explore on */
+  analysisStudies: () => string[];
+  /** run an edited document */
+  runEdited: (d: AnalysisDoc) => void;
+  proposePartition: (req: { doc: AnalysisDoc; cohort: string; attribute?: string; gene?: string; oql?: string[]; name?: string; maxArms?: number; minCount?: number }) => Promise<{ name: string; def: PartitionDef; note?: string }>;
+}
+
+export function useExploreState(page: ExplorePage) {
+  const { analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab } = page;
+  const [exMsg, setExMsg] = useState<string | null>(null);
+  /** the facet whose "split by this" is waiting on the server's proposed arms */
+  const [splittingBy, setSplittingBy] = useState<string | null>(null);
+  /**
+   * Explore opened over the analysis to add one cohort to it ("+ Add cohort"), with the Explore
+   * state it replaced, restored when it closes so the Explore tab is as the reader left it.
+   */
+  const [addMode, setAddMode] = useState<null | { ids: string[]; text: string; explore: ExploreAsk | null }>(null);
+  // Explore → Custom data lives in the add-chart dialog, which exists only once Explore has
+  // facets; asked for from elsewhere (a banner, the data dialog) it opens when they arrive
+  const [wantCustomManager, setWantCustomManager] = useState(false);
+  /** Explore's save dialog is open, prefilled with this name */
+  const [saving, setSaving] = useState<string | null>(null);
+  /** Explore's "+ Add chart": clinical/gene/derived-timeline filter builders live
+   *  here instead of as three permanent cards above the facet grid. */
+  const addChartDialog = useRef<HTMLDialogElement | null>(null);
+  const [chartTab, setChartTab] = useState<"clinical" | "gene" | "derived" | "custom">("clinical");
+  const [cName, setCName] = useState("");
+  const [cDefText, setCDefText] = useState(JSON.stringify({ all: [] }, null, 2));
+  const exploring = useExplore(setError);
+  const { explore, busy: exploreBusy } = exploring;
+  const [sQuery, setSQuery] = useState("");                             // study-panel search
+  const [sCaps, setSCaps] = useState<Set<string>>(() => new Set());                  // study-panel capability filters
+  const [exStudies, setExStudies] = useState<string[]>([]); // studies being explored (checkboxes); none until the reader picks
+  const [exPanelOpen, setExPanelOpen] = useState(false);                // study panel expanded?
+  const exSel = useRef<string[]>([]);                   // current selection (ref: immune to state races)
+  const exFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);                                    // debounce for multi-toggle refetch
+  const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
+  /**
+   * Minimum share of the selected studies an attribute must appear in to be
+   * shown. Across 64 studies the union of vocabularies is 1,634 facets, and the
+   * ones every study shares — CANCER_TYPE, SEX, OS_STATUS — are lost in it. This
+   * also narrows the NEXT request: the server is told which attributes to facet,
+   * so it stops computing the ones being hidden.
+   */
+  /**
+   * The study picker's STAGED selection. null means "not staging" — the picker
+   * is closed and the applied set is authoritative.
+   *
+   * Ticking a box used to call setExploreStudies, which debounces a facet fetch
+   * 350ms later: assembling a ten-study selection fired ten requests, nine of
+   * them for a selection the reader was still in the middle of describing, and
+   * at this scale each one is seconds of ClickHouse work. Staging makes the
+   * cost proportional to intent — one request when they say they are done.
+   */
+  const [exDraftStudies, setExDraftStudies] = useState<string[] | null>(null);
+  /** genes charted as their own alteration facet (the portal's per-gene charts) */
+  const [geneCharts, setGeneCharts] = useState<string[]>([]);
+  const geneChartsRef = useRef<string[]>([]);   // fetchExplore reads this, not the closure
+  /** derived facets beyond the fixed three, switched on from "show more derivations" */
+  const [exExtraDerived, setExExtraDerived] = useState<{ metric: "lines" | "treatmentSpan"; eventType: string; lineGap?: number }[]>([]);
+  const exExtraDerivedRef = useRef<typeof exExtraDerived>([]);   // fetchExplore reads this, not the closure
+  const [geneChartInput, setGeneChartInput] = useState("");
+  /** the header lists selected studies as chips; past a handful it is summarised */
+  const [studyChipsOpen, setStudyChipsOpen] = useState(false);
+  const [geneFilter, setGeneFilter] = useState<Record<string, string>>({});   // per-table gene box, client-side
+  const [clinFilter, setClinFilter] = useState("");                            // narrows the attribute checklist in "+ Add chart", not the grid itself
+  /** attributes unchecked in the "+ Add chart" > Clinical picker — keyed "per|attribute",
+   *  matching data-attr. Empty means every attribute shows, the same default as before
+   *  there was a picker at all. */
+  const [hiddenAttrs, setHiddenAttrs] = useState<Set<string>>(new Set());
+  const [attrCoverage, setAttrCoverage] = useState(0);                       // clinical attributes shown
+  /**
+   * The "sequence / line filter" popover's draft — an A/[B] pair plus a
+   * temporal relation, built into one `event` clause on submit. Kept as its
+   * own form state (not applied to the draft until "add filter") because,
+   * unlike every other facet, it has several fields that only mean something
+   * together — a lone eventType pick here is not itself a valid clause.
+   */
+  const [seq, setSeq] = useState<{
+    aType: string; aOcc: "ANY" | "FIRST" | "LAST"; aLineOp: "=" | ">=" | "<="; aLineNo: string;
+    rel: "NONE" | "BEFORE" | "DURING" | "NOT_FOLLOWED_BY";
+    bType: string; bOcc: "ANY" | "FIRST" | "LAST"; bLineOp: "=" | ">=" | "<="; bLineNo: string;
+    days: string; priorGuard: boolean; lineGap: number;
+  }>({ aType: "", aOcc: "ANY", aLineOp: "=", aLineNo: "", rel: "NONE",
+       bType: "", bOcc: "ANY", bLineOp: "=", bLineNo: "", days: "180", priorGuard: false, lineGap: 90 });
+
+  /** Explore's top action bar: acting on the draft you have built by clicking facets. */
+  /**
+   * What the top bar acts on. With no clauses that is every patient in the
+   * selected studies — a real cohort, and the denominator for everything else —
+   * so exploring a study and hitting Analyze works without filtering first.
+   */
+  const barDef = (): CohortDef | null => {
+    if (!exSel.current.length) return null;
+    return parseDraft() || draftScaffold(exSel.current);
+  };
+  const barDefaultName = () =>
+    parseDraft() ? "explored cohort"
+      : exSel.current.length === 1 ? "all of " + exSel.current[0] : "all selected studies";
+  /**
+   * Analyze starts a FRESH analysis of the explored cohort: it replaces the
+   * document rather than merging into it, because that is what the word means —
+   * you asked to analyse this, not to add it to whatever was there before.
+   * Build a multi-cohort comparison by ticking cohorts in the Cohorts tab and
+   * hitting "Analyze selected".
+   */
+  const analyzeDraft = () => {
+    const d = barDef();
+    if (!d) { setExMsg("select at least one study first"); return; }
+    setExMsg(null);
+    // Named from the draft, not from cName: that field lives on the Cohorts tab
+    // and is invisible here, so inheriting it made the analysis arrive under a
+    // name with no on-screen explanation.
+    const name = barDefaultName();
+    const nextStudy = exSel.current[0] || study;
+    const nd: AnalysisDoc = { study: nextStudy, cohorts: { [name]: d }, views: DEFAULT_VIEWS };
+    setStudy(nextStudy);
+    docs.replace(nd);
+    setError(null);     // never leave the previous run's numbers on screen
+    goTab("analysis");
+  };
+  /**
+   * Analyze the selection split by one facet: the same fresh analysis as Analyze, with the
+   * selection divided into arms that add up to it and every view comparing the arms. The arms
+   * come from the server (counted per patient within the selection), not from the facet's own
+   * bars, which may count samples or show only the top values.
+   */
+  const splitDraftBy = async (spec: SplitSpec, label: string) => {
+    const d = barDef();
+    if (!d) { setExMsg("select at least one study first"); return; }
+    setExMsg(null); setSplittingBy(label);
+    const name = barDefaultName();
+    const nextStudy = exSel.current[0] || study;
+    const base: AnalysisDoc = { study: nextStudy, cohorts: { [name]: d }, views: DEFAULT_VIEWS };
+    try {
+      const { name: sn, def } = await proposePartition({ doc: base, cohort: name, ...spec });
+      const nd: AnalysisDoc = editSplits({ ...base, dsl: DOC_VERSION, views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, sn)] })) },
+        (f) => ({ ...f, partitions: { [splitKey(name, sn)]: { ...def, split: sn } } }));
+      setStudy(nextStudy);
+      docs.replace(nd);
+      setError(null);
+      goTab("analysis");
+    } catch (e) { setExMsg("Could not split by " + label + ": " + String((e as Error)?.message || e)); }
+    setSplittingBy(null);
+  };
+  /**
+   * Analyze the selection with one chart's selected items as the arms: each item an arm, in the
+   * order clicked, and the rest of the selection as the cohort being split. No server proposal —
+   * the arms are the clauses already on screen.
+   */
+  const selectionArmCount = (chart: ChartKey): number => {
+    const d = parseDraft();
+    if (!d) return 0;
+    try { return armsFromSelection(d, chart)?.arms.length ?? 0; } catch { return 9; }
+  };
+  const splitDraftBySelection = (chart: ChartKey, label: string) => {
+    const d = parseDraft();
+    if (!d) return;
+    let r: ReturnType<typeof armsFromSelection>;
+    try { r = armsFromSelection(d, chart); } catch (e) { setExMsg("Could not split by the selected " + label + ": " + String((e as Error)?.message || e)); return; }
+    if (!r) return;
+    setExMsg(null);
+    const name = r.base.all.length ? "explored cohort"
+      : exSel.current.length === 1 ? "all of " + exSel.current[0] : "all selected studies";
+    const parent: CohortDef = r.base.all.length ? { ...d, all: r.base.all } : { ...(draftScaffold(exSel.current) as CohortDef) };
+    const nextStudy = exSel.current[0] || study;
+    const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: { ...parent, splits: { [label]: { arms: r.arms } } } },
+      views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, label)] })) };
+    setStudy(nextStudy);
+    docs.replace(nd);
+    setError(null);
+    goTab("analysis");
+  };
+  /**
+   * Saving asks for a name when you ask to save, rather than keeping a field in
+   * the bar. The bar's job is Analyze; a permanent name box next to it implied
+   * Analyze wanted one too.
+   */
+  const openSaveDialog = () => {
+    if (!barDef()) { setExMsg("select at least one study first"); return; }
+    if (!canSave()) return;
+    setExMsg(null);
+    setSaving(cName.trim() || barDefaultName());
+  };
+  const confirmSave = async (name: string) => {
+    const def = barDef();
+    if (!def) return;
+    // Evaluated with the name and definition in hand rather than through the
+    // shared cName/cDefText state, which React would not have flushed yet.
+    try {
+      const ev = await evalDef(name, def);
+      setCName(name);
+      await persist(name, def, ev);
+      setExMsg("saved \u201c" + name + "\u201d to Cohorts \u2014 " + ev.count.toLocaleString() + " patients");
+    } catch (e) {
+      setExMsg("could not save: " + String((e as Error)?.message || e));
+    }
+    setTimeout(() => setExMsg(null), 3200);
+  };
+
+  const openCustomManager = () => {
+    goTab("explore");
+    if (!explore) fetchExplore();
+    setChartTab("custom");
+    setWantCustomManager(true);
+  };
+  useEffect(() => {
+    if (!wantCustomManager || tab !== "explore" || !explore || !addChartDialog.current) return;
+    if (!addChartDialog.current.open) addChartDialog.current.showModal();
+    setWantCustomManager(false);
+  }, [wantCustomManager, tab, explore]);
+  const saveDraftAsFeature = async () => {
+    const def = barDef();
+    if (!def) { setExMsg("select at least one study first"); return; }
+    const name = window.prompt("Name this feature. Patients matching the current filters are Yes, every other patient of the selected studies No.",
+      parseDraft() ? "explored cohort" : "selected studies");
+    if (!name || !name.trim()) return;
+    setExMsg("saving feature\u2026");
+    try {
+      const d = await featureFromCohort(name.trim(), def, exSel.current);
+      await saveToServer(d);
+      setExMsg(featureSaved(d) + " \u2014 charted below");
+      fetchExplore();
+    } catch (e) { setExMsg("could not save the feature: " + String((e as Error)?.message || e)); }
+  };
+
+  const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
+
+  /** "per|attribute", matching data-attr — the one key format every attribute lookup here uses */
+  const attrKey = (c: { per: string; attribute: string }) => c.per + "|" + c.attribute;
+
+  /**
+   * Which clinical facets are on screen. ONE definition, because this was two
+   * copies — one computing the header's count, one filtering the render — and
+   * they disagreed the moment a search box was added: the header read
+   * "8 attributes" while all 20 were still drawn.
+   *
+   * Coverage (carried by enough of the selected studies) and the reader's own
+   * checklist (hiddenAttrs, set from "+ Add chart" > Clinical) are both "is this
+   * attribute allowed to show" concerns, so both live here; clinFilter is a
+   * different thing now — it narrows the CHECKLIST's own rows, not this.
+   */
+  const visibleClinical = (list: { attribute: string; per: string; studyCount?: number }[]): typeof list => {
+    const coverageOk = (c: { studyCount?: number }) =>
+      attrCoverage === 0 || (c.studyCount ?? 1) >= Math.ceil(attrCoverage * exStudies.length);
+    return list.filter((c) => coverageOk(c) && !hiddenAttrs.has(attrKey(c)));
+  };
+
+  const attrsForBar = (bar: number, studiesOverride?: string[] | string): string[] => {
+    if (bar <= 0 || !exploring.fullAttrs.current.length) return [];
+    const n = (studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current).length;
+    return exploring.fullAttrs.current.filter(a => a.studyCount >= Math.ceil(bar * n)).map(a => a.attribute);
+  };
+
+  /** Ask Explore for the facets of the current selection (app/lab/use-explore.ts); each override
+   *  stands in for what the page holds, for a caller whose state has not landed yet. */
+  const fetchExplore = (draftOverride?: CohortDef | null, studiesOverride?: string[] | string, attrsOverride?: string[]) => {
+    const studies = studiesOverride ? (Array.isArray(studiesOverride) ? studiesOverride : [studiesOverride]) : exSel.current;
+    exploring.ask({
+      studies,
+      draft: draftOverride !== undefined ? draftOverride : parseDraft(),
+      attributes: attrsOverride ?? attrsForBar(attrCoverage, studiesOverride),
+      geneCharts: geneChartsRef.current,
+      extraDerived: exExtraDerivedRef.current,
+      uploads: customDataKey(),
+    }, !(attrsOverride ?? []).length && !(attrCoverage > 0));
+  };
+
+  const addClause = (clause: any) => {
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
+    if (!d || !Array.isArray(d.all)) d = { all: [] };
+    if (clause.kind === "clinical" && clause.op === "=") {
+      const same = d.all.find((c: any) => c.kind === "clinical" && c.attribute === clause.attribute && (c.per || "patient") === (clause.per || "patient") && (c.op === "=" || c.values));
+      if (same) { // second value on the same attribute becomes an OR list
+        const vals = new Set([...(same.values || []), ...(same.op === "=" ? [same.value] : []), clause.value]);
+        delete same.op; delete same.value; same.values = [...vals];
+        const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d); return;
+      }
+    }
+    // Buckets of ONE derived metric are alternatives, not conjuncts: clicking a
+    // second bucket used to AND two mutually exclusive ranges, giving 0 patients
+    // — which then emptied every other facet, since a bucket with no patients is
+    // dropped. Same click also toggles a chosen bucket back off.
+    if (clause.kind === "derived") {
+      const sameRange = (a: any, b: any) =>
+        (a.range || {}).gte === (b.range || {}).gte && (a.range || {}).lt === (b.range || {}).lt;
+      const isMine = (l: any) => l && l.kind === "derived" && l.metric === clause.metric && (l.eventType || "") === (clause.eventType || "");
+      const idx = d.all.findIndex((c: any) => isMine(c) || (Array.isArray(c.any) && c.any.every(isMine) && c.any.length));
+      if (idx >= 0) {
+        const cur = d.all[idx];
+        const leaves: any[] = Array.isArray(cur.any) ? [...cur.any] : [cur];
+        const at = leaves.findIndex((l) => sameRange(l, clause));
+        if (at >= 0) leaves.splice(at, 1); else leaves.push(clause);
+        if (!leaves.length) d.all.splice(idx, 1);
+        else d.all[idx] = leaves.length === 1 ? leaves[0] : { any: leaves };
+        const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d.all.length ? d : null); return;
+      }
+    }
+    if (clause.kind === "oql") {
+      const same = d.all.find((c: any) => c.kind === "oql");
+      if (same) { same.q += "; " + clause.q; const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d); return; }
+    }
+    d.all.push(clause);
+    const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d);
+  };
+
+  /**
+   * Append several clauses as one action. A gene-state pick is two of them —
+   * "profiled for this gene" AND the alteration — and it has to be both: the
+   * facet counted 14,690 EGFR-mutant patients inside the profiled set, while
+   * the OQL clause alone selects 14,697, because 7 patients carry a call for a
+   * gene no panel of theirs covers. A facet whose number changed when you
+   * clicked it would be the worst of the options.
+   *
+   * Deliberately plainer than addClause: no kind-specific merging, because
+   * these clauses only mean what they mean together.
+   */
+  const addClauses = (clauses: any[]) => {
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
+    if (!d || !Array.isArray(d.all)) d = { all: [] };
+    for (const c of clauses) d.all.push(c);
+    setCDefText(JSON.stringify(d, null, 2));
+    fetchExplore(d);
+  };
+
+  /** the clauses that select one state of one gene's alteration facet */
+  const geneStateClauses = (gene: string, type: "MUTATION" | "CNA", state: string): any[] => {
+    const prof = { kind: "profiled", type, gene };
+    const oql = (q: string) => ({ kind: "oql", q: gene + ": " + q });
+    if (state === "notProfiled") return [{ not: prof }];
+    if (state === "altered") return [prof, oql("MUT")];
+    if (state === "amp") return [prof, oql("AMP")];
+    if (state === "del") return [prof, oql("HOMDEL")];
+    // unaltered: profiled and none of the calls this facet counts
+    return [prof, { not: oql(type === "CNA" ? "AMP HOMDEL" : "MUT") }];
+  };
+
+  const chartGene = (raw: string) => {
+    const g = String(raw || "").toUpperCase().trim();
+    if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(g)) return;
+    const next = geneCharts.includes(g) ? geneCharts : [...geneCharts, g].slice(-6);
+    geneChartsRef.current = next;
+    setGeneCharts(next);
+    setGeneChartInput("");
+    fetchExplore();
+  };
+  const unchartGene = (g: string) => {
+    const next = geneCharts.filter((x) => x !== g);
+    geneChartsRef.current = next;
+    setGeneCharts(next);
+    fetchExplore();
+  };
+
+  /** timeline event types this study's Explore facets actually have, folded by case */
+  const exploreEventTypes = (): { canonical: string; label: string; n: number }[] => {
+    const raw: { type: string; n: number }[] = (explore && explore.events) || [];
+    return foldEventNames(raw.map((e) => ({ name: String(e.type), n: e.n })))
+      .map((f) => ({ canonical: f.canonical, label: f.label, n: f.n }));
+  };
+  /** the study's own best guess at "a therapy" — the same heuristic addView's sequence default uses */
+  const treatmentEventType = (): { canonical: string; label: string } | null =>
+    exploreEventTypes().find((e) => /treat|therap|regimen|drug|medicat/.test(e.canonical)) || null;
+
+  // "lines" is not offered here: it is added automatically (see the effect
+  // below) once a treatment-like event is detected, because it is cheap
+  // enough to always compute (measured ~0-700ms on top of an Explore fetch
+  // that already takes 0.7-3s) and answers exactly what the "Derived timeline
+  // filters" card wants to show by default. "treatmentSpan" is a second,
+  // separate query with a narrower audience, so it stays opt-in.
+  const EXTRA_DERIVED_KINDS: { metric: "lines" | "treatmentSpan"; label: (name: string) => string }[] = [
+    { metric: "treatmentSpan", label: (name) => "Time in '" + name + "' records" }
+  ];
+  const extraDerivedOn = (metric: string) => exExtraDerived.some((x) => x.metric === metric);
+  const toggleExtraDerived = (metric: "lines" | "treatmentSpan") => {
+    const tx = treatmentEventType();
+    if (!tx) return;
+    const next = extraDerivedOn(metric)
+      ? exExtraDerived.filter((x) => x.metric !== metric)
+      : [...exExtraDerived, { metric, eventType: tx.label, ...(metric === "lines" ? { lineGap: 90 } : {}) }];
+    exExtraDerivedRef.current = next;
+    setExExtraDerived(next);
+    fetchExplore();
+  };
+
+  /**
+   * One side of the sequence-filter form -> an EventSelector, or null while
+   * that side is incomplete. A treatment-line pick reads LINE_NO as an
+   * attrs-equality (exact line) or a numeric predicate (>=/<=) — the same two
+   * shapes lib/compiler.ts's lineSelectorCte accepts, see EXAMPLES's
+   * "Reached 2nd line" for the equality form.
+   */
+  const seqSelector = (type: string, occ: "ANY" | "FIRST" | "LAST", lineOp: "=" | ">=" | "<=", lineNo: string): any => {
+    if (type === LINE_TYPE) {
+      const n = Number(lineNo);
+      if (!Number.isFinite(n) || lineNo.trim() === "") return null;
+      return lineOp === "="
+        ? { eventType: LINE_TYPE, attrs: [{ key: "LINE_NO", value: String(n) }] }
+        : { eventType: LINE_TYPE, numeric: { key: "LINE_NO", op: lineOp, value: n } };
+    }
+    if (!type) return null;
+    return { eventType: type, ...(occ !== "ANY" ? { occurrence: occ } : {}) };
+  };
+  const seqReady = (() => {
+    const a = seqSelector(seq.aType, seq.aOcc, seq.aLineOp, seq.aLineNo);
+    if (!a) return false;
+    if (seq.rel === "NONE") return true;
+    if ((seq.rel === "BEFORE" || seq.rel === "NOT_FOLLOWED_BY") && !(Number(seq.days) > 0)) return false;
+    return !!seqSelector(seq.bType, seq.bOcc, seq.bLineOp, seq.bLineNo);
+  })();
+  const addSeqFilter = () => {
+    const a = seqSelector(seq.aType, seq.aOcc, seq.aLineOp, seq.aLineNo);
+    if (!a) return;
+    const clause: any = { kind: "event", a, rel: { type: seq.rel } };
+    if (seq.rel !== "NONE") {
+      const b = seqSelector(seq.bType, seq.bOcc, seq.bLineOp, seq.bLineNo);
+      if (!b) return;
+      clause.b = b;
+      if (seq.rel === "BEFORE") clause.rel = { type: "BEFORE", maxDays: Number(seq.days) };
+      else if (seq.rel === "NOT_FOLLOWED_BY") clause.rel = { type: "NOT_FOLLOWED_BY", withinDays: Number(seq.days) };
+    }
+    if (seq.priorGuard) clause.priorGuard = true;
+    if (seq.lineGap !== 90 && (a.eventType === LINE_TYPE || (clause.b && clause.b.eventType === LINE_TYPE)))
+      clause.lineGap = seq.lineGap;
+    addClause(clause);
+    setSeq(s => ({ ...s, aType: "", aLineNo: "", rel: "NONE", bType: "", bLineNo: "" }));
+  };
+
+  /**
+   * The real, per-study "lines" bucket counts the "Derived timeline filters"
+   * card shows are just the existing "lines" derived metric — the same one
+   * "show more derivations" used to offer manually — kept in sync here
+   * instead: the study's own event vocabulary (and so `treatmentEventType()`)
+   * is only known once the FIRST Explore response lands, so this fires once
+   * that response reveals a treatment-like event, and again whenever it
+   * changes (switching studies). It is a no-op once `exExtraDerived` already
+   * matches, so it does not loop and does not refetch on every narrowing
+   * click — only on the transitions that actually change what "lines" means.
+   */
+  useEffect(() => {
+    if (!explore) return;
+    const tx = treatmentEventType();
+    const current = exExtraDerivedRef.current;
+    const inSync = tx
+      ? current.some((x) => x.metric === "lines" && x.eventType === tx.label)
+      : !current.some((x) => x.metric === "lines");
+    if (inSync) return;
+    const next = current.filter((x) => x.metric !== "lines");
+    if (tx) next.push({ metric: "lines", eventType: tx.label, lineGap: 90 });
+    exExtraDerivedRef.current = next;
+    setExExtraDerived(next);
+    fetchExplore();
+  }, [explore]); // eslint-disable-line
+
+  const removeDraftClause = (i: number) => {
+    try {
+      const d = normalizeDef(JSON.parse(cDefText));
+      d.all = d.all.filter((_: any, j: any) => j !== i);
+      setCDefText(JSON.stringify(d, null, 2));
+      fetchExplore(d.all.length ? d : null);
+    } catch {}
+  };
+
+  // studies-explicit draft scaffold for the current explore selection
+  const draftScaffold = (ids: string[]): CohortDef => {
+    const d: CohortDef = { all: [] };
+    if (ids.length > 1) d.studies = ids; else if (ids.length === 1) d.study = ids[0];
+    return d;
+  };
+
+  const clearDraft = () => { setCDefText(JSON.stringify(draftScaffold(exSel.current), null, 2)); fetchExplore(null); };
+
+  // toggle a study in the explore selection. The draft def is STUDY-EXPLICIT —
+  // it carries "study" (one selected) or "studies" (several) itself, so Save /
+  // Preview / Add-to-analysis evaluate against the selection with no separate
+  // "working study" concept. exSel (ref) is the always-current selection so
+  // rapid checkbox toggles don't race on stale render-time state; the refetch
+  // is debounced so checking many boxes fires one request.
+  const setExploreStudies = (ids: string[]) => {
+    exSel.current = ids;
+    setExStudies(ids);
+    if (ids.length) setStudy(ids[0]); // doc-level default for study-less defs (examples, hand edits)
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
+    if (!d || !Array.isArray(d.all)) d = { all: [] };
+    if (ids.length > 1) { d.studies = ids; delete d.study; }
+    else { delete d.studies; if (ids.length === 1) d.study = ids[0]; else delete d.study; }
+    setCDefText(JSON.stringify(d, null, 2));
+    if (exFetchTimer.current) clearTimeout(exFetchTimer.current);
+    if (!ids.length) { exploring.clear(); setExPanelOpen(true); return; } // empty selection: clear facets (and drop any in-flight fetch), keep the picker open
+    exFetchTimer.current = setTimeout(() => fetchExplore(d.all!.length ? d : null, ids), 350);
+  };
+
+  // the creator's quick-add row needs the study catalog even before Explore is visited
+  useEffect(() => {
+    if (tab === "cohorts" && !explore && !exploreBusy && exStudies.length) fetchExplore(null);
+  }, [tab, study, explore]); // eslint-disable-line
+  const openAddCohort = () => {
+    setAddMode({ ids: exSel.current, text: cDefText, explore: exploring.current });
+    const ids = analysisStudies();
+    exSel.current = ids; setExStudies(ids);
+    setCDefText(JSON.stringify(draftScaffold(ids), null, 2));
+    setExMsg(null);
+    fetchExplore(null, ids);
+  };
+  const closeAddCohort = () => {
+    if (!addMode) return;
+    exSel.current = addMode.ids; setExStudies(addMode.ids);
+    setCDefText(addMode.text); exploring.restore(addMode.explore);
+    setAddMode(null);
+  };
+  /** Add Explore's current selection to the open analysis as a new cohort, and close add mode. */
+  const addDraftToAnalysis = (name: string) => {
+    const def = barDef();
+    if (!def) { setExMsg("select at least one study first"); return; }
+    const n = name.trim();
+    if (!n) { setExMsg("give the cohort a name"); return; }
+    if (doc.cohorts?.[n]) { setExMsg("this analysis already has a cohort named “" + n + "”"); return; }
+    const nd: AnalysisDoc = { ...doc, ...(doc.study ? {} : { study: exSel.current[0] || study }),
+      cohorts: { ...(doc.cohorts || {}), [n]: def },
+      ...(doc.views && doc.views.length ? {} : { views: DEFAULT_VIEWS }) };
+    // a view that lists its own cohorts keeps its list; say so, rather than leave the reader to
+    // wonder why the new cohort is missing from it
+    const listed = (doc.views || []).filter((v) => Array.isArray(v.cohorts) && v.cohorts.length).length;
+    closeAddCohort();
+    runEdited(nd);
+    if (listed) setToast("Added “" + n + "”. " + listed + " view" + (listed === 1 ? " lists" : "s list") +
+      " its own cohorts — tick “" + n + "” in " + (listed === 1 ? "its" : "their") + " cohorts menu to show it there.");
+  };
+
+  return { exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, wantCustomManager, setWantCustomManager, saving, setSaving, addChartDialog, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exExtraDerived, setExExtraDerived, exExtraDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, hiddenAttrs, setHiddenAttrs, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, exploreEventTypes, treatmentEventType, EXTRA_DERIVED_KINDS, extraDerivedOn, toggleExtraDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, openAddCohort, closeAddCohort, addDraftToAnalysis };
+}
+
+export type ExploreState = ReturnType<typeof useExploreState>;
