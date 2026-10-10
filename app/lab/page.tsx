@@ -1,23 +1,19 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { MORE_KINDS, isMoreKind, defaultMoreView } from "./more-views";
 import { ExploreCharts } from "./explore-charts";
 import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
-import { pruneSort } from "../_oncoprint/OncoprintCard.tsx";
-import { type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { parameterize } from "../../lib/params.ts";
-import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, OncoprintView, PartitionDef } from "../../lib/types.ts";
+import type { AnalysisDoc, TemplateDoc, AnalysisResult, CohortDef, PartitionDef } from "../../lib/types.ts";
 import type { DslExample } from "../../lib/dsl-reference.ts";
-import { foldEventNames } from "../../lib/event-names.ts";
 import { installLabTools, LAB_TOOL_NAMES, type LabBridge } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import LoginButton from "./login-button.tsx";
-import { type SplitSpec } from "./partitions.tsx";
-import { withoutPartition, renamePartitionChild, expandSplits, flattenSplits, editSplits, splitKey, renameInViews, type PartitionShape } from "../../lib/partition-arms.ts";
+import type { SplitSpec } from "./partitions.tsx";
+import { withoutPartition, renamePartitionChild, flattenSplits, editSplits, splitKey, renameInViews } from "../../lib/partition-arms.ts";
 import { DOC_VERSION, upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
 import { saveToServer, requestLogin, referencedDatasets, bindUploads, unresolvedUploads, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
@@ -26,7 +22,7 @@ import { useExploreState } from "./use-explore-state.ts";
 import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
 import { useAnalysis, seedAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
-import { useGearmenuOpen, CohortNode, ViewHead } from "./view-chrome.tsx";
+import { useGearmenuOpen, ViewHead } from "./view-chrome.tsx";
 import { api } from "./api.ts";
 import { useSavedArtifacts } from "./use-saved.ts";
 import { SavedTab } from "./saved-tab.tsx";
@@ -36,6 +32,8 @@ import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, ty
 import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
 import { CohortEditDialog, ViewNoteDialog, WorkspaceDialog } from "./dialogs.tsx";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
+import { useViewOptions } from "./use-view-options.ts";
+import { useViewEdits } from "./use-view-edits.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -353,239 +351,6 @@ export default function AnalysisPage() {
     setToast(featureSaved(d) + " \u2014 add it as a track, a split or a filter like any attribute");
     setTimeout(() => setToast(null), 6000);
   };
-
-  // ---- composing views without editing JSON --------------------------------
-  /** Genes to prefill a new view with: whatever the document already studies,
-   *  else the most-altered genes from the current exploration. */
-  const viewGenes = (): string[] => {
-    const inDoc = (doc.views || []).flatMap((v: any) => v.genes || []).map(String);
-    if (inDoc.length) return [...new Set(inDoc)].slice(0, 6);
-    if (explore && explore.genes && explore.genes.length) return explore.genes.slice(0, 6).map((g: any) => g.gene);
-    return ["TP53", "KRAS", "EGFR", "PIK3CA"];
-  };
-  const viewAttrs = (): string[] => {
-    const inDoc = (doc.views || []).flatMap((v: any) => v.attributes || []).map(String);
-    if (inDoc.length) return [...new Set(inDoc)].slice(0, 5);
-    return catalogAttrs().slice(0, 4).map((c) => c.attribute);
-  };
-  /**
-   * Timeline event types this study actually has, most common first, folded by
-   * case so `Treatment` and `TREATMENT` offer one choice — the same fold the
-   * engine applies (lib/event-names.ts).
-   */
-  const viewEvents = (): { canonical: string; label: string; n: number; perPatient?: number; hasDurations?: boolean }[] => {
-    // A course result knows this cohort's OWN timeline, including which types
-    // carry durations; Explore only knows the study's. Prefer the former.
-    const fromResult = (result && result.views || []).find((v: any) => v.eventOptions && v.eventOptions.length);
-    if (fromResult) return (fromResult as any).eventOptions.map((e: any) =>
-      ({ canonical: e.canonical, label: e.label, n: e.patients, perPatient: e.perPatient, hasDurations: e.hasDurations }));
-    // Explore's events if it has been opened, else the study catalog's — a shared ?doc= link lands
-    // on Analysis without ever fetching Explore, and the course/sequence buttons would otherwise
-    // report "no timeline events" for a study that has plenty. The derived treatment-line type is
-    // the catalog's own synthesis, not a recorded event type, so it isn't offered here.
-    const raw: { type: string; n: number }[] = (explore && explore.events && explore.events.length) ? explore.events
-      : ((cat && cat.types) || []).filter((t: any) => t.t !== LINE_TYPE).map((t: any) => ({ type: String(t.t), n: Number(t.n_pat) || 0 }));
-    return foldEventNames(raw.map((e) => ({ name: String(e.type), n: e.n })))
-      .map((f) => ({ canonical: f.canonical, label: f.label, n: f.n }));
-  };
-  /** a continuous profile for co-expression / heatmaps, if this study has one */
-  /**
-   * The clinical attribute catalog, for a plot's default axes. `trackAttrs` is the richer,
-   * multi-study union (populated once a plot/clinical/cox/oncoprint view exists in the result),
-   * but the very FIRST plot added to an empty document runs before any result exists to trigger
-   * that fetch — so it falls back to Explore's own per-study facets, already in hand by the time
-   * a reader has gotten as far as adding a view.
-   */
-  const catalogAttrs = (): { attribute: string; kind: string }[] =>
-    trackAttrs.attrs.length ? trackAttrs.attrs : ((explore && explore.clinical) || []);
-  /** the numeric clinical attributes this study declares, for a plot's default axes */
-  const numericAttrs = (): string[] => catalogAttrs().filter((a) => a.kind === "num").map((a) => a.attribute);
-  /** still waiting on an attribute catalog, and nothing to offer yet — show a loader, not "none" */
-  const attrsLoading = (): boolean => !catalogAttrs().length && (trackAttrsLoading || exploreBusy);
-  /** continuous molecular profiles for an axis picker: Explore's if loaded, else the shared catalog's */
-  const profileOptions = (): string[] => (explore && explore.profiles && explore.profiles.length ? explore.profiles : trackAttrs.profiles);
-  const assayOptions = (): string[] => (explore && explore.gaProfiles && explore.gaProfiles.length ? explore.gaProfiles : trackAttrs.gaProfiles);
-
-  const contProfile = (): string | null => {
-    const ps = profileOptions();
-    return ps.find((p: string) => /zscore/i.test(p)) || ps.find((p: string) => /mrna|rna_seq/i.test(p)) || null;
-  };
-
-  /**
-   * Survival and Cox both fit a <X>_MONTHS/<X>_STATUS endpoint. When every cohort lives in one
-   * study and that study's catalog says it declares none (AACR GENIE's public release, say),
-   * adding either view can only produce an error card, so the button says why instead. Unknown
-   * (catalog not loaded, lookup failed, cohorts spanning several studies) leaves them enabled.
-   */
-  const noSurvivalWhy = (): string | null => {
-    const studies = new Set(Object.values(doc.cohorts || {}).flatMap((c: any) =>
-      Array.isArray(c?.studies) && c.studies.length ? c.studies : [c?.study || doc.study]));
-    if (studies.size !== 1 || !cat || cat.study !== [...studies][0]) return null;
-    if (!Array.isArray(cat.survivalEndpoints) || cat.survivalEndpoints.length) return null;
-    return cat.study + " has no survival data (no <X>_MONTHS/<X>_STATUS pair), so there is no endpoint to fit";
-  };
-  /**
-   * `loading`: the data this button's `why` decides on is still being fetched. The button waits
-   * with a spinner rather than guessing — enabling it could add a view that can only error, and
-   * `why` alone would call a study empty when its catalog simply hasn't arrived.
-   */
-  const VIEW_KINDS: { kind: string; label: string; why?: () => string | null; loading?: () => boolean }[] = [
-    { kind: "compare", label: "Compare genes" },
-    { kind: "survival", label: "Survival", why: noSurvivalWhy, loading: () => catLoading },
-    { kind: "cox", label: "Cox regression (forest plot)", why: noSurvivalWhy, loading: () => catLoading },
-    { kind: "logistic", label: "Logistic regression (odds ratios)" },
-    { kind: "oncoprint", label: "Oncoprint" },
-    { kind: "hotspots", label: "Lollipop (hotspots)" },
-    { kind: "plot", label: "Plot", loading: attrsLoading,
-      why: () => viewAttrs().length ? null : "this study declares no clinical attributes to plot" },
-    { kind: "cooccurrence", label: "Co-occurrence" },
-    { kind: "clinical", label: "Clinical comparison", loading: attrsLoading,
-      why: () => viewAttrs().length ? null : "this study declares no clinical attributes to compare" },
-    { kind: "coexpression", label: "Co-expression", loading: () => !contProfile() && (trackAttrsLoading || exploreBusy),
-      why: () => contProfile() ? null : "this study has no continuous molecular profile (mRNA z-scores) to correlate" },
-    { kind: "course", label: "Clinical course", loading: () => !viewEvents().length && (catLoading || exploreBusy),
-      why: () => viewEvents().length ? null
-        : "this study records no timeline events (only 131 of 545 studies have any)" },
-    { kind: "sequence", label: "Treatment sequence", loading: () => !viewEvents().length && (catLoading || exploreBusy),
-      why: () => viewEvents().some(e => /treat|therap|regimen|drug|medicat/.test(e.canonical)) ? null
-        : "this study records no treatment events, so there are no lines of therapy to sequence" },
-    ...Object.entries(MORE_KINDS).map(([kind, k]) => ({ kind, label: k.label,
-      ...(k.why ? { why: () => k.why!({ genes: [], attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) }),
-                    loading: () => !profileOptions().length && (trackAttrsLoading || exploreBusy) } : {}) }))
-  ];
-
-  /**
-   * Whether this view's own block renders its header (and with it the remove/move controls).
-   * Most kinds only draw theirs once they have data, so a view that came back with only an error
-   * would otherwise be a bare red box the reader can't remove without editing the JSON.
-   */
-  const drawsOwnHead = (v: any): boolean =>
-    isMoreKind(v.kind) || v.kind === "cox" || v.kind === "logistic" || v.kind === "plot" ||
-    (v.kind === "compare" && !!v.rows) || (v.kind === "hotspots" && !!v.hotspots) ||
-    (v.kind === "coexpression" && !!v.coexpression) || (v.kind === "clinical" && !!v.clinical) ||
-    (v.kind === "cooccurrence" && !!v.pairs) || (v.kind === "survival" && !!v.curves) ||
-    ((v.kind === "sequence" || v.kind === "course") && !!v.svg) || (v.kind === "oncoprint" && !!v.spec);
-
-  /** Drop one view from the document. Removing a view can't change any OTHER
-   *  view's answer — each view's result depends only on its own definition
-   *  and the cohort definitions it draws from, neither of which removal
-   *  touches — so this splices `result.views` locally instead of re-running
-   *  everything, the same way moveView (below) already does. */
-  const removeViews = (drop: (v: any, i: number) => boolean) => {
-    const all = doc.views || [];
-    const keep = all.map((v: any, j: number) => !drop(v, j));
-    const views = all.filter((_: any, j: number) => keep[j]);
-    docs.set({ ...doc, views });
-  };
-  const removeView = (i: number) => removeViews((_, j) => j === i);
-
-  /** Swap a view with its neighbour. Order is cosmetic — the computed result for
-   *  each view is unchanged, so this reorders `result.views` too rather than
-   *  re-running the document just to move a card. */
-  const moveView = (i: number, dir: -1 | 1) => {
-    const j = i + dir;
-    const views = [...(doc.views || [])];
-    if (j < 0 || j >= views.length) return;
-    [views[i], views[j]] = [views[j], views[i]];
-    docs.set({ ...doc, views });
-  };
-
-  const addView = (kind: string) => {
-    const genes = viewGenes();
-    const v: any =
-      kind === "survival" ? { kind }
-      : kind === "clinical" ? { kind, attributes: viewAttrs() }
-      : kind === "coexpression" ? { kind, genes: genes.slice(0, 5), profileType: contProfile() }
-      : kind === "hotspots" ? { kind, genes: genes.slice(0, 4), minCount: 1 }
-      : kind === "plot" ? (() => {
-          // start from two attributes this study actually declares, and fall back to an
-          // alteration axis, which every study can answer
-          const nums = numericAttrs();
-          if (nums.length >= 2) return { kind, x: { source: "clinical", attribute: nums[0] }, y: { source: "clinical", attribute: nums[1] }, unit: "sample" };
-          const cat = catalogAttrs().find((a) => a.kind !== "num");
-          return { kind, unit: "sample",
-            x: { source: "alteration", gene: genes[0] || "TP53", by: "mutationType" },
-            y: cat ? { source: "clinical", attribute: cat.attribute } : { source: "alteration", gene: genes[1] || "KRAS", by: "mutated" } };
-        })()
-      : kind === "course" ? (() => {
-          const evs = viewEvents();
-          // Rank by STRUCTURE, not by how common the type is. Picking the two
-          // commonest gives Sequencing and Sample acquisition on MSK-CHORD —
-          // exactly one event per patient and no duration, i.e. filing records
-          // that draw a spike and nothing else. A type that carries durations is
-          // a state worth plotting; one that recurs is an event worth counting;
-          // one that happens once per patient is neither.
-          const tier = (e: any) => e.hasDurations ? 2 : (e.perPatient || 0) >= 1.5 ? 1 : 0;
-          const ranked = [...evs].sort((a, b) => tier(b) - tier(a) || b.n - a.n);
-          // The anchor wants the opposite property: a landmark nearly everyone
-          // has. A therapy start is the classic one; failing that, the most
-          // universal event.
-          const anchorOn = evs.find(e => e.hasDurations)
-            || [...evs].sort((a, b) => b.n - a.n)[0];
-          return { kind, eventTypes: ranked.slice(0, 2).map(e => e.canonical),
-                   ...(anchorOn ? { anchor: { eventType: anchorOn.label, occurrence: "FIRST" } } : {}),
-                   binMonths: 3, fromMonths: -12, toMonths: 60 };
-        })()
-      : kind === "sequence" ? (() => {
-          const tx = viewEvents().find(e => /treat|therap|regimen|drug|medicat/.test(e.canonical));
-          return { kind, ...(tx ? { eventType: tx.canonical } : {}), labelKey: "SUBTYPE",
-                   lineGap: 90, maxSteps: 3, topN: 8 };
-        })()
-      : kind === "cooccurrence" ? { kind, genes: genes.slice(0, 6) }
-      : kind === "oncoprint" ? { kind, genes: genes.slice(0, 5) }
-      : kind === "cox" ? { kind, covariates: [{ source: "alteration", gene: genes[0] || "TP53", by: "mutated" }] }
-      : isMoreKind(kind) ? defaultMoreView(kind, { genes, attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) })
-      : kind === "logistic" ? { kind,
-          outcome: { source: "alteration", gene: genes[0] || "TP53", by: "mutated" }, outcomeEvent: "Mutated",
-          covariates: [{ source: "clinical", attribute: viewAttrs()[0] || "SEX" }] }
-      : { kind, genes };
-    // only the new view is asked for: every other card's answer is already cached under its key
-    docs.set({ ...doc, views: [v, ...(doc.views || [])] });
-  };
-
-  /** Rewrite one view in the document; only its own query re-runs (use-analysis.ts) — editing this
-   *  view's settings can't change any OTHER view's answer. */
-  const patchView = (i: number, patch: Record<string, unknown>) => {
-    // a new object at the same position keeps its view id (app/lab/doc-store.ts), so the card is not remounted
-    const views = (doc.views || []).map((v: any, j: number) => j === i ? { ...v, ...patch } : v);
-    for (const v of views as any[]) if (v.anchor == null) delete v.anchor;   // null means "study baseline"
-    docs.set({ ...doc, views });
-  };
-
-  const updateView = (vi: number, patch: (v: any) => any) => {
-    // the edited view keeps its id (app/lab/doc-store.ts): its card is not remounted, and the
-    // re-run's answer finds its slot
-    const views = (doc.views || []).map((v, i: number) => i === vi ? patch(v) : v);
-    docs.set({ ...doc, views });
-  };
-
-  /**
-   * A view change the browser can apply itself — how the oncoprint is drawn, not what it
-   * draws. The document and the URL still record it, so the link, the server SVG, the CLI
-   * and the Python package reproduce the same figure; only the round trip is skipped.
-   */
-  const updateViewLocal = (vi: number, patch: (v: any) => any) => {
-    const views = (doc.views || []).map((v, i: number) => i === vi ? patch(v) : v);
-    const d = { ...doc, views };
-    docs.set(d);
-  };
-
-  /**
-   * The gene list of a view, editable in place.
-   *
-   * Genes used to be settable only by hand-editing the document JSON: addView
-   * seeded them from the most-altered genes in Explore (or a hardcoded fallback)
-   * and nothing could change them afterwards. Five view kinds take genes, so
-   * this is one control rendered in each one's settings panel rather than five
-   * near-identical ones.
-   */
-  const GENE_VIEWS = ["compare", "oncoprint", "cooccurrence", "coexpression", "hotspots"];
-  /** the most-altered genes this exploration found, for the suggestion list */
-  const geneChoices = (): string[] => {
-    const fromExplore = (explore?.mutatedGenes || []).map((g: any) => String(g.gene));
-    const legacy = (explore?.genes || []).map((g: any) => String(g.gene));
-    return [...new Set([...fromExplore, ...legacy])].slice(0, 60);
-  };
   // ---- workspaces ----------------------------------------------------------
   const openWorkspaceSave = () => {
     if (!canSave()) return;
@@ -635,64 +400,6 @@ export default function AnalysisPage() {
   };
 
   const openGenes = (vi: number) => { setGenesFor(vi); genesDialog.current?.showModal(); };
-  /**
-   * Which cohorts a view draws. Absent means all of them, so ticking every cohort removes the
-   * field rather than freezing today's list into the document.
-   */
-  const setViewCohorts = (vi: number, names: string[], all: string[]) => updateView(vi, (v: any) => {
-    const next = { ...v };
-    const picked = all.filter((n) => names.includes(n));
-    const authored = Object.keys(doc.cohorts || {});
-    if (!picked.length || (picked.length === authored.length && picked.every((n, k) => n === authored[k]))) delete next.cohorts;
-    else next.cohorts = picked;
-    // a document's splitBy targets the view's own single chosen cohort (it has no picker of its
-    // own) — so narrowing to exactly one carries an existing splitBy along to it,
-    // same attribute/gene/oql, rather than leaving it pointed at whatever it last targeted.
-    if (next.splitBy && names.length === 1 && next.splitBy.cohort !== names[0])
-      next.splitBy = { ...next.splitBy, cohort: names[0] };
-    return next;
-  });
-  const setViewAttrs = (vi: number, attributes: string[]) => updateView(vi, (v: any) => ({ ...v, attributes }));
-
-  const setViewGenes = (vi: number, genes: GeneTrackSpec[]) =>
-    updateView(vi, v => pruneSort({ ...v, genes }));
-
-  /** the document's view at vi, whatever its kind */
-  const docView = (vi: number): any => ((doc.views || [])[vi] || {});
-
-  /** what a view's cohort picker needs: today's choice, everything on offer, and where to write it */
-  /** the document's splits as the engine sees them, from the last result */
-  const partitionShapes = (): PartitionShape[] => Object.entries((result && result.splits) || {}).map(([name, p]) =>
-    ({ name, of: p.of, comparable: p.children.filter((c) => c.role !== "notEvaluable").map((c) => c.name) }));
-  const cohortChoice = (vi: number, v: any, max?: number) => {
-    // On offer: each cohort, whole; under it each of its splits (drawn as its arms); under that
-    // each arm, and any split of an arm, the same way. A view chooses any of them — a cohort and
-    // its split can be drawn by different views, or side by side in one. With no list of its own
-    // a view shows the authored cohorts, whole.
-    const shapes = partitionShapes();
-    const authored = Object.keys(doc.cohorts || {});
-    const nodes: CohortNode[] = [];
-    const countOf = (n: string) => result?.cohorts[n]?.count ?? null;
-    const offer = (n: string, label: string, kind: CohortNode["kind"], depth: number) => {
-      if (result && !result.cohorts[n]) return;
-      nodes.push({ name: n, label, kind, depth, count: countOf(n) });
-      for (const p of shapes.filter((x) => x.of === n)) {
-        nodes.push({ name: p.name, label: p.name.slice(n.length + 3), kind: "split", depth: depth + 1, count: countOf(n), groups: p.comparable.length });
-        for (const c of p.comparable) offer(c, c.slice(p.name.length + 3), "arm", depth + 2);
-      }
-    };
-    for (const n of authored) offer(n, n, "cohort", 0);
-    const all = nodes.map((x) => x.name);
-    let chosen = (Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored).filter((n: string) => all.includes(n));
-    // a view that draws one cohort draws the first group its list stands for: show that, not the list
-    if (max === 1 && chosen.length) chosen = [expandSplits(chosen, shapes)[0]].filter((n) => all.includes(n));
-    // what the view draws, in the order it colours them (the engine expands the list the same way)
-    const drawn = expandSplits(chosen, shapes).filter((n) => !result || result.cohorts[n]);
-    return { chosen, all, nodes, drawn, max, busy, viewKey: viewIds[vi] ?? vi, onChange: (next: string[]) => setViewCohorts(vi, next, all) };
-  };
-
-  /** the view at index vi, read as an oncoprint view (its editor only renders there) */
-  const ocView = (vi: number): OncoprintView => ((doc.views || [])[vi] || {}) as OncoprintView;
 
   /**
    * A drag across an oncoprint becomes a cohort of exactly those patients — an explicit list,
@@ -922,6 +629,10 @@ export default function AnalysisPage() {
   // ---- Explore (app/lab/use-explore-state.ts) ------------------------------
   const exploreState = useExploreState({ analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
   const { addChartDialog, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setChartTab, setExStudies, setExploreStudies } = exploreState;
+  const viewOptions = useViewOptions({ cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading });
+  const { VIEW_KINDS, assayOptions, attrsLoading, catalogAttrs, contProfile, drawsOwnHead, geneChoices, numericAttrs, profileOptions, viewAttrs, viewEvents, viewGenes } = viewOptions;
+  const viewEdits = useViewEdits({ assayOptions, busy, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, viewAttrs, viewEvents, viewGenes, viewIds });
+  const { addView, cohortChoice, docView, moveView, ocView, patchView, removeView, removeViews, setViewAttrs, setViewCohorts, setViewGenes, updateView, updateViewLocal } = viewEdits;
   /** what Explore's sections read and the edits they can make (app/lab/explore-sections.tsx) */
   const exploreCtx: ExploreCtx = { ...exploreState, moreDerivedMenu, showClauseData, studies };
   /** what every view card reads and the edits it can make (app/lab/view-cards.tsx) */
