@@ -4,6 +4,8 @@
 #   "scikit-survival==0.28.0",
 #   "scikit-learn==1.9.1",
 #   "lifelines==0.30.3",
+#   "statsmodels==0.15.0",
+#   "scipy==1.18.1",
 #   "numpy==2.5.3",
 #   "pandas==2.3.3",
 # ]
@@ -12,8 +14,9 @@
 
   - the elastic-net Cox path: scikit-survival's CoxnetSurvivalAnalysis (glmnet's algorithm and
     objective, Breslow ties), at fixed penalties, on data with tied event times;
-  - delayed entry and strata, unpenalised: lifelines' CoxPHFitter with entry_col / strata, on data
-    with no tied times (lifelines uses Efron ties, which equal Breslow's when nothing ties);
+  - delayed entry and strata, unpenalised (coefficients, standard errors, p-values, log-likelihood):
+    statsmodels' PHReg with entry / strata and Breslow ties. (lifelines' CoxPHFitter agrees when
+    stratified but stops about 5e-6 short without strata, so it is not the reference here.)
   - Harrell's concordance: lifelines.utils.concordance_index, on the same untied data.
 
 Writes the data and the reference results to test/fixtures/golden/coxnet.json, which
@@ -29,9 +32,9 @@ import pathlib
 
 import lifelines
 import numpy as np
-import pandas as pd
 import sksurv
-from lifelines import CoxPHFitter
+import statsmodels
+from statsmodels.duration.hazard_regression import PHReg
 from lifelines.utils import concordance_index
 from sksurv.linear_model import CoxnetSurvivalAnalysis
 from sksurv.util import Surv
@@ -70,16 +73,12 @@ def main():
 
     # 2. unpenalised Cox with delayed entry and strata, untied times
     X, time, event, ent, stratum = dataset(23, 300, [0.4, 0.3, 0.25], 1, tied=False, entry=True)
-    df = pd.DataFrame(X, columns=["g1", "g2", "g3", "d1"])
-    df["time"], df["event"], df["entry"], df["s"] = time, event.astype(int), ent, stratum
     for strata in [False, True]:
-        cph = CoxPHFitter()
-        cph.fit(df if strata else df.drop(columns="s"), duration_col="time", event_col="event", entry_col="entry",
-                strata=["s"] if strata else None)
+        m = PHReg(time, X, status=event.astype(float), entry=ent, strata=stratum if strata else None, ties="breslow").fit(gtol=1e-12)
         cases.append({"name": "unpenalised, delayed entry" + (", 3 strata" if strata else ""), "kind": "cox",
                       "nbinary": 3, "X": X.tolist(), "time": time.tolist(), "event": event.tolist(), "entry": ent.tolist(),
                       "stratum": stratum.tolist() if strata else [0] * len(time),
-                      "coefs": cph.params_[["g1", "g2", "g3", "d1"]].tolist(), "loglik": cph.log_likelihood_})
+                      "coefs": m.params.tolist(), "loglik": float(m.llf), "se": m.bse.tolist(), "p": m.pvalues.tolist()})
 
     # 3. Harrell's C on held-out style scores
     rng = np.random.default_rng(5)
@@ -88,7 +87,7 @@ def main():
                   "risk": score.tolist(), "c": concordance_index(time, -score, event)})
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps({"versions": {"scikit-survival": sksurv.__version__, "lifelines": lifelines.__version__,
+    OUT.write_text(json.dumps({"versions": {"scikit-survival": sksurv.__version__, "lifelines": lifelines.__version__, "statsmodels": statsmodels.__version__,
                                             "numpy": np.__version__}, "cases": cases}) + "\n")
     print("wrote", OUT)
 

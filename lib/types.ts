@@ -935,6 +935,13 @@ export interface RiskmodelView {
   /** risk groups, cut at equal quantiles of the score (default 3, 2 to 5) */
   groups?: number;
   seed?: number;
+  /** clinical attributes always in the model, never penalised (at most 6): numbers as they are,
+   *  categories as indicators against the commonest value */
+  covariates?: string[];
+  /** start each patient's clock at a timeline event (as the survival view), with delayed entry */
+  anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
+  /** train on the discovery half of the engine's fixed split only, and report on the validation half */
+  validate?: boolean;
 }
 
 export interface RiskmodelResult {
@@ -942,6 +949,16 @@ export interface RiskmodelResult {
   /** patients modelled, their events, and those left out with why */
   n: number; events: number;
   notProfiled: number; noStratum: number; neverHeldOut: number;
+  noCovariate: number; noAnchor: number; anchorAfterStart: number; noFollowUp: number;
+  /** "Treatment (FIRST)" etc. when the clock starts at a timeline event */
+  anchoredTo: string | null;
+  /** the always-in covariates as fitted columns (a category's indicator per non-reference level), with
+   *  the share of runs they ended non-zero in (always 1 unless no variation) and their mean coefficient */
+  covariates: { name: string; meanCoef: number; hr: number }[];
+  /** with `validate`: the patients trained on (discovery) and reported on (validation) */
+  validation: { discovery: number; validation: number; validationEvents: number; cIndex: number } | null;
+  /** what the groups, table and refit below are computed on */
+  reportedOn: "held-out scores" | "validation half";
   /** genes every patient was sequenced for (mutations), and of those the candidates */
   genesCovered: number; candidates: number; minMutated: number;
   strata: string | null; strataLevels: number;
@@ -950,8 +967,14 @@ export interface RiskmodelResult {
   cIndex: { median: number; q1: number; q3: number; values: number[] };
   /** candidates kept in at least one run, by how often: share of runs, mean coefficient where kept, patients mutated */
   features: { gene: string; selected: number; meanCoef: number; hr: number; mutated: number }[];
-  groups: { name: string; from: number | null; to: number | null; curve: Omit<KmCurve, "cohort"> }[];
+  groups: { name: string; from: number | null; to: number | null; curve: Omit<KmCurve, "cohort">;
+    /** Kaplan-Meier survival at 12 and 36 months; null past the group's follow-up */
+    at12: number | null; at36: number | null;
+    /** hazard ratio against the lowest-risk group (null for that group), 95% Wald interval, p */
+    hr: number | null; ciLow: number | null; ciHigh: number | null; p: number | null }[];
   logrank: LogRankK | null;
+  /** a Cox model of the outcome on the risk score alone (per standard deviation of the score) */
+  refit: { hr: number; ciLow: number; ciHigh: number; p: number } | null;
   /** the scores' distribution, for the histogram: bin edges and counts */
   histogram: { edges: number[]; counts: number[] };
 }

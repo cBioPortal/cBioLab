@@ -620,16 +620,44 @@ export function riskmodelSvg(v: ViewResult, o: SvgOpts): string {
     out.push(`<path d="${d}" fill="none" stroke="${SERIES[i % SERIES.length]}" stroke-width="2"/>`);
   });
   let yy = T + PLOT + 24;
+  // one row per group: size, median, survival at 12 and 36 months, hazard ratio against the lowest group
+  const pc = (x: number | null) => x == null ? "—" : Math.round(x * 100) + "%";
+  const cols = [22, 210, 290, 360, 420, 480];
+  ["group", "patients · events", "median", "12 mo", "36 mo", "HR vs lowest (95% CI)"].forEach((h, k) =>
+    out.push(`<text x="${cols[k]}" y="${yy + 8}" font-size="10" fill="${p.muted}">${esc(h)}</text>`));
+  yy += 15;
   m.groups.forEach((g, i) => {
     out.push(`<rect x="8" y="${yy}" width="9" height="9" rx="2" fill="${SERIES[i % SERIES.length]}"/>`);
-    out.push(`<text x="22" y="${yy + 8}" font-size="11" fill="${p.ink}">${esc(g.name)}: median ${g.curve.median == null ? "not reached" : num(g.curve.median) + "mo"} ` +
-      `(n=${fmt(g.curve.n)}, ${fmt(g.curve.events)} events)</text>`);
+    const cells = [g.name, fmt(g.curve.n) + " · " + fmt(g.curve.events), g.curve.median == null ? "not reached" : num(g.curve.median) + " mo",
+      pc(g.at12), pc(g.at36), g.hr == null ? (i === 0 ? "reference" : "—") : g.hr.toFixed(2) + " (" + g.ciLow!.toFixed(2) + "–" + g.ciHigh!.toFixed(2) + ") " + pFmt(g.p!)];
+    cells.forEach((c, k) => out.push(`<text x="${cols[k]}" y="${yy + 8}" font-size="11" fill="${p.ink}">${esc(c)}</text>`));
     yy += 16;
   });
   if (m.logrank) { out.push(`<text x="8" y="${yy + 8}" font-size="11" fill="${p.ink}">log-rank χ²=${num(m.logrank.chi2)} (${m.logrank.df} df) · ${esc(pFmt(m.logrank.p))}` +
     (m.logrank.strata > 1 ? ` · stratified by ${esc(m.strata || "")}, ${m.logrank.strata} strata` : "") + `</text>`); yy += 16; }
-  out.push(`<text x="8" y="${yy + 8}" font-size="11" fill="${p.ink}">held-out C-index ${m.cIndex.median.toFixed(3)} (IQR ${m.cIndex.q1.toFixed(3)}–${m.cIndex.q3.toFixed(3)}) over ${m.runs} runs</text>`);
-  yy += 28;
+  if (m.refit) { out.push(`<text x="8" y="${yy + 8}" font-size="11" fill="${p.ink}">risk score alone: HR ${m.refit.hr.toFixed(2)} per standard deviation (95% CI ${m.refit.ciLow.toFixed(2)}–${m.refit.ciHigh.toFixed(2)}) · ${esc(pFmt(m.refit.p))}</text>`); yy += 16; }
+  out.push(`<text x="8" y="${yy + 8}" font-size="11" fill="${p.ink}">held-out C-index ${m.cIndex.median.toFixed(3)} (IQR ${m.cIndex.q1.toFixed(3)}–${m.cIndex.q3.toFixed(3)}) over ${m.runs} runs` +
+    (m.validation ? ` · on the validation half: ${m.validation.cIndex.toFixed(3)} (${fmt(m.validation.validation)} patients never trained on)` : "") + `</text>`);
+  yy += 16;
+  if (m.covariates.length) {
+    out.push(`<text x="8" y="${yy + 8}" font-size="11" fill="${p.ink}">adjusted for (always in the model): ${esc(m.covariates.map((c) => c.name + " HR " + c.hr.toFixed(2)).join(" · "))}</text>`);
+    yy += 16;
+  }
+  // the distribution of the score the groups are cut from, with the cuts
+  yy += 10;
+  const hh = 46, hx0 = L, hx1 = W - R, hmax = Math.max(1, ...m.histogram.counts);
+  const ex = m.histogram.edges, hxOf = (v: number) => hx0 + (hx1 - hx0) * (v - ex[0]) / ((ex[ex.length - 1] - ex[0]) || 1);
+  out.push(`<text x="8" y="${yy}" font-size="11" font-weight="600" fill="${p.ink}">Risk score (${esc(m.reportedOn)}), with the group cuts</text>`);
+  yy += 6;
+  m.histogram.counts.forEach((c, k) => {
+    const x0 = hxOf(ex[k]), x1 = hxOf(ex[k + 1]), h = hh * c / hmax;
+    out.push(`<rect x="${num(x0 + 0.5)}" y="${num(yy + hh - h)}" width="${num(Math.max(0.5, x1 - x0 - 1))}" height="${num(h)}" fill="${p.muted}" opacity="0.55"/>`);
+  });
+  m.groups.slice(1).forEach((g) => { if (g.from != null) { const x = hxOf(g.from);
+    out.push(`<line x1="${num(x)}" y1="${yy - 2}" x2="${num(x)}" y2="${yy + hh}" stroke="${p.ink}" stroke-width="1" stroke-dasharray="3 2"/>`); } });
+  out.push(`<text x="${hx0}" y="${yy + hh + 12}" font-size="10" fill="${p.muted}">lower risk</text>`);
+  out.push(`<text x="${hx1}" y="${yy + hh + 12}" font-size="10" fill="${p.muted}" text-anchor="end">higher risk</text>`);
+  yy += hh + 32;
   // genes kept most often: selection share, and the mean hazard ratio as a bar about HR = 1 on a log scale
   const shown = m.features.slice(0, RISK_FIGURE_GENES);
   out.push(`<text x="8" y="${yy}" font-size="11" font-weight="600" fill="${p.ink}">Genes kept most often (share of runs · mean hazard ratio where kept)</text>`);
@@ -645,8 +673,13 @@ export function riskmodelSvg(v: ViewResult, o: SvgOpts): string {
     yy += 16;
   });
   const left = [m.notProfiled ? fmt(m.notProfiled) + " with no mutation panel on record" : "", m.noStratum ? fmt(m.noStratum) + " with no " + m.strata : "",
+    m.noCovariate ? fmt(m.noCovariate) + " missing a covariate" : "", m.noAnchor ? fmt(m.noAnchor) + " with no " + m.anchoredTo + " event" : "",
+    m.anchorAfterStart ? fmt(m.anchorAfterStart) + " whose " + m.anchoredTo + " came after the study's day 0" : "",
+    m.noFollowUp ? fmt(m.noFollowUp) + " with no follow-up after entry" : "",
     m.neverHeldOut ? fmt(m.neverHeldOut) + " never held out (so unscored and in no group)" : ""].filter(Boolean);
-  const text = fmt(m.n) + " patients, " + fmt(m.events) + " events; " + m.candidates + " candidate genes (of " + m.genesCovered + " covered for every patient, mutated in ≥" +
+  const text = fmt(m.n) + " patients, " + fmt(m.events) + " events" + (m.anchoredTo ? ", clock from " + m.anchoredTo : "") +
+    (m.validation ? " (trained on " + fmt(m.validation.discovery) + " in the discovery half, reported on " + fmt(m.validation.validation) + " in the validation half)" : "") +
+    "; " + m.candidates + " candidate genes (of " + m.genesCovered + " covered for every patient, mutated in ≥" +
     m.minMutated + "); elastic net, alpha " + m.alpha + ", seed " + m.seed + "." + (left.length ? " Left out: " + left.join("; ") + "." : "") +
     (m.features.length > shown.length ? " " + (m.features.length - shown.length) + " more genes were kept in at least one run; they are in the result, not drawn." : "") +
     " " + (v.caveat || "");

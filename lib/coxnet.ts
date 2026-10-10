@@ -38,6 +38,8 @@ export interface PathFit {
   coefs: Float64Array[];
 }
 
+import { chiSquareP1df, Z_975 } from "./stats.ts";
+
 // ---- risk sets ------------------------------------------------------------------------------
 
 /**
@@ -369,6 +371,10 @@ export interface EnsembleOptions extends PathOptions {
   testShare?: number;
   folds?: number;
   seed?: number;
+  /** the rows the runs split between training and testing (default: every row) */
+  pool?: Int32Array;
+  /** rows outside the pool that every run's model scores (a validation set never trained on) */
+  alsoScore?: Int32Array;
 }
 
 export interface EnsembleResult {
@@ -380,31 +386,124 @@ export interface EnsembleResult {
   runs: { cIndex: number; lambda: number; nonzero: number }[];
   /** per column: the share of runs that kept it (non-zero), and its mean coefficient over those runs */
   selected: Float64Array; meanCoef: Float64Array;
+  /** per row of `alsoScore`: the mean of every run's score; NaN for every other row */
+  external: Float64Array;
 }
 
 /** OncoCast's ensemble: random two-thirds / one-third splits, penalty by inner cross-validation, held-out scores averaged. */
 export function coxnetEnsemble(subj: CoxSubject[], X: CoxDesign, o: EnsembleOptions): EnsembleResult {
   const n = X.n, p = X.binary.length + X.dense.length;
   const rand = rng(o.seed ?? 1);
-  const all = Int32Array.from({ length: n }, (_, i) => i);
+  const all = o.pool ?? Int32Array.from({ length: n }, (_, i) => i);
+  const ext = new Float64Array(n);
   const sum = new Float64Array(n), heldOut = new Int32Array(n);
   const keptCount = new Float64Array(p), coefSum = new Float64Array(p);
   const runs: EnsembleResult["runs"] = [];
   for (let run = 0; run < o.runs; run++) {
     const order = shuffled(all, rand);
-    const nTest = Math.round(n * (o.testShare ?? 1 / 3));
+    const nTest = Math.round(all.length * (o.testShare ?? 1 / 3));
     const test = Int32Array.from(order.subarray(0, nTest)).sort();
     const train = Int32Array.from(order.subarray(nTest)).sort();
     const { path, best } = cvLambda(subj, X, train, o.folds ?? 3, rand, o);
     const b = path.coefs[best];
     const eta = linearPredictor(X, test, b);
     test.forEach((r, i) => { sum[r] += eta[i]; heldOut[r]++; });
+    if (o.alsoScore && o.alsoScore.length) {
+      const e2 = linearPredictor(X, o.alsoScore, b);
+      o.alsoScore.forEach((r, i) => { ext[r] += e2[i] / o.runs; });
+    }
     let nonzero = 0;
     for (let j = 0; j < p; j++) if (b[j] !== 0) { nonzero++; keptCount[j]++; coefSum[j] += b[j]; }
     runs.push({ cIndex: concordance(subj, test, eta), lambda: path.lambdas[best], nonzero });
   }
   const risk = Float64Array.from(sum, (s, i) => heldOut[i] ? s / heldOut[i] : NaN);
-  return { risk, heldOut, runs,
+  const scoredExt = new Set(o.alsoScore || []);
+  const external = Float64Array.from(ext, (v, i) => scoredExt.has(i) ? v : NaN);
+  return { risk, heldOut, runs, external,
     selected: Float64Array.from(keptCount, (k) => k / o.runs),
     meanCoef: Float64Array.from(coefSum, (s, j) => keptCount[j] ? s / keptCount[j] : 0) };
+}
+
+// ---- an unpenalised fit with standard errors ------------------------------------------------
+
+export interface CoxFitResult { beta: number[]; se: number[]; hr: number[]; ciLow: number[]; ciHigh: number[]; p: number[]; loglik: number; n: number; events: number }
+
+/**
+ * Newton-Raphson Cox fit of a few dense columns (risk-group indicators, a score, covariates) with
+ * the full information matrix, so each coefficient gets a standard error, a 95% Wald interval and
+ * a p-value. Breslow ties, delayed entry and strata as coxnetPath. Pinned against statsmodels' PHReg by
+ * test/coxnet-golden.test.ts.
+ */
+export function coxFit(subj: CoxSubject[], rows: Int32Array, cols: Float64Array[], maxIter = 30): CoxFitResult {
+  const p = cols.length, n = rows.length;
+  const byStratum = new Map<number, number[]>();
+  for (let q = 0; q < n; q++) { const s = subj[rows[q]].stratum; let l = byStratum.get(s); if (!l) byStratum.set(s, l = []); l.push(q); }
+  const x = (q: number, j: number) => cols[j][rows[q]];
+  const evaluate = (b: number[]) => {
+    let ll = 0;
+    const g = new Array(p).fill(0), H = Array.from({ length: p }, () => new Array(p).fill(0));
+    for (const qs of byStratum.values()) {
+      const eta = qs.map((q) => { let e = 0; for (let j = 0; j < p; j++) e += b[j] * x(q, j); return e; });
+      const shift = Math.max(...eta);
+      const w = eta.map((e) => Math.exp(e - shift));
+      const byEntry = qs.map((_, i) => i).sort((a, c) => subj[rows[qs[a]]].entry - subj[rows[qs[c]]].entry);
+      const byExit = qs.map((_, i) => i).sort((a, c) => subj[rows[qs[a]]].time - subj[rows[qs[c]]].time);
+      const times = [...new Set(qs.filter((q) => subj[rows[q]].event).map((q) => subj[rows[q]].time))].sort((a, c) => a - c);
+      let S0 = 0; const S1 = new Array(p).fill(0), S2 = Array.from({ length: p }, () => new Array(p).fill(0));
+      const add = (i: number, sign: number) => {
+        const q = qs[i]; S0 += sign * w[i];
+        for (let j = 0; j < p; j++) { S1[j] += sign * w[i] * x(q, j); for (let k = 0; k <= j; k++) S2[j][k] += sign * w[i] * x(q, j) * x(q, k); }
+      };
+      let ei = 0, xi = 0;
+      for (const t of times) {
+        // at risk at t: entry < t <= time
+        while (ei < byEntry.length && subj[rows[qs[byEntry[ei]]]].entry < t) add(byEntry[ei++], 1);
+        while (xi < byExit.length && subj[rows[qs[byExit[xi]]]].time < t) add(byExit[xi++], -1);
+        let d = 0;
+        for (let i = 0; i < qs.length; i++) {
+          const s = subj[rows[qs[i]]];
+          if (s.event && s.time === t) { d++; ll += eta[i]; for (let j = 0; j < p; j++) g[j] += x(qs[i], j); }
+        }
+        ll -= d * (Math.log(S0) + shift);
+        for (let j = 0; j < p; j++) {
+          g[j] -= d * S1[j] / S0;
+          for (let k = 0; k <= j; k++) H[j][k] += d * (S2[j][k] / S0 - S1[j] * S1[k] / (S0 * S0));
+        }
+      }
+    }
+    for (let j = 0; j < p; j++) for (let k = 0; k < j; k++) H[k][j] = H[j][k];
+    return { ll, g, H };
+  };
+  let b = new Array(p).fill(0);
+  let cur = evaluate(b);
+  for (let it = 0; it < maxIter; it++) {
+    const step = solve(cur.H, cur.g);
+    let scale = 1, next = b.map((v, j) => v + step[j]), ev = evaluate(next);
+    while (ev.ll < cur.ll - 1e-12 && scale > 1e-4) { scale /= 2; next = b.map((v, j) => v + scale * step[j]); ev = evaluate(next); }
+    const moved = Math.max(...step.map((s) => Math.abs(s * scale)));
+    b = next; cur = ev;
+    if (moved < 1e-10) break;
+  }
+  const inv = invert(cur.H);
+  const se = b.map((_, j) => Math.sqrt(Math.max(inv[j][j], 0)));
+  const Z = Z_975;
+  return { beta: b, se, hr: b.map(Math.exp), ciLow: b.map((v, j) => Math.exp(v - Z * se[j])), ciHigh: b.map((v, j) => Math.exp(v + Z * se[j])),
+    p: b.map((v, j) => se[j] > 0 ? chiSquareP1df((v / se[j]) ** 2) : NaN), loglik: cur.ll, n, events: [...rows].filter((r) => subj[r].event).length };
+}
+
+function solve(A: number[][], y: number[]): number[] {
+  const n = y.length, M = A.map((r, i) => [...r, y[i]]);
+  for (let c = 0; c < n; c++) {
+    let piv = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
+    if (Math.abs(M[piv][c]) < 1e-14) throw new Error("the model's columns are collinear (a group or covariate level with no events, or one that duplicates another)");
+    [M[c], M[piv]] = [M[piv], M[c]];
+    for (let r = 0; r < n; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+  }
+  return M.map((r, i) => r[n] / r[i]);
+}
+
+function invert(A: number[][]): number[][] {
+  const n = A.length;
+  return Array.from({ length: n }, (_, j) => solve(A, Array.from({ length: n }, (_, i) => i === j ? 1 : 0)))
+    .reduce((acc, col, j) => { col.forEach((v, i) => { acc[i][j] = v; }); return acc; }, Array.from({ length: n }, () => new Array(n).fill(0)));
 }

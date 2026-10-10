@@ -1,5 +1,6 @@
 // lib/coxnet.ts checked against scikit-survival (the elastic-net path, glmnet's algorithm and
-// objective) and lifelines (delayed entry and strata, unpenalised; Harrell's C).
+// objective), statsmodels (delayed entry and strata, unpenalised, with standard errors) and
+// lifelines (Harrell's C).
 //
 // test/fixtures/golden/coxnet.json holds seeded synthetic datasets and those libraries' fits on
 // them (regenerate with `uv run python/golden/coxnet.py`; versions are pinned there and recorded
@@ -8,7 +9,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { coxnetPath, concordance, partialLogLik, coxnetEnsemble, type CoxSubject, type CoxDesign } from "../lib/coxnet.ts";
+import { coxnetPath, coxFit, concordance, partialLogLik, coxnetEnsemble, type CoxSubject, type CoxDesign } from "../lib/coxnet.ts";
 
 const golden = JSON.parse(readFileSync("test/fixtures/golden/coxnet.json", "utf8"));
 
@@ -43,6 +44,16 @@ describe("coxnet against scikit-survival and lifelines", () => {
       });
       const ll = partialLogLik(subj, X, rows, b);
       assert.ok(Math.abs(ll - c.loglik) / Math.abs(c.loglik) <= 1e-6, `log-likelihood ${ll} vs ${c.loglik}`);
+    });
+    test(c.name + ": the full fit's coefficients, standard errors and p-values", () => {
+      const subj = c.time.map((t: number, i: number) => ({ time: t, event: !!c.event[i], entry: c.entry[i], stratum: c.stratum[i] }));
+      const cols = c.X[0].map((_: number, j: number) => Float64Array.from(c.X.map((r: number[]) => r[j])));
+      const f = coxFit(subj, Int32Array.from({ length: subj.length }, (_, i) => i), cols);
+      const rel = (a: number, b: number) => Math.abs(a - b) / Math.max(Math.abs(b), 1e-12);
+      c.coefs.forEach((w: number, j: number) => assert.ok(rel(f.beta[j], w) <= 1e-6, `beta ${j}: ${f.beta[j]} vs ${w}`));
+      c.se.forEach((w: number, j: number) => assert.ok(rel(f.se[j], w) <= 1e-5, `se ${j}: ${f.se[j]} vs ${w}`));
+      c.p.forEach((w: number, j: number) => assert.ok(rel(f.p[j], w) <= 1e-4, `p ${j}: ${f.p[j]} vs ${w}`));
+      assert.ok(rel(f.loglik, c.loglik) <= 1e-8, `log-likelihood ${f.loglik} vs ${c.loglik}`);
     });
   }
   for (const c of golden.cases.filter((c: any) => c.kind === "concordance")) {

@@ -386,6 +386,11 @@ function patientListLeafSql(leaf: PatientListLeaf, ctx: Ctx): string {
 // discovery/validation partition ever reported. test/cohort.test.ts pins it.
 export const SPLIT_SALT = "cohort-lab-split-v1";
 const SPLIT_PARTS: Record<string, number> = { discovery: 0, validation: 1 };
+/** The held-out split's bucket for a bare patient id expression: 0 = discovery, 1 = validation. One
+ *  definition, shared with any view that reports on the halves, so they cannot disagree. */
+export function splitBucketSql(pidExpr: string, study: string): string {
+  return "cityHash64(concat(" + sq(SPLIT_SALT + ":" + study + ":") + ", " + pidExpr + ")) % 2";
+}
 
 function splitLeafSql(leaf: SplitLeaf, ctx: Ctx): string {
   const bucket = SPLIT_PARTS[String(leaf.part)];
@@ -393,7 +398,7 @@ function splitLeafSql(leaf: SplitLeaf, ctx: Ctx): string {
   const pid = PID("patient_unique_id", ctx.study);
   return "SELECT DISTINCT " + pid + " AS pid FROM " + dbOf(ctx) + ".sample_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(ctx.study) + "\n" +
-    "    AND cityHash64(concat(" + sq(SPLIT_SALT + ":" + ctx.study + ":") + ", " + pid + ")) % 2 = " + bucket;
+    "    AND " + splitBucketSql(pid, ctx.study) + " = " + bucket;
 }
 
 function leafSql(leaf: any, ctx: Ctx): string {
