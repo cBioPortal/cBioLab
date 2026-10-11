@@ -4,7 +4,7 @@ import { coxRegression, type CoxRow } from "../stats.ts";
 import { viewToSvg } from "../view-svg.ts";
 import type { ViewResult, SurvivalView, CoxView, CoxCoefficient, CoxCovariate } from "../types.ts";
 import { isPatientLevel, type EndpointColumns } from "../federation.ts";
-import { axisLabel, validateAxis, type AxisKind } from "../plot.ts";
+import { axisLabel, validateAxis, OQL_UNALTERED, type AxisKind } from "../plot.ts";
 import { coxMethod, type CoxTrace } from "../method.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
 import { overLimit } from "./shared.ts";
@@ -34,8 +34,10 @@ export function buildCoxColumns(covariates: CoxCovariate[], kindsFinal: AxisKind
       // of patients reports "wild-type vs mutated" while one altered in a majority reports the
       // opposite, purely from how common each gene's alteration happens to be, not from any
       // real change in convention — the exact TP53-vs-APC inconsistency this fixes.
-      const isMutatedAxis = cov.source === "alteration" && (cov.by === "mutated" || cov.by === undefined);
-      const implicitDefault = isMutatedAxis && counts.has("Not mutated") ? "Not mutated" : undefined;
+      // an OQL axis is the same yes/no question, so "Unaltered" is its reference for the same reason
+      const absentLevel = cov.source !== "alteration" ? undefined
+        : "oql" in cov ? OQL_UNALTERED : (cov.by === "mutated" || cov.by === undefined) ? "Not mutated" : undefined;
+      const implicitDefault = absentLevel && counts.has(absentLevel) ? absentLevel : undefined;
       const declared = cov.reference && counts.has(cov.reference) ? cov.reference : implicitDefault;
       const levels = declared ? [declared, ...byFreq.filter((l) => l !== declared)] : byFreq;
       const reference = levels[0];

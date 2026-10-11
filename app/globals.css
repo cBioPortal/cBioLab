@@ -1188,6 +1188,19 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
 /* a plot's axis controls: source, then whatever that source needs */
 .axispick { display: inline-flex; align-items: center; gap: var(--s1); }
 .axispick select { max-width: 11rem; }
+/* a plot's highlight cohorts: one chip each, in the figure's colour for it */
+.hlpick { display: inline-flex; align-items: center; gap: var(--s1); flex-wrap: wrap; min-width: 0; }
+.hlpick select { max-width: 10rem; }
+.hlchip {
+  display: inline-flex; align-items: center; gap: 4px; height: var(--ctl-h); padding: 0 2px 0 var(--s1);
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper); font-size: var(--t-sm); color: var(--ink);
+}
+.hldot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.hlname { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hlx { border: none; background: none; color: var(--muted); cursor: pointer; padding: 0 3px; font-size: var(--t-md); line-height: 1; }
+.hlx:hover { color: var(--ink); }
+/* an OQL query is text, not a symbol: keep its case and give it room */
+.axispick .axisgene.axisoql { text-transform: none; width: auto; max-width: 22rem; }
 .axispick .axisgene { width: 5.5rem; font-size: var(--t-md); height: var(--ctl-h); padding: 0 var(--s1); text-transform: uppercase; }
 /* a gene SET ("TP53,KRAS,PIK3CA") needs more room than a single symbol; grows with content
    rather than claiming a wide fixed width every alteration axis would otherwise pay for. */

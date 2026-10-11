@@ -35,7 +35,7 @@ test("an axis that would read a whole profile is refused by name", () => {
   // 630 million values live in one profile of this warehouse; a plot of "all genes" is not a plot
   assert.throws(() => validateAxis({ source: "molecular", profileType: "log2CNA" } as never, "x"),
     /needs one gene.*name the gene you mean/s);
-  assert.throws(() => validateAxis({ source: "alteration" } as never, "y"), /needs a gene, or a gene set/);
+  assert.throws(() => validateAxis({ source: "alteration" } as never, "y"), /needs a gene, a gene set, or an OQL query/);
   assert.throws(() => validateAxis({ source: "alateration", gene: "APC" } as never, "covariate 1"),
     /unknown source 'alateration' — use one of clinical, molecular, alteration, none/);
   assert.throws(() => validateAxis({ source: "clinical", attribute: "not a name!" }, "x"), /not a clinical attribute name/);
@@ -190,4 +190,38 @@ test("log: true reads log10(v + 1), leaves out what has no such log, and says so
   assert.match(mol, /\) WHERE v IS NOT NULL$/);
   assert.equal(axisLabel({ source: "clinical", attribute: "MUTATION_COUNT", log: true }), "log10(MUTATION_COUNT + 1)");
   assert.equal(axisLabel({ source: "molecular", profileType: "mrna", gene: "ESR1", log: true }), "log10(ESR1 mrna + 1)");
+});
+
+test("an OQL axis: each case is Altered when it matches any entry, Unaltered otherwise", () => {
+  const oql = { source: "alteration" as const, oql: "KRAS: G12C; STK11: MUT" };
+  validateAxis(oql, "x");
+  assert.equal(axisKind(oql), "cat");
+  assert.equal(axisLabel(oql), "KRAS: G12C; STK11: MUT (OQL)");
+  const sql = axisSelect(oql, ctx, "cat");
+  // every case of the cohort is a row, so the unaltered are counted, not missing
+  assert.match(sql, /FROM db\.sample_derived sd/);
+  assert.match(sql, /'Altered', 'Unaltered'\) AS v/);
+  assert.match(sql, /hugo_gene_symbol = 'KRAS'/);
+  assert.match(sql, /hugo_gene_symbol = 'STK11'/);
+});
+
+test("an OQL axis matches samples in sample mode and patients in patient mode", () => {
+  const oql = { source: "alteration" as const, oql: "TP53: TRUNC" };
+  assert.match(axisSelect(oql, ctx, "cat"), /replaceOne\(g\.sample_unique_id/);
+  assert.match(axisSelect(oql, { ...ctx, unit: "patient" }, "cat"), /replaceOne\(g\.patient_unique_id/);
+});
+
+test("an OQL axis is refused when its query is, and says which axis", () => {
+  assert.throws(() => validateAxis({ source: "alteration", oql: "KRAS: GAIN" }, "y"), /^Error: y axis: OQL 'KRAS: GAIN': GAIN is not supported/);
+  assert.throws(() => validateAxis({ source: "alteration", oql: "" }, "x"), /x axis: empty OQL/);
+  assert.throws(() => validateAxis({ source: "alteration", oql: "KRAS", gene: "KRAS" } as never, "x"), /the query alone/);
+  // DRIVER needs the pinned OncoKB store, as the cohort leaf does; with it, the join is there
+  const drv = { source: "alteration" as const, oql: "KRAS: DRIVER" };
+  assert.throws(() => axisSelect(drv, ctx, "cat"), /DRIVER requires the OncoKB annotation store/);
+  assert.match(axisSelect(drv, { ...ctx, oncokbPin: "v7.4" }, "cat"), /oncokb_version = 'v7\.4'/);
+});
+
+test("unaltered is absence: neutral, and never a ring", () => {
+  assert.equal(isAbsent("Unaltered"), true);
+  assert.equal(isAbsent("Altered"), false);
 });

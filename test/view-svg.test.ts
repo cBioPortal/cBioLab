@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { viewToSvg, viewTitle, esc } from "../lib/view-svg.ts";
 import { buildLollipopGene } from "../lib/lollipop.ts";
 import type { ViewResult } from "../lib/types.ts";
+import { HIGHLIGHT_BASE, HIGHLIGHT_COLORS } from "../lib/plot-highlight.ts";
 
 const survival = (cohort: string): ViewResult => ({
   kind: "survival", cohorts: [cohort],
@@ -328,6 +329,60 @@ describe("sequence Sankey keeps everyone accounted for", () => {
 // grows (and the app's container scrolls), and past the colour key the rest is one disclosed
 // "other". Each is pinned here by counting what the SVG actually draws, so a fixed cap on
 // groups, categories or caption lines fails a test rather than hiding cases.
+describe("plot highlights: other cohorts drawn over the plotted one", () => {
+  const scatter = (highlights: any[]): ViewResult => ({ kind: "plot", note: "n", plot: {
+    shape: "scatter", n: 100, x: { label: "AGE", kind: "num" }, y: { label: "TMB", kind: "num" },
+    extent: { x0: 0, x1: 100, y0: 0, y1: 50 }, grid: [10, 10], bins: [{ bx: 1, by: 1, n: 100 }],
+    stats: { pearson: 0.1, spearman: null, slope: 0.1, intercept: 1, pPearson: 0.5, pSpearman: null }, highlights } as any });
+  const hl = (o: any) => ({ name: "R", color: HIGHLIGHT_COLORS[0], patients: 2, inPlot: 2, n: 2, shown: "points", ...o });
+
+  test("the plotted cohort turns grey and each highlight's points draw in its colour, with a key", () => {
+    const svg = viewToSvg(scatter([hl({ points: [{ id: "a", x: 10, y: 5 }, { id: "b", x: 90, y: 45 }] })]))!;
+    assert.match(svg, new RegExp('<rect [^>]*fill="' + HIGHLIGHT_BASE + '"'), "the base density is grey");
+    assert.equal((svg.match(new RegExp('<circle [^>]*fill="' + HIGHLIGHT_COLORS[0] + '" fill-opacity', "g")) || []).length, 2);
+    assert.match(svg, />R \(2\)</, "the key names the highlight and how many it drew");
+    assert.doesNotMatch(svg, /stroke="#D55E00" stroke-width="1.5" stroke-dasharray/, "the fitted line leaves the first highlight colour to the highlight");
+  });
+
+  test("without highlights the figure is as it was", () => {
+    const svg = viewToSvg(scatter([]))!;
+    assert.doesNotMatch(svg, new RegExp(HIGHLIGHT_BASE));
+    assert.doesNotMatch(svg, />highlighted</);
+  });
+
+  test("a highlight too large for points is cells on the same grid, in its colour", () => {
+    const svg = viewToSvg(scatter([hl({ shown: "density", n: 9000, bins: [{ bx: 3, by: 4, n: 9000 }] })]))!;
+    assert.match(svg, new RegExp('<rect [^>]*fill="' + HIGHLIGHT_COLORS[0] + '"'));
+    assert.doesNotMatch(svg, new RegExp('<circle [^>]*fill="' + HIGHLIGHT_COLORS[0] + '" fill-opacity'));
+  });
+
+  test("a highlight drawn as nothing gets no key entry", () => {
+    const svg = viewToSvg(scatter([hl({ shown: "none", n: 0 })]))!;
+    assert.doesNotMatch(svg, />highlighted</);
+  });
+
+  test("a cohort's name is escaped wherever the figure prints it", () => {
+    const svg = viewToSvg(scatter([hl({ name: "<b>&evil", points: [{ id: "a", x: 1, y: 1 }] })]))!;
+    assert.doesNotMatch(svg, /<b>&evil/);
+    assert.match(svg, /&lt;b&gt;&amp;evil/);
+  });
+
+  test("on a box, a highlight's box sits in its group, and a value past the whiskers is pinned and counted", () => {
+    const v: ViewResult = { kind: "plot", plot: {
+      shape: "box", n: 10, x: { label: "CANCER_TYPE", kind: "cat" }, y: { label: "TMB", kind: "num" },
+      groups: [{ g: "A", n: 10, lo: 0, hi: 100, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 10 }], overlay: "none",
+      highlights: [
+        hl({ points: [{ id: "a", g: "A", v: 5 }, { id: "b", g: "A", v: 80 }] }),
+        hl({ name: "S", color: HIGHLIGHT_COLORS[1], shown: "boxes", n: 4, groups: [{ g: "A", n: 4, lo: 1, hi: 9, q1: 3, median: 5, q3: 7, loWhisker: 1, hiWhisker: 9 }] }),
+      ] } as any };
+    const svg = viewToSvg(v)!;
+    assert.match(svg, new RegExp('<rect [^>]*fill="' + HIGHLIGHT_COLORS[1] + '" fill-opacity="0.85"'), "S is a box of its own");
+    assert.equal((svg.match(new RegExp('<circle [^>]*fill="' + HIGHLIGHT_COLORS[0] + '" fill-opacity', "g")) || []).length, 1, "the value inside the whiskers is a dot");
+    assert.match(svg, new RegExp('<path d="M[^"]*Z" fill="' + HIGHLIGHT_COLORS[0] + '"'), "the value past them is a triangle at the edge");
+    assert.match(svg, /1 highlighted value lies beyond the whiskers/);
+  });
+});
+
 describe("plot figures draw every group and category they are given", () => {
   const box = (nGroups: number, extra: Partial<any> = {}): ViewResult => ({
     kind: "plot", plot: {

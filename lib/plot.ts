@@ -16,6 +16,8 @@ import { sq } from "./compiler.ts";
 import { DB } from "./ch.ts";
 import { STYLE } from "./oncoprint-style.ts";
 import { clinicalTable, ATTR_NAME_RE } from "./custom-data.ts";
+import { parseOql, oqlCasesSql } from "./oql.ts";
+import { OQL_ALTERED, OQL_UNALTERED } from "./plot-oql.ts";
 
 /** what goes on one axis */
 export type PlotAxis =
@@ -29,9 +31,21 @@ export type PlotAxis =
    */
   | { source: "alteration"; gene: string; by?: AlterationBy }
   | { source: "alteration"; genes: string[]; by?: "mutated" }
+  /**
+   * An OQL query as one category: "Altered" when the case matches any entry, the portal's own
+   * reading of a multi-gene query, "Unaltered" otherwise. Per patient (any of its samples) or per
+   * sample, following the plot's unit.
+   */
+  | { source: "alteration"; oql: string }
   | { source: "none" };
 export type AlterationBy = "mutated" | "mutationType" | "cna";
 const AXIS_SOURCES: readonly string[] = ["clinical", "molecular", "alteration", "none"] satisfies PlotAxis["source"][];
+/** an alteration axis given as an OQL query, rather than as genes */
+function isOqlAxis(a: PlotAxis): a is { source: "alteration"; oql: string } {
+  return a.source === "alteration" && "oql" in a && a.oql != null;
+}
+export { OQL_ALTERED, OQL_UNALTERED };
+
 /** every gene named on an alteration axis, singular or set, uppercased */
 function alterationGenes(a: { gene?: string; genes?: string[] }): string[] {
   return (a.genes && a.genes.length ? a.genes : a.gene != null ? [a.gene] : []).map((g) => String(g).toUpperCase());
@@ -51,6 +65,7 @@ export const DEFAULT_BINS: [number, number] = [240, 160];
  * density is both smaller to send and what the reader was looking for.
  */
 export const POINTS_CAP = 5000;
+export { HIGHLIGHT_CAP, HIGHLIGHT_COLORS, HIGHLIGHT_BASE } from "./plot-highlight.ts";
 /** bins per group in a violin */
 export const VIOLIN_BINS = 40;
 /** distinct colours a legend can carry before it stops being a legend */
@@ -74,7 +89,11 @@ export function categoryColor(label: string, i = 0): string {
   return pal[i % pal.length];
 }
 
-export interface AxisCtx { study: string; db?: string; unit: "patient" | "sample"; cohortSql: string }
+export interface AxisCtx {
+  study: string; db?: string; unit: "patient" | "sample"; cohortSql: string;
+  /** what an OQL axis's DRIVER and EXP/PROT terms need, as a cohort's OQL leaf does */
+  oncokbPin?: string | null; profiles?: string[];
+}
 
 const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
 const ATTR_RE = ATTR_NAME_RE;
@@ -82,7 +101,7 @@ const PROFILE_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 
 /** categories that mean "this case has none of that", which draw as neutral and never as a ring */
 export function isAbsent(label: string): boolean {
-  return /^(not mutated|neutral|no data|wild type|none|)$/i.test(String(label).trim());
+  return /^(not mutated|unaltered|neutral|no data|wild type|none|)$/i.test(String(label).trim());
 }
 
 /** the shape a pair of axes draws as — the portal's own rule, kept deliberately */
@@ -97,6 +116,10 @@ export function plotShape(x: AxisKind, y: AxisKind): PlotShape {
 export function axisLabel(a: PlotAxis): string {
   if (a.source === "clinical") return a.log ? "log10(" + a.attribute + " + 1)" : a.attribute;
   if (a.source === "molecular") return a.log ? "log10(" + a.gene + " " + a.profileType + " + 1)" : a.gene + " " + a.profileType;
+  if (isOqlAxis(a)) {
+    const q = a.oql.trim().replace(/\s*[;\n]\s*/g, "; ");
+    return (q.length > 48 ? q.slice(0, 47) + "…" : q) + " (OQL)";
+  }
   if (a.source === "alteration") {
     const genes = alterationGenes(a);
     const name = genes.length > 1 ? (genes.length <= 4 ? genes.join("/") + " (any)" : genes.length + " genes (any)") : genes[0];
@@ -132,9 +155,16 @@ export function validateAxis(a: PlotAxis, which: string): void {
     if (!GENE_RE.test(String(a.gene || "").toUpperCase()))
       throw new Error(which + " axis: a molecular axis needs one gene. Plotting a whole profile would read every gene of every case; name the gene you mean.");
   }
+  if (isOqlAxis(a)) {
+    if ("gene" in a || "genes" in a || "by" in a)
+      throw new Error(which + " axis: an OQL axis is the query alone; drop gene, genes and by");
+    try { parseOql(String(a.oql)); }
+    catch (e) { throw new Error(which + " axis: " + (e as Error).message); }
+    return;
+  }
   if (a.source === "alteration") {
     const genes = alterationGenes(a);
-    if (!genes.length) throw new Error(which + " axis: an alteration axis needs a gene, or a gene set");
+    if (!genes.length) throw new Error(which + " axis: an alteration axis needs a gene, a gene set, or an OQL query");
     for (const g of genes) if (!GENE_RE.test(g)) throw new Error(which + " axis: '" + g + "' is not a valid gene symbol");
     if (genes.length > ALTERATION_GENE_SET_CAP)
       throw new Error(which + " axis: a gene-set alteration axis takes at most " + ALTERATION_GENE_SET_CAP + " genes; this asks for " + genes.length);
@@ -208,6 +238,16 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     return a.log ? "SELECT id, v FROM (" + q + ") WHERE v IS NOT NULL" : q;
   }
 
+  if (isOqlAxis(a)) {
+    // every case in the cohort, so "unaltered" is counted rather than missing
+    const matched = oqlCasesSql(a.oql, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study, db, unit: ctx.unit });
+    const idCol = strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study);
+    return "SELECT " + idCol + " AS id, if(" + idCol + " IN (SELECT pid FROM (" + matched + ")), " +
+      sq(OQL_ALTERED) + ", " + sq(OQL_UNALTERED) + ") AS v\n" +
+      "FROM " + db + ".sample_derived sd\n" +
+      "WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + inCohort("sd.patient_unique_id") + "\n" +
+      "GROUP BY id";
+  }
   if (a.source === "alteration") {
     const genes = alterationGenes(a), by = a.by || "mutated";
     const idCol = strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study);
@@ -396,6 +436,35 @@ export function plotPointsSql(numSel: string, catSel: string, cohortSql: string,
 }
 
 /**
+ * The cases of a plotted cohort that are also in a highlight cohort: the plotted cohort's SQL
+ * narrowed by the highlight's. A cohort expression like any other (it projects `pid`), so the
+ * aggregate builders take it unchanged and a highlight is answered by the same queries as the
+ * figure under it.
+ */
+export function highlightCohortSql(cohortSql: string, highlightSql: string): string {
+  return "SELECT pid FROM (" + cohortSql + ") WHERE pid IN (SELECT pid FROM (" + highlightSql + "))";
+}
+
+/** how many patients of a highlight are in the plotted cohort — a count, so any participant may answer */
+export function plotHighlightCountSql(cohortSql: string, highlightSql: string): string {
+  return "SELECT count() AS n FROM (" + highlightCohortSql(cohortSql, highlightSql) + ")";
+}
+
+/**
+ * A scatter's points, WITH their case ids — the highlight layer drawn over the density.
+ * Like plotPointsSql it returns identifiers, so it stays out of lib/federation.ts's aggregate
+ * builders and is reachable only from `PatientLevelResolver`.
+ */
+export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: string, cap = POINTS_CAP): string {
+  return "WITH cohort AS (" + cohortSql + "),\n" +
+    "     xs AS (" + xSel + "),\n" +
+    "     ys AS (" + ySel + ")\n" +
+    "SELECT xs.id AS id, xs.v AS x, ys.v AS y\n" +
+    "FROM xs INNER JOIN ys ON ys.id = xs.id\n" +
+    "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
+}
+
+/**
  * Where a point sits across its box. Deterministic from the case id, as the portal's jitter is,
  * so the same figure comes out of the server SVG, the browser and the Python package rather than
  * moving every time it is drawn.
@@ -478,6 +547,28 @@ export interface PlotRequest {
   /** colour the values by a category: the fill, and optionally a ring, as the portal does */
   colorBy?: PlotAxis; ringBy?: PlotAxis;
 }
+/** one highlighted case: a scatter's (x, y), or a box's group and value */
+export type HighlightPoint = { id: string; x: number; y: number } | { id: string; g: string; v: number };
+/**
+ * A cohort drawn over the plotted one. Its cases are the plotted cohort's cases that are also in
+ * it; each is a point when an entitled participant can name them and there are few enough,
+ * otherwise the same cases as an aggregate (cells on the scatter's grid, or a box per group).
+ */
+export interface PlotHighlight {
+  name: string;
+  color: string;
+  /** patients in the highlight cohort, and how many of them are in the plotted cohort */
+  patients: number;
+  inPlot: number;
+  /** cases drawn (in the plot's unit): those with a value on both axes */
+  n: number;
+  shown: "points" | "density" | "boxes" | "none";
+  /** why it is not drawn as points, when it is not */
+  why?: string;
+  points?: HighlightPoint[];
+  bins?: { bx: number; by: number; n: number }[];
+  groups?: PlotGroup[];
+}
 export interface PlotGroup { g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number; loWhisker: number; hiWhisker: number }
 export interface PlotData {
   shape: "scatter" | "box" | "table";
@@ -506,4 +597,6 @@ export interface PlotData {
   note?: string;
   /** cases in the cohort, and how many carry each axis — what the inner join left out, and why */
   coverage?: { total: number; nx: number; ny: number };
+  /** cohorts drawn over this one, in the view's order */
+  highlights?: PlotHighlight[];
 }
