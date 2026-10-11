@@ -3,7 +3,7 @@ import type { ViewResult, LabsView, LabsPanel } from "../types.ts";
 import { isPatientLevel } from "../federation.ts";
 import { labCourseSql, labBestSql, labWaterfallSql, labTestsSql, LAB_PCT_BIN, LAB_PCT_MIN, LAB_PCT_MAX, LAB_PCT_BINS } from "../federation-views.ts";
 import { fisherExact, quantilesFromHistogram } from "../stats.ts";
-import { LAB_MIN_POINT_N } from "../view-svg-more.ts";
+import { LAB_MIN_POINT_N } from "../figures/labs.ts";
 import { labsMethod, type LabsTrace } from "../method.ts";
 import type { ViewRun } from "./run.ts";
 import { overLimit, answering, refuse } from "./shared.ts";

@@ -55,7 +55,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   **`lib/federation-views.ts`** (re-exported by `lib/federation.ts`, so the boundary suite sweeps
   it). Every local participant has those methods, a remote peer does not, and `answering()` in
   `lib/views/shared.ts` splits a view's studies accordingly so the view names what was left out.
-  Figures: **`lib/view-svg-more.ts`**; cards: `app/lab/more-views.tsx`.
+  Figures: **`lib/view-svg.ts`** draws the first kinds' figures itself and hands the rest to
+  **`lib/figures/<kind>.ts`**, one module per kind, registered with its title in `lib/figures/index.ts`
+  (browser-safe: `app/lab/portal-bodies.tsx` draws from them too); cards: `app/lab/more-views.tsx`.
 - **Table views** (`table`, `mutations`, and any later view that lists rows) — **every one must
   support the same five things: pagination, search over its text, a filter per column (text
   conditions or a value list for text, a range for numbers), sorting, and a CSV download of every
@@ -304,7 +306,7 @@ still holds, against a running server.
 - **Apparatus goes in `.vfoot`.** Legend, methodology caveats and provenance stay on the page and
   a step down in weight, so they read as apparatus rather than as findings.
 - **Server-rendered figures share the palette.** `lib/svg-kit.ts` owns `palette()`, `SERIES` and
-  the frame/caption helpers, for `lib/view-svg.ts` and `lib/view-svg-more.ts` alike; a renderer
+  the frame/caption helpers, for `lib/view-svg.ts` and `lib/figures/` alike; a renderer
   that invents a colour is drifting from every other view.
 - **Geometry stays inline, styling does not.** A tooltip's position and a legend swatch's colour
   are data computed from the drawing; borders, padding and type are classes.

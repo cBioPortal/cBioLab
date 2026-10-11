@@ -1,5 +1,5 @@
 // The frame every server-rendered figure shares: palette, number formats, the
-// outer <svg> and the wrapped caption. lib/view-svg.ts and lib/view-svg-more.ts
+// outer <svg> and the wrapped caption. lib/view-svg.ts and lib/figures/
 // both draw through these, so a new view kind cannot drift from the others'
 // colours or type.
 /** Cohort names and data values reach <text>; they must never reach it raw. */

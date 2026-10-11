@@ -1,8 +1,9 @@
-// Renderers for the view kinds in lib/view-svg-portal.ts: pure functions of a ViewResult, no database.
+// The figures in lib/figures/ for the kinds that reproduce cBioPortal's tabs (cancer types, overlap,
+// enrichment, …): pure functions of a ViewResult, no database.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg, viewTitle } from "../lib/view-svg.ts";
-import { cancertypesPanelSvg } from "../lib/view-svg-portal.ts";
+import { cancertypesPanelSvg } from "../lib/figures/cancertypes.ts";
 import type { ViewResult, CancertypesGroup } from "../lib/types.ts";
 
 const grp = (key: string, label: string, profiled: number, mutation: number, amp = 0, samples = profiled): CancertypesGroup =>
