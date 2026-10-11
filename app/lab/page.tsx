@@ -338,7 +338,6 @@ export default function AnalysisPage() {
         <h1>cbio-lab</h1>
         <span className="sub">analysis documents — cohorts and views over one declarative object</span>
         <span className="spacer" />
-        <a className="toplink" href="/datasets">data sets</a>
         <a className="toplink" href="/reproductions">paper reproductions</a>
         <a className="toplink" href="/verification">how we verify</a>
         <a className="toplink" href="/campaign">hypothesis campaigns</a>
