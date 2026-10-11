@@ -1,10 +1,10 @@
-// Renderers for the view kinds in lib/views-more.ts: pure functions of a ViewResult, so every
+// The figures in lib/figures/ (attrition, genome, pathways, …): pure functions of a ViewResult, so every
 // check here runs without a database.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg, viewTitle } from "../lib/view-svg.ts";
-import { wrap } from "../lib/view-svg-more.ts";
-import { niceCeil, defaultLog2 } from "../lib/views-more.ts";
+import { wrap } from "../lib/figures/common.ts";
+import { niceCeil, defaultLog2 } from "../lib/views/diffexpr.ts";
 import type { ViewResult, GenomeResult } from "../lib/types.ts";
 
 describe("wrap", () => {

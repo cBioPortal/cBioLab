@@ -4,7 +4,7 @@
 // attributes, events and molecular profiles a picker lists, which view kinds can be added
 // (VIEW_KINDS, each with why it cannot when it cannot, and whether that is still being
 // fetched), and which kinds draw their own header. Read-only: it edits nothing.
-import { MORE_KINDS, isMoreKind } from "./more-views";
+import { KIND_CARDS, hasKindCard } from "./kind-cards";
 import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
 import { foldEventNames } from "../../lib/event-names.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
@@ -121,7 +121,7 @@ export function useViewOptions(page: ViewOptionsPage) {
     { kind: "sequence", label: "Treatment sequence", loading: () => !viewEvents().length && (catLoading || exploreBusy),
       why: () => viewEvents().some(e => /treat|therap|regimen|drug|medicat/.test(e.canonical)) ? null
         : "this study records no treatment events, so there are no lines of therapy to sequence" },
-    ...Object.entries(MORE_KINDS).map(([kind, k]) => ({ kind, label: k.label,
+    ...Object.entries(KIND_CARDS).map(([kind, k]) => ({ kind, label: k.label,
       ...(k.why ? { why: () => k.why!({ genes: [], attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) }),
                     loading: () => !profileOptions().length && (trackAttrsLoading || exploreBusy) } : {}) }))
   ];
@@ -132,7 +132,7 @@ export function useViewOptions(page: ViewOptionsPage) {
    * would otherwise be a bare red box the reader can't remove without editing the JSON.
    */
   const drawsOwnHead = (v: any): boolean =>
-    isMoreKind(v.kind) || v.kind === "cox" || v.kind === "logistic" || v.kind === "plot" ||
+    hasKindCard(v.kind) || v.kind === "cox" || v.kind === "logistic" || v.kind === "plot" ||
     (v.kind === "compare" && !!v.rows) || (v.kind === "hotspots" && !!v.hotspots) ||
     (v.kind === "coexpression" && !!v.coexpression) || (v.kind === "clinical" && !!v.clinical) ||
     (v.kind === "cooccurrence" && !!v.pairs) || (v.kind === "survival" && !!v.curves) ||

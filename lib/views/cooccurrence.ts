@@ -5,7 +5,8 @@ import { fisherExact, benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio } 
 import type { ViewResult, CooccurrenceView, CooccurRow } from "../types.ts";
 import type { PairCounts } from "../federation.ts";
 import { cooccurrenceMethod } from "../method.ts";
-import { untimed, overLimit, COOCCUR_GENE_LIMIT, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { overLimit, COOCCUR_GENE_LIMIT } from "./shared.ts";
 
 export async function runCooccurrence(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor } = c;

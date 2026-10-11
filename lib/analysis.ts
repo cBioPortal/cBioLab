@@ -19,10 +19,10 @@ import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } fro
 import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey } from "./partition-arms.ts";
 import { upgradeDocument } from "./doc-version.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
-import { runMoreView, isMoreViewKind } from "./views-more.ts";
 import { ATTR_NAME_RE, assertCustomDataPresent } from "./custom-data.ts";
 import { viewRunner } from "./views/index.ts";
-import { Untimed, overLimit, type ViewRun } from "./views/run.ts";
+import { Untimed, type ViewRun } from "./views/run.ts";
+import { overLimit } from "./views/shared.ts";
 
 async function oncokbPin(): Promise<string | null> {
   try {
@@ -398,7 +398,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     const vStudies = [...new Set(vNames.flatMap((n) => cohorts[n].studies))];
     const mark = queryMark(), pushedBefore = views.length, viewT0 = Date.now();
 
-    const run: ViewRun = { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, overLimit, studyProfiles,
+    const run: ViewRun = { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, studyProfiles,
       page: opts.page, values: opts.values, oncoprint: opts.oncoprint };
     const runner = viewRunner(view.kind);
     if (runner) {
@@ -406,8 +406,6 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       // a refusal carries neither timing nor queries
       if (out instanceof Untimed) { views.push(out.result); continue; }
       views.push(out);
-    } else if (isMoreViewKind(view.kind)) {
-      views.push(await runMoreView(view, run));
     } else {
       // unreachable for well-typed documents, but documents arrive as untrusted
       // JSON from clients/chat/MCP, so an unknown kind must still be reported

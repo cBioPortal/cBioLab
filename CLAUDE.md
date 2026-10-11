@@ -30,9 +30,10 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   federation via study-qualified member ids), then hands each view to its kind's runner.
   **`lib/views/<kind>.ts`** holds one runner per view kind (compare, survival, cox, …), registered
   in `lib/views/index.ts`; each gets the run's context (`ViewRun` in `lib/views/run.ts`: the
-  document, evaluated cohorts, resolvers, the view's cohorts and studies) and returns its result.
-  The kinds in `lib/views-more.ts` (below) are still dispatched through `runMoreView`, with the
-  same context.
+  document, evaluated cohorts, resolvers, the view's cohorts and studies) and returns its result;
+  `lib/views/shared.ts` holds what several runners use (`overLimit`, `answering`, `refuse`). A new
+  view kind is a new runner there, registered in `index.ts`. Kinds registered through `drawn()`
+  have their figure drawn from the result and a throw reported as the view's error.
 - **`lib/oncoprint.ts`** — spec → rows (ClickHouse fetch); **`lib/oncoprint-assemble.ts`** — rows →
   render contract, pure (bitmask cells, NOT_PROFILED=-1, panel-aware denominators, staircase +
   declarative `sort`, clinical tracks incl. numeric heat, `heatmap` molecular tracks incl. synthetic
@@ -49,12 +50,14 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   sort key; `lib/oncoprint-detail.ts` answers one column at a time for tooltips. **`lib/view-svg.ts`** — the same contract for every other view kind (survival,
   hotspots, compare, cooccurrence, coexpression, clinical); used by MCP `run_analysis`
   for its figures (the oncoprint's image included).
-- **`lib/views-more.ts`** — the view kinds added after the first thirteen (`attrition`, `genome`,
-  …). `runAnalysis` evaluates cohorts and resolvers as for every view and hands them to
-  `runMoreView`; their SQL lives in **`lib/federation-more.ts`** (re-exported by
-  `lib/federation.ts`, so the boundary suite sweeps it) and runs through the resolvers'
-  `moreAggregate`/`moreMeta` — present on every local participant, absent on a remote peer, which
-  those views name as left out. Figures: **`lib/view-svg-more.ts`**; cards: `app/lab/more-views.tsx`.
+- **View aggregates** — most view kinds after the first few (`genome`, `pathways`, `enrichment`, …)
+  query through the resolvers' `viewAggregate`/`viewAggregateMany`/`viewMeta`, whose SQL lives in
+  **`lib/federation-views.ts`** (re-exported by `lib/federation.ts`, so the boundary suite sweeps
+  it). Every local participant has those methods, a remote peer does not, and `answering()` in
+  `lib/views/shared.ts` splits a view's studies accordingly so the view names what was left out.
+  Figures: **`lib/view-svg.ts`** draws the first kinds' figures itself and hands the rest to
+  **`lib/figures/<kind>.ts`**, one module per kind, registered with its title in `lib/figures/index.ts`
+  (browser-safe: `app/lab/portal-bodies.tsx` draws from them too); cards: `app/lab/kind-cards.tsx`.
 - **Table views** (`table`, `mutations`, and any later view that lists rows) — **every one must
   support the same five things: pagination, search over its text, a filter per column (text
   conditions or a value list for text, a range for numbers), sorting, and a CSV download of every
@@ -64,7 +67,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   search, filters, sort, page, counts, a column's values for its filter). The query
   (`columns`/`search`/`filters`/`sort`, type `TableQuery`) is part of the view's spec — the page is
   not. The rows name patients, so they run only through `PatientLevelResolver.rowsPage`/
-  `rowsCounts`/`rowsValues` (asserted in `test/boundary.test.ts`); `lib/views-portal.ts`'s
+  `rowsCounts`/`rowsValues` (asserted in `test/boundary.test.ts`); `lib/views/rows.ts`'s
   `runRows` groups parts per database and pages across them. UI: **`app/_table/DataTable.tsx`**;
   `POST /api/view-page` (a page, or a column's values) and `POST /api/table` (the CSV) serve every
   table view.
@@ -303,7 +306,7 @@ still holds, against a running server.
 - **Apparatus goes in `.vfoot`.** Legend, methodology caveats and provenance stay on the page and
   a step down in weight, so they read as apparatus rather than as findings.
 - **Server-rendered figures share the palette.** `lib/svg-kit.ts` owns `palette()`, `SERIES` and
-  the frame/caption helpers, for `lib/view-svg.ts` and `lib/view-svg-more.ts` alike; a renderer
+  the frame/caption helpers, for `lib/view-svg.ts` and `lib/figures/` alike; a renderer
   that invents a colour is drifting from every other view.
 - **Geometry stays inline, styling does not.** A tooltip's position and a legend swatch's colour
   are data computed from the drawing; borders, padding and type are classes.
@@ -331,7 +334,7 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   `.dt-wait` in `app/_table/DataTable.tsx`) and the count is dimmed with a spinner beside it; the
   bar, chips and headers stay visible and usable, and an action that would act on the stale
   answer (the download) waits, saying why. Such a view draws its own waiting state, so the page
-  must not cover its card (`drawsOwnWaiting` in `app/lab/more-views.tsx`, honoured by the lab and
+  must not cover its card (`drawsOwnWaiting` in `app/lab/kind-cards.tsx`, honoured by the lab and
   `PortalTabs`). Its controls show and edit the query **the document holds**, not the last result's,
   so a second edit made while the first is running keeps the first. A page not yet on hand is
   loading from the render that asks for it — never a flash of "no rows" first.

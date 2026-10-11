@@ -4,7 +4,7 @@
 // `updateViewLocal` when the browser can apply it alone (use-analysis.ts leaves those out of its
 // keys). Also what a view's header offers: which cohorts it may draw (cohortChoice). Every edit
 // goes through the document store (doc-store.ts), so a view keeps its id and its card.
-import { isMoreKind, defaultMoreView } from "./more-views";
+import { hasKindCard, defaultKindView } from "./kind-cards";
 import { pruneSort } from "../_oncoprint/OncoprintCard.tsx";
 import type { GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { AnalysisDoc, AnalysisResult, OncoprintView } from "../../lib/types.ts";
@@ -101,7 +101,7 @@ export function useViewEdits(page: ViewEditsPage) {
       : kind === "cooccurrence" ? { kind, genes: genes.slice(0, 6) }
       : kind === "oncoprint" ? { kind, genes: genes.slice(0, 5) }
       : kind === "cox" ? { kind, covariates: [{ source: "alteration", gene: genes[0] || "TP53", by: "mutated" }] }
-      : isMoreKind(kind) ? defaultMoreView(kind, { genes, attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) })
+      : hasKindCard(kind) ? defaultKindView(kind, { genes, attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) })
       : kind === "logistic" ? { kind,
           outcome: { source: "alteration", gene: genes[0] || "TP53", by: "mutated" }, outcomeEvent: "Mutated",
           covariates: [{ source: "clinical", attribute: viewAttrs()[0] || "SEX" }] }

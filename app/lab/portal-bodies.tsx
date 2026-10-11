@@ -1,14 +1,15 @@
 "use client";
 // Card bodies for the views that reproduce cBioPortal's own tabs, laid out as the portal lays them
 // out: its sub-tabs, its sortable tables beside the charts, a row that opens its own plot. The
-// charts are lib/view-svg-portal.ts's — the same functions that draw the server figure for chat
+// charts are lib/figures/'s — the same functions that draw the server figure for chat
 // and MCP — so the two cannot drift; only the arrangement and the interaction live here. Which
 // sub-tab or row is open is this browser's (invariant 9), never the document's.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ViewResult, TableQuery, CohortDef, View } from "../../lib/types";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 export { usePages, Pager } from "../_table/DataTable.tsx";
-import { cancertypesPanelSvg, enrichmentVolcanoSvg, enrichmentScatterSvg, enrichmentTopSvg } from "../../lib/view-svg-portal";
+import { cancertypesPanelSvg } from "../../lib/figures/cancertypes";
+import { enrichmentVolcanoSvg, enrichmentScatterSvg, enrichmentTopSvg } from "../../lib/figures/enrichment";
 import { frame, palette, SERIES } from "../../lib/svg-kit";
 import { api } from "./api.ts";
 import { ServerSvg as Svg } from "./view-chrome.tsx";

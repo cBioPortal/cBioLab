@@ -8,7 +8,8 @@ import { isPatientLevel } from "../federation.ts";
 import { axisLabel, validateAxis, type AxisKind } from "../plot.ts";
 import { logisticMethod, type CoxTrace } from "../method.ts";
 import { buildCoxColumns } from "./cox.ts";
-import { untimed, overLimit, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { overLimit } from "./shared.ts";
 
 export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;

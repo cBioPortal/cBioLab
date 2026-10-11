@@ -23,7 +23,7 @@ import { lollipopPanelsSvg, lollipopSummaryText } from "./lollipop-svg.ts";
 export { lollipopSummaryText };
 import { survivalAxis } from "./stats.ts";
 import type { ViewResult, KmCurve, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind, PlotData } from "./types.ts";
-import { moreViewToSvg, moreViewTitle } from "./view-svg-more.ts";
+import { kindFigure, kindTitle } from "./figures/index.ts";
 import { esc, SERIES, palette, num, fmt, pFmt, frame, caption, type SvgOpts } from "./svg-kit.ts";
 export { esc, SERIES, type SvgOpts };
 
@@ -670,7 +670,7 @@ export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {
   if (v.kind === "compare" && v.rows && v.rows.length) return compareSvg(v, o);
   if (v.kind === "coexpression" && v.coexpression && v.coexpression.length) return coexpressionSvg(v, o);
   if (v.kind === "clinical" && v.clinical && v.clinical.some((r) => !r.skipped)) return clinicalSvg(v, o);
-  return moreViewToSvg(v, o);
+  return kindFigure(v, o);
 }
 
 /** A one-line title for a figure, for alt text and chat captions. */
@@ -688,6 +688,6 @@ export function viewTitle(v: ViewResult): string {
     : v.kind === "course" ? "Clinical course" +
         (v.course && v.course.length ? " — " + [...new Set(v.course.map((z) => z.eventType))].join(", ") : "")
     : v.kind === "compare" ? "Alteration frequencies"
-    : v.kind === "oncoprint" ? "Oncoprint" : moreViewTitle(v) || v.kind;
+    : v.kind === "oncoprint" ? "Oncoprint" : kindTitle(v) || v.kind;
   return c ? base + " — " + c : base;
 }

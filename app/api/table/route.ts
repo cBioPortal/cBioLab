@@ -1,6 +1,6 @@
 import { parseBody, TableRequest } from "../../../lib/api-schemas.ts";
 import { runAnalysis } from "../../../lib/analysis.ts";
-import { TABLE_CHUNK } from "../../../lib/views-portal.ts";
+import { TABLE_CHUNK } from "../../../lib/views/rows.ts";
 import { csvField, describeQuery } from "../../../lib/table-query.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import type { AnalysisDoc, TableResult, MutationsResult } from "../../../lib/types.ts";

@@ -5,7 +5,8 @@ import { benjaminiHochberg, pearsonFromMoments, pearsonR, fisherZMeta } from "..
 import type { ViewResult, CoexpressionView, CoexprRow } from "../types.ts";
 import type { PairMoments } from "../federation.ts";
 import { coexpressionMethod } from "../method.ts";
-import { untimed, overLimit, COOCCUR_GENE_LIMIT, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { overLimit, COOCCUR_GENE_LIMIT } from "./shared.ts";
 
 export async function runCoexpression(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor } = c;

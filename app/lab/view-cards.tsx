@@ -4,7 +4,7 @@
 // and the edits a card can make — so a card holds no state of its own beyond what its body needs.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
-import { MORE_KINDS, isMoreKind, moreSub, MoreControls, MoreBody, drawsOwnWaiting } from "./more-views";
+import { KIND_CARDS, hasKindCard, kindSub, KindCardControls, KindCardBody, drawsOwnWaiting } from "./kind-cards";
 import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
 import { OncoprintCard, Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
@@ -199,7 +199,7 @@ export function ViewCard({ ctx, v, vi }: CardProps) {
 
 function KindBody(p: CardProps) {
   const k = p.v.kind;
-  if (isMoreKind(k)) return <MoreCard {...p} />;
+  if (hasKindCard(k)) return <KindCard {...p} />;
   switch (k) {
     case "compare": return <CompareCard {...p} />;
     case "hotspots": return <HotspotsCard {...p} />;
@@ -602,23 +602,23 @@ function CoxCard({ ctx, v, vi }: CardProps) {
   </>;
 }
 
-function MoreCard({ ctx, v, vi }: CardProps) {
+function KindCard({ ctx, v, vi }: CardProps) {
   const { assayOptions, busy, catalogAttrs, cohortChoice, doc, docView, menuOpenRef, openGenes, patchView, pendingKeys, profileOptions, viewEvents, viewIds } = ctx;
   return <>
-    {isMoreKind(v.kind) && <>
-      <ViewHead menuStore={menuOpenRef.current} v={v} title={MORE_KINDS[v.kind].title}
-        sub={moreSub(v.kind, docView(vi), v)}
-        cohorts={cohortChoice(vi, docView(vi), MORE_KINDS[v.kind].maxCohorts)}
+    {hasKindCard(v.kind) && <>
+      <ViewHead menuStore={menuOpenRef.current} v={v} title={KIND_CARDS[v.kind].title}
+        sub={kindSub(v.kind, docView(vi), v)}
+        cohorts={cohortChoice(vi, docView(vi), KIND_CARDS[v.kind].maxCohorts)}
         {...placement(ctx, vi)}
-        actions={MORE_KINDS[v.kind].genes
+        actions={KIND_CARDS[v.kind].genes
           ? <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
           : undefined} />
       {(() => {
         const mc = { vi, spec: docView(vi), v, busy, updating: busy || pendingKeys.has(viewIds[vi]), patch: (p: Record<string, unknown>) => patchView(vi, p),
           attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), docJson: () => JSON.stringify(doc) };
-        const body = MoreBody({ c: mc });
+        const body = KindCardBody({ c: mc });
         return <>
-          <MoreControls c={mc} />
+          <KindCardControls c={mc} />
           {v.note && <p className="note">{v.note}</p>}
           {body || <ViewFigure svg={v.svg} error={v.error} />}
           {body && v.caveat && <p className="note vfoot">{v.caveat}</p>}

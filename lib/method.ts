@@ -1410,7 +1410,7 @@ export function attritionMethod(panels: { cohort: string; base: number; steps: {
       scope: p.cohort,
       params: [["every patient", p.base.toLocaleString()], ...p.steps.map((s) => [s.label, s.n.toLocaleString() + " (−" + s.excluded.toLocaleString() + ")"] as [string, string])],
     })),
-    implementation: { functions: [], file: "lib/views-more.ts", commit: BUILD_COMMIT },
+    implementation: { functions: [], file: "lib/views/attrition.ts", commit: BUILD_COMMIT },
   };
 }
 
@@ -1631,7 +1631,7 @@ export function courseMethod(t: CourseTrace): MethodRecord {
   ].join("\n") + "\n";
   return {
     steps,
-    implementation: { functions: [], file: "lib/analysis.ts", commit: BUILD_COMMIT },
+    implementation: { functions: [], file: "lib/views/course.ts", commit: BUILD_COMMIT },
     python: withResult(python),
     // percentages are reported to 1 decimal
     check: checks("course:", t.results, (r) => r.cohort + ":" + r.event + ":" + r.bin,
@@ -1725,7 +1725,7 @@ export function sequenceMethod(t: SequenceTrace): MethodRecord {
   ].join("\n") + "\n";
   return {
     steps,
-    implementation: { functions: [], file: "lib/treatment-lines.ts, lib/analysis.ts", commit: BUILD_COMMIT },
+    implementation: { functions: [], file: "lib/treatment-lines.ts, lib/views/sequence.ts", commit: BUILD_COMMIT },
     python: withResult(python),
     check: Object.assign({}, ...t.results.map((p) => ({
       ["sequence:" + p.cohort + ":started"]: { v: p.started, abs: 0 },
@@ -1763,7 +1763,7 @@ export function cancertypesMethod(t: CancertypesTrace): MethodRecord {
       : "Every group has at least " + t.minSamples + " profiled " + t.unit + "s; none pooled.",
     params: [["profiled", p.profiled.toLocaleString("en-US")], ["altered", p.altered.toLocaleString("en-US")]],
   });
-  return { steps, implementation: { functions: [], file: "lib/views-portal.ts", commit: BUILD_COMMIT } };
+  return { steps, implementation: { functions: [], file: "lib/views/cancertypes.ts", commit: BUILD_COMMIT } };
 }
 
 // ---- overlap: how cohorts intersect -------------------------------------------------------------
@@ -1777,7 +1777,7 @@ export function overlapMethod(t: { cohorts: string[]; perSite: { study: string; 
   steps.push({ kind: "transform", title: "Add the counts across studies and name each combination",
     detail: "Each study's bits are mapped back to the view's cohort order; combinations add exactly, and a patient can only overlap within one study.",
     params: [["patients in any cohort", t.union.toLocaleString("en-US")], ["combinations with patients", String(t.intersections)]] });
-  return { steps, implementation: { functions: [], file: "lib/views-portal.ts", commit: BUILD_COMMIT } };
+  return { steps, implementation: { functions: [], file: "lib/views/overlap.ts", commit: BUILD_COMMIT } };
 }
 
 // ---- enrichment: every gene's alteration frequency between cohorts ------------------------------

@@ -1,7 +1,8 @@
 "use client";
-// Cards for the view kinds in lib/views-more.ts. The page draws every one of them the same way —
-// ViewHead, then this kind's controls, then the server-rendered figure — so all that differs
-// per kind lives here: its title, whether it takes a gene list, and its own settings.
+// Cards for the view kinds described by KIND_CARDS, rather than hand-built in view-cards.tsx. The
+// page draws every one of them the same way — ViewHead, then this kind's controls, then the
+// server-rendered figure or the kind's own body — so all that differs per kind lives here: its
+// title, whether it takes a gene list, how many cohorts it draws, and its own settings.
 import React, { useEffect, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 import { CancertypesBody, EnrichmentBody, CorrelatesBody, AssaysBody, MutationsBody } from "./portal-bodies";
@@ -22,7 +23,7 @@ function DraftInput({ value, onCommit, disabled, width, placeholder, title }: {
     onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); }} />;
 }
 
-export interface MoreKindUi {
+export interface KindCardSpec {
   label: string;
   /** the card's title */
   title: string;
@@ -42,7 +43,7 @@ export interface Known {
   events: { canonical: string; label: string; n: number }[]; cohorts: string[];
 }
 
-export const MORE_KINDS: Record<string, MoreKindUi> = {
+export const KIND_CARDS: Record<string, KindCardSpec> = {
   attrition: { label: "Cohort attrition (CONSORT)", title: "Cohort attrition", maxCohorts: 6 },
   genome: { label: "Genome-wide copy number", title: "Genome-wide copy number", maxCohorts: 4 },
   pathways: { label: "Oncogenic pathways", title: "Oncogenic signalling pathways", maxCohorts: 4 },
@@ -72,7 +73,7 @@ export const MORE_KINDS: Record<string, MoreKindUi> = {
 
 const PAIRED_DEFAULT_GENES = ["TP53", "KRAS", "PIK3CA", "ESR1", "AR", "CDKN2A", "MYC", "TERT"];
 
-export const isMoreKind = (k: unknown): boolean => Object.prototype.hasOwnProperty.call(MORE_KINDS, String(k));
+export const hasKindCard = (k: unknown): boolean => Object.prototype.hasOwnProperty.call(KIND_CARDS, String(k));
 
 /**
  * Views that show their own waiting state (the table views: their search, filters and headers stay
@@ -81,7 +82,7 @@ export const isMoreKind = (k: unknown): boolean => Object.prototype.hasOwnProper
 export const drawsOwnWaiting = (k: unknown): boolean => k === "table" || k === "mutations";
 
 /** What a card needs from the page: the view as written, its result, and a way to edit it. */
-export interface MoreCtx {
+export interface KindCardCtx {
   vi: number;
   /** the view as the DOCUMENT holds it (never the result, which has different fields) */
   spec: any;
@@ -106,7 +107,7 @@ export interface MoreCtx {
 const RISK_MENUS = new Map<string, boolean>();
 
 /** A one-line subtitle for the card header. */
-export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
+export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "attrition") return "patients left after each clause, in order";
   if (kind === "enrichment") return ({ mutation: "mutations", cna: "copy-number alterations", amp: "amplifications", homdel: "deep deletions", sv: "structural variants" } as Record<string, string>)[spec.alteration || "mutation"] +
     (spec.measure === "driver" ? " (drivers)" : "") + " in every gene, per sample";
@@ -147,7 +148,7 @@ export function moreSub(kind: string, spec: any, v: any): React.ReactNode {
 }
 
 /** This kind's settings row, or nothing when it has none. */
-export function MoreControls({ c }: { c: MoreCtx }) {
+export function KindCardControls({ c }: { c: KindCardCtx }) {
   const { spec, busy, patch } = c;
   if (spec.kind === "genome") return (
     <div className="viewtb">
@@ -540,7 +541,7 @@ export function MoreControls({ c }: { c: MoreCtx }) {
 }
 
 /** The view a fresh "add view" click starts from, built from what the study is known to have. */
-export function defaultMoreView(kind: string, known: Known): Record<string, unknown> {
+export function defaultKindView(kind: string, known: Known): Record<string, unknown> {
   if (kind === "cancertypes") return { kind, genes: known.genes.length ? known.genes.slice(0, 5) : ["TP53", "KRAS"] };
   if (kind === "labs") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));
@@ -572,7 +573,7 @@ export function defaultMoreView(kind: string, known: Known): Record<string, unkn
 }
 
 /** A body of the kind's own in place of the server figure, or null to draw the figure. */
-export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
+export function KindCardBody({ c }: { c: KindCardCtx }): React.ReactNode | null {
   if (c.spec.kind === "cancertypes" && c.v.cancertypes) return <CancertypesBody v={c.v} />;
   if (c.spec.kind === "enrichment" && c.v.enrichment) return <EnrichmentBody v={c.v} />;
   if (c.spec.kind === "correlates" && c.v.correlates) return <CorrelatesBody v={c.v} docJson={c.docJson} />;
@@ -584,7 +585,7 @@ export function MoreBody({ c }: { c: MoreCtx }): React.ReactNode | null {
 }
 
 /** The clinical data table's body, on the shared table (app/_table/DataTable.tsx). */
-function ClinicalTableBody({ c }: { c: MoreCtx }) {
+function ClinicalTableBody({ c }: { c: KindCardCtx }) {
   const t = c.v.table as import("../../lib/types").TableResult;
   return <DataTable t={t} query={specQuery(c.spec)} updating={c.updating ?? c.busy} vi={c.vi} docJson={c.docJson} unit={t.unit + "s"}
     onQuery={(q) => c.patch({ ...q, attributes: undefined })}

@@ -5,7 +5,8 @@ import type { ViewResult, ClinicalView, ClinicalRow } from "../types.ts";
 import type { AttrStats } from "../federation.ts";
 import { clinicalMethod } from "../method.ts";
 import { ATTR_NAME_RE } from "../custom-data.ts";
-import { untimed, overLimit, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { overLimit } from "./shared.ts";
 
 export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;

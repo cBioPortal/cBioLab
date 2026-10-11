@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc, AnalysisResult, View } from "../../lib/types";
 import { SERIES } from "../../lib/svg-kit";
 import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
-import { MoreBody, MoreControls, isMoreKind, drawsOwnWaiting } from "../lab/more-views";
+import { KindCardBody, KindCardControls, hasKindCard, drawsOwnWaiting } from "../lab/kind-cards";
 import { dataPart } from "../_oncoprint/view-display.ts";
 import { OncoprintCard, type TrackCatalog } from "../_oncoprint/OncoprintCard.tsx";
 import type { PageTab } from "./page-doc";
@@ -120,11 +120,11 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
           // the lab's own oncoprint card; the page's cohorts are its own, so a drag counts but makes no cohort
           ? <OncoprintCard view={spec} spec={v.spec} uploads={doc.uploads} busy={busy} cohortNames={Object.keys(doc.cohorts || {})} catalog={catalog}
               onView={(n) => edit(vi, n as unknown as View)} note={v.note} studies={v.studies} />
-          : v && !v.error ? MoreBody({ c: { ...mc, v } }) : null;
+          : v && !v.error ? KindCardBody({ c: { ...mc, v } }) : null;
         return (
           <section key={key + vi} className="card viewcard portal-view">
             {idx.length > 1 && <h3 className="vtitle">{titles[vi]}</h3>}
-            {isMoreKind(spec.kind) && <MoreControls c={mc} />}
+            {hasKindCard(spec.kind) && <KindCardControls c={mc} />}
             {busy && !v && <div className="skeleton skeleton-view" />}
             {busy && v && !(drawsOwnWaiting(v.kind) && !v.error) && <div className="view-updating"><span className="spinner" /> updating…</div>}
             {!busy && st?.error && <p className="note">{st.error}</p>}
