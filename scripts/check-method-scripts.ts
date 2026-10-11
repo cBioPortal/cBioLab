@@ -15,8 +15,9 @@ import { join } from "path";
 import { spawn, execSync } from "child_process";
 import { EXAMPLES } from "../lib/dsl-reference.ts";
 import { runAnalysis } from "../lib/analysis.ts";
-import { chQuery, PRIMARY } from "../lib/ch.ts";
-import { studyRouting } from "../lib/federation.ts";
+import { methodFiles } from "../lib/method-data.ts";
+import { PYTHON_PINS } from "../lib/method-notebook.ts";
+import type { ViewResult } from "../lib/types.ts";
 import { RESULT_MARKER, type MethodRecord } from "../lib/method.ts";
 import { withRequestCustomData } from "../lib/custom-data-server.ts";
 
@@ -28,7 +29,7 @@ const EXEMPT: Record<string, string> = {
 };
 
 /** The Python environment the scripts are checked in — the versions the golden fixtures pin. */
-const PYTHON_PINS = ["lifelines==0.30.3", "statsmodels==0.15.0", "scipy==1.18.1", "numpy==2.5.3", "pandas==2.3.3"];
+const PINS = Object.entries(PYTHON_PINS).map(([pkg, version]) => pkg + "==" + version);
 const PARALLEL = 4;
 
 let failed = 0;
@@ -42,111 +43,20 @@ catch { console.log("FAIL uv is not on the PATH — the method scripts cannot be
 
 type View = { kind: string; error?: string; method?: MethodRecord; queries?: { study: string; label: string; sql: string }[]; cohorts?: string[] };
 
-const csvField = (v: unknown) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? "\"" + s.replace(/"/g, "\"\"") + "\"" : s; };
-const toCsv = (rows: Record<string, unknown>[], cols: string[]) => [cols.join(","), ...rows.map((r) => cols.map((c) => csvField(r[c])).join(","))].join("\n") + "\n";
-
-async function runSql(study: string, sql: string): Promise<Record<string, unknown>[]> {
-  const conn = (await studyRouting()).get(study) || PRIMARY;
-  return (await chQuery(sql, conn)).data as Record<string, unknown>[];
-}
-
 /** The files a script reads that are not embedded in it, built from the view's own queries. */
 async function materialize(v: View, dir: string): Promise<string | null> {
-  const wanted = [...v.method!.python!.matchAll(/pd\.read_csv\("([^"]+)"/g)].map((m) => m[1]);
-  if (!wanted.length) return null;
-  const qs = v.queries || [];
-  if (v.kind === "cox") {
-    // one file per fitted cohort ("cox_rows.csv", or "cox_rows_<cohort>.csv" per cohort); the fetch
-    // steps list the queries' cohorts in the order they ran
-    const fetches = v.method!.steps.filter((s) => s.kind === "fetch");
-    const rowsQs = qs.filter((q) => q.label.startsWith("coxRows:"));
-    if (fetches.length !== rowsQs.length) return "the cox fetch steps and queries do not line up";
-    const byFile = new Map<string, Record<string, unknown>[]>();
-    for (let i = 0; i < rowsQs.length; i++) {
-      const scope = fetches[i].scope || "";
-      const cohort = scope.includes(" · ") ? scope.split(" · ")[0] : "";
-      const file = "cox_rows" + (cohort ? "_" + cohort.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "") : "") + ".csv";
-      const rows = (await runSql(rowsQs[i].study, rowsQs[i].sql)).map((r) => ({ study: rowsQs[i].study, ...r }));
-      byFile.set(file, [...(byFile.get(file) || []), ...rows]);
-    }
-    for (const [f, rows] of byFile) writeFileSync(join(dir, f), toCsv(rows, Object.keys(rows[0] || { study: 1 })));
-  } else if (v.kind === "logistic") {
-    const rows: Record<string, unknown>[] = [];
-    for (const q of qs.filter((q) => q.label === "logisticRows")) rows.push(...(await runSql(q.study, q.sql)).map((r) => ({ study: q.study, ...r })));
-    writeFileSync(join(dir, "logistic_rows.csv"), toCsv(rows, Object.keys(rows[0] || { study: 1 })));
-  } else if (v.kind === "diffexpr") {
-    const sums = new Map<string, { cohort: string; gene: string; n: number; sx: number; sxx: number }>();
-    for (const q of qs.filter((q) => q.label.startsWith("diffexpr:moments:"))) {
-      const cohort = q.label.slice("diffexpr:moments:".length);
-      for (const r of await runSql(q.study, q.sql)) {
-        const k = cohort + "\t" + r.gene, cur = sums.get(k) || { cohort, gene: String(r.gene), n: 0, sx: 0, sxx: 0 };
-        cur.n += Number(r.n); cur.sx += Number(r.sx); cur.sxx += Number(r.sxx); sums.set(k, cur);
-      }
-    }
-    writeFileSync(join(dir, "diffexpr_moments.csv"), toCsv([...sums.values()], ["cohort", "gene", "n", "sx", "sxx"]));
-  } else if (v.kind === "enrichment") {
-    // altered and panel-profiled samples per (cohort, gene), plus each cohort's whole-exome samples,
-    // assembled exactly as the view assembles them
-    const altered = new Map<string, number>(), panel = new Map<string, number>(), wes = new Map<string, number>();
-    const add = (m: Map<string, number>, k: string, n: number) => m.set(k, (m.get(k) || 0) + n);
-    for (const q of qs) {
-      const [, part, cohort] = /^enrichment:(altered|panels|wes):(.*)$/.exec(q.label) || [];
-      if (!part) continue;
-      for (const r of await runSql(q.study, q.sql)) {
-        if (part === "altered") add(altered, cohort + "\t" + r.gene, Number(r.altered));
-        else if (part === "panels") add(panel, cohort + "\t" + r.gene, Number(r.profiled));
-        else add(wes, cohort, Number(r.n));
-      }
-    }
-    const rows: Record<string, unknown>[] = [];
-    for (const k of new Set([...altered.keys()])) {
-      const [cohort, gene] = k.split("\t");
-      const alt = altered.get(k) || 0;
-      rows.push({ cohort, gene, altered: alt, profiled: Math.max(alt, (panel.get(k) || 0) + (wes.get(cohort) || 0)) });
-    }
-    // a cohort with no altered sample in a gene is still profiled for it
-    const cohortsSeen = [...new Set([...wes.keys(), ...rows.map((r) => String(r.cohort))])];
-    const genesSeen = new Set(rows.map((r) => String(r.gene)));
-    for (const gene of genesSeen) for (const cohort of cohortsSeen) {
-      const k = cohort + "\t" + gene;
-      if (!altered.has(k)) rows.push({ cohort, gene, altered: 0, profiled: (panel.get(k) || 0) + (wes.get(cohort) || 0) });
-    }
-    writeFileSync(join(dir, "enrichment_counts.csv"), toCsv(rows, ["cohort", "gene", "altered", "profiled"]));
-  } else if (v.kind === "assays") {
-    // per (cohort, entity) moments, or per (cohort, entity, called value) counts, summed across studies
-    const numeric = new Map<string, { cohort: string; entity: string; n: number; sx: number; sxx: number }>();
-    const counts = new Map<string, { cohort: string; entity: string; value: string; n: number }>();
-    for (const q of qs) {
-      const [, part, cohort] = /^assays:(moments|values):(.*)$/.exec(q.label) || [];
-      if (!part) continue;
-      for (const r of await runSql(q.study, q.sql)) {
-        if (part === "moments") {
-          const k = cohort + "\t" + r.entity, cur = numeric.get(k) || { cohort, entity: String(r.entity), n: 0, sx: 0, sxx: 0 };
-          cur.n += Number(r.n); cur.sx += Number(r.sx); cur.sxx += Number(r.sxx); numeric.set(k, cur);
-        } else {
-          const value = String(r.value ?? "").trim();
-          if (["", "NA", "N/A", "NaN", "nan", "null", "NULL"].includes(value)) continue;
-          const k = cohort + "\t" + r.entity + "\t" + value, cur = counts.get(k) || { cohort, entity: String(r.entity), value, n: 0 };
-          cur.n += Number(r.n); counts.set(k, cur);
-        }
-      }
-    }
-    if (wanted.includes("assays_moments.csv")) writeFileSync(join(dir, "assays_moments.csv"), toCsv([...numeric.values()], ["cohort", "entity", "n", "sx", "sxx"]));
-    if (wanted.includes("assays_counts.csv")) writeFileSync(join(dir, "assays_counts.csv"), toCsv([...counts.values()], ["cohort", "entity", "value", "n"]));
-  } else if (v.kind === "correlates") {
-    const rows: Record<string, unknown>[] = [];
-    for (const q of qs.filter((q) => q.label === "correlates:moments")) rows.push(...(await runSql(q.study, q.sql)).map((r) => ({ study: q.study, ...r })));
-    writeFileSync(join(dir, "correlates_sums.csv"), toCsv(rows, ["study", "gene", "n", "sx", "sy", "sxy", "sxx", "syy", "rsx", "rsy", "rsxy", "rsxx", "rsyy"]));
-  } else {
-    return "reads " + wanted.join(", ") + ", which this check cannot build for a " + v.kind + " view";
-  }
-  return null;
+  let built;
+  try { built = await methodFiles(v as unknown as ViewResult); }
+  catch (e) { return (e as Error).message; }
+  const { files, missing } = built;
+  for (const [name, csv] of Object.entries(files)) writeFileSync(join(dir, name), csv);
+  return missing.length ? "reads " + missing.join(", ") + ", which this check cannot build for a " + v.kind + " view" : null;
 }
 
 function runPython(dir: string): Promise<{ code: number | null; out: string; err: string; ms: number }> {
   return new Promise((resolve) => {
     const t0 = Date.now();
-    const args = ["run", "--no-project", "--quiet", ...PYTHON_PINS.flatMap((p) => ["--with", p]), "python", "script.py"];
+    const args = ["run", "--no-project", "--quiet", ...PINS.flatMap((p) => ["--with", p]), "python", "script.py"];
     const p = spawn("uv", args, { cwd: dir });
     let out = "", err = "";
     p.stdout.on("data", (d) => { out += d; });

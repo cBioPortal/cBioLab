@@ -6,7 +6,7 @@
 // They return the Response, as fetch does: a caller still decides how to read it (JSON, the
 // binary contract, a file) and what an error status means for it.
 import type {
-  AnalysisBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, ViewPageBody, TableBody,
+  AnalysisBody, NotebookBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, ViewPageBody, TableBody,
 } from "../../lib/api-schemas.ts";
 import { withCustomData, type UploadBinding } from "./custom-data-client.ts";
 import type { ArtifactKind } from "../../lib/artifacts.ts";
@@ -21,6 +21,10 @@ export const api = {
   /** The document's cohorts and views. `query`: "?oncoprint=spec" (the page draws its own oncoprints), "?figures=svg". */
   analysis: async (doc: AnalysisBody, opts: Opts & { query?: string } = {}) =>
     post("/api/analysis" + (opts.query || ""), await withCustomData(doc), opts.signal),
+
+  /** One view's method record as a Jupyter notebook (the .ipynb); the body is the document plus `notebookView`. */
+  methodNotebook: async (body: NotebookBody, opts: Opts = {}) =>
+    post("/api/analysis/notebook", await withCustomData(body), opts.signal),
 
   /** Facets of the selected studies under a draft cohort; every upload with rows in them comes along. */
   explore: async (body: ExploreBody, opts: Opts = {}) =>

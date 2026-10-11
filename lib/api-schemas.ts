@@ -39,6 +39,15 @@ export const DocEnvelope = z.object({
 /** POST /api/analysis — the document itself is the body. */
 export const AnalysisRequest = DocEnvelope.extend(customData);
 
+/**
+ * POST /api/analysis/notebook — the document itself is the body, with `notebookView` naming the
+ * view whose method record becomes the notebook. The server re-derives the view's queries from
+ * the document; no SQL is accepted.
+ */
+export const NotebookRequest = DocEnvelope.extend(customData).extend({
+  notebookView: z.object({ index: z.number().int().min(0), kind: z.string() }),
+});
+
 /** POST /api/explore — facets for one or more studies, under a draft cohort. */
 export const ExploreRequest = z.object({
   study: z.string().optional(),
@@ -104,6 +113,7 @@ export const TableRequest = z.object({
 /** A spec or a document goes out with the fields the envelope does not name. */
 type Open<T> = T & Record<string, unknown>;
 export type AnalysisBody = z.input<typeof AnalysisRequest>;
+export type NotebookBody = z.input<typeof NotebookRequest>;
 export type ExploreBody = z.input<typeof ExploreRequest>;
 export type OncoprintBody = Open<z.input<typeof OncoprintRequest>>;
 export type OncoprintDetailBody = z.input<typeof OncoprintDetailRequest>;
