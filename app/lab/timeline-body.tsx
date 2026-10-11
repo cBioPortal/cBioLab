@@ -68,13 +68,15 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch }: {
               <svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>
               <span className="mono">{m.id}</span>
             </span>))}
-          <span className="tl-settings">
-            <label className="chk" title="draw every year, rather than cutting runs of four or more years without an event to one dashed mark">
-              <input type="checkbox" checked={!!spec.expandGaps} onChange={(e) => patch({ expandGaps: e.target.checked || undefined })} /> every year
-            </label>
-            <button type="button" className="tbbtn" disabled={!collapsed.length} title="unfold every nested track"
-              onClick={() => patch({ collapsed: undefined })}>expand all tracks</button>
-          </span>
+          <div className="viewtb tl-settings">
+            <div className="tbz">
+              <label className="chk" title="draw every year, rather than cutting runs of four or more years without an event to one dashed mark">
+                <input type="checkbox" checked={!!spec.expandGaps} onChange={(e) => patch({ expandGaps: e.target.checked || undefined })} /> every year
+              </label>
+              <button type="button" className="tbbtn" disabled={!collapsed.length} title="unfold every nested track"
+                onClick={() => patch({ collapsed: undefined })}>expand all tracks</button>
+            </div>
+          </div>
         </div>
       ) : <p className="meta">No patient to draw: the cohort's patient list is empty.</p>}
       <div ref={box} className={"tl-fig" + (updating ? " stale" : "")} onClick={onClick} onMouseMove={onMove} onMouseLeave={() => setTip(null)}>
@@ -129,17 +131,20 @@ function TimelineNav({ t, updating, go, first, openList }: {
   const pos = t.position, p = t.patient;
   const who = (x: { id: string } | null | undefined) => x ? " (" + x.id + ")" : "";
   return (
-    <div className="tl-nav">
-      <button type="button" className="tbbtn" disabled={updating || !pos?.prev} title={"the patient before this one in the list" + who(pos?.prev) + " — or press ←"}
-        onClick={() => go(pos?.prev)}>‹ prev</button>
-      <span className="tl-pos">
-        {p && pos ? <>patient <b>{(pos.index + 1).toLocaleString()}</b> of {t.total.toLocaleString()}</>
-          : p ? <>{p.patient} is not in the list as filtered · <button type="button" className="linklike" disabled={updating || !t.total} onClick={first}>go to its first patient</button></>
-          : <>no patients</>}
-      </span>
-      <button type="button" className="tbbtn" disabled={updating || !pos?.next} title={"the patient after this one in the list" + who(pos?.next) + " — or press →"}
-        onClick={() => go(pos?.next)}>next ›</button>
-      <button type="button" className="tbbtn" onClick={openList} title="the cohort's patients: search, filter, sort, download, and click one to draw it">List/Search</button>
+    <div className="viewtb tl-nav">
+      <div className="tbz">
+        <button type="button" className="tbbtn" disabled={updating || !pos?.prev} title={"the patient before this one in the list" + who(pos?.prev) + " — or press ←"}
+          onClick={() => go(pos?.prev)}>‹ prev</button>
+        <span className="tl-pos">
+          {p && pos ? <>patient <b>{(pos.index + 1).toLocaleString()}</b> of {t.total.toLocaleString()}</>
+            : p ? <>{p.patient} is not in the list as filtered</>
+            : <>no patients</>}
+        </span>
+        <button type="button" className="tbbtn" disabled={updating || !pos?.next} title={"the patient after this one in the list" + who(pos?.next) + " — or press →"}
+          onClick={() => go(pos?.next)}>next ›</button>
+        {p && !pos && <button type="button" className="tbbtn" disabled={updating || !t.total} onClick={first} title="draw the list's first patient">go to the first patient</button>}
+        <button type="button" className="tbbtn" onClick={openList} title="the cohort's patients: search, filter, sort, download, and click one to draw it">List/Search</button>
+      </div>
     </div>
   );
 }

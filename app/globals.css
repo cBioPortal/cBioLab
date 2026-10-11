@@ -1630,13 +1630,14 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 /* ---- the timeline view ------------------------------------------------------ */
 .tl-view { display: flex; flex-direction: column; gap: var(--s2); }
 .tl-view:focus { outline: none; }
-.tl-nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); padding: var(--s1) 0; border-bottom: 1px solid var(--line); margin-bottom: var(--s2); }
-.tl-settings { margin-left: auto; display: flex; align-items: center; gap: var(--s2); }
+/* the timeline's two control rows are toolbars (.viewtb / .tbz), so they share the strip's one height */
+.tl-nav { margin: 0 0 var(--s2); padding-bottom: var(--s2); border-bottom: 1px solid var(--line); }
+.tl-settings { margin: 0 0 0 auto; }
 .tl-patients { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card); color: var(--ink);
   width: min(94vw, 72rem); max-width: 94vw; max-height: 88vh; overflow: auto; padding: 1rem 1.1rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22); }
 .tl-patients::backdrop { background: rgba(0, 0, 0, 0.32); }
 .tl-patients-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s2); }
-.tl-pos { font-variant-numeric: tabular-nums; min-width: 12rem; text-align: center; }
+.tl-pos { font-variant-numeric: tabular-nums; font-size: var(--t-md); min-width: 9rem; text-align: center; white-space: nowrap; }
 .tl-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s3); }
 .tl-who { font-weight: 600; }
 .tl-sample { display: inline-flex; align-items: center; gap: 0.3rem; font-size: var(--t-sm); }

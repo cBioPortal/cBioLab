@@ -9,6 +9,27 @@ async function pickExploreStudies(p) {
   await p.evaluate(() => window.cohortLab.selectStudies(["msk_chord_2024", "genie_public"]));
 }
 
+/**
+ * Controls that sit side by side must line up: in every toolbar zone (.tbz) under `scope`, each
+ * control (.tbbtn, .chk, select) is one control height (--ctl-h) tall and every child shares one
+ * centre line. A control placed outside the toolbar idiom takes the global input/button padding
+ * and fails this. Returns the misaligned rows, described; empty when all line up.
+ */
+async function misalignedControls(p, scope) {
+  return p.evaluate((scope) => {
+    const ctl = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ctl-h")) * parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const bad = [];
+    for (const z of document.querySelectorAll(scope + " .tbz")) {
+      const kids = [...z.children].filter((c) => !c.classList.contains("tbl") && c.getBoundingClientRect().height > 0);
+      const mids = kids.map((c) => { const r = c.getBoundingClientRect(); return r.top + r.height / 2; });
+      const off = kids.filter((c) => c.matches(".tbbtn, .chk, select") && Math.abs(c.getBoundingClientRect().height - ctl) > 0.5);
+      if (Math.max(...mids) - Math.min(...mids) > 1 || off.length)
+        bad.push(kids.map((c, i) => (c.textContent || c.tagName).trim().slice(0, 14) + "@" + mids[i].toFixed(1) + "/h" + c.getBoundingClientRect().height.toFixed(1)).join(", "));
+    }
+    return bad;
+  }, scope);
+}
+
 async function main() {
   const browser = await chromium.launch({
     executablePath: process.env.HOME + "/.cache/ms-playwright/chromium-1217/chrome-linux64/chrome"
@@ -898,6 +919,8 @@ async function main() {
       const who = async () => (await page.locator(".tl-who").innerText()).trim();
       const marks = await page.locator(".tl-fig .tl-m").count();
       ok("timeline: draws the named patient's events", (await who()) === "P-0000012" && marks > 100, (await who()) + " · " + marks + " marks");
+      const askew = await misalignedControls(page, ".tl-view");
+      ok("timeline: its controls share one height and centre line (navigator, settings)", askew.length === 0 && (await page.locator(".tl-view .tbz").count()) === 2, askew.join(" | "));
       const foot = await page.locator(".tl-view .vfoot").innerText();
       ok("timeline: the caption says what the axis cut and which samples are which", /cut from the axis/.test(foot) && /1 P-0000012-T02-IM3 \(Primary\)/.test(foot), foot.slice(0, 160));
       await page.locator(".tl-fig .tl-m").nth(20).hover();

@@ -319,6 +319,18 @@ still holds, against a running server.
   happens. Where a view has both kinds, `data` (re-runs a query) sits left of `view` (instant).
 - **One idiom per job.** `.tbbtn` for a button or a disclosure, `.tbfield` for a labelled select,
   `.chk` for a checkbox. Underlined link-buttons are not a fourth kind of control.
+- **Controls side by side are a toolbar, wherever they sit** — a card's body, a line above a
+  figure, a dialog: `.viewtb` > `.tbz`, never a hand-rolled `display: flex` row. The one-height
+  rule (`--ctl-h`, one font size) is `.viewtb`'s, so `.tbz` alone is not enough; outside it a
+  `.tbbtn`, `.chk` or `select` falls back to the global input/button padding and a checkbox
+  beside a button sits on another centre line at another height. (The timeline's controls once
+  shipped that way.)
+- **Look at a UI change, then measure it — "renders without errors" is not done.** Screenshot the
+  changed region itself at `deviceScaleFactor: 2` (a whole card at 1× hides a few pixels of
+  misalignment) and compare it with the same kind of control in a neighbouring view: centre
+  lines, heights, type size, spacing. Then assert the geometry in `e2e.cjs`:
+  `misalignedControls(page, scope)` fails any toolbar zone under `scope` whose controls are not
+  one `--ctl-h` tall on one centre line. A view that adds a control row calls it.
 - **Apparatus goes in `.vfoot`.** Legend, methodology caveats and provenance stay on the page and
   a step down in weight, so they read as apparatus rather than as findings.
 - **Server-rendered figures share the palette.** `lib/svg-kit.ts` owns `palette()`, `SERIES` and
