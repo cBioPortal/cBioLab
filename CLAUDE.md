@@ -58,7 +58,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   Figures: **`lib/view-svg.ts`** draws the first kinds' figures itself and hands the rest to
   **`lib/figures/<kind>.ts`**, one module per kind, registered with its title in `lib/figures/index.ts`
   (browser-safe: `app/lab/portal-bodies.tsx` draws from them too); cards: `app/lab/kind-cards.tsx`.
-- **Table views** (`table`, `mutations`, and any later view that lists rows) — **every one must
+- **Table views** (`table`, `mutations`, `timeline`'s patient list, and any later view that lists rows) — **every one must
   support the same five things: pagination, search over its text, a filter per column (text
   conditions or a value list for text, a range for numbers), sorting, and a CSV download of every
   row kept — plus choosing the columns shown.** Don't build these per view: a table supplies only a
@@ -67,10 +67,26 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   search, filters, sort, page, counts, a column's values for its filter). The query
   (`columns`/`search`/`filters`/`sort`, type `TableQuery`) is part of the view's spec — the page is
   not. The rows name patients, so they run only through `PatientLevelResolver.rowsPage`/
-  `rowsCounts`/`rowsValues` (asserted in `test/boundary.test.ts`); `lib/views/rows.ts`'s
+  `rowsCounts`/`rowsValues`/`rowsRank` (asserted in `test/boundary.test.ts`); `lib/views/rows.ts`'s
   `runRows` groups parts per database and pages across them. UI: **`app/_table/DataTable.tsx`**;
   `POST /api/view-page` (a page, or a column's values) and `POST /api/table` (the CSV) serve every
   table view.
+- **The `timeline` view** (cBioPortal's patient-view Timeline, runner `lib/views/timeline.ts`) — one
+  patient's clinical events as tracks, with its cohort's patients (a table view) to pick from. **`lib/timeline-tracks.ts`** is
+  the track model, ported from cbioportal-frontend's `cbioportal-clinical-timeline` package and
+  `patientView/timeline/timeline_helpers.tsx`: the portal's track order and `trackStructures`
+  nesting, lone-"Other" absorption, line charts for all-numeric lab results, numbered sample
+  markers, the year axis with empty runs cut. **`lib/timeline-svg.ts`** draws it, browser-safe:
+  the lab card (`app/lab/timeline-body.tsx`) and the MCP figure are the same drawing. The queries
+  (`lib/patient-timeline.ts`) name a patient, so they run only through
+  `PatientLevelResolver.patientTimeline`/`rowsPage`/`rowsRank`. The view reads one cohort; its
+  navigator (cohort, the patient list — a `<dialog>` holding the `DataTable` — and ‹ prev / next ›) steps by the result's `position` — the drawn patient's place
+  in the list's order (`rankSql`) and its neighbours — setting `patient`. The chosen `patient`, folded `collapsed`
+  tracks and `expandGaps` are in the spec; the last two are drawn in the browser (`dataPart`).
+  **Opt-in patient-level federation** serves this view alone: a peer that sets
+  `MCP_DISCLOSE_PATIENTS` exposes `federated_patient_rows`/`federated_patient_timeline`, and a
+  coordinator that names the study in `PEER_MCP_PATIENT_LEVEL` reaches it through
+  `RemoteTimelineResolver` (aggregate-only for every other view). See `docs/DATA-BOUNDARY.md`.
 - **`lib/event-names.ts`** — **THE only place timeline event names are normalized.** Case-fold and
   trim, nothing else; measured to be complete for event types and attribute keys (zero residual
   collisions). Folds are disclosed in the caveat, never silent. Do not fork it. Every timeline
@@ -303,6 +319,18 @@ still holds, against a running server.
   happens. Where a view has both kinds, `data` (re-runs a query) sits left of `view` (instant).
 - **One idiom per job.** `.tbbtn` for a button or a disclosure, `.tbfield` for a labelled select,
   `.chk` for a checkbox. Underlined link-buttons are not a fourth kind of control.
+- **Controls side by side are a toolbar, wherever they sit** — a card's body, a line above a
+  figure, a dialog: `.viewtb` > `.tbz`, never a hand-rolled `display: flex` row. The one-height
+  rule (`--ctl-h`, one font size) is `.viewtb`'s, so `.tbz` alone is not enough; outside it a
+  `.tbbtn`, `.chk` or `select` falls back to the global input/button padding and a checkbox
+  beside a button sits on another centre line at another height. (The timeline's controls once
+  shipped that way.)
+- **Look at a UI change, then measure it — "renders without errors" is not done.** Screenshot the
+  changed region itself at `deviceScaleFactor: 2` (a whole card at 1× hides a few pixels of
+  misalignment) and compare it with the same kind of control in a neighbouring view: centre
+  lines, heights, type size, spacing. Then assert the geometry in `e2e.cjs`:
+  `misalignedControls(page, scope)` fails any toolbar zone under `scope` whose controls are not
+  one `--ctl-h` tall on one centre line. A view that adds a control row calls it.
 - **Apparatus goes in `.vfoot`.** Legend, methodology caveats and provenance stay on the page and
   a step down in weight, so they read as apparatus rather than as findings.
 - **Server-rendered figures share the palette.** `lib/svg-kit.ts` owns `palette()`, `SERIES` and

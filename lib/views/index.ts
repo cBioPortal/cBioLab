@@ -30,6 +30,7 @@ import { runAssays } from "./assays.ts";
 import { runCorrelates } from "./correlates.ts";
 import { runTable } from "./table.ts";
 import { runMutations } from "./mutations.ts";
+import { runTimeline } from "./timeline.ts";
 
 /**
  * A runner that draws no figure of its own and lets a throw stand for its error: the figure is drawn
@@ -74,6 +75,7 @@ const RUNNERS: Record<string, ViewRunner> = {
   correlates: drawn(runCorrelates),
   table: drawn(runTable),
   mutations: drawn(runMutations),
+  timeline: drawn(runTimeline),
 };
 
 /** the runner for a view kind, or undefined for a kind runAnalysis does not know */

@@ -35,7 +35,7 @@ export type { PlotData, PlotRequest, PlotGroup, PlotPoint } from "./plot.ts";
 import { impactSql } from "./lollipop.ts";
 import type { Moments } from "./stats.ts";
 // a table view's row queries return ids: imported for PatientLevelResolver.rowsPage, never re-exported
-import { pageSql, countsSql, valuesSql, type RowSource, type TableQuery } from "./table-query.ts";
+import { pageSql, countsSql, valuesSql, rankSql, type RowSource, type TableQuery } from "./table-query.ts";
 
 /** the colour key: the commonest categories, capped, each with the colour every renderer uses */
 export function legendFor(values: string[], ring = false): { label: string; color: string; ring?: boolean }[] {
@@ -47,7 +47,8 @@ export function legendFor(values: string[], ring = false): { label: string; colo
 
 const num = (v: unknown): number | null => { const x = Number(v); return Number.isFinite(x) ? x : null; };
 import { genomicEventsSql, coverageSql } from "./oncoprint.ts";
-import type { CohortDef, CompileCtx, ChRow, ChResult } from "./types.ts";
+import type { CohortDef, CompileCtx, ChRow, ChResult, PatientTimeline } from "./types.ts";
+import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } from "./patient-timeline.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
@@ -1266,9 +1267,42 @@ export interface PatientLevelCapable extends AggregateCapable {
   rowsPage(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], limit: number, offset: number): Promise<{ rows: ChRow[]; total: number }>;
   rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<{ cohort: string; study: string; n: number; all: number }[]>;
   rowsValues(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]>;
+  rowsRank(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], study: string, patient: string): Promise<number | null>;
+  /** one patient's timeline events and samples — see PatientLevelResolver.patientTimeline */
+  patientTimeline(patient: string): Promise<PatientTimeline>;
 }
 
 export type Resolver = AggregateCapable | PatientLevelCapable;
+
+/**
+ * What the timeline view needs from a participant: one patient's record, and its patient list.
+ * A local patient-level resolver has it (rowsPage serves the list); so does a remote peer in the
+ * opt-in patient-level federation mode (RemoteTimelineResolver, lib/federation-remote.ts) — and
+ * nothing else: that peer stays aggregate-only for every other view, because this is the only
+ * patient-level method it has.
+ */
+export interface PatientTimelineCapable {
+  patientTimeline(patient: string): Promise<PatientTimeline>;
+}
+/** A peer that serves the timeline's patient list itself, from the cohort definitions it is sent. */
+export interface RemoteTimelineRows extends PatientTimelineCapable {
+  readonly peerUrl: string;
+  timelineRows(req: TimelineRowsRequest): Promise<TimelineRowsAnswer>;
+}
+export interface TimelineRowsRequest {
+  parts: { cohort: string; def: CohortDef | null | undefined }[];
+  query: TableQuery; defaults: string[];
+  /** a page, the per-part counts, one column's values, or one patient's place in the order */
+  mode: "page" | "counts" | "values" | "rank";
+  limit?: number; offset?: number; column?: string; patient?: string;
+}
+export interface TimelineRowsAnswer { rows?: ChRow[]; counts?: { cohort: string; study: string; n: number; all: number }[]; values?: ChRow[]; rank?: number | null }
+export function hasPatientTimeline(r: Resolver): r is Resolver & PatientTimelineCapable {
+  return typeof (r as unknown as Partial<PatientTimelineCapable>).patientTimeline === "function";
+}
+export function hasRemoteTimelineRows(r: Resolver): r is Resolver & RemoteTimelineRows {
+  return typeof (r as unknown as Partial<RemoteTimelineRows>).timelineRows === "function";
+}
 
 export function isPatientLevel(r: Resolver): r is PatientLevelCapable {
   return r.instance.mode === "patient-level";
@@ -1891,6 +1925,26 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   async rowsValues(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]> {
     return (await this.runLogged<ChRow>(label, valuesSql(source(this.instance.conn.db), q, defaults, column), this.instance.conn)).data;
   }
+  /** one patient's 0-based place in the query's order, or null when the query leaves it out */
+  async rowsRank(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], study: string, patient: string): Promise<number | null> {
+    const r = await this.runLogged<ChRow>(label, rankSql(source(this.instance.conn.db), q, defaults, study, patient), this.instance.conn);
+    return r.data.length ? Number(r.data[0].idx) : null;
+  }
+
+  /**
+   * One named patient's clinical events (with every attribute) and samples, for the timeline view.
+   * The answer IS one patient's record, so — like members() and rowsPage — it lives on the
+   * patient-level resolver alone; an aggregate-only or remote participant has no such method.
+   */
+  async patientTimeline(patient: string): Promise<PatientTimeline> {
+    if (!PATIENT_ID.test(patient)) throw new Error("not a patient id: " + JSON.stringify(patient).slice(0, 90));
+    const db = this.instance.conn.db, conn = this.instance.conn;
+    const [ev, sm] = await Promise.all([
+      this.runLogged<ChRow>("timeline:events", patientEventsSql(this.study, patient, db), conn),
+      this.runLogged<ChRow>("timeline:samples", patientSamplesSql(this.study, patient, db), conn),
+    ]);
+    return { study: this.study, patient, events: toEvents(ev.data), samples: toSamples(sm.data), source: { label: this.instance.label } };
+  }
 
   /**
    * Per-patient (outcome, covariate values) rows for a logistic fit — patient-level only, for
@@ -1939,12 +1993,14 @@ export class AggregateResolver extends BaseResolver {
 
 export async function resolverFor(study: string, ctx: Partial<CompileCtx>): Promise<Resolver> {
   // A peer reached over MCP takes precedence: its data is not ours to query.
-  const { peerForStudy, RemoteAggregateResolver } = await import("./federation-remote.ts");
+  const { peerForStudy, peerSharesPatients, RemoteAggregateResolver, RemoteTimelineResolver } = await import("./federation-remote.ts");
   const peer = peerForStudy(study);
   if (peer) {
-    return new RemoteAggregateResolver(study, peer.url, {
-      id: "peer", mode: "aggregate-only", label: peer.label, conn: PRIMARY /* unused: nothing is queried locally */
-    });
+    const inst: Instance = { id: "peer", mode: "aggregate-only", label: peer.label, conn: PRIMARY /* unused: nothing is queried locally */ };
+    // the opt-in patient-level mode: configured here AND on the peer, and only for the timeline view
+    return peerSharesPatients(study)
+      ? new RemoteTimelineResolver(study, peer.url, { ...inst, label: peer.label + " (shares patient timelines)" })
+      : new RemoteAggregateResolver(study, peer.url, inst);
   }
   const inst = await instanceForStudy(study);
   return inst.mode === "patient-level"

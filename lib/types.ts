@@ -1267,11 +1267,50 @@ export interface MutationsResult extends TableRows<string | number | null> {
   /** the OncoKB version the annotation column reads, or null when none is pinned */
   oncokbPin: string | null;
 }
+/**
+ * One patient's clinical timeline (cBioPortal's patient-view Timeline), with the list of the
+ * cohorts' patients to choose them from. The list is a table view (lib/table-query.ts: paged,
+ * searched, filtered, sorted, downloadable); the timeline is the chosen patient's events as tracks
+ * (lib/timeline-tracks.ts). Both name a patient, so only a patient-level participant contributes.
+ */
+export interface TimelineView extends TableQuery {
+  note?: string;
+  kind: "timeline"; cohorts?: string[];
+  /** the patient whose timeline is drawn; with none, the list's first row */
+  patient?: { study: string; id: string };
+  /** track uids drawn collapsed (their events folded into one row), e.g. "treatment.Chemo" */
+  collapsed?: string[];
+  /** draw every year rather than cutting runs of four or more empty years to one mark (default false) */
+  expandGaps?: boolean;
+  /** patients per page of the list (default 25, at most 1000) */
+  rows?: number;
+}
+/** One clinical event, as the study records it: days from diagnosis, and its attributes in order. */
+export interface PatientEvent { type: string; start: number; end: number | null; attrs: [string, string][] }
+/** One of the patient's samples and its recorded sample type. */
+export interface PatientSample { id: string; type: string }
+/** Everything the timeline figure needs about one patient, and who answered for it. */
+export interface PatientTimeline {
+  study: string; patient: string;
+  events: PatientEvent[];
+  samples: PatientSample[];
+  /** the instance that holds this patient: its label, and whether it answered over MCP */
+  source: { label: string; remote?: boolean };
+}
+export interface TimelineResult extends TableRows<string | number | null> {
+  /** the drawn patient, or null when the list is empty */
+  patient: PatientTimeline | null;
+  /**
+   * Where the drawn patient falls in the list's order (its search, filters and sort), with the
+   * patients either side — what prev / next step to. Null when the list's query leaves it out.
+   */
+  position?: { index: number; prev: { study: string; id: string } | null; next: { study: string; id: string } | null } | null;
+}
 import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView
-  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CorrelatesView | TableView | MutationsView | RiskmodelView;
+  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -1573,6 +1612,7 @@ export interface ViewResult {
   assays?: AssaysResult;                    // generic-assay comparison
   correlates?: CorrelatesResult;            // genome-wide co-expression with one gene
   table?: TableResult;                      // the clinical data table
+  timeline?: TimelineResult;                // one patient's timeline, and the patients to choose from
   mutations?: MutationsResult;              // one gene's mutation table
 }
 /**

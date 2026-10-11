@@ -14,6 +14,8 @@
 import type { CohortDef, ExploreResult } from "./types.ts";
 import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest } from "./federation.ts";
 import { carriesPatientIds } from "./federation.ts";
+import type { RemoteTimelineRows, TimelineRowsRequest, TimelineRowsAnswer } from "./federation.ts";
+import type { PatientTimeline, PatientEvent, PatientSample } from "./types.ts";
 
 interface RemoteAggregates {
   study: string; instance: string; count: number;
@@ -40,6 +42,17 @@ export function peerForStudy(study: string): { url: string; label: string } | nu
     }
   }
   return null;
+}
+
+/**
+ * The opt-in patient-level federation mode, as THIS instance (the coordinator) configures it:
+ * the studies whose peer it trusts to send patient timelines — PEER_MCP_PATIENT_LEVEL, a list of
+ * study ids, or "*" for every study PEER_MCP names. The peer must opt in too (MCP_DISCLOSE_PATIENTS
+ * on its side registers the tools); either one alone changes nothing.
+ */
+export function peerSharesPatients(study: string): boolean {
+  const list = (process.env.PEER_MCP_PATIENT_LEVEL || "").split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
+  return list.includes("*") || list.includes(study);
 }
 
 /**
@@ -261,3 +274,69 @@ export class RemoteAggregateResolver implements AggregateCapable {
     return r.pairMoments || [];
   }
 }
+
+/** One event as a peer sent it, checked field by field: a peer is another program, not this one. */
+function asEvent(x: unknown): PatientEvent | null {
+  const e = x as Record<string, unknown>;
+  if (!e || typeof e.type !== "string" || !Number.isFinite(Number(e.start))) return null;
+  const attrs = Array.isArray(e.attrs) ? (e.attrs as unknown[]).filter((a) => Array.isArray(a) && a.length === 2).map((a) => [String((a as unknown[])[0]).slice(0, 200), String((a as unknown[])[1]).slice(0, 2000)] as [string, string]) : [];
+  return { type: e.type.slice(0, 200), start: Number(e.start), end: e.end == null || !Number.isFinite(Number(e.end)) ? null : Number(e.end), attrs };
+}
+
+/**
+ * A peer in the opt-in patient-level federation mode: everything RemoteAggregateResolver answers,
+ * plus the timeline view's two needs — the cohorts' patient list (the peer pages it in its own
+ * database, from the cohort definitions it is sent) and one patient's record. Nothing else: no
+ * members(), no table rows, no plot points, so every other view still treats this peer as
+ * aggregate-only. It exists only where this instance names the study in PEER_MCP_PATIENT_LEVEL,
+ * and it answers only if the peer has opted in (MCP_DISCLOSE_PATIENTS); a peer that has not lacks
+ * the tools, and the call fails saying so.
+ */
+export class RemoteTimelineResolver extends RemoteAggregateResolver implements RemoteTimelineRows {
+  readonly peerUrl: string;
+  constructor(study: string, url: string, instance: Instance) {
+    super(study, url, instance);
+    this.peerUrl = url;
+  }
+  private refuseIds(defs: (CohortDef | null | undefined)[]): void {
+    // the patient this view asks for is the entitlement; an explicit id LIST in a cohort is not part of it
+    if (defs.some(carriesPatientIds))
+      throw new Error("a cohort here contains an explicit sample or patient list, which is not sent to remote peer " + this.instance.label);
+  }
+  private disclosed<T>(p: Promise<T>): Promise<T> {
+    return p.catch((e: Error) => {
+      const m = String(e?.message || e);
+      throw new Error(/tool .*not found|unknown tool|-32601/i.test(m)
+        ? "the peer serving " + this.study + " does not share patient timelines (it has not set MCP_DISCLOSE_PATIENTS), though this instance's PEER_MCP_PATIENT_LEVEL trusts it to"
+        : /not a study this instance discloses/.test(m)
+          ? "the peer serving " + this.study + " shares patient timelines, but not of " + this.study + " (its MCP_DISCLOSE_PATIENTS does not list it)"
+          : m);
+    });
+  }
+  async timelineRows(req: TimelineRowsRequest): Promise<TimelineRowsAnswer> {
+    this.refuseIds(req.parts.map((p) => p.def));
+    const r = await this.disclosed(mcpCall<TimelineRowsAnswer & { queries?: QueryLogEntry[] | null }>(this.peerUrl, "federated_patient_rows", {
+      study: this.study, parts: req.parts.map((p) => ({ cohort: p.cohort, cohortDef: p.def || {} })), source: this.instance.label,
+      query: req.query, defaults: req.defaults, mode: req.mode,
+      ...(req.limit != null ? { limit: req.limit } : {}), ...(req.offset != null ? { offset: req.offset } : {}), ...(req.column ? { column: req.column } : {}),
+      ...(req.patient ? { patient: req.patient } : {}),
+    }));
+    if (Array.isArray(r.queries)) for (const q of r.queries) this.queries.push({ label: q.label, sql: q.sql, ms: q.ms, remote: true });
+    // what the peer answered for is what it was asked about: its own study and the asked cohorts
+    const cohorts = new Set(req.parts.map((p) => p.cohort));
+    const own = <T extends Record<string, unknown>>(xs: T[] | undefined) => (xs || []).filter((x) => x.study === this.study && cohorts.has(String(x.cohort)));
+    const rank = typeof r.rank === "number" && Number.isInteger(r.rank) && r.rank >= 0 ? r.rank : null;
+    return { rows: own(r.rows), counts: own(r.counts as unknown as Record<string, unknown>[]) as unknown as TimelineRowsAnswer["counts"], values: r.values || [], rank };
+  }
+  async patientTimeline(patient: string): Promise<PatientTimeline> {
+    const r = await this.disclosed(mcpCall<{ study: string; patient: string; events: unknown[]; samples: unknown[]; queries?: QueryLogEntry[] | null }>(
+      this.peerUrl, "federated_patient_timeline", { study: this.study, patient }));
+    if (r.study !== this.study || r.patient !== patient) throw new Error("peer answered for " + r.study + "/" + r.patient + ", not " + this.study + "/" + patient);
+    if (Array.isArray(r.queries)) for (const q of r.queries) this.queries.push({ label: q.label, sql: q.sql, ms: q.ms, remote: true });
+    const events = (Array.isArray(r.events) ? r.events : []).map(asEvent);
+    if (events.some((e) => !e)) throw new Error("peer sent a timeline event this instance cannot read");
+    const samples: PatientSample[] = (Array.isArray(r.samples) ? r.samples : []).map((x) => ({ id: String((x as PatientSample).id).slice(0, 120), type: String((x as PatientSample).type ?? "").slice(0, 120) }));
+    return { study: this.study, patient, events: events as PatientEvent[], samples, source: { label: this.instance.label, remote: true } };
+  }
+}
+

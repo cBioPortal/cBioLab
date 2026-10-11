@@ -82,6 +82,37 @@ The view renders what is permitted and states the covered fraction; if no
 participant permits patient-level access it errors with an explanation. It never
 silently drops those patients and reports a smaller cohort as if it were whole.
 
+## Opt-in patient-level federation (the timeline view only)
+
+The trust change this document anticipates ("that instance becomes patient-level for this
+caller"), made in configuration on **both** sides and for **one** view: browsing patients of
+several portal instances in the `timeline` view, each labelled with the instance it came from.
+
+| side | setting | effect |
+|---|---|---|
+| peer (data owner) | `MCP_DISCLOSE_PATIENTS=<study>,…` (or `*`) | registers `federated_patient_rows` and `federated_patient_timeline`; without it the tools **do not exist**. They answer only for listed studies the peer holds itself at patient level (never a study it reaches through a peer of its own, never an aggregate-only one) |
+| coordinator | `PEER_MCP_PATIENT_LEVEL=<study>,…` (or `*`) | the `PEER_MCP` peer for those studies becomes a `RemoteTimelineResolver` instead of a `RemoteAggregateResolver` |
+
+Either setting alone changes nothing: a coordinator that trusts a peer which has not opted in
+gets a refusal naming the missing setting; a peer that discloses to a coordinator that does not
+trust it is never asked.
+
+The same structural rule holds. `RemoteTimelineResolver` adds exactly `patientTimeline()` and
+`timelineRows()` to the aggregate contract — no `members()`, no table rows, no plot points, no
+Cox/logistic rows — and its instance stays `aggregate-only`, so **every other view treats the peer
+exactly as before** (the clinical table names it as left out, an oncoprint degrades). The peer
+pages, searches and sorts its patient list in its own database from the cohort *definitions* it
+is sent; an explicit id list in a cohort is still refused before the network is touched. The
+patient whose timeline is drawn is the one identifier that crosses, and that is the entitlement.
+Every row and the drawn timeline carry their source ("Site B (shares patient timelines)", "from
+… over MCP"), and the view's caveat names the studies that came over MCP.
+
+**Not built yet, and required before pointing this at restricted data:** caller authentication.
+Today anyone who can reach a disclosing peer's `/api/mcp` can read what it discloses; the setting
+is a statement of intent, not access control. Per-caller tokens (or mTLS), checked by the peer
+before the tool runs, and an access log on the peer are the next step. Answers containing a
+peer's patients also enter the coordinator's result cache (same trust boundary as its own).
+
 ## What the tests cover
 
 `test/boundary.test.ts` (26 checks, no database required, wired into
@@ -103,6 +134,15 @@ silently drops those patients and reports a smaller cohort as if it were whole.
 - The builder list is not maintained by memory: the suite enumerates the module's
   `*Sql` exports and fails if any lacks a case, so a new aggregate cannot reach a
   peer without someone deciding what it may project.
+- A patient's timeline (`patientTimeline`, the `timeline` view) exists only on
+  `PatientLevelResolver` and the opt-in `RemoteTimelineResolver`; its queries
+  (`lib/patient-timeline.ts`) are not among the aggregate builders, and neither aggregate resolver
+  has the method.
+- The opt-in mode: the coordinator builds a `RemoteTimelineResolver` only for a study
+  `PEER_MCP_PATIENT_LEVEL` names; that resolver has no patient-level method beyond the timeline's
+  two and is not `isPatientLevel`; it refuses an id-list cohort before `fetch`; and a peer
+  registers the disclosing tools only with `MCP_DISCLOSE_PATIENTS` set (mutation-checked: removing
+  that condition, or adding `members()` to the resolver, fails the suite).
 - Source tripwires: no query in `lib/explore.ts` projects a bare identifier
   column, and `ExploreResult` exposes no field that could carry one.
 

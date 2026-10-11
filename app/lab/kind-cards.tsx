@@ -7,6 +7,7 @@ import React, { useEffect, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 import { CancertypesBody, EnrichmentBody, CorrelatesBody, AssaysBody, MutationsBody } from "./portal-bodies";
 import { PickMenu } from "./view-chrome.tsx";
+import { TimelineBody } from "./timeline-body";
 
 /**
  * A text field that keeps what is being typed to itself and hands the page the value only on
@@ -31,6 +32,8 @@ export interface KindCardSpec {
   genes?: boolean;
   /** the most cohorts this view can draw at once */
   maxCohorts?: number;
+  /** the header's subtitle names the one cohort drawn, so the header leaves out its "Showing" line */
+  cohortInHeader?: boolean;
   /** why the add button is disabled for this study, or null when it can be added */
   why?: (known: Known) => string | null;
 }
@@ -54,6 +57,8 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
       : !k.assays.length ? "this study has no generic-assay profiles (mutational signatures, arm-level copy number, …)" : null },
   table: { label: "Clinical data table (download)", title: "Clinical data", maxCohorts: 6 },
   mutations: { label: "Mutation table (one gene)", title: "Mutations", maxCohorts: 6 },
+  timeline: { label: "Patient timeline (one patient at a time)", title: "Patient timeline", maxCohorts: 1, cohortInHeader: true,
+    why: (k) => k.events.length ? null : "this study records no timeline events" },
   correlates: { label: "Co-expression with one gene (genome-wide)", title: "Co-expression", maxCohorts: 1,
     why: (k) => !k.profiles.filter((p) => p !== "cna").length ? "this study has no continuous molecular profile (mRNA, protein, …) to correlate on" : null },
   overlap: { label: "Cohort overlap (UpSet)", title: "Cohort overlap", maxCohorts: 6,
@@ -79,7 +84,7 @@ export const hasKindCard = (k: unknown): boolean => Object.prototype.hasOwnPrope
  * Views that show their own waiting state (the table views: their search, filters and headers stay
  * usable while the rows are covered), so the page must not cover the card with its own.
  */
-export const drawsOwnWaiting = (k: unknown): boolean => k === "table" || k === "mutations";
+export const drawsOwnWaiting = (k: unknown): boolean => k === "table" || k === "mutations" || k === "timeline";
 
 /** What a card needs from the page: the view as written, its result, and a way to edit it. */
 export interface KindCardCtx {
@@ -113,6 +118,10 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     (spec.measure === "driver" ? " (drivers)" : "") + " in every gene, per sample";
   if (kind === "overlap") return "patients in exactly each combination of cohorts";
   if (kind === "mutations") return (spec.gene || "no gene") + " · every mutation call" + (v.mutations ? " · " + v.mutations.total.toLocaleString() + " rows" : "");
+  if (kind === "timeline") {
+    const cohort = Array.isArray(v.cohorts) && v.cohorts[0] ? String(v.cohorts[0]).split(" / ").join(" › ") : null;
+    return <>{cohort && <><strong>{cohort}</strong> · </>}{v.timeline ? v.timeline.total.toLocaleString() + " patients · " : ""}clinical events from diagnosis</>;
+  }
   if (kind === "table") return "one row per " + (spec.unit === "patient" ? "patient" : "sample") + (v.table ? " · " + v.table.total.toLocaleString() + " rows, " + v.table.columns.length + " attributes" : "");
   if (kind === "correlates") return (spec.gene || "no gene") + " on " + (spec.profileType || "no profile") + (spec.otherProfile && spec.otherProfile !== spec.profileType ? " against " + spec.otherProfile : "") + " · Spearman ρ, every gene";
   if (kind === "assays") return (v.assays ? v.assays.profileName + " · " + v.assays.test : spec.profileType || "no profile chosen") + ", per " + (v.assays ? v.assays.unit.replace(/s$/, "") : "sample");
@@ -200,6 +209,8 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
       </div>
     </div>
   );
+  // its drawing settings sit in the card, over the timeline (app/lab/timeline-body.tsx)
+  if (spec.kind === "timeline") return null;
   // the search, filters, sort and columns are the table's own (app/_table/DataTable.tsx); a change of unit starts them over
   if (spec.kind === "table") return (
     <div className="viewtb">
@@ -555,6 +566,7 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   if (kind === "paired") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : PAIRED_DEFAULT_GENES };
   if (kind === "mutations") return { kind, gene: known.genes[0] || "TP53", ...(known.cohorts.length > 6 ? { cohorts: known.cohorts.slice(0, 6) } : {}) };
   if (kind === "table") return { kind, ...(known.cohorts.length > 6 ? { cohorts: known.cohorts.slice(0, 6) } : {}) };
+  if (kind === "timeline") return { kind, ...(known.cohorts.length > 1 ? { cohorts: known.cohorts.slice(0, 1) } : {}) };
   if (kind === "correlates") {
     const profs = known.profiles.filter((p) => p !== "cna");
     const profile = profs.find((p) => /mrna|rna_seq/i.test(p) && !/zscore/i.test(p)) || profs.find((p) => /mrna|rna_seq/i.test(p)) || profs[0] || "";
@@ -580,6 +592,7 @@ export function KindCardBody({ c }: { c: KindCardCtx }): React.ReactNode | null 
   if (c.spec.kind === "assays" && c.v.assays) return <AssaysBody v={c.v} />;
   if (c.spec.kind === "mutations" && c.v.mutations) return <MutationsBody v={c.v} spec={c.spec} vi={c.vi} updating={c.updating ?? c.busy} docJson={c.docJson} onQuery={(q) => c.patch({ ...q })} />;
   if (c.spec.kind === "table" && c.v.table) return <ClinicalTableBody c={c} />;
+  if (c.spec.kind === "timeline" && c.v.timeline) return <TimelineBody t={c.v.timeline} spec={c.spec} vi={c.vi} updating={c.updating ?? c.busy} docJson={c.docJson} patch={c.patch} />;
 
   return null;
 }

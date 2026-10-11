@@ -1626,3 +1626,31 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .accentink { color: var(--accent-ink); }
 /* a numeric facet's "NA n", set against the bars' baseline */
 .nacount { align-self: end; padding-left: var(--s1); }
+
+/* ---- the timeline view ------------------------------------------------------ */
+.tl-view { display: flex; flex-direction: column; gap: var(--s2); }
+.tl-view:focus { outline: none; }
+/* the timeline's two control rows are toolbars (.viewtb / .tbz), so they share the strip's one height */
+.tl-nav { margin: 0 0 var(--s2); padding-bottom: var(--s2); border-bottom: 1px solid var(--line); }
+.tl-settings { margin: 0 0 0 auto; }
+.tl-patients { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card); color: var(--ink);
+  width: min(94vw, 72rem); max-width: 94vw; max-height: 88vh; overflow: auto; padding: 1rem 1.1rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22); }
+.tl-patients::backdrop { background: rgba(0, 0, 0, 0.32); }
+.tl-patients-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s2); }
+.tl-pos { font-variant-numeric: tabular-nums; font-size: var(--t-md); min-width: 9rem; text-align: center; white-space: nowrap; }
+.tl-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s3); }
+.tl-who { font-weight: 600; }
+.tl-sample { display: inline-flex; align-items: center; gap: 0.3rem; font-size: var(--t-sm); }
+.tl-fig { position: relative; border: 1px solid var(--line); border-radius: var(--r-md); background: #fff; overflow-x: auto; }
+.tl-fig.stale { opacity: 0.5; }
+.tl-fig .tl-m { cursor: default; }
+.tl-fig .tl-h:hover text { fill: var(--accent); }
+.tl-empty { padding: var(--s3); }
+.tl-tip { max-width: 340px; }
+.tl-tip table { border-collapse: collapse; font-size: var(--t-sm); }
+.tl-tip th { text-align: left; font-weight: 500; color: var(--muted); padding: 0 var(--s2) 0 0; white-space: nowrap; vertical-align: top; }
+.tl-tip td { overflow-wrap: anywhere; }
+.tl-tip-more { margin-top: var(--s1); padding-top: var(--s1); border-top: 1px solid var(--line); }
+.dt-table tr.dt-pick { cursor: pointer; }
+.dt-table tr.dt-pick:hover td { background: var(--code-bg); }
+.dt-table tr.dt-pick.sel td { background: var(--accent-soft); }

@@ -314,9 +314,13 @@ export interface DataTableProps<V> {
   /** how a number shows (default: grouped) */
   num?: (column: string, value: number) => string;
   title?: React.ReactNode;
+  /** a row can be chosen (the timeline view's patient): called with the clicked row */
+  onRow?: (row: TableRows<V>["rows"][number]) => void;
+  /** which row is chosen, highlighted */
+  selected?: (row: TableRows<V>["rows"][number]) => boolean;
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, unit, onQuery, cell, num, title }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, unit, onQuery, cell, num, title, onRow, selected }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson);
   const multi = t.lists.length > 1;
@@ -428,7 +432,8 @@ export function DataTable<V extends string | number | null>({ t, query, updating
             </tr></thead>
             <tbody>
               {p.rows.map((r, k) => (
-                <tr key={k}>
+                <tr key={k} className={onRow ? "dt-pick" + (selected && selected(r) ? " sel" : "") : undefined}
+                  onClick={onRow ? () => onRow(r) : undefined} aria-selected={onRow ? !!(selected && selected(r)) : undefined}>
                   {multi && <td className="meta">{r.cohort}</td>}
                   {multi && <td className="meta">{r.study}</td>}
                   {shownIdx.map((i) => <td key={i} className={t.columns[i].numeric ? "num" : undefined}>{show(t.columns[i], r.values[i])}</td>)}

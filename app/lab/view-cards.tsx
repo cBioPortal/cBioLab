@@ -608,7 +608,7 @@ function KindCard({ ctx, v, vi }: CardProps) {
     {hasKindCard(v.kind) && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title={KIND_CARDS[v.kind].title}
         sub={kindSub(v.kind, docView(vi), v)}
-        cohorts={cohortChoice(vi, docView(vi), KIND_CARDS[v.kind].maxCohorts)}
+        cohorts={cohortChoice(vi, docView(vi), KIND_CARDS[v.kind].maxCohorts)} cohortInSub={KIND_CARDS[v.kind].cohortInHeader}
         {...placement(ctx, vi)}
         actions={KIND_CARDS[v.kind].genes
           ? <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>

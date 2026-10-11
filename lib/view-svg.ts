@@ -688,6 +688,8 @@ export function viewTitle(v: ViewResult): string {
     : v.kind === "course" ? "Clinical course" +
         (v.course && v.course.length ? " — " + [...new Set(v.course.map((z) => z.eventType))].join(", ") : "")
     : v.kind === "compare" ? "Alteration frequencies"
-    : v.kind === "oncoprint" ? "Oncoprint" : kindTitle(v) || v.kind;
+    : v.kind === "oncoprint" ? "Oncoprint"
+    : v.kind === "timeline" ? "Patient timeline" + (v.timeline?.patient ? " — " + v.timeline.patient.patient : "")
+    : kindTitle(v) || v.kind;
   return c ? base + " — " + c : base;
 }

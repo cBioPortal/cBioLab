@@ -14,7 +14,9 @@ import {
 } from "../lib/campaign.ts";
 import { HYPOTHESIS_GRAMMAR } from "../lib/hypothesis.ts";
 import { runAnalysis, resolveStudy, studyProfiles } from "../lib/analysis.ts";
-import { resolverFor, carriesPatientIds, studyRouting } from "../lib/federation.ts";
+import { resolverFor, carriesPatientIds, studyRouting, PatientLevelResolver } from "../lib/federation.ts";
+import { timelinePatientRowSource, TIMELINE_COLUMNS, PATIENT_ID } from "../lib/patient-timeline.ts";
+import { checkQuery, cleanQuery, type TableQuery } from "../lib/table-query.ts";
 import { buildExplore } from "../lib/explore.ts";
 import { PRIMARY } from "../lib/ch.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, Contract, OncoprintSpec, ViewResult } from "../lib/types.ts";
@@ -170,6 +172,95 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       }
     });
 
+  // ---- opt-in patient-level federation ---------------------------------------
+  // Registered ONLY where this instance's operator lists studies in MCP_DISCLOSE_PATIENTS: a peer
+  // that has not opted in does not have these tools at all. They serve exactly one view — the
+  // timeline: a page of a cohort's patient list, and one patient's clinical record — for a study
+  // this instance holds at patient level itself. The coordinator must opt in as well
+  // (PEER_MCP_PATIENT_LEVEL); see docs/DATA-BOUNDARY.md. There is no caller authentication yet:
+  // anyone who can reach this endpoint can read what it discloses.
+  const disclose = (process.env.MCP_DISCLOSE_PATIENTS || "").split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
+  if (disclose.length) {
+    const held = async (study: string): Promise<{ s: string; res: PatientLevelResolver }> => {
+      const s = await resolveStudy(study);
+      if (!disclose.includes("*") && !disclose.includes(s)) throw new Error(s + " is not a study this instance discloses patients of");
+      const { profiles, gaProfiles } = await studyProfiles(s);
+      const res = await resolverFor(s, { oncokbPin: process.env.ONCOKB_PIN || null, profiles, gaProfiles });
+      // only what this instance holds itself at patient level: never a peer's data relayed, never an aggregate-only study
+      if (!(res instanceof PatientLevelResolver)) throw new Error(s + " is not held here at patient level");
+      return { s, res };
+    };
+    const rejected = (e: unknown) => ({ content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true });
+
+    server.registerTool(
+      "federated_patient_rows",
+      {
+        description:
+          "Patient-level federation endpoint (opt-in: MCP_DISCLOSE_PATIENTS) for another cbio-lab instance's timeline view: the patients of the given cohorts in a study THIS instance holds, one row each with sample and timeline-event counts and first/last event day — a page of them, the per-cohort counts, one column's values, or one patient's place in the order — searched, filtered and sorted here. Returns patient identifiers.",
+        inputSchema: {
+          study: z.string().max(120),
+          parts: z.array(z.object({ cohort: z.string().max(200), cohortDef: z.record(z.string(), z.any()) })).min(1).max(6),
+          source: z.string().max(200).describe("What the caller calls this instance: the list's Source column"),
+          query: z.record(z.string(), z.any()).nullish(),
+          defaults: z.array(z.string().max(40)).max(20),
+          mode: z.enum(["page", "counts", "values", "rank"]),
+          limit: z.number().int().min(1).max(10000).nullish(),
+          offset: z.number().int().min(0).nullish(),
+          column: z.string().max(40).nullish(),
+          patient: z.string().max(80).nullish(),
+        }
+      },
+      async ({ study, parts, source, query, defaults, mode, limit, offset, column, patient }: { study: string; parts: { cohort: string; cohortDef: any }[]; source: string; query?: any; defaults: string[]; mode: "page" | "counts" | "values" | "rank"; limit?: number | null; offset?: number | null; column?: string | null; patient?: string | null }) => {
+        try {
+          if (parts.some((p) => carriesPatientIds(p.cohortDef)))
+            throw new Error("a cohort contains an explicit sample or patient list; identifier lists are not accepted across instances");
+          const { s, res } = await held(study);
+          const q = cleanQuery((query || {}) as TableQuery);
+          const bad = checkQuery(q, TIMELINE_COLUMNS);
+          if (bad) throw new Error(bad);
+          const known = new Set(TIMELINE_COLUMNS.map((c) => c.id));
+          if (defaults.some((d) => !known.has(d))) throw new Error("defaults name unknown columns");
+          const label = source.replace(/[^\w .,()/:-]/g, "").slice(0, 120);
+          const src = (db: string) => timelinePatientRowSource(parts.map((p) => ({ cohort: p.cohort, study: s, cohortSql: res.cohortSql(p.cohortDef), source: label })), db);
+          let out: Record<string, unknown>;
+          if (mode === "counts") out = { counts: await res.rowsCounts("timeline:counts", src, q, defaults) };
+          else if (mode === "values") {
+            if (!column || !known.has(column)) throw new Error("values needs one of the list's columns");
+            out = { values: await res.rowsValues("timeline:values", src, q, defaults, column) };
+          } else if (mode === "rank") {
+            if (!patient || !PATIENT_ID.test(patient)) throw new Error("rank needs a patient id");
+            out = { rank: await res.rowsRank("timeline:rank", src, q, defaults, s, patient) };
+          } else out = { rows: (await res.rowsPage("timeline:rows", src, q, defaults, limit || 25, offset || 0)).rows };
+          const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
+          return {
+            content: [{ type: "text" as const, text: `timeline patient list for ${s} (${mode}) — patient-level, disclosed under MCP_DISCLOSE_PATIENTS` }],
+            structuredContent: { ...out, queries: hideSql ? null : res.queries }
+          };
+        } catch (e) { return rejected(e); }
+      });
+
+    server.registerTool(
+      "federated_patient_timeline",
+      {
+        description:
+          "Patient-level federation endpoint (opt-in: MCP_DISCLOSE_PATIENTS) for another cbio-lab instance's timeline view: every clinical event (days from diagnosis, with all attributes) and the samples of ONE patient of a study THIS instance holds. Returns that patient's record.",
+        inputSchema: { study: z.string().max(120), patient: z.string().max(80) }
+      },
+      async ({ study, patient }: { study: string; patient: string }) => {
+        try {
+          if (!PATIENT_ID.test(patient)) throw new Error("not a patient id");
+          const { s, res } = await held(study);
+          const t = await res.patientTimeline(patient);
+          if (!t.events.length && !t.samples.length) throw new Error(patient + " has no record in " + s);
+          const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
+          return {
+            content: [{ type: "text" as const, text: `timeline of ${patient} (${s}): ${t.events.length} events, ${t.samples.length} samples — patient-level, disclosed under MCP_DISCLOSE_PATIENTS` }],
+            structuredContent: { study: s, patient, events: t.events, samples: t.samples, queries: hideSql ? null : res.queries }
+          };
+        } catch (e) { return rejected(e); }
+      });
+  }
+
   // Faceting counterpart to federated_aggregates: everything the Explore page
   // needs, as aggregates. Same guarantee — attribute names, value counts, gene
   // and event counts; never a patient identifier.
@@ -215,7 +306,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
 
   server.tool(
     "run_analysis",
-    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes), oncoprint, attrition (CONSORT-style counts after each cohort clause), genome (genome-wide copy-number gain/loss frequency from segments), pathways (the ten Sanchez-Vega oncogenic pathways, % altered per cohort), diffexpr (two-cohort differential expression volcano plus preranked GSEA), paired (primary-vs-metastasis or before-vs-after-treatment concordance within patients; omit genes to scan every gene, pairBy.studies to pool studies that label samples differently), clonality (FACETS clonal/subclonal calls, LOH, genome doubling, purity, ploidy), incidence (cumulative incidence of a timeline event with death as a competing risk, Gray's test), labs (a lab value's course and response from a treatment start, e.g. PSA50, with a waterfall), cancertypes (a gene list's alteration frequency per cancer type, the portal's Cancer Types Summary), overlap (how cohorts' patients intersect, as an UpSet plot), enrichment (every gene's alteration frequency compared between cohorts, the portal's Genomic Alterations tab), assays (every entity of a generic-assay profile — mutational signatures, arm-level copy number, treatment response — compared between cohorts), mutations (one gene's mutation table: every call with sample, protein change, OncoKB annotation, allele frequency; patient-level studies only), table (the clinical data table: each sample or patient with every clinical attribute, patient-level studies only), correlates (every gene's expression correlated with one gene's, the portal's Co-expression tab), riskmodel (an OncoCast-style elastic-net Cox ensemble predicting survival from mutated genes, held-out C-index and Kaplan-Meier risk groups; patient-level studies only). Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
+    "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: compare (alteration frequencies with Fisher p), clinical (attribute distributions per cohort), cooccurrence (pairwise 2x2 tests), hotspots (mutation lollipop), coexpression (gene-pair correlation), survival (Kaplan-Meier), cox (multivariate hazard ratios, forest plot), logistic (multivariate logistic regression on a binary outcome, odds ratios), course (event timelines), sequence (treatment-line flows), plot (scatter/box/table of any two axes), oncoprint, attrition (CONSORT-style counts after each cohort clause), genome (genome-wide copy-number gain/loss frequency from segments), pathways (the ten Sanchez-Vega oncogenic pathways, % altered per cohort), diffexpr (two-cohort differential expression volcano plus preranked GSEA), paired (primary-vs-metastasis or before-vs-after-treatment concordance within patients; omit genes to scan every gene, pairBy.studies to pool studies that label samples differently), clonality (FACETS clonal/subclonal calls, LOH, genome doubling, purity, ploidy), incidence (cumulative incidence of a timeline event with death as a competing risk, Gray's test), labs (a lab value's course and response from a treatment start, e.g. PSA50, with a waterfall), cancertypes (a gene list's alteration frequency per cancer type, the portal's Cancer Types Summary), overlap (how cohorts' patients intersect, as an UpSet plot), enrichment (every gene's alteration frequency compared between cohorts, the portal's Genomic Alterations tab), assays (every entity of a generic-assay profile — mutational signatures, arm-level copy number, treatment response — compared between cohorts), mutations (one gene's mutation table: every call with sample, protein change, OncoKB annotation, allele frequency; patient-level studies only), table (the clinical data table: each sample or patient with every clinical attribute, patient-level studies only), timeline (one patient's clinical timeline as on cBioPortal's patient view — treatments, diagnoses, samples, lab values from diagnosis — with the cohorts' patients listed to pick from; patient-level studies only), correlates (every gene's expression correlated with one gene's, the portal's Co-expression tab), riskmodel (an OncoCast-style elastic-net Cox ensemble predicting survival from mutated genes, held-out C-index and Kaplan-Meier risk groups; patient-level studies only). Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
     {
       document: z.object({}).passthrough()
         .describe("The Analysis document: {dsl?, study, cohorts: {name: def (may carry splits), ...}, views: [...]}. Grammar and examples: describe_dsl.")
