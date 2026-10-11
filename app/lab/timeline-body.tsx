@@ -2,14 +2,14 @@
 // The timeline view's card: the chosen patient's timeline (lib/timeline-svg.ts, the same drawing
 // the server sends over MCP) with a tooltip per event and a toggle per nested track, and its drawing
 // settings over its right corner. The navigator above it steps to the patient before or after the
-// drawn one in the list's order — the order its search, filters and sort give it — and opens the
-// list itself (the shared table, app/_table/DataTable.tsx) in a dialog, where a click picks a
-// patient. The cohort is the header's picker, as for every view.
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+// drawn one in the list's order and opens the list in a dialog (app/lab/patient-nav.tsx). The
+// cohort is the header's picker, as for every view.
+import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 import { timelineSvg, timelineSummary } from "../../lib/timeline-svg.ts";
 import { formatDays, sampleMarks, attr } from "../../lib/timeline-tracks.ts";
 import type { PatientEvent, TimelineResult } from "../../lib/types";
+import { PatientNav, PatientsDialog, patientKeys } from "./patient-nav.tsx";
 
 type Spec = { patient?: { study: string; id: string }; collapsed?: string[]; expandGaps?: boolean } & Record<string, unknown>;
 
@@ -49,15 +49,12 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch }: {
   const isSel = (row: { study: string; patient: string }) => p != null && row.study === p.study && row.patient === p.patient;
 
   const go = (to: { study: string; id: string } | null | undefined) => { if (to && !updating) patch({ patient: to }); };
-  const onKey = (e: React.KeyboardEvent) => {
-    if ((e.target as Element).closest?.("input, select, textarea, dialog")) return;
-    if (e.key === "ArrowLeft") { e.preventDefault(); go(t.position?.prev); }
-    if (e.key === "ArrowRight") { e.preventDefault(); go(t.position?.next); }
-  };
+  const onKey = patientKeys(t.position, go);
 
   return (
     <div className="tl-view" tabIndex={-1} onKeyDown={onKey}>
-      <TimelineNav t={t} updating={updating} go={go} openList={() => setListOpen(true)} first={() => patch({ patient: undefined })} />
+      <PatientNav shown={p ? p.patient : null} position={t.position} total={t.total} updating={updating} go={go} what="draw it"
+        openList={() => setListOpen(true)} first={() => patch({ patient: undefined })} />
       {p ? (
         <div className="tl-head">
           <span className="tl-who mono">{p.patient}</span>
@@ -96,55 +93,6 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch }: {
           )}
         </PatientsDialog>
       )}
-    </div>
-  );
-}
-
-/**
- * The patient list as a native modal (Esc, focus trapping and the backdrop are the platform's),
- * mounted while open. Esc inside one of the table's own popovers closes that popover, not the list.
- */
-function PatientsDialog({ title, onClose, children }: { title: string; onClose: () => void; children: (close: () => void) => React.ReactNode }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const popEsc = useRef(false);
-  useEffect(() => { const d = ref.current; if (d && !d.open) d.showModal(); }, []);
-  const close = () => ref.current?.close();
-  return (
-    <dialog ref={ref} className="tl-patients" aria-label={title} onClose={onClose}
-      onKeyDownCapture={(e) => { popEsc.current = e.key === "Escape" && !!ref.current?.querySelector(".dt-pop"); }}
-      onCancel={(e) => { if (popEsc.current) e.preventDefault(); popEsc.current = false; }}
-      onClick={(e) => { if (e.target === ref.current) close(); }}>
-      <div className="tl-patients-head">
-        <h3 className="flush">{title}</h3>
-        <button type="button" className="tbbtn" onClick={close} aria-label="close the patient list">close</button>
-      </div>
-      {children(close)}
-    </dialog>
-  );
-}
-
-/** Prev / next through the cohort's patients in the list's order, and the list itself. */
-function TimelineNav({ t, updating, go, first, openList }: {
-  t: TimelineResult; updating: boolean;
-  go: (to: { study: string; id: string } | null | undefined) => void; first: () => void; openList: () => void;
-}) {
-  const pos = t.position, p = t.patient;
-  const who = (x: { id: string } | null | undefined) => x ? " (" + x.id + ")" : "";
-  return (
-    <div className="viewtb tl-nav">
-      <div className="tbz">
-        <button type="button" className="tbbtn" disabled={updating || !pos?.prev} title={"the patient before this one in the list" + who(pos?.prev) + " — or press ←"}
-          onClick={() => go(pos?.prev)}>‹ prev</button>
-        <span className="tl-pos">
-          {p && pos ? <>patient <b>{(pos.index + 1).toLocaleString()}</b> of {t.total.toLocaleString()}</>
-            : p ? <>{p.patient} is not in the list as filtered</>
-            : <>no patients</>}
-        </span>
-        <button type="button" className="tbbtn" disabled={updating || !pos?.next} title={"the patient after this one in the list" + who(pos?.next) + " — or press →"}
-          onClick={() => go(pos?.next)}>next ›</button>
-        {p && !pos && <button type="button" className="tbbtn" disabled={updating || !t.total} onClick={first} title="draw the list's first patient">go to the first patient</button>}
-        <button type="button" className="tbbtn" onClick={openList} title="the cohort's patients: search, filter, sort, download, and click one to draw it">List/Search</button>
-      </div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { timelineMethod } from "../method.ts";
 import { timelineSvg, timelineSummary } from "../timeline-svg.ts";
 import { timelinePatientRowSource, TIMELINE_COLUMNS, TIMELINE_DEFAULT_COLUMNS, PATIENT_ID } from "../patient-timeline.ts";
 import type { ViewRun } from "./run.ts";
-import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows } from "./rows.ts";
+import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "./rows.ts";
 import { refuse } from "./shared.ts";
 
 export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<ViewResult> {
@@ -82,19 +82,9 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
     } catch (e) { return refuse("timeline", ctx, (e as Error).message); }
   }
 
-  const key = (x: Record<string, unknown> | null | undefined) => x ? { study: String(x.study), id: String(x.patient) } : null;
-  let position: TimelineResult["position"] = null;
-  if (patient && view.patient) position = r.position ? { index: r.position.index, prev: key(r.position.prev), next: key(r.position.next) } : null;
-  else if (patient) {
-    // the list's first patient: its next is the page's second row, or the list's when the page holds one
-    let next = rows[1] ? { study: rows[1].study, id: rows[1].patient } : null;
-    if (!next && r.total > 1) {
-      const again = await runRows(ctx, "timeline", holders, q, defaults, shownColumns(q, TIMELINE_COLUMNS, defaults), 1,
-        (parts) => (db) => timelinePatientRowSource(sourced(parts), db), undefined, remoteOf, { study: patient.study, patient: patient.patient });
-      next = key(again.position?.next);
-    }
-    position = { index: 0, prev: null, next };
-  }
+  const position: TimelineResult["position"] = patient ? await listPosition(r, !!view.patient, (first) =>
+    runRows(ctx, "timeline", holders, q, defaults, shownColumns(q, TIMELINE_COLUMNS, defaults), 1,
+      (parts) => (db) => timelinePatientRowSource(sourced(parts), db), undefined, remoteOf, first)) : null;
 
   const sortName = q.sort ? columns.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null;
   // the figure that travels alone (MCP, exports): the patient's timeline with the view's own track and gap settings

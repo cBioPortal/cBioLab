@@ -3,6 +3,7 @@
 import { isPatientLevel, type PatientLevelCapable, type RemoteTimelineRows, type Resolver } from "../federation.ts";
 import type { TablePart } from "../mutation-table.ts";
 import { cleanQuery, describeQuery, mergeValues, type ColumnValues, type RowSource, type TableQuery } from "../table-query.ts";
+import type { TableRows, ViewResult } from "../types.ts";
 import type { ViewRun } from "./run.ts";
 import { plural } from "./shared.ts";
 
@@ -139,4 +140,33 @@ export function tableTail(r: Rows, q: TableQuery, cols: { id: string; name: stri
     (r.groups > 1 ? "These studies live in " + r.groups + " separate databases, so each database's rows are sorted together and listed in turn. " : "") +
     (multiCohort ? "A patient in two cohorts is listed under each. " : "") +
     (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + "; " + plural(e.patients, "patient") + " in these cohorts)").join(", ") + "." : "");
+}
+
+export type PatientKey = { study: string; id: string };
+/** A shown patient's place in a patient list's one order, and the patients either side — what prev / next step to. */
+export type ListPosition = { index: number; prev: PatientKey | null; next: PatientKey | null } | null;
+
+/**
+ * Where the shown patient falls in its view's patient list. A patient the view names is placed by
+ * the list's own `position` (runRows with `locate`; null when the query leaves it out). With none
+ * named it is the list's first: index 0, its next the page's second row — or, when the page holds
+ * one row, found by `locateFirst` (runRows again, locating the first).
+ */
+export async function listPosition(r: Rows, named: boolean, locateFirst: (first: { study: string; patient: string }) => Promise<Rows>): Promise<ListPosition> {
+  const key = (x: Record<string, unknown> | null | undefined): PatientKey | null => x ? { study: String(x.study), id: String(x.patient) } : null;
+  if (named) return r.position ? { index: r.position.index, prev: key(r.position.prev), next: key(r.position.next) } : null;
+  const first = key(r.rows[0]);
+  if (!first) return null;
+  let next = key(r.rows[1]);
+  if (!next && r.total > 1) next = key((await locateFirst({ study: first.study, patient: first.id })).position?.next);
+  return { index: 0, prev: null, next };
+}
+
+/** The view kinds whose rows are paged, searched, filtered and sorted here (POST /api/view-page, /api/table). */
+export const PAGED_KINDS = ["table", "mutations", "timeline", "alterations"];
+
+/** A table view's rows in its result: its one table — or, for the alterations view, the patient list or the `table` named. */
+export function pagedTable(v: ViewResult, table?: string): TableRows<unknown> | undefined {
+  if (v.alterations) return table ? (v.alterations.tables as Record<string, TableRows<unknown> | undefined>)[table] : v.alterations;
+  return v.table || v.mutations || v.timeline;
 }

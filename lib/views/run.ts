@@ -31,6 +31,8 @@ export interface ViewRun {
   page?: { offset: number; limit: number };
   /** a table view's column whose values to return instead of rows (what its filter offers) */
   values?: string;
+  /** which of a view's tables `page` or `values` reads, for a view that holds several */
+  table?: string;
   /** the oncoprint's answer: a server-drawn figure, or the spec the web app draws from */
   oncoprint?: "svg" | "spec";
 }

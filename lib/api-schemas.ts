@@ -100,6 +100,8 @@ export const ViewPageRequest = z.object({
   offset: z.number().int().min(0).default(0),
   limit: z.number().int().min(1).max(1000).default(25),
   values: z.string().optional(),
+  /** which of the view's tables, for a view that holds several (the alterations view's "mutations", "cna", "sv") */
+  table: z.string().max(40).optional(),
   ...customData,
 });
 
@@ -107,6 +109,7 @@ export const ViewPageRequest = z.object({
 export const TableRequest = z.object({
   doc: z.union([DocEnvelope, z.string()]),
   view: z.number().int().min(0),
+  table: z.string().max(40).optional(),
   ...customData,
 });
 

@@ -327,6 +327,16 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
           (pt.events.length > shown.length ? `\n  … ${pt.events.length - shown.length} later events not listed here (the figure draws all of them)` : "") +
           caveatOf(v) + noteOf(v));
       }
+    } else if (v.kind === "alterations" && v.alterations) {
+      const a = v.alterations, pt = a.patient;
+      const head = `Patient alterations — patients to choose from: ${a.total < a.all ? `${a.total.toLocaleString()} of ${a.all.toLocaleString()} kept by the query` : `${a.total.toLocaleString()}`}; ` + tableText(a);
+      if (!pt) out.push(head + "\n  no patient listed: the list is empty" + caveatOf(v) + noteOf(v));
+      else {
+        const names: Record<string, string> = { mutations: "Mutations", cna: "Copy Number Alterations", sv: "Structural Variants" };
+        out.push(head + `\n${pt.id} (${pt.study}); samples: ${pt.samples.map((x) => x.id + (x.type ? " (" + x.type + ")" : "")).join(", ") || "none"}` +
+          Object.entries(a.tables).map(([k, t]) => `\n${names[k] || k}: ${t!.total < t!.all ? `${t!.total.toLocaleString()} of ${t!.all.toLocaleString()} rows kept by the query` : `${t!.total.toLocaleString()} rows`}; ` + tableText(t!)).join("") +
+          caveatOf(v) + noteOf(v));
+      }
     } else if (v.kind === "overlap") {
       const ov = v.overlap!;
       out.push(`Cohort overlap (patients in exactly these cohorts and no other):\n` +

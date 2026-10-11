@@ -97,7 +97,11 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
   },
   timeline: {
     title: "What is this?",
-    text: "Shows one patient's medical history on a single line of time, as cBioPortal's patient page does: when samples were taken, operations, each treatment and how long it lasted, diagnoses, and lab results drawn as small charts. Time is counted from the day of diagnosis, and long stretches with nothing recorded are cut short (the dashed line). Step to the previous or next patient with the arrows at the top (or the ← and → keys), pick another cohort there, or open the patient list to search, sort and pick one. Studies that only share counts, never individual patients, are named rather than listed."
+    text: "Shows one patient's medical history on a single line of time, as cBioPortal's patient page does: when samples were taken, operations, each treatment and how long it lasted, diagnoses, and lab results drawn as small charts. Time is counted from the day of diagnosis, and long stretches with nothing recorded are cut short (the dashed line). Step to the previous or next patient with the arrows at the top (or the ← and → keys), pick another cohort in the header, or open the patient list to search, sort and pick one. Studies that only share counts, never individual patients, are named rather than listed."
+  },
+  alterations: {
+    title: "What is this?",
+    text: "Lists one patient's genetic changes as cBioPortal's patient page does, in three tables: mutations (the gene, the protein change, whether OncoKB considers it cancer-causing, and how much of the tumour carries it), copy-number changes (genes amplified or deleted outright) and structural variants (fusions and rearrangements). A change found in several of the patient's samples is one row, with a numbered marker for each sample. Cohort % says how common the same kind of change in that gene is across the study. Each table can be searched, filtered, sorted and downloaded on its own. Step to the previous or next patient with the arrows at the top (or the ← and → keys), pick another cohort in the header, or open the patient list to search, sort and pick one."
   },
   correlates: {
     title: "What is this?",

@@ -58,7 +58,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   Figures: **`lib/view-svg.ts`** draws the first kinds' figures itself and hands the rest to
   **`lib/figures/<kind>.ts`**, one module per kind, registered with its title in `lib/figures/index.ts`
   (browser-safe: `app/lab/portal-bodies.tsx` draws from them too); cards: `app/lab/kind-cards.tsx`.
-- **Table views** (`table`, `mutations`, `timeline`'s patient list, and any later view that lists rows) — **every one must
+- **Table views** (`table`, `mutations`, `timeline`'s patient list, `alterations`' list and three tables, and any later view that lists rows) — **every one must
   support the same five things: pagination, search over its text, a filter per column (text
   conditions or a value list for text, a range for numbers), sorting, and a CSV download of every
   row kept — plus choosing the columns shown.** Don't build these per view: a table supplies only a
@@ -70,7 +70,16 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   `rowsCounts`/`rowsValues`/`rowsRank` (asserted in `test/boundary.test.ts`); `lib/views/rows.ts`'s
   `runRows` groups parts per database and pages across them. UI: **`app/_table/DataTable.tsx`**;
   `POST /api/view-page` (a page, or a column's values) and `POST /api/table` (the CSV) serve every
-  table view.
+  table view. A view holding several tables (`alterations`) names one with `table` in those
+  requests (`RunOpts.table`), and `pagedTable()` in `lib/views/rows.ts` picks it from the result.
+- **The `alterations` view** (cBioPortal's patient-view genomic tables, runner `lib/views/alterations.ts`) — one
+  patient's Mutations, Copy Number Alterations and Structural Variants as three table views in one card, each
+  with its own query under its own spec key (`mutations`, `cna`, `sv`); the top-level query is the patient list's.
+  Row sources in **`lib/patient-alterations.ts`** (one row per variant / call / event however many of the
+  patient's samples carry it). Local patient-level participants only — the opt-in peer mode stays timeline-only.
+  Its navigator is the timeline's: **`app/lab/patient-nav.tsx`** (‹ prev / next ›, the List/Search dialog,
+  ← / →) serves every view that shows one patient of a cohort at a time, stepping by the result's `position`
+  (`listPosition()` in `lib/views/rows.ts`).
 - **The `timeline` view** (cBioPortal's patient-view Timeline, runner `lib/views/timeline.ts`) — one
   patient's clinical events as tracks, with its cohort's patients (a table view) to pick from. **`lib/timeline-tracks.ts`** is
   the track model, ported from cbioportal-frontend's `cbioportal-clinical-timeline` package and

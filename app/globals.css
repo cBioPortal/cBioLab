@@ -3,6 +3,8 @@
   --accent: #0f86a1; --accent-ink: #0b6478; --accent-soft: #e3f0f3;
   --line: #dde4e8; --code-bg: #f1f5f7; --mark: #b25e09; --mark-soft: #fbf0e2;
   --ok: #2e7d32; --ok-soft: #e6f2e6; --err: #b3261e; --err-soft: #fbeae9;
+  /* copy-number calls as text: amplification red, deep deletion blue */
+  --amp: #c62828; --del: #1f5fbf;
 
   /* Type: seven steps. Everything picks one; nothing invents a size in between.
      xs = eyebrows and chips, sm = secondary UI text, md = controls, base = prose. */
@@ -23,6 +25,7 @@
     --accent: #45b8c2; --accent-ink: #7fd3da; --accent-soft: #16333a;
     --line: #2a353c; --code-bg: #1a242a; --mark: #e0a35c; --mark-soft: #35270f;
     --ok: #7bc47f; --ok-soft: #17301a; --err: #f2b8b5; --err-soft: #3a2323;
+    --amp: #ff8a80; --del: #82b1ff;
   }
 }
 * { box-sizing: border-box; }
@@ -1542,7 +1545,7 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .portal-chooser { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s2); }
 .pb-loading { opacity: 0.45; transition: opacity 0.15s; }
 .pb-pager .tbbtn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-.pb-pager { flex-wrap: wrap; }
+.pb-pager .tbz { flex-wrap: wrap; }
 
 /* ---- table views (app/_table/DataTable.tsx): search, column filters, column chooser, CSV ---- */
 .dt { display: flex; flex-direction: column; gap: var(--s2); }
@@ -1683,6 +1686,12 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .tl-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s3); }
 .tl-who { font-weight: 600; }
 .tl-sample { display: inline-flex; align-items: center; gap: 0.3rem; font-size: var(--t-sm); }
+/* the alterations view: one patient's three tables, one under the other */
+.alt-table { margin-top: var(--s2); }
+.alt-samples { display: inline-flex; gap: 2px; vertical-align: middle; }
+.alt-cna { font-weight: 600; }
+.alt-cna.amp { color: var(--amp); }
+.alt-cna.del { color: var(--del); }
 .tl-fig { position: relative; border: 1px solid var(--line); border-radius: var(--r-md); background: #fff; overflow-x: auto; }
 .tl-fig.stale { opacity: 0.5; }
 .tl-fig .tl-m { cursor: default; }
