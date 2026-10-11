@@ -1,13 +1,13 @@
 // Oncoprint view: genes by patients, built from patient-level participants only (its columns
 // ARE patients) — the rest are named as left out.
-import { buildContract, PIDS_SQL } from "../oncoprint.ts";
+import { buildContract, PIDS_SQL, type PidsCarrier } from "../oncoprint.ts";
 import { geneSymbols } from "../gene-tracks.ts";
 import { varianceFromMoments } from "../stats.ts";
 import { contractToSvg } from "../oncoprint-svg.ts";
 import type { ViewResult, OncoprintView, ZReference } from "../types.ts";
-import type { PidsCarrier } from "../oncoprint.ts";
 import { isPatientLevel } from "../federation.ts";
-import { untimed, overLimit, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { overLimit } from "./shared.ts";
 
 export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;

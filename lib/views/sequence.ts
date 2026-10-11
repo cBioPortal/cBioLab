@@ -4,10 +4,11 @@ import { lineClassesParam } from "../cohort2.ts";
 import { lineGapOf, DEFAULT_LINE_GAP } from "../treatment-lines.ts";
 import { viewToSvg } from "../view-svg.ts";
 import type { ViewResult, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind } from "../types.ts";
-import { type SequenceOpts, SEQUENCE_ROW_LIMIT } from "../federation.ts";
+import { SEQUENCE_ROW_LIMIT, type SequenceOpts } from "../federation.ts";
 import { canonicalEventName } from "../event-names.ts";
 import { sequenceMethod } from "../method.ts";
-import { untimed, overLimit, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { overLimit } from "./shared.ts";
 
 export async function runSequence(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor } = c;

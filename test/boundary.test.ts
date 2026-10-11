@@ -132,12 +132,12 @@ describe("aggregate-only resolvers cannot expose patient-level data", () => {
   });
 
   test("the per-patient rows behind a waterfall are the same kind of missing method", () => {
-    assert.equal(typeof (agg as unknown as { moreRows?: unknown }).moreRows, "undefined");
-    assert.equal(typeof (pl as unknown as { moreRows?: unknown }).moreRows, "function");
+    assert.equal(typeof (agg as unknown as { viewRows?: unknown }).viewRows, "undefined");
+    assert.equal(typeof (pl as unknown as { viewRows?: unknown }).viewRows, "function");
     // and a remote peer answers neither the per-patient rows nor the new aggregates
-    const remote = RemoteAggregateResolver.prototype as unknown as { moreRows?: unknown; moreAggregate?: unknown };
-    assert.equal(typeof remote.moreRows, "undefined");
-    assert.equal(typeof remote.moreAggregate, "undefined");
+    const remote = RemoteAggregateResolver.prototype as unknown as { viewRows?: unknown; viewAggregate?: unknown };
+    assert.equal(typeof remote.viewRows, "undefined");
+    assert.equal(typeof remote.viewAggregate, "undefined");
   });
 
   test("isPatientLevel discriminates correctly", () => {
@@ -303,7 +303,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // Same shape as coxRowsSql: the outcome is just another axis-selected CTE, joined the same
     // way — no identifier ever reaches the outer SELECT here either.
     "logisticRowsSql": () => logisticRowsSql(cohortSql, { label: "y0", sel: catAxis }, [{ label: "c0", sel: numAxis }]),
-    // lib/federation-more.ts, re-exported through lib/federation.ts: the genome view's bins group
+    // lib/federation-views.ts, re-exported through lib/federation.ts: the genome view's bins group
     // the sample id away inside `binned`; only (chrom, bin) and counts cross.
     "genomeBinsSql": () => federation.genomeBinsSql(cohortSql, "x", "db", { binBp: 2e6, threshold: 0.2, includeX: false }),
     "genomeBinsSql:withX": () => federation.genomeBinsSql(cohortSql, "x", "db", { binBp: 1e6, threshold: 0.3, includeX: true }),
@@ -337,9 +337,9 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // labs: per-patient % changes stay inside; the course and best-response queries return histograms
     "labCourseSql": () => federation.labCourseSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS),
     "labBestSql": () => federation.labBestSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS, 50),
-    // one row per patient — its best % change — but no identifier; run only by PatientLevelResolver.moreRows
+    // one row per patient — its best % change — but no identifier; run only by PatientLevelResolver.viewRows
     "labWaterfallSql": () => federation.labWaterfallSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS, 5000),
-    // run only by PatientLevelResolver.moreRows: one row per patient, values only
+    // run only by PatientLevelResolver.viewRows: one row per patient, values only
     "riskmodelRowsSql": () => federation.riskmodelRowsSql(cohortSql, "x", "db", { endpoint: "OS", strata: "CANCER_TYPE", driverPin: "v7",
       covariates: ["AGE", "STAGE"], anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Immuno" } }),
     "riskmodelPanelGenesSql": () => federation.riskmodelPanelGenesSql("x", "db"),

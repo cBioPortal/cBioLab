@@ -1,5 +1,7 @@
-// Every view kind with its own runner, by kind.
-import type { ViewRunner } from "./run.ts";
+// Every view kind's runner, by kind.
+import type { ViewResult } from "../types.ts";
+import { viewToSvg } from "../view-svg.ts";
+import type { DocView, ViewRun, ViewRunner } from "./run.ts";
 import { runCompare } from "./compare.ts";
 import { runSurvival } from "./survival.ts";
 import { runCox } from "./cox.ts";
@@ -12,6 +14,36 @@ import { runCoexpression } from "./coexpression.ts";
 import { runClinical } from "./clinical.ts";
 import { runCooccurrence } from "./cooccurrence.ts";
 import { runOncoprint } from "./oncoprint.ts";
+import { runAttrition } from "./attrition.ts";
+import { runGenome } from "./genome.ts";
+import { runPathways } from "./pathways.ts";
+import { runDiffexpr } from "./diffexpr.ts";
+import { runPaired } from "./paired.ts";
+import { runClonality } from "./clonality.ts";
+import { runIncidence } from "./incidence.ts";
+import { runLabs } from "./labs.ts";
+import { runRiskmodel } from "./riskmodel.ts";
+import { runCancertypes } from "./cancertypes.ts";
+import { runOverlap } from "./overlap.ts";
+import { runEnrichment } from "./enrichment.ts";
+import { runAssays } from "./assays.ts";
+import { runCorrelates } from "./correlates.ts";
+import { runTable } from "./table.ts";
+import { runMutations } from "./mutations.ts";
+
+/**
+ * A runner that draws no figure of its own and lets a throw stand for its error: the figure is drawn
+ * from the result (lib/view-svg.ts), and an error is reported as the view's, with its cohorts.
+ */
+function drawn<V>(run: (view: V, c: ViewRun) => Promise<ViewResult>): ViewRunner {
+  return async (view: DocView, c: ViewRun) => {
+    let r: ViewResult;
+    try { r = await run(view as V, c); }
+    catch (e) { r = { kind: view.kind, cohorts: c.vNames, error: (e as Error).message }; }
+    if (!r.error && !r.svg) r.svg = viewToSvg(r) || undefined;
+    return r;
+  };
+}
 
 const RUNNERS: Record<string, ViewRunner> = {
   compare: runCompare,
@@ -26,9 +58,25 @@ const RUNNERS: Record<string, ViewRunner> = {
   clinical: runClinical,
   cooccurrence: runCooccurrence,
   oncoprint: runOncoprint,
+  attrition: drawn(runAttrition),
+  genome: drawn(runGenome),
+  pathways: drawn(runPathways),
+  diffexpr: drawn(runDiffexpr),
+  paired: drawn(runPaired),
+  clonality: drawn(runClonality),
+  incidence: drawn(runIncidence),
+  labs: drawn(runLabs),
+  riskmodel: drawn(runRiskmodel),
+  cancertypes: drawn(runCancertypes),
+  overlap: drawn(runOverlap),
+  enrichment: drawn(runEnrichment),
+  assays: drawn(runAssays),
+  correlates: drawn(runCorrelates),
+  table: drawn(runTable),
+  mutations: drawn(runMutations),
 };
 
-/** the runner for a view kind, or undefined for a kind runAnalysis hands elsewhere (or does not know) */
+/** the runner for a view kind, or undefined for a kind runAnalysis does not know */
 export function viewRunner(kind: unknown): ViewRunner | undefined {
   const k = String(kind);
   return Object.hasOwn(RUNNERS, k) ? RUNNERS[k] : undefined;

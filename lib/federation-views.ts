@@ -1,4 +1,5 @@
-// Aggregate SQL for the view kinds in lib/views-more.ts. Same rules as every builder in
+// Aggregate SQL behind the view kinds in lib/views/ that query through a resolver's viewAggregate,
+// viewAggregateMany and viewMeta (genome, pathways, enrichment, …). Same rules as every builder in
 // lib/federation.ts, which re-exports these so test/boundary.test.ts sweeps them with the rest:
 // the outer SELECT returns counts, sums and grouping keys — never an identifier — so any
 // participant, aggregate-only included, can answer.
@@ -592,7 +593,7 @@ export function labBestSql(cohortSql: string, study: string, db: string, lab: La
 
 /**
  * Each patient's best % change, one row per patient and no identifier — the values behind a
- * waterfall. Patient-level: only PatientLevelResolver.moreRows runs it, the same entitlement
+ * waterfall. Patient-level: only PatientLevelResolver.viewRows runs it, the same entitlement
  * that lets a plot draw its points.
  */
 export function labWaterfallSql(cohortSql: string, study: string, db: string, lab: LabSpec, anchor: IncidenceAnchor, o: LabOpts, cap: number): string {
@@ -929,7 +930,7 @@ export interface RiskmodelRowsOpts {
  * mutated in them (OncoKB drivers only with `driverPin`), their stratum and covariate values, and
  * which half of the engine's fixed held-out split they are in (`half`, the split leaf's own
  * expression). Values only: the patient id is a join key and never leaves the CTEs. Run only
- * through PatientLevelResolver.moreRows, since a model of individual patients needs their rows.
+ * through PatientLevelResolver.viewRows, since a model of individual patients needs their rows.
  */
 export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o: RiskmodelRowsOpts): string {
   const { endpoint, columns, strata = null, covariates = [], driverPin = null, anchor = null } = o;

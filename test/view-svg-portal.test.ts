@@ -1,4 +1,4 @@
-// Renderers for the view kinds in lib/views-portal.ts: pure functions of a ViewResult, no database.
+// Renderers for the view kinds in lib/view-svg-portal.ts: pure functions of a ViewResult, no database.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg, viewTitle } from "../lib/view-svg.ts";

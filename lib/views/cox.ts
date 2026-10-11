@@ -6,7 +6,8 @@ import type { ViewResult, SurvivalView, CoxView, CoxCoefficient, CoxCovariate } 
 import { isPatientLevel, type EndpointColumns } from "../federation.ts";
 import { axisLabel, validateAxis, type AxisKind } from "../plot.ts";
 import { coxMethod, type CoxTrace } from "../method.ts";
-import { untimed, overLimit, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { overLimit } from "./shared.ts";
 
 export interface CoxColumn { axisIndex: number; label: string; reference?: string; level?: string }
 /**

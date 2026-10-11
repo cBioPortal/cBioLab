@@ -3,7 +3,8 @@ import { geneSymbols } from "../gene-tracks.ts";
 import { buildLollipopGene, fetchProteinInfo, checkHide } from "../lollipop.ts";
 import { viewToSvg } from "../view-svg.ts";
 import type { ViewResult, HotspotsView, HotspotGene } from "../types.ts";
-import { untimed, overLimit, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { overLimit } from "./shared.ts";
 
 export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor, pin } = c;

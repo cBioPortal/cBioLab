@@ -6,7 +6,8 @@ import { fisherExact, benjaminiHochberg, chiSquareTest } from "../stats.ts";
 import type { ViewResult, CompareRow, CompareCell, CompareView } from "../types.ts";
 import { isPatientLevel, type GeneCounts } from "../federation.ts";
 import { compareMethod } from "../method.ts";
-import { untimed, overLimit, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { overLimit } from "./shared.ts";
 
 /** the three alteration types a compare-view gene's "any alteration" figure combines */
 export const ALTERATION_TYPES = ["mutation", "cna", "structuralVariant"] as const;

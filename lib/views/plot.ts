@@ -1,10 +1,9 @@
 // Plot view: two axes over one cohort's cases, drawn as a scatter, box or contingency table as
 // the axes decide; local, or federated where every participant can answer.
-import type { PlotView } from "../types.ts";
+import type { PlotView, ViewResult } from "../types.ts";
 import { pearsonFromMoments, regressionFromMoments, type Moments } from "../stats.ts";
 import { viewToSvg } from "../view-svg.ts";
-import type { ViewResult } from "../types.ts";
-import { isPatientLevel, hasFederatedPlot, type Resolver, type FederatedPlotCapable, legendFor } from "../federation.ts";
+import { isPatientLevel, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable } from "../federation.ts";
 import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, tukey, coverageNote, type PlotData, type PlotGroup } from "../plot.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
 
