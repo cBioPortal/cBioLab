@@ -1689,6 +1689,7 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 /* the alterations view: one patient's three tables, one under the other */
 .alt-table { margin-top: var(--s2); }
 .alt-samples { display: inline-flex; gap: 2px; vertical-align: middle; }
+.alt-key { flex-basis: 100%; margin: 0; }
 .alt-cna { font-weight: 600; }
 .alt-cna.amp { color: var(--amp); }
 .alt-cna.del { color: var(--del); }

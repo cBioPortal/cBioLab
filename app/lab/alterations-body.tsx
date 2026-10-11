@@ -34,19 +34,26 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch }: {
     const next = Object.fromEntries(Object.entries({ ...q, rows }).filter(([, x]) => x !== undefined));
     patch({ [key]: Object.keys(next).length ? next : undefined });
   };
-  const sampleCell = (x: unknown) => (
-    <span className="alt-samples">
-      {String(x || "").split(", ").filter(Boolean).map((id) => {
-        const m = marks.get(id);
-        return (
-          <svg key={id} width="14" height="14" role="img" aria-label={id}>
-            <title>{id + (m?.type ? " — " + m.type : "")}</title>
-            <circle cx="7" cy="7" r="7" fill={m ? m.color : "var(--muted)"} />
-            <text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m ? m.label : "?"}</text>
-          </svg>);
-      })}
-    </span>
-  );
+  // one slot per sample of the patient, in sample order: filled where the sample carries the row's alteration,
+  // an empty ring where it does not — so a row reads as one alteration across the patient's samples
+  const sampleCell = (x: unknown) => {
+    const has = new Set(String(x || "").split(", ").filter(Boolean));
+    const slots = [...marks.values()].map((m) => ({ id: m.id, label: m.label, color: m.color, type: m.type }));
+    for (const id of has) if (!marks.has(id)) slots.push({ id, label: "?", color: "var(--muted)", type: "" });
+    return (
+      <span className="alt-samples" aria-label={"in " + [...has].join(", ")}>
+        {slots.map((m) => {
+          const on = has.has(m.id);
+          return (
+            <svg key={m.id} width="14" height="14" aria-hidden="true">
+              <title>{m.id + (m.type ? " — " + m.type : "") + (on ? "" : ": not found in this sample")}</title>
+              {on ? <circle cx="7" cy="7" r="7" fill={m.color} /> : <circle cx="7" cy="7" r="6.25" fill="none" stroke="var(--line)" strokeWidth="1.5" />}
+              <text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill={on ? "white" : "var(--muted)"}>{m.label}</text>
+            </svg>);
+        })}
+      </span>
+    );
+  };
 
   return (
     <div className="tl-view" tabIndex={-1} onKeyDown={patientKeys(a.position, go)}>
@@ -61,6 +68,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch }: {
               <svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>
               <span className="mono">{m.id}</span>
             </span>))}
+          <span className="note alt-key">Each row is one alteration in one gene across these samples: a filled marker is a sample that carries it, an empty ring one that does not.</span>
         </div>
       ) : <p className="meta">No patient to list: the cohort's patient list is empty.</p>}
       {p && TABLES.map(({ key, name }) => {
