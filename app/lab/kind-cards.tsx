@@ -32,6 +32,8 @@ export interface KindCardSpec {
   genes?: boolean;
   /** the most cohorts this view can draw at once */
   maxCohorts?: number;
+  /** the header's subtitle names the one cohort drawn, so the header leaves out its "Showing" line */
+  cohortInHeader?: boolean;
   /** why the add button is disabled for this study, or null when it can be added */
   why?: (known: Known) => string | null;
 }
@@ -55,7 +57,7 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
       : !k.assays.length ? "this study has no generic-assay profiles (mutational signatures, arm-level copy number, …)" : null },
   table: { label: "Clinical data table (download)", title: "Clinical data", maxCohorts: 6 },
   mutations: { label: "Mutation table (one gene)", title: "Mutations", maxCohorts: 6 },
-  timeline: { label: "Patient timeline (one patient at a time)", title: "Patient timeline", maxCohorts: 1,
+  timeline: { label: "Patient timeline (one patient at a time)", title: "Patient timeline", maxCohorts: 1, cohortInHeader: true,
     why: (k) => k.events.length ? null : "this study records no timeline events" },
   correlates: { label: "Co-expression with one gene (genome-wide)", title: "Co-expression", maxCohorts: 1,
     why: (k) => !k.profiles.filter((p) => p !== "cna").length ? "this study has no continuous molecular profile (mRNA, protein, …) to correlate on" : null },
@@ -116,7 +118,10 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     (spec.measure === "driver" ? " (drivers)" : "") + " in every gene, per sample";
   if (kind === "overlap") return "patients in exactly each combination of cohorts";
   if (kind === "mutations") return (spec.gene || "no gene") + " · every mutation call" + (v.mutations ? " · " + v.mutations.total.toLocaleString() + " rows" : "");
-  if (kind === "timeline") return (v.timeline?.patient ? v.timeline.patient.patient + " · " : "") + "clinical events from diagnosis" + (v.timeline ? " · " + v.timeline.total.toLocaleString() + " patients" : "");
+  if (kind === "timeline") {
+    const cohort = Array.isArray(v.cohorts) && v.cohorts[0] ? String(v.cohorts[0]).split(" / ").join(" › ") : null;
+    return <>{cohort && <><strong>{cohort}</strong> · </>}{v.timeline ? v.timeline.total.toLocaleString() + " patients · " : ""}clinical events from diagnosis</>;
+  }
   if (kind === "table") return "one row per " + (spec.unit === "patient" ? "patient" : "sample") + (v.table ? " · " + v.table.total.toLocaleString() + " rows, " + v.table.columns.length + " attributes" : "");
   if (kind === "correlates") return (spec.gene || "no gene") + " on " + (spec.profileType || "no profile") + (spec.otherProfile && spec.otherProfile !== spec.profileType ? " against " + spec.otherProfile : "") + " · Spearman ρ, every gene";
   if (kind === "assays") return (v.assays ? v.assays.profileName + " · " + v.assays.test : spec.profileType || "no profile chosen") + ", per " + (v.assays ? v.assays.unit.replace(/s$/, "") : "sample");

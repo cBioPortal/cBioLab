@@ -418,8 +418,10 @@ export function CohortStudies({ ids, names }: { ids: string[]; names: Map<string
  * Before this each view kind built its own, so the timing chip landed in a different place
  * in each card.
  */
-export function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onMoveDown, onRemove, onEditNote, menuStore }: {
+export function ViewHead({ v, title, sub, actions, chips, cohorts, cohortInSub, onMoveUp, onMoveDown, onRemove, onEditNote, menuStore }: {
   v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode;
+  /** `sub` names the cohort drawn, so the "Showing" line under the header is left out */
+  cohortInSub?: boolean;
   onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void; onEditNote?: () => void; menuStore: Map<string, boolean>;
   /** which cohorts this view draws; absent when the document has only one */
   cohorts?: { chosen: string[]; all: string[]; nodes: CohortNode[]; drawn: string[]; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void };
@@ -450,7 +452,7 @@ export function ViewHead({ v, title, sub, actions, chips, cohorts, onMoveUp, onM
           reader's aside about the figure ViewHead just named, not something
           that competes with the title for the first thing read. Plain text
           by design, see .viewnote in globals.css for why it's never markdown. */}
-      {cohorts && !v.error && <DrawnCohorts drawn={cohorts.drawn} nodes={cohorts.nodes} />}
+      {cohorts && !cohortInSub && !v.error && <DrawnCohorts drawn={cohorts.drawn} nodes={cohorts.nodes} />}
       {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
       <SplitByNote v={v} />
     </>

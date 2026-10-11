@@ -919,6 +919,9 @@ async function main() {
       const who = async () => (await page.locator(".tl-who").innerText()).trim();
       const marks = await page.locator(".tl-fig .tl-m").count();
       ok("timeline: draws the named patient's events", (await who()) === "P-0000012" && marks > 100, (await who()) + " · " + marks + " marks");
+      const head = await page.locator(".vtitle", { hasText: /patient timeline/i }).innerText();
+      const card = page.locator(".tl-view").locator("xpath=ancestor::*[contains(@class,'card')][1]");
+      ok("timeline: the header names the cohort (no Showing line) and not the patient", /All patients/.test(head) && !/P-0000012/.test(head) && (await card.locator(".viewcohorts").count()) === 0, head);
       const askew = await misalignedControls(page, ".tl-view");
       ok("timeline: its controls share one height and centre line (navigator, settings)", askew.length === 0 && (await page.locator(".tl-view .tbz").count()) === 2, askew.join(" | "));
       const foot = await page.locator(".tl-view .vfoot").innerText();
