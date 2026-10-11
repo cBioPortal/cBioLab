@@ -290,6 +290,22 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
    are pinned against lifelines/statsmodels/scipy/gseapy by `test/*-golden.test.ts`
    (fixtures from `python/golden/`, regenerated with `uv run`).
 
+13. **`/verification` reports what the checks found; it never restates a claim by hand.** It is the
+   report of an automated verification suite meant to run in CI: `npm run verify` runs every stage
+   (unit tests, `check:methods`, then the three below with `RECORD=1`), fails on any failing check,
+   and writes `docs/verification/*.json` — the report CI should keep as an artifact and the page
+   reads (today it is recorded by hand and committed; there is no CI yet). The page is written for
+   bench scientists and PIs and opens by saying what the suite is and what it depends on (the public
+   cbioportal.org API, the warehouse, the studies named in the scripts). The three: `check:portal` (counts, gene frequencies and
+   filtered cohorts against cbioportal.org's public API — exact, no tolerance), `check:cohorts` (the
+   cohort algebra — and/or/not, splits, line nesting, held-out halves — as set arithmetic over
+   patient ids) and `check:mutants` (plants each bug in `scripts/check-mutants.ts` into a temp copy
+   and requires a check to fail). The first two are gate stages. A new statistic gets a row in
+   `lib/verification.ts` (`test/verification.test.ts` fails otherwise); new cohort or count logic
+   should get a planted bug that proves some check would notice it breaking. A planted bug that
+   cannot change any result on this warehouse (e.g. `cna >= 1`, when only ±2 is stored) proves
+   nothing — replace it rather than counting it.
+
 ## UI conventions — the layout system
 
 Added by a design audit of the analysis page; `scripts/layout-metrics.cjs` measures whether it

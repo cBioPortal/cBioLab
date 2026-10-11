@@ -1,0 +1,149 @@
+{
+ "ranAt": "2026-10-11T14:24:40.272Z",
+ "commit": "af2f1d7",
+ "total": 14,
+ "caught": 14,
+ "mutants": [
+  {
+   "id": "km-censored-as-death",
+   "layer": "statistics",
+   "effect": "Survival curves count patients who were still alive at last follow-up as deaths, so every curve drops too fast.",
+   "file": "lib/stats.ts",
+   "guard": "unit",
+   "caught": true,
+   "failures": 9,
+   "evidence": "not ok 1 - with no competing event, cumulative incidence is exactly 1 − Kaplan–Meier, delayed entry included"
+  },
+  {
+   "id": "km-never-leave-risk-set",
+   "layer": "statistics",
+   "effect": "Patients stay in the at-risk group after they leave the study, so later deaths look rarer and curves sit too high.",
+   "file": "lib/stats.ts",
+   "guard": "unit",
+   "caught": true,
+   "failures": 17,
+   "evidence": "not ok 1 - with no competing event, cumulative incidence is exactly 1 − Kaplan–Meier, delayed entry included"
+  },
+  {
+   "id": "logrank-variance",
+   "layer": "statistics",
+   "effect": "The log-rank test overstates its variance when deaths are tied, so survival differences look less significant than they are.",
+   "file": "lib/stats.ts",
+   "guard": "unit",
+   "caught": true,
+   "failures": 6,
+   "evidence": "not ok 1 - Freireich 6-MP vs placebo: chi2 = 16.79, p = 4.2e-5"
+  },
+  {
+   "id": "fisher-one-sided",
+   "layer": "statistics",
+   "effect": "Fisher's exact test only counts tables in one direction, so mutual-exclusivity and enrichment p-values come out too small.",
+   "file": "lib/stats.ts",
+   "guard": "unit",
+   "caught": true,
+   "failures": 30,
+   "evidence": "not ok 1 - Fisher's tea-taster 4x4 split gives p = 0.4857"
+  },
+  {
+   "id": "bh-not-monotone",
+   "layer": "statistics",
+   "effect": "Multiple-testing correction skips a step, so a gene with a weaker p-value can be reported as more significant than a stronger one.",
+   "file": "lib/stats.ts",
+   "guard": "unit",
+   "caught": true,
+   "failures": 4,
+   "evidence": "not ok 2 - 7 p-values"
+  },
+  {
+   "id": "cox-breslow-ties",
+   "layer": "statistics",
+   "effect": "Hazard ratios handle patients who die on the same day with a cruder formula than the one the method states (Breslow, not Efron).",
+   "file": "lib/stats.ts",
+   "guard": "unit",
+   "caught": true,
+   "failures": 4,
+   "evidence": "not ok 2 - mixed covariates, heavy ties — binary + unscaled age + a 3-level categorical; integer-month times put many deaths at the same time"
+  },
+  {
+   "id": "welch-student-df",
+   "layer": "statistics",
+   "effect": "The t-test assumes both groups have the same spread when they do not, so p-values are wrong for unequal groups.",
+   "file": "lib/stats.ts",
+   "guard": "unit",
+   "caught": true,
+   "failures": 7,
+   "evidence": "not ok 1 - case 1: n 40 vs 55"
+  },
+  {
+   "id": "and-as-or",
+   "layer": "cohorts",
+   "effect": "A cohort written as \"A and B\" contains everyone with A or B.",
+   "file": "lib/cohort2.ts",
+   "guard": "cohort-logic",
+   "caught": true,
+   "failures": 14,
+   "evidence": "FAIL [msk_chord_2024] \"A and B\" is exactly the patients in both A and B  (A and B: engine 19,032, expected 6,241 (12791 extra, 0 missing))"
+  },
+  {
+   "id": "or-as-and",
+   "layer": "cohorts",
+   "effect": "A cohort written as \"A or B\" contains only patients with both.",
+   "file": "lib/cohort2.ts",
+   "guard": "cohort-logic",
+   "caught": true,
+   "failures": 10,
+   "evidence": "FAIL [msk_chord_2024] \"A or B\" is exactly the patients in either  (A or B: engine 6,241, expected 19,032 (0 extra, 12791 missing))"
+  },
+  {
+   "id": "split-arms-overlap",
+   "layer": "cohorts",
+   "effect": "Splitting a cohort into arms (KRAS G12C, then other KRAS, then wild-type) puts G12C patients in two arms at once.",
+   "file": "lib/cohort-partitions.ts",
+   "guard": "cohort-logic",
+   "caught": true,
+   "failures": 4,
+   "evidence": "FAIL [msk_chord_2024] the engine reports that the split's children add up to the parent  (0 + 916 + 2,194 + 7,809 = 10,919 of 7,809)"
+  },
+  {
+   "id": "denominator-ignores-panel",
+   "layer": "counts",
+   "effect": "A gene's frequency is divided by samples on the largest panel instead of samples whose panel actually covers that gene, so genes on smaller panels look rarer than they are.",
+   "file": "lib/explore.ts",
+   "guard": "portal-parity",
+   "caught": true,
+   "failures": 33,
+   "evidence": "FAIL nsclc_ctdx_msk_2022 mutations: PTEN  ours 77/2621 / cBioPortal 77/1257"
+  },
+  {
+   "id": "cna-denominator-double-count",
+   "layer": "counts",
+   "effect": "Whole-exome samples with two copy-number profiles are counted twice in the denominator, halving every copy-number frequency.",
+   "file": "lib/explore.ts",
+   "guard": "portal-parity",
+   "history": "Shipped once: brca_tcga MYC amplification read 10.6% where cBioPortal says 21.2%.",
+   "caught": true,
+   "failures": 30,
+   "evidence": "FAIL brca_tcga copy number: MYC amplified  ours 229/2160 / cBioPortal 229/1080"
+  },
+  {
+   "id": "mutation-includes-cna",
+   "layer": "counts",
+   "effect": "\"TP53: MUT\" also selects patients whose TP53 has only a copy-number change.",
+   "file": "lib/oql.ts",
+   "guard": "portal-parity",
+   "caught": true,
+   "failures": 4,
+   "evidence": "FAIL brca_tcga cohort: patients with a PIK3CA mutation (OQL \"PIK3CA: MUT\")  ours 352 / cBioPortal 317"
+  },
+  {
+   "id": "deletion-includes-amplification",
+   "layer": "counts",
+   "effect": "\"Deeply deleted\" also selects amplified patients, so a CDKN2A-loss cohort contains CDKN2A-amplified tumours.",
+   "file": "lib/oql.ts",
+   "guard": "portal-parity",
+   "caught": true,
+   "failures": 1,
+   "evidence": "FAIL nsclc_ctdx_msk_2022 cohort: patients with CDKN2A deeply deleted (OQL \"CDKN2A: HOMDEL\")  ours 137 / cBioPortal 136"
+  }
+ ]
+}

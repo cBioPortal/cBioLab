@@ -31,6 +31,7 @@ export default function ReproductionsPage() {
       <div className="repro-nav">
         <a href="/lab">← back to the app</a>
         <a href="/rationale">rationale</a>
+        <a href="/verification">how we verify</a>
         <span className="spacer" />
         <PageTools kind="reproductions" />
       </div>
