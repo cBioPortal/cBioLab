@@ -21,20 +21,23 @@ set -euo pipefail
 cd "$(cd "$(dirname "$0")/.." && pwd)"
 export NEXT_DIST_DIR=.next-gate
 PORT="${GATE_PORT:-3100}"
+# Each stage prints a summary here; under CI (GitHub Actions sets CI=true) it prints its whole log,
+# which is what a failed run needs to be diagnosed from.
+summary() { if [ -n "${CI:-}" ]; then cat; else "$@"; fi; }
 
 echo "== $(git branch --show-current 2>/dev/null || echo detached) @ $(git rev-parse --short HEAD)$([ -n "$(git status --porcelain)" ] && echo ' + uncommitted changes') =="
-echo "== build (-> $NEXT_DIST_DIR) ==" && npm run build 2>&1 | tail -3
-echo "== unit =="                      && npm test 2>&1 | grep -E "^# (tests|pass|fail)"
-echo "== postgres (stores, migrations, triggers) ==" && npm run test:db 2>&1 | grep -E "^# (tests|pass|fail)"
-echo "== counts against cBioPortal ==" && npm run check:portal 2>&1 | grep -E "^FAIL|comparisons"
-echo "== cohort logic =="              && npm run check:cohorts 2>&1 | grep -E "^FAIL|cohort-logic checks"
-echo "== method scripts =="            && npm run check:methods 2>&1 | grep -E "^FAIL|method records present|FAILED"
+echo "== build (-> $NEXT_DIST_DIR) ==" && npm run build 2>&1 | summary tail -3
+echo "== unit =="                      && npm test 2>&1 | summary grep -E "^# (tests|pass|fail)"
+echo "== postgres (stores, migrations, triggers) ==" && npm run test:db 2>&1 | summary grep -E "^# (tests|pass|fail)"
+echo "== counts against cBioPortal ==" && npm run check:portal 2>&1 | summary grep -E "^FAIL|comparisons"
+echo "== cohort logic =="              && npm run check:cohorts 2>&1 | summary grep -E "^FAIL|cohort-logic checks"
+echo "== method scripts =="            && npm run check:methods 2>&1 | summary grep -E "^FAIL|method records present|FAILED"
 echo "== python conformance (lib/oncoprint-*.ts vs python/cohortlab) =="
 # with the plot extra: /oncoprint-lab/cli runs this interpreter and draws with matplotlib, so a
 # venv without it would turn that page's "not present" note into a traceback
 [ -d python/.venv ] || python3 -m venv python/.venv
 python/.venv/bin/pip install -q -e 'python[plot]'
-python/.venv/bin/python -m unittest discover -s python/tests -v 2>&1 | tail -20
+python/.venv/bin/python -m unittest discover -s python/tests -v 2>&1 | summary tail -20
 echo "== e2e =="
 fuser -k $PORT/tcp 2>/dev/null || true
 sleep 2

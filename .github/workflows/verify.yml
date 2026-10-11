@@ -1,0 +1,89 @@
+# The whole gate, on every pull request and every push to master: build, unit tests, the stores'
+# Postgres tests, the counts against cBioPortal, the cohort logic, the method scripts, the Python
+# port's conformance and the e2e suite (scripts/gate.sh), then the planted-bug check. The report
+# /verification displays (docs/verification/*.json) is kept as this run's artifact.
+#
+# Needs these repository secrets: the warehouse's read-only login (CLICKHOUSE_URL, CLICKHOUSE_USER,
+# CLICKHOUSE_PASSWORD, CLICKHOUSE_DB) and, for the federation checks, the second instance's
+# (CLICKHOUSE2_URL, _USER, _PASSWORD, _DB, _LABEL; leave them unset to run without one). The warehouse
+# must accept connections from GitHub's runners. Network access to www.cbioportal.org is required.
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      # the cBioPortal comparison and cohort-logic stages write their part of the report
+      RECORD: "1"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # the method scripts and the golden fixtures run their Python through uv
+      - uses: astral-sh/setup-uv@v6
+
+      - run: npm ci
+
+      - name: Install Chromium for the e2e suite
+        run: npx playwright install --with-deps chromium
+
+      # every script reads its credentials with `node --env-file=.env.local`
+      - name: Write .env.local from secrets
+        env:
+          CLICKHOUSE_URL: ${{ secrets.CLICKHOUSE_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+          CLICKHOUSE_DB: ${{ secrets.CLICKHOUSE_DB }}
+          CLICKHOUSE2_URL: ${{ secrets.CLICKHOUSE2_URL }}
+          CLICKHOUSE2_USER: ${{ secrets.CLICKHOUSE2_USER }}
+          CLICKHOUSE2_PASSWORD: ${{ secrets.CLICKHOUSE2_PASSWORD }}
+          CLICKHOUSE2_DB: ${{ secrets.CLICKHOUSE2_DB }}
+          CLICKHOUSE2_LABEL: ${{ secrets.CLICKHOUSE2_LABEL }}
+        run: |
+          if [ -z "$CLICKHOUSE_URL" ]; then
+            echo "::error::The CLICKHOUSE_* repository secrets are not set; the gate needs the warehouse."
+            exit 1
+          fi
+          umask 077
+          for k in CLICKHOUSE_URL CLICKHOUSE_USER CLICKHOUSE_PASSWORD CLICKHOUSE_DB \
+                   CLICKHOUSE2_URL CLICKHOUSE2_USER CLICKHOUSE2_PASSWORD CLICKHOUSE2_DB CLICKHOUSE2_LABEL; do
+            [ -n "${!k}" ] && printf '%s=%s\n' "$k" "${!k}" >> .env.local
+          done
+          true
+
+      - name: Gate (build, unit, db, cBioPortal, cohort logic, method scripts, Python, e2e)
+        run: scripts/gate.sh
+
+      - name: Planted bugs
+        run: npm run check:mutants
+
+      - name: Keep the verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-report
+          path: |
+            docs/verification/*.json
+            /tmp/gate-server.log
+          if-no-files-found: warn

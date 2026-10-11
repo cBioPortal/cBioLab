@@ -7,12 +7,11 @@
 // wrapped inside itself (which is how a pair of controls gets split), how wide the plot is on
 // a large monitor, and how many distinct font sizes and inline style objects the source still
 // carries. Needs a dev server with credentials; it draws a real figure.
-const { chromium } = require("/home/ubuntu/cohort-lab/node_modules/playwright");
+const { launch } = require("../e2e-browser.cjs");
 const { readFileSync, readdirSync } = require("node:fs");
 const { join } = require("node:path");
 
 const BASE = process.argv[2] || "http://localhost:3107";
-const CHROME = process.env.HOME + "/.cache/ms-playwright/chromium-1217/chrome-linux64/chrome";
 const DOC = { study: "msk_chord_2024",
   cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
   views: [{ kind: "oncoprint", genes: [{ label: "TP53 pathway", genes: ["TP53", "MDM2", "MDM4"] }, "KRAS", "SMAD4"],
@@ -43,7 +42,7 @@ function sourceCounts() {
 }
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: CHROME, args: ["--no-sandbox"] });
+  const browser = await launch({ args: ["--no-sandbox"] });
   const url = BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify(DOC)).toString("base64url");
   const rows = [];
   for (const w of [1024, 1280, 1600, 2560]) {

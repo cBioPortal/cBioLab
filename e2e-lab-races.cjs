@@ -271,8 +271,8 @@ module.exports = { labRaces };
 
 if (require.main === module) {
   (async () => {
-    const { chromium } = require("/home/ubuntu/cohort-lab/node_modules/playwright");
-    const browser = await chromium.launch({ executablePath: process.env.HOME + "/.cache/ms-playwright/chromium-1217/chrome-linux64/chrome" });
+    const { launch } = require("./e2e-browser.cjs");
+    const browser = await launch();
     const results = [];
     const ok = (name, cond, extra) => results.push((cond ? "PASS " : "FAIL ") + name + (extra ? "  [" + extra + "]" : ""));
     await labRaces(browser, ok, "http://localhost:" + (process.env.E2E_PORT || 3100));

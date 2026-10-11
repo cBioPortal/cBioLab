@@ -122,11 +122,12 @@ export default function VerificationPage() {
       <section className="verif-sec" id="suite">
         <h2>How the suite runs, and what it depends on</h2>
         <p>
-          The suite has five stages. One command, <span className="mono">npm run verify</span>, runs all of
-          them in about ten minutes and stops with an error if any check fails. That is what a CI job runs.
-          The command writes its report to <span className="mono">docs/verification/</span>; CI keeps that
-          report as an artifact of the run, and this page is drawn from it. CI is not set up for this
-          project yet; until it is, the report comes from running the same command by hand.
+          The suite has five stages. On every proposed change, CI runs all of them, together with a build of
+          the app and its end-to-end browser tests, and keeps the report as an artifact of the run. Anyone
+          can run the same five stages with one command, <span className="mono">npm run verify</span>, which
+          takes about ten minutes and stops with an error if any check fails. The report is written to{" "}
+          <span className="mono">docs/verification/</span>; this page shows the copy saved with the code,
+          refreshed from a passing run.
         </p>
         <table className="verif-table">
           <thead><tr><th>Stage</th><th>What it checks</th><th>What it needs</th></tr></thead>
