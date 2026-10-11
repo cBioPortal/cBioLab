@@ -11,15 +11,17 @@
  * database checks), so the working tree and its dev server are never touched.
  *
  * Run: npm run check:mutants (about three minutes).
- * With RECORD=1 (npm run verify) it writes docs/verification/mutants.json, which /verification reads.
+ * With RECORD=1 (npm run verify) it writes docs/verification/mutants.json, which /verification reads
+ * (or REPORT_DIR/mutants.json when REPORT_DIR is set, as in CI).
  */
 import { cpSync, mkdtempSync, readFileSync, writeFileSync, symlinkSync, rmSync, mkdirSync } from "node:fs";
 import { execSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
-const OUT = join(ROOT, "docs/verification/mutants.json");
+/** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
+const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
 type Guard = "unit" | "cohort-logic" | "portal-parity";
 const GUARD_CMD: Record<Guard, string[]> = {
@@ -105,7 +107,9 @@ const MUTANTS: Mutant[] = [
 
 function run(dir: string, guard: Guard): { ok: boolean; failures: number; firstFailure: string } {
   const [cmd, ...args] = GUARD_CMD[guard];
-  const r = spawnSync(cmd, args, { cwd: dir, encoding: "utf8", maxBuffer: 64 << 20, timeout: 600_000 });
+  // a guard run against a planted bug must never write a report
+  const { RECORD, REPORT_DIR, ...env } = process.env;
+  const r = spawnSync(cmd, args, { cwd: dir, env, encoding: "utf8", maxBuffer: 64 << 20, timeout: 600_000 });
   const out = (r.stdout || "") + (r.stderr || "");
   const lines = out.split("\n").map((l) => l.trim()).filter(Boolean);
   const fail = lines.find((l) => /^FAIL |^not ok /.test(l))
@@ -147,6 +151,7 @@ try {
   }
 
   const caught = results.filter((r) => r.caught).length;
+  if (!ONLY && process.env.RECORD) mkdirSync(dirname(OUT), { recursive: true });
   if (!ONLY && process.env.RECORD) writeFileSync(OUT, JSON.stringify({
     ranAt: new Date().toISOString(),
     commit: execSync("git rev-parse --short HEAD", { cwd: ROOT }).toString().trim(),

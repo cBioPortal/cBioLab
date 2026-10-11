@@ -293,8 +293,13 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 13. **`/verification` reports what the checks found; it never restates a claim by hand.** It is the
    report of an automated verification suite meant to run in CI: `npm run verify` runs every stage
    (unit tests, `check:methods`, then the three below with `RECORD=1`), fails on any failing check,
-   and writes `docs/verification/*.json` — the report CI should keep as an artifact and the page
-   reads (today it is recorded by hand and committed; there is no CI yet). The page is written for
+   and writes `docs/verification/*.json` — the report the page reads, committed from a passing run.
+   The saved copy is updated by hand; the page links to the latest CI runs on master. CI
+   (`.github/workflows/verify.yml`) runs `scripts/gate.sh` plus `check:mutants` with `RECORD=1` and
+   `REPORT_DIR` (a folder that starts empty, so a stage that never ran leaves no stale file) on every
+   PR and push to master, and uploads that folder as the `verification-report` artifact. The planted-bug
+   check strips `RECORD`/`REPORT_DIR` from its guard runs, so a run against a planted bug never writes
+   a report. The page is written for
    bench scientists and PIs and opens by saying what the suite is and what it depends on (the public
    cbioportal.org API, the warehouse, the studies named in the scripts). The three: `check:portal` (counts, gene frequencies and
    filtered cohorts against cbioportal.org's public API — exact, no tolerance), `check:cohorts` (the
@@ -451,15 +456,17 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   say what is on it.
 - **`master` is human-gated.** Never fast-forward or merge to `master` on your own initiative;
   do it only when the user says so in that session. `master` is the deploy branch of a repo
-  under the `cBioPortal` org — advancing it is a publishing act, not a bookkeeping step, and
-  there is no CI, so the only gate is a person deciding the work is ready. When they do say so,
+  under the `cBioPortal` org — advancing it is a publishing act, not a bookkeeping step. CI
+  (`.github/workflows/verify.yml`, the whole gate) informs that decision; it does not replace the
+  person making it. When they do say so,
   merge the feature branch (`--no-ff`) rather than fast-forwarding, so the branch is legible in
   the history, and delete it afterwards.
 - **What e2e actually proves.** `node e2e.cjs` drives a local `npx next start -p 3100` against
   the **built working tree** — `.next` from the last `npm run build` — not against a commit and
   not against production. So: rebuild before running it, and if the tree is dirty you are
-  testing uncommitted code. It needs live ClickHouse credentials from `.env.local`, which is
-  also why it cannot run in CI as written.
+  testing uncommitted code. It needs live ClickHouse credentials from `.env.local`; CI writes that
+  file from repository secrets. The e2e scripts get their browser from `e2e-browser.cjs`
+  (Playwright is a devDependency; `CHROME_PATH` overrides the Chromium it launches).
 - Commit style: author is the user; end messages with the Claude co-author trailer. One commit
   per feature with a body that explains semantics and what was verified.
 

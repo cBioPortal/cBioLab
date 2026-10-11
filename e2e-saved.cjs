@@ -157,9 +157,9 @@ async function savedLists(browser, ok, BASE, LOGIN) {
 module.exports = { savedLists };
 
 if (require.main === module) {
-  const { chromium } = require("/home/ubuntu/cohort-lab/node_modules/playwright");
+  const { launch } = require("./e2e-browser.cjs");
   (async () => {
-    const browser = await chromium.launch({ executablePath: process.env.HOME + "/.cache/ms-playwright/chromium-1217/chrome-linux64/chrome" });
+    const browser = await launch();
     const results = [];
     await savedLists(browser, (n, c, x) => results.push((c ? "PASS " : "FAIL ") + n + (x ? "  [" + x + "]" : "")),
       "http://localhost:" + (process.env.E2E_PORT || 3100), process.env.E2E_LOGIN_PASSWORD || "");

@@ -9,17 +9,20 @@
  * so a mistake in how the compiler combines clauses cannot also be made by the check.
  *
  * Every check is exact. Run: npm run check:cohorts
- * With RECORD=1 (npm run verify) it writes docs/verification/cohort-logic.json, which /verification reads.
+ * With RECORD=1 (npm run verify) it writes docs/verification/cohort-logic.json, which /verification reads
+ * (or REPORT_DIR/cohort-logic.json when REPORT_DIR is set, as in CI).
  */
 import { writeFileSync, mkdirSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { compileCohortDef, basePatientsSql } from "../lib/cohort2.ts";
 import { runAnalysis, studyProfiles } from "../lib/analysis.ts";
 import { chQuery, DB, PRIMARY } from "../lib/ch.ts";
 import { oncokbPin } from "../lib/annotation.ts";
 import type { CohortDef, Clause, AnalysisDoc } from "../lib/types.ts";
 
-const OUT = new URL("../docs/verification/cohort-logic.json", import.meta.url);
+/** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
+const OUT = new URL("cohort-logic.json", process.env.REPORT_DIR ? pathToFileURL(process.env.REPORT_DIR + "/") : new URL("../docs/verification/", import.meta.url));
 
 interface Check { study: string; group: string; claim: string; detail: string; pass: boolean }
 const checks: Check[] = [];
