@@ -1,0 +1,253 @@
+{
+ "ranAt": "2026-10-11T14:22:18.315Z",
+ "commit": "af2f1d7",
+ "total": 35,
+ "pass": 35,
+ "checks": [
+  {
+   "study": "msk_chord_2024",
+   "group": "sanity",
+   "claim": "each test condition picks out a real, partial group of patients",
+   "detail": "13,105, 12,168 and 3,341 of 24,950 patients",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "and",
+   "claim": "\"A and B\" is exactly the patients in both A and B",
+   "detail": "A and B: 6,241 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "and",
+   "claim": "the order conditions are written in does not change the cohort",
+   "detail": "B and A vs A and B: 6,241 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "and",
+   "claim": "adding a condition can only narrow a cohort, never grow it",
+   "detail": "A 13,105 ⊇ A and B 6,241 ⊇ A and B and C 439",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "and",
+   "claim": "three conditions combine the same way two do",
+   "detail": "A and B and C: 439 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "or",
+   "claim": "\"A or B\" is exactly the patients in either",
+   "detail": "A or B: 19,032 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "or",
+   "claim": "counts add up: |A or B| = |A| + |B| − |A and B|",
+   "detail": "19,032 = 13,105 + 12,168 − 6,241",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "not",
+   "claim": "\"not A\" is every other patient in the study",
+   "detail": "not A: 11,845 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "not",
+   "claim": "A and \"not A\" share nobody and together are the whole study",
+   "detail": "13,105 + 11,845 = 24,950",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "not",
+   "claim": "\"not (A or B)\" equals \"not A and not B\" (De Morgan's law)",
+   "detail": "not (A or B): 5,918 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "sanity",
+   "claim": "each test condition picks out a real, partial group of patients",
+   "detail": "317, 229 and 513 of 1,101 patients",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "and",
+   "claim": "\"A and B\" is exactly the patients in both A and B",
+   "detail": "A and B: 46 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "and",
+   "claim": "the order conditions are written in does not change the cohort",
+   "detail": "B and A vs A and B: 46 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "and",
+   "claim": "adding a condition can only narrow a cohort, never grow it",
+   "detail": "A 317 ⊇ A and B 46 ⊇ A and B and C 22",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "and",
+   "claim": "three conditions combine the same way two do",
+   "detail": "A and B and C: 22 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "or",
+   "claim": "\"A or B\" is exactly the patients in either",
+   "detail": "A or B: 500 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "or",
+   "claim": "counts add up: |A or B| = |A| + |B| − |A and B|",
+   "detail": "500 = 317 + 229 − 46",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "not",
+   "claim": "\"not A\" is every other patient in the study",
+   "detail": "not A: 784 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "not",
+   "claim": "A and \"not A\" share nobody and together are the whole study",
+   "detail": "317 + 784 = 1,101",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "not",
+   "claim": "\"not (A or B)\" equals \"not A and not B\" (De Morgan's law)",
+   "detail": "not (A or B): 601 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "oql",
+   "claim": "KRAS G12C patients are all among KRAS-mutated patients",
+   "detail": "1,113 ⊆ 7,115",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "oql",
+   "claim": "KRAS driver mutations are a subset of all KRAS mutations",
+   "detail": "7,082 ⊆ 7,115",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "oql",
+   "claim": "\"KRAS: MUT AMP\" is exactly mutated or amplified",
+   "detail": "MUT AMP: 7,287 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "oql",
+   "claim": "PIK3CA H1047R patients are all among PIK3CA-mutated patients",
+   "detail": "126 ⊆ 317",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "oql",
+   "claim": "PIK3CA driver mutations are a subset of all PIK3CA mutations",
+   "detail": "307 ⊆ 317",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "oql",
+   "claim": "\"PIK3CA: MUT AMP\" is exactly mutated or amplified",
+   "detail": "MUT AMP: 351 patients, identical",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "clinical",
+   "claim": "each patient has exactly one GENDER: the values share nobody and cover everyone recorded",
+   "detail": "13,874 + 11,073 + 3 = 24,950; recorded 24,950; overlap 0",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "clinical",
+   "claim": "CURRENT_AGE_DEID below 65 and at-or-above 65 share nobody and cover everyone with a value",
+   "detail": "10,654 + 14,293 = 24,947",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "splits",
+   "claim": "the engine reports that the split's children add up to the parent",
+   "detail": "0 + 916 + 1,278 + 5,615 = 7,809 of 7,809",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "splits",
+   "claim": "every arm holds exactly the patients a by-hand first-match-wins pass puts there",
+   "detail": "G12C 916/916, other KRAS 1278/1278, rest 5615/5615",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "splits",
+   "claim": "the engine reports that the split's children add up to the parent",
+   "detail": "0 + 1,908 + 0 + 1,543 + 1,917 = 5,368 of 5,368",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "splits",
+   "claim": "every arm holds exactly the patients a by-hand first-match-wins pass puts there",
+   "detail": "PIK3CA 1908/1908, TP53 1543/1543, rest 1917/1917",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "timeline",
+   "claim": "everyone who reached a later line of therapy also reached every earlier one",
+   "detail": "line 1: 21,444 ⊇ line 2: 7,824 ⊇ line 3: 3,088 ⊇ line 4: 1,412",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "halves",
+   "claim": "discovery and validation halves share nobody, cover everyone, and are close to 50/50",
+   "detail": "12,514 + 12,436 = 24,950 (50.2% discovery)",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "halves",
+   "claim": "the halves are the same every time they are drawn",
+   "detail": "discovery, twice: 12,514 patients, identical",
+   "pass": true
+  }
+ ]
+}

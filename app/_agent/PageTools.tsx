@@ -8,7 +8,7 @@ import { REPRODUCTIONS } from "../../lib/reproductions.ts";
 import { encodeSpec } from "../../lib/lab-links.ts";
 import { AgentToolsMenu } from "./AgentToolsMenu.tsx";
 
-type Kind = "reproductions" | "provenance" | "oncoprint-lab" | "rationale" | "datasets";
+type Kind = "reproductions" | "provenance" | "oncoprint-lab" | "rationale" | "datasets" | "verification";
 
 const pageText = (max = 30000) => {
   const t = (document.querySelector("main") || document.body).innerText;
@@ -86,6 +86,19 @@ function toolsFor(kind: Kind, spec: unknown): { tools: AgentTool[]; rows: [strin
         : "Your AI assistant can read this oncoprint's spec, and draw another by opening a new one.",
       rows: [["oncoprint_get_spec", "getSpec()"], ["page_get_text", "getText()"], ["oncoprint_open_spec", "openSpec(spec)"]],
       api: { getSpec: () => tools[0].run({}), getText: () => tools[1].run({}), openSpec: (s: unknown) => tools[2].run({ spec: s }) } };
+  }
+  if (kind === "verification") {
+    const tools: AgentTool[] = [
+      { name: "verification_get_results", description: "The last run of each verification check: every count compared with cBioPortal, every cohort-logic check, and every planted bug with whether the checks caught it.",
+        inputSchema: { type: "object", properties: {} },
+        run: async () => spec },
+      { name: "page_get_text", description: "This page as text: how the tool's numbers are checked, and what the checks do not show.",
+        inputSchema: { type: "object", properties: {} },
+        run: async () => pageText(60000) }
+    ];
+    return { tools, intro: "Your AI assistant can read this page and the full results of every check behind it.",
+      rows: [["verification_get_results", "getResults()"], ["page_get_text", "getText()"]],
+      api: { getResults: () => tools[0].run({}), getText: () => tools[1].run({}) } };
   }
   const tools: AgentTool[] = [
     { name: "page_get_text", description: "This page as text: the project's rationale — why it is built this way, and what is built versus planned.",

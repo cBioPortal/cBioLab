@@ -1,0 +1,2633 @@
+{
+ "ranAt": "2026-10-11T14:22:09.159Z",
+ "commit": "af2f1d7",
+ "reference": "https://www.cbioportal.org (public API)",
+ "studies": [
+  "brca_tcga",
+  "nsclc_ctdx_msk_2022",
+  "msk_ch_2020",
+  "crc_apc_impact_2020",
+  "luad_tcga_pan_can_atlas_2018",
+  "blca_mskcc_solit_2014"
+ ],
+ "total": 327,
+ "agree": 327,
+ "checks": [
+  {
+   "study": "brca_tcga",
+   "group": "size",
+   "what": "patients",
+   "ours": "1101",
+   "portal": "1101",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "size",
+   "what": "samples",
+   "ours": "1108",
+   "portal": "1108",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "PIK3CA",
+   "ours": "319/982",
+   "portal": "319/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "TP53",
+   "ours": "301/982",
+   "portal": "301/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "TTN",
+   "ours": "161/982",
+   "portal": "161/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "CDH1",
+   "ours": "112/982",
+   "portal": "112/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "GATA3",
+   "ours": "97/982",
+   "portal": "97/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "MUC16",
+   "ours": "74/982",
+   "portal": "74/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "MAP3K1",
+   "ours": "71/982",
+   "portal": "71/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "KMT2C",
+   "ours": "70/982",
+   "portal": "70/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "MUC12",
+   "ours": "54/982",
+   "portal": "54/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "MUC4",
+   "ours": "53/982",
+   "portal": "53/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "FLG",
+   "ours": "45/982",
+   "portal": "45/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "USH2A",
+   "ours": "45/982",
+   "portal": "45/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "SYNE1",
+   "ours": "43/982",
+   "portal": "43/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "RYR2",
+   "ours": "42/982",
+   "portal": "42/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "mutations",
+   "what": "NCOR1",
+   "ours": "40/982",
+   "portal": "40/982",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "MYC amplified",
+   "ours": "229/1080",
+   "portal": "229/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "PVT1 amplified",
+   "ours": "229/1080",
+   "portal": "229/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "CASC8 amplified",
+   "ours": "227/1080",
+   "portal": "227/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "POU5F1B amplified",
+   "ours": "225/1080",
+   "portal": "225/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "LINC02912 amplified",
+   "ours": "218/1080",
+   "portal": "218/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "RN7SKP226 amplified",
+   "ours": "218/1080",
+   "portal": "218/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "CCAT1 amplified",
+   "ours": "216/1080",
+   "portal": "216/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "LINC00536 amplified",
+   "ours": "216/1080",
+   "portal": "216/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "TRPS1 amplified",
+   "ours": "214/1080",
+   "portal": "214/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "PCAT1 amplified",
+   "ours": "212/1080",
+   "portal": "212/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "PCAT2 amplified",
+   "ours": "212/1080",
+   "portal": "212/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "RNA5SP276 amplified",
+   "ours": "211/1080",
+   "portal": "211/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "EIF3H amplified",
+   "ours": "210/1080",
+   "portal": "210/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "SLC30A8 amplified",
+   "ours": "210/1080",
+   "portal": "210/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "copy number",
+   "what": "LINC00861 amplified",
+   "ours": "209/1080",
+   "portal": "209/1080",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "SAMPLE_TYPE = Primary",
+   "ours": "1101",
+   "portal": "1101",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "SAMPLE_TYPE = Metastasis",
+   "ours": "7",
+   "portal": "7",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "SAMPLE_TYPE_ID = 1",
+   "ours": "1101",
+   "portal": "1101",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "SAMPLE_TYPE_ID = 6",
+   "ours": "7",
+   "portal": "7",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "ONCOTREE_CODE = IDC",
+   "ours": "814",
+   "portal": "814",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "ONCOTREE_CODE = ILC",
+   "ours": "207",
+   "portal": "207",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "ONCOTREE_CODE = MDLC",
+   "ours": "28",
+   "portal": "28",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "ONCOTREE_CODE = IMMC",
+   "ours": "16",
+   "portal": "16",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "ONCOTREE_CODE = MBC",
+   "ours": "14",
+   "portal": "14",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "ONCOTREE_CODE = BRCA",
+   "ours": "11",
+   "portal": "11",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Breast Invasive Ductal Carcinoma",
+   "ours": "814",
+   "portal": "814",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Breast Invasive Lobular Carcinoma",
+   "ours": "207",
+   "portal": "207",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Breast Mixed Ductal and Lobular Carcinoma",
+   "ours": "28",
+   "portal": "28",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Breast Invasive Mixed Mucinous Carcinoma",
+   "ours": "16",
+   "portal": "16",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Metaplastic Breast Cancer",
+   "ours": "14",
+   "portal": "14",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Breast",
+   "ours": "7",
+   "portal": "7",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients with a PIK3CA mutation (OQL \"PIK3CA: MUT\")",
+   "ours": "317",
+   "portal": "317",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients with MYC amplified (OQL \"MYC: AMP\")",
+   "ours": "229",
+   "portal": "229",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients with SAMPLE_TYPE = Metastasis",
+   "ours": "7",
+   "portal": "7",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "size",
+   "what": "patients",
+   "ours": "1127",
+   "portal": "1127",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "size",
+   "what": "samples",
+   "ours": "2621",
+   "portal": "2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "TP53",
+   "ours": "1123/2621",
+   "portal": "1123/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "EGFR",
+   "ours": "662/2621",
+   "portal": "662/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "KRAS",
+   "ours": "523/2621",
+   "portal": "523/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "STK11",
+   "ours": "222/2621",
+   "portal": "222/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "KEAP1",
+   "ours": "197/2621",
+   "portal": "197/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "MET",
+   "ours": "134/2621",
+   "portal": "134/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "ERBB2",
+   "ours": "103/2621",
+   "portal": "103/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "PIK3CA",
+   "ours": "101/2621",
+   "portal": "101/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "BRAF",
+   "ours": "79/2621",
+   "portal": "79/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "PTEN",
+   "ours": "77/1257",
+   "portal": "77/1257",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "RBM10",
+   "ours": "75/945",
+   "portal": "75/945",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "ATM",
+   "ours": "71/1257",
+   "portal": "71/1257",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "PTPRD",
+   "ours": "70/945",
+   "portal": "70/945",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "APC",
+   "ours": "69/1257",
+   "portal": "69/1257",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations",
+   "what": "ARID1A",
+   "ours": "68/1257",
+   "portal": "68/1257",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "CDKN2A deleted",
+   "ours": "159/1476",
+   "portal": "159/1476",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "TERT amplified",
+   "ours": "100/1476",
+   "portal": "100/1476",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "EGFR amplified",
+   "ours": "96/2840",
+   "portal": "96/2840",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "MDM2 amplified",
+   "ours": "92/1173",
+   "portal": "92/1173",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "MYC amplified",
+   "ours": "79/1476",
+   "portal": "79/1476",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "NKX2-1 amplified",
+   "ours": "65/1173",
+   "portal": "65/1173",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "SDHA amplified",
+   "ours": "63/1173",
+   "portal": "63/1173",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "CDK4 amplified",
+   "ours": "58/1476",
+   "portal": "58/1476",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "NFKBIA amplified",
+   "ours": "51/1159",
+   "portal": "51/1159",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "FOXA1 amplified",
+   "ours": "47/1467",
+   "portal": "47/1467",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "MET amplified",
+   "ours": "42/2840",
+   "portal": "42/2840",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "ERBB2 amplified",
+   "ours": "33/2840",
+   "portal": "33/2840",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "RECQL4 amplified",
+   "ours": "29/1164",
+   "portal": "29/1164",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "AGO2 amplified",
+   "ours": "27/1100",
+   "portal": "27/1100",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number",
+   "what": "RAD21 amplified",
+   "ours": "27/1168",
+   "portal": "27/1168",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "ALK",
+   "ours": "75/2621",
+   "portal": "75/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "EML4",
+   "ours": "63/0",
+   "portal": "63/0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "ROS1",
+   "ours": "44/2621",
+   "portal": "44/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "RET",
+   "ours": "38/2621",
+   "portal": "38/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "KIF5B",
+   "ours": "26/0",
+   "portal": "26/0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "MET",
+   "ours": "25/2621",
+   "portal": "25/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "CD74",
+   "ours": "17/0",
+   "portal": "17/0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "CCDC6",
+   "ours": "10/0",
+   "portal": "10/0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "EGFR",
+   "ours": "9/2621",
+   "portal": "9/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "BRAF",
+   "ours": "7/2621",
+   "portal": "7/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "FGFR3",
+   "ours": "7/2621",
+   "portal": "7/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "STK11",
+   "ours": "7/2621",
+   "portal": "7/2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "EZR",
+   "ours": "6/0",
+   "portal": "6/0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "KMT2A",
+   "ours": "6/954",
+   "portal": "6/954",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "structural variants",
+   "what": "CDKN2A",
+   "ours": "5/1257",
+   "portal": "5/1257",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "SAMPLE_TYPE = Metastasis",
+   "ours": "1964",
+   "portal": "1964",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "SAMPLE_TYPE = Primary",
+   "ours": "490",
+   "portal": "490",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "SAMPLE_TYPE = Unknown",
+   "ours": "164",
+   "portal": "164",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "SAMPLE_TYPE = Local Recurrence",
+   "ours": "3",
+   "portal": "3",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "GENE_PANEL = ctDx_lung_panel",
+   "ours": "1364",
+   "portal": "1364",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "GENE_PANEL = IMPACT468",
+   "ours": "848",
+   "portal": "848",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "GENE_PANEL = ACCESS129",
+   "ours": "303",
+   "portal": "303",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "GENE_PANEL = IMPACT410",
+   "ours": "59",
+   "portal": "59",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "GENE_PANEL = IMPACT505",
+   "ours": "33",
+   "portal": "33",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "GENE_PANEL = IMPACT-HEME-400",
+   "ours": "9",
+   "portal": "9",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Lung Adenocarcinoma",
+   "ours": "2191",
+   "portal": "2191",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Non-Small Cell Lung Cancer",
+   "ours": "190",
+   "portal": "190",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Lung Squamous Cell Carcinoma",
+   "ours": "124",
+   "portal": "124",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Cancer of Unknown Primary",
+   "ours": "24",
+   "portal": "24",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Large Cell Neuroendocrine Carcinoma",
+   "ours": "12",
+   "portal": "12",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Adenocarcinoma, NOS",
+   "ours": "10",
+   "portal": "10",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "SAMPLE_CLASS = cfDNA",
+   "ours": "1667",
+   "portal": "1667",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "SAMPLE_CLASS = Tumor",
+   "ours": "954",
+   "portal": "954",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients with a TP53 mutation (OQL \"TP53: MUT\")",
+   "ours": "580",
+   "portal": "580",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients with CDKN2A deeply deleted (OQL \"CDKN2A: HOMDEL\")",
+   "ours": "136",
+   "portal": "136",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients with SAMPLE_TYPE = Primary",
+   "ours": "394",
+   "portal": "394",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "size",
+   "what": "patients",
+   "ours": "24146",
+   "portal": "24146",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "size",
+   "what": "samples",
+   "ours": "24146",
+   "portal": "24146",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "DNMT3A",
+   "ours": "2559/7216",
+   "portal": "2559/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "TET2",
+   "ours": "751/7216",
+   "portal": "751/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "PPM1D",
+   "ours": "613/7075",
+   "portal": "613/7075",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "ASXL1",
+   "ours": "298/7216",
+   "portal": "298/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "TP53",
+   "ours": "254/7216",
+   "portal": "254/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "CHEK2",
+   "ours": "212/7216",
+   "portal": "212/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "ATM",
+   "ours": "159/7216",
+   "portal": "159/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "SF3B1",
+   "ours": "112/7216",
+   "portal": "112/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "JAK2",
+   "ours": "83/7216",
+   "portal": "83/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "FAT1",
+   "ours": "81/7216",
+   "portal": "81/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "KMT2D",
+   "ours": "78/7216",
+   "portal": "78/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "NF1",
+   "ours": "72/7216",
+   "portal": "72/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "SRSF2",
+   "ours": "64/7076",
+   "portal": "64/7076",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "KMT2C",
+   "ours": "55/7216",
+   "portal": "55/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "mutations",
+   "what": "CBL",
+   "ours": "52/7216",
+   "portal": "52/7216",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "TREATMENT_STATUS = Unknown",
+   "ours": "14008",
+   "portal": "14008",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "TREATMENT_STATUS = Treated",
+   "ours": "5978",
+   "portal": "5978",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "TREATMENT_STATUS = Untreated",
+   "ours": "4160",
+   "portal": "4160",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "SEX = Female",
+   "ours": "13121",
+   "portal": "13121",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "SEX = Male",
+   "ours": "11025",
+   "portal": "11025",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "GENE_PANEL = IMPACT468",
+   "ours": "12938",
+   "portal": "12938",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "GENE_PANEL = IMPACT410",
+   "ours": "8921",
+   "portal": "8921",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "GENE_PANEL = IMPACT341",
+   "ours": "2243",
+   "portal": "2243",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "GENE_PANEL = IMPACT505",
+   "ours": "34",
+   "portal": "34",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "GENE_PANEL = IMPACT-HEME-400",
+   "ours": "3",
+   "portal": "3",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Atypical Lung Carcinoid",
+   "ours": "3559",
+   "portal": "3559",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Invasive Breast Carcinoma",
+   "ours": "3540",
+   "portal": "3540",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Colon Adenocarcinoma In Situ",
+   "ours": "2153",
+   "portal": "2153",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Prostate Adenocarcinoma",
+   "ours": "1494",
+   "portal": "1494",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Intraductal Papillary Mucinous Neoplasm",
+   "ours": "1416",
+   "portal": "1416",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Anaplastic Astrocytoma",
+   "ours": "1094",
+   "portal": "1094",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients with a DNMT3A mutation (OQL \"DNMT3A: MUT\")",
+   "ours": "2559",
+   "portal": "2559",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients with TREATMENT_STATUS = Treated",
+   "ours": "5978",
+   "portal": "5978",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "size",
+   "what": "patients",
+   "ours": "471",
+   "portal": "471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "size",
+   "what": "samples",
+   "ours": "471",
+   "portal": "471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "TP53",
+   "ours": "345/471",
+   "portal": "345/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "APC",
+   "ours": "325/471",
+   "portal": "325/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "KRAS",
+   "ours": "238/471",
+   "portal": "238/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "PIK3CA",
+   "ours": "88/471",
+   "portal": "88/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "SMAD4",
+   "ours": "69/471",
+   "portal": "69/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "BRAF",
+   "ours": "58/471",
+   "portal": "58/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "FBXW7",
+   "ours": "51/471",
+   "portal": "51/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "SOX9",
+   "ours": "39/471",
+   "portal": "39/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "RNF43",
+   "ours": "38/471",
+   "portal": "38/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "ARID1A",
+   "ours": "36/471",
+   "portal": "36/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "KMT2D",
+   "ours": "36/471",
+   "portal": "36/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "TCF7L2",
+   "ours": "36/392",
+   "portal": "36/392",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "PTPRS",
+   "ours": "33/471",
+   "portal": "33/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "CTNNB1",
+   "ours": "28/471",
+   "portal": "28/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "mutations",
+   "what": "ERBB4",
+   "ours": "26/471",
+   "portal": "26/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "FLT3 amplified",
+   "ours": "23/471",
+   "portal": "23/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "BCL2L1 amplified",
+   "ours": "21/471",
+   "portal": "21/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "FLT1 amplified",
+   "ours": "21/471",
+   "portal": "21/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "MYC amplified",
+   "ours": "19/471",
+   "portal": "19/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "NKX3-1 deleted",
+   "ours": "19/471",
+   "portal": "19/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "SMAD4 deleted",
+   "ours": "19/471",
+   "portal": "19/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "GNAS amplified",
+   "ours": "18/471",
+   "portal": "18/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "AURKA amplified",
+   "ours": "17/471",
+   "portal": "17/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "CDK8 amplified",
+   "ours": "17/471",
+   "portal": "17/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "ASXL1 amplified",
+   "ours": "16/471",
+   "portal": "16/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "DNMT3B amplified",
+   "ours": "16/471",
+   "portal": "16/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "SRC amplified",
+   "ours": "16/471",
+   "portal": "16/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "CCND2 amplified",
+   "ours": "15/471",
+   "portal": "15/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "RECQL4 amplified",
+   "ours": "15/471",
+   "portal": "15/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "copy number",
+   "what": "TOP1 amplified",
+   "ours": "15/471",
+   "portal": "15/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "APC",
+   "ours": "4/471",
+   "portal": "4/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "CTNNB1",
+   "ours": "4/471",
+   "portal": "4/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "BRAF",
+   "ours": "3/471",
+   "portal": "3/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "SMAD4",
+   "ours": "3/471",
+   "portal": "3/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "CDH1",
+   "ours": "2/471",
+   "portal": "2/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "CUL1",
+   "ours": "2/0",
+   "portal": "2/0",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "TCF7L2",
+   "ours": "2/392",
+   "portal": "2/392",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "AGAP3",
+   "ours": "1/0",
+   "portal": "1/0",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "ARID1A",
+   "ours": "1/471",
+   "portal": "1/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "ASB17",
+   "ours": "1/0",
+   "portal": "1/0",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "AXIN2",
+   "ours": "1/471",
+   "portal": "1/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "B2M",
+   "ours": "1/471",
+   "portal": "1/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "BCOR",
+   "ours": "1/471",
+   "portal": "1/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "BRCA1",
+   "ours": "1/471",
+   "portal": "1/471",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "structural variants",
+   "what": "CAPZA2",
+   "ours": "1/0",
+   "portal": "1/0",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "OS_STATUS = 1:DECEASED",
+   "ours": "311",
+   "portal": "311",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "OS_STATUS = 0:LIVING",
+   "ours": "160",
+   "portal": "160",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "CARCINOMATOSIS = No",
+   "ours": "327",
+   "portal": "327",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "CARCINOMATOSIS = Yes",
+   "ours": "144",
+   "portal": "144",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "DIFFERENTIATION = Moderately differentiated",
+   "ours": "345",
+   "portal": "345",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "DIFFERENTIATION = Poorly differentiated",
+   "ours": "121",
+   "portal": "121",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "DIFFERENTIATION = Well differentiated",
+   "ours": "5",
+   "portal": "5",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "TIMING_METS = Synchronous",
+   "ours": "350",
+   "portal": "350",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "TIMING_METS = Metachronous",
+   "ours": "119",
+   "portal": "119",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "TIMING_METS = 2",
+   "ours": "2",
+   "portal": "2",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients with a TP53 mutation (OQL \"TP53: MUT\")",
+   "ours": "345",
+   "portal": "345",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients with FLT3 amplified (OQL \"FLT3: AMP\")",
+   "ours": "23",
+   "portal": "23",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients with OS_STATUS = 0:LIVING",
+   "ours": "160",
+   "portal": "160",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "size",
+   "what": "patients",
+   "ours": "566",
+   "portal": "566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "size",
+   "what": "samples",
+   "ours": "566",
+   "portal": "566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "TP53",
+   "ours": "295/566",
+   "portal": "295/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "TTN",
+   "ours": "272/566",
+   "portal": "272/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "MUC16",
+   "ours": "242/566",
+   "portal": "242/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "CSMD3",
+   "ours": "226/566",
+   "portal": "226/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "RYR2",
+   "ours": "217/566",
+   "portal": "217/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "LRP1B",
+   "ours": "201/566",
+   "portal": "201/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "ZFHX4",
+   "ours": "185/566",
+   "portal": "185/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "USH2A",
+   "ours": "177/566",
+   "portal": "177/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "KRAS",
+   "ours": "168/566",
+   "portal": "168/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "XIRP2",
+   "ours": "150/566",
+   "portal": "150/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "SPTA1",
+   "ours": "148/566",
+   "portal": "148/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "FLG",
+   "ours": "145/566",
+   "portal": "145/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "CSMD1",
+   "ours": "125/566",
+   "portal": "125/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "NAV3",
+   "ours": "123/566",
+   "portal": "123/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "mutations",
+   "what": "FAT3",
+   "ours": "121/566",
+   "portal": "121/566",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "CDKN2A deleted",
+   "ours": "86/511",
+   "portal": "86/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "CDKN2B deleted",
+   "ours": "84/511",
+   "portal": "84/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "CDKN2B-AS1 deleted",
+   "ours": "84/511",
+   "portal": "84/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "CDKN2A-AS1 deleted",
+   "ours": "80/511",
+   "portal": "80/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "SFTA3 amplified",
+   "ours": "68/511",
+   "portal": "68/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "CLPTM1L amplified",
+   "ours": "67/511",
+   "portal": "67/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "MBIP amplified",
+   "ours": "67/511",
+   "portal": "67/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "NKX2-1 amplified",
+   "ours": "67/511",
+   "portal": "67/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "NKX2-1-AS1 amplified",
+   "ours": "67/511",
+   "portal": "67/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "AHRR amplified",
+   "ours": "66/511",
+   "portal": "66/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "BRD9 amplified",
+   "ours": "66/511",
+   "portal": "66/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "CCDC127 amplified",
+   "ours": "66/511",
+   "portal": "66/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "CEP72 amplified",
+   "ours": "66/511",
+   "portal": "66/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "CEP72-DT amplified",
+   "ours": "66/511",
+   "portal": "66/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "copy number",
+   "what": "EXOC3 amplified",
+   "ours": "66/511",
+   "portal": "66/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "SFTPB",
+   "ours": "17/511",
+   "portal": "17/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "ROS1",
+   "ours": "7/511",
+   "portal": "7/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "ASH1L",
+   "ours": "6/511",
+   "portal": "6/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "ALK",
+   "ours": "5/511",
+   "portal": "5/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "CHD6",
+   "ours": "5/511",
+   "portal": "5/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "EML4",
+   "ours": "5/511",
+   "portal": "5/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "MYO10",
+   "ours": "5/511",
+   "portal": "5/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "PTK2",
+   "ours": "5/511",
+   "portal": "5/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "TSHZ2",
+   "ours": "5/511",
+   "portal": "5/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "ATP11A",
+   "ours": "4/511",
+   "portal": "4/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "CD2AP",
+   "ours": "4/511",
+   "portal": "4/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "IGHJ4",
+   "ours": "4/511",
+   "portal": "4/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "ITCH",
+   "ours": "4/511",
+   "portal": "4/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "LAMA3",
+   "ours": "4/511",
+   "portal": "4/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "structural variants",
+   "what": "MRTFA",
+   "ours": "4/511",
+   "portal": "4/511",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "OS_STATUS = 0:LIVING",
+   "ours": "328",
+   "portal": "328",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "OS_STATUS = 1:DECEASED",
+   "ours": "186",
+   "portal": "186",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE_CODE = 55",
+   "ours": "91",
+   "portal": "91",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE_CODE = 17",
+   "ours": "52",
+   "portal": "52",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE_CODE = 44",
+   "ours": "46",
+   "portal": "46",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE_CODE = 86",
+   "ours": "34",
+   "portal": "34",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE_CODE = 5",
+   "ours": "33",
+   "portal": "33",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE_CODE = 78",
+   "ours": "33",
+   "portal": "33",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE = International Genomics Consortium",
+   "ours": "91",
+   "portal": "91",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE = Washington University",
+   "ours": "52",
+   "portal": "52",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE = Christiana Healthcare",
+   "ours": "46",
+   "portal": "46",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE = Asterand",
+   "ours": "34",
+   "portal": "34",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE = Indivumed",
+   "ours": "33",
+   "portal": "33",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE = Prince Charles Hospital",
+   "ours": "33",
+   "portal": "33",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TUMOR_TYPE = Lung Adenocarcinoma (NOS)",
+   "ours": "320",
+   "portal": "320",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TUMOR_TYPE = Lung Adenocarcinoma, Mixed Subtype",
+   "ours": "107",
+   "portal": "107",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TUMOR_TYPE = Lung Adenocarcinoma",
+   "ours": "52",
+   "portal": "52",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TUMOR_TYPE = Lung Papillary Adenocarcinoma",
+   "ours": "22",
+   "portal": "22",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TUMOR_TYPE = Lung Bronchioloalveolar Carcinoma, Non-Mucinous",
+   "ours": "19",
+   "portal": "19",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TUMOR_TYPE = Lung Acinar Adenocarcinoma",
+   "ours": "18",
+   "portal": "18",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients with a TP53 mutation (OQL \"TP53: MUT\")",
+   "ours": "295",
+   "portal": "295",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients with CDKN2A deeply deleted (OQL \"CDKN2A: HOMDEL\")",
+   "ours": "86",
+   "portal": "86",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients with OS_STATUS = 1:DECEASED",
+   "ours": "186",
+   "portal": "186",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "size",
+   "what": "patients",
+   "ours": "109",
+   "portal": "109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "size",
+   "what": "samples",
+   "ours": "109",
+   "portal": "109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "TP53",
+   "ours": "63/109",
+   "portal": "63/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "KDM6A",
+   "ours": "45/109",
+   "portal": "45/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "KMT2D",
+   "ours": "34/109",
+   "portal": "34/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "ARID1A",
+   "ours": "31/109",
+   "portal": "31/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "PIK3CA",
+   "ours": "25/109",
+   "portal": "25/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "RB1",
+   "ours": "25/109",
+   "portal": "25/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "FGFR3",
+   "ours": "21/109",
+   "portal": "21/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "EP300",
+   "ours": "17/109",
+   "portal": "17/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "STAG2",
+   "ours": "16/109",
+   "portal": "16/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "CREBBP",
+   "ours": "15/109",
+   "portal": "15/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "KMT2C",
+   "ours": "15/109",
+   "portal": "15/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "ERBB3",
+   "ours": "14/109",
+   "portal": "14/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "CDKN1A",
+   "ours": "13/109",
+   "portal": "13/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "ERBB2",
+   "ours": "13/109",
+   "portal": "13/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "mutations",
+   "what": "FAT1",
+   "ours": "12/109",
+   "portal": "12/109",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "CCND1 amplified",
+   "ours": "9/218",
+   "portal": "9/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "CDKN2A deleted",
+   "ours": "8/218",
+   "portal": "8/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "E2F3 amplified",
+   "ours": "5/218",
+   "portal": "5/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "MDM2 amplified",
+   "ours": "5/218",
+   "portal": "5/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "CDKN2B deleted",
+   "ours": "4/218",
+   "portal": "4/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "RAF1 amplified",
+   "ours": "4/218",
+   "portal": "4/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "ERBB2 amplified",
+   "ours": "3/218",
+   "portal": "3/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "MYC amplified",
+   "ours": "3/218",
+   "portal": "3/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "CDK4 amplified",
+   "ours": "2/218",
+   "portal": "2/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "DDR2 amplified",
+   "ours": "2/218",
+   "portal": "2/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "EPHA3 amplified",
+   "ours": "2/218",
+   "portal": "2/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "HMGA2 amplified",
+   "ours": "2/218",
+   "portal": "2/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "MET amplified",
+   "ours": "2/218",
+   "portal": "2/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "MYCL amplified",
+   "ours": "2/218",
+   "portal": "2/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "copy number",
+   "what": "CCNE1 amplified",
+   "ours": "1/218",
+   "portal": "1/218",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "OS_STATUS = 0:LIVING",
+   "ours": "58",
+   "portal": "58",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "OS_STATUS = 1:DECEASED",
+   "ours": "40",
+   "portal": "40",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "TISSUE_SEQUENCED = Radical Cystectomy",
+   "ours": "89",
+   "portal": "89",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "TISSUE_SEQUENCED = TUR",
+   "ours": "20",
+   "portal": "20",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "CONCOMITANT_CIS = No",
+   "ours": "58",
+   "portal": "58",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "CONCOMITANT_CIS = Yes",
+   "ours": "51",
+   "portal": "51",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "SURGERY_PROCEDURE = Radical Cystectomy",
+   "ours": "98",
+   "portal": "98",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "SURGERY_PROCEDURE = TUR",
+   "ours": "11",
+   "portal": "11",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients with a TP53 mutation (OQL \"TP53: MUT\")",
+   "ours": "63",
+   "portal": "63",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients with CCND1 amplified (OQL \"CCND1: AMP\")",
+   "ours": "9",
+   "portal": "9",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients with OS_STATUS = 1:DECEASED",
+   "ours": "40",
+   "portal": "40",
+   "agree": true
+  }
+ ]
+}

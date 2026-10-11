@@ -340,6 +340,7 @@ export default function AnalysisPage() {
         <span className="spacer" />
         <a className="toplink" href="/datasets">data sets</a>
         <a className="toplink" href="/reproductions">paper reproductions</a>
+        <a className="toplink" href="/verification">how we check</a>
         <a className="toplink" href="/campaign">hypothesis campaigns</a>
         <a className="toplink" href="/rationale">rationale</a>
         <AgentToolsMenu page="analysis" tools={LAB_TOOL_NAMES} webmcp={webmcp}

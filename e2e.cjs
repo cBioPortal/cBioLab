@@ -99,6 +99,19 @@ async function main() {
         rationaleInfo = "svg=" + svgCount + " fallback=" + fallback + " backLink=" + backLink;
       } catch (e) { rationaleInfo = String(e.message || e).slice(0, 100); }
       ok("/rationale renders with a live Mermaid diagram", rationaleOk, rationaleInfo);
+
+      // /verification shows the recorded results of every check, and none of them failing.
+      await page.goto(BASE + "/verification");
+      let verifOk = false, verifInfo = "";
+      try {
+        await page.waitForSelector(".verif-page h1", { timeout: 60000 });
+        const tiles = await page.locator(".repro-tile .n").allTextContents();
+        const sections = await page.locator(".verif-sec").count();
+        const failing = await page.locator(".verif-mark.err, .verif-pill.err").count();
+        verifOk = tiles.length === 5 && sections >= 8 && failing === 0;
+        verifInfo = "tiles=" + tiles.join(" ") + " sections=" + sections + " failing=" + failing;
+      } catch (e) { verifInfo = String(e.message || e).slice(0, 100); }
+      ok("/verification renders every check's recorded result, none failing", verifOk, verifInfo);
       await page.goto(BASE + "/lab");
       await page.waitForSelector("header a", { timeout: 60000 });
       const headerLinks = await page.locator("header a").allTextContents();
