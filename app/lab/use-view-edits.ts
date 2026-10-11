@@ -151,6 +151,8 @@ export function useViewEdits(page: ViewEditsPage) {
     // same attribute/gene/oql, rather than leaving it pointed at whatever it last targeted.
     if (next.splitBy && names.length === 1 && next.splitBy.cohort !== names[0])
       next.splitBy = { ...next.splitBy, cohort: names[0] };
+    // a timeline's drawn patient belongs to its cohort: another cohort starts at its own first patient
+    if (next.kind === "timeline" && JSON.stringify(next.cohorts) !== JSON.stringify(v.cohorts)) delete next.patient;
     return next;
   });
   const setViewAttrs = (vi: number, attributes: string[]) => updateView(vi, (v: any) => ({ ...v, attributes }));

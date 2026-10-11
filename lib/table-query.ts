@@ -179,6 +179,18 @@ export function pageSql(src: RowSource, q: TableQuery, defaults: string[], limit
     "LIMIT " + Math.max(0, Math.floor(limit)) + " OFFSET " + Math.max(0, Math.floor(offset));
 }
 
+/**
+ * Where one patient's row falls in the query's one order: its 0-based place among the rows kept
+ * (`idx`), or no row when the query leaves it out. Assumes one row per study and patient, as a
+ * one-cohort list of patients has.
+ */
+export function rankSql(src: RowSource, q: TableQuery, defaults: string[], study: string, patient: string): string {
+  return src.with +
+    "SELECT idx FROM (SELECT study, patient, row_number() OVER (ORDER BY " + orderSql(src, q) + ") - 1 AS idx FROM rows\n" +
+    "WHERE " + whereSql(src, q, defaults) + ")\n" +
+    "WHERE study = " + sq(study) + " AND patient = " + sq(patient) + " LIMIT 1";
+}
+
 /** Per cohort and study: the rows the query keeps (`n`) and every row (`all`). Counts only. */
 export function countsSql(src: RowSource, q: TableQuery, defaults: string[]): string {
   return src.with + "SELECT cohort, study, countIf(" + whereSql(src, q, defaults) + ") AS n, count() AS all FROM rows GROUP BY cohort, study";

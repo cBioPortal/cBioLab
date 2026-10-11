@@ -33,7 +33,7 @@ import { axisSelect, plotPointsSql } from "../lib/plot.ts";
 import { clinicalRowSource } from "../lib/clinical-table.ts";
 import { mutationRowSource } from "../lib/mutation-table.ts";
 import { pageSql } from "../lib/table-query.ts";
-import { RemoteAggregateResolver } from "../lib/federation-remote.ts";
+import { RemoteAggregateResolver, RemoteTimelineResolver, peerSharesPatients } from "../lib/federation-remote.ts";
 import type { Instance } from "../lib/federation.ts";
 import { PRIMARY } from "../lib/ch.ts";
 
@@ -187,12 +187,12 @@ describe("remote peers: nothing identifying leaves before the network is touched
 
   test("a table view's rows are the entitlement, and live only where it lives", () => {
     // the row sources return patient and sample ids, so they sit outside the aggregate builders
-    for (const name of ["clinicalRowSource", "mutationRowSource", "pageSql"])
+    for (const name of ["clinicalRowSource", "mutationRowSource", "pageSql", "rankSql"])
       assert.equal(name in (federation as Record<string, unknown>), false, name + " returns ids and must not sit among the aggregate builders");
     const part = [{ cohort: "c", study: "x", cohortSql: "SELECT '' AS pid" }];
     assert.match(pageSql(clinicalRowSource(part, "db", "sample", [{ id: "AGE", name: "Age", per: "patient", numeric: true }]), {}, [], 10, 0), /AS patient, replaceOne\(u\.suid/);
     assert.match(pageSql(mutationRowSource(part, "db", "KRAS", "v7.5"), {}, [], 10, 0), /m\.sid AS sid/);
-    for (const m of ["rowsPage", "rowsCounts", "rowsValues"]) {
+    for (const m of ["rowsPage", "rowsCounts", "rowsValues", "rowsRank"]) {
       for (const R of [AggregateResolver, RemoteAggregateResolver])
         assert.equal(typeof (R.prototype as unknown as Record<string, unknown>)[m], "undefined", R.name + " must not be able to run a table view's " + m);
       assert.equal(typeof (PatientLevelResolver.prototype as unknown as Record<string, unknown>)[m], "function");
@@ -212,6 +212,15 @@ describe("remote peers: nothing identifying leaves before the network is touched
       "AggregateResolver must not be able to return the points behind a box");
     assert.equal(typeof (PatientLevelResolver.prototype as unknown as Record<string, unknown>).plotPoints, "function",
       "the entitled participant is the one that answers with points");
+  });
+
+  test("a patient's timeline is the entitlement, and lives only where it lives", () => {
+    // the timeline's queries name one patient and return their record, so they sit outside the aggregate builders
+    for (const name of ["patientEventsSql", "patientSamplesSql", "timelinePatientRowSource"])
+      assert.equal(name in (federation as Record<string, unknown>), false, name + " reads a patient's record and must not sit among the aggregate builders");
+    for (const R of [AggregateResolver, RemoteAggregateResolver])
+      assert.equal(typeof (R.prototype as unknown as Record<string, unknown>).patientTimeline, "undefined", R.name + " must not be able to return a patient's timeline");
+    assert.equal(typeof (PatientLevelResolver.prototype as unknown as Record<string, unknown>).patientTimeline, "function");
   });
 
   test("remote resolver has no members() either", () => {
@@ -505,3 +514,72 @@ describe("a peer's federation tools refuse explicit id lists on their own", () =
     assert.match(r.content[0].text, /explicit sample or patient list/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The opt-in patient-level federation mode (docs/DATA-BOUNDARY.md): a peer both sides configured
+// may answer the timeline view — and nothing else.
+describe("patient-level federation is opt-in, on both sides, and timeline-only", () => {
+  const withEnv = async (env: Record<string, string | undefined>, fn: () => Promise<void> | void) => {
+    const saved = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]));
+    for (const [k, v] of Object.entries(env)) { if (v == null) delete process.env[k]; else process.env[k] = v; }
+    try { await fn(); } finally { for (const [k, v] of Object.entries(saved)) { if (v == null) delete process.env[k]; else process.env[k] = v; } }
+  };
+
+  test("the coordinator trusts a peer only for the studies PEER_MCP_PATIENT_LEVEL names", async () => {
+    await withEnv({ PEER_MCP: "s1=http://peer.invalid/api/mcp,s2=http://peer.invalid/api/mcp", PEER_MCP_PATIENT_LEVEL: undefined }, async () => {
+      assert.equal(peerSharesPatients("s1"), false);
+      const r = await federation.resolverFor("s1", {});
+      assert.equal(r instanceof RemoteTimelineResolver, false, "no setting: the peer is aggregate-only");
+      assert.equal(federation.hasPatientTimeline(r), false);
+    });
+    await withEnv({ PEER_MCP: "s1=http://peer.invalid/api/mcp,s2=http://peer.invalid/api/mcp", PEER_MCP_PATIENT_LEVEL: "s1" }, async () => {
+      assert.ok((await federation.resolverFor("s1", {})) instanceof RemoteTimelineResolver);
+      assert.equal((await federation.resolverFor("s2", {})) instanceof RemoteTimelineResolver, false, "only the named study");
+    });
+  });
+
+  test("a trusted peer has the timeline's two methods and none of the other patient-level ones", () => {
+    const r = new RemoteTimelineResolver("s", "http://peer.invalid/api/mcp", AGG);
+    assert.equal(typeof r.patientTimeline, "function");
+    assert.equal(typeof r.timelineRows, "function");
+    for (const m of ["members", "rowsPage", "rowsCounts", "rowsValues", "rowsRank", "plotPoints", "coxRows", "logisticRows", "viewRows", "viewAggregate"])
+      assert.equal(typeof (r as unknown as Record<string, unknown>)[m], "undefined", "a timeline peer must not have " + m);
+    // and it is not patient-level for any other view
+    assert.equal(federation.isPatientLevel(r), false);
+    // the plain remote resolver is unchanged
+    assert.equal(typeof (RemoteAggregateResolver.prototype as unknown as Record<string, unknown>).patientTimeline, "undefined");
+  });
+
+  test("an explicit id list in a cohort is still refused before the network is touched", async () => {
+    const original = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (async () => { calls++; throw new Error("network must not be reached"); }) as typeof fetch;
+    try {
+      const r = new RemoteTimelineResolver("s", "http://peer.invalid/api/mcp", AGG);
+      const def = { all: [{ kind: "patientList" as const, ids: ["s:P-0000123"] }] };
+      await assert.rejects(() => r.timelineRows({ parts: [{ cohort: "c", def }], query: {}, defaults: ["patient"], mode: "counts" }), /explicit sample or patient list/i);
+      await assert.rejects(() => r.count(def), /explicit sample or patient list/i);
+      assert.equal(calls, 0);
+    } finally { globalThis.fetch = original; }
+  });
+
+  test("a peer registers the disclosing tools only when MCP_DISCLOSE_PATIENTS is set", async () => {
+    const { registerTools } = await import("../mcp/tools.ts");
+    const names = async () => {
+      const out: string[] = [];
+      const fake = { registerTool: (n: string) => out.push(n), tool: (n: string) => out.push(n), registerResource: () => {}, resource: () => {}, registerPrompt: () => {}, prompt: () => {} };
+      registerTools(fake);
+      return out;
+    };
+    await withEnv({ MCP_DISCLOSE_PATIENTS: undefined }, async () => {
+      const n = await names();
+      assert.ok(n.includes("federated_aggregates"));
+      assert.equal(n.some((x) => /federated_patient/.test(x)), false, "no opt-in, no tool");
+    });
+    await withEnv({ MCP_DISCLOSE_PATIENTS: "rms_msk_2026" }, async () => {
+      const n = await names();
+      assert.ok(n.includes("federated_patient_rows") && n.includes("federated_patient_timeline"));
+    });
+  });
+});
+

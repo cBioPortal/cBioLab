@@ -1,12 +1,12 @@
 import { parseBody, ViewPageRequest } from "../../../lib/api-schemas.ts";
 import { runAnalysis } from "../../../lib/analysis.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
-import type { AnalysisDoc, MutationsResult, TableResult } from "../../../lib/types.ts";
+import type { AnalysisDoc, MutationsResult, TableResult, TimelineResult } from "../../../lib/types.ts";
 
 export const maxDuration = 60;
 
 /** Table views: their rows are paged, searched, filtered and sorted by lib/table-query.ts. */
-const PAGED = new Set(["mutations", "table"]);
+const PAGED = new Set(["mutations", "table", "timeline"]);
 
 /**
  * One page of a table view — rows `offset` to `offset + limit` of the view's one order, as its
@@ -26,8 +26,8 @@ export async function POST(req: Request) {
     const one = { ...doc, views: [view] };
     const run = (opts: Parameters<typeof runAnalysis>[1]) => withRequestCustomData(customData, () => runAnalysis(one, opts), { refs: customRefs, req });
     const pick = (r: Awaited<ReturnType<typeof runAnalysis>>) => {
-      const v = r.views[0] as { error?: string; mutations?: MutationsResult; table?: TableResult };
-      const t = v.mutations || v.table;
+      const v = r.views[0] as { error?: string; mutations?: MutationsResult; table?: TableResult; timeline?: TimelineResult };
+      const t = v.mutations || v.table || v.timeline;
       if (!t) throw new Error(v.error || "the view returned no rows");
       return t;
     };

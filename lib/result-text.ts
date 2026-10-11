@@ -5,6 +5,9 @@
 import type { AnalysisDoc, AnalysisResult, ViewResult, AssaysEntity, CorrelatesGene } from "./types.ts";
 import { lollipopSummaryText } from "./lollipop-svg.ts";
 
+/** a timeline's events listed in text (MCP); the figure draws every one */
+const TIMELINE_TEXT_EVENTS = 400;
+
 export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[] {
   const out: string[] = [];
   // Small shared formatters. The engine attaches caveats and the author
@@ -310,6 +313,20 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
       const title = v.mutations ? `${v.mutations.gene} mutations` : `Clinical data table (one row per ${v.table!.unit})`;
       out.push(`${title}: ${t.total < t.all ? `${t.total.toLocaleString()} of ${t.all.toLocaleString()} rows kept by the query` : `${t.total.toLocaleString()} rows`}; ` +
         tableText(t) + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "timeline" && v.timeline) {
+      const t = v.timeline, pt = t.patient;
+      const head = `Patient timeline — patients to choose from: ${t.total < t.all ? `${t.total.toLocaleString()} of ${t.all.toLocaleString()} kept by the query` : `${t.total.toLocaleString()}`}; ` + tableText(t);
+      if (!pt) out.push(head + "\n  no patient drawn: the list is empty" + caveatOf(v) + noteOf(v));
+      else {
+        const shown = pt.events.slice(0, TIMELINE_TEXT_EVENTS);
+        const line = (e: (typeof pt.events)[number]) => `  day ${e.start}${e.end != null && e.end > e.start ? `–${e.end}` : ""}: ${e.type}` +
+          (e.attrs.length ? " — " + e.attrs.filter(([k]) => !/^STYLE_/i.test(k)).map(([k, x]) => `${k}=${x}`).join(", ") : "");
+        out.push(head + `\n${pt.patient} (${pt.study}${pt.source.remote ? ", from " + pt.source.label + " over MCP" : ""}): ${pt.events.length} events, days from diagnosis; ` +
+          `samples: ${pt.samples.map((x) => x.id + (x.type ? " (" + x.type + ")" : "")).join(", ") || "none"}\n` +
+          shown.map(line).join("\n") +
+          (pt.events.length > shown.length ? `\n  … ${pt.events.length - shown.length} later events not listed here (the figure draws all of them)` : "") +
+          caveatOf(v) + noteOf(v));
+      }
     } else if (v.kind === "overlap") {
       const ov = v.overlap!;
       out.push(`Cohort overlap (patients in exactly these cohorts and no other):\n` +
