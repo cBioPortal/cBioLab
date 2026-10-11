@@ -57,8 +57,16 @@ export const ALTERATION_PATIENT_COLUMNS: QueryColumn[] = [
 ];
 export const ALTERATION_PATIENT_DEFAULT_COLUMNS = ["patient", "samples", "mutations", "cna", "sv"];
 
-/** The patient's samples' ids, sorted and joined — the Samples column — from a CTE's `sid`. */
-const sampleList = "arrayStringConcat(arraySort(groupUniqArray(sid)), ', ')";
+/** The patient's samples in their order (the numbered markers: lib/timeline-tracks.ts' sampleMarks), as an SQL array. */
+const orderArray = (order: string[]) => order.length ? "[" + order.map(sq).join(", ") + "]" : "CAST([] AS Array(String))";
+/** a sample's place in that order, from 1; a sample it does not name, last */
+const ordinalOf = (order: string[], x: string) => "if(indexOf(" + orderArray(order) + ", " + x + ") = 0, 1000000, indexOf(" + orderArray(order) + ", " + x + "))";
+/**
+ * Over a group of a CTE's rows (`sid` a sample id): the Samples column — the ids in the patient's sample
+ * order, joined — and `so`, the first of them's place in that order, which orders a gene's rows.
+ */
+const sampleCols = (order: string[]) =>
+  "arrayStringConcat(arraySort(x -> " + ordinalOf(order, "x") + ", groupUniqArray(sid)), ', ') AS samples, min(" + ordinalOf(order, "sid") + ") AS so";
 
 /** The study's samples profiled for each of `genesFrom`'s genes by `alterationType`'s profile. */
 function profiledCte(name: string, db: string, study: string, alterationType: string, genesFrom: string): string {
@@ -85,9 +93,11 @@ const labels = (p: TablePart, patient: string) => sq(p.cohort) + " AS cohort, " 
  * portal's patient table): the samples listed, the highest allele frequency among them with that
  * sample's reads, the gene's deep copy-number calls in the patient's samples (Copy #), and the share
  * of the study's samples profiled for the gene with any mutation in it (Cohort %). Uncalled calls are
- * left out, as the portal leaves them out. Drivers first, then by gene and codon.
+ * left out, as the portal leaves them out. With no sort, a gene's rows sit together — genes with a
+ * driver first, then by name — and within a gene by the first sample carrying the row (`order`, the
+ * patient's sample order), then codon.
  */
-export function patientMutationsSource(p: TablePart, patient: string, db: string, pin: string | null): RowSource {
+export function patientMutationsSource(p: TablePart, patient: string, db: string, pin: string | null, order: string[]): RowSource {
   const st = sq(p.study), uid = sq(p.study + "_" + patient);
   return {
     with: "WITH m AS (\n" +
@@ -98,7 +108,7 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       "  WHERE studyId = " + st + " AND patientId = " + sq(patient) + " AND molecularProfileId NOT LIKE '%uncalled%'\n" +
       "),\n" +
       "g AS (\n" +
-      "  SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, " + sampleList + " AS samples,\n" +
+      "  SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, " + sampleCols(order) + ",\n" +
       "         max(f) AS vaf, argMax(ac, ifNull(f, -1)) AS altCount, argMax(rc, ifNull(f, -1)) AS refCount\n" +
       "  FROM m GROUP BY gene, proteinChange, mutationType, variantType, chr, start, end, ref, var\n" +
       "),\n" +
@@ -110,18 +120,18 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       "  WHERE cancer_study_identifier = " + st + " AND variant_type = 'mutation' AND genetic_profile_stable_id NOT LIKE '%uncalled%'\n" +
       "    AND hugo_gene_symbol IN (SELECT gene FROM g) GROUP BY gene),\n" +
       profiledCte("fp", db, p.study, "MUTATION_EXTENDED", "SELECT gene FROM g") +
-      "rows AS (\n" +
-      "  SELECT " + labels(p, patient) + ", g.samples AS samples, g.gene AS gene, g.proteinChange AS proteinChange, " + annSelect(pin) + ",\n" +
+      "rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (\n" +
+      "  SELECT " + labels(p, patient) + ", g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, " + annSelect(pin) + ",\n" +
       "         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,\n" +
       "         g.vaf AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,\n" +
       "         g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos\n" +
       "  FROM g\n" +
       (pin ? "  LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange\n" : "") +
       "  LEFT JOIN cn ON cn.gene = g.gene LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene\n" +
-      ")\n",
+      "))\n",
     columns: ALTERATION_COLUMNS.mutations,
     select: "*",
-    defaultOrder: "drv DESC, gene, pos ASC NULLS LAST",
+    defaultOrder: "gdrv DESC, gene, so, pos ASC NULLS LAST",
     tiebreak: "gene, chr, start, end, ref, var, proteinChange, mutationType",
   };
 }
@@ -129,10 +139,10 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
 /**
  * One patient's deep copy-number alterations (AMP, HOMDEL — the calls the portal's patient table
  * lists), one row per gene and call however many samples carry it, with the gene's cytoband and the
- * share of the study's samples profiled for the gene with the same call (Cohort %). Drivers first,
- * then by gene.
+ * share of the study's samples profiled for the gene with the same call (Cohort %). With no sort,
+ * genes with a driver call first, then by gene, then by the first sample carrying the call (`order`).
  */
-export function patientCnaSource(p: TablePart, patient: string, db: string, pin: string | null): RowSource {
+export function patientCnaSource(p: TablePart, patient: string, db: string, pin: string | null, order: string[]): RowSource {
   const st = sq(p.study), pre = sq(p.study + "_"), uid = sq(p.study + "_" + patient);
   return {
     with: "WITH c AS (\n" +
@@ -140,22 +150,22 @@ export function patientCnaSource(p: TablePart, patient: string, db: string, pin:
       "  FROM " + db + ".genomic_event_derived\n" +
       "  WHERE cancer_study_identifier = " + st + " AND patient_unique_id = " + uid + " AND variant_type = 'cna' AND abs(cna_alteration) >= 2\n" +
       "),\n" +
-      "g AS (SELECT gene, alt, any(cytoband) AS cytoband, " + sampleList + " AS samples FROM c GROUP BY gene, alt),\n" +
+      "g AS (SELECT gene, alt, any(cytoband) AS cytoband, " + sampleCols(order) + " FROM c GROUP BY gene, alt),\n" +
       (pin ? oncokbCte(pin, "CNA", "SELECT gene FROM g") : "") +
       "fa AS (SELECT hugo_gene_symbol AS gene, cna_alteration AS alt, uniqExact(sample_unique_id) AS n FROM " + db + ".genomic_event_derived\n" +
       "  WHERE cancer_study_identifier = " + st + " AND variant_type = 'cna' AND abs(cna_alteration) >= 2 AND hugo_gene_symbol IN (SELECT gene FROM g)\n" +
       "  GROUP BY gene, alt),\n" +
       profiledCte("fp", db, p.study, "COPY_NUMBER_ALTERATION", "SELECT gene FROM g") +
-      "rows AS (\n" +
-      "  SELECT " + labels(p, patient) + ", g.samples AS samples, g.gene AS gene, if(g.alt > 0, 'AMP', 'HOMDEL') AS cna, " + annSelect(pin) + ",\n" +
+      "rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (\n" +
+      "  SELECT " + labels(p, patient) + ", g.samples AS samples, g.so AS so, g.gene AS gene, if(g.alt > 0, 'AMP', 'HOMDEL') AS cna, " + annSelect(pin) + ",\n" +
       "         g.cytoband AS cytoband, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq\n" +
       "  FROM g\n" +
       (pin ? "  LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = if(g.alt > 0, 'AMPLIFICATION', 'DELETION')\n" : "") +
       "  LEFT JOIN fa ON fa.gene = g.gene AND fa.alt = g.alt LEFT JOIN fp ON fp.gene = g.gene\n" +
-      ")\n",
+      "))\n",
     columns: ALTERATION_COLUMNS.cna,
     select: "*",
-    defaultOrder: "drv DESC, gene",
+    defaultOrder: "gdrv DESC, gene, so",
     tiebreak: "gene, cna",
   };
 }
@@ -169,9 +179,10 @@ const patientSamples = (db: string, study: string, patient: string) =>
 /**
  * One patient's structural variants, one row per event (both genes, both breakpoints, its class and
  * event info) however many samples carry it, with the study's own description of each site and the
- * highest supporting read counts among those samples. By the first gene, then the second.
+ * highest supporting read counts among those samples. With no sort, by the first gene, then by the first
+ * sample carrying the event (`order`), then the second gene.
  */
-export function patientSvSource(p: TablePart, patient: string, db: string): RowSource {
+export function patientSvSource(p: TablePart, patient: string, db: string, order: string[]): RowSource {
   return {
     with: "WITH s AS (\n" +
       "  SELECT smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,\n" +
@@ -188,7 +199,7 @@ export function patientSvSource(p: TablePart, patient: string, db: string): RowS
       "  WHERE sv.sample_id IN (" + patientSamples(db, p.study, patient) + ")\n" +
       "),\n" +
       "g AS (\n" +
-      "  SELECT gene1, gene2, class, eventInfo, pos1, pos2, " + sampleList + " AS samples,\n" +
+      "  SELECT gene1, gene2, class, eventInfo, pos1, pos2, " + sampleCols(order) + ",\n" +
       "         any(breakpointType) AS breakpointType, any(connectionType) AS connectionType, any(frame) AS frame, any(site1) AS site1, any(site2) AS site2,\n" +
       "         any(length) AS length, max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount,\n" +
       "         any(dnaSupport) AS dnaSupport, any(rnaSupport) AS rnaSupport, any(status) AS status, any(svAnnotation) AS svAnnotation, any(comments) AS comments\n" +
@@ -197,7 +208,7 @@ export function patientSvSource(p: TablePart, patient: string, db: string): RowS
       "rows AS (SELECT " + labels(p, patient) + ", g.* FROM g)\n",
     columns: ALTERATION_COLUMNS.sv,
     select: "*",
-    defaultOrder: "gene1, gene2",
+    defaultOrder: "gene1, so, gene2",
     tiebreak: "gene1, gene2, pos1, pos2, class, eventInfo",
   };
 }
@@ -216,8 +227,8 @@ export function patientSamplesSource(p: TablePart, patient: string, db: string):
 }
 
 /** A table's row source for one patient of `p`'s study. */
-export function alterationSource(table: AlterationTable, p: TablePart, patient: string, db: string, pin: string | null): RowSource {
-  return table === "mutations" ? patientMutationsSource(p, patient, db, pin) : table === "cna" ? patientCnaSource(p, patient, db, pin) : patientSvSource(p, patient, db);
+export function alterationSource(table: AlterationTable, p: TablePart, patient: string, db: string, pin: string | null, order: string[]): RowSource {
+  return table === "mutations" ? patientMutationsSource(p, patient, db, pin, order) : table === "cna" ? patientCnaSource(p, patient, db, pin, order) : patientSvSource(p, patient, db, order);
 }
 
 /**

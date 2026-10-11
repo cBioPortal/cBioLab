@@ -70,7 +70,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch }: {
               <svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>
               <span className="mono">{m.id}</span>
             </span>))}
-          <span className="note alt-key">Each row is one alteration in one gene across these samples: a sample's marker where it carries it, -- where it does not.</span>
+          <span className="note alt-key">Each row is one alteration in one gene across these samples: a sample's marker where it carries it, -- where it does not. A gene's rows sit together, shaded alike, in sample order.</span>
         </div>
       ) : <p className="meta">No patient to list: the cohort's patient list is empty.</p>}
       {p && TABLES.map(({ key, name }) => {
@@ -78,7 +78,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch }: {
         if (!t) return null;
         return (
           <section key={key} className="alt-table" aria-label={name}>
-            <DataTable t={t} query={specQuery((spec[key] || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table={key} unit={name}
+            <DataTable t={t} query={specQuery((spec[key] || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table={key} unit={name} groupBy={key === "sv" ? "gene1" : "gene"}
               onQuery={(q) => setQuery(key, q)}
               num={(id, x) => id === "vaf" ? x.toFixed(2) : id === "freq" ? x.toFixed(1) + "%" : x.toLocaleString()}
               cell={(id, x) => id === "samples" ? sampleCell(x)

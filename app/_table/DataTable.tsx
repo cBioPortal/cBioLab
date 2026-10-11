@@ -320,12 +320,25 @@ export interface DataTableProps<V> {
   onRow?: (row: TableRows<V>["rows"][number]) => void;
   /** which row is chosen, highlighted */
   selected?: (row: TableRows<V>["rows"][number]) => boolean;
+  /** a column whose runs of one value are drawn as groups (the alterations view's gene): the value shown on a run's
+   *  first row only, no rule inside a run, alternate runs shaded */
+  groupBy?: string;
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, num, title, onRow, selected }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, num, title, onRow, selected, groupBy }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
+  // runs of one value of `groupBy` on this page: whether a row continues the run above, has more below, and is in an odd run
+  const gi = groupBy ? t.columns.findIndex((c) => c.id === groupBy) : -1;
+  const groups = gi < 0 ? null : (() => {
+    let run = 0;
+    return p.rows.map((r, k) => {
+      const v = r.values[gi], cont = k > 0 && v === p.rows[k - 1].values[gi];
+      if (k > 0 && !cont) run++;
+      return { cont, more: k + 1 < p.rows.length && p.rows[k + 1].values[gi] === v, odd: run % 2 === 1 };
+    });
+  })();
   const [menu, setMenu] = useState<string | null>(null);   // a column id, or "\x01columns"
   const [search, setSearch] = useState(q.search || "");
   useEffect(() => { setSearch(q.search || ""); }, [q.search]);
@@ -433,13 +446,18 @@ export function DataTable<V extends string | number | null>({ t, query, updating
               })}
             </tr></thead>
             <tbody>
-              {p.rows.map((r, k) => (
-                <tr key={k} className={onRow ? "dt-pick" + (selected && selected(r) ? " sel" : "") : undefined}
+              {p.rows.map((r, k) => {
+                const g = groups ? groups[k] : null;
+                const cls = [onRow ? "dt-pick" + (selected && selected(r) ? " sel" : "") : "", g?.odd ? "dt-galt" : "", g?.more ? "dt-gmid" : ""].filter(Boolean).join(" ");
+                return (
+                <tr key={k} className={cls || undefined}
                   onClick={onRow ? () => onRow(r) : undefined} aria-selected={onRow ? !!(selected && selected(r)) : undefined}>
                   {multi && <td className="meta">{r.cohort}</td>}
                   {multi && <td className="meta">{r.study}</td>}
-                  {shownIdx.map((i) => <td key={i} className={t.columns[i].numeric ? "num" : undefined}>{show(t.columns[i], r.values[i])}</td>)}
-                </tr>))}
+                  {shownIdx.map((i) => <td key={i} className={t.columns[i].numeric ? "num" : undefined}>
+                    {g?.cont && t.columns[i].id === groupBy ? null : show(t.columns[i], r.values[i])}</td>)}
+                </tr>);
+              })}
               {!p.rows.length && !waiting && <tr><td className="meta" colSpan={shownIdx.length + (multi ? 2 : 0)}>{filtered ? "no rows match — loosen the search or a filter" : "no rows"}</td></tr>}
             </tbody>
           </table>

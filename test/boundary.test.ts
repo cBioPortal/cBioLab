@@ -197,7 +197,7 @@ describe("remote peers: nothing identifying leaves before the network is touched
     // the alterations view's list and its three tables name one patient and their samples
     assert.match(pageSql(alterationPatientRowSource(part, "db"), {}, [], 10, 0), /c\.pid AS patient/);
     for (const t of ["mutations", "cna", "sv"] as const)
-      assert.match(pageSql(alterationSource(t, part[0], "P-1", "db", "v7.5"), {}, [], 10, 0), /'P-1' AS patient/);
+      assert.match(pageSql(alterationSource(t, part[0], "P-1", "db", "v7.5", []), {}, [], 10, 0), /'P-1' AS patient/);
     assert.match(pageSql(patientSamplesSource(part[0], "P-1", "db"), {}, [], 10, 0), /s\.id AS sid/);
     for (const m of ["rowsPage", "rowsCounts", "rowsValues", "rowsRank"]) {
       for (const R of [AggregateResolver, RemoteAggregateResolver])

@@ -7,6 +7,7 @@ import type { TablePart } from "../mutation-table.ts";
 import { checkQuery, describeQuery, shownColumns, type TableQuery } from "../table-query.ts";
 import { alterationsMethod } from "../method.ts";
 import { PATIENT_ID } from "../patient-timeline.ts";
+import { sampleMarks } from "../timeline-tracks.ts";
 import {
   ALTERATION_TABLES, ALTERATION_TABLE_NAMES, ALTERATION_COLUMNS, ALTERATION_DEFAULT_COLUMNS, ALTERATION_PATIENT_COLUMNS, ALTERATION_PATIENT_DEFAULT_COLUMNS,
   alterationSource, alterationPatientRowSource, patientSamplesSource, type AlterationTable,
@@ -75,11 +76,18 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
   const listRows = (size: number, opts: { values?: boolean; locate?: { study: string; patient: string } } = {}) =>
     runRows(ctx, "alterations", holders, q, defaults, shown, size, (parts) => (db) => alterationPatientRowSource(parts, db),
       opts.values && ctx.values ? { column: ctx.values, numeric: !!ALTERATION_PATIENT_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined, undefined, opts.locate);
+  /** the patient's samples in their order — the numbered markers, which order a gene's rows — read whole whatever page is asked */
+  const samplesOf = async (pt: { study: string; id: string }) => {
+    const r = await runRows({ ...ctx, page: undefined, values: undefined }, "alterations:samples", [pt.study], {}, ["sid"], ["sid", "type"], TABLE_ROWS_MAX,
+      (parts: TablePart[]) => (db) => patientSamplesSource(parts[0], pt.id, db));
+    const samples = r.rows.map((x) => ({ id: String(x.sid), type: String(x.type ?? "") }));
+    return { samples, order: [...sampleMarks(samples, []).keys()] };
+  };
   /** one of the patient's tables, for the page (or values) the request asks of it */
-  const tableRows = async (t: AlterationTable, pt: { study: string; id: string }): Promise<{ r: Rows; rows: TableRows<Cell> }> => {
+  const tableRows = async (t: AlterationTable, pt: { study: string; id: string }, order: string[]): Promise<{ r: Rows; rows: TableRows<Cell> }> => {
     const cols = ALTERATION_COLUMNS[t], { q: tqq, size } = tq[t], defs = ALTERATION_DEFAULT_COLUMNS[t];
     const r = await runRows(ctx, "alterations:" + t, [pt.study], tqq, defs, shownColumns(tqq, cols, defs), size,
-      (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin),
+      (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin, order),
       ctx.values && only === t ? { column: ctx.values, numeric: !!cols.find((c) => c.id === ctx.values)?.numeric } : undefined);
     const columns = cols.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric }));
     return { r, rows: { columns, shown: shownColumns(tqq, columns, defs), defaults: defs, query: tqq, rows: rowsOf(r, cols), offset: r.offset, pageSize: size,
@@ -97,7 +105,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
       const first = pt ? null : await listRows(1);
       const want = pt || (first?.rows[0] ? { study: String(first.rows[0].study), id: String(first.rows[0].patient) } : null);
       if (!want) return no("the cohort's patient list is empty, so there is no patient's " + only + " table to page");
-      const { rows } = await tableRows(only, want);
+      const { rows } = await tableRows(only, want, (await samplesOf(want)).order);
       return partial({ ...listOf({ rows: [], lists: [], total: 0, all: 0, offset: 0, groups: 1 }), patient: { ...want, samples: [] }, tables: { [only]: rows }, oncokbPin: pin });
     }
     const r = await listRows(show, { values: true, locate: view.patient && !ctx.page && !ctx.values ? { study: view.patient.study, patient: view.patient.id } : undefined });
@@ -112,15 +120,14 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
         .map((cn) => ({ cohort: cn, study: want.study, cohortSql: ctx.resolvers[want.study].cohortSql(ctx.doc.cohorts[cn]) })), db), member, defaults);
       if (!counts.some((c) => c.n > 0)) return no(want.id + " is not a patient of this cohort in " + want.study);
     }
-    const [position, smp, ...tabs] = await Promise.all([
+    const smp = want ? await samplesOf(want) : null;
+    const [position, ...tabs] = await Promise.all([
       want ? listPosition(r, !!view.patient, (first) => listRows(1, { locate: first })) : Promise.resolve(null),
-      want ? runRows(ctx, "alterations:samples", [want.study], {}, ["sid"], ["sid", "type"], TABLE_ROWS_MAX,
-        (parts: TablePart[]) => (db) => patientSamplesSource(parts[0], want.id, db)) : Promise.resolve(null),
-      ...ALTERATION_TABLES.map((t) => want ? tableRows(t, want) : Promise.resolve(null)),
+      ...ALTERATION_TABLES.map((t) => want ? tableRows(t, want, smp!.order) : Promise.resolve(null)),
     ]);
     const tables: AlterationsResult["tables"] = {};
     ALTERATION_TABLES.forEach((t, i) => { const x = tabs[i]; if (x) tables[t] = x.rows; });
-    const samples = (smp?.rows || []).map((x) => ({ id: String(x.sid), type: String(x.type ?? "") }));
+    const samples = smp?.samples || [];
     const list = listOf(r);
     const sortName = q.sort ? listColumns.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null;
     const tableLine = (t: AlterationTable) => {

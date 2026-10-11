@@ -25,7 +25,7 @@ describe("the alterations view's tables", () => {
     });
     test(t + ": every column sorts, filters and lists its values in SQL", () => {
       for (const pin of ["v7.5", null]) {
-        const src = alterationSource(t, part, "P-1", "db", pin);
+        const src = alterationSource(t, part, "P-1", "db", pin, ["P-1-T01", "P-1-T02"]);
         for (const c of cols) {
           const q = { sort: { column: c.id, desc: true }, filters: { [c.id]: c.numeric ? { min: 0 } : { op: "contains" as const, value: "x" } } };
           assert.equal(checkQuery(q, cols), null);
@@ -39,16 +39,27 @@ describe("the alterations view's tables", () => {
   }
   test("one patient's rows only: every table reads the patient it is given", () => {
     for (const t of ALTERATION_TABLES) {
-      const sql = alterationSource(t, part, "P-0024249", "db", "v7.5").with;
+      const sql = alterationSource(t, part, "P-0024249", "db", "v7.5", []).with;
       assert.match(sql, /P-0024249/);
     }
-    assert.match(alterationSource("mutations", part, "P-1", "db", null).with, /NOT LIKE '%uncalled%'/, "uncalled calls are left out, as the portal leaves them out");
-    assert.match(alterationSource("cna", part, "P-1", "db", null).with, /abs\(cna_alteration\) >= 2/, "the deep calls only");
+    assert.match(alterationSource("mutations", part, "P-1", "db", null, []).with, /NOT LIKE '%uncalled%'/, "uncalled calls are left out, as the portal leaves them out");
+    assert.match(alterationSource("cna", part, "P-1", "db", null, []).with, /abs\(cna_alteration\) >= 2/, "the deep calls only");
+  });
+  test("with no sort a gene's rows sit together, then follow the patient's sample order", () => {
+    const order = ["P-1-T03", "P-1-T01"];
+    for (const t of ["mutations", "cna"] as const) {
+      const src = alterationSource(t, part, "P-1", "db", null, order);
+      assert.match(src.defaultOrder, /^gdrv DESC, gene, so\b/, "genes with a driver first, a gene's rows together, then by sample");
+      assert.match(src.with, /max\(drv\) OVER \(PARTITION BY gene\) AS gdrv/);
+    }
+    assert.match(alterationSource("sv", part, "P-1", "db", null, order).defaultOrder, /^gene1, so\b/);
+    // the Samples column lists them in that order too, not by id
+    assert.match(alterationSource("mutations", part, "P-1", "db", null, order).with, /arraySort\(x -> if\(indexOf\(\['P-1-T03', 'P-1-T01'\], x\)/);
   });
   test("OncoKB joins only when a version is pinned, by protein change or by AMPLIFICATION / DELETION", () => {
-    assert.doesNotMatch(alterationSource("mutations", part, "P-1", "db", null).with, /oncokb_annotation/);
-    assert.match(alterationSource("mutations", part, "P-1", "db", "v7.5").with, /alteration_type = 'MUTATION'[\s\S]*ann\.alteration = g\.proteinChange/);
-    assert.match(alterationSource("cna", part, "P-1", "db", "v7.5").with, /alteration_type = 'CNA'[\s\S]*'AMPLIFICATION', 'DELETION'/);
+    assert.doesNotMatch(alterationSource("mutations", part, "P-1", "db", null, []).with, /oncokb_annotation/);
+    assert.match(alterationSource("mutations", part, "P-1", "db", "v7.5", []).with, /alteration_type = 'MUTATION'[\s\S]*ann\.alteration = g\.proteinChange/);
+    assert.match(alterationSource("cna", part, "P-1", "db", "v7.5", []).with, /alteration_type = 'CNA'[\s\S]*'AMPLIFICATION', 'DELETION'/);
   });
 });
 

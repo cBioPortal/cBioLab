@@ -1690,6 +1690,9 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .alt-table { margin-top: var(--s2); }
 .alt-samples { display: inline-flex; gap: 2px; vertical-align: middle; }
 .alt-key { flex-basis: 100%; margin: 0; }
+/* a table's groups (DataTable groupBy): no rule inside a run, alternate runs shaded */
+.dt-table tr.dt-gmid td { border-bottom-color: transparent; }
+.dt-table tr.dt-galt td { background: var(--code-bg); }
 .alt-cna { font-weight: 600; }
 .alt-cna.amp { color: var(--amp); }
 .alt-cna.del { color: var(--del); }
