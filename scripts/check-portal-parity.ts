@@ -19,10 +19,12 @@
  * study shows up as a failure to look at, not as slack.
  *
  * Run: npm run check:portal
- * With RECORD=1 (npm run verify) it writes docs/verification/portal-parity.json, which /verification reads.
+ * With RECORD=1 (npm run verify) it writes docs/verification/portal-parity.json, which /verification reads
+ * (or REPORT_DIR/portal-parity.json when REPORT_DIR is set, as in CI).
  */
 import { writeFileSync, mkdirSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { buildExplore } from "../lib/explore.ts";
 import { studyProfiles } from "../lib/analysis.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
@@ -43,7 +45,8 @@ const STUDIES = [
 ];
 const TOP_GENES = 15;
 const CLINICAL_ATTRS = 4;
-const OUT = new URL("../docs/verification/portal-parity.json", import.meta.url);
+/** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
+const OUT = new URL("portal-parity.json", process.env.REPORT_DIR ? pathToFileURL(process.env.REPORT_DIR + "/") : new URL("../docs/verification/", import.meta.url));
 
 interface Check { study: string; group: string; what: string; ours: string; portal: string; agree: boolean }
 const checks: Check[] = [];

@@ -26,8 +26,11 @@ jobs:
     permissions:
       contents: read
     env:
-      # the cBioPortal comparison and cohort-logic stages write their part of the report
+      # each check writes its part of the report to a folder that starts empty, so the artifact holds
+      # only what this run wrote (docs/verification/ keeps the copy saved with the code, which the
+      # build reads); a stage that never ran leaves no file
       RECORD: "1"
+      REPORT_DIR: ${{ github.workspace }}/verification-report
     steps:
       - uses: actions/checkout@v5
 
@@ -84,6 +87,6 @@ jobs:
         with:
           name: verification-report
           path: |
-            docs/verification/*.json
+            verification-report/
             /tmp/gate-server.log
           if-no-files-found: warn

@@ -22,6 +22,9 @@ import coxnet from "../../test/fixtures/golden/coxnet.json" with { type: "json" 
 
 export const metadata = { title: "How we check the numbers — cbio-lab" };
 
+/** every run of the Verify workflow on master, newest first (.github/workflows/verify.yml) */
+const CI_RUNS = "https://github.com/cBioPortal/cohort-lab/actions/workflows/verify.yml?query=branch%3Amaster";
+
 const FIXTURES: Record<string, Record<string, unknown>> = { survival, regression, tables, moments, incidence, gsea, coxnet };
 const caseCount = (fixture: string, keys: string[]) =>
   keys.reduce((n, k) => n + ((FIXTURES[fixture][k] as unknown[] | undefined)?.length || 0), 0);
@@ -88,8 +91,10 @@ export default function VerificationPage() {
           this tool&apos;s numbers against things we did not write, namely cBioPortal and the standard
           statistics libraries. It is built to run in continuous integration (CI): automatically, on every
           proposed change to the code, blocking any change that fails a check and publishing each run&apos;s
-          results as a report. This page displays that report. The results below are from the run on{" "}
-          {when(lastRun)}.
+          results as a report. The results below are a copy of that report saved with the code, from the
+          run on {when(lastRun)}. For the most recent run, see{" "}
+          <a href={CI_RUNS}>the latest CI runs on master</a> (on GitHub; it opens only for people with access
+          to the code).
         </p>
         <p className="lede" style={{ marginTop: "var(--s3)" }}>
           Why this matters: much of this tool&apos;s code was written with an AI assistant. That is a reason to
@@ -127,7 +132,8 @@ export default function VerificationPage() {
           can run the same five stages with one command, <span className="mono">npm run verify</span>, which
           takes about ten minutes and stops with an error if any check fails. The report is written to{" "}
           <span className="mono">docs/verification/</span>; this page shows the copy saved with the code,
-          refreshed from a passing run.
+          updated by hand from a passing run. Every CI run on master keeps its own report, as a download
+          named <span className="mono">verification-report</span> on <a href={CI_RUNS}>its page on GitHub</a>.
         </p>
         <table className="verif-table">
           <thead><tr><th>Stage</th><th>What it checks</th><th>What it needs</th></tr></thead>

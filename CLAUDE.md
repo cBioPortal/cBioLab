@@ -278,8 +278,12 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
    report of an automated verification suite meant to run in CI: `npm run verify` runs every stage
    (unit tests, `check:methods`, then the three below with `RECORD=1`), fails on any failing check,
    and writes `docs/verification/*.json` — the report the page reads, committed from a passing run.
-   CI (`.github/workflows/verify.yml`) runs `scripts/gate.sh` plus `check:mutants` with `RECORD=1`
-   on every PR and push to master, and keeps that report as the `verification-report` artifact. The page is written for
+   The saved copy is updated by hand; the page links to the latest CI runs on master. CI
+   (`.github/workflows/verify.yml`) runs `scripts/gate.sh` plus `check:mutants` with `RECORD=1` and
+   `REPORT_DIR` (a folder that starts empty, so a stage that never ran leaves no stale file) on every
+   PR and push to master, and uploads that folder as the `verification-report` artifact. The planted-bug
+   check strips `RECORD`/`REPORT_DIR` from its guard runs, so a run against a planted bug never writes
+   a report. The page is written for
    bench scientists and PIs and opens by saying what the suite is and what it depends on (the public
    cbioportal.org API, the warehouse, the studies named in the scripts). The three: `check:portal` (counts, gene frequencies and
    filtered cohorts against cbioportal.org's public API — exact, no tolerance), `check:cohorts` (the
