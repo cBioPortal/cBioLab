@@ -3660,7 +3660,7 @@ Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 
 ### Example 60: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
 
-MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row.
+MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row, and P-0000012's alterations beside it.
 
 ```json
 {
@@ -3692,6 +3692,13 @@ MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 
       "sort": {
         "column": "events",
         "desc": true
+      }
+    },
+    {
+      "kind": "alterations",
+      "patient": {
+        "study": "msk_chord_2024",
+        "id": "P-0000012"
       }
     }
   ]

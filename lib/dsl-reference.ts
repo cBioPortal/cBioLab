@@ -1020,13 +1020,14 @@ export const EXAMPLES: DslExample[] = [
   },
   {
     title: "A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis",
-    demonstrates: "A `timeline` view, the portal's patient-view Timeline: the chosen patient's clinical events as tracks — treatment nested by subtype and agent, lab tests as line charts, samples as numbered markers — with the list of the cohort's patients to choose from (a table: searchable, sortable, downloadable). `patient` names who is drawn; `collapsed` folds a track's sub-tracks into one row. Both name a patient, so only a study that may disclose patients takes part.",
-    tags: ["timeline", "patient", "table"],
-    note: "MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row.",
+    demonstrates: "A `timeline` view, the portal's patient-view Timeline: the chosen patient's clinical events as tracks — treatment nested by subtype and agent, lab tests as line charts, samples as numbered markers — with the list of the cohort's patients to choose from (a table: searchable, sortable, downloadable). `patient` names who is drawn; `collapsed` folds a track's sub-tracks into one row. Beside it, an `alterations` view of the same patient: their mutations, copy-number alterations and structural variants, as the portal's patient page lists them under the timeline. Both name a patient, so only a study that may disclose patients takes part.",
+    tags: ["timeline", "alterations", "patient", "table"],
+    note: "MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row, and P-0000012's alterations beside it.",
     doc: {
       study: "msk_chord_2024",
       cohorts: { "Breast": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"], per: "sample" }] } },
-      views: [{ kind: "timeline", patient: { study: "msk_chord_2024", id: "P-0000012" }, collapsed: ["treatment.Chemo"], sort: { column: "events", desc: true } }]
+      views: [{ kind: "timeline", patient: { study: "msk_chord_2024", id: "P-0000012" }, collapsed: ["treatment.Chemo"], sort: { column: "events", desc: true } },
+               { kind: "alterations", patient: { study: "msk_chord_2024", id: "P-0000012" } }]
     }
   },
   {
