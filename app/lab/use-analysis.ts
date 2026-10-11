@@ -17,6 +17,7 @@ import { dataPart } from "../_oncoprint/view-display.ts";
 import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
 import { api } from "./api.ts";
 import type { AnalysisBody } from "../../lib/api-schemas.ts";
+import { viewIsEmpty } from "../../lib/partition-arms.ts";
 
 /** Analyses are a function of the document and the data: never stale in a session, never refetched
  *  on focus, and an engine error is a refusal, not something to retry. */
@@ -29,14 +30,14 @@ export function makeQueryClient(): QueryClient {
 type ViewResult = AnalysisResult["views"][number];
 type V = Record<string, unknown>;
 
-/** The document as sent for its cohorts: everything but its views and its prose (its own notes,
- *  and each cohort's), which change no number. */
+/** The document as sent for its cohorts: everything but its views, its prose (its own notes,
+ *  and each cohort's) and where each cohort was copied from, none of which changes a number. */
 function cohortsPart(doc: AnalysisDoc, study: string): AnalysisDoc {
   const { views, title, notes, cohorts, ...rest } = doc as AnalysisDoc & { title?: unknown; notes?: unknown };
   void views; void title; void notes;
   const plain = Object.fromEntries(Object.entries(cohorts || {}).map(([k, c]) => {
-    const { notes: cohortNotes, ...def } = c as typeof c & { notes?: unknown };
-    void cohortNotes;
+    const { notes: cohortNotes, from: source, ...def } = c;
+    void cohortNotes; void source;
     return [k, def];
   }));
   return { ...rest, cohorts: plain, study: doc.study || study } as AnalysisDoc;
@@ -99,13 +100,15 @@ export function useAnalysis(doc: AnalysisDoc, ids: number[], epoch: number, stud
       if (!r.views || !r.views[0]) throw new Error("no result for this view");
       return r.views[0];
     },
-    enabled: enabled && cohortsCurrent,
+    // a view with no cohorts has nothing to ask: the page draws it empty, waiting for one
+    enabled: enabled && cohortsCurrent && !viewIsEmpty(v),
     placeholderData: (): ViewResult | undefined => lastViews.current.get(ids[i]),
   })) });
 
   if (cohorts.data && !cohorts.isPlaceholderData) lastCohorts.current = { epoch, data: cohorts.data };
   const shown = viewQs.map((q, i): ViewResult => {
     const v = views[i];
+    if (viewIsEmpty(v)) return withNote({ kind: String(v.kind), empty: true }, v);
     const r: ViewResult = q.data ?? (q.error ? { kind: v.kind, error: String((q.error as Error).message || q.error) } as ViewResult
       : { kind: v.kind, pending: true } as unknown as ViewResult);
     if (q.data && !q.isPlaceholderData) lastViews.current.set(ids[i], q.data);
@@ -116,7 +119,7 @@ export function useAnalysis(doc: AnalysisDoc, ids: number[], epoch: number, stud
 
   const result = enabled && cohorts.data ? { ...cohorts.data, views: shown } : null;
   const pending = new Set<number>();
-  viewQs.forEach((q, i) => { if (q.isFetching || (enabled && !cohortsCurrent)) pending.add(ids[i]); });
+  viewQs.forEach((q, i) => { if (!viewIsEmpty(views[i]) && (q.isFetching || (enabled && !cohortsCurrent))) pending.add(ids[i]); });
   return {
     result,
     busy: enabled && (cohorts.isFetching || cohorts.isPending),
@@ -129,7 +132,7 @@ export function useAnalysis(doc: AnalysisDoc, ids: number[], epoch: number, stud
 export function seedAnalysis(qc: QC, doc: AnalysisDoc, study: string, r: AnalysisResult): void {
   const base = cohortsPart(doc, study);
   qc.setQueryData(cohortsKey(base), { ...r, views: [] });
-  ((doc.views || []) as unknown as V[]).forEach((v, i) => { if (r.views[i]) qc.setQueryData(viewKey(base, v), r.views[i]); });
+  ((doc.views || []) as unknown as V[]).forEach((v, i) => { if (r.views[i] && !r.views[i].empty) qc.setQueryData(viewKey(base, v), r.views[i]); });
 }
 
 /** Ask every analysis again (data the document named has arrived, say). */

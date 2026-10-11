@@ -14,7 +14,7 @@
 
 import { flattenSplits, viewDrawProblem } from "./partition-arms.ts";
 
-export const DOC_VERSION = "2.4";
+export const DOC_VERSION = "2.5";
 
 /** what upgrading a document did, reported in the result so a reader is told, not left to notice */
 export interface DocUpgrade {
@@ -145,10 +145,33 @@ function splitsNoLongerReplace(doc: AnyDoc, changes: string[]): AnyDoc {
   return fixed ? { ...doc, views } : doc;
 }
 
+/**
+ * 2.4 → 2.5: a view with no `cohorts` (or an empty list) drew every authored cohort. In 2.5 a view
+ * draws the cohorts it names and nothing else — one without any is empty, waiting for a cohort —
+ * so each such view is given the list it drew. A view split by `splitBy` draws that split's arms
+ * either way and is left alone.
+ */
+function viewsNameTheirCohorts(doc: AnyDoc, changes: string[]): AnyDoc {
+  const authored = Object.keys(doc.cohorts || {});
+  if (!authored.length || !Array.isArray(doc.views)) return doc;
+  let fixed = 0;
+  const views = doc.views.map((v: AnyDoc) => {
+    if (!v || typeof v !== "object" || v.splitBy) return v;
+    if (v.cohorts !== undefined && !(Array.isArray(v.cohorts) && !v.cohorts.length)) return v;
+    fixed++;
+    return { ...v, cohorts: [...authored] };
+  });
+  if (!fixed) return doc;
+  changes.push(fixed + " view" + (fixed === 1 ? "" : "s") + " that showed every cohort by default now list" +
+    (fixed === 1 ? "s" : "") + " them by name, since a view now draws only the cohorts it names");
+  return { ...doc, views };
+}
+
 /** each step upgrades from the version before `to`; unversioned documents start at the first */
 const STEPS: { to: string; run: (doc: AnyDoc, changes: string[]) => AnyDoc }[] = [
   { to: "2.3", run: partitionsToSplits },
-  { to: "2.4", run: splitsNoLongerReplace }
+  { to: "2.4", run: splitsNoLongerReplace },
+  { to: "2.5", run: viewsNameTheirCohorts }
 ];
 
 /**

@@ -12,7 +12,8 @@ import { type SplitSpec } from "./partitions.tsx";
 import { armsFromSelection, editSplits, splitKey, type ChartKey } from "../../lib/partition-arms.ts";
 import { DOC_VERSION } from "../../lib/doc-version.ts";
 import { saveToServer, customDataKey, featureFromCohort, type StoredDataset } from "./custom-data-client.ts";
-import { DEFAULT_VIEWS } from "./doc-store.ts";
+import { DEFAULT_VIEWS, defaultViews } from "./doc-store.ts";
+import type { AddCohortTarget } from "./add-cohort-dialog.tsx";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { useExplore, type ExploreAsk } from "./use-explore.ts";
 
@@ -39,10 +40,12 @@ export interface ExplorePage {
   /** run an edited document */
   runEdited: (d: AnalysisDoc) => void;
   proposePartition: (req: { doc: AnalysisDoc; cohort: string; attribute?: string; gene?: string; oql?: string[]; name?: string; maxArms?: number; minCount?: number }) => Promise<{ name: string; def: PartitionDef; note?: string }>;
+  /** put a new cohort in the view add mode was opened for (use-view-edits.ts) */
+  addCohortToView: (target: AddCohortTarget, name: string, def?: CohortDef, studyHint?: string) => void;
 }
 
 export function useExploreState(page: ExplorePage) {
-  const { analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab } = page;
+  const { addCohortToView, analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, setError, setStudy, study, tab } = page;
   const [exMsg, setExMsg] = useState<string | null>(null);
   /** the facet whose "split by this" is waiting on the server's proposed arms */
   const [splittingBy, setSplittingBy] = useState<string | null>(null);
@@ -50,7 +53,7 @@ export function useExploreState(page: ExplorePage) {
    * Explore opened over the analysis to add one cohort to it ("+ Add cohort"), with the Explore
    * state it replaced, restored when it closes so the Explore tab is as the reader left it.
    */
-  const [addMode, setAddMode] = useState<null | { ids: string[]; text: string; explore: ExploreAsk | null }>(null);
+  const [addMode, setAddMode] = useState<null | { ids: string[]; text: string; explore: ExploreAsk | null; target: AddCohortTarget }>(null);
   // Explore → Custom data lives in the add-chart dialog, which exists only once Explore has
   // facets; asked for from elsewhere (a banner, the data dialog) it opens when they arrive
   const [wantCustomManager, setWantCustomManager] = useState(false);
@@ -149,7 +152,7 @@ export function useExploreState(page: ExplorePage) {
     // name with no on-screen explanation.
     const name = barDefaultName();
     const nextStudy = exSel.current[0] || study;
-    const nd: AnalysisDoc = { study: nextStudy, cohorts: { [name]: d }, views: DEFAULT_VIEWS };
+    const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: d }, views: defaultViews([name]) };
     setStudy(nextStudy);
     docs.replace(nd);
     setError(null);     // never leave the previous run's numbers on screen
@@ -167,7 +170,7 @@ export function useExploreState(page: ExplorePage) {
     setExMsg(null); setSplittingBy(label);
     const name = barDefaultName();
     const nextStudy = exSel.current[0] || study;
-    const base: AnalysisDoc = { study: nextStudy, cohorts: { [name]: d }, views: DEFAULT_VIEWS };
+    const base: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: d }, views: defaultViews([name]) };
     try {
       const { name: sn, def } = await proposePartition({ doc: base, cohort: name, ...spec });
       const nd: AnalysisDoc = editSplits({ ...base, dsl: DOC_VERSION, views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, sn)] })) },
@@ -529,8 +532,8 @@ export function useExploreState(page: ExplorePage) {
   useEffect(() => {
     if (tab === "cohorts" && !explore && !exploreBusy && exStudies.length) fetchExplore(null);
   }, [tab, study, explore]); // eslint-disable-line
-  const openAddCohort = () => {
-    setAddMode({ ids: exSel.current, text: cDefText, explore: exploring.current });
+  const openAddCohort = (target: AddCohortTarget) => {
+    setAddMode({ ids: exSel.current, text: cDefText, explore: exploring.current, target });
     const ids = analysisStudies();
     exSel.current = ids; setExStudies(ids);
     setCDefText(JSON.stringify(draftScaffold(ids), null, 2));
@@ -543,23 +546,17 @@ export function useExploreState(page: ExplorePage) {
     setCDefText(addMode.text); exploring.restore(addMode.explore);
     setAddMode(null);
   };
-  /** Add Explore's current selection to the open analysis as a new cohort, and close add mode. */
+  /** Add Explore's current selection to the view add mode was opened for, as a new cohort of the analysis. */
   const addDraftToAnalysis = (name: string) => {
     const def = barDef();
     if (!def) { setExMsg("select at least one study first"); return; }
     const n = name.trim();
     if (!n) { setExMsg("give the cohort a name"); return; }
     if (doc.cohorts?.[n]) { setExMsg("this analysis already has a cohort named “" + n + "”"); return; }
-    const nd: AnalysisDoc = { ...doc, ...(doc.study ? {} : { study: exSel.current[0] || study }),
-      cohorts: { ...(doc.cohorts || {}), [n]: def },
-      ...(doc.views && doc.views.length ? {} : { views: DEFAULT_VIEWS }) };
-    // a view that lists its own cohorts keeps its list; say so, rather than leave the reader to
-    // wonder why the new cohort is missing from it
-    const listed = (doc.views || []).filter((v) => Array.isArray(v.cohorts) && v.cohorts.length).length;
+    const target = addMode?.target;
+    const studyHint = exSel.current[0];
     closeAddCohort();
-    runEdited(nd);
-    if (listed) setToast("Added “" + n + "”. " + listed + " view" + (listed === 1 ? " lists" : "s list") +
-      " its own cohorts — tick “" + n + "” in " + (listed === 1 ? "its" : "their") + " cohorts menu to show it there.");
+    if (target) addCohortToView(target, n, def, studyHint);
   };
 
   return { exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, wantCustomManager, setWantCustomManager, saving, setSaving, addChartDialog, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exExtraDerived, setExExtraDerived, exExtraDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, hiddenAttrs, setHiddenAttrs, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, exploreEventTypes, treatmentEventType, EXTRA_DERIVED_KINDS, extraDerivedOn, toggleExtraDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, openAddCohort, closeAddCohort, addDraftToAnalysis };

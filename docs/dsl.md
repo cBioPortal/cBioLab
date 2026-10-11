@@ -1,6 +1,6 @@
 <!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.ts; regenerate with `npm run docs:gen`. -->
 
-# cbio-lab DSL (v2.4)
+# cbio-lab DSL (v2.5)
 
 One declarative JSON object — the **Analysis document** — describes everything cbio-lab does:
 which patients form each cohort, and which views compare them. The server compiles it to
@@ -11,10 +11,10 @@ SQL each cohort compiled to.
 ## Analysis document
 
 ```
-{ "dsl":     "2.4",                         // the document's version; see "Versions" below
+{ "dsl":     "2.5",                         // the document's version; see "Versions" below
   "study":   "<default study id>",            // validated against cancer_study
-  "cohorts": { "<name>": cohortDef, ... },    // max 16
-  "views":   [ view, ... ],                   // max 6
+  "cohorts": { "<name>": cohortDef, ... },    // max 16 — the store every view's "cohorts" names from
+  "views":   [ view, ... ],                   // max 6; each lists its own "cohorts": ["<name>", ...]
   "uploads"?: [ { "as": "<name>", "dataset": "<id>", "version": n } ] }  // server-stored custom data, pinned
 ```
 
@@ -35,6 +35,7 @@ cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient 
                "studies"?: ["<id>", ...],     // union across studies (federated, no count limit)
                "lineGap"?: 90,                // derived-treatment-line gap, days
                "notes"?:   "<prose>",         // the analyst's own note on this cohort; never compiled
+               "from"?:    { "saved": "<id>", "name": "<name>", "hash": "<sha256>", "savedAt"?: "<when>" },  // set by the page: the saved cohort this was copied from, and the hash of what was copied; never compiled
                "splits"?:  { "<name>": splitDef } }  // divisions of this cohort into arms that add up to it
 splitDef  := { "arms": [ { "name": "<label>", "where": clause, "splits"?: {…} } × 1-8 ],  // tested in order; first match wins; an arm may be split again
                "other"?: "<label>",            // the remainder's name, default "Other"
@@ -86,12 +87,13 @@ Up to 16 authored cohorts and 48 cohorts in all, children included. Expanded bef
 each child `extends` its parent and runs in the parent's studies. (Not to be confused with the
 `{"kind":"split"}` leaf below, which selects the engine's fixed discovery or validation half.)
 
-**Versions.** A document carries `"dsl": "2.4"`. One written for an older version is
+**Versions.** A document carries `"dsl": "2.5"`. One written for an older version is
 upgraded when it is read — the result's `upgraded` says from which version and what changed
 (2.2 → 2.3 moved top-level `partitions` onto the cohorts they split as `splits`, and renamed
 their children from `"<partition> / <arm>"` to `"<cohort> / <partition> / <arm>"`, views
 included; 2.3 → 2.4 ended "a split replaces what it splits" — a view that drew a split cohort's arms
-under 2.3 is given those arms by name, so it draws the same thing) — and saving it writes the new
+under 2.3 is given those arms by name, so it draws the same thing; 2.4 → 2.5 ended "a view with no
+`cohorts` draws every cohort" — such a view is given every authored cohort by name) — and saving it writes the new
 version. One with no `dsl` is read the same way, so
 leaving it out is harmless. One written for a NEWER version than the server reads is refused,
 rather than silently ignoring what it does not understand.
@@ -223,42 +225,45 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 
 | kind | fields | semantics |
 |---|---|---|
-| `compare` | `genes:[≤20], cohorts?:[names]` | per-gene driver% / altered% per cohort with **panel-aware denominators** (profiled patients only); two-sided Fisher p for exactly 2 cohorts, a Pearson chi-squared (2×N table, altered vs not) for 3+; either way, q-values are Benjamini–Hochberg across the genes tested, separately for any-alteration and driver-only. `altered%` combines mutation/CNA/structural-variant, matching the oncoprint's "any alteration" convention; each cell also carries the same three counts split by type, and if a WHOLE type was never assayed anywhere in the participating studies (e.g. no copy-number data at all) the view says so rather than let a false 0% for that type alone read as a real negative |
-| `clinical` | `attributes:[≤1-20], cohorts?:[names]` | compares clinical attribute distributions across cohorts. Categorical: Pearson chi-squared over the **full** value vocabulary, any number of cohorts. Numeric: Welch's unequal-variance t-test for exactly 2 cohorts, **Welch's ANOVA for 3+** — both from (n, Σx, Σx²) per cohort, additive across sites, so pooled mean/variance are exact and no individual value is transmitted, at any study count. BH q across attributes (moment-based test only). Each site types its own attributes from `clinical_attribute_meta`; disagreements are refused, not merged. **Single-study views only:** numeric attributes also report median/IQR, and a rank-based test alongside the moment-based one — a Mann-Whitney U for exactly 2 cohorts, **Kruskal-Wallis for 3+** — a check worth having when the mean is misleading (skew, outliers); computed from the complete value distribution, which is exact only when the whole comparison stays within one study, so it is not offered otherwise, and not part of the q-value correction above |
-| `cooccurrence` | `genes:[2-12], cohorts?:[names]` | pairwise co-occurrence / mutual exclusivity **within one cohort** (the first named). Each pair's 2×2 is counted among patients profiled for **both** genes, per study against that study's own panels; log₂ odds ratio, two-sided Fisher, Benjamini–Hochberg q across pairs. Across studies the test is **stratified by study** (Cochran–Mantel–Haenszel). Pairs no panel covers are reported as not assessable, never as a null result |
-| `hotspots` | `genes:[≤12], cohorts?:[names], minCount?, hide?:[cells]` | the lollipop, as cBioPortal's results-page mutation tab draws it: one stem per codon (the stored protein start position) whose height is the distinct patient + protein change pairs there, coloured by the codon's dominant mutation type (putative drivers first), on the canonical transcript with its Pfam domains (Genome Nexus); mutations with no protein position are counted and disclosed, not drawn. `minCount` is a suppression floor each site applies **before returning anything** — a change carried by one patient is the most disclosive aggregate here. `hide` leaves cells of the Driver/VUS × alteration class grid out of the plot — `"<class>.driver"` or `"<class>.vus"`, classes `missense`, `truncating`, `inframe`, `splice`, `fusion`, `other` (e.g. `["missense.vus", "truncating.vus"]` draws drivers only, `["missense.driver", "missense.vus"]` everything but missense); each change goes in or out whole by its class and driver status. The grid's counts stay whole, and the result keeps every change, so the web app redraws a new selection without re-running; a figure standing alone says in its caption what is hidden. A site on older code that reports no class has its changes drawn regardless, and the caption says how many |
-| `coexpression` | `genes:[2-12], profileType, cohorts?:[names]` | Pearson correlation between gene pairs on a continuous molecular profile, **within one cohort** (the first named). Each site reports only six sums (n, Σx, Σy, Σxy, Σx², Σy²), which are additive — so the federated correlation is exact, not approximate. Across studies a Fisher-z meta-analysis of per-study correlations is reported alongside the pooled one |
-| `survival` | `endpoint?:"OS"|"PFS"|…, monthsAttribute?/statusAttribute?, anchor?:{eventType,key?,value?,occurrence?}, cohorts?:[names]` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts, or the **k-group generalization** (a (k-1)-df chi-squared from the full covariance matrix, not a scalar variance — the same statistic R's `survdiff()` reports) when 3+, testing whether the groups differ AT ALL rather than which pair does. Across studies either test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. `anchor` resets the clock to a timeline event (first chemotherapy, initial diagnosis) instead of the study's day 0, and **applies left truncation automatically**: a patient joins the risk set when the study could first observe them, never at the anchor — otherwise everyone appears to survive from the anchor to their own entry, which is exactly what put them in the study. The reported entry distribution warns when an anchor is matching earlier events than intended. Cross-study baselines are not harmonized. **The test is refused, not computed, when any arm has fewer than 10 patients** — the KM curves still draw (they are descriptive), but a chi-squared from a handful of patients reads as a real result whatever its p-value says, so it is named as refused rather than reported. `monthsAttribute`/`statusAttribute` override the `<endpoint>_MONTHS`/`<endpoint>_STATUS` naming convention with exact column names, for a study whose outcome columns don't follow it (some do not — e.g. `PFS_MONTHS_FIRST_LINE_TX`/`PROGRESSION_STATUS`); both must be given together, and `endpoint` becomes purely a display label rather than something column names are derived from |
-| `cox` | `endpoint?:"OS"|"PFS"|..., monthsAttribute?/statusAttribute?, covariates:[axis, ...(max 8)], stratifyByStudy?, stratifyByCohort?, cutoffMonths?, cohorts?:[names]` | multivariate Cox proportional-hazards regression: several covariates fit simultaneously, reported as hazard ratios with Wald confidence intervals, drawn as a forest plot. Each `covariate` is a plot axis (clinical, molecular, or a gene's — or a gene SET's — alteration status; see Plot axes below). Unlike every other view, this is fit from real per-patient rows within each LOCAL study, not pooled aggregate counts, so a remote or aggregate-only participant cannot contribute to it and is named as excluded rather than silently dropped. `stratifyByStudy` fits a separate baseline hazard per study instead of pooling them (one model, per-study risk sets). `stratifyByCohort` goes further: with 2+ named cohorts, it fits each cohort as its own INDEPENDENT model — own coefficients, own reference-level choice — instead of one pooled fit, drawn as one forest-plot panel per cohort sharing a single hazard-ratio scale so the effects are directly comparable; the right tool when a covariate's EFFECT, not just the cohorts' case mix, might genuinely differ between them (pooling would average that difference away). A cohort that can't be fit (too few patients, no variation) is named and skipped rather than blocking the rest; a no-op with only one cohort. A categorical covariate is dummy-coded against a reference level: a mutated-vs-not alteration axis (`by:"mutated"`, the default) always defaults to `"Not mutated"` regardless of which side is more frequent — a gene altered in a minority of patients and one altered in a majority would otherwise silently end up measured in opposite directions, purely from how common each gene's alteration happens to be; every other categorical (a mutation-type/CNA axis, a clinical attribute) defaults to its most-frequently-observed level. Either way, a covariate axis may add `"reference":"<level>"` to declare the level explicitly instead — a `reference` naming a level the data doesn't have is ignored (falls back to the same default as if none were declared) rather than silently matching nothing. `monthsAttribute`/`statusAttribute` are the same naming-convention override as `survival`, for a study whose outcome columns don't follow `<endpoint>_MONTHS`/`<endpoint>_STATUS` |
-| `logistic` | `outcome:axis, outcomeEvent?:"<level>", covariates:[axis, ...(max 8)], cohorts?:[names]` | multivariate logistic regression: a BINARY outcome (not time-to-event — no endpoint/months convention here) regressed on several covariates at once, reported as odds ratios with Wald confidence intervals, drawn as a forest plot the same shape as `cox`'s. `outcome` is a plot axis, exactly like a covariate (clinical, molecular, or alteration status). A categorical outcome (a clinical attribute, or an alteration axis) needs `outcomeEvent` naming which observed value counts as the event (1) — every other observed value collapses into "not event" (0), and which values got collapsed is disclosed in the caveat; omitting it, or naming a value never observed, is refused with the actual observed values listed rather than guessed at. A numeric outcome must already be coded exactly 0/1 (refused otherwise) and must NOT be given `outcomeEvent`. Covariates use the exact same dummy-coding and reference-level rules as `cox` (see above): a mutated-vs-not axis defaults to `"Not mutated"`, others default to the most frequent level, `reference` overrides either. Same patient-level-only boundary as `cox` |
-| `course` | `eventTypes:[≤6], anchor?:{eventType,key?,value?,occurrence?}, binMonths?:3, fromMonths?:-12, toMonths?:60, cohorts?:[names]` | the **clinical course**: per time bin, the share of the cohort in each event state. Two things it refuses to fake. (1) The denominator is the patients still under observation in that bin — first recorded event to last contact (the later of their last event and their OS follow-up) — never the whole cohort, which would make a curve fall merely because follow-up ran out. (2) `anchor` is optional for one study but **required across studies**: day 0 is birth in some studies and first sequencing in others, and nothing in the schema records which, so raw day 0 compares incomparable clocks. Event types that carry real durations are drawn as a state the patient is IN; the rest as an event that HAPPENED — read from the data, not from the name. Bins are half-open [t, t+w). Event-name spellings differing only in case are folded (`Treatment`/`TREATMENT`) and the fold is named in the caveat; nothing else is merged |
-| `sequence` | `labelKey?:"SUBTYPE", eventType?:"treatment", lineClasses?:"systemic"|"all"|[classes], exclude?:[values], lineGap?:90, maxSteps?:3, topN?:8, cohorts?:[names]` | **what follows what**: therapy transitions as lines, drawn as a Sankey. Records are first grouped into LINES — therapies less than `lineGap` days apart are one line, labelled by their whole combination (sorted, so `A + B` and `B + A` are one regimen). That grouping is the point: a patient has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision. Paths that end flow into TWO explicit terminals, never one: **no further line** (the study watched for at least one `lineGap` and saw no further therapy) and **record ends here** (it did not, so nothing can be concluded). Measured on MSK-CHORD, 68% of patients have under three months of observation after their last therapy and the median is 15 days — so collapsing the two would turn record-keeping into an apparent clinical decision. Flows out of a node sum to it, so nobody vanishes. Up to two cohorts are drawn as panels sharing one scale and one colour per regimen. Lines are the shared definition (see "Treatment line (derived)" above): systemic-therapy records by default, `lineClasses` `"all"` for every treatment record or a list of class names for your own; `labelKey` only names a line’s therapies (e.g. AGENT), it never decides which records form lines. `exclude` drops records by label value, matched ignoring case. More than two cohorts is refused |
-| `plot` | `x:axis, y:axis, unit?:"patient"\|"sample", bins?:[240,160], points?:true, colorBy?:axis, ringBy?:axis, highlight?:[names(max 4)], cohorts?:[names]` | two axes over the same cases, aggregated **inside the database**: a scatter comes back as counts per grid cell, a box as quartiles per group, two categoricals as a contingency table. The payload is a few kilobytes whatever the cohort's size |
-| `attrition` | `cohorts?:[names] (≤6)` | **cohort attrition**, CONSORT-style: for each cohort, the study base and then the patients left after each clause of its `all`, in the order written, with how many that clause alone removed. Each step is evaluated as its own cohort (the first k clauses ANDed), with the same compiler and the same per-study counts, so the last step is the cohort's own count by construction — a mismatch is reported, never smoothed over. The order of clauses changes the path, never the final count. Counts only, so every participant (aggregate-only and remote included) can answer; across studies the counts are summed and overlap is not deduplicated |
-| `genome` | `binMb?:2, threshold?:0.2, includeX?:false, cohorts?:[names] (≤4)` | **genome-wide copy-number frequency** from the copy-number SEGMENTS: the share of each cohort's segmented samples gained (log2 segment mean ≥ `threshold`) or lost (≤ −`threshold`) in every `binMb`-megabase bin (1–50) along chromosomes 1–22 (and X with `includeX` — its log ratio mostly records sex, so it is off by default), drawn as gains up and losses down, one panel per cohort. Each bin's denominator is the samples whose segmentation covers it — a bin nothing covers is drawn as unmeasured, never as copy-neutral. A bin takes the value of the segment over its midpoint, so an event narrower than a bin can be missed; the caption says so. Unit is the SAMPLE, not the patient. Exactly two cohorts add a per-bin two-sided Fisher test (gains and losses separately, Benjamini–Hochberg across bins), drawn as a strip coloured by which cohort is higher. Studies on different reference genomes (hg19/hg38) are refused rather than drawn on one axis. Counts only; a remote peer cannot answer yet and is named as left out |
-| `pathways` | `pathways?:[names], sets?:[{name, genes:[≤40]} ×≤4], measure?:"driver"|"any", topGenes?:6, cohorts?:[names] (≤4)` | **oncogenic signalling pathways**: the ten canonical pathways of Sanchez-Vega et al. (Cell 2018, Table S3: RTK-RAS, PI3K, TP53, Cell cycle, MYC, WNT, NOTCH, Hippo, TGF-β, NRF2 — 334 genes), and/or the document's own `sets`, each as the share of the cohort with at least one member altered. `measure` defaults to `"driver"` (OncoKB-annotated drivers, as the paper counted curated oncogenic events; refused without an annotation pin) or `"any"`. A pathway's denominator is the patients profiled for at least ONE member (the union of the members' panels, the oncoprint's merged-row rule, computed in the database with the same event table, CNA rule and driver join as `compare`, so a one-gene set equals that gene's own count); each member's % is over the patients profiled for THAT gene. The `topGenes` most-altered members are drawn per pathway; the rest are pooled as "+N more altered", and members on no participating panel are listed as never profiled. Two cohorts add Fisher tests with BH q across pathways, and separately across member genes. Counts only; a remote peer cannot answer yet and is named |
+| `compare` | `genes:[≤20], cohorts:[names]` | per-gene driver% / altered% per cohort with **panel-aware denominators** (profiled patients only); two-sided Fisher p for exactly 2 cohorts, a Pearson chi-squared (2×N table, altered vs not) for 3+; either way, q-values are Benjamini–Hochberg across the genes tested, separately for any-alteration and driver-only. `altered%` combines mutation/CNA/structural-variant, matching the oncoprint's "any alteration" convention; each cell also carries the same three counts split by type, and if a WHOLE type was never assayed anywhere in the participating studies (e.g. no copy-number data at all) the view says so rather than let a false 0% for that type alone read as a real negative |
+| `clinical` | `attributes:[≤1-20], cohorts:[names]` | compares clinical attribute distributions across cohorts. Categorical: Pearson chi-squared over the **full** value vocabulary, any number of cohorts. Numeric: Welch's unequal-variance t-test for exactly 2 cohorts, **Welch's ANOVA for 3+** — both from (n, Σx, Σx²) per cohort, additive across sites, so pooled mean/variance are exact and no individual value is transmitted, at any study count. BH q across attributes (moment-based test only). Each site types its own attributes from `clinical_attribute_meta`; disagreements are refused, not merged. **Single-study views only:** numeric attributes also report median/IQR, and a rank-based test alongside the moment-based one — a Mann-Whitney U for exactly 2 cohorts, **Kruskal-Wallis for 3+** — a check worth having when the mean is misleading (skew, outliers); computed from the complete value distribution, which is exact only when the whole comparison stays within one study, so it is not offered otherwise, and not part of the q-value correction above |
+| `cooccurrence` | `genes:[2-12], cohorts:[names]` | pairwise co-occurrence / mutual exclusivity **within one cohort** (the first named). Each pair's 2×2 is counted among patients profiled for **both** genes, per study against that study's own panels; log₂ odds ratio, two-sided Fisher, Benjamini–Hochberg q across pairs. Across studies the test is **stratified by study** (Cochran–Mantel–Haenszel). Pairs no panel covers are reported as not assessable, never as a null result |
+| `hotspots` | `genes:[≤12], cohorts:[names], minCount?, hide?:[cells]` | the lollipop, as cBioPortal's results-page mutation tab draws it: one stem per codon (the stored protein start position) whose height is the distinct patient + protein change pairs there, coloured by the codon's dominant mutation type (putative drivers first), on the canonical transcript with its Pfam domains (Genome Nexus); mutations with no protein position are counted and disclosed, not drawn. `minCount` is a suppression floor each site applies **before returning anything** — a change carried by one patient is the most disclosive aggregate here. `hide` leaves cells of the Driver/VUS × alteration class grid out of the plot — `"<class>.driver"` or `"<class>.vus"`, classes `missense`, `truncating`, `inframe`, `splice`, `fusion`, `other` (e.g. `["missense.vus", "truncating.vus"]` draws drivers only, `["missense.driver", "missense.vus"]` everything but missense); each change goes in or out whole by its class and driver status. The grid's counts stay whole, and the result keeps every change, so the web app redraws a new selection without re-running; a figure standing alone says in its caption what is hidden. A site on older code that reports no class has its changes drawn regardless, and the caption says how many |
+| `coexpression` | `genes:[2-12], profileType, cohorts:[names]` | Pearson correlation between gene pairs on a continuous molecular profile, **within one cohort** (the first named). Each site reports only six sums (n, Σx, Σy, Σxy, Σx², Σy²), which are additive — so the federated correlation is exact, not approximate. Across studies a Fisher-z meta-analysis of per-study correlations is reported alongside the pooled one |
+| `survival` | `endpoint?:"OS"|"PFS"|…, monthsAttribute?/statusAttribute?, anchor?:{eventType,key?,value?,occurrence?}, cohorts:[names]` | Kaplan–Meier on OS_MONTHS/OS_STATUS, plus a two-sided **log-rank** test when exactly 2 cohorts, or the **k-group generalization** (a (k-1)-df chi-squared from the full covariance matrix, not a scalar variance — the same statistic R's `survdiff()` reports) when 3+, testing whether the groups differ AT ALL rather than which pair does. Across studies either test is **stratified by study** (each study compared only against itself, so differing case mix cannot masquerade as a cohort effect); the pooled p is reported alongside. `anchor` resets the clock to a timeline event (first chemotherapy, initial diagnosis) instead of the study's day 0, and **applies left truncation automatically**: a patient joins the risk set when the study could first observe them, never at the anchor — otherwise everyone appears to survive from the anchor to their own entry, which is exactly what put them in the study. The reported entry distribution warns when an anchor is matching earlier events than intended. Cross-study baselines are not harmonized. **The test is refused, not computed, when any arm has fewer than 10 patients** — the KM curves still draw (they are descriptive), but a chi-squared from a handful of patients reads as a real result whatever its p-value says, so it is named as refused rather than reported. `monthsAttribute`/`statusAttribute` override the `<endpoint>_MONTHS`/`<endpoint>_STATUS` naming convention with exact column names, for a study whose outcome columns don't follow it (some do not — e.g. `PFS_MONTHS_FIRST_LINE_TX`/`PROGRESSION_STATUS`); both must be given together, and `endpoint` becomes purely a display label rather than something column names are derived from |
+| `cox` | `endpoint?:"OS"|"PFS"|..., monthsAttribute?/statusAttribute?, covariates:[axis, ...(max 8)], stratifyByStudy?, stratifyByCohort?, cutoffMonths?, cohorts:[names]` | multivariate Cox proportional-hazards regression: several covariates fit simultaneously, reported as hazard ratios with Wald confidence intervals, drawn as a forest plot. Each `covariate` is a plot axis (clinical, molecular, or a gene's — or a gene SET's — alteration status; see Plot axes below). Unlike every other view, this is fit from real per-patient rows within each LOCAL study, not pooled aggregate counts, so a remote or aggregate-only participant cannot contribute to it and is named as excluded rather than silently dropped. `stratifyByStudy` fits a separate baseline hazard per study instead of pooling them (one model, per-study risk sets). `stratifyByCohort` goes further: with 2+ named cohorts, it fits each cohort as its own INDEPENDENT model — own coefficients, own reference-level choice — instead of one pooled fit, drawn as one forest-plot panel per cohort sharing a single hazard-ratio scale so the effects are directly comparable; the right tool when a covariate's EFFECT, not just the cohorts' case mix, might genuinely differ between them (pooling would average that difference away). A cohort that can't be fit (too few patients, no variation) is named and skipped rather than blocking the rest; a no-op with only one cohort. A categorical covariate is dummy-coded against a reference level: a mutated-vs-not alteration axis (`by:"mutated"`, the default) always defaults to `"Not mutated"` regardless of which side is more frequent — a gene altered in a minority of patients and one altered in a majority would otherwise silently end up measured in opposite directions, purely from how common each gene's alteration happens to be; every other categorical (a mutation-type/CNA axis, a clinical attribute) defaults to its most-frequently-observed level. Either way, a covariate axis may add `"reference":"<level>"` to declare the level explicitly instead — a `reference` naming a level the data doesn't have is ignored (falls back to the same default as if none were declared) rather than silently matching nothing. `monthsAttribute`/`statusAttribute` are the same naming-convention override as `survival`, for a study whose outcome columns don't follow `<endpoint>_MONTHS`/`<endpoint>_STATUS` |
+| `logistic` | `outcome:axis, outcomeEvent?:"<level>", covariates:[axis, ...(max 8)], cohorts:[names]` | multivariate logistic regression: a BINARY outcome (not time-to-event — no endpoint/months convention here) regressed on several covariates at once, reported as odds ratios with Wald confidence intervals, drawn as a forest plot the same shape as `cox`'s. `outcome` is a plot axis, exactly like a covariate (clinical, molecular, or alteration status). A categorical outcome (a clinical attribute, or an alteration axis) needs `outcomeEvent` naming which observed value counts as the event (1) — every other observed value collapses into "not event" (0), and which values got collapsed is disclosed in the caveat; omitting it, or naming a value never observed, is refused with the actual observed values listed rather than guessed at. A numeric outcome must already be coded exactly 0/1 (refused otherwise) and must NOT be given `outcomeEvent`. Covariates use the exact same dummy-coding and reference-level rules as `cox` (see above): a mutated-vs-not axis defaults to `"Not mutated"`, others default to the most frequent level, `reference` overrides either. Same patient-level-only boundary as `cox` |
+| `course` | `eventTypes:[≤6], anchor?:{eventType,key?,value?,occurrence?}, binMonths?:3, fromMonths?:-12, toMonths?:60, cohorts:[names]` | the **clinical course**: per time bin, the share of the cohort in each event state. Two things it refuses to fake. (1) The denominator is the patients still under observation in that bin — first recorded event to last contact (the later of their last event and their OS follow-up) — never the whole cohort, which would make a curve fall merely because follow-up ran out. (2) `anchor` is optional for one study but **required across studies**: day 0 is birth in some studies and first sequencing in others, and nothing in the schema records which, so raw day 0 compares incomparable clocks. Event types that carry real durations are drawn as a state the patient is IN; the rest as an event that HAPPENED — read from the data, not from the name. Bins are half-open [t, t+w). Event-name spellings differing only in case are folded (`Treatment`/`TREATMENT`) and the fold is named in the caveat; nothing else is merged |
+| `sequence` | `labelKey?:"SUBTYPE", eventType?:"treatment", lineClasses?:"systemic"|"all"|[classes], exclude?:[values], lineGap?:90, maxSteps?:3, topN?:8, cohorts:[names]` | **what follows what**: therapy transitions as lines, drawn as a Sankey. Records are first grouped into LINES — therapies less than `lineGap` days apart are one line, labelled by their whole combination (sorted, so `A + B` and `B + A` are one regimen). That grouping is the point: a patient has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision. Paths that end flow into TWO explicit terminals, never one: **no further line** (the study watched for at least one `lineGap` and saw no further therapy) and **record ends here** (it did not, so nothing can be concluded). Measured on MSK-CHORD, 68% of patients have under three months of observation after their last therapy and the median is 15 days — so collapsing the two would turn record-keeping into an apparent clinical decision. Flows out of a node sum to it, so nobody vanishes. Up to two cohorts are drawn as panels sharing one scale and one colour per regimen. Lines are the shared definition (see "Treatment line (derived)" above): systemic-therapy records by default, `lineClasses` `"all"` for every treatment record or a list of class names for your own; `labelKey` only names a line’s therapies (e.g. AGENT), it never decides which records form lines. `exclude` drops records by label value, matched ignoring case. More than two cohorts is refused |
+| `plot` | `x:axis, y:axis, unit?:"patient"\|"sample", bins?:[240,160], points?:true, colorBy?:axis, ringBy?:axis, highlight?:[names(max 4)], cohorts:[names]` | two axes over the same cases, aggregated **inside the database**: a scatter comes back as counts per grid cell, a box as quartiles per group, two categoricals as a contingency table. The payload is a few kilobytes whatever the cohort's size |
+| `attrition` | `cohorts:[names] (≤6)` | **cohort attrition**, CONSORT-style: for each cohort, the study base and then the patients left after each clause of its `all`, in the order written, with how many that clause alone removed. Each step is evaluated as its own cohort (the first k clauses ANDed), with the same compiler and the same per-study counts, so the last step is the cohort's own count by construction — a mismatch is reported, never smoothed over. The order of clauses changes the path, never the final count. Counts only, so every participant (aggregate-only and remote included) can answer; across studies the counts are summed and overlap is not deduplicated |
+| `genome` | `binMb?:2, threshold?:0.2, includeX?:false, cohorts:[names] (≤4)` | **genome-wide copy-number frequency** from the copy-number SEGMENTS: the share of each cohort's segmented samples gained (log2 segment mean ≥ `threshold`) or lost (≤ −`threshold`) in every `binMb`-megabase bin (1–50) along chromosomes 1–22 (and X with `includeX` — its log ratio mostly records sex, so it is off by default), drawn as gains up and losses down, one panel per cohort. Each bin's denominator is the samples whose segmentation covers it — a bin nothing covers is drawn as unmeasured, never as copy-neutral. A bin takes the value of the segment over its midpoint, so an event narrower than a bin can be missed; the caption says so. Unit is the SAMPLE, not the patient. Exactly two cohorts add a per-bin two-sided Fisher test (gains and losses separately, Benjamini–Hochberg across bins), drawn as a strip coloured by which cohort is higher. Studies on different reference genomes (hg19/hg38) are refused rather than drawn on one axis. Counts only; a remote peer cannot answer yet and is named as left out |
+| `pathways` | `pathways?:[names], sets?:[{name, genes:[≤40]} ×≤4], measure?:"driver"|"any", topGenes?:6, cohorts:[names] (≤4)` | **oncogenic signalling pathways**: the ten canonical pathways of Sanchez-Vega et al. (Cell 2018, Table S3: RTK-RAS, PI3K, TP53, Cell cycle, MYC, WNT, NOTCH, Hippo, TGF-β, NRF2 — 334 genes), and/or the document's own `sets`, each as the share of the cohort with at least one member altered. `measure` defaults to `"driver"` (OncoKB-annotated drivers, as the paper counted curated oncogenic events; refused without an annotation pin) or `"any"`. A pathway's denominator is the patients profiled for at least ONE member (the union of the members' panels, the oncoprint's merged-row rule, computed in the database with the same event table, CNA rule and driver join as `compare`, so a one-gene set equals that gene's own count); each member's % is over the patients profiled for THAT gene. The `topGenes` most-altered members are drawn per pathway; the rest are pooled as "+N more altered", and members on no participating panel are listed as never profiled. Two cohorts add Fisher tests with BH q across pathways, and separately across member genes. Counts only; a remote peer cannot answer yet and is named |
 | `diffexpr` | `profileType, log2?, geneSets?:[≤12 MSigDB names], label?:12, cohorts:[2 names]` | **differential expression between exactly two cohorts** on one molecular profile (mRNA z-scores, RNA-seq, protein, methylation — refused, listing what the study has, if absent): per gene, Welch's t-test from each cohort's n, Σv and Σv² — additive, so the pooled test is exact across sites and no value is ever sent — with each patient contributing the mean of their samples. `log2` compares log2(v+1) and defaults to true for a non-z-score RNA-seq profile; the effect is the difference of means (first cohort minus second) on the compared scale, a log2 fold change under log2. q is Benjamini–Hochberg across every gene tested; genes with fewer than 3 patients in a cohort or no variance are left out and counted. Drawn as a volcano — the 1,500 most significant genes as points, the rest as density, `label` genes named, split between the two directions. Then **preranked GSEA** (Subramanian 2005, weight 1) of the unrounded t ranking against `geneSets` (default: the 50 MSigDB Hallmark sets; `[]` skips it): NES, a permutation p from 1,000 random same-size sets seeded by the set's name (so a shared link reproduces it), BH q across the sets, the leading edge, and the running sum for the strongest set each way. Gene-set permutation ignores gene–gene correlation (anti-conservative next to phenotype permutation, which would need patient-level values) — the caption says so. A remote peer cannot answer yet and is named |
-| `paired` | `genes?:[≤20], top?:1-40, pairBy?:{attribute, a, b, studies?:{<study>:{attribute, a, b}}, labels?:{a, b}}, measure?:"driver"|"any", cohorts?:[names] (≤3)` | **paired samples within patients**: among patients with at least one sample on each side of `pairBy` (a SAMPLE-level attribute and its values for side a and side b — default `SAMPLE_TYPE` Primary / Metastasis; values fold on case and whitespace like every clinical predicate), per gene, the patients with a driver (or, with `measure:"any"`, any alteration) on both sides, on side a only, on side b only — counted only among patients profiled for that gene on BOTH sides by each side's own panels, so a gene one side never assayed never reads as discordant. A patient with several samples on a side is altered there if any is. Concordance = both ÷ altered anywhere; an exact McNemar test (two-sided binomial on the discordant patients) asks whether discordance runs one way, BH q across the genes of each cohort. When no patient has both sides, the refusal lists the values the attribute actually takes. Sample type records where tissue came from, not when — the caption says "metastasis-only" is not "acquired later". Counts only; a remote peer cannot answer yet and is named. **Without `genes` it scans**: every gene with a driver (or any alteration) in some paired patient is tested, q is Benjamini–Hochberg across all of them, and the `top` (default 20) most one-sided are drawn, ordered by McNemar p — how to ask "what is acquired after treatment" without naming genes first. **`pairBy.studies`** gives each study its own attribute and values (PRE-TX / POST-TX in one, pre-treatment / post-treatment in another) so their patients pool into one count; a study not listed uses the top-level attribute, and `labels` names the two sides in the figure (default: their values). With an attribute other than a sample site, the caption says the sides are as each study labels them, and that a side-only call can also be a subclone one biopsy missed or a lower-purity sample under-calling |
-| `clonality` | `genes:[≤12], measure?:"driver"|"any", qc?:true, cohorts?:[names] (≤3)` | **clonality from FACETS allele-specific copy number** (only studies that carry it — the refusal names them): per gene, the cohort's mutation CALLS (one mutation in one sample; OncoKB drivers by default) that FACETS called clonal, subclonal or indeterminate, LOH at the locus (minor copy number 0, of calls where it was estimated) and the cancer-cell fraction in ten bins; per cohort, FACETS's own whole-genome-doubling, purity and ploidy calls. `qc` (default true) uses only samples whose `FACETS_QC` is Pass, with the pass/fail counts reported. Only the study's current mutation profile is read (the table also holds rows orphaned by superseded loads). Two cohorts add Fisher tests on clonal vs subclonal per gene (BH across genes) and on WGD. Counts only; a remote peer cannot answer yet and is named |
-| `incidence` | `event:{eventType, attrs?:[{key,value} ×≤3], label?}, anchor?:{eventType,key?,value?,occurrence?}, horizons?:[12,24,60], cohorts?:[names] (≤6)` | **cumulative incidence with a competing risk**: time from the anchor (default the study's day 0) to the FIRST `event` after it, with death (`OS_STATUS`) as the competing event and `OS_MONTHS` as follow-up — Aalen–Johansen, with 95% intervals from its delta-method standard error (checked against R's cmprsk: estimates identical to five decimals, SEs within 3%). Not 1 − Kaplan–Meier, which censors the dead as if still at risk and overstates incidence wherever death is common; the view reports both at each of `horizons`, so the difference is on the page. Left truncation as in `survival`: a patient anchored before day 0 enters the risk set at day 0. Patients who cannot be at risk are counted by reason, never read as event-free: already had the event at or before the anchor, had it before observation began, no follow-up, no anchor event. Two or more cohorts: Gray's test (weight 1) by permutation of cohort labels over the pooled records — exact under the null, seeded, and computable from the (entry, time, cause) tallies each site sends, which are counts |
+| `paired` | `genes?:[≤20], top?:1-40, pairBy?:{attribute, a, b, studies?:{<study>:{attribute, a, b}}, labels?:{a, b}}, measure?:"driver"|"any", cohorts:[names] (≤3)` | **paired samples within patients**: among patients with at least one sample on each side of `pairBy` (a SAMPLE-level attribute and its values for side a and side b — default `SAMPLE_TYPE` Primary / Metastasis; values fold on case and whitespace like every clinical predicate), per gene, the patients with a driver (or, with `measure:"any"`, any alteration) on both sides, on side a only, on side b only — counted only among patients profiled for that gene on BOTH sides by each side's own panels, so a gene one side never assayed never reads as discordant. A patient with several samples on a side is altered there if any is. Concordance = both ÷ altered anywhere; an exact McNemar test (two-sided binomial on the discordant patients) asks whether discordance runs one way, BH q across the genes of each cohort. When no patient has both sides, the refusal lists the values the attribute actually takes. Sample type records where tissue came from, not when — the caption says "metastasis-only" is not "acquired later". Counts only; a remote peer cannot answer yet and is named. **Without `genes` it scans**: every gene with a driver (or any alteration) in some paired patient is tested, q is Benjamini–Hochberg across all of them, and the `top` (default 20) most one-sided are drawn, ordered by McNemar p — how to ask "what is acquired after treatment" without naming genes first. **`pairBy.studies`** gives each study its own attribute and values (PRE-TX / POST-TX in one, pre-treatment / post-treatment in another) so their patients pool into one count; a study not listed uses the top-level attribute, and `labels` names the two sides in the figure (default: their values). With an attribute other than a sample site, the caption says the sides are as each study labels them, and that a side-only call can also be a subclone one biopsy missed or a lower-purity sample under-calling |
+| `clonality` | `genes:[≤12], measure?:"driver"|"any", qc?:true, cohorts:[names] (≤3)` | **clonality from FACETS allele-specific copy number** (only studies that carry it — the refusal names them): per gene, the cohort's mutation CALLS (one mutation in one sample; OncoKB drivers by default) that FACETS called clonal, subclonal or indeterminate, LOH at the locus (minor copy number 0, of calls where it was estimated) and the cancer-cell fraction in ten bins; per cohort, FACETS's own whole-genome-doubling, purity and ploidy calls. `qc` (default true) uses only samples whose `FACETS_QC` is Pass, with the pass/fail counts reported. Only the study's current mutation profile is read (the table also holds rows orphaned by superseded loads). Two cohorts add Fisher tests on clonal vs subclonal per gene (BH across genes) and on WGD. Counts only; a remote peer cannot answer yet and is named |
+| `incidence` | `event:{eventType, attrs?:[{key,value} ×≤3], label?}, anchor?:{eventType,key?,value?,occurrence?}, horizons?:[12,24,60], cohorts:[names] (≤6)` | **cumulative incidence with a competing risk**: time from the anchor (default the study's day 0) to the FIRST `event` after it, with death (`OS_STATUS`) as the competing event and `OS_MONTHS` as follow-up — Aalen–Johansen, with 95% intervals from its delta-method standard error (checked against R's cmprsk: estimates identical to five decimals, SEs within 3%). Not 1 − Kaplan–Meier, which censors the dead as if still at risk and overstates incidence wherever death is common; the view reports both at each of `horizons`, so the difference is on the page. Left truncation as in `survival`: a patient anchored before day 0 enters the risk set at day 0. Patients who cannot be at risk are counted by reason, never read as event-free: already had the event at or before the anchor, had it before observation began, no follow-up, no anchor event. Two or more cohorts: Gray's test (weight 1) by permutation of cohort labels over the pooled records — exact under the null, seeded, and computable from the (entry, time, cause) tallies each site sends, which are counts |
 | `riskmodel` | `cohorts:[one name], endpoint?, monthsAttribute?/statusAttribute?, measure?:"any"|"driver", minMutated?:30, strata?:"<attribute>", covariates?:["<attribute>" ×≤6], anchor?:{eventType,key?,value?,occurrence?}, validate?:false, alpha?:0.5, runs?:10 (≤100), groups?:3 (2-5), seed?:1` | **a survival risk model from mutated genes**, in the manner of OncoCast (Martin et al.): an elastic-net Cox model (glmnet's algorithm, checked against scikit-survival; Breslow ties; `alpha` the l1 share of the penalty) of one cohort's survival on every gene that the panels of EVERY patient cover — so no patient counts as wild-type for a gene never tested — and that is mutated in at least `minMutated` patients. Fitted `runs` times, each on a random two-thirds of the patients with the penalty chosen by 3-fold cross-validated partial likelihood, scoring the held-out third; a patient's risk score is the mean of their held-out scores, so no one is scored by a model trained on them (a patient never held out has no score and is counted). `covariates` are clinical attributes always in the model and never penalised (numbers as they are, categories as indicators against the commonest value, at most 10 values); a patient missing one is left out and counted. `anchor` starts each patient's clock at a timeline event, as the survival view does, with the delayed entry that implies (patients without the event, or whose event follows the study's day 0, are counted out). `validate` trains only on the discovery half of the engine's fixed split (the `split` leaf's halves) and reports everything below on the validation half, which no model saw, cut at the discovery half's quantiles. Reports the held-out C-index across runs (and on the validation half), each gene's share of runs kept and mean hazard ratio, the covariates' hazard ratios, Kaplan-Meier curves of `groups` risk groups cut at equal quantiles of the score (no outcome used; a cut moves to the nearer edge of a run of tied scores, so equal scores share a group, and groups merge when the scores cannot fill them) with a log-rank test, each group's 12- and 36-month survival and hazard ratio against the lowest (95% Wald interval), the hazard ratio per standard deviation of the score, and the score's histogram. `strata` gives each value its own baseline hazard — use CANCER_TYPE on a mixed cohort, or a gene marking a type carries that type's prognosis. One cohort in one patient-level study; at most 300,000 patients × runs per request (refused, naming the limit). Seeded: the same document gives the same model |
-| `labs` | `test, anchor:{eventType,key?,value?,occurrence?}, eventType?:"Lab_Test", testKey?:"TEST", resultKey?:"RESULT", baselineDays?:90, fromWeeks?:-12, toWeeks?:52, binWeeks?:4, responseDrop?:50, cohorts?:[names] (≤4)` | **a lab value's course from a treatment start**: each patient's `test` results (timeline events of `eventType` whose `testKey` names the test, value in `resultKey`) as % change from their own baseline — the last value in the `baselineDays` up to and including the anchor; a non-positive baseline is left out — per `binWeeks` bin from `fromWeeks` to `toWeeks`, drawn as median and interquartile band (from 2-point histograms, exact to within a point; a patient counts once per bin, at their mean; the baseline reading itself is not drawn). Best response is each patient's lowest value after the anchor; the share falling by at least `responseDrop`% is counted exactly (50 on PSA is PCWG3's PSA50), and two cohorts get a Fisher test on it. A **waterfall** of every patient's best change is drawn only from participants entitled to patient-level values (a method only PatientLevelResolver has, like a plot's points); an aggregate-only participant's patients stay in the histograms and the rate and are counted as withheld from the bars. With no evaluable patient, the refusal lists the tests the study records |
-| `cancertypes` | `genes:[≤30], groupBy?:"CANCER_TYPE"|<sample attribute>|"study", measure?:"any"|"driver", minSamples?:10, show?:"frequency"|"count", unit?:"patient"|"sample", cohorts?:[names] (≤2)` | **Cancer Types Summary**, cBioPortal's results-view tab: per group of the cohort's PATIENTS (the portal's default; `unit:"sample"` counts samples — a patient counts in each group one of their samples is in) — a sample attribute's value (folded on case and whitespace like every clinical predicate; samples with no value form their own group) or the study — the share altered in at least one of `genes`, split by kind: only mutations, only amplifications, only deep deletions, only structural variants, or more than one kind. A group's denominator is its samples profiled for at least one of the genes (the union of their panels, as an oncoprint's merged row counts it); its total sample count is shown beside it. `measure:"driver"` counts OncoKB drivers only. Groups with fewer than `minSamples` profiled samples are pooled into one bar, named and counted, never dropped. Counts only, so every local participant can answer; a remote peer cannot yet and is named |
-| `overlap` | `cohorts?:[names] (2–6)` | **how cohorts' patients intersect**, cBioPortal's group-comparison Overlap tab: for every combination of the cohorts, the patients — and their samples — in exactly those cohorts and none of the others, with each cohort's own size. Two or three cohorts are drawn as the portal draws them, area-proportional diagrams of samples and of patients side by side; more as an UpSet plot. A cohort is a set of patients, so a patient's samples go wherever the patient does. Each study's database answers with one count per combination (a bitmask of membership) — counts only — and a cohort's size here must equal its own count, or the view says the definition gave two answers. Ids are study-qualified, so patients only ever overlap within a study |
+| `labs` | `test, anchor:{eventType,key?,value?,occurrence?}, eventType?:"Lab_Test", testKey?:"TEST", resultKey?:"RESULT", baselineDays?:90, fromWeeks?:-12, toWeeks?:52, binWeeks?:4, responseDrop?:50, cohorts:[names] (≤4)` | **a lab value's course from a treatment start**: each patient's `test` results (timeline events of `eventType` whose `testKey` names the test, value in `resultKey`) as % change from their own baseline — the last value in the `baselineDays` up to and including the anchor; a non-positive baseline is left out — per `binWeeks` bin from `fromWeeks` to `toWeeks`, drawn as median and interquartile band (from 2-point histograms, exact to within a point; a patient counts once per bin, at their mean; the baseline reading itself is not drawn). Best response is each patient's lowest value after the anchor; the share falling by at least `responseDrop`% is counted exactly (50 on PSA is PCWG3's PSA50), and two cohorts get a Fisher test on it. A **waterfall** of every patient's best change is drawn only from participants entitled to patient-level values (a method only PatientLevelResolver has, like a plot's points); an aggregate-only participant's patients stay in the histograms and the rate and are counted as withheld from the bars. With no evaluable patient, the refusal lists the tests the study records |
+| `cancertypes` | `genes:[≤30], groupBy?:"CANCER_TYPE"|<sample attribute>|"study", measure?:"any"|"driver", minSamples?:10, show?:"frequency"|"count", unit?:"patient"|"sample", cohorts:[names] (≤2)` | **Cancer Types Summary**, cBioPortal's results-view tab: per group of the cohort's PATIENTS (the portal's default; `unit:"sample"` counts samples — a patient counts in each group one of their samples is in) — a sample attribute's value (folded on case and whitespace like every clinical predicate; samples with no value form their own group) or the study — the share altered in at least one of `genes`, split by kind: only mutations, only amplifications, only deep deletions, only structural variants, or more than one kind. A group's denominator is its samples profiled for at least one of the genes (the union of their panels, as an oncoprint's merged row counts it); its total sample count is shown beside it. `measure:"driver"` counts OncoKB drivers only. Groups with fewer than `minSamples` profiled samples are pooled into one bar, named and counted, never dropped. Counts only, so every local participant can answer; a remote peer cannot yet and is named |
+| `overlap` | `cohorts:[names] (2–6)` | **how cohorts' patients intersect**, cBioPortal's group-comparison Overlap tab: for every combination of the cohorts, the patients — and their samples — in exactly those cohorts and none of the others, with each cohort's own size. Two or three cohorts are drawn as the portal draws them, area-proportional diagrams of samples and of patients side by side; more as an UpSet plot. A cohort is a set of patients, so a patient's samples go wherever the patient does. Each study's database answers with one count per combination (a bitmask of membership) — counts only — and a cohort's size here must equal its own count, or the view says the definition gave two answers. Ids are study-qualified, so patients only ever overlap within a study |
 | `enrichment` | `alteration?:"mutation"|"cna"|"amp"|"homdel"|"sv", measure?:"any"|"driver", minAltered?:5, label?:12, cohorts:[2–6 names]` | **genomic-alteration enrichment across every gene**, cBioPortal's group-comparison Genomic Alterations tab: each gene's frequency of one alteration type per cohort, counted in SAMPLES over the samples profiled for that gene — samples on a panel listing it (counted per panel, then joined to its genes, Explore's own construction) plus whole-exome samples, and a sample altered off-panel counts as measured. Uncalled mutations are excluded as the portal excludes them; copy number is high-level only. Two cohorts: a two-sided Fisher test and the log2 ratio of the altered shares, drawn as a volcano beside the table; three or more: a chi-squared test. q is Benjamini–Hochberg across every gene tested; genes altered in fewer than `minAltered` samples, or unprofiled in a cohort, are counted as not tested. The caption warns that hypermutated tumours enrich almost every gene. Counts only |
 | `assays` | `profileType:"<generic-assay profile>", minN?:3, label?:12, cohorts:[2–6 names]` | **every entity of one generic-assay profile compared between cohorts**, cBioPortal's group-comparison tabs for generic assays (mutational signatures, arm-level copy number, treatment response, …): one value per sample (every sample of each cohort's patients) or per patient for a patient-level profile. A numeric profile: each entity's n, Σv and Σv² per cohort — values that are not numbers, such as a limit `">8"` or NA, are counted and left out — then Welch's t for two cohorts (drawn as a volcano of the difference in means) or Welch's ANOVA for more. A categorical one: each entity's count per value per cohort — NA and blank are not called and are counted apart — then a chi-squared test on cohort × value. q is Benjamini–Hochberg across every entity tested; an entity with fewer than `minN` values in a cohort, or with no spread, is counted as not tested. Per-probe methylation is refused (hundreds of thousands of probes), as is any profile past 20,000 entities. Counts and moments only |
-| `mutations` | `gene:"<symbol>", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts?:[≤6 names]` | **one gene's mutation table**, the table under cBioPortal's Mutations-tab lollipop: every called mutation of `gene` in each cohort's samples (uncalled calls left out), one row per call — sample, detailed cancer type, protein change, the OncoKB annotation at the pinned version, mutation and variant type, allele frequency (variant / variant + reference reads) with both read counts, the study's MUTATION_COUNT, chromosome, positions, alleles, mutation status. Column ids: `sample`, `cancerType`, `proteinChange`, `annotation`, `mutationType`, `variantType`, `vaf`, `altCount`, `refCount`, `mutCount`, `chr`, `start`, `end`, `ref`, `var`, `status`; shown by default: sample, cancerType, proteinChange, annotation, mutationType, mutCount (the portal's own). Searched, filtered and sorted as every table view is (see *Table views* below; default order drivers first, then by codon; `proteinChange` sorts by codon, `annotation` drivers first). Its rows name samples, so only a patient-level participant contributes them; any other study is named |
-| `table` | `unit?:"sample"|"patient", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts?:[≤6 names]` | **the clinical data table**, cBioPortal's Clinical Data tab: one row per sample of each cohort's patients — carrying its patient's attributes too — or per patient (patient attributes only), with every clinical attribute the study records (highest priority first; at most 200 — past that, name the ones you want in `columns`), values as recorded. Column ids: `patient`, `sample` (or `samples`, the count, per patient), and the attribute ids; every one is shown by default. Searched, filtered and sorted as every table view is (see *Table views* below; an attribute the study declares NUMBER is numeric; default order patient and sample id). `attributes` and `sort.attribute` are older spellings of `columns` and `sort.column`. Its rows are patients, so only a patient-level participant contributes them; an aggregate-only or remote study is named with how many of each cohort's patients it holds. A patient in two cohorts is listed under each. A listing: no statistic |
-| `timeline` | `patient?:{study, id}, collapsed?:[track ids], expandGaps?:false, columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts?:[1 name]` | **one patient's clinical timeline**, cBioPortal's patient-view Timeline: every clinical event the study records for `patient` (default: the first patient of the list), in days from diagnosis, as tracks — one per event type (case-folded), in the portal's order (sample acquisition, sequencing, surgery, … treatment, diagnosis, lab tests), nested by attribute as the portal nests them (Treatment by TREATMENT_TYPE → SUBTYPE → AGENT, Lab_Test by TEST, Diagnosis and Pathology by SUBTYPE; a lone "Other" level is folded into its parent). Points are events, bars are events with a stop date, same-day events stack with their count; samples are numbered markers (collection order) coloured by SAMPLE_TYPE; a lab test whose every RESULT is a number is a line chart (a result recorded as `<x`/`>x` is drawn hollow at x); STYLE_COLOR / STYLE_SHAPE attributes are honoured. Runs of four or more years with no event are cut to one dashed mark unless `expandGaps`. `collapsed` names tracks drawn folded, by id: the event type in lower case, then each nesting value, dot-joined (`treatment`, `treatment.Chemo`, `lab_test`). The cohort's patients to choose from — in the lab card, a dialog its navigator opens — are a table view (see *Table views* below) with column ids `patient`, `samples`, `events`, `first`, `last` (event days), `span` (days), `types` (event types recorded); default order patients with a timeline first, then by id. A named patient must be one of the cohort's patients. The view reads ONE cohort (name it in `cohorts` when the document has several). The result gives the drawn patient's `position` in the list's order (its search, filters and sort) — `index` from 0, and the `prev` and `next` patients as `{study, id}`, what the card's ‹ prev / next › step to by setting `patient`; null when the query leaves the patient out. Both the list and the timeline name a patient, so only a patient-level participant contributes; any other study is named. A listing: no statistic |
-| `alterations` | `patient?:{study, id}, columns?, search?, filters?, sort?:{column, desc?}, rows?:25, mutations?:{…}, cna?:{…}, sv?:{…}, cohorts?:[1 name]` | **one patient's genomic alterations**, cBioPortal's patient-view tables: three table views in one — **Mutations** (column ids `samples`, `gene`, `proteinChange`, `annotation`, `mutationType`, `copy` (Copy #: the gene's deep copy-number calls in the patient), `freq` (Cohort %), `vaf`, `altCount`, `refCount`, `variantType`, `chr`, `start`, `end`, `ref`, `var`, `status`), **Copy Number Alterations** (the deep calls, AMP and HOMDEL: `samples`, `gene`, `cna`, `annotation`, `cytoband`, `freq`) and **Structural Variants** (`samples`, `gene1`, `gene2`, `class`, `eventInfo`, `breakpointType`, `connectionType`, `frame`, `site1`, `site2`, `pos1`, `pos2`, `length`, `tumorVariantCount`, `tumorReadCount`, `dnaSupport`, `rnaSupport`, `status`, `svAnnotation`, `comments`) — for `patient` (default: the list's first). A variant, a gene's call or an event is one row however many of the patient's samples carry it (`samples` lists them; allele frequency and read counts are the highest among them). With no sort, a gene's rows sit together — genes with a driver first, then by name (structural variants: by the first gene) — and within a gene in the patient's sample order (the numbered markers), then by codon; `samples` lists the samples in that order. `freq` is the share of the study's samples profiled for the gene (by their panel) with a mutation in it, or with the same copy-number call, in percent; `annotation` is OncoKB at the pinned version (none for structural variants). Each table's query is under its own key — `mutations`, `cna`, `sv`, each `{columns?, search?, filters?, sort?, rows?}`, searched, filtered, sorted and paged as every table view is (see *Table views* below); the top-level query is the patient list's: column ids `patient`, `samples`, `mutations`, `cna`, `sv` (each table's row count), default order patients with any alteration first, then by id. The view reads ONE cohort; a named patient must be one of its patients; the result's `position` places the patient in the list's order as the timeline's does. Every table names a patient, so only a patient-level participant contributes; any other study is named. A listing: no statistic |
+| `mutations` | `gene:"<symbol>", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[≤6 names]` | **one gene's mutation table**, the table under cBioPortal's Mutations-tab lollipop: every called mutation of `gene` in each cohort's samples (uncalled calls left out), one row per call — sample, detailed cancer type, protein change, the OncoKB annotation at the pinned version, mutation and variant type, allele frequency (variant / variant + reference reads) with both read counts, the study's MUTATION_COUNT, chromosome, positions, alleles, mutation status. Column ids: `sample`, `cancerType`, `proteinChange`, `annotation`, `mutationType`, `variantType`, `vaf`, `altCount`, `refCount`, `mutCount`, `chr`, `start`, `end`, `ref`, `var`, `status`; shown by default: sample, cancerType, proteinChange, annotation, mutationType, mutCount (the portal's own). Searched, filtered and sorted as every table view is (see *Table views* below; default order drivers first, then by codon; `proteinChange` sorts by codon, `annotation` drivers first). Its rows name samples, so only a patient-level participant contributes them; any other study is named |
+| `table` | `unit?:"sample"|"patient", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[≤6 names]` | **the clinical data table**, cBioPortal's Clinical Data tab: one row per sample of each cohort's patients — carrying its patient's attributes too — or per patient (patient attributes only), with every clinical attribute the study records (highest priority first; at most 200 — past that, name the ones you want in `columns`), values as recorded. Column ids: `patient`, `sample` (or `samples`, the count, per patient), and the attribute ids; every one is shown by default. Searched, filtered and sorted as every table view is (see *Table views* below; an attribute the study declares NUMBER is numeric; default order patient and sample id). `attributes` and `sort.attribute` are older spellings of `columns` and `sort.column`. Its rows are patients, so only a patient-level participant contributes them; an aggregate-only or remote study is named with how many of each cohort's patients it holds. A patient in two cohorts is listed under each. A listing: no statistic |
+| `timeline` | `patient?:{study, id}, collapsed?:[track ids], expandGaps?:false, columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[1 name]` | **one patient's clinical timeline**, cBioPortal's patient-view Timeline: every clinical event the study records for `patient` (default: the first patient of the list), in days from diagnosis, as tracks — one per event type (case-folded), in the portal's order (sample acquisition, sequencing, surgery, … treatment, diagnosis, lab tests), nested by attribute as the portal nests them (Treatment by TREATMENT_TYPE → SUBTYPE → AGENT, Lab_Test by TEST, Diagnosis and Pathology by SUBTYPE; a lone "Other" level is folded into its parent). Points are events, bars are events with a stop date, same-day events stack with their count; samples are numbered markers (collection order) coloured by SAMPLE_TYPE; a lab test whose every RESULT is a number is a line chart (a result recorded as `<x`/`>x` is drawn hollow at x); STYLE_COLOR / STYLE_SHAPE attributes are honoured. Runs of four or more years with no event are cut to one dashed mark unless `expandGaps`. `collapsed` names tracks drawn folded, by id: the event type in lower case, then each nesting value, dot-joined (`treatment`, `treatment.Chemo`, `lab_test`). The cohort's patients to choose from — in the lab card, a dialog its navigator opens — are a table view (see *Table views* below) with column ids `patient`, `samples`, `events`, `first`, `last` (event days), `span` (days), `types` (event types recorded); default order patients with a timeline first, then by id. A named patient must be one of the cohort's patients. The view reads ONE cohort (name it in `cohorts` when the document has several). The result gives the drawn patient's `position` in the list's order (its search, filters and sort) — `index` from 0, and the `prev` and `next` patients as `{study, id}`, what the card's ‹ prev / next › step to by setting `patient`; null when the query leaves the patient out. Both the list and the timeline name a patient, so only a patient-level participant contributes; any other study is named. A listing: no statistic |
+| `alterations` | `patient?:{study, id}, columns?, search?, filters?, sort?:{column, desc?}, rows?:25, mutations?:{…}, cna?:{…}, sv?:{…}, cohorts:[1 name]` | **one patient's genomic alterations**, cBioPortal's patient-view tables: three table views in one — **Mutations** (column ids `samples`, `gene`, `proteinChange`, `annotation`, `mutationType`, `copy` (Copy #: the gene's deep copy-number calls in the patient), `freq` (Cohort %), `vaf`, `altCount`, `refCount`, `variantType`, `chr`, `start`, `end`, `ref`, `var`, `status`), **Copy Number Alterations** (the deep calls, AMP and HOMDEL: `samples`, `gene`, `cna`, `annotation`, `cytoband`, `freq`) and **Structural Variants** (`samples`, `gene1`, `gene2`, `class`, `eventInfo`, `breakpointType`, `connectionType`, `frame`, `site1`, `site2`, `pos1`, `pos2`, `length`, `tumorVariantCount`, `tumorReadCount`, `dnaSupport`, `rnaSupport`, `status`, `svAnnotation`, `comments`) — for `patient` (default: the list's first). A variant, a gene's call or an event is one row however many of the patient's samples carry it (`samples` lists them; allele frequency and read counts are the highest among them). With no sort, a gene's rows sit together — genes with a driver first, then by name (structural variants: by the first gene) — and within a gene in the patient's sample order (the numbered markers), then by codon; `samples` lists the samples in that order. `freq` is the share of the study's samples profiled for the gene (by their panel) with a mutation in it, or with the same copy-number call, in percent; `annotation` is OncoKB at the pinned version (none for structural variants). Each table's query is under its own key — `mutations`, `cna`, `sv`, each `{columns?, search?, filters?, sort?, rows?}`, searched, filtered, sorted and paged as every table view is (see *Table views* below); the top-level query is the patient list's: column ids `patient`, `samples`, `mutations`, `cna`, `sv` (each table's row count), default order patients with any alteration first, then by id. The view reads ONE cohort; a named patient must be one of its patients; the result's `position` places the patient in the list's order as the timeline's does. Every table names a patient, so only a patient-level participant contributes; any other study is named. A listing: no statistic |
 | `correlates` | `gene:"<symbol>", profileType:"<continuous profile>", otherProfile?:"<profile>", show?:100, minN?:10, cohorts:[one name]` | **genome-wide co-expression with one gene**, cBioPortal's Co-expression tab: `gene` on `profileType` against every gene on `otherProfile` (the same profile unless given — e.g. protein against mRNA), over one cohort's patients with both values (a patient's samples averaged). Each study's database returns six sums per gene on the values and six on their average ranks among those patients — nothing else — from which Pearson's r and Spearman's ρ follow exactly, each p from t on n − 2 df as scipy computes it. Ranked by ρ, as the portal ranks; q is Benjamini–Hochberg over ρ's p. Across studies r pools the sums; ρ, which does not add, is each study's combined by Fisher z. Lists the `show` most positive and most negative genes, with every tested gene's ρ as a histogram. Sums only |
-| `oncoprint` | `genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], unit?:"patient"\|"sample", display?:{…}, overlays?:[≤2], derivedCohorts?:[≤3], cohorts?:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
+| `oncoprint` | `genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], unit?:"patient"\|"sample", display?:{…}, overlays?:[≤2], derivedCohorts?:[≤3], cohorts:[names]` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state |
 
 `views[].note` is the analyst's own one-line annotation, carried through to the result and
 drawn above the figure. It is plain text on purpose — never markdown — so a document cannot
 smuggle formatting or links into a page that reports numbers.
 
-`views[].cohorts` defaults to all cohorts. Oncoprints federate across studies: columns are
+`views[].cohorts` lists the cohorts a view draws, in order — every view names its own; one with
+no list (or an empty one) is refused as empty, never read as "all of them". The document's
+`cohorts` is the store those names come from: a cohort is defined once there and listed by every
+view that draws it. Oncoprints federate across studies: columns are
 study-qualified, a synthetic **Study** track shows each column's origin, and duplicates appear twice.
 
 ### Table views: columns, search, filters, sort
@@ -566,6 +571,10 @@ EGFR-mutant versus KRAS-mutant lung adenocarcinoma — the two dominant, mutuall
   "views": [
     {
       "kind": "compare",
+      "cohorts": [
+        "EGFR-mutant NSCLC",
+        "KRAS-mutant NSCLC"
+      ],
       "genes": [
         "TP53",
         "STK11",
@@ -577,6 +586,10 @@ EGFR-mutant versus KRAS-mutant lung adenocarcinoma — the two dominant, mutuall
     },
     {
       "kind": "clinical",
+      "cohorts": [
+        "EGFR-mutant NSCLC",
+        "KRAS-mutant NSCLC"
+      ],
       "attributes": [
         "SMOKING_PREDICTIONS_3_CLASSES",
         "CURRENT_AGE_DEID",
@@ -585,10 +598,18 @@ EGFR-mutant versus KRAS-mutant lung adenocarcinoma — the two dominant, mutuall
       ]
     },
     {
-      "kind": "survival"
+      "kind": "survival",
+      "cohorts": [
+        "EGFR-mutant NSCLC",
+        "KRAS-mutant NSCLC"
+      ]
     },
     {
       "kind": "cooccurrence",
+      "cohorts": [
+        "EGFR-mutant NSCLC",
+        "KRAS-mutant NSCLC"
+      ],
       "genes": [
         "EGFR",
         "TP53",
@@ -651,6 +672,10 @@ Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 
   "views": [
     {
       "kind": "hotspots",
+      "cohorts": [
+        "CRC, KRAS-mutant",
+        "CRC, KRAS wild-type"
+      ],
       "genes": [
         "KRAS",
         "BRAF",
@@ -661,6 +686,10 @@ Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 
     },
     {
       "kind": "cooccurrence",
+      "cohorts": [
+        "CRC, KRAS-mutant",
+        "CRC, KRAS wild-type"
+      ],
       "genes": [
         "KRAS",
         "BRAF",
@@ -673,6 +702,10 @@ Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 
     },
     {
       "kind": "compare",
+      "cohorts": [
+        "CRC, KRAS-mutant",
+        "CRC, KRAS wild-type"
+      ],
       "genes": [
         "BRAF",
         "NRAS",
@@ -683,6 +716,10 @@ Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 
     },
     {
       "kind": "clinical",
+      "cohorts": [
+        "CRC, KRAS-mutant",
+        "CRC, KRAS wild-type"
+      ],
       "attributes": [
         "CURRENT_AGE_DEID",
         "MSI_SCORE",
@@ -690,7 +727,11 @@ Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 
       ]
     },
     {
-      "kind": "survival"
+      "kind": "survival",
+      "cohorts": [
+        "CRC, KRAS-mutant",
+        "CRC, KRAS wild-type"
+      ]
     }
   ]
 }
@@ -738,6 +779,10 @@ TP53-mutant versus wild-type across MSK-CHORD and MSK-MET. The log-rank is strat
   "views": [
     {
       "kind": "compare",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
       "genes": [
         "KRAS",
         "PIK3CA",
@@ -747,10 +792,18 @@ TP53-mutant versus wild-type across MSK-CHORD and MSK-MET. The log-rank is strat
       ]
     },
     {
-      "kind": "survival"
+      "kind": "survival",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ]
     },
     {
       "kind": "clinical",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
       "attributes": [
         "CURRENT_AGE_DEID",
         "TMB_NONSYNONYMOUS",
@@ -759,6 +812,10 @@ TP53-mutant versus wild-type across MSK-CHORD and MSK-MET. The log-rank is strat
     },
     {
       "kind": "cooccurrence",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
       "genes": [
         "TP53",
         "KRAS",
@@ -804,6 +861,10 @@ STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it
   "views": [
     {
       "kind": "compare",
+      "cohorts": [
+        "STK11 driver",
+        "STK11 wt"
+      ],
       "genes": [
         "KEAP1",
         "KRAS",
@@ -811,7 +872,11 @@ STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it
       ]
     },
     {
-      "kind": "survival"
+      "kind": "survival",
+      "cohorts": [
+        "STK11 driver",
+        "STK11 wt"
+      ]
     }
   ]
 }
@@ -832,6 +897,9 @@ Overall survival regressed on TP53 mutation status and reported gender, over the
   "views": [
     {
       "kind": "cox",
+      "cohorts": [
+        "all patients"
+      ],
       "covariates": [
         {
           "source": "alteration",
@@ -897,6 +965,9 @@ Never-smokers whose timeline shows progression within 180 days after first immun
   "views": [
     {
       "kind": "compare",
+      "cohorts": [
+        "never-smoker fast progressors"
+      ],
       "genes": [
         "STK11",
         "KEAP1",
@@ -941,6 +1012,10 @@ Any question about an outcome is only honest among patients observed long enough
   "views": [
     {
       "kind": "clinical",
+      "cohorts": [
+        "followed 2y+",
+        "followed < 6mo"
+      ],
       "attributes": [
         "CANCER_TYPE",
         "CURRENT_AGE_DEID",
@@ -949,6 +1024,10 @@ Any question about an outcome is only honest among patients observed long enough
     },
     {
       "kind": "compare",
+      "cohorts": [
+        "followed 2y+",
+        "followed < 6mo"
+      ],
       "genes": [
         "TP53",
         "KRAS",
@@ -1030,6 +1109,10 @@ Patients who progressed while on immunotherapy (1,423) versus those with no prog
   "views": [
     {
       "kind": "compare",
+      "cohorts": [
+        "progressed on immunotherapy",
+        "no progression within a year"
+      ],
       "genes": [
         "STK11",
         "KEAP1",
@@ -1040,6 +1123,10 @@ Patients who progressed while on immunotherapy (1,423) versus those with no prog
     },
     {
       "kind": "clinical",
+      "cohorts": [
+        "progressed on immunotherapy",
+        "no progression within a year"
+      ],
       "attributes": [
         "TMB_NONSYNONYMOUS",
         "CURRENT_AGE_DEID",
@@ -1047,7 +1134,11 @@ Patients who progressed while on immunotherapy (1,423) versus those with no prog
       ]
     },
     {
-      "kind": "survival"
+      "kind": "survival",
+      "cohorts": [
+        "progressed on immunotherapy",
+        "no progression within a year"
+      ]
     }
   ]
 }
@@ -1122,10 +1213,18 @@ Patients who reached a third line of therapy (3,088) versus those who had a firs
   },
   "views": [
     {
-      "kind": "survival"
+      "kind": "survival",
+      "cohorts": [
+        "reached 3rd line",
+        "first line only"
+      ]
     },
     {
       "kind": "clinical",
+      "cohorts": [
+        "reached 3rd line",
+        "first line only"
+      ],
       "attributes": [
         "CURRENT_AGE_DEID",
         "CANCER_TYPE",
@@ -1134,6 +1233,10 @@ Patients who reached a third line of therapy (3,088) versus those who had a firs
     },
     {
       "kind": "compare",
+      "cohorts": [
+        "reached 3rd line",
+        "first line only"
+      ],
       "genes": [
         "TP53",
         "KRAS",
@@ -1425,10 +1528,18 @@ Among treatment-naive patients starting first-line chemotherapy: progression rec
   },
   "views": [
     {
-      "kind": "survival"
+      "kind": "survival",
+      "cohorts": [
+        "progressed within 180d of 1L chemo",
+        "no progression within 180d"
+      ]
     },
     {
       "kind": "compare",
+      "cohorts": [
+        "progressed within 180d of 1L chemo",
+        "no progression within 180d"
+      ],
       "genes": [
         "TP53",
         "KRAS",
@@ -1439,6 +1550,10 @@ Among treatment-naive patients starting first-line chemotherapy: progression rec
     },
     {
       "kind": "clinical",
+      "cohorts": [
+        "progressed within 180d of 1L chemo",
+        "no progression within 180d"
+      ],
       "attributes": [
         "CANCER_TYPE",
         "FRACTION_GENOME_ALTERED",
@@ -1526,6 +1641,10 @@ PSA recorded above 100 ng/ml at any point (879) versus PSA measured but never ab
   "views": [
     {
       "kind": "compare",
+      "cohorts": [
+        "PSA above 100",
+        "PSA measured, never above 100"
+      ],
       "genes": [
         "AR",
         "TP53",
@@ -1535,10 +1654,18 @@ PSA recorded above 100 ng/ml at any point (879) versus PSA measured but never ab
       ]
     },
     {
-      "kind": "survival"
+      "kind": "survival",
+      "cohorts": [
+        "PSA above 100",
+        "PSA measured, never above 100"
+      ]
     },
     {
       "kind": "clinical",
+      "cohorts": [
+        "PSA above 100",
+        "PSA measured, never above 100"
+      ],
       "attributes": [
         "CURRENT_AGE_DEID",
         "FRACTION_GENOME_ALTERED",
@@ -1595,6 +1722,9 @@ Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep 
   "views": [
     {
       "kind": "compare",
+      "cohorts": [
+        "CRC/PAAD without CDKN2A loss"
+      ],
       "genes": [
         "KRAS",
         "TP53",
@@ -1630,6 +1760,9 @@ One cohort unioned across two studies (members are study-qualified; overlap is N
   "views": [
     {
       "kind": "oncoprint",
+      "cohorts": [
+        "TP53-mut, CHORD+MET"
+      ],
       "genes": [
         "TP53",
         "KRAS",
@@ -1668,6 +1801,9 @@ ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene t
   "views": [
     {
       "kind": "oncoprint",
+      "cohorts": [
+        "ERBB2 amp"
+      ],
       "genes": [
         "ERBB2",
         "EGFR",
@@ -1706,6 +1842,9 @@ Tumour mutational burden against fraction of the genome altered, over every samp
   "views": [
     {
       "kind": "plot",
+      "cohorts": [
+        "TP53 mut"
+      ],
       "unit": "sample",
       "x": {
         "source": "clinical",
@@ -1718,6 +1857,9 @@ Tumour mutational burden against fraction of the genome altered, over every samp
     },
     {
       "kind": "plot",
+      "cohorts": [
+        "TP53 mut"
+      ],
       "unit": "sample",
       "x": {
         "source": "alteration",
@@ -2043,6 +2185,9 @@ Pancreatic adenocarcinoma. The first row pools TP53, MDM2 and MDM4: it is altere
   "views": [
     {
       "kind": "oncoprint",
+      "cohorts": [
+        "Pancreatic"
+      ],
       "genes": [
         {
           "label": "TP53 pathway",
@@ -2096,6 +2241,9 @@ A heatmap track with reference:"federation" is scored against a distribution poo
   "views": [
     {
       "kind": "oncoprint",
+      "cohorts": [
+        "ERBB2 amp"
+      ],
       "genes": [
         "ERBB2",
         "EGFR"
@@ -2145,6 +2293,10 @@ MSK-CHORD, aligned on each patient's FIRST treatment, split by TP53 status. Trea
   "views": [
     {
       "kind": "course",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
       "eventTypes": [
         "treatment",
         "surgery"
@@ -2197,16 +2349,25 @@ The gene list appears once, in `params`, and every view refers to it as `$genes`
   "views": [
     {
       "kind": "compare",
+      "cohorts": [
+        "NSCLC"
+      ],
       "genes": "$genes",
       "note": "Frequencies first — the headline numbers."
     },
     {
       "kind": "cooccurrence",
+      "cohorts": [
+        "NSCLC"
+      ],
       "genes": "$genes",
       "note": "Do these drivers co-occur, or exclude one another?"
     },
     {
       "kind": "oncoprint",
+      "cohorts": [
+        "NSCLC"
+      ],
       "genes": "$genes"
     }
   ]
@@ -2247,6 +2408,10 @@ MSK-CHORD therapy lines by TP53 status, 90-day gap, two panels on one scale. Rea
   "views": [
     {
       "kind": "sequence",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
       "labelKey": "SUBTYPE",
       "lineGap": 90,
       "maxSteps": 3,
@@ -2280,6 +2445,9 @@ Hotspots in colorectal cancer, drawn the way cBioPortal's mutation tab draws the
   "views": [
     {
       "kind": "hotspots",
+      "cohorts": [
+        "CRC"
+      ],
       "genes": [
         "KRAS",
         "BRAF",
@@ -2312,6 +2480,9 @@ Pearson correlation between gene pairs in TCGA breast cancer. A correlation depe
   "views": [
     {
       "kind": "coexpression",
+      "cohorts": [
+        "BRCA"
+      ],
       "profileType": "rna_seq_v2_mrna_median_Zscores",
       "genes": [
         "ERBB2",
@@ -2359,6 +2530,10 @@ How TP53-mutant and wild-type tumors differ clinically. Categorical attributes a
   "views": [
     {
       "kind": "clinical",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
       "attributes": [
         "CANCER_TYPE",
         "SMOKING_PREDICTIONS_3_CLASSES",
@@ -2395,6 +2570,9 @@ Pairwise associations among lung cancer driver genes. Each site returns four cou
   "views": [
     {
       "kind": "cooccurrence",
+      "cohorts": [
+        "NSCLC"
+      ],
       "genes": [
         "EGFR",
         "KRAS",
@@ -2442,6 +2620,10 @@ TP53-mutant vs wild-type, overall survival measured from each patient's first ch
   "views": [
     {
       "kind": "survival",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
       "anchor": {
         "eventType": "Treatment",
         "key": "SUBTYPE",
@@ -2494,7 +2676,11 @@ TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers w
   },
   "views": [
     {
-      "kind": "survival"
+      "kind": "survival",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ]
     }
   ]
 }
@@ -2532,6 +2718,10 @@ APC-mutant colorectal cancer, then the same population restricted to liver metas
   "views": [
     {
       "kind": "compare",
+      "cohorts": [
+        "APC-mutant",
+        "APC-mutant, liver mets"
+      ],
       "genes": [
         "TP53",
         "KRAS",
@@ -2648,6 +2838,10 @@ APC-mutant colorectal cancer, split by liver metastasis. Alongside mean/SD, nume
   "views": [
     {
       "kind": "clinical",
+      "cohorts": [
+        "liver mets",
+        "no liver mets"
+      ],
       "attributes": [
         "MSI_SCORE",
         "AGE_AT_MET"
@@ -2672,6 +2866,9 @@ Every patient in the study, one term: mutated in any of TP53/KRAS/PIK3CA versus 
   "views": [
     {
       "kind": "cox",
+      "cohorts": [
+        "all patients"
+      ],
       "endpoint": "OS",
       "covariates": [
         {
@@ -2722,6 +2919,10 @@ APC mutation status regressed on overall survival, separately in the MSI-high an
   "views": [
     {
       "kind": "cox",
+      "cohorts": [
+        "MSI-high",
+        "MSS"
+      ],
       "covariates": [
         {
           "source": "alteration",
@@ -2750,6 +2951,9 @@ MSI_TYPE = Instable (vs every other observed value: Stable, Indeterminate, Do no
   "views": [
     {
       "kind": "logistic",
+      "cohorts": [
+        "all patients"
+      ],
       "outcome": {
         "source": "clinical",
         "attribute": "MSI_TYPE"
@@ -2898,7 +3102,12 @@ MSI status in three groups (stable / instable / indeterminate) instead of the us
   },
   "views": [
     {
-      "kind": "survival"
+      "kind": "survival",
+      "cohorts": [
+        "stable",
+        "instable",
+        "indeterminate"
+      ]
     }
   ]
 }
@@ -2928,6 +3137,9 @@ TP53 (a real mutation hotspot here) and MDM2 (never assayed for copy-number in t
   "views": [
     {
       "kind": "compare",
+      "cohorts": [
+        "Well-diff liposarcoma"
+      ],
       "genes": [
         "MDM2",
         "TP53"
@@ -2997,6 +3209,12 @@ Breast cancer's four receptor subtypes, compared on genomic instability (FRACTIO
   "views": [
     {
       "kind": "clinical",
+      "cohorts": [
+        "HR+/HER2-",
+        "TNBC",
+        "HR+/HER2+",
+        "HR-/HER2+"
+      ],
       "attributes": [
         "TMB_NONSYNONYMOUS",
         "FRACTION_GENOME_ALTERED"
@@ -3042,6 +3260,10 @@ MSI-H vs MSS endometrial cancer, progression-free survival from first-line treat
   "views": [
     {
       "kind": "survival",
+      "cohorts": [
+        "MSI-H",
+        "MSS"
+      ],
       "endpoint": "PFS_1L",
       "monthsAttribute": "PFS_MONTHS_FIRST_LINE_TX",
       "statusAttribute": "PROGRESSION_STATUS"
@@ -3190,7 +3412,11 @@ KRAS G12C lung adenocarcinoma treated with immunotherapy, with at least six mont
   },
   "views": [
     {
-      "kind": "attrition"
+      "kind": "attrition",
+      "cohorts": [
+        "LUAD KRAS G12C, immunotherapy",
+        "LUAD KRAS wild-type"
+      ]
     }
   ]
 }
@@ -3232,6 +3458,10 @@ Colorectal and breast cancers in MSK-IMPACT, 2 Mb bins. The textbook colorectal 
   "views": [
     {
       "kind": "genome",
+      "cohorts": [
+        "Colorectal",
+        "Breast"
+      ],
       "binMb": 2
     }
   ]
@@ -3273,7 +3503,11 @@ Colorectal and pancreatic cancer in MSK-CHORD. WNT separates them almost complet
   },
   "views": [
     {
-      "kind": "pathways"
+      "kind": "pathways",
+      "cohorts": [
+        "Colorectal",
+        "Pancreatic"
+      ]
     }
   ]
 }
@@ -3313,6 +3547,10 @@ TCGA PanCancer Atlas breast cancer, PAM50 basal-like against luminal A, on mRNA 
   "views": [
     {
       "kind": "diffexpr",
+      "cohorts": [
+        "Basal-like",
+        "Luminal A"
+      ],
       "profileType": "rna_seq_v2_mrna_median_all_sample_Zscores"
     }
   ]
@@ -3334,6 +3572,9 @@ MSK-IMPACT, the 2,278 patients sequenced at both a primary and a metastatic site
   "views": [
     {
       "kind": "paired",
+      "cohorts": [
+        "all patients"
+      ],
       "genes": [
         "TP53",
         "KRAS",
@@ -3364,6 +3605,9 @@ MSK-IMPACT again, the 2,278 patients with both kinds of sample, but no gene list
   "views": [
     {
       "kind": "paired",
+      "cohorts": [
+        "all patients"
+      ],
       "top": 15
     }
   ]
@@ -3392,6 +3636,9 @@ MSK-IMPACT again, the 2,278 patients with both kinds of sample, but no gene list
   "views": [
     {
       "kind": "paired",
+      "cohorts": [
+        "before and after treatment"
+      ],
       "top": 12,
       "pairBy": {
         "labels": {
@@ -3467,6 +3714,10 @@ Colorectal against breast cancer. Tumour suppressors show the classic second hit
   "views": [
     {
       "kind": "clonality",
+      "cohorts": [
+        "Colorectal",
+        "Breast"
+      ],
       "genes": [
         "TP53",
         "KRAS",
@@ -3529,6 +3780,11 @@ MSK-CHORD, from each patient's day 0, among those without a brain metastasis by 
   "views": [
     {
       "kind": "incidence",
+      "cohorts": [
+        "NSCLC",
+        "Breast",
+        "Colorectal"
+      ],
       "event": {
         "eventType": "Diagnosis",
         "attrs": [
@@ -3590,6 +3846,10 @@ Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a med
   "views": [
     {
       "kind": "labs",
+      "cohorts": [
+        "Prostate, TP53 mutant",
+        "Prostate, TP53 wild-type"
+      ],
       "test": "PSA",
       "anchor": {
         "eventType": "Treatment",
@@ -3634,7 +3894,40 @@ Non-small cell lung cancer in MSK-CHORD. The model keeps KEAP1, STK11, SMARCA4 a
 }
 ```
 
-### Example 57: Custom data: a curated biopsy site on every sample
+### Example 57: A survival risk model from mutated genes in lung cancer
+
+Non-small cell lung cancer in MSK-CHORD. The model keeps KEAP1, STK11, SMARCA4 and TP53 as adverse and EGFR as favourable, as the literature does, and its risk thirds separate clearly; a held-out C-index near 0.61 says mutations alone predict survival only modestly. Five runs keep the example quick; OncoCast recommends fifty.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "NSCLC": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ],
+          "per": "sample"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "riskmodel",
+      "cohorts": [
+        "NSCLC"
+      ],
+      "runs": 5
+    }
+  ]
+}
+```
+
+### Example 58: Custom data: a curated biopsy site on every sample
 
 luad_mskimpact_2021 is 93 EGFR-mutant lung adenocarcinomas with 186 primary and metastatic samples. The demo upload gives every sample a BIOPSY_SITE, grouped from the study's own SAMPLE_TYPE and free-text METASTATIC_SITE the way a reviewer would (scripts/gen-custom-demo.ts), standing in for a clinician-curated annotation. "CNS met" filters on it: 8 patients. Ordered by site, the oncoprint puts each patient's primary and metastases in their own groups. Fraction of the genome altered has a median of 0.47 in the 11 CNS samples and 0.36 in liver, against 0.21 in the 76 primaries. Split by site, TP53 is altered in 7 of 8 CNS-met patients (87.5%) against 65.6% of the patients with a primary sample. The split arms overlap, because a patient whose primary and metastasis were both sequenced belongs to both arms. With 8 to 61 patients per arm, these are illustrations, not findings.
 
@@ -3717,7 +4010,7 @@ Runs on custom data: `luad-biopsy-site` (LUAD biopsy site (demo), 186 samples, c
 }
 ```
 
-### Example 58: Cancer types summary: RAS genes across 50,000 tumours
+### Example 59: Cancer types summary: RAS genes across 50,000 tumours
 
 KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appendiceal and colorectal follow, and the bars show where RAS is amplified rather than mutated — germ cell tumours and esophagogastric cancer.
 
@@ -3732,6 +4025,9 @@ KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appen
   "views": [
     {
       "kind": "cancertypes",
+      "cohorts": [
+        "all patients"
+      ],
       "genes": [
         "KRAS",
         "NRAS",
@@ -3743,7 +4039,7 @@ KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appen
 }
 ```
 
-### Example 59: Cohort overlap: how four groups share their patients
+### Example 60: Cohort overlap: how four groups share their patients
 
 TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD. 5,314 TP53-mutant patients belong to none of the other three groups; 435 are in all four.
 
@@ -3801,13 +4097,19 @@ TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD.
   },
   "views": [
     {
-      "kind": "overlap"
+      "kind": "overlap",
+      "cohorts": [
+        "TP53 mutant",
+        "KRAS mutant",
+        "Immunotherapy",
+        "NSCLC"
+      ]
     }
   ]
 }
 ```
 
-### Example 60: Alteration enrichment: what separates colorectal from pancreatic tumours
+### Example 61: Alteration enrichment: what separates colorectal from pancreatic tumours
 
 Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TCF7L2, PIK3CA, FBXW7 and SOX9 mark colorectal cancer; KRAS and CDKN2A mark pancreatic cancer.
 
@@ -3862,13 +4164,17 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
   },
   "views": [
     {
-      "kind": "enrichment"
+      "kind": "enrichment",
+      "cohorts": [
+        "Colorectal, MSS",
+        "Pancreatic, MSS"
+      ]
     }
   ]
 }
 ```
 
-### Example 61: Mutational signatures: what UV light and tobacco leave behind
+### Example 62: Mutational signatures: what UV light and tobacco leave behind
 
 Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature (7) makes up about half of a melanoma's mutations and almost none of a lung cancer's; the smoking signature (4) is the reverse.
 
@@ -3904,13 +4210,17 @@ Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature 
   "views": [
     {
       "kind": "assays",
+      "cohorts": [
+        "Melanoma",
+        "Non-small cell lung"
+      ],
       "profileType": "mutational_signatures_contribution_v2"
     }
   ]
 }
 ```
 
-### Example 62: Co-expression: the genes that rise and fall with ESR1
+### Example 63: Co-expression: the genes that rise and fall with ESR1
 
 TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up behind ESR1 — CCDC170 (its neighbour on 6q25, often co-amplified), THSD4, FOXA1, TBC1D9 — and the genes of basal-like tumours fall away from it.
 
@@ -3925,6 +4235,9 @@ TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up be
   "views": [
     {
       "kind": "correlates",
+      "cohorts": [
+        "all patients"
+      ],
       "gene": "ESR1",
       "profileType": "rna_seq_v2_mrna"
     }
@@ -3932,7 +4245,7 @@ TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up be
 }
 ```
 
-### Example 63: Clinical data: every pancreatic cancer sample, oldest patients first
+### Example 64: Clinical data: every pancreatic cancer sample, oldest patients first
 
 Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 
@@ -3956,6 +4269,9 @@ Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
   "views": [
     {
       "kind": "table",
+      "cohorts": [
+        "Pancreatic"
+      ],
       "sort": {
         "column": "CURRENT_AGE_DEID",
         "desc": true
@@ -3966,7 +4282,7 @@ Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 }
 ```
 
-### Example 64: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
+### Example 65: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
 
 MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row, and P-0000012's alterations beside it.
 
@@ -3990,6 +4306,9 @@ MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 
   "views": [
     {
       "kind": "timeline",
+      "cohorts": [
+        "Breast"
+      ],
       "patient": {
         "study": "msk_chord_2024",
         "id": "P-0000012"
@@ -4004,6 +4323,9 @@ MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 
     },
     {
       "kind": "alterations",
+      "cohorts": [
+        "Breast"
+      ],
       "patient": {
         "study": "msk_chord_2024",
         "id": "P-0000012"
@@ -4013,7 +4335,7 @@ MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 
 }
 ```
 
-### Example 65: A patient's mutations, copy-number alterations and structural variants
+### Example 66: A patient's mutations, copy-number alterations and structural variants
 
 MSK-CHORD prostate cancer patients, those with the most structural variants first; P-0024249's tables, mutations kept to OncoKB-oncogenic calls.
 
@@ -4037,6 +4359,9 @@ MSK-CHORD prostate cancer patients, those with the most structural variants firs
   "views": [
     {
       "kind": "alterations",
+      "cohorts": [
+        "Prostate"
+      ],
       "patient": {
         "study": "msk_chord_2024",
         "id": "P-0024249"
@@ -4058,7 +4383,7 @@ MSK-CHORD prostate cancer patients, those with the most structural variants firs
 }
 ```
 
-### Example 66: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
+### Example 67: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
 
 MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at an allele frequency of 0.2 or more, highest first.
 
@@ -4082,6 +4407,9 @@ MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at 
   "views": [
     {
       "kind": "mutations",
+      "cohorts": [
+        "Colorectal"
+      ],
       "gene": "KRAS",
       "columns": [
         "sample",

@@ -6,7 +6,8 @@
 import { useState } from "react";
 import type { AnalysisDoc, TemplateDoc, CohortDef } from "../../lib/types.ts";
 import type { DslExample } from "../../lib/dsl-reference.ts";
-import { DEFAULT_VIEWS } from "./doc-store.ts";
+import { defaultViews } from "./doc-store.ts";
+import { DOC_VERSION } from "../../lib/doc-version.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 
 import type { DocStore } from "./doc-store.ts";
@@ -84,7 +85,7 @@ export function useLibrary(page: LibraryPage) {
       setError("an analysis takes at most 16 cohorts; " + chosen.length + " are ticked — untick " + (chosen.length - 16) + " and analyse again");
       return;
     }
-    const nd: AnalysisDoc = { study, cohorts: Object.fromEntries(chosen), views: DEFAULT_VIEWS };
+    const nd: AnalysisDoc = { dsl: DOC_VERSION, study, cohorts: Object.fromEntries(chosen), views: defaultViews(chosen.map(([n]) => n)) };
     docs.replace(nd);
     setError(null);
     goTab("analysis");

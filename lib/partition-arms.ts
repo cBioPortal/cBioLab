@@ -377,3 +377,9 @@ export function renameInViews(views: unknown[] | undefined, from: string, to: st
     return Array.isArray(cs) ? { ...(v as object), cohorts: cs.map(re) } : v;
   });
 }
+
+/** A view that names no cohorts draws nothing yet: it waits for one. A `splitBy` view draws its split's arms. */
+export function viewIsEmpty(v: unknown): boolean {
+  const x = (v || {}) as { cohorts?: unknown; splitBy?: unknown };
+  return !x.splitBy && !(Array.isArray(x.cohorts) && x.cohorts.length > 0);
+}

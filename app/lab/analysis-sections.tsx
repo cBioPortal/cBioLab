@@ -3,6 +3,7 @@
 // buttons and the view cards), the document dialog, the genes dialog, and the notice when the
 // document names custom data that is not here. The page holds the state; each section reads it
 // and the page's actions from one AnalysisCtx.
+import { useState } from "react";
 import CohortPills from "./pills";
 import { GeneListEditor } from "../_oncoprint/OncoprintCard.tsx";
 import type { GeneTrackSpec } from "../../lib/gene-tracks.ts";
@@ -12,8 +13,10 @@ import { PartitionPanel, SplitForm, type SplitSpec } from "./partitions.tsx";
 import type { DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
 import { requestLogin, referencedDatasets, unresolvedUploads } from "./custom-data-client.ts";
-import { DEFAULT_VIEWS } from "./doc-store.ts";
-import { CohortStudies, CohortEditMenu, CAT_COLORS } from "./view-chrome.tsx";
+import { CohortStudies, CohortEditMenu, CAT_COLORS, ViewHead } from "./view-chrome.tsx";
+import { cohortHash, shortHash } from "../../lib/cohort-hash.ts";
+import { viewIsEmpty } from "../../lib/partition-arms.ts";
+import type { CohortSourceState } from "./use-cohort-edits.ts";
 import { ViewCard } from "./view-cards.tsx";
 import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort, SavedWorkspace } from "./use-saved.ts";
@@ -38,7 +41,16 @@ export interface AnalysisCtx {
   genesFor: number | null;
   goTab: (t: "explore" | "cohorts" | "analysis" | "examples") => void;
   menuOpenRef: React.RefObject<Map<string, boolean>>;
-  openAddCohort: () => void;
+  /** open "+ Add cohort" for the view at vi */
+  openCohortChooser: (vi: number) => void;
+  /** where a copied cohort stands against the saved cohort it came from (use-cohort-edits.ts) */
+  cohortSource: (name: string) => CohortSourceState | null;
+  updateFromSaved: (name: string) => void;
+  loggedIn: boolean;
+  viewTitle: (kind: string) => string;
+  emptyViewHint: (kind: string) => string;
+  moveView: (i: number, dir: -1 | 1) => void;
+  removeView: (i: number) => void;
   openCohortEdit: (name: string) => void;
   openCustomManager: () => void;
   openWorkspaceSave: () => void;
@@ -106,26 +118,35 @@ export function CustomDataWarning({ ctx }: { ctx: AnalysisCtx }) {
   </>;
 }
 
+/** One view with no cohorts yet: its header (to move or remove it), what it will draw, and "+ Add cohort". */
+function EmptyViewCard({ ctx, vi }: { ctx: AnalysisCtx; vi: number }) {
+  const { busy, doc, emptyViewHint, menuOpenRef, moveView, openCohortChooser, removeView, viewTitle } = ctx;
+  const dv: any = (doc.views || [])[vi] || {};
+  const n = (doc.views || []).length;
+  return (
+    <div className="card viewcard emptyview">
+      <ViewHead menuStore={menuOpenRef.current} v={{ kind: dv.kind, annotationNote: dv.note }} title={viewTitle(dv.kind)}
+        onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < n - 1 ? () => moveView(vi, 1) : undefined}
+        onRemove={() => removeView(vi)} />
+      <div className="emptyview-body">
+        <p className="emptyview-lead">This view has no cohorts yet.</p>
+        <p>{emptyViewHint(dv.kind)} Pick one from this analysis or your library, or build one in Explore.</p>
+        <button className="primary" disabled={busy} onClick={() => openCohortChooser(vi)}>+ Add cohort</button>
+      </div>
+    </div>
+  );
+}
+
 export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
-  const { busy, catalogAttrs, doc, menuOpenRef, openAddCohort, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, result, saved, setPartitionDef, setUpgradeNote, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, upgradeNote } = ctx;
+  const { busy, catalogAttrs, cohortSource, doc, loggedIn, menuOpenRef, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, result, setPartitionDef, setUpgradeNote, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, updateFromSaved, upgradeNote, viewTitle } = ctx;
+  const [cohortOpen, setCohortOpen] = useState<Set<string>>(() => new Set());
+  const names = Object.keys(doc.cohorts || {});
+  const flat = splitsFlat();
+  const usedIn = (n: string) => (doc.views || [])
+    .filter((v: any) => (Array.isArray(v.cohorts) ? v.cohorts : []).some((c: string) => c === n || c.startsWith(n + " / ")) || v.splitBy?.cohort === n)
+    .map((v: any) => viewTitle(v.kind));
   return <>
     <div>
-      {/* Cohorts, bare: each is its own labelled, bordered box, with no
-          enclosing card — they ARE the leftbar, not a section within it.
-          Each box's gear menu (CohortEditMenu) covers a note and
-          removing the cohort. It deliberately does NOT cover the
-          cohort's own filters yet: those are pills built from Explore's
-          facets or hand-typed JSON, and editing them in place would mean
-          either Explore or the JSON editor opening ON TOP of an
-          analysis already in progress (a modal, most likely) — a bigger
-          piece of work than this pass, and not yet scoped. */}
-      {(busy || result) && (
-        <h2 className="vtitle hflex items-center gap-3 mb-4">
-          Cohorts{busy && <span className="spinner" />}
-          <button className="tbbtn addcohortbtn" disabled={busy} onClick={openAddCohort}
-            title="build another cohort in Explore and add it to this analysis">+ Add cohort</button>
-        </h2>
-      )}
       {upgradeNote && (
         <p className="note upgradenote">
           This analysis was written {upgradeNote.from === "unversioned" ? "before analyses carried a version" : "for DSL " + upgradeNote.from} and has been upgraded to {upgradeNote.to}
@@ -133,52 +154,84 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
           <button className="linklike" onClick={() => setUpgradeNote(null)}>dismiss</button>
         </p>
       )}
-      <div className="cohortlist">
-        {busy && !result
-          ? Array.from({ length: Math.max(1, Object.keys(doc.cohorts || {}).length) }).map((_, i) => (
-              <div key={i} className="skeleton skeleton-cohort" />
-            ))
-          : result && Object.entries(result.cohorts).filter(([n]) => doc.cohorts?.[n]).map(([n, c], i) => {
-            // a cohort's splits are drawn attached to it, so which cohort a split divides is
-            // seen, not read; splits of a split's arms are nested inside that split's panel
-            const flat = splitsFlat();
-            const splits = Object.keys(flat).filter((k) => flat[k].of === n);
-            return (
-            <div key={n} className={"cohortgroup" + (splits.length ? " hassplit" : "")}>
-              <div className="cohortbox">
-                <CohortEditMenu busy={busy} canEdit={!!(doc.title && spaces[doc.title])}
-                  onEdit={() => openCohortEdit(n)} onRemove={() => removeCohort(n)}
-                  split={(done: () => void) => <SplitForm cohort={n} attrs={catalogAttrs()} busy={busy} onSplit={splitCohortBy} onDone={done} />}
-                  splitCount={splits.length}
-                  menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
-                <div className="cohortbox-head">
-                  <span className="cohortbox-name"><span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />{n}</span>
-                  <strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span>
-                </div>
-                <CohortStudies ids={c.studies && c.studies.length ? c.studies : [doc.cohorts?.[n]?.study || doc.study || result.study].filter(Boolean) as string[]}
-                  names={studyNames} />
-                {doc.cohorts && doc.cohorts[n] && <CohortPills def={doc.cohorts[n]} onCustomData={showClauseData(n)} />}
-                {/* A note only shows here — passively, read-only — once the
-                    cohort is actually saved as a reusable artifact AND
-                    someone bothered to write one; an ad-hoc cohort that
-                    might be gone in a minute doesn't need an invitation to
-                    write prose about it. Writing or changing the note
-                    itself always happens through the gear menu above. */}
-                {saved[n] && doc.cohorts?.[n]?.notes && (
-                  <p className="note">{doc.cohorts[n].notes}</p>
-                )}
-              </div>
-              {splits.length > 0 && <div className="cohortgroup-splits">
-                {splits.map((k) => (
-                  <PartitionPanel key={k} name={k} partitions={flat} results={result.splits}
-                    cohortText={(x) => result.cohorts[x]?.text} attrs={catalogAttrs()} busy={busy}
-                    onChange={setPartitionDef} onRename={renamePartitionRow} onRemove={removePartitionNamed} onSplit={splitCohortBy} />
-                ))}
-              </div>}
-            </div>
-            );
-          })}
-      </div>
+      {/* The analysis's cohorts are not its top level: each view names the ones it draws, and this
+          is the summary of them — one line each, with the views that draw it; the definition, its
+          splits and its menu a click away. Cohorts come in through a view's "+ Add cohort". */}
+      {names.length > 0 && (
+        <section className="cohortsum" aria-label="cohorts in this analysis">
+          <h2 className="vtitle hflex items-center gap-3 mb-2">
+            Cohorts in this analysis <span className="plain meta">— {names.length} · add one from a view</span>{busy && <span className="spinner" />}
+          </h2>
+          <ul className="cohortsum-list">
+            {names.map((n, i) => {
+              const c = result?.cohorts[n];
+              const splits = Object.keys(flat).filter((k) => flat[k].of === n);
+              const views = usedIn(n);
+              const open = cohortOpen.has(n);
+              const src = cohortSource(n);
+              const toggle = () => setCohortOpen((s) => { const x = new Set(s); if (x.has(n)) x.delete(n); else x.add(n); return x; });
+              return (
+                <li key={n} className="cohortsum-item">
+                  <div className="cohortsum-row">
+                    <button className="cohortsum-toggle" aria-expanded={open} title={open ? "hide its definition" : "show its definition" + (splits.length ? " and splits" : "")}
+                      onClick={toggle}>{open ? "▾" : "▸"}</button>
+                    <span className="cohortsum-name" title={n}>
+                      <span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />{n}
+                      {splits.length > 0 && <span className="meta" title={splits.map((k) => flat[k].split).join(", ")}>⑂ {splits.length}</span>}
+                    </span>
+                    <span className="cohortsum-count">{c ? <><strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span></>
+                      : busy ? <span className="skeleton cohortsum-skel" /> : <span className="meta">—</span>}</span>
+                    <CohortStudies ids={c?.studies && c.studies.length ? c.studies : [doc.cohorts?.[n]?.study || doc.study || result?.study].filter(Boolean) as string[]}
+                      names={studyNames} />
+                    <span className="cohortsum-views-cell">
+                      <span className={"cohortsum-views" + (views.length ? "" : " unused")} title={views.join(", ")}>
+                        {views.length ? "in " + views.join(", ") : "in no view"}
+                      </span>
+                      {src?.state === "changed" && <button className="srcbadge changed" onClick={() => { if (!open) toggle(); }}
+                        title={"the saved cohort “" + src.srcName + "” has changed since this copy was made — open to compare and update"}>saved version changed</button>}
+                      {src?.state === "deleted" && <span className="srcbadge" title={"copied from a saved cohort “" + src.from.name + "” that has since been deleted"}>source deleted</span>}
+                    </span>
+                    <CohortEditMenu busy={busy} canEdit={!!(doc.title && spaces[doc.title])}
+                      onEdit={() => openCohortEdit(n)} onRemove={() => removeCohort(n)}
+                      split={(done: () => void) => <SplitForm cohort={n} attrs={catalogAttrs()} busy={busy} onSplit={splitCohortBy} onDone={done} />}
+                      splitCount={splits.length}
+                      menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
+                  </div>
+                  {open && (
+                    <div className="cohortsum-detail">
+                      {doc.cohorts?.[n] && <CohortPills def={doc.cohorts[n]} onCustomData={showClauseData(n)} />}
+                      {doc.cohorts?.[n]?.notes && <p className="note flush">{doc.cohorts[n].notes}</p>}
+                      {src && (
+                        <div className="cohortsrc meta">
+                          <span>Copied from saved cohort <strong>“{src.from.name}”</strong>{src.from.savedAt ? " (saved " + src.from.savedAt + ")" : ""}
+                            {" "}· definition <code title={src.from.hash}>#{shortHash(src.from.hash)}</code>.</span>
+                          {src.state === "unknown" && <span> {loggedIn ? "Checking the saved cohort…" : "Log in to compare it with the saved cohort."}</span>}
+                          {src.state === "deleted" && <span> That saved cohort has since been deleted; this copy is unaffected.</span>}
+                          {(src.state === "current" || src.state === "changed") && src.srcName !== src.from.name && <span> It is now named “{src.srcName}”.</span>}
+                          {src.state === "current" && !src.edited && <span> The saved cohort is unchanged.</span>}
+                          {src.edited && <span> This copy has been edited here since (now <code>#{shortHash(cohortHash(doc.cohorts![n]))}</code>).</span>}
+                          {src.state === "changed" && <span className="cohortsrc-changed"> The saved cohort has changed since (now <code title={src.now}>#{shortHash(src.now!)}</code>, saved {src.src!.savedAt}).</span>}
+                          {(src.state === "changed" || (src.state === "current" && src.edited)) && <>
+                            {src.state === "changed" && <div className="cohortsrc-new"><span className="meta">The saved version:</span> <CohortPills def={src.src!.def} /></div>}
+                            <button className="tbbtn" disabled={busy} onClick={() => updateFromSaved(n)}
+                              title={"replace this copy's definition with the saved cohort's; every view drawing “" + n + "” re-runs"}>
+                              {src.state === "changed" ? "Update to the saved version" : "Revert to the saved version"}</button>
+                          </>}
+                        </div>
+                      )}
+                      {result && splits.map((k) => (
+                        <PartitionPanel key={k} name={k} partitions={flat} results={result.splits}
+                          cohortText={(x) => result.cohorts[x]?.text} attrs={catalogAttrs()} busy={busy}
+                          onChange={setPartitionDef} onRename={renamePartitionRow} onRemove={removePartitionNamed} onSplit={splitCohortBy} />
+                      ))}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
     </div>
   </>;
 }
@@ -224,10 +277,10 @@ export function DocDialog({ ctx }: { ctx: AnalysisCtx }) {
 }
 
 export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
-  const { VIEW_KINDS, addView, busy, doc, docDialog, docs, explore, fetchExplore, goTab, openAddCohort, openWorkspaceSave, removeViews, result, setCdFocus, spaces, viewCtx, viewIds } = ctx;
+  const { VIEW_KINDS, addView, busy, doc, docDialog, explore, fetchExplore, goTab, openWorkspaceSave, removeViews, result, setCdFocus, spaces, viewCtx, viewIds } = ctx;
   return <>
     <div>
-      {(busy || result) && (
+      {(busy || result || (doc.views || []).length > 0) && (
         <div className="row baseline mb-4">
           <h2 className="vtitle">
             Analysis{busy && <span className="spinner ml-2" />}
@@ -274,25 +327,16 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
       {busy && !result && Array.from({ length: Math.max(1, (doc.views || []).length) }).map((_, i) => (
         <div key={i} className="skeleton skeleton-view" />
       ))}
-      {!busy && !result && (
+      {!busy && !result && !(doc.views || []).length && (
         <div className="card">
-          <p className="note t-md flush hflex items-center gap-3 wrap">
-            <button className="primary" onClick={openAddCohort}>+ Add cohort</button>
-            <span>to start an analysis here, or make one on the <button className="linklike" onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore page</button>
-            {" "}or choose cohorts on the <button className="linklike" onClick={() => goTab("cohorts")}>Cohorts page</button>.</span>
+          <p className="note t-md flush">
+            Start with a view: choose below what you want to see — survival, an oncoprint, a gene comparison — and
+            then add its cohorts, from your library, from this analysis, or built on the{" "}
+            <button className="linklike" onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore page</button>.
           </p>
         </div>
       )}
-      {result && !result.views.length && (
-        <div className="card">
-          <h2>Cohorts evaluated — no views defined</h2>
-          <p className="note t-md">
-            Add a views array to the document (e.g. <code>{`{"kind":"survival"}`}</code>),{" "}
-            <button className="linklike" onClick={() => { const d = { ...doc, views: DEFAULT_VIEWS }; docs.set(d); }}>add the default views</button>, or ask your AI assistant in the browser sidebar.
-          </p>
-        </div>
-      )}
-      {!(busy && !result) && Object.keys(doc.cohorts || {}).length > 0 && (
+      {!(busy && !result) && (
         <div className="card addview">
           <div className="row center g2">
             <strong className="addview-title">Add a view</strong>
@@ -307,20 +351,23 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
                   onClick={() => removeViews((v) => v.kind === kind)}>{label}{present > 1 && " ×" + present} <span aria-hidden="true">✕</span></button>
               );
               const full = (doc.views || []).length >= 6;
-              const waiting = !full && !!loading && loading();
+              // with no cohorts yet there is no study to ask about: the view's cohorts decide later
+              const known = Object.keys(doc.cohorts || {}).length > 0;
+              const waiting = !full && known && !!loading && loading();
               const blocked = full ? "this document already has the maximum of 6 views"
                 : waiting ? "loading this study's catalog — a moment"
-                : (why ? why() : null);
+                : (known && why ? why() : null);
               return (
                 <button key={kind} className="facet" disabled={!!blocked}
-                  title={blocked || ("add a " + label.toLowerCase() + " view and run it")}
+                  title={blocked || ("add a " + label.toLowerCase() + " view, then choose its cohorts")}
                   onClick={() => addView(kind)}>+ {label}{waiting && <span className="spinner" />}</button>
               );
             })}
           </div>
         </div>
       )}
-      {result && result.views.map((v, vi) => (
+      {!result && !busy && (doc.views || []).map((dv: any, vi: number) => viewIsEmpty(dv) ? <EmptyViewCard key={viewIds[vi] ?? vi} ctx={ctx} vi={vi} /> : null)}
+      {result && result.views.map((v, vi) => v.empty ? <EmptyViewCard key={viewIds[vi] ?? vi} ctx={ctx} vi={vi} /> : (
         <ViewCard key={viewIds[vi] ?? vi} ctx={{ ...viewCtx, result }} v={v} vi={vi} />
       ))}
     </div>

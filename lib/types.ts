@@ -216,7 +216,15 @@ export interface CohortDef {
   a?: EventSelector; b?: EventSelector | null; rel?: EventRel; priorGuard?: boolean;
   /** the analyst's own prose about this cohort: why it's defined this way, what to read */
   notes?: string;
+  /**
+   * Where this definition was copied from: a saved cohort (its id, which survives a rename), its
+   * name then, and the hash of its definition then (lib/cohort-hash.ts). Provenance only — the
+   * engine never reads it; the page compares it with the saved cohort to offer an update.
+   */
+  from?: CohortSource;
 }
+
+export interface CohortSource { saved: string; name: string; hash: string; savedAt?: string }
 
 /**
  * One arm of a split: a name and the clause a patient must match to be in it. Arms are tested in
@@ -1563,6 +1571,8 @@ export interface LogRankK {
 }
 export interface ViewResult {
   kind: string; error?: string; note?: string; studies?: string[];
+  /** a view that names no cohorts yet: the page draws it waiting for one, and nothing ran for it */
+  empty?: true;
   /** the analyst's own annotation, carried through from the view spec */
   annotationNote?: string;
   participation?: ViewParticipation;

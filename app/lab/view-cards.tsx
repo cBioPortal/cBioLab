@@ -59,6 +59,8 @@ export interface ViewCtx {
   removeView: (vi: number) => void;
   noteEdit: (vi: number) => (() => void) | undefined;
   openGenes: (vi: number) => void;
+  /** open "+ Add cohort" for the view at vi */
+  openCohortChooser: (vi: number) => void;
   cohortFromSelection: (sel: ColumnSelection, studies: string[]) => Promise<void>;
   featureFromSelection: (sel: ColumnSelection, all: string[], studies: string[]) => Promise<void>;
 }
@@ -769,7 +771,7 @@ function PlotCard({ ctx, v, vi }: CardProps) {
 }
 
 function SequenceCard({ ctx, v, vi }: CardProps) {
-  const { busy, cohortChoice, docView, menuOpenRef, patchView, setViewCohorts, viewIds } = ctx;
+  const { busy, cohortChoice, docView, menuOpenRef, openCohortChooser, patchView, setViewCohorts, viewIds } = ctx;
   return <>
     {v.kind === "sequence" && v.svg && <>
       <div className="vhead">
@@ -779,7 +781,7 @@ function SequenceCard({ ctx, v, vi }: CardProps) {
         <div className="vmeta">
           <ViewHelpButton kind="sequence" menuId={"help:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} />
           <CohortPicker nodes={cohortChoice(vi, docView(vi)).nodes} chosen={cohortChoice(vi, docView(vi)).chosen} max={1} busy={busy}
-            menuId={"pick:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current}
+            menuId={"pick:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} onAdd={() => openCohortChooser(vi)}
             onChange={(next) => setViewCohorts(vi, next, cohortChoice(vi, docView(vi)).all)} />
         {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
           <details className="gearmenu inline">
@@ -832,7 +834,7 @@ function SequenceCard({ ctx, v, vi }: CardProps) {
 }
 
 function CourseCard({ ctx, v, vi }: CardProps) {
-  const { busy, cohortChoice, doc, docView, menuOpenRef, patchView, setViewCohorts, viewIds } = ctx;
+  const { busy, cohortChoice, doc, docView, menuOpenRef, openCohortChooser, patchView, setViewCohorts, viewIds } = ctx;
   return <>
     {v.kind === "course" && v.svg && <>
       <div className="vhead">
@@ -842,7 +844,7 @@ function CourseCard({ ctx, v, vi }: CardProps) {
         <div className="vmeta">
           <ViewHelpButton kind="course" menuId={"help:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} />
           <CohortPicker nodes={cohortChoice(vi, docView(vi)).nodes} chosen={cohortChoice(vi, docView(vi)).chosen} busy={busy}
-            menuId={"pick:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current}
+            menuId={"pick:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} onAdd={() => openCohortChooser(vi)}
             onChange={(next) => setViewCohorts(vi, next, cohortChoice(vi, docView(vi)).all)} />
         <details className="gearmenu inline">
           <summary title="clinical course options">settings</summary>

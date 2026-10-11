@@ -365,11 +365,13 @@ export interface CohortNode { name: string; label: string; kind: "cohort" | "spl
  *   - a view draws EITHER whole cohorts OR the groups of one split: ticking a split, or a group of
  *     one, replaces whole cohorts and any other split's; ticking a whole cohort replaces a split;
  *   - whole cohorts combine with each other; a one-cohort view (max 1) behaves like radio buttons;
- *   - the last ticked item cannot be unticked — ticking another switches to it.
+ *   - unticking the last item leaves the view empty, waiting for a cohort (with `onAdd`; without
+ *     it the last cannot be unticked — ticking another switches to it);
+ *   - "+ add a cohort…" at the foot (`onAdd`) brings in one the analysis does not have yet.
  */
-export function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuStore }: {
+export function CohortPicker({ nodes, chosen, max, busy, onChange, onAdd, menuId, menuStore }: {
   nodes: CohortNode[]; chosen: string[]; max?: number; busy?: boolean;
-  onChange: (next: string[]) => void; menuId: string; menuStore: Map<string, boolean>;
+  onChange: (next: string[]) => void; onAdd?: () => void; menuId: string; menuStore: Map<string, boolean>;
 }) {
   const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   const byName = new Map(nodes.map((x) => [x.name, x] as const));
@@ -387,7 +389,7 @@ export function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuS
   const single = max === 1;
   const hidden = (n: string) => !single && splits.some((x) => !open.has(x.name) && n.startsWith(x.name + " / "));
   const choose = (n: string) => {
-    if (chosen.includes(n)) { if (chosen.length > 1) onChange(chosen.filter((c) => c !== n)); return; }
+    if (chosen.includes(n)) { if (chosen.length > 1 || onAdd) onChange(chosen.filter((c) => c !== n)); return; }
     const owner = ownerOf(n);
     let kept = max === 1 ? [] : chosen.filter((c) => !related(c, n));
     // whole cohorts, or one split's groups — never a mix
@@ -398,7 +400,7 @@ export function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuS
   const row = (o: CohortNode) => {
     const on = chosen.includes(o.name);
     const implied = !on && chosen.some((c) => o.name.startsWith(c + " / ") && byName.get(c)?.kind === "split");
-    const last = on && chosen.length === 1;
+    const last = on && chosen.length === 1 && !onAdd;
     const full = !on && max != null && max > 1 && chosen.filter((c) => !related(c, o.name)).length >= max;
     const mine = ownerOf(o.name);
     const replaces = !on && !implied && chosen.some((c) => ownerOf(c) !== mine);
@@ -440,6 +442,9 @@ export function CohortPicker({ nodes, chosen, max, busy, onChange, menuId, menuS
         {nodes.filter((o) => !hidden(o.name)).map(row)}
         {single ? <p className="cpick-foot">This view draws one cohort — pick one, or one group of a split.</p>
           : splits.length > 0 && <p className="cpick-foot">A view draws whole cohorts, or the groups of one split — not both. Choosing one replaces the other.</p>}
+        {onAdd && <button type="button" className="linklike cpick-add" disabled={busy}
+          title="add a cohort from your library, or build one in Explore"
+          onClick={() => { menuStore.set(menuId, false); if (ref.current) ref.current.open = false; onAdd(); }}>+ add a cohort…</button>}
       </div>
     </details>
   );
@@ -502,7 +507,7 @@ export function ViewHead({ v, title, sub, actions, chips, cohorts, cohortInSub, 
   cohortInSub?: boolean;
   onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void; onEditNote?: () => void; menuStore: Map<string, boolean>;
   /** which cohorts this view draws; absent when the document has only one */
-  cohorts?: { chosen: string[]; all: string[]; nodes: CohortNode[]; drawn: string[]; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void };
+  cohorts?: { chosen: string[]; all: string[]; nodes: CohortNode[]; drawn: string[]; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void; onAdd?: () => void };
 }) {
   const menuKey = cohorts?.viewKey ?? "vh";
   return (
@@ -511,9 +516,9 @@ export function ViewHead({ v, title, sub, actions, chips, cohorts, cohortInSub, 
         <h2 className="vtitle">{title}{sub != null && <span className="plain"> — {sub}</span>}</h2>
         <div className="vmeta">
           <ViewHelpButton kind={v.kind} menuId={"help:" + menuKey} menuStore={menuStore} />
-          {cohorts && cohorts.all.length > 1 && (
+          {cohorts && (cohorts.onAdd || cohorts.all.length > 1) && (
             <CohortPicker nodes={cohorts.nodes} chosen={cohorts.chosen} max={cohorts.max} busy={cohorts.busy}
-              onChange={cohorts.onChange} menuId={"pick:" + menuKey} menuStore={menuStore} />
+              onChange={cohorts.onChange} onAdd={cohorts.onAdd} menuId={"pick:" + menuKey} menuStore={menuStore} />
           )}
           {actions}
           {chips}
@@ -602,7 +607,7 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
           <button className="linklike" disabled={busy} onClick={onEdit}>edit…</button>
           <hr />
         </>}
-        <button className="linklike" disabled={busy} onClick={onRemove}>remove this cohort</button>
+        <button className="linklike" disabled={busy} title="remove it from the analysis and from every view that draws it" onClick={onRemove}>remove from analysis</button>
       </div>
     </details>
   );

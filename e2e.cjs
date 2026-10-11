@@ -506,8 +506,8 @@ async function main() {
           catch { return false; }
         }, null, { timeout: 300000 });
         const leaf = (await page.evaluate(() => JSON.parse(document.querySelector("#docjson").value).cohorts["dragged"].all[0]));
-        // the pill shows what the compiler counted for that cohort
-        await page.waitForFunction(() => /dragged/.test(document.body.innerText), null, { timeout: 300000 });
+        // the cohort summary shows what the compiler counted for that cohort, once it has counted it
+        await page.waitForFunction(() => /dragged\s+[\d,]+\s+patients/.test(document.body.innerText), null, { timeout: 300000 });
         const counted = await page.evaluate(() => {
           const m = document.body.innerText.match(/dragged\s+([\d,]+)\s+patients/);
           return m ? Number(m[1].replace(/,/g, "")) : null;
@@ -618,24 +618,31 @@ async function main() {
       } catch { /* left empty */ }
       ok("ticked cohorts are analysed together", together.length === 2, together.join(" + ") || "no document");
 
-      // ...and a view can be added without editing the document JSON.
-      let added = [], dots = 0;
+      // ...and a view can be added without editing the document JSON. It arrives empty, saying so,
+      // and draws once a cohort of the analysis is added to it from its "+ Add cohort".
+      let added = [], dots = 0, emptyFirst = false, drew = [];
       try {
         await page.waitForSelector(".addview", { timeout: 120000 });
         await page.locator(".addview button:has-text('Lollipop')").click();
-        await page.waitForSelector(".lp-plot circle.lollipop-head", { timeout: 300000 });
+        await page.waitForSelector(".emptyview .emptyview-body button.primary", { timeout: 30000 });
         added = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).map(v => v.kind);
+        emptyFirst = (await page.locator(".lp-plot circle.lollipop-head").count()) === 0;
+        await page.locator(".emptyview .emptyview-body button.primary").first().click();
+        await page.locator(".addcohortdialog .acd-row button").first().click();
+        await page.waitForSelector(".lp-plot circle.lollipop-head", { timeout: 300000 });
         dots = await page.locator(".lp-plot circle.lollipop-head").count();
+        drew = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).find(v => v.kind === "hotspots")?.cohorts || [];
       } catch { /* left empty */ }
-      ok("a lollipop view can be added from the UI", added.includes("hotspots") && dots > 0,
-        added.length ? added.join(", ") + " · " + dots + " dots" : "view was not added");
+      ok("a lollipop view can be added from the UI, empty until a cohort is added to it",
+        added.includes("hotspots") && emptyFirst && drew.length === 1 && dots > 0,
+        added.length ? added.join(", ") + " · empty first: " + emptyFirst + " · draws " + (drew.join(", ") || "nothing") + " · " + dots + " dots" : "view was not added");
 
-      // Every cohort card names the studies it was queried in, with all of them in its tooltip.
-      const studyLines = await page.$$eval(".cohortbox", bs => bs.map(b => {
+      // The cohort summary names the studies each cohort was queried in, with all of them in its tooltip.
+      const studyLines = await page.$$eval(".cohortsum-row", bs => bs.map(b => {
         const el = b.querySelector(".cohortbox-studies");
         return el ? { text: el.textContent.trim(), title: el.title } : null;
       }));
-      ok("each cohort card says which studies it queried",
+      ok("each cohort in the summary says which studies it queried",
         studyLines.length > 0 && studyLines.every(s => s && s.text && s.title),
         studyLines.map(s => s ? s.text : "missing").join(" | "));
 
@@ -1113,6 +1120,44 @@ async function main() {
     const out = String((e.stdout || "") + (e.stderr || "")).trim();
     for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
     if (!/^FAIL /m.test(out)) results.push("FAIL docs:check crashed: " + String(e.message).slice(0, 120));
+  }
+  // A saved cohort added to a view is a COPY that remembers its source: the saved cohort's id and
+  // the hash of what was copied. Editing the saved cohort changes nothing in the analysis until the
+  // reader asks; the summary says the saved version changed and "Update" brings it in.
+  if (LOGIN) {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const sp = await ctx.newPage();
+    let steps = {};
+    try {
+      await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
+      const name = "e2e source " + Date.now();
+      const v1 = { study: "msk_chord_2024", all: [{ kind: "oql", q: "KRAS: MUT" }] };
+      const v2 = { study: "msk_chord_2024", all: [{ kind: "oql", q: "KRAS: MUT" }, { kind: "clinical", attribute: "SEX", values: ["Female"] }] };
+      const made = await (await ctx.request.post(BASE + "/api/artifacts", { data: { kind: "cohort", name, definition: v1 } })).json();
+      const id = made.artifact.id;
+      const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
+      await sp.goto(BASE + "/lab?tab=analysis", { waitUntil: "domcontentloaded" });
+      await sp.locator(".addview button:has-text('Survival')").click();
+      await sp.locator(".emptyview .emptyview-body button.primary").first().click();
+      await sp.getByRole("tab", { name: "Library" }).click();
+      await sp.locator(".addcohortdialog .acd-row", { hasText: name }).getByRole("button").click();
+      await sp.waitForSelector(".cohortsum-row", { timeout: 120000 });
+      const copied = (await docOf()).cohorts[name];
+      steps.copied = !!copied && copied.from?.saved === id && /^[0-9a-f]{64}$/.test(copied.from?.hash || "");
+      await ctx.request.patch(BASE + "/api/artifacts/" + id, { data: { name, definition: v2 } });
+      await sp.reload({ waitUntil: "domcontentloaded" });
+      await sp.waitForSelector(".srcbadge.changed", { timeout: 120000 });
+      steps.untouched = JSON.stringify((await docOf()).cohorts[name].all) === JSON.stringify(v1.all);
+      await sp.locator(".srcbadge.changed").click();
+      await sp.getByRole("button", { name: "Update to the saved version" }).click();
+      await sp.waitForFunction(() => !document.querySelector(".srcbadge.changed"), null, { timeout: 60000 });
+      const after = (await docOf()).cohorts[name];
+      steps.updated = JSON.stringify(after.all) === JSON.stringify(v2.all) && after.from.hash !== copied.from.hash;
+      await ctx.request.delete(BASE + "/api/artifacts/" + id);
+    } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
+    ok("a saved cohort is copied with its source, left alone when the saved one changes, and updated on request",
+      steps.copied && steps.untouched && steps.updated, JSON.stringify(steps));
+    await ctx.close();
   }
   // The study picker STAGES. Ticking boxes must not query: assembling a
   // selection used to fire one facet request per click, 350ms apart, each one

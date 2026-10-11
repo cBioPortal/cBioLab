@@ -32,6 +32,7 @@ import { useCohortEdits } from "./use-cohort-edits.ts";
 import { useWorkspace } from "./use-workspace.ts";
 import { useLibrary, EXAMPLES } from "./use-library.ts";
 import { useToolActions } from "./use-tool-actions.ts";
+import { AddCohortDialog, type AddCohortTarget } from "./add-cohort-dialog.tsx";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 
@@ -70,8 +71,8 @@ function tabFromParams(sp: SearchParams): typeof TABS[number] {
  * The bar across the top of Explore in add mode: name the cohort being built, then add it to the
  * open analysis or cancel. Owns its own text, so typing re-renders only this bar.
  */
-function AddCohortBar({ existing, ready, error, onAdd, onCancel }: {
-  existing: string[]; ready: boolean; error?: string | null; onAdd: (name: string) => void; onCancel: () => void;
+function AddCohortBar({ existing, target, ready, error, onAdd, onCancel }: {
+  existing: string[]; target: string; ready: boolean; error?: string | null; onAdd: (name: string) => void; onCancel: () => void;
 }) {
   const [name, setName] = useState(() => {
     for (let i = existing.length + 1; ; i++) if (!existing.includes("cohort " + i)) return "cohort " + i;
@@ -97,16 +98,16 @@ function AddCohortBar({ existing, ready, error, onAdd, onCancel }: {
   const clash = existing.includes(name.trim());
   return (
     <div className="addcohortbar" ref={bar}>
-      <strong>Add a cohort to this analysis</strong>
-      <span className="meta">filter below, then add it</span>
+      <strong>Adding a cohort to {target}</strong>
+      <span className="meta">filter below, name it, then add it — Cancel returns to the analysis</span>
       <span className="spacer" />
       <label className="addcohortname">name
         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80}
           onKeyDown={(e) => { if (e.key === "Enter" && ready && name.trim() && !clash) onAdd(name); }} />
       </label>
       <button className="primary" disabled={!ready || !name.trim() || clash} onClick={() => onAdd(name)}
-        title={!ready ? "select a study first" : clash ? "the analysis already has a cohort with this name" : "add this selection to the analysis as “" + name.trim() + "”"}>
-        Add to analysis
+        title={!ready ? "select a study first" : clash ? "the analysis already has a cohort with this name" : "add this selection to " + target + " as “" + name.trim() + "”"}>
+        Add to {target}
       </button>
       <button onClick={onCancel} title="close without adding (Esc)">Cancel</button>
       {(clash || error) && <p className="error fullrow flush">{clash ? "the analysis already has a cohort named “" + name.trim() + "”" : error}</p>}
@@ -130,6 +131,8 @@ export default function AnalysisPage() {
   /** set when an opened document was written for an older version and has been upgraded */
   const [upgradeNote, setUpgradeNote] = useState<DocUpgrade | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  /** the view whose "+ Add cohort" dialog is open */
+  const [chooser, setChooser] = useState<AddCohortTarget | null>(null);
   const [cdFocus, setCdFocus] = useState<CustomDataFocus | null>(null);
   /** the `custom` tag on a cohort's pill: that clause's upload, scoped to the clause */
   const showClauseData = (cohort?: string): OnCustomData => (attribute, leaf, negated) =>
@@ -299,22 +302,23 @@ export default function AnalysisPage() {
   const { analyzePicked, cohortsSubTab, docLink, exEvals, exTag, picked, previewExample, runDocExample, saveExample, setCohortsSubTab, setExTag, setPicked, togglePick } = library;
   const workspace = useWorkspace({ canSave, doc, docs, goTab, persistSpaces, removeSpace, setError, setStudy, spaces, study });
   const { analysisSaved, clearAnalysis, confirmViewNoteEdit, confirmWorkspaceSave, deleteWorkspace, noteEdit, openWorkspace, openWorkspaceSave, setNotes, setParam, setViewNoteEditing, setWsOpen, viewNoteEditing, wsError, wsOpen } = workspace;
-  const cohortEdits = useCohortEdits({ doc, docs, proposePartition, setError, setToast, study });
-  const { analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat } = cohortEdits;
-  const exploreState = useExploreState({ analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
+  const savedReady = loggedIn && !savedArtifacts.cohortsState.pending && !savedArtifacts.cohortsState.error;
+  const cohortEdits = useCohortEdits({ doc, docs, proposePartition, saved, savedReady, setError, setToast, study });
+  const { analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved } = cohortEdits;
+  const exploreState = useExploreState({ addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
   const { addChartDialog, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setChartTab, setExStudies, setExploreStudies } = exploreState;
   const viewOptions = useViewOptions({ cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading });
   const { VIEW_KINDS, assayOptions, attrsLoading, catalogAttrs, contProfile, drawsOwnHead, geneChoices, numericAttrs, profileOptions, viewAttrs, viewEvents, viewGenes } = viewOptions;
-  const viewEdits = useViewEdits({ assayOptions, busy, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, viewAttrs, viewEvents, viewGenes, viewIds });
-  const { addView, cohortChoice, docView, moveView, ocView, patchView, removeView, removeViews, setViewAttrs, setViewCohorts, setViewGenes, updateView, updateViewLocal } = viewEdits;
+  const viewEdits = useViewEdits({ VIEW_KINDS, assayOptions, busy, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, setChooser, setToast, study, viewAttrs, viewEvents, viewGenes, viewIds });
+  const { addCohortToView, addView, cohortChoice, docView, emptyViewHint, moveView, ocView, openCohortChooser, patchView, removeView, removeViews, setViewAttrs, setViewCohorts, setViewGenes, updateView, updateViewLocal, viewTitle } = viewEdits;
 
   // ---- what the sections read ------------------------------------------------------------
   /** what Explore's sections read and the edits they can make (app/lab/explore-sections.tsx) */
   const exploreCtx: ExploreCtx = { ...exploreState, moreDerivedMenu, showClauseData, studies };
   /** what every view card reads and the edits it can make (app/lab/view-cards.tsx) */
-  const viewCtx = { VIEW_KINDS, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, menuOpenRef, moveView, noteEdit, ocView, openGenes, patchView, pendingKeys, profileOptions, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
+  const viewCtx = { VIEW_KINDS, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, menuOpenRef, moveView, noteEdit, ocView, openCohortChooser, openGenes, patchView, pendingKeys, profileOptions, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
   /** what the Analysis tab's sections read and the actions they take (app/lab/analysis-sections.tsx) */
-  const analysisCtx: AnalysisCtx = { VIEW_KINDS, addView, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, genesDialog, genesFor, goTab, menuOpenRef, openAddCohort, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeViews, renamePartitionRow, result, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, upgradeNote, viewCtx, viewIds };
+  const analysisCtx: AnalysisCtx = { VIEW_KINDS, addView, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortSource, emptyViewHint, genesDialog, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, removeViews, renamePartitionRow, result, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
   // what the page offers the researcher's AI assistant (app/lab/agent-tools.ts), current every render
   const webmcp = useLabTools({
     doc, result, busy, error, tab, study, savedAs: analysisSaved ? doc.title || null : null,
@@ -375,8 +379,8 @@ export default function AnalysisPage() {
 
         {/* ================= Explore tab ================= */}
         {(tab === "explore" || addMode) && <div className={addMode ? "exploremodal" : undefined}
-          role={addMode ? "dialog" : undefined} aria-modal={addMode ? true : undefined} aria-label={addMode ? "add a cohort to this analysis" : undefined}>
-          {addMode && <AddCohortBar existing={Object.keys(doc.cohorts || {})} ready={exStudies.length > 0} error={exMsg}
+          role={addMode ? "dialog" : undefined} aria-modal={addMode ? true : undefined} aria-label={addMode ? "add a cohort to " + addMode.target.title : undefined}>
+          {addMode && <AddCohortBar existing={Object.keys(doc.cohorts || {})} target={addMode.target.title} ready={exStudies.length > 0} error={exMsg}
             onAdd={addDraftToAnalysis} onCancel={closeAddCohort} />}
           <StudyPicker ctx={exploreCtx} />
           {/* Underneath study selection, and only present once there's something to
@@ -453,6 +457,20 @@ export default function AnalysisPage() {
           <ViewColumn ctx={analysisCtx} />
         </div>}
       </main>
+      <AddCohortDialog target={chooser}
+        analysis={Object.entries(doc.cohorts || {}).map(([name, def]) => ({ name, def, count: result?.cohorts[name]?.count ?? null,
+          views: (doc.views || []).filter((v: any) => Array.isArray(v.cohorts) && v.cohorts.includes(name)).map((v: any) => viewTitle(v.kind)) }))}
+        library={{
+          saved: !customState.enabled ? "off" : !loggedIn ? "locked"
+            : savedArtifacts.cohortsState.pending ? "loading" : savedArtifacts.cohortsState.error ? "error" : "ready",
+          savedError: savedArtifacts.cohortsState.error,
+          cohorts: Object.entries(saved).map(([name, x]) => ({ id: x.id, name, def: x.def, savedAt: x.savedAt })),
+          examples: EXAMPLES,
+        }}
+        onAdd={(name, def) => { if (chooser) addCohortToView(chooser, name, def); }}
+        onExplore={() => { if (!chooser) return; const t = chooser; setChooser(null); openAddCohort(t); }}
+        onLogin={requestLogin}
+        onClose={() => setChooser(null)} />
       {toast && <div className="toast" role="status" onClick={() => setToast(null)}>{toast}</div>}
       <CustomDataDialog focus={cdFocus} onClose={() => setCdFocus(null)}
         bindings={doc.uploads || []}

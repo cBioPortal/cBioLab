@@ -35,6 +35,8 @@ export interface KindCardSpec {
   maxCohorts?: number;
   /** the header's subtitle names the one cohort drawn, so the header leaves out its "Showing" line */
   cohortInHeader?: boolean;
+  /** the fewest it compares; an empty view says so beside its "+ Add cohort" */
+  minCohorts?: number;
   /** why the add button is disabled for this study, or null when it can be added */
   why?: (known: Known) => string | null;
 }
@@ -51,11 +53,9 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   attrition: { label: "Cohort attrition (CONSORT)", title: "Cohort attrition", maxCohorts: 6 },
   genome: { label: "Genome-wide copy number", title: "Genome-wide copy number", maxCohorts: 4 },
   pathways: { label: "Oncogenic pathways", title: "Oncogenic signalling pathways", maxCohorts: 4 },
-  enrichment: { label: "Alteration enrichment (all genes)", title: "Alteration enrichment", maxCohorts: 6,
-    why: (k) => k.cohorts.length < 2 ? "compares two or more cohorts — this analysis has one" : null },
-  assays: { label: "Generic assays (signatures, arm-level CNA, …)", title: "Generic assays", maxCohorts: 6,
-    why: (k) => k.cohorts.length < 2 ? "compares two or more cohorts — this analysis has one"
-      : !k.assays.length ? "this study has no generic-assay profiles (mutational signatures, arm-level copy number, …)" : null },
+  enrichment: { label: "Alteration enrichment (all genes)", title: "Alteration enrichment", maxCohorts: 6, minCohorts: 2 },
+  assays: { label: "Generic assays (signatures, arm-level CNA, …)", title: "Generic assays", maxCohorts: 6, minCohorts: 2,
+    why: (k) => !k.assays.length ? "this study has no generic-assay profiles (mutational signatures, arm-level copy number, …)" : null },
   table: { label: "Clinical data table (download)", title: "Clinical data", maxCohorts: 6 },
   mutations: { label: "Mutation table (one gene)", title: "Mutations", maxCohorts: 6 },
   timeline: { label: "Patient timeline (one patient at a time)", title: "Patient timeline", maxCohorts: 1, cohortInHeader: true,
@@ -63,8 +63,7 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   alterations: { label: "Patient alterations (mutations, copy number, SVs; one patient at a time)", title: "Patient alterations", maxCohorts: 1, cohortInHeader: true },
   correlates: { label: "Co-expression with one gene (genome-wide)", title: "Co-expression", maxCohorts: 1,
     why: (k) => !k.profiles.filter((p) => p !== "cna").length ? "this study has no continuous molecular profile (mRNA, protein, …) to correlate on" : null },
-  overlap: { label: "Cohort overlap (UpSet)", title: "Cohort overlap", maxCohorts: 6,
-    why: (k) => k.cohorts.length < 2 ? "intersects two or more cohorts — this analysis has one" : null },
+  overlap: { label: "Cohort overlap (UpSet)", title: "Cohort overlap", maxCohorts: 6, minCohorts: 2 },
   cancertypes: { label: "Cancer types summary", title: "Cancer types summary", genes: true, maxCohorts: 2 },
   labs: { label: "Lab course and response (e.g. PSA50)", title: "Lab course", maxCohorts: 4,
     why: (k) => k.events.some((e) => /lab/i.test(e.canonical)) ? null : "this study records no lab-test timeline events" },
@@ -73,9 +72,8 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   clonality: { label: "Clonality (FACETS)", title: "Clonality", genes: true, maxCohorts: 3 },
   paired: { label: "Paired samples (primary vs metastasis, before vs after)", title: "Paired samples", genes: true, maxCohorts: 3 },
   riskmodel: { label: "Risk model (elastic-net Cox, OncoCast-style)", title: "Risk model", maxCohorts: 1 },
-  diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2,
-    why: (k) => k.cohorts.length < 2 ? "compares exactly two cohorts — this analysis has one"
-      : !k.profiles.length ? "this study has no molecular profile to compare expression on" : null }
+  diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2, minCohorts: 2,
+    why: (k) => !k.profiles.length ? "this study has no molecular profile to compare expression on" : null }
 };
 
 const PAIRED_DEFAULT_GENES = ["TP53", "KRAS", "PIK3CA", "ESR1", "AR", "CDKN2A", "MYC", "TERT"];
@@ -572,13 +570,13 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   }
   if (kind === "clonality") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "APC", "PIK3CA", "SMAD4", "CDH1"] };
   if (kind === "paired") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : PAIRED_DEFAULT_GENES };
-  if (kind === "mutations") return { kind, gene: known.genes[0] || "TP53", ...(known.cohorts.length > 6 ? { cohorts: known.cohorts.slice(0, 6) } : {}) };
-  if (kind === "table") return { kind, ...(known.cohorts.length > 6 ? { cohorts: known.cohorts.slice(0, 6) } : {}) };
-  if (kind === "timeline" || kind === "alterations") return { kind, ...(known.cohorts.length > 1 ? { cohorts: known.cohorts.slice(0, 1) } : {}) };
+  if (kind === "mutations") return { kind, gene: known.genes[0] || "TP53" };
+  if (kind === "table") return { kind };
+  if (kind === "timeline" || kind === "alterations") return { kind };
   if (kind === "correlates") {
     const profs = known.profiles.filter((p) => p !== "cna");
     const profile = profs.find((p) => /mrna|rna_seq/i.test(p) && !/zscore/i.test(p)) || profs.find((p) => /mrna|rna_seq/i.test(p)) || profs[0] || "";
-    return { kind, gene: known.genes[0] || "TP53", profileType: profile, ...(known.cohorts.length > 1 ? { cohorts: known.cohorts.slice(0, 1) } : {}) };
+    return { kind, gene: known.genes[0] || "TP53", profileType: profile };
   }
   if (kind === "assays") {
     const profile = known.assays.find((p) => /signature/i.test(p) && /contribution/i.test(p)) || known.assays.find((p) => !/methylation/i.test(p)) || known.assays[0] || "";
@@ -587,7 +585,7 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   if (kind === "diffexpr") {
     const profile = known.profiles.find((p) => /zscore/i.test(p) && /mrna|rna_seq/i.test(p))
       || known.profiles.find((p) => /mrna|rna_seq/i.test(p)) || known.profiles[0] || "";
-    return { kind, profileType: profile, ...(known.cohorts.length > 2 ? { cohorts: known.cohorts.slice(0, 2) } : {}) };
+    return { kind, profileType: profile };
   }
   return { kind };
 }

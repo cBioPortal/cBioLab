@@ -115,6 +115,8 @@ export const DEFAULT_VIEWS: View[] = [
   { kind: "survival" },
   { kind: "oncoprint", genes: ["TP53", "KRAS", "STK11", "KEAP1", "EGFR"] }
 ];
+/** the default views, each drawing `cohorts` — a view draws only the cohorts it names */
+export const defaultViews = (cohorts: string[]): View[] => DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [...cohorts] }));
 
 /** The document a new page starts from: already the current version, so opening the page
  *  upgrades (and writes into the URL) nothing. */
