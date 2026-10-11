@@ -57,7 +57,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   `lib/views/shared.ts` splits a view's studies accordingly so the view names what was left out.
   Figures: **`lib/view-svg.ts`** draws the first kinds' figures itself and hands the rest to
   **`lib/figures/<kind>.ts`**, one module per kind, registered with its title in `lib/figures/index.ts`
-  (browser-safe: `app/lab/portal-bodies.tsx` draws from them too); cards: `app/lab/more-views.tsx`.
+  (browser-safe: `app/lab/portal-bodies.tsx` draws from them too); cards: `app/lab/kind-cards.tsx`.
 - **Table views** (`table`, `mutations`, and any later view that lists rows) — **every one must
   support the same five things: pagination, search over its text, a filter per column (text
   conditions or a value list for text, a range for numbers), sorting, and a CSV download of every
@@ -334,7 +334,7 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   `.dt-wait` in `app/_table/DataTable.tsx`) and the count is dimmed with a spinner beside it; the
   bar, chips and headers stay visible and usable, and an action that would act on the stale
   answer (the download) waits, saying why. Such a view draws its own waiting state, so the page
-  must not cover its card (`drawsOwnWaiting` in `app/lab/more-views.tsx`, honoured by the lab and
+  must not cover its card (`drawsOwnWaiting` in `app/lab/kind-cards.tsx`, honoured by the lab and
   `PortalTabs`). Its controls show and edit the query **the document holds**, not the last result's,
   so a second edit made while the first is running keeps the first. A page not yet on hand is
   loading from the render that asks for it — never a flash of "no rows" first.
