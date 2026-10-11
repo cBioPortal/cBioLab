@@ -44,6 +44,22 @@ test("it is nbformat 4, all cells well formed", () => {
   assert.ok(nb.cells.filter((c: any) => c.cell_type === "code").length >= 5);
 });
 
+test("every cell has a unique id (nbformat 4.5), and nothing is written for one notebook host", () => {
+  const nb = build();
+  assert.equal(nb.nbformat_minor, 5);
+  const ids = nb.cells.map((c: any) => c.id);
+  assert.ok(ids.every((i: unknown) => typeof i === "string" && i));
+  assert.equal(new Set(ids).size, ids.length);
+  assert.doesNotMatch(JSON.stringify(nb), /JupyterLite|Pyodide/);
+});
+
+test("the first code cell installs numpy and matplotlib only when they are missing", () => {
+  const first = build().cells.find((c: any) => c.cell_type === "code").source.join("");
+  assert.match(first, /find_spec\(_pkg\) is None/);
+  assert.match(first, /"numpy", "matplotlib"/);
+  assert.match(first, /pip", "install"/);
+});
+
 test("the payload cell carries the package as committed", () => {
   const cell = build().cells.find((c: any) => String(c.source.join("")).includes("PACKAGE = "));
   const b64 = /PACKAGE = "([^"]+)"/.exec(cell.source.join(""))![1];

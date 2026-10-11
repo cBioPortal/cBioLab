@@ -965,7 +965,7 @@ function QueriesPanel({ ctx, v, vi }: CardProps) {
             <pre>{q.sql}</pre>
           </div>
         ))}
-        {v.method && <MethodPanel method={v.method} />}
+        {v.method && <MethodPanel method={v.method} source={{ doc: ctx.doc, index: vi, kind: v.kind }} />}
       </details>
     )}
   </>;

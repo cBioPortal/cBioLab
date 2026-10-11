@@ -289,6 +289,13 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
    record's text come from variables or named constants, never typed in. The statistics themselves
    are pinned against lifelines/statsmodels/scipy/gseapy by `test/*-golden.test.ts`
    (fixtures from `python/golden/`, regenerated with `uv run`).
+   **A record's script is also a notebook**: the panel's "download as notebook" posts the document to
+   `POST /api/analysis/notebook`, which re-runs it, rebuilds the files the script reads from the view's
+   own recorded queries (`lib/method-data.ts` — the same code `check:methods` runs, so the export is
+   what was checked; no SQL is ever accepted from a caller) and assembles the `.ipynb`
+   (`lib/method-notebook.ts`). A view with rows from a federated peer is refused (403) and the
+   notebook is capped at `NOTEBOOK_MAX_BYTES` (413). A new view kind whose script reads a file needs
+   its rebuild in `methodFiles`, or the notebook says the file is missing.
 
 13. **`/verification` reports what the checks found; it never restates a claim by hand.** It is the
    report of an automated verification suite meant to run in CI: `npm run verify` runs every stage

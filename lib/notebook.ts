@@ -1,18 +1,22 @@
 // A drawn oncoprint as a real Jupyter notebook: nbformat 4 JSON, opening in Jupyter, JupyterLab,
-// JupyterLite, Colab or VS Code without anything of ours running.
+// Colab or VS Code without anything of ours running.
 //
-// The notebook is self-contained. Its first cell carries two gzipped base64 payloads — the
-// cohortlab package exactly as committed, and this figure's contract as OPB1 bytes — so no
-// install, no network and no credentials are needed to re-draw the figure or work with its
-// arrays. The cells after it are the ones worth reading.
+// The notebook is self-contained. A setup cell installs numpy and matplotlib if the environment
+// lacks them; the next carries two gzipped base64 payloads — the cohortlab package exactly as
+// committed, and this figure's contract as OPB1 bytes — so no network (beyond that install) and no
+// credentials are needed to re-draw the figure or work with its arrays. The cells after it are the
+// ones worth reading.
 
 import type { Contract } from "./types.ts";
 
-interface Cell { cell_type: "code" | "markdown"; metadata: Record<string, unknown>; source: string[]; outputs?: unknown[]; execution_count?: null }
+interface Cell { id: string; cell_type: "code" | "markdown"; metadata: Record<string, unknown>; source: string[]; outputs?: unknown[]; execution_count?: null }
 
 const lines = (s: string): string[] => s.split("\n").map((l, i, a) => i === a.length - 1 ? l : l + "\n");
-const md = (s: string): Cell => ({ cell_type: "markdown", metadata: {}, source: lines(s.trim()) });
-const code = (s: string): Cell => ({ cell_type: "code", metadata: {}, execution_count: null, outputs: [], source: lines(s.trim()) });
+// nbformat 4.5 requires every cell to carry a unique id
+let nextCell = 0;
+const cellId = () => "c" + String(++nextCell).padStart(3, "0");
+const md = (s: string): Cell => ({ id: cellId(), cell_type: "markdown", metadata: {}, source: lines(s.trim()) });
+const code = (s: string): Cell => ({ id: cellId(), cell_type: "code", metadata: {}, execution_count: null, outputs: [], source: lines(s.trim()) });
 
 export interface NotebookInput {
   /** the spec this figure was drawn from, echoed for provenance and for re-running it live */
@@ -32,16 +36,28 @@ export interface NotebookInput {
 const num = (n: number) => n.toLocaleString("en-US");
 
 export function oncoprintNotebook(o: NotebookInput): unknown {
+  nextCell = 0;
   const s = o.stats;
   const cells: Cell[] = [
     md(`# Oncoprint — ${num(s.columns)} ${s.unit}s, ${s.tracks} tracks
 
 ${s.genes.length ? "Genes: **" + s.genes.join("**, **") + "**. " : ""}${s.groups.length > 1 ? "Groups: " + s.groups.join(", ") + ". " : ""}
 Exported from [cbio-lab](${o.origin}). This notebook carries the figure's **contract** — the one
-JSON object every cbio-lab renderer reads — and the \`cohortlab\` package itself, so it runs with
-no install, no database and no network. \`numpy\` and \`matplotlib\` are the only outside packages.
+JSON object every cbio-lab renderer reads — and the \`cohortlab\` package itself, so it needs no
+database, no credentials and no network once its two outside packages, \`numpy\` and
+\`matplotlib\`, are present. The first code cell installs them if your Python environment lacks them.
 ${o.cut ? "\n> **" + o.cut + "** The numbers below are of that cut, not of the whole cohort.\n" : ""}
 The spec that produced it, if you want to re-run it live against the server, is in the last cell.`),
+
+    md(`## Setup
+
+Installs \`numpy\` and \`matplotlib\` into the kernel's environment only if they are missing.`),
+
+    code(`import importlib.util, subprocess, sys
+
+for _pkg in ("numpy", "matplotlib"):
+    if importlib.util.find_spec(_pkg) is None:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", _pkg])`),
 
     md(`## The payload
 
@@ -49,13 +65,6 @@ One cell, two gzipped blobs: the package as committed, and this figure. Run it a
 nothing below reads it again.`),
 
     code(`import base64, gzip, json, pathlib, sys
-
-# JupyterLite's Pyodide kernel only preloads a package when it sees a literal
-# "import" for it in the cell being run; numpy and matplotlib are needed by
-# cohortlab (imported below) but never named literally here, so without these
-# two lines JupyterLite fails the import below with ModuleNotFoundError while
-# every other host (Jupyter, Colab, VS Code) already has them installed.
-import numpy, matplotlib
 
 PACKAGE = "${o.packageB64}"
 CONTRACT = "${o.contractB64}"
@@ -93,9 +102,9 @@ from IPython.display import Image, display
 
 # op.figure() returns a matplotlib Figure drawn on the non-interactive "Agg"
 # backend (there is no display server to draw to here), so returning it bare
-# shows nothing unless the frontend already switched on inline display itself
-# — not guaranteed on JupyterLite's Pyodide kernel. Rendering it to a PNG
-# buffer and displaying that explicitly works the same way everywhere.
+# shows nothing unless the frontend already switched on inline display itself.
+# Rendering it to a PNG buffer and displaying that explicitly works the same
+# way in every notebook host.
 fig = op.figure(width=1200)
 buf = io.BytesIO()
 fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")

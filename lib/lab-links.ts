@@ -82,16 +82,6 @@ export interface LabLinks {
 }
 
 /**
- * JupyterLite — real JupyterLab, in the reader's browser, run by jupyter.org — opening a notebook
- * of ours. It is the reader's browser that fetches the URL, so this works for any origin they can
- * reach, but only over https: an https page cannot fetch an http one.
- */
-export const JUPYTERLITE = "https://jupyter.org/try-jupyter/lab/index.html";
-export function jupyterLiteUrl(absoluteIpynbUrl: string): string {
-  return JUPYTERLITE + "?fromURL=" + encodeURIComponent(absoluteIpynbUrl);
-}
-
-/**
  * Links that open this figure in the two lab pages, cutting the spec only as far as the URL
  * forces. Returns null when even the smallest cut does not fit — the caller says so rather
  * than offering a link to a figure that is not this one.
@@ -116,9 +106,8 @@ export function labLinks(spec: unknown, max = SPEC_URL_MAX): LabLinks | null {
 }
 
 /**
- * The notebook's URL must END in `.ipynb`, so everything it carries goes in the path: JupyterLite's
- * open-from-URL names the uploaded file `basename(url)`, query string and all, and a file called
- * `oncoprint.ipynb?spec=…` opens in the text editor as a page of JSON instead of as a notebook.
+ * The notebook's URL ends in `oncoprint.ipynb`, with everything it carries in the path, so the file
+ * a browser or `curl -O` saves is named like a notebook rather than after a query string.
  */
 export function ipynbPath(spec: unknown, cut?: string | null): string {
   return "/api/oncoprint/notebook/" + encodeSpec(cut ? { spec, cut } : { spec }) + "/oncoprint.ipynb";
