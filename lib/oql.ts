@@ -114,7 +114,18 @@ const DRIVER_JOIN = (pin: string): string =>
   "     OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))\n";
 
 // full OQL leaf -> SQL of matching patient stable ids (portal semantics: altered by ANY entry)
-export function oqlLeafSql(q: string, { oncokbPin, profiles, study = STUDY, db = DB }: { oncokbPin?: string | null; profiles?: string[]; study?: string; db?: string } = {}): string {
+export function oqlLeafSql(q: string, opts: { oncokbPin?: string | null; profiles?: string[]; study?: string; db?: string } = {}): string {
+  return oqlCasesSql(q, { ...opts, unit: "patient" });
+}
+
+/**
+ * The cases an OQL query matches, as `pid`: patients (any of their samples matches) or samples
+ * (that sample matches), each stripped of the study prefix. The cohort leaf asks for patients; a
+ * plot axis asks in the plot's own unit.
+ */
+export function oqlCasesSql(q: string, { oncokbPin, profiles, study = STUDY, db = DB, unit }:
+  { oncokbPin?: string | null; profiles?: string[]; study?: string; db?: string; unit: "patient" | "sample" }): string {
+  const caseCol = unit === "sample" ? "sample_unique_id" : "patient_unique_id";
   const parsed = parseOql(q);
   const parts: string[] = [];
   for (const { gene, specs } of parsed) {
@@ -126,7 +137,7 @@ export function oqlLeafSql(q: string, { oncokbPin, profiles, study = STUDY, db =
         if (!prof) throw new Error("OQL " + spec.type + " requires an " + (spec.type === "EXP" ? "mRNA" : "protein") +
           " profile; this study has: " + ((profiles || []).join(", ") || "none"));
         parts.push(
-          "SELECT DISTINCT replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '') AS pid\n" +
+          "SELECT DISTINCT replaceOne(sd." + caseCol + ", " + sq(study + "_") + ", '') AS pid\n" +
           "  FROM " + db + ".genetic_alteration_derived ga\n" +
           "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
           "  WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.hugo_gene_symbol = " + sq(gene) + "\n" +
@@ -134,7 +145,7 @@ export function oqlLeafSql(q: string, { oncokbPin, profiles, study = STUDY, db =
         continue;
       }
       parts.push(
-        "SELECT DISTINCT replaceOne(g.patient_unique_id, " + sq(study + "_") + ", '') AS pid\n" +
+        "SELECT DISTINCT replaceOne(g." + caseCol + ", " + sq(study + "_") + ", '') AS pid\n" +
         "  FROM " + db + ".genomic_event_derived g\n" +
         (spec.driver ? DRIVER_JOIN(oncokbPin!) : "") +
         "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +

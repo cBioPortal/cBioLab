@@ -513,6 +513,13 @@ export interface PlotView {
    */
   colorBy?: PlotAxis;
   ringBy?: PlotAxis;
+  /**
+   * Cohorts drawn over the plotted one (at most 4), each in its own colour: the plotted cohort's
+   * cases that are also in it, as points when this participant may see cases and there are few
+   * enough, otherwise as density cells (scatter) or a box per group. The plotted cohort's
+   * statistics are unchanged; the figure says how many of each highlight it drew.
+   */
+  highlight?: string[];
 }
 export interface CooccurrenceView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */

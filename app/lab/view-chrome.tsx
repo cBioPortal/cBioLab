@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { attributeLabel } from "../../lib/custom-data-names.ts";
 import type { ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
+import { HIGHLIGHT_CAP, HIGHLIGHT_COLORS } from "../../lib/plot-highlight.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 
 /** the cohort colours, in order, for every chart on the page */
@@ -103,25 +104,76 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
         </select>}
         <GeneInput gene={a.gene || ""} busy={busy} onCommit={(gene) => set({ ...a, gene })} />
       </>}
-      {src === "alteration" && <>
-        <GeneSetInput genes={a.genes && a.genes.length ? a.genes : a.gene ? [a.gene] : []} busy={busy}
-          onCommit={(genes) => {
-            // A gene SET (2+) only supports "mutated vs not" — combining several genes'
-            // mutation types or copy-number states into one category has no honest reading,
-            // so switching to a set falls back to that rather than leaving an axis the
-            // engine would refuse.
-            const by = genes.length > 1 && a.by && a.by !== "mutated" ? "mutated" : a.by;
-            set(genes.length > 1 ? { ...a, gene: undefined, genes, by }
-              : { ...a, genes: undefined, gene: genes[0] || "", by });
-          }} />
-        <select value={a.by || (a.genes && a.genes.length > 1 ? "mutated" : "mutationType")} disabled={busy || (a.genes && a.genes.length > 1)}
-          title={a.genes && a.genes.length > 1 ? "a gene set only supports \"mutated vs not\"" : "how the gene's alterations are grouped"}
-          onChange={(e) => set({ ...a, by: e.target.value })}>
-          <option value="mutationType">mutation type</option>
-          <option value="mutated">mutated vs not</option>
-          <option value="cna">copy number</option>
+      {src === "alteration" && (() => {
+        const isOql = a.oql != null;
+        const genes: string[] = a.genes && a.genes.length ? a.genes : a.gene ? [a.gene] : [];
+        const isSet = !isOql && genes.length > 1;
+        return <>
+          {isOql
+            ? <OqlInput query={a.oql} busy={busy} onCommit={(oql) => set({ source: "alteration", oql })} />
+            : <GeneSetInput genes={genes} busy={busy}
+                onCommit={(next) => {
+                  // A gene SET (2+) only supports "mutated vs not" — combining several genes'
+                  // mutation types or copy-number states into one category has no honest reading,
+                  // so switching to a set falls back to that rather than leaving an axis the
+                  // engine would refuse.
+                  const by = next.length > 1 && a.by && a.by !== "mutated" ? "mutated" : a.by;
+                  set(next.length > 1 ? { ...a, gene: undefined, genes: next, by }
+                    : { ...a, genes: undefined, gene: next[0] || "", by });
+                }} />}
+          <select value={isOql ? "oql" : a.by || (isSet ? "mutated" : "mutationType")} disabled={busy}
+            title={isOql ? "Altered when a case matches any line of the query, Unaltered otherwise"
+              : isSet ? "a gene set is \"mutated vs not\", or write it as an OQL query" : "how the gene's alterations are grouped"}
+            onChange={(e) => {
+              const by = e.target.value;
+              // to OQL: the genes become a query (a bare gene is "any alteration"); from OQL: the
+              // query's first gene, so a round trip keeps the gene
+              if (by === "oql") set({ source: "alteration", oql: genes.length ? genes.join("; ") : "TP53: MUT" });
+              else if (isOql) set({ source: "alteration", gene: (/^\s*([A-Za-z0-9.-]+)/.exec(a.oql) || [])[1]?.toUpperCase() || "TP53", by });
+              else set({ ...a, by });
+            }}>
+            <option value="mutationType" disabled={isSet}>mutation type</option>
+            <option value="mutated">mutated vs not</option>
+            <option value="cna" disabled={isSet}>copy number</option>
+            <option value="oql">matches OQL</option>
+          </select>
+        </>;
+      })()}
+    </span>
+  );
+}
+
+/**
+ * A plot's highlight cohorts: one chip per cohort in the view's list, in its figure colour, and a
+ * select offering the document's other cohorts until the cap is reached. Order is colour, so a
+ * removed chip shifts the ones after it to the next colour, as the figure does.
+ */
+export function HighlightPicker({ chosen, options, busy, onChange }: {
+  chosen: string[];
+  /** cohorts that may be highlighted: every cohort but the plotted one */
+  options: { name: string; label: string; depth: number }[];
+  busy?: boolean;
+  onChange: (next: string[]) => void;
+}) {
+  const left = options.filter((o) => !chosen.includes(o.name));
+  return (
+    <span className="hlpick">
+      <span className="tbl" title="other cohorts drawn over this one, each in its own colour">highlight</span>
+      {chosen.map((n, i) => (
+        <span key={n} className="hlchip" title={"“" + n + "” drawn over the plotted cohort"}>
+          <span className="hldot" style={{ background: HIGHLIGHT_COLORS[i] }} />
+          <span className="hlname">{n}</span>
+          <button type="button" className="hlx" disabled={busy} aria-label={"stop highlighting " + n}
+            onClick={() => onChange(chosen.filter((x) => x !== n))}>×</button>
+        </span>
+      ))}
+      {chosen.length < HIGHLIGHT_CAP && left.length > 0 && (
+        <select value="" disabled={busy} aria-label="add a cohort to highlight"
+          onChange={(e) => { if (e.target.value) onChange([...chosen, e.target.value]); }}>
+          <option value="">{chosen.length ? "+ another" : "+ cohort"}</option>
+          {left.map((o) => <option key={o.name} value={o.name}>{"\u00a0".repeat(o.depth * 2) + o.label}</option>)}
         </select>
-      </>}
+      )}
     </span>
   );
 }
@@ -172,6 +224,32 @@ export function GeneSetInput({ genes, busy, onCommit }: { genes: string[]; busy?
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => onCommit(parse(v)), 500);
       }}
+      onBlur={() => commit(draft)} />
+  );
+}
+
+/**
+ * An OQL query typed into an alteration axis ("KRAS: G12C; STK11: MUT"), committed after a pause,
+ * on Enter or on leaving the box — like the gene inputs, so a half-typed query never becomes the
+ * shareable link. The engine checks it and the view says what it refused.
+ */
+export function OqlInput({ query, busy, onCommit }: { query: string; busy?: boolean; onCommit: (oql: string) => void }) {
+  const [draft, setDraft] = useState(query);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => setDraft(query), [query]);
+  const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); if (v.trim() && v !== query) onCommit(v.trim()); };
+  return (
+    <input className="axisgene axisoql" value={draft} disabled={busy} placeholder="KRAS: G12C; STK11: MUT" spellCheck={false}
+      size={Math.max(16, Math.min(44, draft.length + 2))}
+      title={"OQL, one gene per line or ';' — e.g. KRAS: G12C; STK11: MUT; EGFR: AMP; TP53: DRIVER; ERBB2: EXP>2. " +
+        "A case is Altered when it matches any of them."}
+      onChange={(e) => {
+        const v = e.target.value;
+        setDraft(v);
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => commit(v), 900);
+      }}
+      onKeyDown={(e) => { if (e.key === "Enter") commit(draft); }}
       onBlur={() => commit(draft)} />
   );
 }

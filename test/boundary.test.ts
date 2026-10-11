@@ -21,7 +21,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
-  carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql,
+  carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotHighlightCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql,
   geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
   clinicalCountsSql, clinicalMomentsSql, clinicalHistogramSql, attributeQuantileSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
   lollipopChangesSql, lollipopTypesSql, lollipopTotalsSql, cohortSampleCountSql,
@@ -29,7 +29,7 @@ import {
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
 import * as federation from "../lib/federation.ts";
-import { axisSelect, plotPointsSql } from "../lib/plot.ts";
+import { axisSelect, highlightCohortSql, plotPointsSql, plotScatterPointsSql } from "../lib/plot.ts";
 import { clinicalRowSource } from "../lib/clinical-table.ts";
 import { mutationRowSource } from "../lib/mutation-table.ts";
 import { alterationPatientRowSource, alterationSource, patientSamplesSource } from "../lib/patient-alterations.ts";
@@ -221,6 +221,20 @@ describe("remote peers: nothing identifying leaves before the network is touched
       "the entitled participant is the one that answers with points");
   });
 
+  test("a highlight's points are the entitlement too; its aggregates are anyone's", () => {
+    // a scatter's points carry case ids, so their builder sits beside plotPointsSql, not among the aggregates
+    assert.equal("plotScatterPointsSql" in (federation as Record<string, unknown>), false,
+      "plotScatterPointsSql returns case ids and must not sit among the aggregate builders");
+    assert.match(plotScatterPointsSql("SELECT 1 AS id, 1 AS v", "SELECT 1 AS id, 2 AS v", "SELECT '' AS pid"), /xs\.id AS id/);
+    for (const R of [AggregateResolver, RemoteAggregateResolver])
+      assert.equal(typeof (R.prototype as unknown as Record<string, unknown>).plotHighlightPoints, "undefined",
+        R.name + " must not be able to return a highlight's points");
+    assert.equal(typeof (PatientLevelResolver.prototype as unknown as Record<string, unknown>).plotHighlightPoints, "function");
+    // the aggregate fallback is answerable by an aggregate-only participant, which is the point of it
+    for (const m of ["plotHighlightCount", "plotHighlightBins", "plotHighlightBoxRows"])
+      assert.equal(typeof (AggregateResolver.prototype as unknown as Record<string, unknown>)[m], "function", "AggregateResolver answers " + m);
+  });
+
   test("a patient's timeline is the entitlement, and lives only where it lives", () => {
     // the timeline's queries name one patient and return their record, so they sit outside the aggregate builders
     for (const name of ["patientEventsSql", "patientSamplesSql", "timelinePatientRowSource"])
@@ -254,6 +268,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   const catAxis = axisSelect({ source: "clinical", attribute: "CANCER_TYPE" }, axisCtx, "cat");
   const catAxis2 = axisSelect({ source: "alteration", gene: "TP53", by: "mutationType" }, axisCtx, "cat");
   const catAxisGeneSet = axisSelect({ source: "alteration", genes: ["TP53", "KRAS", "APC"], by: "mutated" }, axisCtx, "cat");
+  const catAxisOql = axisSelect({ source: "alteration", oql: "KRAS: G12C; STK11: DRIVER; ERBB2: EXP>2" }, { ...axisCtx, oncokbPin: "v7.4", profiles: ["rna_seq_v2_mrna_median_Zscores"] }, "cat");
 
   const LAB = { eventType: "Lab_Test", testKey: "TEST", test: "PSA", resultKey: "RESULT" };
   const LAB_ANCHOR = { eventType: "Treatment", key: "SUBTYPE", value: "Hormone", occurrence: "FIRST" as const };
@@ -272,9 +287,16 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   // A gene-SET alteration axis (item 2b) is still just a WHERE ... IN (...) — never a
   // per-gene identifier — so it must pass the same aggregate-only check as a single gene.
   "plotTableSql:gene-set": () => plotTableSql(catAxis, catAxisGeneSet, cohortSql),
+  // an OQL axis carries a query's matched cases inside it, and still groups every id away
+  "plotTableSql:oql": () => plotTableSql(catAxis, catAxisOql, cohortSql),
+  "plotBoxSql:oql": () => plotBoxSql(numAxis, catAxisOql, cohortSql),
   "plotViolinSql": () => plotViolinSql(numAxis, catAxis, cohortSql),
   "plotCoverageSql": () => plotCoverageSql(numAxis, catAxis, axisCtx),
   "plotCoverageSql:patient": () => plotCoverageSql(numAxis, catAxis, { ...axisCtx, unit: "patient" as const }),
+  "plotHighlightCountSql": () => plotHighlightCountSql(cohortSql, cohortSql),
+  // a highlight's aggregates are the plot's own builders over the narrowed cohort
+  "plotBinsSql:highlight": () => plotBinsSql(numAxis, numAxis2, highlightCohortSql(cohortSql, cohortSql), undefined, { x0: 0, x1: 10, y0: 0, y1: 10 }),
+  "plotBoxSql:highlight": () => plotBoxSql(numAxis, catAxis, highlightCohortSql(cohortSql, cohortSql)),
   "geneCountsSql": () => geneCountsSql(cohortSql, ["TP53", "KRAS"], "x", "v7.4", "db"),
     "geneCountsSql:no-annotation-pin": () => geneCountsSql(cohortSql, ["TP53"], "x", null, "db"),
     "survivalCountsSql": () => survivalCountsSql(cohortSql, "x", "db"),
@@ -554,7 +576,7 @@ describe("patient-level federation is opt-in, on both sides, and timeline-only",
     const r = new RemoteTimelineResolver("s", "http://peer.invalid/api/mcp", AGG);
     assert.equal(typeof r.patientTimeline, "function");
     assert.equal(typeof r.timelineRows, "function");
-    for (const m of ["members", "rowsPage", "rowsCounts", "rowsValues", "rowsRank", "plotPoints", "coxRows", "logisticRows", "viewRows", "viewAggregate"])
+    for (const m of ["members", "rowsPage", "rowsCounts", "rowsValues", "rowsRank", "plotPoints", "plotHighlightPoints", "coxRows", "logisticRows", "viewRows", "viewAggregate"])
       assert.equal(typeof (r as unknown as Record<string, unknown>)[m], "undefined", "a timeline peer must not have " + m);
     // and it is not patient-level for any other view
     assert.equal(federation.isPatientLevel(r), false);

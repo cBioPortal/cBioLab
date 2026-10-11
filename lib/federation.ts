@@ -27,11 +27,12 @@ import { compileCohortDef, eventTypeMatchSql } from "./cohort2.ts";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
-  type AxisKind, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape } from "./plot.ts";
+  highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql,
+  type AxisKind, type HighlightPoint, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
 export * from "./federation-views.ts";
-export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
-export type { PlotData, PlotRequest, PlotGroup, PlotPoint } from "./plot.ts";
+export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotHighlightCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
+export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotHighlight, HighlightPoint } from "./plot.ts";
 import { impactSql } from "./lollipop.ts";
 import type { Moments } from "./stats.ts";
 // a table view's row queries return ids: imported for PatientLevelResolver.rowsPage, never re-exported
@@ -1253,6 +1254,9 @@ export interface QueryLogEntry { label: string; sql: string; ms?: number; remote
 export interface PatientLevelCapable extends AggregateCapable {
   /** the values behind a box plot, with their case ids — the entitlement, in one method */
   plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number): Promise<PlotPoint[]>;
+  /** a highlight cohort's points over the plot, with their case ids; null past the cap */
+  plotHighlightPoints(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    cap?: number): Promise<HighlightPoint[] | null>;
   readonly instance: Instance & { mode: "patient-level" };
   members(def: CohortDef | null | undefined): Promise<string[]>;
   /** per-patient rows for a Cox fit — see PatientLevelResolver.coxRows for why this is here and not on AggregateCapable */
@@ -1329,6 +1333,14 @@ export interface FederatedPlotCapable {
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]>;
   plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ total: number; nx: number; ny: number }>;
+  /** a highlight's patients that are in the plotted cohort, here — a count */
+  plotHighlightCount(def: CohortDef | null | undefined, highlight: CohortDef): Promise<number>;
+  /** a highlight's cases as cells on the plotted scatter's own grid and extent */
+  plotHighlightBins(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]>;
+  /** a highlight's cases as quartiles per group of the plotted box */
+  plotHighlightBoxRows(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]>;
 }
 /**
  * The aggregates in lib/federation-views.ts, behind the view kinds in lib/views/ that query through
@@ -1610,7 +1622,7 @@ abstract class BaseResolver implements AggregateCapable {
     validateAxis(spec.x, "x");
     validateAxis(spec.y, "y");
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
-    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def) };
+    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
 
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const kindOf = (attr: string) => kinds.get(attr);
@@ -1708,9 +1720,12 @@ abstract class BaseResolver implements AggregateCapable {
     return { xk, yk, shape: plotShape(xk, yk), xLabel: axisLabel(spec.x), yLabel: axisLabel(spec.y) };
   }
 
-  private plotCtx(def: CohortDef | null | undefined, spec: PlotRequest) {
+  /** what an OQL axis needs from this participant: its pinned OncoKB version and its profiles */
+  protected oqlCtx() { return { oncokbPin: this.ctx.oncokbPin, profiles: this.ctx.profiles }; }
+
+  protected plotCtx(def: CohortDef | null | undefined, spec: PlotRequest) {
     return { study: this.study, db: this.instance.conn.db,
-      unit: spec.unit === "sample" ? "sample" as const : "patient" as const, cohortSql: this.cohortSql(def) };
+      unit: spec.unit === "sample" ? "sample" as const : "patient" as const, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
   }
 
   /** This site's cases, and how many carry each axis — summed across sites by lib/views/plot.ts. */
@@ -1736,9 +1751,13 @@ abstract class BaseResolver implements AggregateCapable {
   /** Pass 2: this site's bin counts against the shared extent every participant was given. */
   async plotBinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
     bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
-    const ctx = this.plotCtx(def, spec);
+    return this.binCountsIn("plot:bins", this.plotCtx(def, spec), spec, xk, yk, bins, extent);
+  }
+
+  private async binCountsIn(label: string, ctx: ReturnType<BaseResolver["plotCtx"]>, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
-    const r = await this.runLogged<ChRow>("plot:bins", plotBinsSql(xSel, ySel, ctx.cohortSql, bins, extent), this.instance.conn);
+    const r = await this.runLogged<ChRow>(label, plotBinsSql(xSel, ySel, ctx.cohortSql, bins, extent), this.instance.conn);
     return r.data.map((b) => ({ bx: Number(b.bx), by: Number(b.by), n: Number(b.n) }));
   }
 
@@ -1769,15 +1788,47 @@ abstract class BaseResolver implements AggregateCapable {
    */
   async plotBoxRows(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
-    const ctx = this.plotCtx(def, spec);
+    return this.boxRowsIn("plot:box", this.plotCtx(def, spec), spec, xk, yk);
+  }
+
+  private async boxRowsIn(label: string, ctx: ReturnType<BaseResolver["plotCtx"]>, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
     const numFirst = xk === "num";
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
-    const r = await this.runLogged<ChRow>("plot:box",
+    const r = await this.runLogged<ChRow>(label,
       plotBoxSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql), this.instance.conn);
     return r.data.map((row) => {
       const q = (row.q as unknown as number[]).map(Number);
       return { g: String(row.g), n: Number(row.n), lo: Number(row.lo), hi: Number(row.hi), q1: q[0], median: q[1], q3: q[2] };
     });
+  }
+
+  // ---- a highlight: another cohort drawn over the plotted one -------------------
+  //
+  // Its cases are the plotted cohort's cases that are also in the highlight cohort, so every
+  // query below is one of the plot's own aggregates over that narrower cohort. The points of a
+  // highlight are case-level and live on PatientLevelResolver alone (plotHighlightPoints).
+
+  /** the plotted cohort narrowed to a highlight, as a plot context */
+  protected highlightCtx(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest) {
+    const ctx = this.plotCtx(def, spec);
+    return { ...ctx, cohortSql: highlightCohortSql(ctx.cohortSql, this.cohortSql(highlight)) };
+  }
+
+  async plotHighlightCount(def: CohortDef | null | undefined, highlight: CohortDef): Promise<number> {
+    const r = await this.runLogged<ChRow>("plot:highlight:count",
+      plotHighlightCountSql(this.cohortSql(def), this.cohortSql(highlight)), this.instance.conn);
+    return Number(r.data[0]?.n || 0);
+  }
+
+  async plotHighlightBins(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
+    return this.binCountsIn("plot:highlight:bins", this.highlightCtx(def, highlight, spec), spec, xk, yk, bins, extent);
+  }
+
+  async plotHighlightBoxRows(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
+    return this.boxRowsIn("plot:highlight:box", this.highlightCtx(def, highlight, spec), spec, xk, yk);
   }
 
   /**
@@ -1840,7 +1891,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   async plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap = POINTS_CAP): Promise<PlotPoint[]> {
     const db = this.instance.conn.db, conn = this.instance.conn;
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
-    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def) };
+    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
     if (plotShape(xk, yk) !== "box") return [];
@@ -1855,6 +1906,30 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     if (r.data.length > cap) return [];
     return r.data.map((x) => ({ id: String(x.id), g: String(x.g), v: Number(x.v),
       ...(colorSel ? { c: String(x.c ?? "") } : {}), ...(ringSel ? { r: String(x.r ?? "") } : {}) }));
+  }
+
+  /**
+   * A highlight's points: the plotted cohort's cases that are also in `highlight`, each with its
+   * case id — (x, y) on a scatter, (group, value) on a box. Case-level, so here and nowhere else,
+   * for the reason plotPoints is. null when there are more than `cap`: the caller draws the same
+   * cases as an aggregate rather than the first `cap` of them.
+   */
+  async plotHighlightPoints(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    cap = POINTS_CAP): Promise<HighlightPoint[] | null> {
+    const ctx = this.highlightCtx(def, highlight, spec);
+    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const shape = plotShape(xk, yk);
+    if (shape === "scatter") {
+      const r = await this.runLogged<ChRow>("plot:highlight:points", plotScatterPointsSql(xSel, ySel, ctx.cohortSql, cap), this.instance.conn);
+      if (r.data.length > cap) return null;
+      return r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y) }));
+    }
+    if (shape !== "box") return [];
+    const numFirst = xk === "num";
+    const r = await this.runLogged<ChRow>("plot:highlight:points",
+      plotPointsSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql, cap), this.instance.conn);
+    if (r.data.length > cap) return null;
+    return r.data.map((p) => ({ id: String(p.id), g: String(p.g), v: Number(p.v) }));
   }
 
   async members(def: CohortDef | null | undefined): Promise<string[]> {
@@ -1875,7 +1950,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const db = this.instance.conn.db, conn = this.instance.conn;
     const kindsMap = await this.clinicalKinds(covariates);
     const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
-    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def) };
+    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
     const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
     const sql = coxRowsSql(ctx.cohortSql, this.study, db, endpoint, sels, columns);
     const r = await this.runLogged<ChRow>("coxRows:" + endpoint, sql, conn);
@@ -1960,7 +2035,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const kindsMap = await this.clinicalKinds([outcome, ...covariates]);
     const outcomeKind = axisKind(outcome, (a) => kindsMap.get(a));
     const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
-    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def) };
+    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
     const outcomeSel = { label: "y0", sel: axisSelect(outcome, ctx, outcomeKind) };
     const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
     const sql = logisticRowsSql(ctx.cohortSql, outcomeSel, sels);

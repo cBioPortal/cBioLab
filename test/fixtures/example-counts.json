@@ -63,6 +63,24 @@
     "A plot of 13,000 samples, drawn as density": {
       "TP53 mut": 13105
     },
+    "Highlight cohorts on a plot: KRAS G12C and STK11 against 25,000 patients": {
+      "All patients": 24950,
+      "KRAS G12C": 1113,
+      "STK11 mut": 1206,
+      "TP53 mut": 13105
+    },
+    "A highlight that reaches beyond the plotted cohort": {
+      "NSCLC": 7809,
+      "KRAS G12C": 1113
+    },
+    "Highlights across two studies": {
+      "Lung (TCGA)": 1053,
+      "KRAS mut": 175,
+      "TP53 mut": 699
+    },
+    "OQL on a plot axis: STK11 or KEAP1 mutant lung cancer": {
+      "NSCLC": 7809
+    },
     "Merged gene rows: a pathway as one track": {
       "Pancreatic": 3109
     },

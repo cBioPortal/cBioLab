@@ -11,7 +11,7 @@ import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { AnalysisDoc, AnalysisResult, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
 import { survivalAxis } from "../../lib/stats.ts";
 import { MethodPanel } from "./method-panel.tsx";
-import { AxisPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, CAT_COLORS, Participation, ServerSvg, ViewFigure } from "./view-chrome.tsx";
+import { AxisPicker, HighlightPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, CAT_COLORS, Participation, ServerSvg, ViewFigure } from "./view-chrome.tsx";
 
 
 type ResultView = AnalysisResult["views"][number];
@@ -733,6 +733,20 @@ function PlotCard({ ctx, v, vi }: CardProps) {
             attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
             onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
         </div>}
+        {v.plot?.shape !== "table" && (() => {
+          // every cohort the document evaluates, but the plotted one and a split (which stands for
+          // several groups, not one set of cases)
+          const ch = cohortChoice(vi, docView(vi), 1);
+          const plotted = ch.drawn[0];
+          const options = ch.nodes.filter((nd) => nd.kind !== "split" && nd.name !== plotted)
+            .map((nd) => ({ name: nd.name, label: nd.label, depth: nd.depth }));
+          const chosen: string[] = Array.isArray(docView(vi).highlight) ? docView(vi).highlight : [];
+          if (!options.length && !chosen.length) return null;
+          return <div className="tbz">
+            <HighlightPicker chosen={chosen} options={options} busy={busy}
+              onChange={(next) => updateView(vi, (vv: any) => { const n = { ...vv }; if (next.length) n.highlight = next; else delete n.highlight; return n; })} />
+          </div>;
+        })()}
         <div className="tbz">
           <label className="tbfield" title="what a point is; patient mode averages a patient's samples">unit <select
             value={docView(vi).unit || "patient"} disabled={busy}

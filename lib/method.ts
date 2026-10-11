@@ -11,6 +11,7 @@
 
 import type { CoxCovariate } from "./types.ts";
 import type { AxisKind } from "./plot.ts";
+import { OQL_UNALTERED } from "./plot-oql.ts";
 import { BUILD_COMMIT } from "./build-info.ts";
 import { COX_MAX_ITERATIONS, LOGISTIC_MAX_ITERATIONS } from "./stats.ts";
 import { SYSTEMIC_LINE_CLASSES, CLASS_KEYS } from "./treatment-lines.ts";
@@ -141,9 +142,11 @@ const pyComment = (s: unknown) => String(s).replace(/[\r\n]+/g, " ");
 /** Why a categorical covariate's reference level is the one it is — mirrors buildCoxColumns. */
 function referenceReason(cov: CoxCovariate, reference: string): string {
   if (cov.reference && cov.reference === reference) return "declared in the view";
-  const isMutatedAxis = cov.source === "alteration" && (cov.by === "mutated" || cov.by === undefined);
-  const fallback = isMutatedAxis && reference === "Not mutated"
-    ? "the fixed default for a mutated-vs-not axis" : "the most frequent level";
+  const absentLevel = cov.source !== "alteration" ? undefined
+    : "oql" in cov ? OQL_UNALTERED : (cov.by === "mutated" || cov.by === undefined) ? "Not mutated" : undefined;
+  const fallback = absentLevel && reference === absentLevel
+    ? (absentLevel === OQL_UNALTERED ? "the fixed default for an OQL axis" : "the fixed default for a mutated-vs-not axis")
+    : "the most frequent level";
   return cov.reference ? "declared “" + cov.reference + "” was never observed, so " + fallback : fallback;
 }
 

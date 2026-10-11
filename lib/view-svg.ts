@@ -17,7 +17,7 @@
 // Colours come from CSS custom properties with literal fallbacks, so an SVG
 // inlined in the app follows the page theme while the same string rasterised
 // for a chat gets a fixed light figure.
-import { categoryColor, isAbsent, jitterFor } from "./plot.ts";
+import { categoryColor, isAbsent, jitterFor, HIGHLIGHT_BASE } from "./plot.ts";
 import { filterHotspotGene } from "./lollipop.ts";
 import { lollipopPanelsSvg, lollipopSummaryText } from "./lollipop-svg.ts";
 export { lollipopSummaryText };
@@ -369,6 +369,25 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
   const out: string[] = [];
   const axisText = (t: string, x: number, y: number, anchor = "middle", size = 11) =>
     `<text x="${num(x)}" y="${num(y)}" font-size="${size}" fill="${p.muted}" text-anchor="${anchor}">${esc(t)}</text>`;
+  // With highlights the plotted cohort is the background: grey, so each highlight's colour reads
+  const hs = d.highlights || [];
+  const base = hs.length ? HIGHLIGHT_BASE : SERIES[0];
+  const drawnHs = hs.filter((h) => h.shown !== "none");
+  /** one row of highlight chips from x0 at y, wrapping inside `right`; returns the row's last y */
+  const highlightKey = (x0: number, y: number, right: number): number => {
+    if (!drawnHs.length) return y;
+    out.push(`<text x="${x0}" y="${num(y)}" font-size="9" fill="${p.muted}">highlighted</text>`);
+    let kx = x0 + 58;
+    for (const h of drawnHs) {
+      const label = h.name + " (" + fmt(h.n) + ")";
+      const w = 16 + label.length * 5.4;
+      if (kx + w > right) { kx = x0 + 58; y += 14; }
+      out.push(`<circle cx="${num(kx + 4)}" cy="${num(y - 3)}" r="3.8" fill="${h.color}" stroke="${p.bg}" stroke-width="0.8"/>` +
+        `<text x="${num(kx + 11)}" y="${num(y)}" font-size="9" fill="${p.ink}">${esc(label)}</text>`);
+      kx += w;
+    }
+    return y;
+  };
 
   if (d.shape === "scatter" && d.bins && d.extent && d.grid) {
     const { x0, x1, y0, y1 } = d.extent, [gx, gy] = d.grid;
@@ -376,18 +395,30 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
     const cw = plotW / gx, ch = PLOT / gy;
     // a log ramp, because a linear one hides everything but the mode — said on the figure
     const shade = (n: number) => Math.min(1, 0.18 + 0.82 * Math.log1p(n) / Math.log1p(maxN));
-    for (const b of d.bins)
-      out.push(`<rect x="${num(L + b.bx * cw)}" y="${num(T + PLOT - (b.by + 1) * ch)}" width="${num(Math.max(cw, 0.8))}" ` +
-        `height="${num(Math.max(ch, 0.8))}" fill="${SERIES[0]}" fill-opacity="${num(shade(b.n))}"/>`);
+    const cell = (b: { bx: number; by: number }, fill: string, opacity: number) =>
+      `<rect x="${num(L + b.bx * cw)}" y="${num(T + PLOT - (b.by + 1) * ch)}" width="${num(Math.max(cw, 0.8))}" ` +
+      `height="${num(Math.max(ch, 0.8))}" fill="${fill}" fill-opacity="${num(opacity)}"/>`;
+    // under highlights the plotted cohort is a floor-raised grey, so its faintest cells still read
+    for (const b of d.bins) out.push(cell(b, base, hs.length ? 0.3 + 0.7 * shade(b.n) : shade(b.n)));
+    const sx = (xv: number) => L + plotW * (xv - x0) / Math.max(1e-9, x1 - x0);
+    const sy = (yv: number) => T + PLOT - PLOT * (yv - y0) / Math.max(1e-9, y1 - y0);
+    // a highlight too large to draw as points is cells on the same grid, shaded by its own densest cell
+    for (const h of hs) if (h.shown === "density" && h.bins) {
+      const hMax = Math.max(1, ...h.bins.map((b) => b.n));
+      for (const b of h.bins) out.push(cell(b, h.color, 0.3 + 0.7 * Math.log1p(b.n) / Math.log1p(hMax)));
+    }
+    const nPts = hs.reduce((a, h) => a + (h.shown === "points" ? h.points!.length : 0), 0);
+    const rPt = Math.max(1.6, Math.min(3.6, 70 / Math.sqrt(Math.max(1, nPts))));
+    for (const h of hs) if (h.shown === "points") for (const pt of h.points!) if ("x" in pt)
+      out.push(`<circle cx="${num(sx(pt.x))}" cy="${num(sy(pt.y))}" r="${num(rPt)}" fill="${h.color}" fill-opacity="0.9" ` +
+        `stroke="${p.bg}" stroke-width="0.6"/>`);
     // the fitted line, over every case rather than over what is visible
     const st = d.stats;
     if (st && st.slope != null && st.intercept != null && x1 > x0) {
       const yAt = (xv: number) => st.intercept! + st.slope! * xv;
-      const sx = (xv: number) => L + plotW * (xv - x0) / (x1 - x0);
-      const sy = (yv: number) => T + PLOT - PLOT * (yv - y0) / Math.max(1e-9, y1 - y0);
       const ya = Math.max(y0, Math.min(y1, yAt(x0))), yb = Math.max(y0, Math.min(y1, yAt(x1)));
       out.push(`<line x1="${num(sx(x0))}" y1="${num(sy(ya))}" x2="${num(sx(x1))}" y2="${num(sy(yb))}" ` +
-        `stroke="${SERIES[4]}" stroke-width="1.5" stroke-dasharray="4 3"/>`);
+        `stroke="${hs.length ? p.ink : SERIES[4]}" stroke-width="1.5" stroke-dasharray="4 3"/>`);
     }
     out.push(`<rect x="${L}" y="${T}" width="${num(plotW)}" height="${PLOT}" fill="none" stroke="${p.line}"/>`);
     out.push(axisText(num(x0), L, T + PLOT + 14, "start"), axisText(num(x1), L + plotW, T + PLOT + 14, "end"));
@@ -400,9 +431,10 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
     out.push(axisText(d.x.label, L + plotW / 2, T + PLOT + 30), 
       `<text x="14" y="${T + PLOT / 2}" font-size="11" fill="${p.muted}" text-anchor="middle" ` +
       `transform="rotate(-90 14 ${T + PLOT / 2})">${esc(d.y.label)}</text>`);
+    const keyBottom = drawnHs.length ? highlightKey(L, T + PLOT + 48, W - R) + 8 : T + PLOT + 40;
     const cap = caption((v.note || "") + (v.note ? "  " : "") + "Darker is more " +
-      (v.plot!.n > 1 ? "cases" : "case") + "; the shade is logarithmic.", W, T + PLOT + 40, p.muted);
-    return frame(W, T + PLOT + 40 + cap.height + 10, out.join("") + cap.svg, p.bg);
+      (v.plot!.n > 1 ? "cases" : "case") + "; the shade is logarithmic.", W, keyBottom, p.muted);
+    return frame(W, keyBottom + cap.height + 10, out.join("") + cap.svg, p.bg);
   }
 
   if (d.shape === "box" && d.groups && d.groups.length) {
@@ -456,6 +488,7 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
     const otherLabel = (n: number, noValue: boolean) =>
       "other (" + [n ? n + " more categor" + (n === 1 ? "y" : "ies") : "", noValue ? "no value" : ""].filter(Boolean).join(", ") + ")";
     const vBins = d.violinBins || 40;
+    let offScale = 0;
 
     gs.forEach((g, i) => {
       const cx = L + bw * (i + 0.5), half = Math.min(24, bw * 0.32);
@@ -477,7 +510,7 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
           const step = Math.max(1.2, sy(Math.max(lo, vLo)) - yTop);
           if (!colorKey.length) {
             out.push(`<rect x="${num(cx - w)}" y="${num(yTop)}" width="${num(w * 2)}" height="${num(step)}" ` +
-              `fill="${SERIES[0]}" fill-opacity="0.28"/>`);
+              `fill="${base}" fill-opacity="0.28"/>`);
             continue;
           }
           let x = cx - w;
@@ -498,7 +531,7 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
         const nPts = d.points!.length;
         const rBase = Math.max(1.3, Math.min(4.5, 90 / Math.sqrt(Math.max(1, nPts))));
         for (const pt of byGroup.get(g.g)!) {
-          const fill = pt.c != null && colorKey.length ? fillOf(pt.c) : SERIES[0];
+          const fill = pt.c != null && colorKey.length ? fillOf(pt.c) : base;
           const ring = pt.r != null && !isAbsent(pt.r) ? ringOf(pt.r) : null;
           out.push(`<circle cx="${num(cx + jitterFor(pt.id) * half * 0.9)}" cy="${num(sy(pt.v))}" ` +
             `r="${num(ring ? rBase * 1.25 : rBase)}" fill="${fill}" fill-opacity="0.85"` +
@@ -507,8 +540,39 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
       }
       out.push(`<line x1="${num(cx)}" y1="${num(sy(g.loWhisker))}" x2="${num(cx)}" y2="${num(sy(g.hiWhisker))}" stroke="${p.muted}"/>`);
       out.push(`<rect x="${num(cx - half)}" y="${num(sy(g.q3))}" width="${num(half * 2)}" height="${num(Math.max(1, sy(g.q1) - sy(g.q3)))}" ` +
-        `fill="${SERIES[0]}" fill-opacity="${d.overlay === "none" ? 0.25 : 0.1}" stroke="${SERIES[0]}"/>`);
-      out.push(`<line x1="${num(cx - half)}" y1="${num(sy(g.median))}" x2="${num(cx + half)}" y2="${num(sy(g.median))}" stroke="${SERIES[0]}" stroke-width="2"/>`);
+        `fill="${base}" fill-opacity="${d.overlay === "none" ? 0.25 : 0.1}" stroke="${base}"/>`);
+      out.push(`<line x1="${num(cx - half)}" y1="${num(sy(g.median))}" x2="${num(cx + half)}" y2="${num(sy(g.median))}" stroke="${base}" stroke-width="2"/>`);
+      // highlights over the box: a narrow box of their own (side by side when several), then
+      // their points at the same fixed jitter the plotted cohort's points use, so a highlighted
+      // case sits exactly on its own dot
+      const boxed = hs.filter((h) => h.shown === "boxes");
+      boxed.forEach((h, j) => {
+        const hg = h.groups!.find((x) => x.g === g.g);
+        if (!hg) return;
+        const hw = Math.max(1.5, half * 0.42), hx = cx + (j - (boxed.length - 1) / 2) * hw * 1.25;
+        const inAxis = (val: number) => Math.max(lo, Math.min(hi, val));
+        out.push(`<line x1="${num(hx)}" y1="${num(sy(inAxis(hg.loWhisker)))}" x2="${num(hx)}" y2="${num(sy(inAxis(hg.hiWhisker)))}" stroke="${h.color}"/>` +
+          `<rect x="${num(hx - hw / 2)}" y="${num(sy(hg.q3))}" width="${num(hw)}" height="${num(Math.max(1, sy(hg.q1) - sy(hg.q3)))}" ` +
+          `fill="${h.color}" fill-opacity="0.85"/>` +
+          `<line x1="${num(hx - hw / 2 - 1)}" y1="${num(sy(hg.median))}" x2="${num(hx + hw / 2 + 1)}" y2="${num(sy(hg.median))}" stroke="${p.ink}" stroke-width="1.5"/>`);
+      });
+      // a highlighted value past the whiskers is pinned to the frame's edge as a triangle pointing
+      // off the axis, and counted in the caption, rather than drawn outside the figure
+      for (const h of hs) if (h.shown === "points") {
+        const rH = Math.max(1.8, Math.min(4.2, 80 / Math.sqrt(Math.max(1, h.points!.length))));
+        for (const pt of h.points!) if ("g" in pt && pt.g === g.g) {
+          const px = cx + jitterFor(pt.id) * half * 0.9;
+          if (pt.v > hi || pt.v < lo) {
+            offScale++;
+            const up = pt.v > hi, ty = up ? T + 1 : T + PLOT - 1, k = rH * 1.3;
+            out.push(`<path d="M${num(px - k)} ${num(up ? ty + k * 1.6 : ty - k * 1.6)} L${num(px + k)} ${num(up ? ty + k * 1.6 : ty - k * 1.6)} ` +
+              `L${num(px)} ${num(ty)} Z" fill="${h.color}" stroke="${p.bg}" stroke-width="0.5"/>`);
+            continue;
+          }
+          out.push(`<circle cx="${num(px)}" cy="${num(sy(pt.v))}" r="${num(rH)}" ` +
+            `fill="${h.color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`);
+        }
+      }
       const label = g.g.length > 14 ? g.g.slice(0, 13) + "…" : g.g;
       out.push(`<text x="${num(cx)}" y="${T + PLOT + 26}" font-size="9" fill="${p.muted}" text-anchor="end" ` +
         `transform="rotate(-40 ${num(cx)} ${T + PLOT + 26})">${esc(label)}</text>`);
@@ -546,12 +610,15 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
       }
       keyY += 8;
     }
+    if (drawnHs.length) { keyY = highlightKey(L, keyY, Wb - R) + 18; }
     // the engine's note leads, as it does under the scatter — it is where the view says what it
     // drew over (and what it had to leave out), so a box plot without it hid exactly that
     const cap = caption((v.note ? v.note + "  " : "") + "Box: quartiles with Tukey whiskers, computed over every case in the group. The count is above each name." +
       (d.overlay === "points" ? " Every value is drawn over its box; the jitter is fixed per case."
         : d.overlay === "violin" ? " The shaded width is the share of that group's values sitting at that height, scaled per group."
-        : ""),
+        : "") +
+      (offScale ? " " + fmt(offScale) + " highlighted value" + (offScale === 1 ? " lies" : "s lie") +
+        " beyond the whiskers and " + (offScale === 1 ? "is" : "are") + " drawn as a triangle at the frame's edge." : ""),
       Wb, Math.max(T + PLOT + 84, keyY), p.muted);
     const bottom = Math.max(T + PLOT + 84, keyY);
     return frame(Wb, bottom + cap.height + 10, out.join("") + cap.svg, p.bg, Wb > W);
