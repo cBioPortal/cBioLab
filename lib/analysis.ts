@@ -92,6 +92,8 @@ export interface RunOpts {
   page?: { offset: number; limit: number };
   /** a table view's column whose values to return instead of rows (what its filter offers) */
   values?: string;
+  /** which of a view's tables `page` or `values` reads, for a view that holds several (the alterations view's "mutations", "cna", "sv") */
+  table?: string;
   /**
    * How a local participant's cohort is counted, given its compiled SQL: the Next routes pass a
    * cached one (lib/next-cache.ts), so the per-view requests the page sends do not each count
@@ -399,7 +401,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     const mark = queryMark(), pushedBefore = views.length, viewT0 = Date.now();
 
     const run: ViewRun = { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, studyProfiles,
-      page: opts.page, values: opts.values, oncoprint: opts.oncoprint };
+      page: opts.page, values: opts.values, table: opts.table, oncoprint: opts.oncoprint };
     const runner = viewRunner(view.kind);
     if (runner) {
       const out = await runner(view, run);

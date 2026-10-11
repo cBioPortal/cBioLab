@@ -30,6 +30,7 @@ import { runAssays } from "./assays.ts";
 import { runCorrelates } from "./correlates.ts";
 import { runTable } from "./table.ts";
 import { runMutations } from "./mutations.ts";
+import { runAlterations } from "./alterations.ts";
 import { runTimeline } from "./timeline.ts";
 
 /**
@@ -75,6 +76,7 @@ const RUNNERS: Record<string, ViewRunner> = {
   correlates: drawn(runCorrelates),
   table: drawn(runTable),
   mutations: drawn(runMutations),
+  alterations: drawn(runAlterations),
   timeline: drawn(runTimeline),
 };
 

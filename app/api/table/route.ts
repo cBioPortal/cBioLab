@@ -1,9 +1,9 @@
 import { parseBody, TableRequest } from "../../../lib/api-schemas.ts";
 import { runAnalysis } from "../../../lib/analysis.ts";
-import { TABLE_CHUNK } from "../../../lib/views/rows.ts";
+import { PAGED_KINDS, TABLE_CHUNK, pagedTable } from "../../../lib/views/rows.ts";
 import { csvField, describeQuery } from "../../../lib/table-query.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
-import type { AnalysisDoc, TableResult, MutationsResult, TimelineResult } from "../../../lib/types.ts";
+import type { AnalysisDoc, ViewResult } from "../../../lib/types.ts";
 
 export const maxDuration = 300;
 
@@ -28,16 +28,16 @@ export async function POST(req: Request) {
     doc = (typeof body.doc === "string" ? JSON.parse(body.doc) : body.doc) as AnalysisDoc;
     const vi = body.view as number;
     const view = doc && Array.isArray(doc.views) ? doc.views[vi] : null;
-    if (!view || (view.kind !== "table" && view.kind !== "mutations" && view.kind !== "timeline")) throw new Error("view " + body.view + " is not a table view");
+    if (!view || !PAGED_KINDS.includes(view.kind)) throw new Error("view " + body.view + " is not a table view");
     doc = { ...doc, views: [view] };
   } catch (e) {
     return new Response("cannot download: " + String((e as Error)?.message || e) + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
   }
   const run = <T,>(fn: () => Promise<T>) => withRequestCustomData(body.customData, fn, { refs: body.customRefs, req });
-  type One = { error?: string; table?: TableResult; mutations?: MutationsResult; timeline?: TimelineResult };
-  const first = await run(() => runAnalysis(doc)).catch((e) => ({ views: [{ error: String((e as Error)?.message || e) }] }));
-  const v = first.views[0] as One;
-  const t = v.table || v.mutations || v.timeline;
+  const table = typeof body.table === "string" ? body.table : undefined;
+  const first = await run(() => runAnalysis(doc, { table })).catch((e) => ({ views: [{ kind: "", cohorts: [], error: String((e as Error)?.message || e) } as ViewResult] }));
+  const v = first.views[0];
+  const t = pagedTable(v, table);
   if (!t) return new Response("cannot download: " + (v.error || "the view returned nothing") + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
   const line = (xs: unknown[]) => xs.map(csvField).join(",") + "\r\n";
   const enc = new TextEncoder();
@@ -46,16 +46,16 @@ export async function POST(req: Request) {
   const filtered = !!describeQuery(t.query, t.columns);
   const studies = [...new Set(t.lists.map((l) => l.study))];
   const name = "cohort-lab_" + (studies.length === 1 ? studies[0] : studies.length + "-studies") + "_" +
-    (v.table ? "clinical_" + v.table.unit + "s" : v.timeline ? "timeline_patients" : v.mutations!.gene + "_mutations") + (filtered ? "_filtered" : "") + ".csv";
+    (v.table ? "clinical_" + v.table.unit + "s" : v.timeline ? "timeline_patients" : v.alterations ? (table && v.alterations.patient ? v.alterations.patient.id + "_" + table : "alterations_patients") : v.mutations!.gene + "_mutations") + (filtered ? "_filtered" : "") + ".csv";
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
         controller.enqueue(enc.encode(line(["cohort", "study", ...t.columns.map((c) => c.id)])));
         // one order across every cohort and study: page through it whole, as the page view does
         for (let offset = 0; offset < t.total; offset += TABLE_CHUNK) {
-          const r = await run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK } }));
-          const page = r.views[0] as One;
-          const p = page.table || page.mutations || page.timeline;
+          const r = await run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK }, table }));
+          const page = r.views[0];
+          const p = pagedTable(page, table);
           if (!p) throw new Error(page.error || "the page at row " + offset + " returned nothing");
           controller.enqueue(enc.encode(p.rows.map((row) => line([row.cohort, row.study, ...row.values])).join("")));
         }

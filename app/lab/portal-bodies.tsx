@@ -94,18 +94,22 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
             {cols.map((c) => <td key={c.key} className={c.num ? "num" : undefined}>{c.render ? c.render(r) : String(c.value(r) ?? "")}</td>)}
           </tr>))}</tbody>
       </table>
-      <div className="pb-pager">
+      <div className="viewtb pb-pager"><div className="tbz">
         <button type="button" className="tbbtn" disabled={pg === 0} onClick={() => setPage(pg - 1)}>‹</button>
         <span>Showing {shown.length ? pg * pageSize + 1 : 0}–{Math.min(shown.length, (pg + 1) * pageSize)} of {shown.length.toLocaleString()}</span>
         <button type="button" className="tbbtn" disabled={pg >= pages - 1} onClick={() => setPage(pg + 1)}>›</button>
         {note && <span>{note}</span>}
-      </div>
+      </div></div>
     </div>
   );
 }
 
 const Badge = ({ text, color }: { text: string; color: string | null }) =>
   <span className="pb-badge" style={color ? { background: color } : { background: "var(--line)", color: "var(--ink)" }}>{text}</span>;
+
+/** An OncoKB annotation cell: oncogenic calls coloured, the rest grey; nothing when there is no call. */
+export const AnnotationBadge = ({ text }: { text: string }) => text
+  ? <Badge text={text} color={/oncogenic/i.test(text) && !/likely neutral|inconclusive/i.test(text) ? SERIES[4] : null} /> : null;
 
 // ---- Genomic Alterations: the three charts, then the table -------------------------------------
 
@@ -288,7 +292,7 @@ export function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: 
     <div className="pb">
       <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} onQuery={onQuery}
         num={(id, x) => id === "vaf" ? x.toFixed(2) : x.toLocaleString()}
-        cell={(id, x) => id === "annotation" && x ? <Badge text={String(x)} color={/oncogenic/i.test(String(x)) && !/likely neutral|inconclusive/i.test(String(x)) ? SERIES[4] : null} />
+        cell={(id, x) => id === "annotation" && x ? <AnnotationBadge text={String(x)} />
           : id === "sample" ? <span className="mono">{x}</span> : undefined} />
     </div>
   );

@@ -32,6 +32,7 @@ import * as federation from "../lib/federation.ts";
 import { axisSelect, plotPointsSql } from "../lib/plot.ts";
 import { clinicalRowSource } from "../lib/clinical-table.ts";
 import { mutationRowSource } from "../lib/mutation-table.ts";
+import { alterationPatientRowSource, alterationSource, patientSamplesSource } from "../lib/patient-alterations.ts";
 import { pageSql } from "../lib/table-query.ts";
 import { RemoteAggregateResolver, RemoteTimelineResolver, peerSharesPatients } from "../lib/federation-remote.ts";
 import type { Instance } from "../lib/federation.ts";
@@ -187,11 +188,17 @@ describe("remote peers: nothing identifying leaves before the network is touched
 
   test("a table view's rows are the entitlement, and live only where it lives", () => {
     // the row sources return patient and sample ids, so they sit outside the aggregate builders
-    for (const name of ["clinicalRowSource", "mutationRowSource", "pageSql", "rankSql"])
+    for (const name of ["clinicalRowSource", "mutationRowSource", "pageSql", "rankSql", "alterationPatientRowSource", "alterationSource",
+      "patientMutationsSource", "patientCnaSource", "patientSvSource", "patientSamplesSource"])
       assert.equal(name in (federation as Record<string, unknown>), false, name + " returns ids and must not sit among the aggregate builders");
     const part = [{ cohort: "c", study: "x", cohortSql: "SELECT '' AS pid" }];
     assert.match(pageSql(clinicalRowSource(part, "db", "sample", [{ id: "AGE", name: "Age", per: "patient", numeric: true }]), {}, [], 10, 0), /AS patient, replaceOne\(u\.suid/);
     assert.match(pageSql(mutationRowSource(part, "db", "KRAS", "v7.5"), {}, [], 10, 0), /m\.sid AS sid/);
+    // the alterations view's list and its three tables name one patient and their samples
+    assert.match(pageSql(alterationPatientRowSource(part, "db"), {}, [], 10, 0), /c\.pid AS patient/);
+    for (const t of ["mutations", "cna", "sv"] as const)
+      assert.match(pageSql(alterationSource(t, part[0], "P-1", "db", "v7.5", []), {}, [], 10, 0), /'P-1' AS patient/);
+    assert.match(pageSql(patientSamplesSource(part[0], "P-1", "db"), {}, [], 10, 0), /s\.id AS sid/);
     for (const m of ["rowsPage", "rowsCounts", "rowsValues", "rowsRank"]) {
       for (const R of [AggregateResolver, RemoteAggregateResolver])
         assert.equal(typeof (R.prototype as unknown as Record<string, unknown>)[m], "undefined", R.name + " must not be able to run a table view's " + m);
@@ -536,6 +543,11 @@ describe("patient-level federation is opt-in, on both sides, and timeline-only",
       assert.ok((await federation.resolverFor("s1", {})) instanceof RemoteTimelineResolver);
       assert.equal((await federation.resolverFor("s2", {})) instanceof RemoteTimelineResolver, false, "only the named study");
     });
+  });
+
+  test("the alterations view never asks a peer: its rows come from local patient-level participants alone", () => {
+    const src = readFileSync(new URL("../lib/views/alterations.ts", import.meta.url), "utf8");
+    assert.doesNotMatch(src, /RemoteTimeline|hasRemoteTimelineRows|timelineRows/, "the opt-in peer mode serves the timeline alone");
   });
 
   test("a trusted peer has the timeline's two methods and none of the other patient-level ones", () => {

@@ -690,6 +690,7 @@ export function viewTitle(v: ViewResult): string {
     : v.kind === "compare" ? "Alteration frequencies"
     : v.kind === "oncoprint" ? "Oncoprint"
     : v.kind === "timeline" ? "Patient timeline" + (v.timeline?.patient ? " — " + v.timeline.patient.patient : "")
+    : v.kind === "alterations" ? "Patient alterations" + (v.alterations?.patient ? " — " + v.alterations.patient.id : "")
     : kindTitle(v) || v.kind;
   return c ? base + " — " + c : base;
 }

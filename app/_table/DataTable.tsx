@@ -47,7 +47,7 @@ export type PageRows<R> = { rows: R[]; loading: boolean; error: string | null; p
  * any other is POSTed to /api/view-page as {document, view, offset, limit} and kept, so moving
  * back and forth is instant. A new result (a filter or sort changed, say) starts again at page 1.
  */
-export function usePages<R>(first: R[], total: number, offset0: number, viewSize: number, vi: number, docJson?: () => string): PageRows<R> {
+export function usePages<R>(first: R[], total: number, offset0: number, viewSize: number, vi: number, docJson?: () => string, table?: string): PageRows<R> {
   const [size, setSizeState] = useState(viewSize);
   const [page, setPageState] = useState(0);
   const [cache, setCache] = useState<Map<string, R[]>>(new Map());
@@ -65,7 +65,7 @@ export function usePages<R>(first: R[], total: number, offset0: number, viewSize
     setError(null);
     let doc: unknown;
     try { doc = JSON.parse(docJson()); } catch { setError("no document to page"); return; }
-    api.viewPage({ doc: doc as ViewPageBody["doc"], view: vi, offset: page * size, limit: size })
+    api.viewPage({ doc: doc as ViewPageBody["doc"], view: vi, offset: page * size, limit: size, ...(table ? { table } : {}) })
       .then((r) => r.json())
       .then((j) => { if (gen.current !== g) return; if (j.error) setError(j.error); else setCache((m) => new Map(m).set(k, j.rows)); })
       .catch((e) => { if (gen.current === g) setError(String(e)); });
@@ -86,7 +86,7 @@ export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
   if (hi < p.pages - 1) nums.push(...(hi < p.pages - 2 ? [null] : []), p.pages - 1);
   const from = p.total ? p.page * p.size + 1 : 0, to = Math.min(p.total, (p.page + 1) * p.size);
   return (
-    <div className="pb-pager">
+    <div className="viewtb pb-pager"><div className="tbz">
       <button type="button" className="tbbtn" disabled={p.page === 0} onClick={() => p.setPage(p.page - 1)} aria-label="previous page">‹</button>
       {nums.map((n, i) => n == null ? <span key={"g" + i}>…</span>
         : <button key={n} type="button" className={"tbbtn" + (n === p.page ? " on" : "")} aria-current={n === p.page ? "page" : undefined} onClick={() => p.setPage(n)}>{(n + 1).toLocaleString()}</button>)}
@@ -96,7 +96,7 @@ export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
         {[25, 50, 100, 250].map((n) => <option key={n} value={n}>{n}</option>)}
       </select></label>
       {p.error && <span className="mark">{p.error}</span>}
-    </div>
+    </div></div>
   );
 }
 
@@ -140,14 +140,14 @@ function Popover({ open, onClose, children, align = "left" }: { open: boolean; o
  * opens. Loading, failed and loaded are three states, and `retry` asks again after a failure.
  */
 type Values = { status: "loading" } | { status: "failed"; error: string } | { status: "loaded"; v: ColumnValues };
-function useColumnValues(column: string, vi: number, docJson?: () => string): Values & { retry: () => void } {
+function useColumnValues(column: string, vi: number, docJson?: () => string, table?: string): Values & { retry: () => void } {
   const [state, setState] = useState<Values>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let doc: unknown, live = true;
     try { doc = JSON.parse(docJson ? docJson() : ""); } catch { setState({ status: "failed", error: "no document to read the values from" }); return; }
     setState({ status: "loading" });
-    api.viewPage({ doc: doc as ViewPageBody["doc"], view: vi, values: column })
+    api.viewPage({ doc: doc as ViewPageBody["doc"], view: vi, values: column, ...(table ? { table } : {}) })
       .then((r) => r.json())
       .then((j) => { if (live) setState(j.error || !j.values ? { status: "failed", error: j.error || "no values came back" } : { status: "loaded", v: j.values }); })
       .catch((e) => { if (live) setState({ status: "failed", error: String((e as Error)?.message || e) }); });
@@ -163,11 +163,11 @@ function ValuesState({ s, what }: { s: Values & { retry: () => void }; what: str
   return null;
 }
 
-function FilterMenu({ col, current, vi, docJson, onApply }: {
-  col: { id: string; name: string; numeric: boolean }; current: ColumnFilter | undefined; vi: number; docJson?: () => string;
+function FilterMenu({ col, current, vi, docJson, table, onApply }: {
+  col: { id: string; name: string; numeric: boolean }; current: ColumnFilter | undefined; vi: number; docJson?: () => string; table?: string;
   onApply: (f: ColumnFilter | undefined) => void;
 }) {
-  const vals = useColumnValues(col.id, vi, docJson);
+  const vals = useColumnValues(col.id, vi, docJson, table);
   const v = vals.status === "loaded" ? vals.v : null;
   const cur = current;
   const [op, setOp] = useState<TextFilterOp>(cur && !isRange(cur) && !isValues(cur) ? cur.op : "contains");
@@ -305,6 +305,8 @@ export interface DataTableProps<V> {
   updating: boolean;
   /** the view's index in the document, and the document — for pages, a column's values and the download */
   vi: number; docJson?: () => string;
+  /** which of the view's tables this is, for a view that holds several (the alterations view's "mutations", "cna", "sv") */
+  table?: string;
   /** what a row is, plural: "mutations", "samples" */
   unit: string;
   /** the view's search, filters, sort and columns changed: write them to its spec (re-runs the view) */
@@ -318,12 +320,25 @@ export interface DataTableProps<V> {
   onRow?: (row: TableRows<V>["rows"][number]) => void;
   /** which row is chosen, highlighted */
   selected?: (row: TableRows<V>["rows"][number]) => boolean;
+  /** a column whose runs of one value are drawn as groups (the alterations view's gene): the value shown on a run's
+   *  first row only, no rule inside a run, alternate runs shaded */
+  groupBy?: string;
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, unit, onQuery, cell, num, title, onRow, selected }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, num, title, onRow, selected, groupBy }: DataTableProps<V>) {
   const q = query || t.query || {};
-  const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson);
+  const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
+  // runs of one value of `groupBy` on this page: whether a row continues the run above, has more below, and is in an odd run
+  const gi = groupBy ? t.columns.findIndex((c) => c.id === groupBy) : -1;
+  const groups = gi < 0 ? null : (() => {
+    let run = 0;
+    return p.rows.map((r, k) => {
+      const v = r.values[gi], cont = k > 0 && v === p.rows[k - 1].values[gi];
+      if (k > 0 && !cont) run++;
+      return { cont, more: k + 1 < p.rows.length && p.rows[k + 1].values[gi] === v, odd: run % 2 === 1 };
+    });
+  })();
   const [menu, setMenu] = useState<string | null>(null);   // a column id, or "\x01columns"
   const [search, setSearch] = useState(q.search || "");
   useEffect(() => { setSearch(q.search || ""); }, [q.search]);
@@ -361,7 +376,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     const f = e.currentTarget;
     let doc: unknown;
     try { doc = JSON.parse(docJson ? docJson() : ""); } catch { return; }
-    (f.elements.namedItem("payload") as HTMLInputElement).value = await api.tablePayload({ doc: doc as TableBody["doc"], view: vi });
+    (f.elements.namedItem("payload") as HTMLInputElement).value = await api.tablePayload({ doc: doc as TableBody["doc"], view: vi, ...(table ? { table } : {}) });
     f.submit();
   };
   return (
@@ -423,7 +438,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
                           <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M1 1.5h10L7.2 6.2V10L4.8 11V6.2z" fill="currentColor" /></svg>
                         </button>
                         <Popover open={menu === c.id} onClose={() => setMenu(null)} align={c.numeric ? "right" : "left"}>
-                          <FilterMenu col={c} current={q.filters?.[c.id]} vi={vi} docJson={docJson} onApply={(f) => setFilter(c.id, f)} />
+                          <FilterMenu col={c} current={q.filters?.[c.id]} vi={vi} docJson={docJson} table={table} onApply={(f) => setFilter(c.id, f)} />
                         </Popover>
                       </span>
                     </span>
@@ -431,13 +446,18 @@ export function DataTable<V extends string | number | null>({ t, query, updating
               })}
             </tr></thead>
             <tbody>
-              {p.rows.map((r, k) => (
-                <tr key={k} className={onRow ? "dt-pick" + (selected && selected(r) ? " sel" : "") : undefined}
+              {p.rows.map((r, k) => {
+                const g = groups ? groups[k] : null;
+                const cls = [onRow ? "dt-pick" + (selected && selected(r) ? " sel" : "") : "", g?.odd ? "dt-galt" : "", g?.more ? "dt-gmid" : ""].filter(Boolean).join(" ");
+                return (
+                <tr key={k} className={cls || undefined}
                   onClick={onRow ? () => onRow(r) : undefined} aria-selected={onRow ? !!(selected && selected(r)) : undefined}>
                   {multi && <td className="meta">{r.cohort}</td>}
                   {multi && <td className="meta">{r.study}</td>}
-                  {shownIdx.map((i) => <td key={i} className={t.columns[i].numeric ? "num" : undefined}>{show(t.columns[i], r.values[i])}</td>)}
-                </tr>))}
+                  {shownIdx.map((i) => <td key={i} className={t.columns[i].numeric ? "num" : undefined}>
+                    {g?.cont && t.columns[i].id === groupBy ? null : show(t.columns[i], r.values[i])}</td>)}
+                </tr>);
+              })}
               {!p.rows.length && !waiting && <tr><td className="meta" colSpan={shownIdx.length + (multi ? 2 : 0)}>{filtered ? "no rows match — loosen the search or a filter" : "no rows"}</td></tr>}
             </tbody>
           </table>
