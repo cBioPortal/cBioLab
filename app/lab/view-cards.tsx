@@ -44,6 +44,8 @@ export interface ViewCtx {
   assayOptions: () => string[];
   viewEvents: () => EventOption[];
   drawsOwnHead: (v: any) => boolean;
+  /** the most cohorts a view of this kind draws at once */
+  maxCohortsOf: (kind: string) => number | undefined;
   /** the view as the document holds it (the result's copy may lag an edit) */
   docView: (vi: number) => any;
   ocView: (vi: number) => OncoprintView;
@@ -180,21 +182,43 @@ function CovariateList({ covariates, ratio, observedLevels, busy, attrs, profile
 /** One view of the analysis, as a card: the waiting cover, the kind's own body, its queries, its error. */
 export function ViewCard({ ctx, v, vi }: CardProps) {
   const { busy, pendingKeys, viewIds } = ctx;
+  // a view with no result yet to keep showing draws its header and a skeleton, whatever its kind
+  if ((v as any).pending) return <LoadingViewCard ctx={ctx} vi={vi} />;
   return (
     <div className="card viewcard">
     {/* recomputing this view (a settings change), or the whole document */}
-    {!(v as any).pending && !(drawsOwnWaiting(v.kind) && !v.error) && (busy || pendingKeys.has(viewIds[vi])) && <Updating />}
-    {/* addView's placeholder for a brand-new view that has no prior
-        result to keep showing while its own delta request is in
-        flight (see addView) — every v.kind===… block below is
-        already guarded on a kind-specific data field, so this
-        placeholder object just falls through all of them silently;
-        this is the only thing that needs to render for it. */}
-    {(v as any).pending && <div className="skeleton skeleton-view" />}
+    {!(drawsOwnWaiting(v.kind) && !v.error) && (busy || pendingKeys.has(viewIds[vi])) && <Updating />}
       <KindBody ctx={ctx} v={v} vi={vi} />
       <QueriesPanel ctx={ctx} v={v} vi={vi} />
       <ErrorHead ctx={ctx} v={v} vi={vi} />
       <ErrorNote ctx={ctx} v={v} vi={vi} />
+    </div>
+  );
+}
+
+const VIEW_HEAD_TITLES: Record<string, string> = {
+  compare: "Compare", hotspots: "Mutations", coexpression: "Co-expression", clinical: "Clinical comparison",
+  cooccurrence: "Co-occurrence", survival: "Survival", cox: "Cox regression", logistic: "Logistic regression",
+  plot: "Plot", sequence: "Treatment sequence", course: "Clinical course", oncoprint: "Oncoprint",
+};
+
+/** the title a view's header carries once drawn, so its loading card reads the same */
+export const viewHeadTitle = (kind: string): string =>
+  hasKindCard(kind) ? KIND_CARDS[kind].title : VIEW_HEAD_TITLES[kind] ?? kind;
+
+/** A view still waiting for its first result: its header, then a skeleton where the figure will be. */
+export function LoadingViewCard({ ctx, vi }: { ctx: Omit<ViewCtx, "result">; vi: number }) {
+  const { cohortChoice, doc, docView, maxCohortsOf, menuOpenRef, moveView, removeView, noteEdit } = ctx;
+  const spec = docView(vi);
+  const n = (doc.views || []).length;
+  const max = maxCohortsOf(spec.kind);
+  return (
+    <div className="card viewcard viewloading" aria-busy="true">
+      <ViewHead menuStore={menuOpenRef.current} v={{ kind: spec.kind, annotationNote: typeof spec.note === "string" ? spec.note.trim() || undefined : undefined }}
+        title={viewHeadTitle(spec.kind)} cohorts={{ ...cohortChoice(vi, spec, max), busy: true }}
+        onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < n - 1 ? () => moveView(vi, 1) : undefined}
+        onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)} />
+      <div className="skeleton skeleton-view" />
     </div>
   );
 }

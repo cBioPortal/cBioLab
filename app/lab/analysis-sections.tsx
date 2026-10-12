@@ -17,7 +17,7 @@ import { CohortStudies, CohortEditMenu, CAT_COLORS, ViewHead } from "./view-chro
 import { cohortHash, shortHash } from "../../lib/cohort-hash.ts";
 import { viewIsEmpty } from "../../lib/partition-arms.ts";
 import type { CohortSaveState, CohortSourceState } from "./use-cohort-edits.ts";
-import { ViewCard } from "./view-cards.tsx";
+import { ViewCard, LoadingViewCard } from "./view-cards.tsx";
 import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort, SavedWorkspace } from "./use-saved.ts";
 import type { ExploreResult } from "../../lib/types.ts";
@@ -328,9 +328,9 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
         </div>
       )}
       {busy && !result && <div className="skeleton skeleton-addview" />}
-      {busy && !result && Array.from({ length: Math.max(1, (doc.views || []).length) }).map((_, i) => (
-        <div key={i} className="skeleton skeleton-view" />
-      ))}
+      {busy && !result && (doc.views || []).map((dv: any, vi: number) => viewIsEmpty(dv)
+        ? <EmptyViewCard key={viewIds[vi] ?? vi} ctx={ctx} vi={vi} />
+        : <LoadingViewCard key={viewIds[vi] ?? vi} ctx={viewCtx} vi={vi} />)}
       {!busy && !result && !(doc.views || []).length && (
         <div className="card">
           <p className="note t-md flush">

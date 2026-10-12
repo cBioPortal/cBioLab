@@ -131,7 +131,7 @@ export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], 
     const where = unsynced.length <= 2 ? unsynced.join(", ")
       : unsynced.length + " of " + list.length + " studies";
     return { isDriver, source: "OncoKB " + pin + " (pinned)" +
-      (partial ? " — variants synced from " + synced.join("/") + "; coverage for " + where + " may be partial" : "") };
+      (partial ? " — " + where + " not synced; driver coverage may be partial" : "") };
   } catch (e) {
     // A cancelled request must not be answered with mock annotations — it is not a licensing
     // or availability problem, and nobody is waiting for the answer anyway.
