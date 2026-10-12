@@ -8,6 +8,7 @@
 // runs on (the engine's `split` leaf), the correction across every locked hypothesis, and
 // the replication step. Pure and browser-safe; the ledger is lib/campaign.ts.
 import { benjaminiHochberg } from "./stats.ts";
+import { upgradeDocument } from "./doc-version.ts";
 import type { AnalysisDoc, AnalysisResult, ClinicalCell, CohortDef, ViewResult } from "./types.ts";
 
 export type Primary =
@@ -77,10 +78,12 @@ function hasSplit(x: unknown): boolean {
   return false;
 }
 
-/** Cohort names a primary result compares, in order: the view's own list, else the document's. */
+/** Cohort names a primary result compares, in order: the view's own list, read as the engine
+ *  reads it (an older document's view with no list drew every cohort). */
 export function primaryCohorts(h: Hypothesis): string[] {
-  const v = (h.doc.views || [])[h.primary.view] as { cohorts?: string[] } | undefined;
-  return v?.cohorts && v.cohorts.length ? v.cohorts : Object.keys(h.doc.cohorts || {});
+  const doc = upgradeDocument(h.doc).doc;
+  const v = (doc.views || [])[h.primary.view] as { cohorts?: string[] } | undefined;
+  return Array.isArray(v?.cohorts) ? v.cohorts : [];
 }
 
 /**
@@ -93,7 +96,7 @@ export function pinCohortOrder(h: Hypothesis): Hypothesis {
   const views = h.doc?.views || [];
   const v = views[h.primary?.view] as { cohorts?: string[] } | undefined;
   if (!v || (v.cohorts && v.cohorts.length)) return h;
-  const pinned = views.map((x, i) => i === h.primary.view ? { ...x, cohorts: Object.keys(h.doc.cohorts || {}) } : x);
+  const pinned = views.map((x, i) => i === h.primary.view ? { ...x, cohorts: primaryCohorts(h) } : x);
   return { ...h, doc: { ...h.doc, views: pinned as AnalysisDoc["views"] } };
 }
 

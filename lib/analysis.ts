@@ -390,9 +390,20 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
         continue;
       }
     } else {
-      // With no cohorts named a view shows the authored ones, whole; a split's name in the list
-      // stands for its arms (expandSplits)
-      const listed = view.cohorts && view.cohorts.length ? view.cohorts : names.filter((n) => !generatedNames.has(n));
+      // A view draws the cohorts it names, whole; a split's name in the list stands for its arms
+      // (expandSplits). One that names none is empty, which is a refusal, not "all of them".
+      const listed = Array.isArray(view.cohorts) ? view.cohorts : [];
+      if (!listed.length) {
+        views.push({ kind: view.kind, error: "this view names no cohorts — list the ones it draws in its `cohorts` (this document has " +
+          names.filter((n) => !generatedNames.has(n)).map((n) => "“" + n + "”").join(", ") + ")" });
+        continue;
+      }
+      const unknown = listed.filter((n) => !cohorts[n] && !partitionShapes.some((p) => p.name === n));
+      if (unknown.length) {
+        views.push({ kind: view.kind, error: "this view names " + unknown.map((n) => "“" + n + "”").join(", ") +
+          ", which " + (unknown.length === 1 ? "is not a cohort" : "are not cohorts") + " in this document" });
+        continue;
+      }
       const problem = viewDrawProblem(listed, partitionShapes);
       if (problem) { views.push({ kind: view.kind, error: problem }); continue; }
       vNames = expandSplits(listed, partitionShapes).filter((n) => cohorts[n]);

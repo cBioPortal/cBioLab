@@ -321,16 +321,18 @@ async function main() {
       // Analyze lives in the studies card, not the filters bar (.exbar) it sits
       // below — it works regardless of whether any filter is set.
       await page.locator('button:text-is("Analyze")').click();
-      let landed = false, views = [];
+      // It starts with no views: the reader picks what to see of the cohort.
+      let landed = false, views = -1, counted = "";
       try {
-        await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 1, null, { timeout: 300000 });
-        views = (await page.locator(".ana-grid h2").allTextContents()).map(t => t.split("\u2014")[0].trim());
-        const docText = await page.locator("#docjson").inputValue();
+        await page.waitForSelector(".cohortbox .cohortbox-head strong", { timeout: 300000 });
+        counted = (await page.locator(".cohortbox-head").first().innerText()).replace(/\s+/g, " ");
+        const d = JSON.parse(await page.locator("#docjson").inputValue());
         // Named from the draft itself now that the bar has no name field.
-        landed = Object.keys(JSON.parse(docText).cohorts || {}).length === 1;
+        landed = Object.keys(d.cohorts || {}).length === 1;
+        views = (d.views || []).length;
       } catch { /* landed stays false */ }
-      ok("Analyze carries the cohort into a running analysis", landed && views.length > 1,
-        landed ? views.join(" + ") : "cohort did not reach the document");
+      ok("Analyze carries the cohort into an analysis with no views yet", landed && views === 0,
+        landed ? counted + " · " + views + " views" : "cohort did not reach the document");
 
       // Saving asks for the name when you ask to save. The dialog is native
       // <dialog>, so Esc and the backdrop come from the platform. Targeted by
@@ -375,7 +377,7 @@ async function main() {
       try {
         await page.locator(".pick input").nth(0).check();
         await page.locator("button:has-text('Analyze selected')").click();
-        await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 0, null, { timeout: 300000 });
+        await page.waitForSelector(".cohortbox", { timeout: 300000 });
         seeded = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {});
       } catch { /* left empty */ }
       await page.locator(".tabs button:has-text('Explore')").click();
@@ -506,8 +508,8 @@ async function main() {
           catch { return false; }
         }, null, { timeout: 300000 });
         const leaf = (await page.evaluate(() => JSON.parse(document.querySelector("#docjson").value).cohorts["dragged"].all[0]));
-        // the pill shows what the compiler counted for that cohort
-        await page.waitForFunction(() => /dragged/.test(document.body.innerText), null, { timeout: 300000 });
+        // the cohort summary shows what the compiler counted for that cohort, once it has counted it
+        await page.waitForFunction(() => /dragged\s+[\d,]+\s+patients/.test(document.body.innerText), null, { timeout: 300000 });
         const counted = await page.evaluate(() => {
           const m = document.body.innerText.match(/dragged\s+([\d,]+)\s+patients/);
           return m ? Number(m[1].replace(/,/g, "")) : null;
@@ -611,31 +613,51 @@ async function main() {
       await page.locator(".pick input").nth(0).check();
       await page.locator(".pick input").nth(1).check();
       await page.locator("button:has-text('Analyze selected')").click();
-      let together = [];
+      let together = [], startViews = -1;
       try {
-        await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 1, null, { timeout: 300000 });
-        together = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {});
+        await page.waitForFunction(() => document.querySelectorAll(".cohortbox").length === 2, null, { timeout: 300000 });
+        const d = JSON.parse(await page.locator("#docjson").inputValue());
+        together = Object.keys(d.cohorts || {});
+        startViews = (d.views || []).length;
       } catch { /* left empty */ }
-      ok("ticked cohorts are analysed together", together.length === 2, together.join(" + ") || "no document");
+      ok("ticked cohorts are analysed together, with no views until the reader adds one", together.length === 2 && startViews === 0,
+        (together.join(" + ") || "no document") + " · " + startViews + " views");
 
-      // ...and a view can be added without editing the document JSON.
-      let added = [], dots = 0;
+      // Views come in from "Add a view", each then given a cohort from its "+ Add cohort".
+      for (const label of ["Survival", "Oncoprint"]) {
+        try {
+          await page.locator(".addview button.facet", { hasText: new RegExp("^\\+ " + label + "$") }).click();
+          await page.locator(".emptyview .emptyview-body button.primary").first().click();
+          await page.locator(".addcohortdialog .acd-row button").first().click();
+          await page.waitForFunction(() => !document.querySelector(".emptyview"), null, { timeout: 60000 });
+        } catch { /* the checks below report what is missing */ }
+      }
+
+      // ...and a view can be added without editing the document JSON. It arrives empty, saying so,
+      // and draws once a cohort of the analysis is added to it from its "+ Add cohort".
+      let added = [], dots = 0, emptyFirst = false, drew = [];
       try {
         await page.waitForSelector(".addview", { timeout: 120000 });
         await page.locator(".addview button:has-text('Lollipop')").click();
-        await page.waitForSelector(".lp-plot circle.lollipop-head", { timeout: 300000 });
+        await page.waitForSelector(".emptyview .emptyview-body button.primary", { timeout: 30000 });
         added = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).map(v => v.kind);
+        emptyFirst = (await page.locator(".lp-plot circle.lollipop-head").count()) === 0;
+        await page.locator(".emptyview .emptyview-body button.primary").first().click();
+        await page.locator(".addcohortdialog .acd-row button").first().click();
+        await page.waitForSelector(".lp-plot circle.lollipop-head", { timeout: 300000 });
         dots = await page.locator(".lp-plot circle.lollipop-head").count();
+        drew = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).find(v => v.kind === "hotspots")?.cohorts || [];
       } catch { /* left empty */ }
-      ok("a lollipop view can be added from the UI", added.includes("hotspots") && dots > 0,
-        added.length ? added.join(", ") + " · " + dots + " dots" : "view was not added");
+      ok("a lollipop view can be added from the UI, empty until a cohort is added to it",
+        added.includes("hotspots") && emptyFirst && drew.length === 1 && dots > 0,
+        added.length ? added.join(", ") + " · empty first: " + emptyFirst + " · draws " + (drew.join(", ") || "nothing") + " · " + dots + " dots" : "view was not added");
 
-      // Every cohort card names the studies it was queried in, with all of them in its tooltip.
+      // Each cohort card names the studies it was queried in, with all of them in its tooltip.
       const studyLines = await page.$$eval(".cohortbox", bs => bs.map(b => {
         const el = b.querySelector(".cohortbox-studies");
         return el ? { text: el.textContent.trim(), title: el.title } : null;
       }));
-      ok("each cohort card says which studies it queried",
+      ok("each cohort in the summary says which studies it queried",
         studyLines.length > 0 && studyLines.every(s => s && s.text && s.title),
         studyLines.map(s => s ? s.text : "missing").join(" | "));
 
@@ -655,7 +677,7 @@ async function main() {
       // The oncoprint does not go through a resolver, so its provenance is a separate
       // code path — and the one most likely to be left behind. It is also the one view
       // the BROWSER draws, from the binary contract, so the card must hold a canvas and
-      // the SQL that produced it. This document (default views) actually contains one.
+      // the SQL that produced it. This document has one, added above.
       // The oncoprint fetches its own contract after the document runs, so it can still be loading
       // here; wait for it to draw (or give up and report what is on screen).
       const oncoState = () => page.evaluate(() => {
@@ -1113,6 +1135,93 @@ async function main() {
     const out = String((e.stdout || "") + (e.stderr || "")).trim();
     for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
     if (!/^FAIL /m.test(out)) results.push("FAIL docs:check crashed: " + String(e.message).slice(0, 120));
+  }
+  // A saved cohort added to a view is a COPY that remembers its source: the saved cohort's id and
+  // the hash of what was copied. Editing the saved cohort changes nothing in the analysis until the
+  // reader asks; the summary says the saved version changed and "Update" brings it in.
+  if (LOGIN) {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const sp = await ctx.newPage();
+    let steps = {};
+    try {
+      await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
+      const name = "e2e source " + Date.now();
+      const v1 = { study: "msk_chord_2024", all: [{ kind: "oql", q: "KRAS: MUT" }] };
+      const v2 = { study: "msk_chord_2024", all: [{ kind: "oql", q: "KRAS: MUT" }, { kind: "clinical", attribute: "SEX", values: ["Female"] }] };
+      const made = await (await ctx.request.post(BASE + "/api/artifacts", { data: { kind: "cohort", name, definition: v1 } })).json();
+      const id = made.artifact.id;
+      const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
+      await sp.goto(BASE + "/lab?tab=analysis", { waitUntil: "domcontentloaded" });
+      await sp.locator(".addview button:has-text('Survival')").click();
+      await sp.locator(".emptyview .emptyview-body button.primary").first().click();
+      await sp.getByRole("tab", { name: "Library" }).click();
+      await sp.locator(".addcohortdialog .acd-row", { hasText: name }).getByRole("button").click();
+      await sp.waitForSelector(".cohortbox", { timeout: 120000 });
+      const copied = (await docOf()).cohorts[name];
+      steps.copied = !!copied && copied.from?.saved === id && /^[0-9a-f]{64}$/.test(copied.from?.hash || "");
+      await ctx.request.patch(BASE + "/api/artifacts/" + id, { data: { name, definition: v2 } });
+      await sp.reload({ waitUntil: "domcontentloaded" });
+      await sp.waitForSelector(".srcbadge.changed", { timeout: 120000 });
+      steps.untouched = JSON.stringify((await docOf()).cohorts[name].all) === JSON.stringify(v1.all);
+      await sp.locator(".srcbadge.changed").click();
+      await sp.getByRole("button", { name: "Update to the saved version" }).click();
+      await sp.waitForFunction(() => !document.querySelector(".srcbadge.changed"), null, { timeout: 60000 });
+      const after = (await docOf()).cohorts[name];
+      steps.updated = JSON.stringify(after.all) === JSON.stringify(v2.all) && after.from.hash !== copied.from.hash;
+      await ctx.request.delete(BASE + "/api/artifacts/" + id);
+    } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
+    ok("a saved cohort is copied with its source, left alone when the saved one changes, and updated on request",
+      steps.copied && steps.untouched && steps.updated, JSON.stringify(steps));
+    await ctx.close();
+  }
+  // A cohort with something to save — never saved, or re-split since — offers "save" in its gear
+  // menu; saving makes the analysis's copy name the saved cohort as its source, and the item goes.
+  if (LOGIN) {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const sp = await ctx.newPage();
+    let steps = {};
+    try {
+      await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
+      const name = "e2e save " + Date.now();
+      const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
+      const open = async (doc) => {
+        const b64 = Buffer.from(JSON.stringify(doc)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        await sp.goto(BASE + "/lab?tab=analysis&doc=" + b64, { waitUntil: "domcontentloaded" });
+        await sp.waitForSelector(".cohortbox", { timeout: 120000 });
+      };
+      const menuItems = async () => {
+        const box = sp.locator(".cohortbox", { hasText: name });
+        await box.locator(".cohortgear").evaluate((d) => { d.open = true; });
+        const items = await box.locator(".cohortgear .gearmenu-items button").allInnerTexts();
+        return { box, items };
+      };
+      const savedDef = async () => {
+        const j = await (await ctx.request.get(BASE + "/api/artifacts?kind=cohort")).json();
+        return (j.artifacts || []).find((a) => a.name === name);
+      };
+      await open({ dsl: "2.5", study: "msk_chord_2024", cohorts: { [name]: { all: [{ kind: "oql", q: "KRAS: MUT" }] } }, views: [{ kind: "survival", cohorts: [name] }] });
+      let m = await menuItems();
+      steps.offered = m.items.some((t) => t.trim() === "save to library");
+      await m.box.locator(".cohortgear button", { hasText: "save to library" }).click();
+      await sp.waitForFunction((n) => { try { return !!JSON.parse(document.querySelector("#docjson").value).cohorts[n].from; } catch { return false; } }, name, { timeout: 60000 });
+      const a1 = await savedDef();
+      steps.saved = !!a1 && (await docOf()).cohorts[name].from.saved === a1.id;
+      m = await menuItems();
+      steps.goneAfter = !m.items.some((t) => /^save/.test(t.trim()));
+      const d = await docOf();
+      d.cohorts[name].splits = { sex: { arms: [{ name: "Female", where: { kind: "clinical", attribute: "SEX", values: ["Female"] } }] } };
+      await open(d);
+      m = await menuItems();
+      steps.offeredAfterSplit = m.items.some((t) => t.trim() === "save changes to library");
+      await m.box.locator(".cohortgear button", { hasText: "save changes to library" }).click();
+      for (let i = 0; i < 60 && !(await savedDef())?.definition?.splits; i++) await sp.waitForTimeout(1000);
+      const a2 = await savedDef();
+      steps.splitSaved = !!a2 && a2.id === a1.id && !!a2.definition.splits?.sex && !a2.definition.from;
+      await ctx.request.delete(BASE + "/api/artifacts/" + a1.id);
+    } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
+    ok("a cohort that is unsaved, or re-split since saving, offers save in its menu, and saving records it as the source",
+      steps.offered && steps.saved && steps.goneAfter && steps.offeredAfterSplit && steps.splitSaved, JSON.stringify(steps));
+    await ctx.close();
   }
   // The study picker STAGES. Ticking boxes must not query: assembling a
   // selection used to fire one facet request per click, 350ms apart, each one

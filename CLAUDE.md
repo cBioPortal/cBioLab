@@ -14,7 +14,12 @@
 
 A working demonstration that a cBioPortal-class tool can be rebuilt around **one declarative
 JSON object** — the *Analysis document* (`{study, cohorts: {name: def}, views: [...]}`) — that
-the web UI and MCP clients all read and write. The server compiles it to
+the web UI and MCP clients all read and write. `cohorts` is a store: **every view names the cohorts it
+draws in its own `cohorts` list** (since DSL 2.5 there is no "all cohorts" default — a view without a
+list is empty, and the page shows it waiting for one). The analysis page shows the store as a
+summary ("Cohorts in this analysis": size, studies, which views draw each); cohorts come in through
+a view's "+ Add cohort" (`app/lab/add-cohort-dialog.tsx`: the analysis's own, the library, or
+Explore in add mode, which returns the selection to that view). The server compiles it to
 ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (UI at
 `/lab`, MCP at `/api/mcp`, project rationale at `/rationale`).
 

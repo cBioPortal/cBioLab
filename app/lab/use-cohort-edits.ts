@@ -5,13 +5,25 @@
 // open analysis reads, for add-cohort mode. A rename carries every view's reference along.
 import { useState } from "react";
 import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
-import type { AnalysisDoc, CohortDef, PartitionDef } from "../../lib/types.ts";
+import type { AnalysisDoc, CohortDef, CohortSource, PartitionDef } from "../../lib/types.ts";
+import { canonicalSplits, cohortHash } from "../../lib/cohort-hash.ts";
+import type { SavedCohort } from "./use-saved.ts";
 import type { SplitSpec } from "./partitions.tsx";
 import { withoutPartition, renamePartitionChild, flattenSplits, editSplits, splitKey, renameInViews } from "../../lib/partition-arms.ts";
 import { saveToServer, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
 import { api } from "./api.ts";
 
 import type { DocStore } from "./doc-store.ts";
+
+/** A copied cohort against the saved cohort it came from: changed since, deleted, current — or unknown, while logged out or loading. */
+export type CohortSourceState = {
+  from: CohortSource; edited: boolean; state: "unknown" | "deleted" | "current" | "changed";
+  /** the saved cohort's name, definition hash and entry now (current or changed only) */
+  srcName?: string; now?: string; src?: SavedCohort;
+};
+
+/** What saving a cohort to the library would do: make a new saved cohort, or write over saved cohort `id`; saved as `as`. */
+export type CohortSaveState = { action: "create" | "update"; id?: string; as: string };
 
 /** What useCohortEdits needs from the analysis page. */
 export interface CohortEditsPage {
@@ -21,10 +33,16 @@ export interface CohortEditsPage {
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   setToast: React.Dispatch<React.SetStateAction<string | null>>;
   study: string;
+  /** the login's saved cohorts, and whether they have arrived */
+  saved: Record<string, SavedCohort>;
+  savedReady: boolean;
+  persist: (name: string, def: CohortDef, lastEval: SavedCohort["lastEval"], id?: string) => Promise<SavedCohort>;
+  /** a cohort's last evaluation, kept with it when saved */
+  evalOf: (name: string) => SavedCohort["lastEval"];
 }
 
 export function useCohortEdits(page: CohortEditsPage) {
-  const { doc, docs, proposePartition, setError, setToast, study } = page;
+  const { doc, docs, evalOf, persist, proposePartition, saved, savedReady, setError, setToast, study } = page;
 
   // ---- editing a cohort's name/note (the gear menu's "edit…") -------------
   const [cohortEditing, setCohortEditing] = useState<string | null>(null); // the name AS IT IS in doc.cohorts right now
@@ -74,12 +92,76 @@ export function useCohortEdits(page: CohortEditsPage) {
     // its splits go with it (they are stored on it), and so does every view reference to their arms
     const base: AnalysisDoc = doc;
     const cs = { ...base.cohorts }; delete cs[name];
-    // views naming the cohort explicitly drop it; a view with no cohorts left goes too
+    // every view drawing it drops it; a view with none left stays, empty, waiting for a cohort
     const views = (base.views || [])
-      .map(v => Array.isArray(v.cohorts) ? { ...v, cohorts: v.cohorts.filter(c => c !== name && !c.startsWith(name + " / ")) } : v)
-      .filter(v => !Array.isArray(v.cohorts) || v.cohorts.length);
+      .map(v => Array.isArray(v.cohorts) ? { ...v, cohorts: v.cohorts.filter(c => c !== name && !c.startsWith(name + " / ")) } : v);
     const d = { ...base, cohorts: cs, views };
     docs.set(d);
+  };
+
+  /**
+   * Where a copied cohort stands against the saved cohort it came from (`from`, by the saved
+   * cohort's id and the hash of what was copied): the saved one changed since, the copy was edited
+   * here, the saved one is gone — or unknown, while logged out or still loading.
+   */
+  const cohortSource = (name: string): CohortSourceState | null => {
+    const def = doc.cohorts?.[name];
+    const from = def?.from;
+    if (!def || !from) return null;
+    const edited = cohortHash(def) !== from.hash;
+    if (!savedReady) return { from, edited, state: "unknown" };
+    const hit = Object.entries(saved).find(([, x]) => x.id === from.saved);
+    if (!hit) return { from, edited, state: "deleted" };
+    const [srcName, src] = hit;
+    const now = cohortHash(src.def);
+    return { from, edited, state: now === from.hash ? "current" : "changed", srcName, now, src };
+  };
+  /** Replace a copy with its saved cohort's current definition; the copy keeps its name here, its note and its splits. */
+  const updateFromSaved = (name: string) => {
+    const s = cohortSource(name);
+    if (!s || !s.src || !(s.state === "changed" || (s.state === "current" && s.edited))) return;
+    const cur = doc.cohorts![name];
+    const next: CohortDef = { ...s.src.def, ...(cur.notes ? { notes: cur.notes } : {}), ...(cur.splits ? { splits: cur.splits } : {}),
+      from: { saved: s.from.saved, name: s.srcName!, hash: s.now!, savedAt: s.src.savedAt } };
+    docs.set({ ...doc, cohorts: { ...doc.cohorts, [name]: next } });
+  };
+
+  /**
+   * Whether a cohort has anything to save to the library, and where it would go — null when there
+   * is nothing to save, or while the saved cohorts are not known (logged out, loading). A cohort
+   * copied from a saved one saves back over it once edited here or re-split; one whose saved
+   * version has changed since is not offered, since saving would discard that change. A cohort
+   * with no source matches a saved cohort by name.
+   */
+  const cohortSaveState = (name: string): CohortSaveState | null => {
+    const def = doc.cohorts?.[name];
+    if (!def || !savedReady) return null;
+    const s = cohortSource(name);
+    if (s) {
+      if (s.state === "deleted") return { action: "create", as: name };
+      if (s.state !== "current") return null;
+      return s.edited || canonicalSplits(def) !== canonicalSplits(s.src!.def) ? { action: "update", id: s.src!.id, as: s.srcName! } : null;
+    }
+    const same = saved[name];
+    if (!same) return { action: "create", as: name };
+    return cohortHash(def) !== cohortHash(same.def) || canonicalSplits(def) !== canonicalSplits(same.def)
+      ? { action: "update", id: same.id, as: name } : null;
+  };
+  /** Save a cohort to the library (cohortSaveState says where); the analysis's copy then names it as its source. */
+  const saveCohortToLibrary = async (name: string) => {
+    const st = cohortSaveState(name);
+    const cur = doc.cohorts?.[name];
+    if (!st || !cur) return;
+    const { from: _from, ...def } = cur;
+    try {
+      const c = await persist(st.as, def, evalOf(name), st.id);
+      const now = docs.current.doc;
+      if (now.cohorts?.[name]) {
+        docs.set({ ...now, cohorts: { ...now.cohorts, [name]: { ...now.cohorts[name], from: { saved: c.id, name: st.as, hash: cohortHash(def), savedAt: c.savedAt } } } });
+      }
+    } catch (e: any) {
+      setError("could not save \u201c" + name + "\u201d: " + (e?.message || e));
+    }
   };
 
   // ---- partitions: a cohort split into arms that add up to it ------------------------------
@@ -103,9 +185,8 @@ export function useCohortEdits(page: CohortEditsPage) {
     const withSplit = editSplits(doc, (f) => ({ ...f, partitions: { ...f.partitions, [key]: { ...def, split: name } } }));
     // only a view showing just this cohort switches: one showing other cohorts too would then mix
     // whole cohorts with a split's groups, which a view does not draw
-    const authored = Object.keys(doc.cohorts || {});
     const views = (withSplit.views || []).map((v) => {
-      const list = Array.isArray(v.cohorts) && v.cohorts.length ? v.cohorts : authored;
+      const list = Array.isArray(v.cohorts) ? v.cohorts : [];
       return list.length === 1 && list[0] === cohort ? { ...v, cohorts: [key] } : v;
     });
     runEdited({ ...withSplit, views });
@@ -153,5 +234,5 @@ export function useCohortEdits(page: CohortEditsPage) {
     docs.set(d);
   };
 
-  return { cohortEditing, setCohortEditing, featureSaved, featureFromSelection, cohortFromSelection, removeCohort, runEdited, splitsFlat, setPartitionDef, removePartitionNamed, renamePartitionRow, splitCohortBy, analysisStudies, openCohortEdit, confirmCohortEdit };
+  return { cohortEditing, setCohortEditing, featureSaved, featureFromSelection, cohortFromSelection, removeCohort, runEdited, splitsFlat, setPartitionDef, removePartitionNamed, renamePartitionRow, splitCohortBy, analysisStudies, openCohortEdit, confirmCohortEdit, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary };
 }

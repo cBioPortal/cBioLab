@@ -289,7 +289,7 @@ export const REPRODUCTIONS: PaperReproduction[] = [
         "Black": { all: [{ kind: "clinical", attribute: "RACE", values: ["Black"], per: "patient" }] },
         "Asian": { all: [{ kind: "clinical", attribute: "RACE", values: ["Asian"], per: "patient" }] }
       },
-      views: [{ kind: "compare", genes: ["FOXA1", "TP53"],
+      views: [{ kind: "compare", cohorts: ["White", "Black", "Asian"], genes: ["FOXA1", "TP53"],
         note: "Reproduces the paper's race comparison: FOXA1 14.9% (White) / 16.4% (Black) / 30.2% (Asian), p=0.0044, and TP53 also differs significantly (29.7% / 19.4% / 34.9%, p=0.0119) — both match the paper's reported significance. What this view CANNOT show: the paper stratifies by disease stage before comparing race, since stage and race both plausibly affect alteration rate and are entangled in this cohort. There's no first-class \"compare A, holding B constant\" operation here — only defining one cohort per stage×race combination by hand, which stops scaling past two stratifying dimensions." }]
     }
   },
@@ -380,7 +380,7 @@ export const REPRODUCTIONS: PaperReproduction[] = [
       title: "Janjigian 2017 — esophagogastric cancer treatment response",
       notes: "Janjigian et al.'s genomics-and-treatment-response analysis. This document tests mutation burden's effect on platinum-based chemotherapy response — the outcome with real, usable per-patient data (187 patients) and a clean survival-status coding. It stops short of the paper's actual headline (TMB and survival specifically on immunotherapy): that outcome exists for only 40 patients, and its status column isn't coded in the \"1:<label>\"/\"0:<label>\" convention this engine's event parser expects, so even naming the exact columns would silently read every patient as censored rather than erroring — worse than refusing outright, so this document doesn't attempt it.",
       cohorts: { "all patients": { all: [] } },
-      views: [{ kind: "cox", monthsAttribute: "PLATINUM_PFS_MONTHS", statusAttribute: "PLATINUM_PFS_STATUS",
+      views: [{ kind: "cox", cohorts: ["all patients"], monthsAttribute: "PLATINUM_PFS_MONTHS", statusAttribute: "PLATINUM_PFS_STATUS",
         covariates: [{ source: "clinical", attribute: "MUTATION_RATE" }],
         note: "Tests mutation rate's association with platinum-based chemotherapy progression-free survival — reachable because PLATINUM_PFS_STATUS happens to use the \"1:Progressed\"/\"0:Not Progressed\" convention the engine expects, unlike the paper's actual immunotherapy-outcome columns (see the document's own note). HR=1.02 per unit mutation rate, p=0.11 — a real, honestly-reported non-significant result for this specific covariate and outcome." }]
     }

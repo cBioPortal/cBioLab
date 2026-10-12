@@ -68,7 +68,7 @@ describe("upgradeDocument", () => {
       cohorts: { EGFR: { all: [] }, KRAS: { all: [], splits: { allele: { arms: [{ name: "G12C", where: g12c }] } } } },
       views: [{ kind: "survival" }, { kind: "compare", cohorts: ["KRAS"] }, { kind: "clinical", cohorts: ["EGFR"] }, { kind: "cox", cohorts: ["KRAS / allele"] }] };
     const { doc, upgrade } = upgradeDocument(d23) as any;
-    assert.equal(doc.dsl, "2.4");
+    assert.equal(doc.dsl, DOC_VERSION);
     assert.deepEqual(doc.views.map((v: any) => v.cohorts), [
       ["EGFR", "KRAS / allele / G12C", "KRAS / allele / Other"],   // default list: KRAS was drawn as its arms
       ["KRAS / allele / G12C", "KRAS / allele / Other"],
@@ -81,10 +81,27 @@ describe("upgradeDocument", () => {
   });
 
   test("a 2.3 document without splits upgrades with nothing to report", () => {
-    const { doc, upgrade } = upgradeDocument({ dsl: "2.3", cohorts: { A: { all: [] } }, views: [{ kind: "survival" }] }) as any;
-    assert.equal(doc.dsl, "2.4");
+    const { doc, upgrade } = upgradeDocument({ dsl: "2.3", cohorts: { A: { all: [] } }, views: [{ kind: "survival", cohorts: ["A"] }] }) as any;
+    assert.equal(doc.dsl, DOC_VERSION);
     assert.deepEqual(upgrade.changes, []);
-    assert.deepEqual(doc.views, [{ kind: "survival" }]);
+    assert.deepEqual(doc.views, [{ kind: "survival", cohorts: ["A"] }]);
+  });
+
+  test("2.4 → 2.5: a view with no cohorts, or an empty list, is given every authored cohort by name", () => {
+    const d24 = { dsl: "2.4", cohorts: { A: { all: [] }, B: { all: [] } },
+      views: [{ kind: "survival" }, { kind: "compare", cohorts: [] }, { kind: "clinical", cohorts: ["B"] },
+        { kind: "survival", splitBy: { cohort: "A", attribute: "SEX" } }] };
+    const { doc, upgrade } = upgradeDocument(d24) as any;
+    assert.equal(doc.dsl, "2.5");
+    assert.deepEqual(doc.views.map((v: any) => v.cohorts), [["A", "B"], ["A", "B"], ["B"], undefined]);
+    assert.deepEqual(upgrade.changes, ["2 views that showed every cohort by default now list them by name, since a view now draws only the cohorts it names"]);
+  });
+
+  test("a 2.5 view with no cohorts stays empty", () => {
+    const d = { dsl: "2.5", cohorts: { A: { all: [] } }, views: [{ kind: "survival" }] };
+    const r = upgradeDocument(d);
+    assert.equal(r.doc, d);
+    assert.equal(r.upgrade, null);
   });
 
   test("a document for a newer version is refused, naming both versions", () => {

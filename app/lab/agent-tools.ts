@@ -12,6 +12,7 @@ import type { AnalysisDoc, AnalysisResult, CohortDef, ExploreResult, PartitionDe
 import { withoutPartition, editSplits, splitKey } from "../../lib/partition-arms.ts";
 import { api } from "./api.ts";
 import { useEffect, useRef, useState } from "react";
+import { cohortHash } from "../../lib/cohort-hash.ts";
 
 export interface LabBridge {
   doc: AnalysisDoc;
@@ -44,7 +45,7 @@ export interface LabBridge {
   analyzeDraft: () => void;
   saveDraft: (name: string) => Promise<{ count: number }>;
   // saved cohorts and analyses
-  savedCohorts: Record<string, { def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null }>;
+  savedCohorts: Record<string, { id: string; def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null }>;
   savedAnalyses: Record<string, { doc: AnalysisDoc; savedAt: string }>;
   openSaved: (name: string) => void;
 }
@@ -164,6 +165,13 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
     return n;
   };
 
+  /** the views at `into` with `names` appended to their cohort lists; an index that is not a view is refused */
+  const withCohortIn = (vs: NonNullable<AnalysisDoc["views"]>, into: unknown, names: string[]) => {
+    const idx = Array.isArray(into) ? into.map(needIndex) : [];
+    return vs.map((v: any, i: number) => !idx.includes(i) ? v
+      : { ...v, cohorts: [...(Array.isArray(v.cohorts) ? v.cohorts : []).filter((c: string) => !names.includes(c)), ...names] });
+  };
+
   const tools: AgentTool[] = [
     // ---- read --------------------------------------------------------------------------
     { name: "analysis_get_document", description: "The Analysis document on the page now (study, cohorts, views, title, notes, params), plus which tab is open, whether a run is in progress, and whether it is saved.",
@@ -207,15 +215,17 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
     { name: "analysis_set_document", description: "Replace the whole Analysis document. The engine runs it first; if it rejects the document (or any view errors), the page is left unchanged and the reason is returned.",
       inputSchema: { type: "object", required: ["document"], properties: { document: { type: "object", description: "{dsl?, study, cohorts: {name: cohortDef (may carry splits)}, views: [...], title?, notes?, params?}" } } },
       run: async ({ document }) => edit("set document", clone(document)) },
-    { name: "analysis_set_cohort", description: "Add a cohort, or replace the definition of an existing one, by name. Every view is re-run, since a cohort feeds all of them.",
-      inputSchema: { type: "object", required: ["name", "definition"], properties: { name: { type: "string" }, definition: { type: "object", description: "cohortDef: {all: [clause, ...], extends?, study?, studies?}" } } },
-      run: async ({ name, definition }) => {
+    { name: "analysis_set_cohort", description: "Add a cohort to the analysis, or replace the definition of an existing one, by name. A view draws only the cohorts its own `cohorts` list names, so a new cohort is drawn nowhere until it is added to a view: pass `views` (indices) to append it to those views' lists. Replacing a definition re-runs every view that draws it.",
+      inputSchema: { type: "object", required: ["name", "definition"], properties: { name: { type: "string" }, definition: { type: "object", description: "cohortDef: {all: [clause, ...], extends?, study?, studies?}" },
+        views: { type: "array", items: { type: "integer" }, description: "indices of the views to draw it in (appended to each view's `cohorts`)" } } },
+      run: async ({ name, definition, views: into }) => {
         const d = clone(get().doc);
         const existed = !!d.cohorts?.[name];
         d.cohorts = { ...(d.cohorts || {}), [name]: definition as CohortDef };
-        return edit(`${existed ? "replace" : "add"} cohort "${name}"`, d);
+        d.views = withCohortIn(d.views || [], into, [name]);
+        return edit(`${existed ? "replace" : "add"} cohort "${name}"` + (into?.length ? ` in view${into.length === 1 ? "" : "s"} ${into.join(", ")}` : ""), d);
       } },
-    { name: "analysis_remove_cohort", description: "Remove a cohort by name. Views that listed it in their own `cohorts` lose it from that list.",
+    { name: "analysis_remove_cohort", description: "Remove a cohort by name. Every view that drew it loses it from its `cohorts`; a view left with none stays, empty, until a cohort is added to it.",
       inputSchema: { type: "object", required: ["name"], properties: { name: { type: "string" } } },
       run: async ({ name }) => {
         const d = clone(get().doc);
@@ -256,7 +266,7 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
         const d = editSplits(clone(get().doc), (f) => { const r = withoutPartition(f, splitKey(cohort, name)); removed = r.removed; return r.doc; });
         return edit(`remove split${removed.length > 1 ? "s" : ""} ${removed.map((n) => `"${n}"`).join(", ")}`, d);
       } },
-    { name: "analysis_add_view", description: "Add a view (compare, survival, clinical, oncoprint, cox, plot, …; grammar in dsl_reference). It goes at the top of the page unless a position is given. Rejected, page unchanged, if the engine cannot run it.",
+    { name: "analysis_add_view", description: "Add a view (compare, survival, clinical, oncoprint, cox, plot, …; grammar in dsl_reference). Give it a `cohorts` list naming the analysis's cohorts it draws; without one it is added empty, and the page shows it waiting for a cohort. It goes at the top of the page unless a position is given. Rejected, page unchanged, if the engine cannot run it.",
       inputSchema: { type: "object", required: ["view"], properties: { view: { type: "object" }, position: { type: "integer", description: "index to insert at; default 0 (top)" } } },
       run: async ({ view, position }) => {
         const vs = views();
@@ -367,7 +377,7 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
     { name: "explore_clear_filters", description: "Remove every clause from the draft cohort (the studies stay selected).",
       inputSchema: { type: "object", properties: {} },
       run: async () => { get().clearDraft(); await exploreSettled(get); return exploreState(get()); } },
-    { name: "explore_analyze", description: "Start a fresh analysis of the draft cohort with the default views, replacing the analysis on the page (analysis_undo can bring it back).",
+    { name: "explore_analyze", description: "Start a fresh analysis of the draft cohort, with no views yet, replacing the analysis on the page (analysis_undo can bring it back).",
       inputSchema: { type: "object", properties: {} },
       run: async () => {
         if (!get().exploreStudies.length) throw new Error("select studies first (explore_select_studies)");
@@ -394,15 +404,19 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
           analyses: Object.entries(b.savedAnalyses).map(([name, w]) => ({ name, savedAt: w.savedAt, study: w.doc.study, cohorts: Object.keys(w.doc.cohorts || {}), views: (w.doc.views || []).map((v) => v.kind) }))
         };
       } },
-    { name: "cohorts_add_saved_to_analysis", description: "Put saved cohorts into the current analysis by name (a cohort of the same name is replaced). Validated by the engine like every edit.",
-      inputSchema: { type: "object", required: ["names"], properties: { names: { type: "array", items: { type: "string" } } } },
-      run: async ({ names }) => {
+    { name: "cohorts_add_saved_to_analysis", description: "Put saved cohorts into the current analysis by name (a cohort of the same name is replaced). A view draws only the cohorts it names: pass `views` (indices) to add them to those views. Validated by the engine like every edit.",
+      inputSchema: { type: "object", required: ["names"], properties: { names: { type: "array", items: { type: "string" } },
+        views: { type: "array", items: { type: "integer" }, description: "indices of the views to draw them in (appended to each view's `cohorts`)" } } },
+      run: async ({ names, views: into }) => {
         const b = get();
         const missing = (names || []).filter((n: string) => !b.savedCohorts[n]);
         if (missing.length) throw new Error(`no saved cohort ${missing.map((n: string) => `"${n}"`).join(", ")}; have ${Object.keys(b.savedCohorts).join(", ") || "none"}`);
         const d = clone(b.doc);
         d.cohorts = { ...(d.cohorts || {}) };
-        for (const n of names) d.cohorts[n] = clone(b.savedCohorts[n].def);
+        // each copy records its source and what it was, so the page can offer the saved cohort's later edits
+        for (const n of names) d.cohorts[n] = { ...clone(b.savedCohorts[n].def),
+          from: { saved: b.savedCohorts[n].id, name: n, hash: cohortHash(b.savedCohorts[n].def), savedAt: b.savedCohorts[n].savedAt } };
+        d.views = withCohortIn(d.views || [], into, names);
         return edit(`add saved cohort${names.length === 1 ? "" : "s"} ${names.map((n: string) => `"${n}"`).join(", ")}`, d);
       } },
     { name: "analysis_open_saved", description: "Open a saved analysis by name, replacing the one on the page (analysis_undo can bring it back).",

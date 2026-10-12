@@ -5,6 +5,7 @@
 // nothing is asked twice), and save the analysis under a name.
 import type { AnalysisDoc, AnalysisResult, PartitionDef } from "../../lib/types.ts";
 import { upgradeDocument } from "../../lib/doc-version.ts";
+import { viewIsEmpty } from "../../lib/partition-arms.ts";
 import { seedAnalysis } from "./use-analysis.ts";
 import { api } from "./api.ts";
 
@@ -31,13 +32,19 @@ export function useToolActions(page: ToolActionsPage) {
   // The page's analysis as WebMCP tools and window.cohortLab (app/lab/agent-tools.ts), for the
   // researcher's assistant in the browser. The bridge is rebuilt every render, so a tool always
   // sees the current document; edits are validated by the engine before they reach the page.
-  const validateDoc = async (d: AnalysisDoc): Promise<AnalysisResult> => {
+  const validateDoc = async (d0: AnalysisDoc): Promise<AnalysisResult> => {
     setValidating(true);
     try {
-      const res = await api.analysis({ study: d.study || study, ...d }, { query: "?oncoprint=spec" });
+      // a view with no cohorts is not an error on the page — it waits for one — so it is not asked
+      // about, and its slot in the answer says it is empty (read as the engine reads it: an older
+      // document's view without a list drew every cohort)
+      const d = upgradeDocument(d0).doc;
+      const all = d.views || [];
+      const res = await api.analysis({ study: d.study || study, ...d, views: all.filter((v) => !viewIsEmpty(v)) }, { query: "?oncoprint=spec" });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
-      return j as AnalysisResult;
+      const asked = [...(j as AnalysisResult).views];
+      return { ...j, views: all.map((v) => viewIsEmpty(v) ? { kind: v.kind, empty: true } : asked.shift()!) } as AnalysisResult;
     } finally {
       // released whatever happens next: an edit the tool then rejects never reaches commitDoc
       setValidating(false);

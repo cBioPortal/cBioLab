@@ -61,6 +61,7 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
       (p.unchecked.length ? `\n  CAVEAT (tell the user): whether a patient can be tested for ${p.unchecked.join(", ")} is not checked, so the remainder may hold patients with no data for it.` : ""));
   }
   for (const v of r.views) {
+    if (v.empty) { out.push(`View ${v.kind}: EMPTY — it names no cohorts yet, so nothing was computed; give it a \`cohorts\` list`); continue; }
     if (v.error) { out.push(`View ${v.kind}: ERROR — ${v.error}`); continue; }
     if (v.kind === "compare") {
       const rows = v.rows!.slice(0, 20).map((row) =>
