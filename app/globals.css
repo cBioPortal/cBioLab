@@ -1,5 +1,5 @@
 :root {
-  --paper: #fafbfc; --card: #ffffff; --ink: #1f2933; --muted: #5b6b76;
+  --page: #eef2f5; --paper: #fafbfc; --card: #ffffff; --ink: #1f2933; --muted: #5b6b76;
   --accent: #0f86a1; --accent-ink: #0b6478; --accent-soft: #e3f0f3;
   --line: #dde4e8; --code-bg: #f1f5f7; --mark: #b25e09; --mark-soft: #fbf0e2;
   --ok: #2e7d32; --ok-soft: #e6f2e6; --err: #b3261e; --err-soft: #fbeae9;
@@ -21,7 +21,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #12181c; --card: #171f24; --ink: #e4eaee; --muted: #93a3ad;
+    --page: #0e1418; --paper: #12181c; --card: #171f24; --ink: #e4eaee; --muted: #93a3ad;
     --accent: #45b8c2; --accent-ink: #7fd3da; --accent-soft: #16333a;
     --line: #2a353c; --code-bg: #1a242a; --mark: #e0a35c; --mark-soft: #35270f;
     --ok: #7bc47f; --ok-soft: #17301a; --err: #f2b8b5; --err-soft: #3a2323;
@@ -30,7 +30,7 @@
 }
 * { box-sizing: border-box; }
 body {
-  margin: 0; background: var(--paper); color: var(--ink);
+  margin: 0; background: var(--page); color: var(--ink);
   font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
   font-size: var(--t-base); line-height: 1.5;
 }
