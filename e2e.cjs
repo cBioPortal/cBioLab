@@ -762,7 +762,7 @@ async function main() {
         ["Co-expression from sums alone", ".rbar", "coexpression"],
         ["Lollipop plot: mutations by protein position", ".lp-plot circle.lollipop-head", "hotspots lollipop"],
         ["Study-stratified survival across two studies", ".logrank", "survival log-rank"],
-        ["Clinical attributes compared between cohorts", "h2:has-text('Clinical comparison')", "clinical"]
+        ["Clinical attributes compared between cohorts", ".viewcard:not(.viewloading) h2:has-text('Clinical comparison')", "clinical"]
       ];
       // a multi-view document must render EVERY one of its views, not just the first
       await page.goto(BASE + "/lab");
@@ -772,8 +772,8 @@ async function main() {
         .locator("button:has-text('Run')").click();
       const multiWanted = [
         [".lp-plot circle.lollipop-head", "hotspots"], [".tend", "cooccurrence"],
-        [".logrank", "survival log-rank"], ["h2:has-text('Clinical comparison')", "clinical"],
-        ["h2:has-text('Compare')", "compare"]
+        [".logrank", "survival log-rank"], [".viewcard:not(.viewloading) h2:has-text('Clinical comparison')", "clinical"],
+        [".viewcard:not(.viewloading) h2:has-text('Compare')", "compare"]
       ];
       const multiMissing = [];
       for (const [sel, label] of multiWanted) {
