@@ -1,5 +1,6 @@
 import "./globals.css";
 import PopoverAutoClose from "./PopoverAutoClose";
+import { BUILD_INFO } from "../lib/build-info.ts";
 
 export const metadata = {
   title: "cbio-lab",
@@ -16,6 +17,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <PopoverAutoClose />
         {children}
+        {/* which code this deployment runs (lib/build-info.ts); also served as /api/version */}
+        <footer className="build-stamp">
+          build{" "}
+          {BUILD_INFO.url
+            ? <a className="mono" href={BUILD_INFO.url} title={BUILD_INFO.commit ?? undefined}>{BUILD_INFO.label}</a>
+            : <span className="mono" title={BUILD_INFO.commit ? undefined : "this build was not told which commit it is"}>{BUILD_INFO.label}</span>}
+        </footer>
       </body>
     </html>
   );
