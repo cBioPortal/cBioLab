@@ -26,6 +26,11 @@ export function canonicalCohort(def: CohortDef): string {
   return JSON.stringify(canonical(def, true));
 }
 
+/** The cohort's splits, keys sorted: what the hash leaves out but a saved copy still keeps. */
+export function canonicalSplits(def: CohortDef): string {
+  return JSON.stringify(canonical(def.splits ?? null, false));
+}
+
 /** Hex SHA-256 of the cohort's canonical form. */
 export function cohortHash(def: CohortDef): string {
   return sha256(new TextEncoder().encode(canonicalCohort(def)));

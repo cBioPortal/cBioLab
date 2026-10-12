@@ -78,7 +78,7 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
       <li key={name} className="acd-row">
         <div className="acd-main">
           <div className="acd-name">{name}{as !== name && <span className="meta"> — added as “{as}”, since this analysis already has a different “{name}”</span>}</div>
-          {desc && <div className="meta">{desc}</div>}
+          <div className="meta" title={desc}>{desc}</div>
           <div className="acd-def"><CohortPills def={def} /></div>
         </div>
         <button className="tbbtn" disabled={full} title={addTitle("“" + as + "”")} onClick={() => onAdd(as, copy)}>{replaces ? "Use" : "Add"}</button>
@@ -118,7 +118,7 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
                     <span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[analysis.indexOf(c) % CAT_COLORS.length] }} />
                     {c.name} {c.count != null && <><strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span></>}
                   </div>
-                  <div className="meta">{c.views.length ? "in " + c.views.join(", ") : "in no view yet"}</div>
+                  <div className="meta" title={c.views.join(", ")}>{c.views.length ? "in " + c.views.join(", ") : "in no view yet"}</div>
                   <div className="acd-def"><CohortPills def={c.def} /></div>
                 </div>
                 <button className="tbbtn" disabled={full} title={addTitle("“" + c.name + "”")} onClick={() => onAdd(c.name)}>{replaces ? "Use" : "Add"}</button>

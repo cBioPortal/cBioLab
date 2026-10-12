@@ -127,9 +127,12 @@ export function useViewEdits(page: ViewEditsPage) {
           outcome: { source: "alteration", gene: genes[0] || "TP53", by: "mutated" }, outcomeEvent: "Mutated",
           covariates: [{ source: "clinical", attribute: viewAttrs()[0] || "SEX" }] }
       : { kind, genes };
-    // A new view draws nothing until a cohort is added to it (its card says so and offers one);
-    // every other card's answer is already cached under its key.
-    docs.set({ ...doc, views: [{ ...v, cohorts: [] }, ...(doc.views || [])] });
+    // With one cohort in the document a new view draws it, unless the view needs more than one;
+    // otherwise it draws nothing until a cohort is added to it (its card says so and offers one).
+    // Every other card's answer is already cached under its key.
+    const names = Object.keys(doc.cohorts || {});
+    const min = (hasKindCard(kind) && KIND_CARDS[kind].minCohorts) || 1;
+    docs.set({ ...doc, views: [{ ...v, cohorts: names.length === 1 && min <= 1 ? names : [] }, ...(doc.views || [])] });
   };
 
   /** Rewrite one view in the document; only its own query re-runs (use-analysis.ts) — editing this

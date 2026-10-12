@@ -321,16 +321,18 @@ async function main() {
       // Analyze lives in the studies card, not the filters bar (.exbar) it sits
       // below — it works regardless of whether any filter is set.
       await page.locator('button:text-is("Analyze")').click();
-      let landed = false, views = [];
+      // It starts with no views: the reader picks what to see of the cohort.
+      let landed = false, views = -1, counted = "";
       try {
-        await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 1, null, { timeout: 300000 });
-        views = (await page.locator(".ana-grid h2").allTextContents()).map(t => t.split("\u2014")[0].trim());
-        const docText = await page.locator("#docjson").inputValue();
+        await page.waitForSelector(".cohortbox .cohortbox-head strong", { timeout: 300000 });
+        counted = (await page.locator(".cohortbox-head").first().innerText()).replace(/\s+/g, " ");
+        const d = JSON.parse(await page.locator("#docjson").inputValue());
         // Named from the draft itself now that the bar has no name field.
-        landed = Object.keys(JSON.parse(docText).cohorts || {}).length === 1;
+        landed = Object.keys(d.cohorts || {}).length === 1;
+        views = (d.views || []).length;
       } catch { /* landed stays false */ }
-      ok("Analyze carries the cohort into a running analysis", landed && views.length > 1,
-        landed ? views.join(" + ") : "cohort did not reach the document");
+      ok("Analyze carries the cohort into an analysis with no views yet", landed && views === 0,
+        landed ? counted + " · " + views + " views" : "cohort did not reach the document");
 
       // Saving asks for the name when you ask to save. The dialog is native
       // <dialog>, so Esc and the backdrop come from the platform. Targeted by
@@ -375,7 +377,7 @@ async function main() {
       try {
         await page.locator(".pick input").nth(0).check();
         await page.locator("button:has-text('Analyze selected')").click();
-        await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 0, null, { timeout: 300000 });
+        await page.waitForSelector(".cohortbox", { timeout: 300000 });
         seeded = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {});
       } catch { /* left empty */ }
       await page.locator(".tabs button:has-text('Explore')").click();
@@ -611,12 +613,25 @@ async function main() {
       await page.locator(".pick input").nth(0).check();
       await page.locator(".pick input").nth(1).check();
       await page.locator("button:has-text('Analyze selected')").click();
-      let together = [];
+      let together = [], startViews = -1;
       try {
-        await page.waitForFunction(() => document.querySelectorAll(".ana-grid .card h2").length > 1, null, { timeout: 300000 });
-        together = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {});
+        await page.waitForFunction(() => document.querySelectorAll(".cohortbox").length === 2, null, { timeout: 300000 });
+        const d = JSON.parse(await page.locator("#docjson").inputValue());
+        together = Object.keys(d.cohorts || {});
+        startViews = (d.views || []).length;
       } catch { /* left empty */ }
-      ok("ticked cohorts are analysed together", together.length === 2, together.join(" + ") || "no document");
+      ok("ticked cohorts are analysed together, with no views until the reader adds one", together.length === 2 && startViews === 0,
+        (together.join(" + ") || "no document") + " · " + startViews + " views");
+
+      // Views come in from "Add a view", each then given a cohort from its "+ Add cohort".
+      for (const label of ["Survival", "Oncoprint"]) {
+        try {
+          await page.locator(".addview button.facet", { hasText: new RegExp("^\\+ " + label + "$") }).click();
+          await page.locator(".emptyview .emptyview-body button.primary").first().click();
+          await page.locator(".addcohortdialog .acd-row button").first().click();
+          await page.waitForFunction(() => !document.querySelector(".emptyview"), null, { timeout: 60000 });
+        } catch { /* the checks below report what is missing */ }
+      }
 
       // ...and a view can be added without editing the document JSON. It arrives empty, saying so,
       // and draws once a cohort of the analysis is added to it from its "+ Add cohort".
@@ -637,8 +652,8 @@ async function main() {
         added.includes("hotspots") && emptyFirst && drew.length === 1 && dots > 0,
         added.length ? added.join(", ") + " · empty first: " + emptyFirst + " · draws " + (drew.join(", ") || "nothing") + " · " + dots + " dots" : "view was not added");
 
-      // The cohort summary names the studies each cohort was queried in, with all of them in its tooltip.
-      const studyLines = await page.$$eval(".cohortsum-row", bs => bs.map(b => {
+      // Each cohort card names the studies it was queried in, with all of them in its tooltip.
+      const studyLines = await page.$$eval(".cohortbox", bs => bs.map(b => {
         const el = b.querySelector(".cohortbox-studies");
         return el ? { text: el.textContent.trim(), title: el.title } : null;
       }));
@@ -662,7 +677,7 @@ async function main() {
       // The oncoprint does not go through a resolver, so its provenance is a separate
       // code path — and the one most likely to be left behind. It is also the one view
       // the BROWSER draws, from the binary contract, so the card must hold a canvas and
-      // the SQL that produced it. This document (default views) actually contains one.
+      // the SQL that produced it. This document has one, added above.
       // The oncoprint fetches its own contract after the document runs, so it can still be loading
       // here; wait for it to draw (or give up and report what is on screen).
       const oncoState = () => page.evaluate(() => {
@@ -1141,7 +1156,7 @@ async function main() {
       await sp.locator(".emptyview .emptyview-body button.primary").first().click();
       await sp.getByRole("tab", { name: "Library" }).click();
       await sp.locator(".addcohortdialog .acd-row", { hasText: name }).getByRole("button").click();
-      await sp.waitForSelector(".cohortsum-row", { timeout: 120000 });
+      await sp.waitForSelector(".cohortbox", { timeout: 120000 });
       const copied = (await docOf()).cohorts[name];
       steps.copied = !!copied && copied.from?.saved === id && /^[0-9a-f]{64}$/.test(copied.from?.hash || "");
       await ctx.request.patch(BASE + "/api/artifacts/" + id, { data: { name, definition: v2 } });
@@ -1157,6 +1172,55 @@ async function main() {
     } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
     ok("a saved cohort is copied with its source, left alone when the saved one changes, and updated on request",
       steps.copied && steps.untouched && steps.updated, JSON.stringify(steps));
+    await ctx.close();
+  }
+  // A cohort with something to save — never saved, or re-split since — offers "save" in its gear
+  // menu; saving makes the analysis's copy name the saved cohort as its source, and the item goes.
+  if (LOGIN) {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const sp = await ctx.newPage();
+    let steps = {};
+    try {
+      await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
+      const name = "e2e save " + Date.now();
+      const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
+      const open = async (doc) => {
+        const b64 = Buffer.from(JSON.stringify(doc)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        await sp.goto(BASE + "/lab?tab=analysis&doc=" + b64, { waitUntil: "domcontentloaded" });
+        await sp.waitForSelector(".cohortbox", { timeout: 120000 });
+      };
+      const menuItems = async () => {
+        const box = sp.locator(".cohortbox", { hasText: name });
+        await box.locator(".cohortgear").evaluate((d) => { d.open = true; });
+        const items = await box.locator(".cohortgear .gearmenu-items button").allInnerTexts();
+        return { box, items };
+      };
+      const savedDef = async () => {
+        const j = await (await ctx.request.get(BASE + "/api/artifacts?kind=cohort")).json();
+        return (j.artifacts || []).find((a) => a.name === name);
+      };
+      await open({ dsl: "2.5", study: "msk_chord_2024", cohorts: { [name]: { all: [{ kind: "oql", q: "KRAS: MUT" }] } }, views: [{ kind: "survival", cohorts: [name] }] });
+      let m = await menuItems();
+      steps.offered = m.items.some((t) => t.trim() === "save to library");
+      await m.box.locator(".cohortgear button", { hasText: "save to library" }).click();
+      await sp.waitForFunction((n) => { try { return !!JSON.parse(document.querySelector("#docjson").value).cohorts[n].from; } catch { return false; } }, name, { timeout: 60000 });
+      const a1 = await savedDef();
+      steps.saved = !!a1 && (await docOf()).cohorts[name].from.saved === a1.id;
+      m = await menuItems();
+      steps.goneAfter = !m.items.some((t) => /^save/.test(t.trim()));
+      const d = await docOf();
+      d.cohorts[name].splits = { sex: { arms: [{ name: "Female", where: { kind: "clinical", attribute: "SEX", values: ["Female"] } }] } };
+      await open(d);
+      m = await menuItems();
+      steps.offeredAfterSplit = m.items.some((t) => t.trim() === "save changes to library");
+      await m.box.locator(".cohortgear button", { hasText: "save changes to library" }).click();
+      for (let i = 0; i < 60 && !(await savedDef())?.definition?.splits; i++) await sp.waitForTimeout(1000);
+      const a2 = await savedDef();
+      steps.splitSaved = !!a2 && a2.id === a1.id && !!a2.definition.splits?.sex && !a2.definition.from;
+      await ctx.request.delete(BASE + "/api/artifacts/" + a1.id);
+    } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
+    ok("a cohort that is unsaved, or re-split since saving, offers save in its menu, and saving records it as the source",
+      steps.offered && steps.saved && steps.goneAfter && steps.offeredAfterSplit && steps.splitSaved, JSON.stringify(steps));
     await ctx.close();
   }
   // The study picker STAGES. Ticking boxes must not query: assembling a

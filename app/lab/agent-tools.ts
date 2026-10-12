@@ -377,7 +377,7 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
     { name: "explore_clear_filters", description: "Remove every clause from the draft cohort (the studies stay selected).",
       inputSchema: { type: "object", properties: {} },
       run: async () => { get().clearDraft(); await exploreSettled(get); return exploreState(get()); } },
-    { name: "explore_analyze", description: "Start a fresh analysis of the draft cohort with the default views, replacing the analysis on the page (analysis_undo can bring it back).",
+    { name: "explore_analyze", description: "Start a fresh analysis of the draft cohort, with no views yet, replacing the analysis on the page (analysis_undo can bring it back).",
       inputSchema: { type: "object", properties: {} },
       run: async () => {
         if (!get().exploreStudies.length) throw new Error("select studies first (explore_select_studies)");

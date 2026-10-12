@@ -839,13 +839,20 @@ details.gearmenu.inline[open] > summary {
 .addcohortdialog[open] { width: min(94vw, 40rem); max-width: 40rem; max-height: 85vh; display: flex; flex-direction: column; }
 .acd-tabs { margin: var(--s2) 0 var(--s3); }
 .acd-tabs button { display: inline-flex; align-items: baseline; gap: var(--s1); white-space: nowrap; }
-.acd-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
-.acd-row { display: flex; align-items: flex-start; gap: var(--s3); padding: var(--s2) 0; border-top: 1px solid var(--line); }
+.acd-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; grid-template-columns: fit-content(16rem) minmax(8rem, 1fr) fit-content(40%) auto; column-gap: var(--s3); }
+.acd-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; padding: var(--s1) 0; border-top: 1px solid var(--line); }
 .acd-row:first-child { border-top: none; }
-.acd-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s1); }
-.acd-name { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s1) var(--s2); font-weight: 600; font-size: var(--t-md); }
+.acd-main { display: contents; }
+.acd-main > .meta { font-size: var(--t-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.acd-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s1) var(--s2); font-weight: 600; font-size: var(--t-md); }
+.acd-name .meta { font-weight: 400; }
 .acd-name strong { font-weight: 600; }
-.acd-def .fpills { gap: var(--s1); }
+.acd-def { min-width: 0; }
+.acd-def .fpills { gap: var(--s1); margin: 0; }
+@media (max-width: 600px) {
+  .acd-list { grid-template-columns: minmax(0, 1fr) auto; }
+  .acd-main { display: flex; flex-direction: column; gap: var(--s1); min-width: 0; }
+}
 .acd-search { width: 100%; height: var(--ctl-h); font-size: var(--t-md); margin-bottom: var(--s2); }
 .acd-h { margin: var(--s3) 0 var(--s1); font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .acd-explore { padding: var(--s2) 0; }
@@ -855,31 +862,17 @@ details.gearmenu.inline[open] > summary {
   border: 1px dashed var(--line); border-radius: var(--r-md); background: var(--paper); }
 .emptyview-body p { margin: 0; max-width: 34rem; font-size: var(--t-md); color: var(--muted); }
 .emptyview-body .emptyview-lead { color: var(--ink); font-size: var(--t-base); }
-/* The analysis's cohorts, summarised: one line each, the definition a click away */
+/* The analysis's cohorts: one card each, with the views that draw it and the saved cohort it came from */
 .cohortsum { margin-bottom: var(--s4); }
-.cohortsum-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card); }
-.cohortsum-item { border-top: 1px solid var(--line); }
-.cohortsum-item:first-child { border-top: none; }
-.cohortsum-row { display: grid; grid-template-columns: auto minmax(8rem, 1fr) minmax(7rem, auto) minmax(6rem, 1fr) minmax(8rem, 1.4fr) auto; align-items: center;
-  gap: var(--s3); padding: var(--s2) var(--s3); font-size: var(--t-md); }
-.cohortsum-toggle { border: none; background: none; padding: 0; color: var(--muted); cursor: pointer; width: 1rem; height: var(--ctl-h); }
-.cohortsum-name { font-weight: 600; display: flex; align-items: center; gap: var(--s2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cohortsum-count { text-align: right; white-space: nowrap; }
-.cohortsum-row .cohortbox-studies { margin: 0; min-width: 0; }
-.cohortsum-views-cell { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.cohortbox-foot { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2); font-size: var(--t-sm); min-width: 0; }
 .srcbadge { flex: none; font-size: var(--t-xs); padding: 0 var(--s2); border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--code-bg); color: var(--muted); white-space: nowrap; }
 button.srcbadge { cursor: pointer; height: auto; }
 .srcbadge.changed { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
-.cohortsrc { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s1) var(--s2); font-size: var(--t-sm); }
+.cohortsrc { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s1) var(--s2); font-size: var(--t-sm); margin-top: var(--s2); }
 .cohortsrc-changed { color: var(--ink); }
 .cohortsrc-new { flex-basis: 100%; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
-.cohortsum-views { min-width: 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cohortsum-views { min-width: 0; flex: 1 1 auto; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cohortsum-views.unused { font-style: italic; }
-.cohortsum-detail { padding: 0 var(--s3) var(--s3) calc(var(--s3) + 1rem + var(--s3)); display: flex; flex-direction: column; gap: var(--s2); }
-@media (max-width: 720px) {
-  .cohortsum-row { grid-template-columns: auto 1fr auto auto auto; }
-  .cohortsum-row .cohortbox-studies, .cohortsum-views { display: none; }
-}
 /* The document's JSON, run/clear controls and generated SQL — wide enough for
    both, and tall enough to scroll internally rather than push past the viewport. */
 .docdialog { width: min(90vw, 48rem); max-width: 48rem; max-height: 85vh; overflow: auto; }
@@ -1772,6 +1765,4 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .dt-table tr.dt-pick { cursor: pointer; }
 .dt-table tr.dt-pick:hover td { background: var(--code-bg); }
 .dt-table tr.dt-pick.sel td { background: var(--accent-soft); }
-.cohortsum-row .gearmenu-items { right: 0; left: auto; }
-.cohortsum-row > details.gearmenu { margin: 0; display: inline-flex; align-items: center; }
 .cohortsum-skel { display: inline-block; width: 4rem; height: 0.9rem; }

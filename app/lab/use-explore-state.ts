@@ -12,7 +12,6 @@ import { type SplitSpec } from "./partitions.tsx";
 import { armsFromSelection, editSplits, splitKey, type ChartKey } from "../../lib/partition-arms.ts";
 import { DOC_VERSION } from "../../lib/doc-version.ts";
 import { saveToServer, customDataKey, featureFromCohort, type StoredDataset } from "./custom-data-client.ts";
-import { DEFAULT_VIEWS, defaultViews } from "./doc-store.ts";
 import type { AddCohortTarget } from "./add-cohort-dialog.tsx";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { useExplore, type ExploreAsk } from "./use-explore.ts";
@@ -33,7 +32,7 @@ export interface ExplorePage {
   /** saving needs the login; asks for it, and says whether saving may go ahead */
   canSave: () => boolean;
   evalDef: (name: string, def: CohortDef) => Promise<{ count: number; text: string }>;
-  persist: (name: string, def: CohortDef, lastEval: SavedCohort["lastEval"]) => Promise<void>;
+  persist: (name: string, def: CohortDef, lastEval: SavedCohort["lastEval"]) => Promise<unknown>;
   featureSaved: (d: StoredDataset) => string;
   /** the studies the open analysis reads — what add-cohort mode opens Explore on */
   analysisStudies: () => string[];
@@ -140,6 +139,7 @@ export function useExploreState(page: ExplorePage) {
    * Analyze starts a FRESH analysis of the explored cohort: it replaces the
    * document rather than merging into it, because that is what the word means —
    * you asked to analyse this, not to add it to whatever was there before.
+   * It starts with no views: the reader chooses what to see of it.
    * Build a multi-cohort comparison by ticking cohorts in the Cohorts tab and
    * hitting "Analyze selected".
    */
@@ -152,7 +152,7 @@ export function useExploreState(page: ExplorePage) {
     // name with no on-screen explanation.
     const name = barDefaultName();
     const nextStudy = exSel.current[0] || study;
-    const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: d }, views: defaultViews([name]) };
+    const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: d }, views: [] };
     setStudy(nextStudy);
     docs.replace(nd);
     setError(null);     // never leave the previous run's numbers on screen
@@ -160,7 +160,7 @@ export function useExploreState(page: ExplorePage) {
   };
   /**
    * Analyze the selection split by one facet: the same fresh analysis as Analyze, with the
-   * selection divided into arms that add up to it and every view comparing the arms. The arms
+   * selection divided into arms that add up to it, for the views the reader adds to compare. The arms
    * come from the server (counted per patient within the selection), not from the facet's own
    * bars, which may count samples or show only the top values.
    */
@@ -170,10 +170,10 @@ export function useExploreState(page: ExplorePage) {
     setExMsg(null); setSplittingBy(label);
     const name = barDefaultName();
     const nextStudy = exSel.current[0] || study;
-    const base: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: d }, views: defaultViews([name]) };
+    const base: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: d }, views: [] };
     try {
       const { name: sn, def } = await proposePartition({ doc: base, cohort: name, ...spec });
-      const nd: AnalysisDoc = editSplits({ ...base, dsl: DOC_VERSION, views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, sn)] })) },
+      const nd: AnalysisDoc = editSplits(base,
         (f) => ({ ...f, partitions: { [splitKey(name, sn)]: { ...def, split: sn } } }));
       setStudy(nextStudy);
       docs.replace(nd);
@@ -204,7 +204,7 @@ export function useExploreState(page: ExplorePage) {
     const parent: CohortDef = r.base.all.length ? { ...d, all: r.base.all } : { ...(draftScaffold(exSel.current) as CohortDef) };
     const nextStudy = exSel.current[0] || study;
     const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: { ...parent, splits: { [label]: { arms: r.arms } } } },
-      views: DEFAULT_VIEWS.map((v) => ({ ...v, cohorts: [splitKey(name, label)] })) };
+      views: [] };
     setStudy(nextStudy);
     docs.replace(nd);
     setError(null);

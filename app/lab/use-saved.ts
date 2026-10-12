@@ -72,8 +72,8 @@ export function useSavedArtifacts(loggedIn: boolean) {
   const idOf = (kind: ArtifactKind, name: string) =>
     qc.getQueryData<Record<string, { id: string }>>(keyOf(kind))?.[name]?.id;
 
-  async function save(kind: ArtifactKind, name: string, definition: unknown): Promise<Artifact> {
-    const id = idOf(kind, name);
+  async function save(kind: ArtifactKind, name: string, definition: unknown, known?: string): Promise<Artifact> {
+    const id = known || idOf(kind, name);
     const res = id ? await api.artifacts.update(id, { name, definition }) : await api.artifacts.create({ kind, name, definition });
     return (await answer(res)).artifact as Artifact;
   }
@@ -94,8 +94,14 @@ export function useSavedArtifacts(loggedIn: boolean) {
     workspaces: ((loggedIn && workspacesQ.data) || NONE) as Record<string, SavedWorkspace>,
     cohortsState: state(cohortsQ),
     workspacesState: state(workspacesQ),
-    saveCohort: async (name: string, def: CohortDef, lastEval: SavedCohort["lastEval"]) =>
-      put("cohort", name, asCohort(await save("cohort", name, def), lastEval)),
+    /** save a cohort under `name` — over the saved cohort `id` when given, else over the one of that name, else as a new one */
+    saveCohort: async (name: string, def: CohortDef, lastEval: SavedCohort["lastEval"], id?: string): Promise<SavedCohort> => {
+      const a = await save("cohort", name, def, id);
+      const c = asCohort(a, lastEval);
+      if (id) { const old = Object.entries(qc.getQueryData<Record<string, SavedCohort>>(keyOf("cohort")) || {}).find(([, x]) => x.id === id); if (old && old[0] !== name) put<SavedCohort>("cohort", old[0], null); }
+      put("cohort", name, c);
+      return c;
+    },
     removeCohort: (name: string) => remove("cohort", name),
     saveWorkspace: async (name: string, doc: AnalysisDoc) =>
       put("workspace", name, asWorkspace(await save("workspace", name, doc))),

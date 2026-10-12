@@ -583,8 +583,10 @@ export function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove, on
  * "Cohorts" heading for why that is deliberately a separate, unscoped piece
  * of work.
  */
-export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCount = 0, menuId, menuStore }: {
+export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCount = 0, save, menuId, menuStore }: {
   busy?: boolean; canEdit: boolean; onEdit: () => void; onRemove: () => void;
+  /** saving the cohort to the library, offered only while it has something to save */
+  save?: { onSave: () => Promise<void>; label: string; title: string } | null;
   /** the split form; `done` closes this menu. A cohort may have several splits — each view draws one */
   split?: (done: () => void) => React.ReactNode;
   /** how many splits the cohort has already */
@@ -593,11 +595,18 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
 }) {
   const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   const [splitting, setSplitting] = useState(false);
+  const [saving, setSaving] = useState(false);
   return (
     <details className="gearmenu cohortgear" ref={ref} data-menu-id={menuId}
       onToggle={(e) => { onToggle(e); if (!(e.currentTarget as HTMLDetailsElement).open) setSplitting(false); }}>
       <summary className="tbbtn" title="edit this cohort" aria-label="edit this cohort">⋯</summary>
       <div className={"gearmenu-items" + (splitting ? " wide" : "")}>
+        {save && !splitting && <>
+          <button className="linklike" disabled={busy || saving} title={save.title}
+            onClick={async () => { setSaving(true); try { await save.onSave(); } finally { setSaving(false); } }}>
+            {save.label}{saving && <span className="spinner ml-2" />}</button>
+          <hr />
+        </>}
         {split && (splitting ? <>{split(() => { menuStore.set(menuId, false); setSplitting(false); })}<hr /></> : <>
           <button className="linklike" disabled={busy} title="divide this cohort into arms that never overlap and add up to it"
             onClick={() => setSplitting(true)}>{splitCount ? "split another way…" : "split into arms…"}</button>

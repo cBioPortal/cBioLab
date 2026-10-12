@@ -16,7 +16,7 @@ import { requestLogin, referencedDatasets, unresolvedUploads } from "./custom-da
 import { CohortStudies, CohortEditMenu, CAT_COLORS, ViewHead } from "./view-chrome.tsx";
 import { cohortHash, shortHash } from "../../lib/cohort-hash.ts";
 import { viewIsEmpty } from "../../lib/partition-arms.ts";
-import type { CohortSourceState } from "./use-cohort-edits.ts";
+import type { CohortSaveState, CohortSourceState } from "./use-cohort-edits.ts";
 import { ViewCard } from "./view-cards.tsx";
 import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort, SavedWorkspace } from "./use-saved.ts";
@@ -46,6 +46,9 @@ export interface AnalysisCtx {
   /** where a copied cohort stands against the saved cohort it came from (use-cohort-edits.ts) */
   cohortSource: (name: string) => CohortSourceState | null;
   updateFromSaved: (name: string) => void;
+  /** whether a cohort has anything to save to the library, and the action that saves it */
+  cohortSaveState: (name: string) => CohortSaveState | null;
+  saveCohortToLibrary: (name: string) => Promise<void>;
   loggedIn: boolean;
   viewTitle: (kind: string) => string;
   emptyViewHint: (kind: string) => string;
@@ -138,7 +141,7 @@ function EmptyViewCard({ ctx, vi }: { ctx: AnalysisCtx; vi: number }) {
 }
 
 export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
-  const { busy, catalogAttrs, cohortSource, doc, loggedIn, menuOpenRef, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, result, setPartitionDef, setUpgradeNote, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, updateFromSaved, upgradeNote, viewTitle } = ctx;
+  const { busy, catalogAttrs, cohortSaveState, cohortSource, doc, loggedIn, menuOpenRef, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, result, saveCohortToLibrary, setPartitionDef, setUpgradeNote, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, updateFromSaved, upgradeNote, viewTitle } = ctx;
   const [cohortOpen, setCohortOpen] = useState<Set<string>>(() => new Set());
   const names = Object.keys(doc.cohorts || {});
   const flat = splitsFlat();
@@ -154,82 +157,83 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
           <button className="linklike" onClick={() => setUpgradeNote(null)}>dismiss</button>
         </p>
       )}
-      {/* The analysis's cohorts are not its top level: each view names the ones it draws, and this
-          is the summary of them — one line each, with the views that draw it; the definition, its
-          splits and its menu a click away. Cohorts come in through a view's "+ Add cohort". */}
+      {/* The analysis's cohorts are not its top level: each view names the ones it draws, and these
+          cards summarise them — each with the views that draw it and the saved cohort it was copied
+          from. Cohorts come in through a view's "+ Add cohort". */}
       {names.length > 0 && (
         <section className="cohortsum" aria-label="cohorts in this analysis">
-          <h2 className="vtitle hflex items-center gap-3 mb-2">
-            Cohorts in this analysis <span className="plain meta">— {names.length} · add one from a view</span>{busy && <span className="spinner" />}
+          <h2 className="vtitle hflex items-center gap-3 mb-4">
+            Cohorts in this analysis <span className="plain meta">— add one from a view</span>{busy && <span className="spinner" />}
           </h2>
-          <ul className="cohortsum-list">
+          <div className="cohortlist">
             {names.map((n, i) => {
               const c = result?.cohorts[n];
               const splits = Object.keys(flat).filter((k) => flat[k].of === n);
               const views = usedIn(n);
               const open = cohortOpen.has(n);
               const src = cohortSource(n);
+              const toSave = cohortSaveState(n);
               const toggle = () => setCohortOpen((s) => { const x = new Set(s); if (x.has(n)) x.delete(n); else x.add(n); return x; });
               return (
-                <li key={n} className="cohortsum-item">
-                  <div className="cohortsum-row">
-                    <button className="cohortsum-toggle" aria-expanded={open} title={open ? "hide its definition" : "show its definition" + (splits.length ? " and splits" : "")}
-                      onClick={toggle}>{open ? "▾" : "▸"}</button>
-                    <span className="cohortsum-name" title={n}>
-                      <span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />{n}
-                      {splits.length > 0 && <span className="meta" title={splits.map((k) => flat[k].split).join(", ")}>⑂ {splits.length}</span>}
-                    </span>
-                    <span className="cohortsum-count">{c ? <><strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span></>
-                      : busy ? <span className="skeleton cohortsum-skel" /> : <span className="meta">—</span>}</span>
-                    <CohortStudies ids={c?.studies && c.studies.length ? c.studies : [doc.cohorts?.[n]?.study || doc.study || result?.study].filter(Boolean) as string[]}
-                      names={studyNames} />
-                    <span className="cohortsum-views-cell">
-                      <span className={"cohortsum-views" + (views.length ? "" : " unused")} title={views.join(", ")}>
-                        {views.length ? "in " + views.join(", ") : "in no view"}
-                      </span>
-                      {src?.state === "changed" && <button className="srcbadge changed" onClick={() => { if (!open) toggle(); }}
-                        title={"the saved cohort “" + src.srcName + "” has changed since this copy was made — open to compare and update"}>saved version changed</button>}
-                      {src?.state === "deleted" && <span className="srcbadge" title={"copied from a saved cohort “" + src.from.name + "” that has since been deleted"}>source deleted</span>}
-                    </span>
+                <div key={n} className={"cohortgroup" + (splits.length ? " hassplit" : "")}>
+                  <div className="cohortbox">
                     <CohortEditMenu busy={busy} canEdit={!!(doc.title && spaces[doc.title])}
                       onEdit={() => openCohortEdit(n)} onRemove={() => removeCohort(n)}
                       split={(done: () => void) => <SplitForm cohort={n} attrs={catalogAttrs()} busy={busy} onSplit={splitCohortBy} onDone={done} />}
                       splitCount={splits.length}
+                      save={toSave && { onSave: () => saveCohortToLibrary(n), label: toSave.action === "create" ? "save to library" : "save changes to library",
+                        title: toSave.action === "create" ? "save “" + toSave.as + "” to your library, to add it to other analyses"
+                          : "write this cohort's definition and splits over “" + toSave.as + "” in your library" }}
                       menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
-                  </div>
-                  {open && (
-                    <div className="cohortsum-detail">
-                      {doc.cohorts?.[n] && <CohortPills def={doc.cohorts[n]} onCustomData={showClauseData(n)} />}
-                      {doc.cohorts?.[n]?.notes && <p className="note flush">{doc.cohorts[n].notes}</p>}
-                      {src && (
-                        <div className="cohortsrc meta">
-                          <span>Copied from saved cohort <strong>“{src.from.name}”</strong>{src.from.savedAt ? " (saved " + src.from.savedAt + ")" : ""}
-                            {" "}· definition <code title={src.from.hash}>#{shortHash(src.from.hash)}</code>.</span>
-                          {src.state === "unknown" && <span> {loggedIn ? "Checking the saved cohort…" : "Log in to compare it with the saved cohort."}</span>}
-                          {src.state === "deleted" && <span> That saved cohort has since been deleted; this copy is unaffected.</span>}
-                          {(src.state === "current" || src.state === "changed") && src.srcName !== src.from.name && <span> It is now named “{src.srcName}”.</span>}
-                          {src.state === "current" && !src.edited && <span> The saved cohort is unchanged.</span>}
-                          {src.edited && <span> This copy has been edited here since (now <code>#{shortHash(cohortHash(doc.cohorts![n]))}</code>).</span>}
-                          {src.state === "changed" && <span className="cohortsrc-changed"> The saved cohort has changed since (now <code title={src.now}>#{shortHash(src.now!)}</code>, saved {src.src!.savedAt}).</span>}
-                          {(src.state === "changed" || (src.state === "current" && src.edited)) && <>
-                            {src.state === "changed" && <div className="cohortsrc-new"><span className="meta">The saved version:</span> <CohortPills def={src.src!.def} /></div>}
-                            <button className="tbbtn" disabled={busy} onClick={() => updateFromSaved(n)}
-                              title={"replace this copy's definition with the saved cohort's; every view drawing “" + n + "” re-runs"}>
-                              {src.state === "changed" ? "Update to the saved version" : "Revert to the saved version"}</button>
-                          </>}
-                        </div>
-                      )}
-                      {result && splits.map((k) => (
-                        <PartitionPanel key={k} name={k} partitions={flat} results={result.splits}
-                          cohortText={(x) => result.cohorts[x]?.text} attrs={catalogAttrs()} busy={busy}
-                          onChange={setPartitionDef} onRename={renamePartitionRow} onRemove={removePartitionNamed} onSplit={splitCohortBy} />
-                      ))}
+                    <div className="cohortbox-head">
+                      <span className="cohortbox-name"><span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />{n}</span>
+                      {c ? <><strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span></>
+                        : busy ? <span className="skeleton cohortsum-skel" /> : null}
                     </div>
-                  )}
-                </li>
+                    <CohortStudies ids={c?.studies && c.studies.length ? c.studies : [doc.cohorts?.[n]?.study || doc.study || result?.study].filter(Boolean) as string[]}
+                      names={studyNames} />
+                    {doc.cohorts?.[n] && <CohortPills def={doc.cohorts[n]} onCustomData={showClauseData(n)} />}
+                    {doc.cohorts?.[n]?.notes && <p className="note">{doc.cohorts[n].notes}</p>}
+                    <div className="cohortbox-foot">
+                      <span className={"cohortsum-views" + (views.length ? "" : " unused")} title={views.join(", ")}>
+                        {views.length ? "in " + views.join(", ") : "in no view"}
+                      </span>
+                      {src && <button className={"srcbadge" + (src.state === "changed" ? " changed" : "")} aria-expanded={open} onClick={toggle}
+                        title={src.state === "changed" ? "the saved cohort “" + src.srcName + "” has changed since this copy was made — open to compare and update"
+                          : src.state === "deleted" ? "copied from a saved cohort “" + src.from.name + "” that has since been deleted"
+                          : "copied from the saved cohort “" + src.from.name + "”"}>
+                        {src.state === "changed" ? "saved version changed" : src.state === "deleted" ? "source deleted" : "#" + shortHash(src.from.hash)}</button>}
+                    </div>
+                    {open && src && (
+                      <div className="cohortsrc meta">
+                        <span>Copied from saved cohort <strong>“{src.from.name}”</strong>{src.from.savedAt ? " (saved " + src.from.savedAt + ")" : ""}
+                          {" "}· definition <code title={src.from.hash}>#{shortHash(src.from.hash)}</code>.</span>
+                        {src.state === "unknown" && <span> {loggedIn ? "Checking the saved cohort…" : "Log in to compare it with the saved cohort."}</span>}
+                        {src.state === "deleted" && <span> That saved cohort has since been deleted; this copy is unaffected.</span>}
+                        {(src.state === "current" || src.state === "changed") && src.srcName !== src.from.name && <span> It is now named “{src.srcName}”.</span>}
+                        {src.state === "current" && !src.edited && <span> The saved cohort is unchanged.</span>}
+                        {src.edited && <span> This copy has been edited here since (now <code>#{shortHash(cohortHash(doc.cohorts![n]))}</code>).</span>}
+                        {src.state === "changed" && <span className="cohortsrc-changed"> The saved cohort has changed since (now <code title={src.now}>#{shortHash(src.now!)}</code>, saved {src.src!.savedAt}).</span>}
+                        {(src.state === "changed" || (src.state === "current" && src.edited)) && <>
+                          {src.state === "changed" && <div className="cohortsrc-new"><span className="meta">The saved version:</span> <CohortPills def={src.src!.def} /></div>}
+                          <button className="tbbtn" disabled={busy} onClick={() => updateFromSaved(n)}
+                            title={"replace this copy's definition with the saved cohort's; every view drawing “" + n + "” re-runs"}>
+                            {src.state === "changed" ? "Update to the saved version" : "Revert to the saved version"}</button>
+                        </>}
+                      </div>
+                    )}
+                  </div>
+                  {result && splits.length > 0 && <div className="cohortgroup-splits">
+                    {splits.map((k) => (
+                      <PartitionPanel key={k} name={k} partitions={flat} results={result.splits}
+                        cohortText={(x) => result.cohorts[x]?.text} attrs={catalogAttrs()} busy={busy}
+                        onChange={setPartitionDef} onRename={renamePartitionRow} onRemove={removePartitionNamed} onSplit={splitCohortBy} />
+                    ))}
+                  </div>}
+                </div>
               );
             })}
-          </ul>
+          </div>
         </section>
       )}
     </div>
