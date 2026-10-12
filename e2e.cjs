@@ -43,6 +43,14 @@ async function main() {
     const anon = await browser.newContext();
     const r = await anon.request.get(BASE + "/api/artifacts?kind=cohort");
     ok("saved cohorts are refused without the login", r.status() === 403 || r.status() === 404, "HTTP " + r.status());
+    // a built server knows its commit (lib/build-info.ts), says it at /api/version, and every page's footer agrees
+    const v = await (await anon.request.get(BASE + "/api/version")).json();
+    ok("/api/version names the commit this build was made from", /^[0-9a-f]{40}(\+dirty)?$/.test(v.commit || "") && /\/commit\/[0-9a-f]{40}$/.test(v.url || ""), JSON.stringify(v));
+    const vp = await anon.newPage();
+    await vp.goto(BASE + "/lab", { waitUntil: "domcontentloaded" });
+    const stamp = await vp.locator("footer.build-stamp a").first();
+    const [text, href] = [await stamp.textContent(), await stamp.getAttribute("href")];
+    ok("the page footer shows the same commit, linked", text === v.label && href === v.url, text + " → " + href);
     await anon.close();
   }
 

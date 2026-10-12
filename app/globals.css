@@ -48,6 +48,10 @@ header .sub { color: var(--muted); font-size: var(--t-md); }
 }
 .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .pill.on { color: var(--ok); border-color: var(--ok); } .pill.on .dot { background: var(--ok); }
+/* which commit this deployment runs — apparatus, a step below everything else */
+.build-stamp { padding: var(--s2) 1.4rem var(--s4); color: var(--muted); font-size: var(--t-xs); text-align: right; }
+.build-stamp a { color: inherit; }
+.build-stamp .mono { font-family: "IBM Plex Mono", monospace; }
 main { max-width: 76rem; margin: 0 auto; padding: 1.2rem 1.4rem 4rem; }
 .card {
   background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);

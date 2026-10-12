@@ -449,6 +449,12 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
 ## Workflows
 
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
+- **Every build knows its commit.** `next.config.mjs` stamps it as `GIT_COMMIT`: Vercel's
+  `VERCEL_GIT_COMMIT_SHA`, else a `GIT_COMMIT` passed in (the Docker image takes it as a build
+  argument — `.git` is not in its context — and CI passes `github.sha`), else `git rev-parse HEAD`
+  with `+dirty` for a changed tree; `next dev` says `dev`. `lib/build-info.ts` reads it; every page's
+  footer shows it, linked to the commit, and `GET /api/version` returns it. A build that could find no
+  commit (a hand-run `docker build` without `--build-arg GIT_COMMIT=…`) reads "unknown", never blank.
 - Test: `npm test` — unit suites, no database needed (the patient-data boundary, the stats used by
   federated views, cohort-definition semantics, clinical-course semantics, and the SVG figure
   renderers, plots, gene tracks, template parameters and the panel-aware denominator;
