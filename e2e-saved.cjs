@@ -102,9 +102,9 @@ async function savedLists(browser, ok, BASE, LOGIN) {
         "starts empty " + startsEmpty + ", reopened " + reopened);
 
       const names = Object.keys((await doc()).cohorts);
-      const gear = page.locator("details.cohortgear").first();
-      await gear.locator("summary").click();
-      await gear.getByRole("button", { name: "edit…" }).click();
+      const menu = page.locator("[data-slot=popover-content]");
+      await page.locator(".cohortgear").first().click();
+      await menu.getByRole("button", { name: "edit…" }).click();
       await open("cohortdialog").waitFor();
       await page.locator("#cename").fill(names[1]);
       await open("cohortdialog").locator("button[type=submit]").click();
@@ -114,14 +114,14 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       const renamed = await docUntil((d) => !!d.cohorts["e2e renamed"] && !d.cohorts[names[0]]);
       ok("cohort dialog: refuses a taken name, then renames", refused && renamed, "refused " + refused + ", renamed " + renamed);
 
-      const vgear = page.locator(".viewcard details.gearmenu:has(summary[title='reorder or remove this view'])").first();
-      await vgear.locator("summary").click();
-      await vgear.getByRole("button", { name: /add note…/ }).click();
+      const vgear = page.locator(".viewcard .viewgear").first();
+      await vgear.click();
+      await menu.getByRole("button", { name: /add note…/ }).click();
       await page.locator("#vntext").fill("  e2e note  ");
       await open("cohortdialog").locator("button[type=submit]").click();
       const noted = await docUntil((d) => d.views[0].note === "e2e note");
-      await vgear.locator("summary").click();
-      await vgear.getByRole("button", { name: /edit note…/ }).click();
+      await vgear.click();
+      await menu.getByRole("button", { name: /edit note…/ }).click();
       await page.locator("#vntext").fill("");
       await open("cohortdialog").locator("button[type=submit]").click();
       const cleared = await docUntil((d) => d.views[0].note === undefined);

@@ -8,6 +8,10 @@ import type { ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 import { HIGHLIGHT_CAP, HIGHLIGHT_COLORS } from "../../lib/plot-highlight.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
+import { ArrowDown, ArrowUp, Ellipsis, Pencil, Plus, Save, Split, StickyNote, Trash2 } from "lucide-react";
+import { Button } from "../_ui/button";
+import { Checkbox } from "../_ui/checkbox";
+import { GearMenu, MenuItem, MenuSeparator } from "./gear-menu.tsx";
 
 /** the cohort colours, in order, for every chart on the page */
 export const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
@@ -279,16 +283,13 @@ export function useGearmenuOpen(id: string, store: Map<string, boolean>) {
  * ViewHead means every view kind gets it for free, with nothing to add at each view's own JSX.
  */
 export function ViewHelpButton({ kind, menuId, menuStore }: { kind: string; menuId: string; menuStore: Map<string, boolean> }) {
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   const help = VIEW_HELP[kind];
   if (!help) return null;
   return (
-    <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title="what this view is, in plain language" aria-label="what this view is, in plain language">?</summary>
-      <div className="gearmenu-items">
-        <p className="viewhelp-text">{help.text}</p>
-      </div>
-    </details>
+    <GearMenu menuId={menuId} menuStore={menuStore} label="?" title="what this view is, in plain language"
+      ariaLabel="what this view is, in plain language" wide contentClassName="p-3">
+      <p className="viewhelp-text">{help.text}</p>
+    </GearMenu>
   );
 }
 
@@ -332,24 +333,21 @@ export function PickMenu({ label, title, options, chosen, onChange, min, max, bu
     if (has && min != null && chosen.length <= min) return;
     onChange(has ? chosen.filter((x) => x !== v) : [...chosen, v]);
   };
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   return (
-    <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title={title}>{label} ({chosen.length}){loading && !options.length && <span className="spinner" />}</summary>
-      <div className="gearmenu-items">
+    <GearMenu menuId={menuId} menuStore={menuStore} title={title} contentClassName="max-h-[65vh] overflow-y-auto px-2.5"
+      label={<>{label} ({chosen.length}){loading && !options.length && <span className="spinner" />}</>}>
         {options.length === 0 && (loading ? <Waiting what={label} /> : <span className="meta">nothing to choose from</span>)}
         {options.map((o) => {
           const on = chosen.includes(o.value);
           const stuck = on ? (min != null && chosen.length <= min) : (max != null && chosen.length >= max);
           return (
-            <label key={o.value} className="chk" title={stuck ? (on ? "a view needs at least " + min : "at most " + max) : undefined}>
-              <input type="checkbox" checked={on} disabled={busy || stuck} onChange={() => toggle(o.value)} />
-              {o.label}{o.hint && <span className="meta"> — {o.hint}</span>}
+            <label key={o.value} className="flex cursor-pointer items-center gap-2 py-1 text-md" title={stuck ? (on ? "a view needs at least " + min : "at most " + max) : undefined}>
+              <Checkbox checked={on} disabled={busy || stuck} onCheckedChange={() => toggle(o.value)} />
+              <span>{o.label}{o.hint && <span className="meta"> — {o.hint}</span>}</span>
             </label>
           );
         })}
-      </div>
-    </details>
+    </GearMenu>
   );
 }
 
@@ -373,7 +371,6 @@ export function CohortPicker({ nodes, chosen, max, busy, onChange, onAdd, menuId
   nodes: CohortNode[]; chosen: string[]; max?: number; busy?: boolean;
   onChange: (next: string[]) => void; onAdd?: () => void; menuId: string; menuStore: Map<string, boolean>;
 }) {
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   const byName = new Map(nodes.map((x) => [x.name, x] as const));
   const splits = nodes.filter((x) => x.kind === "split");
   /** the split a name draws from: itself if a split, else the deepest split it sits under */
@@ -433,20 +430,19 @@ export function CohortPicker({ nodes, chosen, max, busy, onChange, onAdd, menuId
     );
   };
   return (
-    <details className="gearmenu cohortpick" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title="which cohorts this view draws — a split draws each of its groups">
-        cohorts ({drawn === chosen.length ? drawn : drawn + " groups"})
-      </summary>
-      <div className="gearmenu-items">
+    <GearMenu menuId={menuId} menuStore={menuStore} className="cohortpick" title="which cohorts this view draws — a split draws each of its groups"
+      label={"cohorts (" + (drawn === chosen.length ? drawn : drawn + " groups") + ")"}
+      contentClassName="max-h-[65vh] max-w-[30rem] min-w-[22rem] gap-0 overflow-y-auto px-0 pt-0 pb-1">
+      {(close) => <>
         <div className="cpick-head">Draw in this view</div>
         {nodes.filter((o) => !hidden(o.name)).map(row)}
         {single ? <p className="cpick-foot">This view draws one cohort — pick one, or one group of a split.</p>
           : splits.length > 0 && <p className="cpick-foot">A view draws whole cohorts, or the groups of one split — not both. Choosing one replaces the other.</p>}
-        {onAdd && <button type="button" className="linklike cpick-add" disabled={busy}
+        {onAdd && <Button type="button" variant="link" size="inline" className="mx-2.5 mt-1 self-start text-md" disabled={busy}
           title="add a cohort from your library, or build one in Explore"
-          onClick={() => { menuStore.set(menuId, false); if (ref.current) ref.current.open = false; onAdd(); }}>+ add a cohort…</button>}
-      </div>
-    </details>
+          onClick={() => { close(); onAdd(); }}><Plus />add a cohort…</Button>}
+      </>}
+    </GearMenu>
   );
 }
 
@@ -547,25 +543,23 @@ export function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove, on
   menuId: string; menuStore: Map<string, boolean>; onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void;
   onEditNote?: () => void; hasNote?: boolean;
 }) {
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   return (
-    <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title="reorder or remove this view" aria-label="reorder or remove this view">⋯</summary>
-      <div className="gearmenu-items">
-        <button className="linklike" disabled={!onMoveUp} onClick={onMoveUp}>move up</button>
-        <button className="linklike" disabled={!onMoveDown} onClick={onMoveDown}>move down</button>
+    <GearMenu menuId={menuId} menuStore={menuStore} className="viewgear" label={<Ellipsis />} title="reorder or remove this view" ariaLabel="reorder or remove this view">
+      {(close) => <>
+        <MenuItem disabled={!onMoveUp} onClick={() => { close(); onMoveUp?.(); }}><ArrowUp />move up</MenuItem>
+        <MenuItem disabled={!onMoveDown} onClick={() => { close(); onMoveDown?.(); }}><ArrowDown />move down</MenuItem>
         {/* a note belongs to a saved analysis, as a cohort's edits do (see CohortEditMenu), so the
             item only exists once there is a saved analysis for it to belong to */}
         {onEditNote && <>
-          <hr />
-          <button className="linklike" onClick={onEditNote}>{hasNote ? "edit note…" : "add note…"}</button>
+          <MenuSeparator />
+          <MenuItem onClick={() => { close(); onEditNote(); }}><StickyNote />{hasNote ? "edit note…" : "add note…"}</MenuItem>
         </>}
         {onRemove && <>
-          <hr />
-          <button className="linklike" onClick={onRemove}>remove</button>
+          <MenuSeparator />
+          <MenuItem className="text-destructive hover:text-destructive" onClick={() => { close(); onRemove(); }}><Trash2 />remove</MenuItem>
         </>}
-      </div>
-    </details>
+      </>}
+    </GearMenu>
   );
 }
 
@@ -593,32 +587,31 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
   splitCount?: number;
   menuId: string; menuStore: Map<string, boolean>;
 }) {
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   const [splitting, setSplitting] = useState(false);
   const [saving, setSaving] = useState(false);
   return (
-    <details className="gearmenu cohortgear" ref={ref} data-menu-id={menuId}
-      onToggle={(e) => { onToggle(e); if (!(e.currentTarget as HTMLDetailsElement).open) setSplitting(false); }}>
-      <summary className="tbbtn" title="edit this cohort" aria-label="edit this cohort">⋯</summary>
-      <div className={"gearmenu-items" + (splitting ? " wide" : "")}>
+    <GearMenu menuId={menuId} menuStore={menuStore} className="cohortgear" label={<Ellipsis />} title="edit this cohort" ariaLabel="edit this cohort"
+      wide={splitting} onOpenChange={(o) => { if (!o) setSplitting(false); }}>
+      {(close) => <>
         {save && !splitting && <>
-          <button className="linklike" disabled={busy || saving} title={save.title}
+          <MenuItem disabled={busy || saving} title={save.title}
             onClick={async () => { setSaving(true); try { await save.onSave(); } finally { setSaving(false); } }}>
-            {save.label}{saving && <span className="spinner ml-1.5" />}</button>
-          <hr />
+            <Save />{save.label}{saving && <span className="spinner ml-1.5" />}</MenuItem>
+          <MenuSeparator />
         </>}
-        {split && (splitting ? <>{split(() => { menuStore.set(menuId, false); setSplitting(false); })}<hr /></> : <>
-          <button className="linklike" disabled={busy} title="divide this cohort into arms that never overlap and add up to it"
-            onClick={() => setSplitting(true)}>{splitCount ? "split another way…" : "split into arms…"}</button>
-          <hr />
+        {split && (splitting ? <>{split(() => { close(); setSplitting(false); })}<MenuSeparator /></> : <>
+          <MenuItem disabled={busy} title="divide this cohort into arms that never overlap and add up to it"
+            onClick={() => setSplitting(true)}><Split />{splitCount ? "split another way…" : "split into arms…"}</MenuItem>
+          <MenuSeparator />
         </>)}
         {canEdit && <>
-          <button className="linklike" disabled={busy} onClick={onEdit}>edit…</button>
-          <hr />
+          <MenuItem disabled={busy} onClick={() => { close(); onEdit(); }}><Pencil />edit…</MenuItem>
+          <MenuSeparator />
         </>}
-        <button className="linklike" disabled={busy} title="remove it from the analysis and from every view that draws it" onClick={onRemove}>remove from analysis</button>
-      </div>
-    </details>
+        <MenuItem className="text-destructive hover:text-destructive" disabled={busy} title="remove it from the analysis and from every view that draws it"
+          onClick={() => { close(); onRemove(); }}><Trash2 />remove from analysis</MenuItem>
+      </>}
+    </GearMenu>
   );
 }
 

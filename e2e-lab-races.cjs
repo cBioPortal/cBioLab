@@ -152,8 +152,8 @@ async function labRaces(browser, ok, BASE) {
       await settled(page);
       await page.locator(".viewcard").evaluateAll((els) => els.forEach((el, i) => { el.__mark = "card" + i; }));
       const marks = () => page.locator(".viewcard").evaluateAll((els) => els.map((el) => el.__mark || "new"));
-      await page.locator(".viewcard").first().locator("summary[aria-label='reorder or remove this view']").click();
-      await page.locator(".viewcard").first().getByRole("button", { name: "move down" }).click();
+      await page.locator(".viewcard").first().getByRole("button", { name: "reorder or remove this view" }).click();
+      await page.locator("[data-slot=popover-content]").getByRole("button", { name: "move down" }).click();
       await page.waitForTimeout(500);
       const moved = await marks();
       const kinds = (await doc(page)).views.map((v) => v.kind);

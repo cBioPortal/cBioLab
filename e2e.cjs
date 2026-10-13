@@ -696,8 +696,8 @@ async function main() {
       try {
         beforeN = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).length;
         const firstCard = page.locator(".viewcard").first();
-        await firstCard.locator("summary[title='reorder or remove this view']").click();
-        await firstCard.locator(".gearmenu-items button:has-text('remove')").click();
+        await firstCard.getByRole("button", { name: "reorder or remove this view" }).click();
+        await page.locator("[data-slot=popover-content]").getByRole("button", { name: "remove" }).click();
         await page.waitForFunction((n) => {
           try { return (JSON.parse(document.querySelector("#docjson").value).views || []).length === n - 1; }
           catch { return false; }
@@ -1184,8 +1184,9 @@ async function main() {
       };
       const menuItems = async () => {
         const box = sp.locator(".cohortbox", { hasText: name });
-        await box.locator(".cohortgear").evaluate((d) => { d.open = true; });
-        const items = await box.locator(".cohortgear .gearmenu-items button").allInnerTexts();
+        const gear = box.locator(".cohortgear");
+        if ((await gear.getAttribute("data-state")) !== "open") await gear.click();
+        const items = await sp.locator("[data-slot=popover-content]").getByRole("button").allInnerTexts();
         return { box, items };
       };
       const savedDef = async () => {
@@ -1195,7 +1196,7 @@ async function main() {
       await open({ dsl: "2.5", study: "msk_chord_2024", cohorts: { [name]: { all: [{ kind: "oql", q: "KRAS: MUT" }] } }, views: [{ kind: "survival", cohorts: [name] }] });
       let m = await menuItems();
       steps.offered = m.items.some((t) => t.trim() === "save to library");
-      await m.box.locator(".cohortgear button", { hasText: "save to library" }).click();
+      await sp.locator("[data-slot=popover-content]").getByRole("button", { name: "save to library", exact: true }).click();
       await sp.waitForFunction((n) => { try { return !!JSON.parse(document.querySelector("#docjson").value).cohorts[n].from; } catch { return false; } }, name, { timeout: 60000 });
       const a1 = await savedDef();
       steps.saved = !!a1 && (await docOf()).cohorts[name].from.saved === a1.id;
@@ -1206,7 +1207,7 @@ async function main() {
       await open(d);
       m = await menuItems();
       steps.offeredAfterSplit = m.items.some((t) => t.trim() === "save changes to library");
-      await m.box.locator(".cohortgear button", { hasText: "save changes to library" }).click();
+      await sp.locator("[data-slot=popover-content]").getByRole("button", { name: "save changes to library", exact: true }).click();
       for (let i = 0; i < 60 && !(await savedDef())?.definition?.splits; i++) await sp.waitForTimeout(1000);
       const a2 = await savedDef();
       steps.splitSaved = !!a2 && a2.id === a1.id && !!a2.definition.splits?.sex && !a2.definition.from;
