@@ -7,6 +7,9 @@
 import { useState } from "react";
 import type { PartitionDef, PartitionResult } from "../../lib/types.ts";
 import { moveArm, removeArm, mergeArms, canMergeArms } from "../../lib/partition-arms.ts";
+import { Ellipsis, LoaderCircle } from "lucide-react";
+import { Button } from "../_ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../_ui/dropdown-menu";
 
 export type SplitSpec = { attribute: string } | { gene: string } | { oql: string[] };
 
@@ -222,16 +225,17 @@ export interface ChartAction { label: string; title: string; onClick: () => void
 export function ChartMenu({ actions, label }: { actions: ChartAction[]; label: string }) {
   if (!actions.length) return null;
   return (
-    <details className="gearmenu chartgear">
-      <summary className="tbbtn" title={"actions for " + label} aria-label={"actions for " + label}>⋯</summary>
-      <div className="gearmenu-items">
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon-xs" className="chartgear" title={"actions for " + label} aria-label={"actions for " + label}><Ellipsis /></Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-52">
         {actions.map((a) => (
-          <button key={a.label} className="linklike" disabled={a.disabled} title={a.title}
-            onClick={(e) => { const d = (e.currentTarget as HTMLElement).closest("details"); if (d) d.open = false; a.onClick(); }}>
-            {a.working && <span className="spinner" />}{a.label}
-          </button>
+          <DropdownMenuItem key={a.label} disabled={a.disabled} title={a.title} onSelect={a.onClick}>
+            {a.working && <LoaderCircle className="animate-spin" />}{a.label}
+          </DropdownMenuItem>
         ))}
-      </div>
-    </details>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
