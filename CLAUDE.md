@@ -514,8 +514,14 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
 - Lint: `npm run lint` (~2 min) — ESLint with type-aware rules (`eslint.config.mjs`: typescript-eslint,
   the hooks rules, Next's rules and the SonarJS rules that point at wrong code; style rules are off
   on purpose), knip (`knip.json`: unused files and dependencies) and ruff on `python/` (rules in
-  `python/pyproject.toml`; `pip install -e 'python[dev]'` puts it in the venv). It starts clean:
-  fix what it reports, or disable that line with a `-- reason`.
+  `python/pyproject.toml`; `pip install -e 'python[dev]'` puts it in the venv). It is the gate's
+  first stage, so it fails fast: fix what it reports, or disable that line with a `-- reason`.
+  `npm run report:dupes` (jscpd) and `npm run report:security` (Semgrep's registry packs, via
+  `uvx`) write to `quality-report/`; CI runs both as a report-only job and keeps the artifact.
+- **An API GET handler that never reads the request is prerendered at build time** (Cache
+  Components) and then answers every request with what the build saw — e.g. "no login" from a
+  build without `LOGIN_PASSWORD`. Call `await connection()` (`next/server`) first. `scripts/gate.sh`
+  fails on any prerendered API route outside its short allowlist.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push **your own branch**. **Stop there.**
   This is the checkpoint for a *finished* piece of work, not a loop to run after every edit —

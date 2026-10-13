@@ -30,3 +30,6 @@ verification-report/
 
 # ruff
 .ruff_cache/
+
+# npm run report:dupes / report:security
+quality-report/

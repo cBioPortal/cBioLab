@@ -1,0 +1,8 @@
+{
+  "path": ["app", "lib", "mcp", "scripts", "test", "python/cohortlab"],
+  "ignore": ["**/*.json"],
+  "minTokens": 70,
+  "reporters": ["console", "json"],
+  "output": "quality-report/duplication",
+  "gitignore": true
+}
