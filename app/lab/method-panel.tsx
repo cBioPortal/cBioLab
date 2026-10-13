@@ -5,6 +5,9 @@ import { useState } from "react";
 import type { MethodRecord } from "../../lib/method.ts";
 import type { AnalysisDoc } from "../../lib/types.ts";
 import { api } from "./api.ts";
+import { Check, Copy, Download, LoaderCircle } from "lucide-react";
+import { Button } from "../_ui/button";
+import { TB } from "../_ui/toolbar.ts";
 
 const REPO = "https://github.com/cBioPortal/cohort-lab";
 
@@ -83,10 +86,10 @@ export function MethodPanel({ method, source }: { method: MethodRecord; source?:
         <summary className="meta">Python equivalent — recompute these numbers with standard libraries</summary>
         <div className="provq">
           <div className="provhead">
-            <button className="tbbtn" onClick={copy}>{copied ? "copied" : "copy"}</button>
-            {source && <button className="tbbtn" onClick={download} disabled={nb.busy}
+            <Button variant="outline" size="sm" className={TB} onClick={copy}>{copied ? <Check /> : <Copy />}{copied ? "copied" : "copy"}</Button>
+            {source && <Button variant="outline" size="sm" className={TB} onClick={download} disabled={nb.busy}
               title="A Jupyter notebook with this script, the data it reads and a check against these numbers. Opens in JupyterLab, VS Code or Colab.">
-              {nb.busy ? "building notebook…" : "download as notebook (.ipynb)"}</button>}
+              {nb.busy ? <LoaderCircle className="animate-spin" /> : <Download />}{nb.busy ? "building notebook…" : "download as notebook (.ipynb)"}</Button>}
             {nb.error && <span className="meta" role="alert">{nb.error}</span>}
           </div>
           <pre>{method.python}</pre>

@@ -4,6 +4,13 @@
 // filters on request. Search matches name, id, cancer type and reference.
 import { useMemo, useState } from "react";
 import type { DatasetRow } from "../../lib/datasets.ts";
+import { Columns3, ListFilter } from "lucide-react";
+import { Checkbox } from "../_ui/checkbox";
+import { GearMenu } from "../_ui/gear-menu.tsx";
+import { Input } from "../_ui/input";
+
+/** a checkbox row in a menu */
+const CHK = "flex cursor-pointer items-center gap-2 py-1 text-md";
 
 type Col = { key: keyof DatasetRow; label: string; title: string; shown?: boolean };
 const COUNTS: Col[] = [
@@ -58,28 +65,24 @@ export function DatasetsTable({ rows }: { rows: DatasetRow[] }) {
   return (
     <section className="ds-table">
       <div className="ds-controls">
-        <input type="search" placeholder="search studies, cancer types, references" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Input type="search" placeholder="search studies, cancer types, references" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 w-80 bg-card text-md md:text-md" />
         <span className="meta">{shown.length.toLocaleString()} of {rows.length.toLocaleString()} studies</span>
         <span className="spacer" />
-        <details className="ds-menu">
-          <summary className="tbbtn">Filters{on.length ? " (" + on.length + ")" : ""} ▾</summary>
-          <div className="ds-menu-body">
+        <GearMenu menuId="ds-filters" title="show only studies with these data" contentClassName="px-2.5"
+          label={<><ListFilter />Filters{on.length ? " (" + on.length + ")" : ""}</>}>
             <span className="meta">studies with:</span>
             {FILTERS.map((f) => (
-              <label key={f.id} className="chk"><input type="checkbox" checked={on.includes(f.id)}
-                onChange={() => setOn((o) => o.includes(f.id) ? o.filter((x) => x !== f.id) : [...o, f.id])} /> {f.label}</label>
+              <label key={f.id} className={CHK}><Checkbox checked={on.includes(f.id)}
+                onCheckedChange={() => setOn((o) => o.includes(f.id) ? o.filter((x) => x !== f.id) : [...o, f.id])} /> {f.label}</label>
             ))}
-          </div>
-        </details>
-        <details className="ds-menu">
-          <summary className="tbbtn">Columns ▾</summary>
-          <div className="ds-menu-body">
+        </GearMenu>
+        <GearMenu menuId="ds-columns" title="choose the count columns shown" contentClassName="px-2.5"
+          label={<><Columns3 />Columns</>}>
             {COUNTS.map((c) => (
-              <label key={String(c.key)} className="chk" title={c.title}><input type="checkbox" checked={cols.includes(String(c.key))}
-                onChange={() => setCols((o) => o.includes(String(c.key)) ? o.filter((x) => x !== String(c.key)) : [...o, String(c.key)])} /> {c.label}</label>
+              <label key={String(c.key)} className={CHK} title={c.title}><Checkbox checked={cols.includes(String(c.key))}
+                onCheckedChange={() => setCols((o) => o.includes(String(c.key)) ? o.filter((x) => x !== String(c.key)) : [...o, String(c.key)])} /> {c.label}</label>
             ))}
-          </div>
-        </details>
+        </GearMenu>
       </div>
       <div className="ds-scroll">
         <table>

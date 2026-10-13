@@ -9,6 +9,10 @@ import { PortalTabs } from "../PortalTabs";
 import { useStudyKnown, expressionProfile, type StudyKnown } from "../study-known";
 import { arrange, decodeDoc, usePageDoc, type PageLayout } from "../page-doc";
 import { ALTERATION_CELLS, cellLabel } from "../../../lib/lollipop";
+import { Button } from "../../_ui/button";
+import { Input } from "../../_ui/input";
+import { FIELD } from "../../_ui/toolbar.ts";
+import { cn } from "../../../lib/cn";
 
 const CLINICAL_SHOWN = 8;
 
@@ -93,9 +97,9 @@ export default function ResultsPage() {
   if (!study || !genes.length) return (
     <main className="portal-main">{head}
       <form className="card" method="get">
-        <label className="tbfield">study <input name="study" defaultValue={study} placeholder="msk_chord_2024" /></label>{" "}
-        <label className="tbfield">genes <input name="genes" defaultValue={genes.join(" ")} placeholder="KRAS NRAS BRAF" /></label>{" "}
-        <button className="tbbtn" type="submit">show</button>
+        <label className="tbfield">study <Input name="study" defaultValue={study} placeholder="msk_chord_2024" className={cn(FIELD, "w-48")} /></label>{" "}
+        <label className="tbfield">genes <Input name="genes" defaultValue={genes.join(" ")} placeholder="KRAS NRAS BRAF" className={cn(FIELD, "w-48")} /></label>{" "}
+        <Button size="sm" className="h-ctl px-3 text-md" type="submit">show</Button>
       </form>
     </main>);
   if (genes.length > 12) return <main className="portal-main">{head}<p className="note">a results page takes at most 12 genes, the oncoprint&apos;s rows; this asks for {genes.length}</p></main>;

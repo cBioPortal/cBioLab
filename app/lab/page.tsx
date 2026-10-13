@@ -37,6 +37,7 @@ import { useToolActions } from "./use-tool-actions.ts";
 import { AddCohortDialog, type AddCohortTarget } from "./add-cohort-dialog.tsx";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { Button } from "../_ui/button";
+import { Input } from "../_ui/input";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 const TAB_LABELS: [typeof TABS[number], string][] = [["explore", "Explore"], ["cohorts", "Saved"], ["analysis", "Analysis"], ["examples", "Examples"]];
@@ -107,14 +108,14 @@ function AddCohortBar({ existing, target, ready, error, onAdd, onCancel }: {
       <span className="meta">filter below, name it, then add it — Cancel returns to the analysis</span>
       <span className="spacer" />
       <label className="addcohortname">name
-        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80}
+        <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} className="h-8 w-56 bg-card text-md md:text-md"
           onKeyDown={(e) => { if (e.key === "Enter" && ready && name.trim() && !clash) onAdd(name); }} />
       </label>
-      <button className="primary" disabled={!ready || !name.trim() || clash} onClick={() => onAdd(name)}
+      <Button disabled={!ready || !name.trim() || clash} onClick={() => onAdd(name)}
         title={!ready ? "select a study first" : clash ? "the analysis already has a cohort with this name" : "add this selection to " + target + " as “" + name.trim() + "”"}>
-        Add to {target}
-      </button>
-      <button onClick={onCancel} title="close without adding (Esc)">Cancel</button>
+        <Plus />Add to {target}
+      </Button>
+      <Button variant="outline" onClick={onCancel} title="close without adding (Esc)">Cancel</Button>
       {(clash || error) && <p className="error fullrow flush">{clash ? "the analysis already has a cohort named “" + name.trim() + "”" : error}</p>}
     </div>
   );

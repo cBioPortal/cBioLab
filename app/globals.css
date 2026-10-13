@@ -1647,10 +1647,6 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .pb-tablebar { display: flex; gap: var(--s3); align-items: center; justify-content: flex-end; margin-bottom: var(--s2); }
 .pb-plot { flex: 1 1 420px; max-width: 760px; }
 .ds-controls .spacer { flex: 1; }
-.ds-menu { position: relative; }
-.ds-menu > summary { list-style: none; cursor: pointer; }
-.ds-menu > summary::-webkit-details-marker { display: none; }
-.ds-menu-body { position: absolute; right: 0; z-index: 10; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s3); display: grid; gap: var(--s1); min-width: 13rem; box-shadow: 0 6px 24px rgb(0 0 0 / 0.12); }
 .ds-table .ds-dl a { color: var(--accent-ink); }
 .ds-table .ds-study { min-width: 20rem; }
 .portal-group { color: #fff; border-radius: var(--r-sm); padding: 1px var(--s2); font-size: var(--t-xs); }
