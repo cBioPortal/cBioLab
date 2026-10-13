@@ -5,10 +5,17 @@
 //
 // The rows a clause matches are re-derived here from the stored values, folding case and
 // whitespace the way the engine does, as a reading aid. The cohort's own count is the engine's.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCustomDataState } from "./custom-data-panel.tsx";
 import { builtinDataset, requestLogin, datasetStudies, datasetToTsv, fetchServerVersion, serverBySlug, type StoredDataset, type UploadBinding } from "./custom-data-client.ts";
 import { parseCustomAttr, type CustomDataset } from "../../lib/custom-data-names.ts";
+import { Download } from "lucide-react";
+import { Button } from "../_ui/button";
+import { Checkbox } from "../_ui/checkbox";
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "../_ui/dialog";
+import { Input } from "../_ui/input";
+import { cn } from "../../lib/cn";
+import { FIELD, TB } from "./toolbar.ts";
 
 export interface CustomDataFocus {
   /** dataset ids to show, in order */
@@ -81,7 +88,7 @@ function ServerDataset({ id, version, latest, clause, onRepin }: { id: string; v
   const pinNote = (
     <p className="meta" style={{ margin: "0 0 var(--s1)" }}>
       <span className="customtag">server</span> version {version}{latest > version ? <> · <b>v{latest} is newer</b></> : latest ? " (latest)" : ""}
-      {latest > version && onRepin && <> <button className="linklike" onClick={onRepin}>use v{latest} in this analysis</button></>}
+      {latest > version && onRepin && <> <Button variant="link" size="inline" className="text-md" onClick={onRepin}>use v{latest} in this analysis</Button></>}
     </p>
   );
   if (err) return <section className="cdview">{pinNote}<p className="error">{err}</p></section>;
@@ -116,7 +123,7 @@ function DatasetView({ d, clause, note }: { d: StoredDataset; clause?: CustomDat
         <h4 style={{ margin: 0 }}>{d.name}</h4>
         <code className="meta">custom:{d.id}</code>
         <span className="spacer" />
-        <button className="tbbtn" onClick={download} title="download as a tab-separated file you can upload again">Export</button>
+        <Button variant="outline" size="sm" className={TB} onClick={download} title="download as a tab-separated file you can upload again"><Download />Export</Button>
       </div>
       {note}
       <p className="meta" style={{ margin: "var(--s1) 0 var(--s3)" }}>
@@ -160,8 +167,8 @@ function DatasetView({ d, clause, note }: { d: StoredDataset; clause?: CustomDat
       )}
 
       <div className="row" style={{ alignItems: "center", marginTop: "var(--s3)" }}>
-        <input type="search" placeholder="find a case id or value" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: "16rem" }} />
-        {matching && <label className="chk"><input type="checkbox" checked={onlyMatching} onChange={(e) => setOnlyMatching(e.target.checked)} /> only rows this clause matches</label>}
+        <Input type="search" placeholder="find a case id or value" value={q} onChange={(e) => setQ(e.target.value)} className={cn(FIELD, "w-64")} />
+        {matching && <label className="chk"><Checkbox checked={onlyMatching} onCheckedChange={(c) => setOnlyMatching(c === true)} /> only rows this clause matches</label>}
         <span className="meta">
           {shown.length > ROW_CAP ? "showing the first " + ROW_CAP.toLocaleString() + " of " + shown.length.toLocaleString() + " rows — search to narrow"
             : shown.length.toLocaleString() + " row" + (shown.length === 1 ? "" : "s")}
@@ -199,14 +206,7 @@ export default function CustomDataDialog({ focus, onClose, onManage, bindings, o
   /** open Explore → Custom data */
   onManage: () => void;
 }) {
-  const ref = useRef<HTMLDialogElement | null>(null);
   const server = useCustomDataState();
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (focus && !el.open) el.showModal();
-    if (!focus && el.open) el.close();
-  }, [focus]);
   const ids = focus?.datasets ?? [];
   // the same precedence the requests use (custom-data-client.ts attach): bundled demo data, a pin, the server's latest
   const where = ids.map((id) => {
@@ -219,24 +219,25 @@ export default function CustomDataDialog({ focus, onClose, onManage, bindings, o
   const missing = where.filter((w) => !w.demo && !w.server).map((w) => w.id);
 
   return (
-    <dialog ref={ref} className="addchartdialog customdatadialog" onClose={onClose}
-      onClick={(e) => { if (e.target === ref.current) ref.current?.close(); }}>
-      <div className="row" style={{ alignItems: "baseline" }}>
-        <h3 style={{ margin: 0 }}>
+    <Dialog open={!!focus} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <DialogContent aria-describedby={undefined} showCloseButton={false}
+      className="customdatadialog flex h-[90vh] w-[94vw] max-w-[94vw] flex-col gap-3 overflow-auto p-6 sm:max-w-[94vw]">
+      <div className="flex items-baseline gap-3">
+        <DialogTitle className="text-base">
           {focus?.clause ? <>Custom data behind {focus.clause.cohort ? <>&ldquo;{focus.clause.cohort}&rdquo;</> : "this clause"}</> : "Custom data this analysis uses"}
-        </h3>
+        </DialogTitle>
         <span className="spacer" />
-        <button className="linklike" onClick={() => { ref.current?.close(); onManage(); }}>manage uploads</button>
-        <button className="primary" onClick={() => ref.current?.close()}>Done</button>
+        <Button variant="link" size="inline" className="text-md" onClick={() => { onClose(); onManage(); }}>manage uploads</Button>
+        <DialogClose asChild><Button size="sm">Done</Button></DialogClose>
       </div>
-      <p className="note" style={{ marginTop: "var(--s1)" }}>
+      <p className="note m-0">
         Stored on the server and pinned by version: the document holds the attribute names and the
         version, never these values.
       </p>
       {missing.length > 0 && (
         <div className="card customwarn">
           {!server.enabled ? <>This deployment does not store custom data, so {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)} cannot be read here.</>
-            : !server.unlocked ? <><button className="linklike" onClick={requestLogin}>Log in</button> to read {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}.</>
+            : !server.unlocked ? <><Button variant="link" size="inline" className="text-md" onClick={requestLogin}>Log in</Button> to read {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}.</>
             : <>Not on the server: {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}.</>}
         </div>
       )}
@@ -245,6 +246,7 @@ export default function CustomDataDialog({ focus, onClose, onManage, bindings, o
         : w.server ? <ServerDataset key={w.id} id={w.server.dataset} version={w.server.version} latest={w.server.latest} clause={focus?.clause}
             onRepin={bindings.some((b) => b.as === w.id) ? () => onRepin(w.id, w.server!.latest) : undefined} />
         : null)}
-    </dialog>
+    </DialogContent>
+    </Dialog>
   );
 }

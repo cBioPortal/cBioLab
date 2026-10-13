@@ -83,7 +83,7 @@ export function SplitForm({ cohort, attrs, busy, onSplit, onDone }: SplitProps &
           <span className="meta">one query per line, tested in order; the first match wins</span>
           <Textarea className="min-h-18 bg-muted font-mono text-md md:text-md" value={oql} onChange={(e) => setOql(e.target.value)} placeholder={"KRAS: G12C\nKRAS: MUT"} spellCheck={false} />
         </div>}
-        <p className="text-sm text-muted-foreground">
+        <p className="m-0 text-sm text-muted-foreground">
           The arms never overlap and add up to “{cohort}”. Patients not profiled for the gene, or with
           no value recorded, get their own row rather than counting as wild-type or Other.
         </p>

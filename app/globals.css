@@ -58,21 +58,22 @@
 @layer legacy {
 /* The browser defaults this stylesheet was written against, which Tailwind's preflight removes.
    Measured, not guessed: each is a computed style that changed on a real page when preflight was
-   added. They apply only outside new UI (shadcn components mark every part with [data-slot]; a
-   converted area marks its root [data-tw]), and :where() keeps them at zero specificity so any
-   rule below wins. Delete this block once nothing outside those remains. */
+   added. They apply to legacy markup wherever it sits, a shadcn dialog or popover included, but
+   not to shadcn's own parts (each marked [data-slot]) or inside a converted area (its root marked
+   [data-tw]); links and media also stay out of shadcn components entirely. :where() keeps them at
+   zero specificity so any rule below wins. Delete this block once nothing outside those remains. */
 :where(a:not([data-slot] *, [data-tw] *, [data-slot], [data-tw])) { color: var(--accent-ink); text-decoration: underline; }
 :where(svg, canvas, img, video):where(:not([data-slot] *, [data-tw] *)) { display: inline; vertical-align: baseline; }
-:where(h1, h2, h3, h4, h5, h6, th, b, strong):where(:not([data-slot] *, [data-tw] *)) { font-weight: 700; }
+:where(h1, h2, h3, h4, h5, h6, th, b, strong):where(:not([data-slot], [data-tw] *)) { font-weight: 700; }
 :where(dialog:not([data-slot])) { margin: auto; }
-:where(p, pre, dl, figure, blockquote):where(:not([data-slot] *, [data-tw] *, [data-slot])) { margin-block: 1em; }
-:where(ul, ol):where(:not([data-slot] *, [data-tw] *, [data-slot])) { margin-block: 1em; padding-left: 40px; }
-:where(ul):where(:not([data-slot] *, [data-tw] *, [data-slot])) { list-style: disc; }
-:where(ol):where(:not([data-slot] *, [data-tw] *, [data-slot])) { list-style: decimal; }
-:where(dd):where(:not([data-slot] *, [data-tw] *)) { margin-left: 40px; }
-:where(input[type=checkbox], input[type=radio]):where(:not([data-slot] *, [data-tw] *, [data-slot])) { margin: 3px 3px 3px 4px; }
-:where(table):where(:not([data-slot] *, [data-tw] *, [data-slot])) { border-collapse: separate; border-spacing: 2px; }
-:where(td, th):where(:not([data-slot] *, [data-tw] *)) { padding: 1px; }
+:where(p, pre, dl, figure, blockquote):where(:not([data-slot], [data-tw] *)) { margin-block: 1em; }
+:where(ul, ol):where(:not([data-slot], [data-tw] *)) { margin-block: 1em; padding-left: 40px; }
+:where(ul):where(:not([data-slot], [data-tw] *)) { list-style: disc; }
+:where(ol):where(:not([data-slot], [data-tw] *)) { list-style: decimal; }
+:where(dd):where(:not([data-slot], [data-tw] *)) { margin-left: 40px; }
+:where(input[type=checkbox], input[type=radio]):where(:not([data-slot], [data-tw] *)) { margin: 3px 3px 3px 4px; }
+:where(table):where(:not([data-slot], [data-tw] *)) { border-collapse: separate; border-spacing: 2px; }
+:where(td, th):where(:not([data-slot], [data-tw] *)) { padding: 1px; }
 :where(hr) { color: var(--line); }
 
 :root {
@@ -662,7 +663,6 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .kmlegend { display: flex; flex-wrap: wrap; gap: 1.2rem; font-size: var(--t-sm); color: var(--muted); margin-top: 0.4rem; }
 
 /* ---------------- text dialogs (app/lab/dialogs.tsx) ---------------- */
-.namedialog .error { margin-top: var(--s2); }
 
 /* ---------------- Saved tab ---------------- */
 .flush, .card h2.flush, dialog h3.flush { margin: 0; }
@@ -924,13 +924,13 @@ details.gearmenu.gm-inline[open] > summary {
 
 /* Name-a-cohort dialog. Native <dialog>, so Esc, focus trapping and the
    backdrop are the platform's rather than ours. */
-.namedialog, .genedialog, .exportdialog, .addchartdialog {
+.genedialog, .exportdialog {
   border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card);
   color: var(--ink); padding: 1rem 1.1rem; min-width: 20rem; max-width: 26rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
 }
-.namedialog::backdrop, .genedialog::backdrop, .exportdialog::backdrop, .addchartdialog::backdrop { background: rgba(0, 0, 0, 0.32); }
-.namedialog h3, .genedialog h3, .exportdialog h3, .addchartdialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
+.genedialog::backdrop, .exportdialog::backdrop { background: rgba(0, 0, 0, 0.32); }
+.genedialog h3, .exportdialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
 /* "+ Add cohort" on a view: the analysis's cohorts, the library, or Explore, as three tabs */
 .acd-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; grid-template-columns: fit-content(16rem) minmax(8rem, 1fr) fit-content(40%) auto; column-gap: var(--s3); }
 .acd-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; padding: var(--s1) 0; border-top: 1px solid var(--line); }
@@ -964,19 +964,13 @@ button.srcbadge { cursor: pointer; height: auto; }
 .cohortsrc-new { flex-basis: 100%; display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
 .cohortsum-views { min-width: 0; flex: 1 1 auto; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cohortsum-views.unused { font-style: italic; }
-/* Explore's "+ Add chart": one tab per filter kind (clinical/gene/derived-timeline),
-   each of which used to be its own permanent card above the facet grid. Most of the
-   screen on purpose — a checkbox list of 60+ clinical attributes and the custom
-   sequence builder's several setrows both want real width to breathe, not a
-   form-sized dialog forcing everything into one cramped column. */
-.addchartdialog { width: 94vw; max-width: 94vw; height: 90vh; max-height: 90vh; overflow: auto; }
 /* The custom sequence builder's setrows, inline in the Derived tab rather than
    behind their own nested dropdown — same row shape .gearmenu-items gives a
    popover's setrows, scoped to this dialog instead of a details>summary. */
-.addchartdialog .setrow, .addchart .setrow { display: flex; align-items: center; gap: 0.4rem; font-size: var(--t-sm); padding: 0.15rem 0; }
-.addchartdialog .setrow > .meta, .addchart .setrow > .meta { min-width: 5.2rem; color: var(--muted); flex: none; }
-.addchartdialog .setrow select, .addchart .setrow select { flex: 1; min-width: 0; }
-.addchartdialog hr, .addchart hr { border: none; border-top: 1px solid var(--line); margin: 0.5rem 0; }
+.addchart .setrow { display: flex; align-items: center; gap: 0.4rem; font-size: var(--t-sm); padding: 0.15rem 0; }
+.addchart .setrow > .meta { min-width: 5.2rem; color: var(--muted); flex: none; }
+.addchart .setrow select { flex: 1; min-width: 0; }
+.addchart hr { border: none; border-top: 1px solid var(--line); margin: 0.5rem 0; }
 /* The dialog itself is huge on purpose, but a <select> or button stretched to
    94vw wide reads as broken, not spacious — cap the form's own width the same
    way .gearmenu-items.wide used to, independent of the dialog around it. */
@@ -1059,8 +1053,6 @@ button.customtag:hover { text-decoration: underline; }
 }
 .customlist td { vertical-align: top; }
 .customlist td.meta { white-space: normal; }
-.namedialog .meta { display: block; margin-bottom: 0.6rem; }
-.namedialog input { width: 100%; box-sizing: border-box; }
 .genedialog { min-width: 24rem; max-width: 30rem; }
 .genedialog .setcol > .meta { color: var(--muted); font-size: var(--t-sm); }
 .genedialog .pillwrap { display: flex; flex-wrap: wrap; gap: 0.3rem; }
@@ -1594,8 +1586,6 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .agent-pop code { font-family: "IBM Plex Mono", monospace; font-size: var(--t-xs); }
 /* the header's shared login (app/lab/login-button.tsx) */
 .loginstate { display: inline-flex; align-items: center; gap: var(--s2); }
-.logindialog .meta { display: block; margin-bottom: var(--s3); }
-.logindialog input { width: 100%; box-sizing: border-box; }
 
 /* /datasets — the data sets table */
 .ds-page { max-width: 1400px; }

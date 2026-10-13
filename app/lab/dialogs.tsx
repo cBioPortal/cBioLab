@@ -25,7 +25,7 @@ function FormDialog({ className, title, onClose, onSubmit, children, footer }: {
 }) {
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent aria-describedby={undefined} className={cn("gap-0 sm:max-w-md", className)}>
+      <DialogContent data-tw aria-describedby={undefined} className={cn("gap-0 sm:max-w-md", className)}>
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="flex flex-col gap-3">
           <DialogHeader><DialogTitle className="text-base">{title}</DialogTitle></DialogHeader>
           {children}
