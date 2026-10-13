@@ -58,8 +58,6 @@ export type ExploreCtx = ExploreState & {
 
 /** a search box in a toolbar row */
 const SEARCH = "h-8 w-44 text-md md:text-md";
-/** a text-sized action that reads as a link */
-const LINK = "h-auto px-0 text-sm text-link";
 /** the × that removes a chip */
 const CHIP_X = "ml-1 size-4 rounded-sm text-muted-foreground hover:text-foreground [&_svg:not([class*='size-'])]:size-3";
 /** a study row's action icon */
@@ -375,8 +373,8 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
               <div className="row baseline">
                 {custom.length > 0 && <>
                   <span className="meta">{checkedOf(custom)} of {custom.length} checked</span>
-                  <Button variant="link" size="xs" className={LINK} onClick={() => setAll(custom, true)}>check all</Button>
-                  <Button variant="link" size="xs" className={LINK} onClick={() => setAll(custom, false)}>check none</Button>
+                  <Button variant="link" size="inline" onClick={() => setAll(custom, true)}>check all</Button>
+                  <Button variant="link" size="inline" onClick={() => setAll(custom, false)}>check none</Button>
                 </>}
                 <span className="spacer" />
                 <Button variant="outline" size="sm" onClick={() => { setAddChartOpen(false); openCustomManager(custom.length ? "manage" : "add"); }}>
@@ -403,8 +401,8 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                   title="narrows this checklist by attribute name" autoFocus
                   onChange={e => setClinFilter(e.target.value)} />
                 <span className="meta">{checkedOf(builtin)} of {builtin.length} checked</span>
-                <Button variant="link" size="xs" className={LINK} onClick={() => setAll(builtin, true)}>check all</Button>
-                <Button variant="link" size="xs" className={LINK} onClick={() => setAll(builtin, false)}>check none</Button>
+                <Button variant="link" size="inline" onClick={() => setAll(builtin, true)}>check all</Button>
+                <Button variant="link" size="inline" onClick={() => setAll(builtin, false)}>check none</Button>
                 {exStudies.length > 1 && (
                   <Choice className="w-44" value={String(attrCoverage)} disabled={exploreBusy}
                     title="attributes carried by only one study are that study's own vocabulary, not something the selection shares"
@@ -993,7 +991,7 @@ export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
             </p>
           )}
           {!needle && rows.length > geneRowLimit && (
-            <Button variant="link" size="xs" className={LINK} onClick={() => setGeneRowLimit(geneRowLimit + 50)}>show more</Button>
+            <Button variant="link" size="inline" onClick={() => setGeneRowLimit(geneRowLimit + 50)}>show more</Button>
           )}
         </div>
       );

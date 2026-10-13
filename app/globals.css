@@ -794,7 +794,6 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 
 /* Cohorts tab: tick-to-select */
 .pick { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
-.pick input { margin: 0; cursor: pointer; }
 
 /* Per-view latency, beside the participation marker */
 .lat {

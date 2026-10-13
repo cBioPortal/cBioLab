@@ -369,10 +369,10 @@ async function main() {
       // derives the name from the draft, so two Analyze runs share a name and
       // counting cohorts could not tell replace from overwrite.
       await page.getByRole("tab", { name: "Saved", exact: true }).click();
-      await page.waitForSelector(".pick input", { timeout: 240000 });
+      await page.waitForSelector(".pick [role=checkbox]", { timeout: 240000 });
       let seeded = [];
       try {
-        await page.locator(".pick input").nth(0).check();
+        await page.locator(".pick [role=checkbox]").nth(0).check();
         await page.locator("button:has-text('Analyze selected')").click();
         await page.waitForSelector(".cohortbox", { timeout: 300000 });
         seeded = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {});
@@ -597,14 +597,14 @@ async function main() {
       // Cohorts tab: tick cohorts, submit them together. No per-row "add" links.
       await page.goto(BASE + "/lab");
       await page.getByRole("tab", { name: "Saved", exact: true }).click();
-      await page.waitForSelector(".pick input", { timeout: 240000 });
+      await page.waitForSelector(".pick [role=checkbox]", { timeout: 240000 });
       ok("cohort rows use checkboxes, not per-row add links",
         (await page.locator("button:has-text('add to analysis')").count()) === 0,
-        (await page.locator(".pick input").count()) + " selectable cohorts");
+        (await page.locator(".pick [role=checkbox]").count()) + " selectable cohorts");
       ok("submit is refused with nothing ticked",
         await page.locator("button:has-text('Analyze selected')").isDisabled());
-      await page.locator(".pick input").nth(0).check();
-      await page.locator(".pick input").nth(1).check();
+      await page.locator(".pick [role=checkbox]").nth(0).check();
+      await page.locator(".pick [role=checkbox]").nth(1).check();
       await page.locator("button:has-text('Analyze selected')").click();
       let together = [], startViews = -1;
       try {
