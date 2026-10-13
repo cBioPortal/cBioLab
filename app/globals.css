@@ -49,6 +49,12 @@
   --font-mono: "IBM Plex Mono", monospace;
 }
 
+/* new UI draws borders in the theme's border colour unless a utility names another */
+@layer base {
+  :where([data-slot], [data-tw]), :where([data-slot], [data-tw]) *,
+  :where([data-slot], [data-tw]) ::before, :where([data-slot], [data-tw]) ::after { border-color: var(--color-border); }
+}
+
 @layer legacy {
 /* The browser defaults this stylesheet was written against, which Tailwind's preflight removes.
    Measured, not guessed: each is a computed style that changed on a real page when preflight was
@@ -137,12 +143,12 @@ main { max-width: 76rem; margin: 0 auto; padding: 1.2rem 1.4rem 4rem; }
   color: var(--muted); font-weight: 600; margin: 0 0 0.7rem;
 }
 .card h2 .plain { text-transform: none; letter-spacing: 0; font-weight: 400; }
-label { display: block; font-size: var(--t-sm); color: var(--muted); margin: 0.55rem 0 0.15rem; }
-input, select, button {
+label:where(:not([data-slot])) { display: block; font-size: var(--t-sm); color: var(--muted); margin: 0.55rem 0 0.15rem; }
+:where(input, select, button):where(:not([data-slot])) {
   font: inherit; color: var(--ink); background: var(--paper);
   border: 1px solid var(--line); border-radius: var(--r-sm); padding: 0.35rem 0.55rem;
 }
-input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+:where(input, select, button):where(:not([data-slot])):focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 input[type=number] { width: 6.2rem; font-variant-numeric: tabular-nums; }
 button { cursor: pointer; }
 button.primary {

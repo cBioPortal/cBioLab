@@ -80,8 +80,8 @@ async function main() {
     const rootResp = await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
     ok(scheme + ": / redirects into the app", /\/lab(\?|$)/.test(page.url()) && rootResp.ok(),
       page.url() + " status " + rootResp.status());
-    await page.waitForSelector(".tabs button", { timeout: 90000 });
-    ok(scheme + ": app shell loads", (await page.locator(".tabs button").count()) >= 4);
+    await page.waitForSelector("[aria-label='lab sections'] [role=tab]", { timeout: 90000 });
+    ok(scheme + ": app shell loads", (await page.getByRole("tab").count()) >= 4);
 
     if (scheme === "light") {
       // No credentials anywhere client-visible: check for env var names plus the
@@ -221,7 +221,7 @@ async function main() {
       // (the filters bar below it only renders once a filter exists), so this
       // is the main path from browsing to an analysis with zero filters set.
       await page.goto(BASE + "/lab");
-      await page.locator("button:has-text('Explore')").first().click();
+      await page.getByRole("tab", { name: "Explore", exact: true }).click();
       await page.waitForSelector('h2:has-text("Exploring")', { timeout: 120000 });
       await pickExploreStudies(page);
       let unfiltered = "";
@@ -340,7 +340,7 @@ async function main() {
       // several .namedialog-based dialogs, and "everything except this one"
       // stopped meaning "the Save-as-a-Cohort dialog" the moment a second
       // one showed up.
-      await page.locator(".tabs button:has-text('Explore')").click();
+      await page.getByRole("tab", { name: "Explore", exact: true }).click();
       await page.waitForSelector(".exbar", { timeout: 120000 });
       await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
       let saveFlow = "dialog never opened";
@@ -359,7 +359,7 @@ async function main() {
         await page.locator("dialog.savedialog button:has-text('Save')").click();
         await page.waitForFunction(() => /saved/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 120000 });
-        await page.locator(".tabs button:text-is('Saved')").click();
+        await page.getByRole("tab", { name: "Saved", exact: true }).click();
         await page.waitForTimeout(1500);
         const inList = await page.locator("text=e2e dialog cohort").count();
         savedOk = !!prefilled && closedOnEsc && inList > 0;
@@ -371,7 +371,7 @@ async function main() {
       // DIFFERENTLY-named cohort first, so replacement is provable: the bar now
       // derives the name from the draft, so two Analyze runs share a name and
       // counting cohorts could not tell replace from overwrite.
-      await page.locator(".tabs button:text-is('Saved')").click();
+      await page.getByRole("tab", { name: "Saved", exact: true }).click();
       await page.waitForSelector(".pick input", { timeout: 240000 });
       let seeded = [];
       try {
@@ -380,7 +380,7 @@ async function main() {
         await page.waitForSelector(".cohortbox", { timeout: 300000 });
         seeded = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {});
       } catch { /* left empty */ }
-      await page.locator(".tabs button:has-text('Explore')").click();
+      await page.getByRole("tab", { name: "Explore", exact: true }).click();
       await page.waitForSelector(".exbar", { timeout: 120000 });
       await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
       await page.locator(".valrow, .slice").nth(2).click();
@@ -579,18 +579,14 @@ async function main() {
 
       // Tabs are deep-linked: a refresh must land you where you were.
       await page.goto(BASE + "/lab");
-      await page.waitForSelector(".tabs button", { timeout: 120000 });
-      await page.locator(".tabs button:has-text('Explore')").click();
+      await page.waitForSelector("[aria-label='lab sections'] [role=tab]", { timeout: 120000 });
+      await page.getByRole("tab", { name: "Explore", exact: true }).click();
       await page.waitForTimeout(400);
       const urlHasTab = /tab=explore/.test(await page.evaluate(() => location.search));
       await page.reload();
-      // :visible matters here: the "+ Add chart" dialog carries its own nested
-      // .tabs (Clinical/Gene status/Derived timeline filters), present in the
-      // DOM with its own default-active button even while the <dialog> itself
-      // is closed — a bare ".tabs button.active" is ambiguous the moment that
-      // dialog has ever been part of the tree, not just while it's open.
-      await page.waitForSelector(".tabs button.active:visible", { timeout: 120000 });
-      const stayed = (await page.locator(".tabs button.active:visible").innerText()).trim();
+      // scoped to the lab's own tab list: the "+ Add chart" dialog carries tabs of its own
+      await page.waitForSelector("[aria-label='lab sections'] [role=tab][aria-selected=true]", { timeout: 120000 });
+      const stayed = (await page.locator("[aria-label='lab sections'] [role=tab][aria-selected=true]").innerText()).trim();
       ok("tabs survive a refresh", urlHasTab && stayed === "Explore", "?tab written: " + urlHasTab + ", after reload: " + stayed);
 
       // A ?doc= link still implies the analysis, but an explicit ?tab= wins.
@@ -599,11 +595,11 @@ async function main() {
       await page.goto(BASE + "/lab?tab=examples&doc=" + enc);
       await page.waitForTimeout(1800);
       ok("an explicit ?tab= beats the document's default tab",
-        (await page.locator(".tabs button.active:visible").innerText()).trim() === "Examples");
+        (await page.locator("[aria-label='lab sections'] [role=tab][aria-selected=true]").innerText()).trim() === "Examples");
 
       // Cohorts tab: tick cohorts, submit them together. No per-row "add" links.
       await page.goto(BASE + "/lab");
-      await page.locator(".tabs button:text-is('Saved')").click();
+      await page.getByRole("tab", { name: "Saved", exact: true }).click();
       await page.waitForSelector(".pick input", { timeout: 240000 });
       ok("cohort rows use checkboxes, not per-row add links",
         (await page.locator("button:has-text('add to analysis')").count()) === 0,
@@ -749,7 +745,7 @@ async function main() {
       // The docs gate already proves each one RUNS; this proves the app can
       // launch them and that the federated views actually paint something.
       await page.goto(BASE + "/lab");
-      await page.locator("button:has-text('Examples')").first().click();
+      await page.getByRole("tab", { name: "Examples", exact: true }).click();
       await page.waitForSelector(".excard", { timeout: 120000 });
       const nCards = await page.locator(".excard").count();
       const { EXAMPLES } = await import("./lib/dsl-reference.ts");
@@ -766,7 +762,7 @@ async function main() {
       ];
       // a multi-view document must render EVERY one of its views, not just the first
       await page.goto(BASE + "/lab");
-      await page.locator("button:has-text('Examples')").first().click();
+      await page.getByRole("tab", { name: "Examples", exact: true }).click();
       await page.waitForSelector(".excard", { timeout: 120000 });
       await page.locator(".excard").filter({ hasText: "One cohort, five ways" }).first()
         .locator("button:has-text('Run')").click();
@@ -843,7 +839,7 @@ async function main() {
 
       for (const [title, sel, label] of launches) {
         await page.goto(BASE + "/lab");
-        await page.locator("button:has-text('Examples')").first().click();
+        await page.getByRole("tab", { name: "Examples", exact: true }).click();
         await page.waitForSelector(".excard", { timeout: 120000 });
         const card = page.locator(".excard").filter({ hasText: title }).first();
         await card.locator("button:has-text('Run')").click();

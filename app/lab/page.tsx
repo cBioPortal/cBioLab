@@ -18,6 +18,7 @@ import { useExploreState } from "./use-explore-state.ts";
 import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
 import { useAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
+import { Plus, Upload } from "lucide-react";
 import { useGearmenuOpen } from "./view-chrome.tsx";
 import { api } from "./api.ts";
 import { useSavedArtifacts } from "./use-saved.ts";
@@ -34,8 +35,11 @@ import { useWorkspace } from "./use-workspace.ts";
 import { useLibrary, EXAMPLES } from "./use-library.ts";
 import { useToolActions } from "./use-tool-actions.ts";
 import { AddCohortDialog, type AddCohortTarget } from "./add-cohort-dialog.tsx";
+import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
+import { Button } from "../_ui/button";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
+const TAB_LABELS: [typeof TABS[number], string][] = [["explore", "Explore"], ["cohorts", "Saved"], ["analysis", "Analysis"], ["examples", "Examples"]];
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -369,12 +373,12 @@ export default function AnalysisPage() {
         {viewNoteEditing != null && <ViewNoteDialog note={(doc.views || [])[viewNoteEditing]?.note || ""}
           onSave={confirmViewNoteEdit} onClose={() => setViewNoteEditing(null)} />}
         <GenesDialog ctx={analysisCtx} />
-        <div className="tabs">
-          <button className={tab === "explore" ? "active" : ""} onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
-          <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Saved</button>
-          <button className={tab === "analysis" ? "active" : ""} onClick={() => goTab("analysis")}>Analysis</button>
-          <button className={tab === "examples" ? "active" : ""} onClick={() => goTab("examples")}>Examples</button>
-        </div>
+        <Tabs value={tab} className="mb-4" onValueChange={(v) => { goTab(v as typeof TABS[number]); if (v === "explore" && !explore) fetchExplore(); }}>
+          <TabsList variant="line" aria-label="lab sections" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
+            {TAB_LABELS.map(([t, label]) => <TabsTrigger key={t} value={t}
+              className="h-auto flex-none rounded-none px-3.5 pt-2 pb-1.5 text-base leading-normal after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary">{label}</TabsTrigger>)}
+          </TabsList>
+        </Tabs>
         {error && <div className="error">{error}</div>}
         <CustomDataWarning ctx={analysisCtx} />
 
@@ -404,10 +408,10 @@ export default function AnalysisPage() {
               touched any of them. One button, one modal with a tab per kind instead. */}
           {explore && (
             <div className="row mb-4">
-              <button className="tbbtn" onClick={() => addChartDialog.current?.showModal()}>+ Add chart</button>
-              <button className="tbbtn" title="upload your own annotations and chart, filter and analyse them like clinical attributes"
+              <Button variant="outline" size="sm" onClick={() => addChartDialog.current?.showModal()}><Plus />Add chart</Button>
+              <Button variant="outline" size="sm" title="upload your own annotations and chart, filter and analyse them like clinical attributes"
                 onClick={() => openCustomManager(customState.unlocked && customState.datasets.length ? "manage" : "add")}>
-                Custom data{customState.datasets.length ? " (" + customState.datasets.length + ")" : ""}</button>
+                <Upload />Custom data{customState.datasets.length ? " (" + customState.datasets.length + ")" : ""}</Button>
               {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
             </div>
           )}
