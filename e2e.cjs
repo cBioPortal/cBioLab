@@ -334,12 +334,9 @@ async function main() {
       ok("Analyze carries the cohort into an analysis with no views yet", landed && views === 0,
         landed ? counted + " · " + views + " views" : "cohort did not reach the document");
 
-      // Saving asks for the name when you ask to save. The dialog is native
-      // <dialog>, so Esc and the backdrop come from the platform. Targeted by
-      // its own .savedialog class, not ":not(.wsdialog)" — the app now has
-      // several .namedialog-based dialogs, and "everything except this one"
-      // stopped meaning "the Save-as-a-Cohort dialog" the moment a second
-      // one showed up.
+      // Saving asks for the name when you ask to save; Esc and the backdrop come
+      // from the dialog primitive. Targeted by its own .savedialog class, since
+      // the app has several dialogs open from the same page.
       await page.getByRole("tab", { name: "Explore", exact: true }).click();
       await page.waitForSelector(".exbar", { timeout: 120000 });
       await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
@@ -347,16 +344,16 @@ async function main() {
       let savedOk = false;
       try {
         await page.locator(".exbar button:has-text('Save as a Cohort')").click();
-        await page.waitForSelector("dialog.savedialog[open]", { timeout: 30000 });
-        const prefilled = await page.locator("dialog.savedialog input").inputValue();
+        await page.waitForSelector("[role=dialog].savedialog", { timeout: 30000 });
+        const prefilled = await page.locator("[role=dialog].savedialog input").inputValue();
         // Esc must dismiss without saving
         await page.keyboard.press("Escape");
         await page.waitForTimeout(400);
-        const closedOnEsc = (await page.locator("dialog.savedialog[open]").count()) === 0;
+        const closedOnEsc = (await page.locator("[role=dialog].savedialog").count()) === 0;
         await page.locator(".exbar button:has-text('Save as a Cohort')").click();
-        await page.waitForSelector("dialog.savedialog[open]", { timeout: 30000 });
-        await page.locator("dialog.savedialog input").fill("e2e dialog cohort");
-        await page.locator("dialog.savedialog button:has-text('Save')").click();
+        await page.waitForSelector("[role=dialog].savedialog", { timeout: 30000 });
+        await page.locator("[role=dialog].savedialog input").fill("e2e dialog cohort");
+        await page.locator("[role=dialog].savedialog button[type=submit]").click();
         await page.waitForFunction(() => /saved/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 120000 });
         await page.getByRole("tab", { name: "Saved", exact: true }).click();

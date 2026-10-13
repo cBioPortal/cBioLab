@@ -76,7 +76,7 @@ async function savedLists(browser, ok, BASE, LOGIN) {
     {
       const tool = (n, a = {}) => page.evaluate(([n, a]) => window.cohortLab.call(n, a), [n, a]);
       const doc = async () => (await tool("analysis_get_document")).document;
-      const open = (cls) => page.locator("dialog." + cls + "[open]");
+      const open = (cls) => page.locator("[role=dialog]." + cls);
       /** poll the document until `pred` holds (an edit reaches it a render later), or give up after 15 s */
       const docUntil = async (pred) => {
         for (const t0 = Date.now(); Date.now() - t0 < 15000; await page.waitForTimeout(200)) if (pred(await doc())) return true;
@@ -90,9 +90,9 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       for (let i = 0; i < 400 && await wsBtn.isDisabled(); i++) await page.waitForTimeout(300);
       await wsBtn.click();
       await open("wsdialog").waitFor();
-      const startsEmpty = (await open("wsdialog").locator("input").first().inputValue()) === "" && await open("wsdialog").locator("button.primary").isDisabled();
+      const startsEmpty = (await open("wsdialog").locator("input").first().inputValue()) === "" && await open("wsdialog").locator("button[type=submit]").isDisabled();
       await open("wsdialog").locator("input").first().fill("e2e workspace");
-      await open("wsdialog").locator("button.primary").click();
+      await open("wsdialog").locator("button[type=submit]").click();
       await page.waitForFunction(() => /saved \d{4}/.test(document.querySelector("button[title*='” — ']")?.title || ""), null, { timeout: 60000 }).catch(() => {});
       await wsBtn.click();
       await open("wsdialog").waitFor();
@@ -107,10 +107,10 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       await gear.getByRole("button", { name: "edit…" }).click();
       await open("cohortdialog").waitFor();
       await page.locator("#cename").fill(names[1]);
-      await open("cohortdialog").locator("button.primary").click();
+      await open("cohortdialog").locator("button[type=submit]").click();
       const refused = /already exists/.test(await open("cohortdialog").locator(".error").innerText({ timeout: 5000 }).catch(() => ""));
       await page.locator("#cename").fill("e2e renamed");
-      await open("cohortdialog").locator("button.primary").click();
+      await open("cohortdialog").locator("button[type=submit]").click();
       const renamed = await docUntil((d) => !!d.cohorts["e2e renamed"] && !d.cohorts[names[0]]);
       ok("cohort dialog: refuses a taken name, then renames", refused && renamed, "refused " + refused + ", renamed " + renamed);
 
@@ -118,12 +118,12 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       await vgear.locator("summary").click();
       await vgear.getByRole("button", { name: /add note…/ }).click();
       await page.locator("#vntext").fill("  e2e note  ");
-      await open("cohortdialog").locator("button.primary").click();
+      await open("cohortdialog").locator("button[type=submit]").click();
       const noted = await docUntil((d) => d.views[0].note === "e2e note");
       await vgear.locator("summary").click();
       await vgear.getByRole("button", { name: /edit note…/ }).click();
       await page.locator("#vntext").fill("");
-      await open("cohortdialog").locator("button.primary").click();
+      await open("cohortdialog").locator("button[type=submit]").click();
       const cleared = await docUntil((d) => d.views[0].note === undefined);
       ok("view note dialog: saves the note trimmed, and emptying removes it", noted && cleared, "noted " + noted + ", cleared " + cleared);
     }
