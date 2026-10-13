@@ -193,7 +193,7 @@ export default async function CliPage({ searchParams }: { searchParams: Promise<
             <details className="card" style={{ marginBottom: "0.8rem" }}>
               <summary className="meta">spec.json — save this next to the commands below</summary>
               <pre style={{ maxHeight: 320, overflow: "auto" }}>{JSON.stringify(spec, null, 2)}</pre>
-              <a className="linklike" download="spec.json"
+              <a className="text-link underline" download="spec.json"
                 href={"data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(spec, null, 2))}>download spec.json</a>
             </details>
             {list.map((s, i) => <Block key={i} s={s} />)}

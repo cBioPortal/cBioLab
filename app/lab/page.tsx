@@ -19,7 +19,6 @@ import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
 import { useAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload } from "lucide-react";
-import { useGearmenuOpen } from "./view-chrome.tsx";
 import { api } from "./api.ts";
 import { useSavedArtifacts } from "./use-saved.ts";
 import { SavedTab } from "./saved-tab.tsx";
@@ -146,9 +145,8 @@ export default function AnalysisPage() {
   const [genesFor, setGenesFor] = useState<number | null>(null);
   const customState = useCustomDataState();
   const tabRef = useRef<string>(tabFromParams(sp));            // the tab syncUrl should record
-  /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
+  /** which menus (view menu, cohorts picker, ...) are open, so a menu outlives its card remounting (GearMenu) */
   const menuOpenRef = useRef(new Map<string, boolean>());
-  const moreDerivedMenu = useGearmenuOpen("explore:more-derivations", menuOpenRef.current);
   /**
    * The document's raw JSON is a place to inspect and share what was asked, not something to
    * read while interpreting a figure — so it lives behind a button, in a dialog, rather than
@@ -320,7 +318,7 @@ export default function AnalysisPage() {
 
   // ---- what the sections read ------------------------------------------------------------
   /** what Explore's sections read and the edits they can make (app/lab/explore-sections.tsx) */
-  const exploreCtx: ExploreCtx = { ...exploreState, moreDerivedMenu, showClauseData, studies };
+  const exploreCtx: ExploreCtx = { ...exploreState, menuStore: menuOpenRef.current, showClauseData, studies };
   /** what every view card reads and the edits it can make (app/lab/view-cards.tsx) */
   const viewCtx = { VIEW_KINDS, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, maxCohortsOf, menuOpenRef, moveView, noteEdit, ocView, openCohortChooser, openGenes, patchView, pendingKeys, profileOptions, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
   /** what the Analysis tab's sections read and the actions they take (app/lab/analysis-sections.tsx) */

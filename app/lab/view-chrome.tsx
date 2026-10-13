@@ -2,7 +2,7 @@
 // The chrome every view card shares, and the small controls inside it: the header (ViewHead), its
 // menus, the cohort and value pickers, the axis picker, the gene inputs. Module-level components,
 // so React keeps their state across the analysis page's renders.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { attributeLabel } from "../../lib/custom-data-names.ts";
 import type { ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
@@ -260,24 +260,6 @@ export function OqlInput({ query, busy, onCommit }: { query: string; busy?: bool
       onKeyDown={(e) => { if (e.key === "Enter") commit(draft); }}
       onBlur={() => commit(draft)} />
   );
-}
-
-/**
- * A gearmenu's open/closed state, keyed by a caller-chosen id, kept in a store the page owns (see
- * `menuOpenRef` in AnalysisPage) rather than in the menu itself. A native `<details>` has no
- * memory of its own, so when its card is remounted (an edit that replaces the view, and with it
- * the card's key) the menu would silently reopen closed. This restores it synchronously before
- * the browser paints, so the close is never visible, and stays current on every open/close
- * however it happens — a click on the summary, or PopoverAutoClose's outside-click/Escape
- * handler, both fire the same native "toggle" event this listens for.
- */
-export function useGearmenuOpen(id: string, store: Map<string, boolean>) {
-  const ref = useRef<HTMLDetailsElement>(null);
-  useLayoutEffect(() => {
-    if (store.get(id) && ref.current) ref.current.open = true;
-  }, [id, store]);
-  const onToggle = (e: React.SyntheticEvent<HTMLDetailsElement>) => store.set(id, e.currentTarget.open);
-  return { ref, onToggle };
 }
 
 /**

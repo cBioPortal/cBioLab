@@ -152,11 +152,8 @@ label:where(:not([data-slot])) { display: block; font-size: var(--t-sm); color: 
 :where(input, select, button):where(:not([data-slot])):focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 input[type=number] { width: 6.2rem; font-variant-numeric: tabular-nums; }
 button { cursor: pointer; }
-button.primary {
-  background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
-  padding: 0.45rem 1.1rem;
-}
-@media (prefers-color-scheme: dark) { button.primary { color: #0d1417; } }
+
+@media (prefers-color-scheme: dark) {  }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 .row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: flex-end; }
 .grid2 { display: grid; grid-template-columns: minmax(330px, 420px) 1fr; gap: 1rem; align-items: start; }
@@ -170,7 +167,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .attr-row { display: flex; gap: 0.4rem; margin-top: 0.35rem; align-items: center; }
 .attr-row input { flex: 1; min-width: 0; }
 .attr-row .rm { border: none; background: none; color: var(--muted); padding: 0 0.3rem; font-size: var(--t-lg); }
-.linklike { border: none; background: none; color: var(--accent-ink); padding: 0.2rem 0; font-size: var(--t-md); text-decoration: underline; }
+
 .recipes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .recipes button { font-size: var(--t-sm); padding: 0.25rem 0.6rem; border-radius: var(--r-pill); background: var(--paper); }
 .recipes button:hover { border-color: var(--accent); color: var(--accent-ink); }
@@ -263,9 +260,9 @@ pre {
   border: 2px solid var(--accent-soft); border-top-color: var(--accent);
   border-radius: 50%; animation: spin 0.7s linear infinite;
 }
-.spinner.onprimary { border-color: rgba(255,255,255,0.35); border-top-color: #fff; }
+
 @media (prefers-color-scheme: dark) {
-  .spinner.onprimary { border-color: rgba(13,20,23,0.35); border-top-color: #0d1417; }
+  
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .busy { opacity: 0.45; pointer-events: none; transition: opacity 0.15s; }
@@ -273,7 +270,7 @@ pre {
   display: flex; align-items: center; gap: 0.6rem; color: var(--muted);
   font-size: var(--t-md); padding: 1.2rem 0;
 }
-button.primary { display: inline-flex; align-items: center; gap: 0.5rem; }
+
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
 /* Skeleton loading: shaped like the content it stands in for, so a run
@@ -328,13 +325,6 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .fpill .fx:hover, .fgroup .fx:hover { color: var(--err); }
 .fconn { font-size: var(--t-xs); font-weight: 700; color: var(--muted); letter-spacing: 0.09em; }
 .fgroup { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; border: 1px dashed var(--line); border-radius: var(--r-md); padding: 0.15rem 0.4rem; }
-button.facet {
-  font-size: var(--t-sm); padding: 0.18rem 0.55rem; border-radius: var(--r-pill);
-  background: var(--paper); border: 1px solid var(--line); cursor: pointer;
-}
-button.facet:hover { border-color: var(--accent); color: var(--accent-ink); }
-button.facet .meta { margin-left: 0.25rem; }
-button.facet.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
 
 /* condensed study rows in the Explore study panel */
 /* The study list is one grid and each row a subgrid, so a column is as wide as its widest
@@ -374,32 +364,11 @@ button.facet.on { border-color: var(--accent); background: var(--accent-soft); c
 .study-row.study-head:hover { background: var(--card); }
 .studylist-note { grid-column: 1 / -1; }
 .studyacts { display: inline-flex; gap: 2px; justify-self: end; }
-.iconbtn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 1.35rem; height: 1.35rem; padding: 0; margin: 0;
-  border: 1px solid transparent; border-radius: var(--r-sm); background: none;
-  color: var(--muted); cursor: pointer;
-}
-.iconbtn svg { width: 14px; height: 14px; fill: currentColor; }
-.iconbtn:hover, .iconbtn:focus-visible { color: var(--accent-ink); border-color: var(--line); background: var(--paper); }
 
 /* gear menu (oncoprint card options) */
-details.gearmenu { position: relative; }
-details.gearmenu > summary { list-style: none; cursor: pointer; color: var(--muted); font-size: var(--t-xl); line-height: 1; padding: 0.1rem 0.3rem; border-radius: var(--r-sm); user-select: none; }
-details.gearmenu > summary::-webkit-details-marker { display: none; }
-details.gearmenu > summary:hover, details.gearmenu[open] > summary { color: var(--ink); background: var(--code-bg); }
-details.gearmenu > .gearmenu-items {
-  position: absolute; right: 0; top: 1.7rem; z-index: 30;
-  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
-  padding: 0.55rem 0.75rem; min-width: 18rem; max-width: 24rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
-  display: flex; flex-direction: column; gap: 0.25rem;
-}
+
 .gearmenu-items a { color: var(--accent-ink); font-size: var(--t-md); }
 .viewhelp-text { margin: 0; font-size: var(--t-md); line-height: 1.5; color: var(--ink); }
-/* a <button> centers its text by default; every other item in this column
-   (links, checkboxes) reads flush left, so a button among them looked adrift. */
-.gearmenu-items > button.linklike { text-align: left; }
 
 /* ---- a view's toolbar -----------------------------------------------------
    Controls sit in labelled zones, and the zones say what kind of control they hold:
@@ -415,7 +384,7 @@ details.gearmenu > .gearmenu-items {
   color: var(--muted); cursor: help; user-select: none;
 }
 /* one height for everything in the strip, so the row has a single baseline */
-.viewtb select, .viewtb .tbbtn, .viewtb .zoomctl, .viewtb .chk {
+.viewtb select, .viewtb .zoomctl, .viewtb .chk {
   height: var(--ctl-h); font-size: var(--t-md);
 }
 .viewtb select { padding: 0 var(--s1); max-width: 13rem; }
@@ -424,22 +393,7 @@ details.gearmenu > .gearmenu-items {
   font-size: var(--t-sm); color: var(--muted); white-space: nowrap;
 }
 .viewtb .chk { display: inline-flex; align-items: center; gap: var(--s1); margin: 0; font-size: var(--t-sm); white-space: nowrap; }
-.tbbtn {
-  display: inline-flex; align-items: center; gap: var(--s1);
-  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper);
-  color: var(--ink); padding: 0 var(--s2); font-size: var(--t-md); cursor: pointer;
-  white-space: nowrap; list-style: none; text-decoration: none;
-}
-.tbbtn::-webkit-details-marker { display: none; }
-/* the disclosure buttons in the strip are buttons like any other: the generic gear-menu
-   summary rule is more specific than .tbbtn, so it has to be answered here */
-.viewtb details.gearmenu, .vmeta details.gearmenu { display: inline-flex; align-items: center; margin: 0; }
-details.gearmenu > summary.tbbtn { font-size: var(--t-md); padding: 0 var(--s2); color: var(--ink); }
-details.gearmenu > summary.tbbtn:hover { background: var(--paper); }
-.tbbtn:hover { border-color: var(--muted); }
-/* a button is a button: the genes control keeps its name, not its underline */
-.tbbtn.genesbtn { text-decoration: none; font-weight: 400; }
-details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-soft); }
+
 /* the zoom triple reads as one instrument: one border, no gaps to break at */
 .zoomctl { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; background: var(--paper); }
 .zoomctl > input[type=range] { width: 6.5rem; margin: 0 var(--s1); }
@@ -620,9 +574,6 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .row.baseline { align-items: baseline; }
 .row.g5 { gap: 0.5rem; }
 .facettitle { font-size: var(--t-md); font-weight: 600; }
-/* a row of link-buttons that switch what a menu shows, the current one bold */
-/* a menu's items, the one in effect bold */
-/* the document dialog's JSON and its compiled SQL */
 
 /* ---------------- view-card tables (app/lab/view-cards.tsx) ---------------- */
 .vscroll { overflow-x: auto; }
@@ -651,8 +602,6 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .covrow { display: inline-flex; align-items: center; gap: 0.3rem; }
 .covlist .covadd { align-self: flex-start; }
 .kmlegend { display: flex; flex-wrap: wrap; gap: 1.2rem; font-size: var(--t-sm); color: var(--muted); margin-top: 0.4rem; }
-
-/* ---------------- text dialogs (app/lab/dialogs.tsx) ---------------- */
 
 /* ---------------- Saved tab ---------------- */
 .flush, .card h2.flush, dialog h3.flush { margin: 0; }
@@ -778,7 +727,6 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 
 /* Analysis: compose views without hand-editing the document JSON */
 .addview { padding-top: 0.5rem; padding-bottom: 0.5rem; }
-.addview .facet { font-size: var(--t-sm); }
 
 /* Cohorts tab: tick-to-select */
 .pick { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
@@ -890,27 +838,6 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .gearmenu-items .pillwrap .pill { font-size: var(--t-sm); padding: 0.15rem 0.5rem; cursor: pointer; }
 .gearmenu-items hr { border: none; border-top: 1px solid var(--line); margin: 0.35rem 0 0.1rem; }
 
-/* A gear that sits next to the card title rather than at the far right of the
-   header. The panel is anchored to the LEFT edge here — the default right:0
-   would open it leftward, off the side of the card. */
-.gearmenu.gm-inline { margin-left: 0.4rem; }
-.gearmenu.gm-inline > .gearmenu-items { right: auto; left: 0; top: 1.9rem; }
-
-/* The inline gear reads as a text link rather than an icon: it sits in the
-   run of the card title, where a lone glyph is easy to miss and says nothing
-   about what it opens. Sized and baselined to sit quietly beside the heading,
-   not to compete with it. */
-.gearmenu.gm-inline > summary {
-  font-size: var(--t-md); font-weight: 500; letter-spacing: 0.01em;
-  color: var(--accent-ink); padding: 0 0.1rem;
-  text-decoration: underline; text-decoration-style: dotted;
-  text-underline-offset: 0.18em;
-}
-.gearmenu.gm-inline > summary:hover,
-details.gearmenu.gm-inline[open] > summary {
-  color: var(--accent-ink); background: none;
-  text-decoration-style: solid;
-}
 
 /* Name-a-cohort dialog. Native <dialog>, so Esc, focus trapping and the
    backdrop are the platform's rather than ours. */
@@ -1079,10 +1006,6 @@ button.customtag:hover { text-decoration: underline; }
 }
 /* pinned to the card's own corner, not a slot in the header row's flex flow —
    a long cohort name or a wrapped row of pills must never push it around */
-/* margin: 0 undoes the generic `details { margin-top: 0.8rem }` above — the
-   same override every other gearmenu already gets from its .viewtb/.vmeta
-   container, but this one is absolutely positioned outside either, so
-   without it the stray margin pushed the button ~13px past its own `top`. */
 .cohortbox > .cohortgear { position: absolute; top: 0.45rem; right: 0.5rem; margin: 0; }
 .cohortbox-head { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.35rem; padding-right: 1.6rem; }
 .cohortbox-name { display: inline-flex; align-items: center; gap: 0.45rem; }
@@ -1132,16 +1055,14 @@ button.customtag:hover { text-decoration: underline; }
 .partrow.other .partbar > span { background: var(--muted); }
 .partrow.notEvaluable .partbar > span { background: var(--mark); }
 .partacts { display: flex; gap: var(--s0); justify-content: flex-end; }
-.partacts .tbbtn { height: 1.45rem; padding: 0 var(--s1); font-size: var(--t-sm); }
-.partacts details.gearmenu { margin: 0; }
-.partacts details.gearmenu > summary.tbbtn { height: 1.45rem; padding: 0 var(--s1); font-size: var(--t-sm); }
+
 .partacts .gearmenu-items { right: 0; left: auto; }
 .partsum { margin: var(--s1) 0 0; font-size: var(--t-sm); border-top: 1px solid var(--line); padding-top: var(--s1); }
 .partsum.ok { color: var(--ok); }
 .partsum.bad { color: var(--err); font-weight: 600; }
 .partadd { display: flex; gap: var(--s1); margin-top: var(--s2); }
 .partadd input { flex: 1; min-width: 0; height: var(--ctl-h); font-size: var(--t-md); }
-.partadd .tbbtn { height: var(--ctl-h); }
+
 details.splitmenu { margin: 0; }
 /* Explore in add mode: over the analysis, which stays where it was underneath */
 .exploremodal {
@@ -1189,7 +1110,7 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
 .cpick-noinput { width: 13px; flex: none; }
 .cpick-open { border: none; background: none; color: var(--accent-ink); font-size: var(--t-md); padding: 0 var(--s1); cursor: pointer; }
 .cpick-foot { margin: var(--s1) var(--s3) 0; padding-top: var(--s1); border-top: 1px solid var(--line); font-size: var(--t-sm); color: var(--muted); }
-.gearmenu-items > button.cpick-add { display: block; margin: var(--s1) var(--s3) 0; padding-top: var(--s1); font-size: var(--t-md); }
+
 /* an Explore chart's "⋯" menu: pinned to the card's corner, like a cohort box's */
 .facetgrid > .card { position: relative; }
 .facetgrid > .card > div:first-child { padding-right: 1.8rem; }
@@ -1198,8 +1119,6 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
 .partrename:hover { text-decoration: underline dotted; }
 .partrenameinput { font: inherit; height: 1.45rem; width: 100%; box-sizing: border-box; padding: 0 var(--s1); }
 .cohortbox details.splitmenu { margin-top: var(--s2); }
-.cohortbox details.splitmenu > summary.tbbtn { height: var(--ctl-h); }
-textarea.splitoql { width: 100%; box-sizing: border-box; height: 4.5rem; font: var(--t-md) 'IBM Plex Mono', monospace; background: var(--code-bg); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--s1); }
 
 /* ---- workspaces: a saved document, its parameters, and its notes ---------- */
 .wsbar {
@@ -1229,9 +1148,6 @@ textarea.splitoql { width: 100%; box-sizing: border-box; height: 4.5rem; font: v
 .readme p, .readme li { font-size: var(--t-md); max-width: 74ch; }
 .readme code { font-size: var(--t-md); }
 .readme pre { margin: 0.4rem 0; }
-
-/* a gear menu whose summary is a word rather than the ⚙ glyph */
-details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent-ink); text-decoration: underline; }
 
 /* The oncoprint's horizontal scrollbar, drawn by us. A native one over a virtual width of
    200,000 px gives a thumb a few pixels wide that nobody can grab, and it fades out when idle;
@@ -1314,17 +1230,6 @@ details.gearmenu > summary.textual { font-size: var(--t-md); color: var(--accent
    sideways only if it truly cannot fit */
 .viewfig { overflow-x: auto; margin-top: var(--s3); }
 .viewfig svg { max-width: 100%; height: auto; }
-
-/* ---- per-card search boxes -------------------------------------------------
-   Deliberately quiet: these sit in a card header beside the count, and a
-   full-height input there reads as the card's subject rather than a filter. */
-.genesearch {
-  font: inherit; font-size: var(--t-md); color: var(--ink);
-  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm);
-  padding: 0 var(--s2); width: 10.5rem; height: var(--ctl-h);
-}
-.genesearch::placeholder { color: var(--muted); }
-.genesearch:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* cytoband (CNA) and event count (mutations/SV) — columns whose data was
    already in the payload and simply not drawn. */
@@ -1654,7 +1559,7 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .portal-head .portal-summary { display: flex; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; font-size: var(--t-sm); }
 .portal-chooser { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s2); }
 .pb-loading { opacity: 0.45; transition: opacity 0.15s; }
-.pb-pager .tbbtn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
 .pb-pager .tbz { flex-wrap: wrap; }
 
 /* ---- table views (app/_table/DataTable.tsx): search, column filters, column chooser, CSV ---- */
@@ -1664,9 +1569,7 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .dt-title { font-size: var(--t-base); font-weight: 600; }
 .dt-title .meta { font-weight: 400; }
 .dt-search input { height: var(--ctl-h); width: 14rem; max-width: 60vw; padding: 0 var(--s2); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--card); color: var(--ink); font-size: var(--t-md); }
-.dt-bar .tbbtn { height: var(--ctl-h); }
-.dt .tbbtn.on { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-soft); }
-.dt .tbbtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
 .dt-anchor { position: relative; display: inline-flex; }
 .dt-pop {
   position: fixed; z-index: 60; overflow-y: auto;
@@ -1689,7 +1592,7 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .dt-values .mono, .dt-table .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
 .dt-chips { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; font-size: var(--t-sm); }
 .dt-chip { display: inline-flex; align-items: center; gap: 2px; padding: 0 0 0 var(--s2); border: 1px solid var(--accent); border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent-ink); }
-.dt-chip .linklike { text-decoration: none; font-size: var(--t-sm); padding: 0; color: inherit; }
+
 .dt-chip > button:last-child { border: none; background: none; color: inherit; cursor: pointer; padding: 0 var(--s2); font-size: var(--t-md); line-height: 1.4; }
 .dt-table th { cursor: default; vertical-align: bottom; }
 .dt-th { display: inline-flex; align-items: center; gap: 2px; }
@@ -1717,12 +1620,11 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .dt-skel { display: block; height: 0.8rem; border-radius: var(--r-sm); }
 .dt-skel:nth-child(odd) { width: 70%; } .dt-skel:nth-child(even) { width: 85%; }
 
-
 /* ---- the lollipop (app/_lollipop/HotspotsBody.tsx): the plot, and beside it the gene summary and the alteration grid ---- */
 .lp { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s2); }
 .lp-banner { display: flex; align-items: center; gap: var(--s2); align-self: flex-start; padding: var(--s1) var(--s3); border-radius: var(--r-sm);
   background: var(--ok-soft); border: 1px solid var(--ok); font-size: var(--t-sm); color: var(--ink); }
-.lp-banner .tbbtn { height: 1.4rem; font-size: var(--t-sm); }
+
 .lp-gene { display: flex; gap: var(--s4, 1.25rem); align-items: flex-start; flex-wrap: wrap; }
 .lp-plot { flex: 0 1 760px; min-width: 0; overflow-x: auto; }
 .lp-plot svg { max-width: 100%; height: auto; }

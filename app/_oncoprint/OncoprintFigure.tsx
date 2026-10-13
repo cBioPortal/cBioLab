@@ -773,11 +773,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 <div className="menu-aside">
                   <span className="meta">open this figure elsewhere</span>
                   {lab ? <>
-                    <a className="linklike block px-2 py-1" href={lab.cli} target="_blank" rel="noreferrer"
+                    <a className="block rounded-sm px-2 py-1 text-link hover:bg-accent" href={lab.cli} target="_blank" rel="noreferrer"
                       title="the node and Python command lines, run against this spec on this server">export to CLI emulator ↗</a>
-                    <a className="linklike block px-2 py-1" href={lab.python} target="_blank" rel="noreferrer"
+                    <a className="block rounded-sm px-2 py-1 text-link hover:bg-accent" href={lab.python} target="_blank" rel="noreferrer"
                       title="this figure in a Pyodide notebook — the cohortlab package, in your browser">export to Python notebook ↗</a>
-                    <a className="linklike block px-2 py-1" href={lab.ipynb} download="oncoprint.ipynb"
+                    <a className="block rounded-sm px-2 py-1 text-link hover:bg-accent" href={lab.ipynb} download="oncoprint.ipynb"
                       title="a real .ipynb with the package and this figure's contract embedded; it opens in JupyterLab, VS Code or Colab">export to Jupyter (.ipynb)</a>
                     {lab.cut && <span className="meta">{lab.cut}</span>}
                   </> : <span className="meta">this figure&apos;s spec is too large to travel in a link;

@@ -14,6 +14,7 @@ import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { Save, Tag, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { CHIP } from "../_ui/toolbar.ts";
+import { GearMenu } from "../_ui/gear-menu.tsx";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
 import { Choice } from "../_ui/choice.tsx";
@@ -52,7 +53,8 @@ const SHOW_DERIVED_FACETS = false;
 /** What Explore's sections read and the edits they can make: Explore's own state and actions
  *  (use-explore-state.ts), plus the few page values they show. */
 export type ExploreCtx = ExploreState & {
-  moreDerivedMenu: { ref: React.RefObject<HTMLDetailsElement | null>; onToggle: (e: React.SyntheticEvent<HTMLDetailsElement>) => Map<string, boolean>; };
+  /** where the page keeps which of its menus are open */
+  menuStore: Map<string, boolean>;
   showClauseData: (cohort?: string) => OnCustomData;
   studies: { id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string; }[];
 };
@@ -537,31 +539,29 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
 }
 
 export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
-  const { EXTRA_DERIVED_KINDS, addClause, explore, extraDerivedOn, moreDerivedMenu, parseDraft, toggleExtraDerived, treatmentEventType } = ctx;
+  const { EXTRA_DERIVED_KINDS, addClause, explore, extraDerivedOn, menuStore, parseDraft, toggleExtraDerived, treatmentEventType } = ctx;
   return <>
     {SHOW_DERIVED_FACETS && explore && explore.derived && explore.derived.length > 0 && (
       <div className="card">
         <div className="row baseline">
           <h2 className="flush">Derived <span className="plain">— computed from the data's shape, so these mean the same thing in any study</span></h2>
           <span className="spacer" />
-          <details className="gearmenu" ref={moreDerivedMenu.ref} onToggle={moreDerivedMenu.onToggle}>
-            <summary className="tbbtn" title="more ways to derive a facet from this study's own timeline">show more derivations</summary>
-            <div className="gearmenu-items">
+          <GearMenu menuId="explore:more-derivations" menuStore={menuStore} title="more ways to derive a facet from this study's own timeline"
+            label="show more derivations" wide contentClassName="px-2.5">
               <span className="meta">from this study's own timeline events</span>
               {(() => {
                 const tx = treatmentEventType();
                 return EXTRA_DERIVED_KINDS.map((k) => (
                   <label key={k.metric} className="chk"
                     title={tx ? "based on '" + tx.label + "' events" : "this study records no treatment-like timeline events, so this can't be derived here"}>
-                    <input type="checkbox" checked={extraDerivedOn(k.metric)} disabled={!tx}
-                      onChange={() => toggleExtraDerived(k.metric)} />
+                    <Checkbox checked={extraDerivedOn(k.metric)} disabled={!tx}
+                      onCheckedChange={() => toggleExtraDerived(k.metric)} />
                     {tx ? k.label(tx.label) : k.label("a treatment event")}
                     {!tx && <span className="meta"> — not available for this study</span>}
                   </label>
                 ));
               })()}
-            </div>
-          </details>
+          </GearMenu>
         </div>
         <div className="derivedgrid">
           {/* "lines" is excluded here — it shows in its own "Derived timeline
@@ -770,8 +770,8 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
           })()}
           {c.kind === "num" && <div className="flex items-center gap-1 mt-1 flex-wrap">
             <span className="meta">min {Math.round(c.min * 10) / 10} · median {Math.round(c.median * 10) / 10} · max {Math.round(c.max * 10) / 10}</span>
-            <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>≥ median</button>
-            <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>&lt; median</button>
+            <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>≥ median</Button>
+            <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>&lt; median</Button>
           </div>}
       </div>
     ))}
@@ -842,8 +842,8 @@ export function StudyBreakdown({ ctx }: { ctx: ExploreCtx }) {
               <span className="meta pct">{Math.round(1000 * r.n / total) / 10}%</span>
               <span className="n">{r.n.toLocaleString()}</span>
               <span>{exStudies.length > 1 && (
-                <button className="linklike" title="explore only this study"
-                  onClick={() => setExploreStudies([r.study])}>only</button>
+                <Button variant="link" size="inline" title="explore only this study"
+                  onClick={() => setExploreStudies([r.study])}>only</Button>
               )}</span>
             </div>
           ));
@@ -1006,9 +1006,9 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
       <h2>Genes <span className="plain">— most-altered (click = OQL clause)</span></h2>
       <div className="flex flex-wrap gap-1">
         {explore.genes.map(g => (
-          <button key={g.gene} className="facet" onClick={() => addClause({ kind: "oql", q: g.gene + ":" })}>
+          <Button key={g.gene} variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "oql", q: g.gene + ":" })}>
             {g.gene} <span className="meta">{g.n.toLocaleString()}</span>
-          </button>
+          </Button>
         ))}
       </div>
       <p className="note">Bare gene = any alteration; edit the OQL pill afterwards for MUT/AMP/DRIVER specifics.</p>
