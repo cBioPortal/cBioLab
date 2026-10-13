@@ -418,8 +418,8 @@ async function main() {
         })).toString("base64")));
         await page.waitForSelector("button.genesbtn", { timeout: 300000 });
         await page.locator("button.genesbtn").first().click();
-        await page.waitForSelector("dialog.genedialog[open]", { timeout: 30000 });
-        const panel = page.locator("dialog.genedialog");
+        await page.waitForSelector("[role=dialog].genedialog", { timeout: 30000 });
+        const panel = page.locator("[role=dialog].genedialog");
         const before = await panel.locator(".pill").count();
         await panel.locator("input[list=view-genes]").fill("PIK3CA");
         await panel.locator('button:has-text("add")').click();
@@ -619,8 +619,8 @@ async function main() {
       // Views come in from "Add a view", each then given a cohort from its "+ Add cohort".
       for (const label of ["Survival", "Oncoprint"]) {
         try {
-          await page.locator(".addview button.facet", { hasText: new RegExp("^\\+ " + label + "$") }).click();
-          await page.locator(".emptyview .emptyview-body button.primary").first().click();
+          await page.locator(".addview button", { hasText: new RegExp("^" + label + "$") }).click();
+          await page.locator(".emptyview .emptyview-body button").first().click();
           await page.locator(".addcohortdialog .acd-row button").first().click();
           await page.waitForFunction(() => !document.querySelector(".emptyview"), null, { timeout: 60000 });
         } catch { /* the checks below report what is missing */ }
@@ -632,10 +632,10 @@ async function main() {
       try {
         await page.waitForSelector(".addview", { timeout: 120000 });
         await page.locator(".addview button:has-text('Lollipop')").click();
-        await page.waitForSelector(".emptyview .emptyview-body button.primary", { timeout: 30000 });
+        await page.waitForSelector(".emptyview .emptyview-body button", { timeout: 30000 });
         added = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).map(v => v.kind);
         emptyFirst = (await page.locator(".lp-plot circle.lollipop-head").count()) === 0;
-        await page.locator(".emptyview .emptyview-body button.primary").first().click();
+        await page.locator(".emptyview .emptyview-body button").first().click();
         await page.locator(".addcohortdialog .acd-row button").first().click();
         await page.waitForSelector(".lp-plot circle.lollipop-head", { timeout: 300000 });
         dots = await page.locator(".lp-plot circle.lollipop-head").count();
@@ -657,12 +657,12 @@ async function main() {
       // A kind already in the document shows as a selected pill, and clicking it removes the view.
       let pillOn = false, pillOff = false, left = [];
       try {
-        const pill = page.locator(".addview button.facet:has-text('Lollipop')");
-        pillOn = /\bon\b/.test(await pill.getAttribute("class") || "");
+        const pill = page.locator(".addview button:has-text('Lollipop')");
+        pillOn = (await pill.getAttribute("aria-pressed")) === "true";
         await pill.click();
         await page.waitForFunction(() => !document.querySelector(".lp-plot circle.lollipop-head"), null, { timeout: 30000 });
         left = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).map(v => v.kind);
-        pillOff = !/\bon\b/.test(await pill.getAttribute("class") || "");
+        pillOff = (await pill.getAttribute("aria-pressed")) === "false";
       } catch { /* left as failed */ }
       ok("a selected view pill removes its view when clicked", pillOn && pillOff && !left.includes("hotspots") && left.length > 0,
         "selected " + pillOn + " · deselected " + pillOff + " · views now " + (left.join(", ") || "none"));
@@ -1146,7 +1146,7 @@ async function main() {
       const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
       await sp.goto(BASE + "/lab?tab=analysis", { waitUntil: "domcontentloaded" });
       await sp.locator(".addview button:has-text('Survival')").click();
-      await sp.locator(".emptyview .emptyview-body button.primary").first().click();
+      await sp.locator(".emptyview .emptyview-body button").first().click();
       await sp.getByRole("tab", { name: "Library" }).click();
       await sp.locator(".addcohortdialog .acd-row", { hasText: name }).getByRole("button").click();
       await sp.waitForSelector(".cohortbox", { timeout: 120000 });

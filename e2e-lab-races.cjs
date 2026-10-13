@@ -94,9 +94,9 @@ async function labRaces(browser, ok, BASE) {
       const onFail = (r) => { if (r.url().includes("/api/analysis")) failed++; };
       page.on("request", onReq); page.on("response", onRes); page.on("requestfailed", onFail);
       await page.locator(".viewcard .genesbtn").first().click();
-      const pills = await page.locator("dialog.genedialog .pill", { hasText: "TP53" }).count();
-      await page.locator("dialog.genedialog .pill", { hasText: "TP53" }).click(); // re-runs this view
-      await page.locator("dialog.genedialog button.primary").click();
+      const pills = await page.locator("[role=dialog].genedialog .pill", { hasText: "TP53" }).count();
+      await page.locator("[role=dialog].genedialog .pill", { hasText: "TP53" }).click(); // re-runs this view
+      await page.locator("[role=dialog].genedialog").getByRole("button", { name: "Done" }).click();
       await until(async () => !(await genesOf()).includes("TP53"), "the re-run without TP53", 60000).catch(() => {});
       const after = await genesOf();
       // on a failure, whether the edit reached the document says which half went wrong; a further
@@ -120,7 +120,7 @@ async function labRaces(browser, ok, BASE) {
     //    inside the page component would be a new component every render, and lose it.
     {
       await page.locator(".viewcard .genesbtn").first().click();
-      const input = page.locator("dialog.genedialog input[placeholder='add a gene…']");
+      const input = page.locator("[role=dialog].genedialog input[placeholder='add a gene…']");
       await input.click();
       await input.type("BRC");
       await tool(page, "analysis_set_details", { notes: "re-render while typing" });
