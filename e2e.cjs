@@ -1234,18 +1234,18 @@ async function main() {
       await sp.waitForTimeout(2000);
       let apiCalls = 0;
       sp.on("request", (r) => { if (/\/api\/(explore|cohort)/.test(r.url())) apiCalls++; });
-      await sp.locator('button:has-text("add / change studies")').click();
+      await sp.getByRole("button", { name: "Add / change studies" }).click();
       await sp.waitForSelector(".applybar", { timeout: 60000 });
       // "add all" over every study is refused, naming the limit: each study adds dozens of
       // facet queries, and nothing here needs more than a handful
-      const addAll = sp.locator('button.facet:has-text("add all")').first();
+      const addAll = sp.getByRole("button", { name: /^add all/ });
       const refused = await addAll.isDisabled();
       const refusedWhy = (await addAll.getAttribute("title")) || "";
       ok("add all is refused past 30 studies, saying so", refused && /at most 30 studies/.test(refusedWhy), refusedWhy.slice(0, 90));
       // a narrow search: two ticks, then add all picks up the rest of it
       await sp.locator('input[placeholder^="search name"]').fill("thymoma");
       await sp.waitForTimeout(300);
-      const boxes = sp.locator('.study-row input[type=checkbox]');
+      const boxes = sp.locator('.study-row [role=checkbox]');
       for (let i = 0; i < 2; i++) { await boxes.nth(i).click(); await sp.waitForTimeout(250); }
       await addAll.click();
       await sp.waitForTimeout(2500);                  // well past the 350ms fetch debounce
@@ -1255,7 +1255,7 @@ async function main() {
       ok("the staged bar distinguishes staged from applied", /not queried yet/.test(bar), bar.slice(0, 80));
       // and submit must actually apply it
       const staged = Number((/^([\d,]+)/.exec(bar.trim()) || [])[1]?.replace(/,/g, "") || 0);
-      await sp.locator('.applybar button:has-text("submit")').click();
+      await sp.locator(".applybar").getByRole("button", { name: "Submit" }).click();
       await sp.waitForFunction(() => !document.querySelector(".applybar"), null, { timeout: 60000 });
       await sp.waitForTimeout(8000);
       const hdr = await sp.evaluate(() => {

@@ -12,6 +12,8 @@ import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import type { ExploreState } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { Button } from "../_ui/button";
+import { Checkbox } from "../_ui/checkbox";
+import { Input } from "../_ui/input";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 
@@ -51,6 +53,9 @@ export type ExploreCtx = ExploreState & {
   showClauseData: (cohort?: string) => OnCustomData;
   studies: { id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string; }[];
 };
+
+/** a filter chip: an outline toggle, filled while pressed */
+const CHIP = "rounded-pill px-2.5 text-sm font-normal aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:font-semibold aria-pressed:text-accent-foreground";
 
 export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
   const { addMode, analyzeDraft, exDraftStudies, exPanelOpen, exSel, exStudies, explore, exploreBusy, sCaps, sQuery, setExDraftStudies, setExPanelOpen, setExploreStudies, setSCaps, setSQuery, setStudyChipsOpen, studies, studyChipsOpen } = ctx;
@@ -136,25 +141,25 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               );
             })()}
             <span className="spacer" />
-            {!addMode && <button className="primary" onClick={analyzeDraft} disabled={!ready}
+            {!addMode && <Button onClick={analyzeDraft} disabled={!ready}
               title={ready ? "start a fresh analysis of this cohort (replaces the current document)" : "select a study first"}>
               Analyze
-            </button>}
-            {exStudies.length > 0 && <button onClick={() => {
+            </Button>}
+            {exStudies.length > 0 && <Button variant="outline" onClick={() => {
               if (exPanelOpen) { setExDraftStudies(null); setExPanelOpen(false); }   // close discards
               else { setExDraftStudies(exStudies); setExPanelOpen(true); }           // open seeds
-            }}>{exPanelOpen ? "cancel" : "add / change studies"}</button>}
+            }}>{exPanelOpen ? "Cancel" : "Add / change studies"}</Button>}
           </div>
           {/* with nothing selected the picker is simply open: there is nothing else to do here */}
           {(exPanelOpen || exStudies.length === 0) && <>
             <div className="row g5 center mt-2.5 mb-2.5">
-              <input placeholder="search name, id, or cancer type…" value={sQuery} onChange={e => setSQuery(e.target.value)}
-                style={{ flex: 1, minWidth: "16rem" }} />
+              <Input placeholder="search name, id, or cancer type…" value={sQuery} onChange={e => setSQuery(e.target.value)}
+                className="h-8 min-w-64 flex-1 text-md md:text-md" />
               {CAP_FILTERS.map(([k, label]) => (
-                <button key={k} className={"facet" + (sCaps.has(k) ? " on" : "")}
+                <Button key={k} variant="outline" size="xs" className={CHIP} aria-pressed={sCaps.has(k)}
                   onClick={() => setSCaps(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; })}>
                   {label}
-                </button>
+                </Button>
               ))}
               <span className="meta">{hits.length.toLocaleString()} of {studies.length.toLocaleString()}</span>
               {/* "all matches", not "all 200 drawn": the list renders the 200 largest, and a button
@@ -165,17 +170,17 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
                 const after = new Set([...staged, ...hits.map(h => h.id)]).size;
                 const over = after > ADD_ALL_LIMIT;
                 return (
-                  <button className="facet" disabled={!hits.length || over}
+                  <Button variant="outline" size="xs" className={CHIP} disabled={!hits.length || over}
                     title={over
                       ? "add all stages at most " + ADD_ALL_LIMIT + " studies; this would make " + after.toLocaleString() + " — narrow the search, or tick studies one by one"
                       : "adds the " + hits.length + " studies matching the current search to the staged set, keeping what is already staged — use clear first to replace"}
                     onClick={() => setExDraftStudies([...new Set([...staged, ...hits.map(h => h.id)])])}>
                     add all {hits.length.toLocaleString()} match{hits.length === 1 ? "" : "es"}
-                  </button>
+                  </Button>
                 );
               })()}
-              <button className="facet" disabled={!staged.length}
-                onClick={() => setExDraftStudies([])}>clear</button>
+              <Button variant="ghost" size="xs" className={CHIP} disabled={!staged.length}
+                onClick={() => setExDraftStudies([])}>clear</Button>
             </div>
             <div className="row applybar center g5">
               <strong>{staged.length.toLocaleString()}</strong>
@@ -185,10 +190,10 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
                 {dirty ? " · not queried yet" : " · matches what is shown"}
               </span>
               <span className="spacer" />
-              <button className="primary" disabled={!dirty || !staged.length} onClick={applyStaged}
+              <Button size="sm" disabled={!dirty || !staged.length} onClick={applyStaged}
                 title={staged.length ? "run the facets for these " + staged.length + " studies" : "stage at least one study"}>
-                submit
-              </button>
+                Submit
+              </Button>
             </div>
             {!studies.length && <div className="loading-block"><span className="spinner" /> Loading studies…</div>}
             {/* One grid for the whole list (each row a subgrid), so every column lines up
@@ -200,7 +205,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               </div>}
               {hits.slice(0, 200).map(s => (
                 <label key={s.id} title={s.name + " (" + s.id + ")"} className={"study-row" + (staged.includes(s.id) ? " sel" : "")}>
-                  <input type="checkbox" checked={staged.includes(s.id)} onChange={() => toggleStaged(s.id)} />
+                  <Checkbox checked={staged.includes(s.id)} onCheckedChange={() => toggleStaged(s.id)} aria-label={"stage " + s.name} />
                   <span className="studyname">
                     <strong>{s.name}</strong>
                     {s.instance && s.instance !== "a" &&
