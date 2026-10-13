@@ -8,8 +8,12 @@ import type { ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 import { HIGHLIGHT_CAP, HIGHLIGHT_COLORS } from "../../lib/plot-highlight.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
-import { ArrowDown, ArrowUp, Ellipsis, Pencil, Plus, Save, Split, StickyNote, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Ellipsis, Pencil, Plus, Save, Split, StickyNote, Trash2, X } from "lucide-react";
 import { Button } from "../_ui/button";
+import { Input } from "../_ui/input";
+import { cn } from "../../lib/cn";
+import { OptionSelect } from "./choice.tsx";
+import { FIELD } from "./toolbar.ts";
 import { Checkbox } from "../_ui/checkbox";
 import { GearMenu, MenuItem, MenuSeparator } from "./gear-menu.tsx";
 
@@ -74,9 +78,9 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
   return (
     <span className="axispick">
       <span className="tbl">{side}</span>
-      <select value={src} disabled={busy} title="what this axis measures"
-        onChange={(e) => {
-          const s = e.target.value;
+      <OptionSelect className="max-w-44" value={src} disabled={busy} title="what this axis measures"
+        onValueChange={(v) => {
+          const s = v;
           // Keep whatever this axis last held for each source (spreading `a` rather than
           // starting fresh), so switching away and back round-trips instead of always
           // reverting to the catalog's first entry — a molecular axis already did this for
@@ -90,22 +94,22 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
         <option value="clinical">clinical</option>
         {!categorical && <option value="molecular">molecular</option>}
         <option value="alteration">alteration</option>
-      </select>
+      </OptionSelect>
       {src === "clinical" && loading && !attrs.length && <Waiting what="attributes" />}
       {src === "clinical" && !(loading && !attrs.length) && (
-        <select value={a.attribute || ""} disabled={busy} title="which clinical attribute"
-          onChange={(e) => set({ ...a, attribute: e.target.value })}>
+        <OptionSelect className="max-w-44" value={a.attribute || ""} disabled={busy} title="which clinical attribute"
+          onValueChange={(v) => set({ ...a, attribute: v })}>
           {!attrs.some((x) => x.attribute === a.attribute) && <option value={a.attribute || ""}>{a.attribute || "(none)"}</option>}
           {attrs.map((x) => <option key={x.attribute} value={x.attribute}>{attributeLabel(x.attribute)}{x.kind === "num" ? "" : " (categorical)"}</option>)}
-        </select>
+        </OptionSelect>
       )}
       {src === "molecular" && <>
         {loading && !profiles.length ? <Waiting what="profiles" /> :
-        <select value={a.profileType || ""} disabled={busy} title="which molecular profile"
-          onChange={(e) => set({ ...a, profileType: e.target.value })}>
+        <OptionSelect className="max-w-44" value={a.profileType || ""} disabled={busy} title="which molecular profile"
+          onValueChange={(v) => set({ ...a, profileType: v })}>
           {!profiles.includes(a.profileType || "") && <option value={a.profileType || ""}>{a.profileType || "(none)"}</option>}
           {profiles.map((pt) => <option key={pt} value={pt}>{pt}</option>)}
-        </select>}
+        </OptionSelect>}
         <GeneInput gene={a.gene || ""} busy={busy} onCommit={(gene) => set({ ...a, gene })} />
       </>}
       {src === "alteration" && (() => {
@@ -125,11 +129,11 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
                   set(next.length > 1 ? { ...a, gene: undefined, genes: next, by }
                     : { ...a, genes: undefined, gene: next[0] || "", by });
                 }} />}
-          <select value={isOql ? "oql" : a.by || (isSet ? "mutated" : "mutationType")} disabled={busy}
+          <OptionSelect className="max-w-44" value={isOql ? "oql" : a.by || (isSet ? "mutated" : "mutationType")} disabled={busy}
             title={isOql ? "Altered when a case matches any line of the query, Unaltered otherwise"
               : isSet ? "a gene set is \"mutated vs not\", or write it as an OQL query" : "how the gene's alterations are grouped"}
-            onChange={(e) => {
-              const by = e.target.value;
+            onValueChange={(v) => {
+              const by = v;
               // to OQL: the genes become a query (a bare gene is "any alteration"); from OQL: the
               // query's first gene, so a round trip keeps the gene
               if (by === "oql") set({ source: "alteration", oql: genes.length ? genes.join("; ") : "TP53: MUT" });
@@ -140,7 +144,7 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
             <option value="mutated">mutated vs not</option>
             <option value="cna" disabled={isSet}>copy number</option>
             <option value="oql">matches OQL</option>
-          </select>
+          </OptionSelect>
         </>;
       })()}
     </span>
@@ -167,16 +171,16 @@ export function HighlightPicker({ chosen, options, busy, onChange }: {
         <span key={n} className="hlchip" title={"“" + n + "” drawn over the plotted cohort"}>
           <span className="hldot" style={{ background: HIGHLIGHT_COLORS[i] }} />
           <span className="hlname">{n}</span>
-          <button type="button" className="hlx" disabled={busy} aria-label={"stop highlighting " + n}
-            onClick={() => onChange(chosen.filter((x) => x !== n))}>×</button>
+          <Button type="button" variant="ghost" size="icon-xs" className="size-4 text-muted-foreground [&_svg:not([class*='size-'])]:size-3" disabled={busy}
+            aria-label={"stop highlighting " + n} onClick={() => onChange(chosen.filter((x) => x !== n))}><X /></Button>
         </span>
       ))}
       {chosen.length < HIGHLIGHT_CAP && left.length > 0 && (
-        <select value="" disabled={busy} aria-label="add a cohort to highlight"
-          onChange={(e) => { if (e.target.value) onChange([...chosen, e.target.value]); }}>
+        <OptionSelect className="max-w-40" value="" disabled={busy} aria-label="add a cohort to highlight"
+          onValueChange={(v) => { if (v) onChange([...chosen, v]); }}>
           <option value="">{chosen.length ? "+ another" : "+ cohort"}</option>
           {left.map((o) => <option key={o.name} value={o.name}>{"\u00a0".repeat(o.depth * 2) + o.label}</option>)}
-        </select>
+        </OptionSelect>
       )}
     </span>
   );
@@ -195,7 +199,7 @@ export function GeneInput({ gene, busy, onCommit }: { gene: string; busy?: boole
   useEffect(() => setDraft(gene), [gene]);
   const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); onCommit(v); };
   return (
-    <input className="axisgene" value={draft} disabled={busy} placeholder="gene"
+    <Input className={cn(FIELD, "w-22 px-1.5 uppercase")} value={draft} disabled={busy} placeholder="gene"
       onChange={(e) => {
         const v = e.target.value.toUpperCase();
         setDraft(v);
@@ -220,7 +224,7 @@ export function GeneSetInput({ genes, busy, onCommit }: { genes: string[]; busy?
   const parse = (v: string) => v.split(",").map((g) => g.trim().toUpperCase()).filter(Boolean);
   const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); onCommit(parse(v)); };
   return (
-    <input className="axisgene geneset" value={draft} disabled={busy} placeholder="gene, or gene,gene,... for a set" size={Math.max(8, Math.min(30, draft.length + 2))}
+    <Input className={cn(FIELD, "w-auto max-w-56 min-w-22 px-1.5 uppercase")} value={draft} disabled={busy} placeholder="gene, or gene,gene,... for a set" size={Math.max(8, Math.min(30, draft.length + 2))}
       title={'one gene, or a comma-separated gene set ("is any of these altered")'}
       onChange={(e) => {
         const v = e.target.value.toUpperCase();
@@ -243,7 +247,7 @@ export function OqlInput({ query, busy, onCommit }: { query: string; busy?: bool
   useEffect(() => setDraft(query), [query]);
   const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); if (v.trim() && v !== query) onCommit(v.trim()); };
   return (
-    <input className="axisgene axisoql" value={draft} disabled={busy} placeholder="KRAS: G12C; STK11: MUT" spellCheck={false}
+    <Input className={cn(FIELD, "w-auto max-w-88 px-1.5")} value={draft} disabled={busy} placeholder="KRAS: G12C; STK11: MUT" spellCheck={false}
       size={Math.max(16, Math.min(44, draft.length + 2))}
       title={"OQL, one gene per line or ';' — e.g. KRAS: G12C; STK11: MUT; EGFR: AMP; TP53: DRIVER; ERBB2: EXP>2. " +
         "A case is Altered when it matches any of them."}
