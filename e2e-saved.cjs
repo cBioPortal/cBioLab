@@ -135,21 +135,21 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       await page.waitForFunction(() => window.cohortLab && window.cohortLab.call, null, { timeout: 120000 });
       await tool("explore_select_studies", { studies: ["msk_chord_2024"] });
       await page.locator('button[title^="upload your own annotations"]').click();
-      await page.locator("dialog.customdatamanager[open] .tabs button", { hasText: "Add data" }).click();
+      await page.locator("[role=dialog].customdatamanager [role=tab]", { hasText: "Add data" }).click();
       await page.locator("textarea.customdata-text").fill("PATIENT_ID\tGROUP\nP-0000012\tA\nP-0000015\tB\nNOT_A_PATIENT\tC\n");
-      await page.locator("dialog.customdatamanager[open] button.tbbtn", { hasText: "Check ids" }).click();
+      await page.locator("[role=dialog].customdatamanager button", { hasText: "Check ids" }).click();
       const said = await page.waitForFunction(() => {
-        const t = (document.querySelector("dialog.customdatamanager[open]")?.innerText || "").replace(/\s+/g, " ");
+        const t = (document.querySelector("[role=dialog].customdatamanager")?.innerText || "").replace(/\s+/g, " ");
         return /of 3 rows matched/.test(t) && t;
       }, null, { timeout: 60000 }).then((h) => h.jsonValue()).catch(() => "");
       ok("an upload's preview matches its ids and names what it drops",
         /2 of 3 rows matched a patient of msk_chord_2024/.test(said) && /NOT_A_PATIENT/.test(said),
         (said.match(/\d+ of 3 rows matched[^.]*/) || [said.slice(0, 120)])[0]);
       // the example is built from the explored study's own patients, so every row of it matches
-      await page.locator("dialog.customdatamanager[open] button", { hasText: "start over" }).click();
-      await page.locator("dialog.customdatamanager[open] button", { hasText: "Use example data for msk_chord_2024" }).click();
+      await page.locator("[role=dialog].customdatamanager button", { hasText: "start over" }).click();
+      await page.locator("[role=dialog].customdatamanager button", { hasText: "Use example data for msk_chord_2024" }).click();
       const ex = await page.waitForFunction(() => {
-        const t = (document.querySelector("dialog.customdatamanager[open] .cd-match")?.textContent || "").replace(/\s+/g, " ");
+        const t = (document.querySelector("[role=dialog].customdatamanager .cd-match")?.textContent || "").replace(/\s+/g, " ");
         return /rows matched/.test(t) && t;
       }, null, { timeout: 60000 }).then((h) => h.jsonValue()).catch(() => "");
       ok("the upload example matches the explored study in full", /(\d+) of \1 rows matched a patient of msk_chord_2024/.test(ex), ex.slice(0, 120));
