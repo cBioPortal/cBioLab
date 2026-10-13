@@ -4,6 +4,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg, viewTitle, esc } from "../lib/view-svg.ts";
+import { PLOT_POINT_R } from "../lib/figures/plot.ts";
 import { buildLollipopGene } from "../lib/lollipop.ts";
 import type { ViewResult } from "../lib/types.ts";
 import { HIGHLIGHT_BASE, HIGHLIGHT_COLORS } from "../lib/plot-highlight.ts";
@@ -426,6 +427,21 @@ describe("plot points: every case, or the outliers over the density", () => {
     assert.equal(cells(svg), 1, "only the cell of 100 is shaded");
     assert.equal(dots(svg), 5);
     assert.match(svg, /Darker is more cases; the shade is logarithmic\. Each dot is one case\./);
+  });
+
+  test("a point is the same size on every plot, whatever the count or shape", () => {
+    // a plotted case carries a fill-opacity; a legend swatch does not, and is not a case
+    const radii = (svg: string) => new Set([...svg.matchAll(/<circle [^>]*\br="([^"]+)"[^>]*fill-opacity/g)].map((m) => m[1]));
+    const few = viewToSvg({ kind: "plot", plot: { ...base, shape: "scatter", n: 2, bins: [{ bx: 1, by: 1, n: 2 }],
+      xyPoints: [{ id: "a", x: 1, y: 1 }, { id: "b", x: 2, y: 2 }], pointSet: { rule: "all", drawn: 2 } } as any })!;
+    const many = viewToSvg({ kind: "plot", plot: { ...base, shape: "scatter", n: 4000, bins: [{ bx: 1, by: 1, n: 4000 }],
+      xyPoints: Array.from({ length: 4000 }, (_, i) => ({ id: "p" + i, x: (i % 100) / 10, y: Math.floor(i / 100) / 4 })),
+      pointSet: { rule: "all", drawn: 4000 } } as any })!;
+    const boxed = viewToSvg({ kind: "plot", plot: { shape: "box", n: 3, x: { label: "G", kind: "cat" }, y: { label: "V", kind: "num" },
+      groups: [{ g: "A", n: 3, lo: 0, hi: 10, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 10 }], overlay: "points",
+      points: [{ id: "a", g: "A", v: 1 }, { id: "b", g: "A", v: 5, r: "Amplification" }, { id: "c", g: "A", v: 9 }],
+      legend: [{ label: "Amplification", color: "#f00", ring: true }], pointSet: { rule: "all", drawn: 3 } } as any })!;
+    for (const svg of [few, many, boxed]) assert.deepEqual([...radii(svg)], [String(PLOT_POINT_R)]);
   });
 
   test("a box's axis reaches its outliers, at most a whisker span past the whiskers; beyond that a counted triangle", () => {
