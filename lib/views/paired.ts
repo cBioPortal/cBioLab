@@ -1,7 +1,6 @@
 // Paired view: primary against metastasis (or any two kinds of sample), within patients
 import type { ViewResult, PairedView, PairedPanel } from "../types.ts";
 import { pairedCountsSql, pairedPatientsSql, sampleAttributeValuesSql } from "../federation-views.ts";
-import { concordance } from "../coxnet.ts";
 import { benjaminiHochberg, mcnemarExact } from "../stats.ts";
 import { geneSymbols } from "../gene-tracks.ts";
 import { pairedMethod, type PairedTrace } from "../method.ts";

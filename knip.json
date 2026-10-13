@@ -1,0 +1,7 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["e2e.cjs", "e2e-saved.cjs", "bench.mjs", "scripts/**/*.{ts,cjs,mjs}", "test/**/*.ts"],
+  "project": ["**/*.{ts,tsx,cjs,mjs}"],
+  "ignoreBinaries": ["uv"],
+  "rules": { "exports": "off", "types": "off" }
+}

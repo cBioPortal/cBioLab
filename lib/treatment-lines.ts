@@ -86,7 +86,6 @@ export function lineClassesOf(spec: LineSpec): string[] | null {
  */
 export function linesCtes({ db, study, patientFilter, spec }: LinesSqlArgs): string[] {
   const gap = lineGapOf(spec);
-  const classes = lineClassesOf(spec);
   const labelKey = spec.labelKey ? String(spec.labelKey).trim().toLowerCase() : "";
   const labelIsClass = !labelKey || (CLASS_KEYS as readonly string[]).includes(labelKey);
   const exclude = [...new Set((spec.exclude || []).map((x) => String(x).trim()).filter(Boolean))].slice(0, 40);

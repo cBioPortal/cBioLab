@@ -60,7 +60,7 @@ for (const c of CASES) for (const drafted of [false, true]) {
   const conn = connById(c.conn);
   if (!conn) { ok(`${c.study}: connection ${c.conn}`, false, "no such connection"); continue; }
   const tag = c.study + (drafted ? " (drafted)" : "");
-  let facets: NonNullable<Awaited<ReturnType<typeof buildExplore>>["geneFacets"]> = [];
+  let facets: NonNullable<Awaited<ReturnType<typeof buildExplore>>["geneFacets"]>;
   try {
     const res = await buildExplore({
       study: c.study, conn, geneCharts: [...c.genes],

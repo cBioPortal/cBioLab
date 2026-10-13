@@ -12,7 +12,8 @@ import { derivedMetricSql } from "../lib/cohort2.ts";
 const block = (sql: string, name: string) => {
   const i = sql.indexOf(name + " AS (");
   assert.ok(i >= 0, "has a " + name + " CTE");
-  let depth = 0, j = sql.indexOf("(", i);
+  const j = sql.indexOf("(", i);
+  let depth = 0;
   for (let k = j; k < sql.length; k++) { if (sql[k] === "(") depth++; else if (sql[k] === ")" && --depth === 0) return sql.slice(j, k + 1); }
   throw new Error("unbalanced " + name);
 };

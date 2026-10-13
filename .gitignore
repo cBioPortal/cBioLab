@@ -27,3 +27,6 @@ python/dist/
 # the report CI writes and uploads (scripts/check-*.ts with REPORT_DIR)
 verification-report/
 .visual/
+
+# ruff
+.ruff_cache/

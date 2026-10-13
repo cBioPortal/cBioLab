@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 import re
 from functools import cmp_to_key
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 import numpy as np
 
@@ -183,7 +183,8 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             label = _heatmap_label(gene, h["profileType"])
             ref = z_reference.get(h["profileType"] + "|" + gene)
             using_ref = bool(ref and ref["sd"] > 0)
-            tx = (lambda v: (v - ref["mean"]) / ref["sd"]) if using_ref else (lambda v: v)
+            # called on the next line, within this iteration
+            tx = (lambda v: (v - ref["mean"]) / ref["sd"]) if using_ref else (lambda v: v)  # noqa: B023
             vals = [tx(h["values"][p + "|" + gene]) for p in all_pids if (p + "|" + gene) in h["values"]]
             if not vals:
                 heat.append(Track("clinical", label + " (no data)", np.full(n, -1, dtype=np.int32), {"categories": []}))

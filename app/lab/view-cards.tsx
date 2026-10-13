@@ -549,7 +549,7 @@ function SurvivalCard({ ctx, v, vi }: CardProps) {
 }
 
 function CoxCard({ ctx, v, vi }: CardProps) {
-  const { attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, doc, docView, menuOpenRef, patchView, profileOptions, result, trackAttrs } = ctx;
+  const { attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, doc, docView, menuOpenRef, patchView, profileOptions, trackAttrs } = ctx;
   return <>
     {v.kind === "cox" && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Cox regression" cohorts={cohortChoice(vi, docView(vi))} {...placement(ctx, vi)}
@@ -830,7 +830,7 @@ function CourseCard({ ctx, v, vi }: CardProps) {
       <div className="vhead">
         <h2 className="vtitle">Clinical course <span className="plain">
           — {[...new Set((v.course || []).map(c => c.eventType))].join(", ")}
-          {v.anchoredTo ? "" : ""} · {v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
+          {" · "}{v.courseAxis ? v.courseAxis.binMonths + "-month bins" : ""}</span></h2>
         <div className="vmeta">
           <ViewHelpButton kind="course" menuId={"help:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} />
           <CohortPicker nodes={cohortChoice(vi, docView(vi)).nodes} chosen={cohortChoice(vi, docView(vi)).chosen} busy={busy}
@@ -979,7 +979,7 @@ function ErrorHead({ ctx, v, vi }: CardProps) {
   </>;
 }
 
-function ErrorNote({ ctx, v, vi }: CardProps) {
+function ErrorNote({ v }: CardProps) {
   return <>
     {v.error && <div className="error">{v.kind}: {v.error}{v.participation ? <> <>{v.ms != null && (
           <span className="lat" title={

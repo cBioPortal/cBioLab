@@ -104,7 +104,6 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
       layout: { groupBy: { kind: "cohorts" as const, groups: vNames.map((n) => ({ name: n, dsl: doc.cohorts[n] })) } } } };
   } else {
     const oncoLog: { label: string; sql: string; ms?: number; study?: string }[] = [];
-    const tQuery = Date.now();
     const contract = await buildContract({ ...oncoSpec,
       layout: { groupBy: { kind: "cohorts" as const, groups: vNames.map((n) => ({ name: n, dsl: {
         [PIDS_SQL]: multi
@@ -112,7 +111,6 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
           : cohorts[n].perStudy[okStudies[0]].sql
       } as PidsCarrier })) } }
     }, { log: oncoLog });
-    const oncoQueryMs = Date.now() - tQuery;
     const tRender = Date.now();
     const oncoSvg = contractToSvg(contract, 1200);
     const oncoRenderMs = Date.now() - tRender;
@@ -121,6 +119,5 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
       queries: oncoLog.map((q) => ({ study: q.study || okStudies[0], label: q.label, sql: q.sql, ...(q.ms != null ? { ms: q.ms } : {}) })),
       genes: contract.tracks.filter((t) => t.kind === "gene").map((t) => ({ gene: t.label, driverPct: t.driverPct ?? null, anyPct: t.freqPct ?? null })),
       nColumns: contract.stats.nColumns, annotation: contract.conventions.annotation };
-    void oncoQueryMs;
   }
 }

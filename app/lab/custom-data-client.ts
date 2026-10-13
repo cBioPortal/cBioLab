@@ -247,7 +247,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
  * PATIENT_ID / SAMPLE_ID (else the first column), and its name decides the level.
  */
 export function parseUpload(text: string): ParsedUpload {
-  const lines = text.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim() && !l.startsWith("#"));
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim() && !l.startsWith("#"));
   if (lines.length < 2) throw new Error("paste a header row and at least one row of data");
   const sep = lines[0].includes("\t") ? "\t" : ",";
   const split = (l: string) => l.split(sep).map((c) => c.trim().replace(/^"(.*)"$/, "$1"));

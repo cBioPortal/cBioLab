@@ -17,7 +17,7 @@
 // Colours come from CSS custom properties with literal fallbacks, so an SVG
 // inlined in the app follows the page theme while the same string rasterised
 // for a chat gets a fixed light figure.
-import { categoryColor, isAbsent, jitterFor, HIGHLIGHT_BASE } from "./plot.ts";
+import { isAbsent, jitterFor, HIGHLIGHT_BASE } from "./plot.ts";
 import { filterHotspotGene } from "./lollipop.ts";
 import { lollipopPanelsSvg, lollipopSummaryText } from "./lollipop-svg.ts";
 export { lollipopSummaryText };

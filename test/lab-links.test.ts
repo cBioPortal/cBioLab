@@ -58,7 +58,8 @@ test("both encodings agree — the browser's Buffer shim has no base64url, so ne
   const b64 = globalThis.btoa, a64 = globalThis.atob;
   try {
     // @ts-expect-error — force the Buffer fallback the way a runtime without btoa would
-    delete globalThis.btoa; // @ts-expect-error
+    delete globalThis.btoa;
+    // @ts-expect-error — and without atob
     delete globalThis.atob;
     assert.equal(encodeSpec(spec), withWeb);
     assert.deepEqual(decodeSpec(withWeb), spec);

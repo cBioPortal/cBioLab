@@ -161,7 +161,7 @@ export default function AnalysisPage() {
   const unresolvedCount = unresolvedUploads(doc).length;
   const wasUnresolved = useRef(0);
   useEffect(() => {
-    if (wasUnresolved.current > 0 && unresolvedCount === 0 && Object.keys(doc.cohorts || {}).length) { setError(null); rerunAnalysis(queryClient); }
+    if (wasUnresolved.current > 0 && unresolvedCount === 0 && Object.keys(doc.cohorts || {}).length) { setError(null); void rerunAnalysis(queryClient); }
     wasUnresolved.current = unresolvedCount;
   }, [unresolvedCount]); // eslint-disable-line
   const docText = docs.current.text;

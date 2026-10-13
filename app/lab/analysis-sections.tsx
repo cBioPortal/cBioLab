@@ -106,13 +106,12 @@ export function GenesDialog({ ctx }: { ctx: AnalysisCtx }) {
 }
 
 export function CustomDataWarning({ ctx }: { ctx: AnalysisCtx }) {
-  const { doc, openCustomManager, tab } = ctx;
+  const { doc, tab } = ctx;
   return <>
     {tab === "analysis" && (() => {
       // a shared document can name server custom data that is locked here, deleted, or absent
       const unresolved = unresolvedUploads(doc);
       const of = (why: string) => unresolved.filter((u) => u.why === why).map((u) => u.as);
-      const manage = <Button variant="link" size="inline" onClick={() => openCustomManager()}>Explore → Custom data</Button>;
       const names = (ids: string[]) => ids.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>);
       return unresolved.length > 0 && (
         <div className="card customwarn">

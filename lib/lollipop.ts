@@ -230,7 +230,7 @@ export function fetchProteinInfo(gene: string): Promise<ProteinInfo | null> {
         start: d.pfamDomainStart, end: d.pfamDomainEnd })) };
   })().catch(() => null);
   // a failure is not remembered: the next view asks again rather than staying degraded
-  p.then((v) => { if (!v) PROTEIN_CACHE.delete(key); });
+  void p.then((v) => { if (!v) PROTEIN_CACHE.delete(key); });
   PROTEIN_CACHE.set(key, p);
   return p;
 }

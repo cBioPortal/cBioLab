@@ -1,6 +1,5 @@
 // Survival view: Kaplan-Meier curves pooled exactly from each participant's id-free
 // (months, event, n) counts, with log-rank tests.
-import { STUDY } from "../ch.ts";
 import { kaplanMeier, logRank, logRankK, applyCutoff, toIncidence } from "../stats.ts";
 import type { ViewResult, LogRank, LogRankK, SurvivalView } from "../types.ts";
 import { expandSurvivalCounts, type SurvivalCount, type EndpointColumns } from "../federation.ts";
@@ -130,10 +129,9 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
   const thinArms = curves.filter((c) => c.n < MIN_ARM_N).map((c) => c.cohort + " (n=" + c.n + ")");
   let logrank: LogRank | undefined, logrankPooled: LogRank | undefined;
   let logrankK: LogRankK | undefined, logrankKPooled: LogRankK | undefined;
-  let sites: string[] = [];
   if (thinArms.length === 0 && vNames.length === 2) {
     const [A, B] = vNames;
-    sites = [...new Set([...perSite.get(A)!.keys(), ...perSite.get(B)!.keys()])];
+    const sites = [...new Set([...perSite.get(A)!.keys(), ...perSite.get(B)!.keys()])];
     const pooledTest = logRank([{ a: pointsFor(A), b: pointsFor(B) }]);
     if (sites.length > 1) {
       logrank = logRank(sites.map((st) => ({ a: pointsFor(A, st), b: pointsFor(B, st) })));
@@ -142,7 +140,7 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
       logrank = pooledTest;
     }
   } else if (thinArms.length === 0 && vNames.length >= 3) {
-    sites = [...new Set(vNames.flatMap((n) => [...perSite.get(n)!.keys()]))];
+    const sites = [...new Set(vNames.flatMap((n) => [...perSite.get(n)!.keys()]))];
     const pooledTest = logRankK([{ groups: vNames.map((n) => pointsFor(n)) }]);
     if (sites.length > 1) {
       logrankK = logRankK(sites.map((st) => ({ groups: vNames.map((n) => pointsFor(n, st)) })));

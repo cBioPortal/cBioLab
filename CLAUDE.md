@@ -511,6 +511,11 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   `node e2e.cjs` — 81 checks (Playwright + docs gate + the boundary suite + the
   denominator gate).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
+- Lint: `npm run lint` (~2 min) — ESLint with type-aware rules (`eslint.config.mjs`: typescript-eslint,
+  the hooks rules, Next's rules and the SonarJS rules that point at wrong code; style rules are off
+  on purpose), knip (`knip.json`: unused files and dependencies) and ruff on `python/` (rules in
+  `python/pyproject.toml`; `pip install -e 'python[dev]'` puts it in the venv). It starts clean:
+  fix what it reports, or disable that line with a `-- reason`.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push **your own branch**. **Stop there.**
   This is the checkpoint for a *finished* piece of work, not a loop to run after every edit —

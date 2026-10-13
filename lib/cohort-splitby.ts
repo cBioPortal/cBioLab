@@ -104,7 +104,7 @@ function resolveSplitByOql(splitBy: SplitBy, existingCohortNames: string[], base
   if (queries.length > SPLIT_BY_MAX_ARMS_CEILING)
     throw new Error("splitBy: oql takes at most " + SPLIT_BY_MAX_ARMS_CEILING + " queries; got " + queries.length);
   for (const q of queries) {
-    try { parseOql(q); } catch (e) { throw new Error("splitBy: '" + q + "' is not valid OQL — " + (e as Error).message); }
+    try { parseOql(q); } catch (e) { throw new Error("splitBy: '" + q + "' is not valid OQL — " + (e as Error).message, { cause: e }); }
   }
   const baseAll = baseDef.all || [];
   const leaves: OqlLeaf[] = queries.map((q) => ({ kind: "oql", q }));

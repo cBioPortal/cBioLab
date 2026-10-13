@@ -38,7 +38,7 @@ describe("resolveCohortPercentiles", () => {
       "NSCLC high-TMB": { all: [{ kind: "clinical", attribute: "TMB_NONSYNONYMOUS", op: ">=", percentile: 0.8, percentileOf: "NSCLC" }] },
     });
     let sawRefDef: any = undefined;
-    const out = await resolveCohortPercentiles(d, "x", async (study, refDef, attribute, per, p) => {
+    const out = await resolveCohortPercentiles(d, "x", async (study, refDef) => {
       sawRefDef = refDef;
       return 13.7;
     });

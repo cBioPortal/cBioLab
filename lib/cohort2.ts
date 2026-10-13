@@ -16,7 +16,7 @@
 import { DB, STUDY } from "./ch.ts";
 import { compileCohort, sq, LINE_TYPE } from "./compiler.ts";
 import { oqlLeafSql } from "./oql.ts";
-import { clinicalValueFoldSql, canonicalEventName, foldedEqualsSql } from "./event-names.ts";
+import { clinicalValueFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
 import { clinicalTable } from "./custom-data.ts";
 import type {

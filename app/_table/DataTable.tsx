@@ -361,6 +361,8 @@ export function DataTable<V extends string | number | null>({ t, query, updating
   useEffect(() => { setSearch(q.search || ""); }, [q.search]);
   const head = useRef<HTMLTableSectionElement>(null);
   const [headH, setHeadH] = useState(0);
+  // measures after every render; setState with an unchanged height is a no-op
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => { if (head.current) setHeadH(head.current.offsetHeight); });
   const set = (patch: Partial<TableQuery>, keepOpen = false) => {
     if (!keepOpen) setMenu(null);

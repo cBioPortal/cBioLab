@@ -10,7 +10,7 @@ import { seedAnalysis } from "./use-analysis.ts";
 import { api } from "./api.ts";
 
 import type { DocStore } from "./doc-store.ts";
-import type { QueryClient } from "@tanstack/query-core";
+import type { QueryClient } from "@tanstack/react-query";
 
 /** What useToolActions needs from the analysis page. */
 export interface ToolActionsPage {

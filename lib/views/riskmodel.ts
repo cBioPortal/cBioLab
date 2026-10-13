@@ -156,7 +156,7 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
   // hazard ratios: each group against the lowest, then the score alone (per SD), stratified as the model
   const repRows = Int32Array.from(reported);
   const nonEmpty = members.map((m) => m.length > 0);
-  let groupFit: ReturnType<typeof coxFit> | null = null, refit: RiskmodelResult["refit"] = null;
+  let groupFit: ReturnType<typeof coxFit> | null = null, refit: RiskmodelResult["refit"];
   try {
     const dummies = members.slice(1).map((_, g) => { const col = new Float64Array(kept.length); for (const i of members[g + 1]) col[i] = 1; return col; })
       .filter((_, g) => nonEmpty[g + 1]);
@@ -179,7 +179,7 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
       hr: fitIdx >= 0 ? groupFit!.hr[fitIdx] : null, ciLow: fitIdx >= 0 ? groupFit!.ciLow[fitIdx] : null,
       ciHigh: fitIdx >= 0 ? groupFit!.ciHigh[fitIdx] : null, p: fitIdx >= 0 ? groupFit!.p[fitIdx] : null };
   });
-  let logrank = null;
+  let logrank;
   try { logrank = logRankK(strataLevels.map((_, s) => ({ groups: members.map((m) => m.filter((i) => subj[i].stratum === s).map(rec)) }))); } catch { logrank = null; }
   const cs = fit.runs.map((x) => x.cIndex).filter((c) => Number.isFinite(c)).sort((x, y) => x - y);
   const pct = (f: number) => cs.length ? cs[Math.min(cs.length - 1, Math.round(f * (cs.length - 1)))] : NaN;

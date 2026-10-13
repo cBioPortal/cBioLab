@@ -108,7 +108,7 @@ function GeneSummary({ g }: { g: HotspotGene }) {
 }
 
 export function HotspotsBody({ v, hide: hideList, onHide }: { v: ViewResult; hide?: string[]; onHide: (next: string[] | undefined) => void }) {
-  const genes = (v.hotspots || []) as HotspotGene[];
+  const genes = useMemo(() => (v.hotspots || []) as HotspotGene[], [v.hotspots]);
   const hide = useMemo(() => new Set(hideList || []), [hideList]);
   const classes = classesOf(genes);
   const set = (next: string[]) => onHide(next.length ? [...next].sort() : undefined);

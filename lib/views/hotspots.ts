@@ -7,7 +7,7 @@ import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
 import { overLimit } from "./shared.ts";
 
 export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
-  const { doc, cohorts, resolvers, vNames, participationFor, pin } = c;
+  const { doc, cohorts, resolvers, vNames, participationFor } = c;
   const hv = view as HotspotsView;
   const uniq = geneSymbols(hv.genes);
   if (!uniq.length) return untimed({ kind: "hotspots", error: "hotspots view needs genes" });

@@ -6,7 +6,6 @@ import { useState } from "react";
 import { parameterize } from "../../lib/params.ts";
 import type { AnalysisDoc } from "../../lib/types.ts";
 import { EMPTY_DOC } from "./doc-store.ts";
-import { ViewHead } from "./view-chrome.tsx";
 
 import type { DocStore } from "./doc-store.ts";
 import type { SavedWorkspace } from "./use-saved.ts";
