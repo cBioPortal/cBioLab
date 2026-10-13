@@ -11,7 +11,7 @@ async function pickExploreStudies(p) {
 
 /**
  * Controls that sit side by side must line up: in every toolbar zone (.tbz) under `scope`, each
- * control (.tbbtn, .chk, select) is one control height (--ctl-h) tall and every child shares one
+ * control (a button, checkbox label or select) is one control height (--ctl-h) tall and every child shares one
  * centre line. A control placed outside the toolbar idiom takes the global input/button padding
  * and fails this. Returns the misaligned rows, described; empty when all line up.
  */
@@ -22,7 +22,7 @@ async function misalignedControls(p, scope) {
     for (const z of document.querySelectorAll(scope + " .tbz")) {
       const kids = [...z.children].filter((c) => !c.classList.contains("tbl") && c.getBoundingClientRect().height > 0);
       const mids = kids.map((c) => { const r = c.getBoundingClientRect(); return r.top + r.height / 2; });
-      const off = kids.filter((c) => c.matches(".tbbtn, .chk, select") && Math.abs(c.getBoundingClientRect().height - ctl) > 0.5);
+      const off = kids.filter((c) => c.matches(".tbbtn, .chk, select, [data-slot=button], [data-slot=select-trigger]") && Math.abs(c.getBoundingClientRect().height - ctl) > 0.5);
       if (Math.max(...mids) - Math.min(...mids) > 1 || off.length)
         bad.push(kids.map((c, i) => (c.textContent || c.tagName).trim().slice(0, 14) + "@" + mids[i].toFixed(1) + "/h" + c.getBoundingClientRect().height.toFixed(1)).join(", "));
     }
@@ -990,7 +990,7 @@ async function main() {
       await page.keyboard.press("Escape");
       ok("timeline: Esc closes the patient list", (await page.locator("dialog.tl-patients").count()) === 0);
       const at2 = await pos();
-      await page.getByRole("button", { name: "‹ prev" }).click();
+      await page.getByRole("button", { name: "prev", exact: true }).click();
       await page.waitForFunction((s) => document.querySelector(".tl-who")?.textContent !== s && !document.querySelector(".tl-fig.stale"), second, { timeout: 120000 });
       const back = await who(), at1 = await pos();
       await page.locator(".tl-fig").click({ position: { x: 4, y: 4 } });
@@ -1051,7 +1051,7 @@ async function main() {
         (dl ? dl.suggestedFilename() : "no download") + " · " + lines.length + " lines");
       // the navigator steps to the next patient, and every table follows
       const pos = await page.locator(".tl-pos").innerText();
-      await page.getByRole("button", { name: "next ›" }).click();
+      await page.getByRole("button", { name: "next", exact: true }).click();
       await page.waitForFunction(() => document.querySelector(".tl-who")?.textContent !== "P-0024249", null, { timeout: 120000 });
       await settle();
       const titles2 = await page.locator(".alt-table .dt-title").allInnerTexts();

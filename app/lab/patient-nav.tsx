@@ -4,6 +4,9 @@
 // search, filters and sort give it, as the result's `position` places the shown patient — and the
 // list itself (the shared table, app/_table/DataTable.tsx) in a dialog, where a click picks one.
 import React, { useEffect, useRef } from "react";
+import { ChevronLeft, ChevronRight, List, X } from "lucide-react";
+import { Button } from "../_ui/button";
+import { TB } from "./toolbar.ts";
 
 export type PatientKey = { study: string; id: string };
 export type ListPosition = { index: number; prev: PatientKey | null; next: PatientKey | null } | null | undefined;
@@ -33,7 +36,7 @@ export function PatientsDialog({ title, onClose, children }: { title: string; on
       onClick={(e) => { if (e.target === ref.current) close(); }}>
       <div className="tl-patients-head">
         <h3 className="flush">{title}</h3>
-        <button type="button" className="tbbtn" onClick={close} aria-label="close the patient list">close</button>
+        <Button type="button" variant="ghost" size="sm" className={TB} onClick={close} aria-label="close the patient list"><X />close</Button>
       </div>
       {children(close)}
     </dialog>
@@ -53,17 +56,17 @@ export function PatientNav({ shown, position, total, updating, go, first, openLi
   return (
     <div className="viewtb tl-nav">
       <div className="tbz">
-        <button type="button" className="tbbtn" disabled={updating || !pos?.prev} title={"the patient before this one in the list" + who(pos?.prev) + " — or press ←"}
-          onClick={() => go(pos?.prev)}>‹ prev</button>
+        <Button type="button" variant="outline" size="sm" className={TB} disabled={updating || !pos?.prev} title={"the patient before this one in the list" + who(pos?.prev) + " — or press ←"}
+          onClick={() => go(pos?.prev)}><ChevronLeft />prev</Button>
         <span className="tl-pos">
           {shown && pos ? <>patient <b>{(pos.index + 1).toLocaleString()}</b> of {total.toLocaleString()}</>
             : shown ? <>{shown} is not in the list as filtered</>
             : <>no patients</>}
         </span>
-        <button type="button" className="tbbtn" disabled={updating || !pos?.next} title={"the patient after this one in the list" + who(pos?.next) + " — or press →"}
-          onClick={() => go(pos?.next)}>next ›</button>
-        {shown && !pos && <button type="button" className="tbbtn" disabled={updating || !total} onClick={first} title="show the list's first patient">go to the first patient</button>}
-        <button type="button" className="tbbtn" onClick={openList} title={"the cohort's patients: search, filter, sort, download, and click one to " + what}>List/Search</button>
+        <Button type="button" variant="outline" size="sm" className={TB} disabled={updating || !pos?.next} title={"the patient after this one in the list" + who(pos?.next) + " — or press →"}
+          onClick={() => go(pos?.next)}>next<ChevronRight /></Button>
+        {shown && !pos && <Button type="button" variant="outline" size="sm" className={TB} disabled={updating || !total} onClick={first} title="show the list's first patient">go to the first patient</Button>}
+        <Button type="button" variant="outline" size="sm" className={TB} onClick={openList} title={"the cohort's patients: search, filter, sort, download, and click one to " + what}><List />List/Search</Button>
       </div>
     </div>
   );

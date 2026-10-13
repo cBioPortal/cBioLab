@@ -9,6 +9,10 @@ import { CancertypesBody, EnrichmentBody, CorrelatesBody, AssaysBody, MutationsB
 import { PickMenu } from "./view-chrome.tsx";
 import { TimelineBody } from "./timeline-body";
 import { AlterationsBody } from "./alterations-body";
+import { Checkbox } from "../_ui/checkbox";
+import { Input } from "../_ui/input";
+import { OptionSelect } from "./choice.tsx";
+import { FIELD } from "./toolbar.ts";
 
 /**
  * A text field that keeps what is being typed to itself and hands the page the value only on
@@ -21,7 +25,7 @@ function DraftInput({ value, onCommit, disabled, width, placeholder, title }: {
   const [draft, setDraft] = useState(value);
   useEffect(() => { setDraft(value); }, [value]);
   const commit = () => { if (draft !== value) onCommit(draft); };
-  return <input type="text" value={draft} disabled={disabled} placeholder={placeholder} title={title} style={{ width: width || "8rem" }}
+  return <Input type="text" value={draft} disabled={disabled} placeholder={placeholder} title={title} className={FIELD} style={{ width: width || "8rem" }}
     onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); }} />;
 }
 
@@ -167,17 +171,17 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
         <label className="tbfield" title="bin width along the genome; a bin takes the value of the segment over its midpoint, so a narrower bin catches a narrower event">
-          bins <select value={String(spec.binMb ?? 2)} disabled={busy} onChange={(e) => patch({ binMb: Number(e.target.value) })}>
+          bins <OptionSelect value={String(spec.binMb ?? 2)} disabled={busy} onValueChange={(v) => patch({ binMb: Number(v) })}>
             {[1, 2, 5, 10, 20].map((b) => <option key={b} value={b}>{b} Mb</option>)}
-          </select>
+          </OptionSelect>
         </label>
         <label className="tbfield" title="the |log2 segment mean| at or past which a bin counts as gained or lost">
-          threshold <select value={String(spec.threshold ?? 0.2)} disabled={busy} onChange={(e) => patch({ threshold: Number(e.target.value) })}>
+          threshold <OptionSelect value={String(spec.threshold ?? 0.2)} disabled={busy} onValueChange={(v) => patch({ threshold: Number(v) })}>
             {[0.1, 0.2, 0.3, 0.5, 1].map((t) => <option key={t} value={t}>±{t}</option>)}
-          </select>
+          </OptionSelect>
         </label>
         <label className="chk" title="chromosome X's log ratio mostly records sex against the reference, so it is off by default">
-          <input type="checkbox" checked={spec.includeX === true} disabled={busy} onChange={(e) => patch({ includeX: e.target.checked || undefined })} /> chrX
+          <Checkbox checked={spec.includeX === true} disabled={busy} onCheckedChange={(on) => patch({ includeX: (on === true) || undefined })} /> chrX
         </label>
       </div>
     </div>
@@ -186,18 +190,18 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
         <label className="tbfield" title="the molecular profile both cohorts are compared on">
-          profile <select value={spec.profileType || ""} disabled={busy} onChange={(e) => patch({ profileType: e.target.value, log2: undefined })}>
+          profile <OptionSelect value={spec.profileType || ""} disabled={busy} onValueChange={(v) => patch({ profileType: v, log2: undefined })}>
             {!c.profiles.includes(spec.profileType) && <option value={spec.profileType || ""}>{spec.profileType || "choose…"}</option>}
             {c.profiles.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
-          </select>
+          </OptionSelect>
         </label>
         <label className="chk" title="compare log2(v + 1) instead of the stored value; on by default for a non-z-score RNA-seq profile">
-          <input type="checkbox" checked={c.v.diffexpr ? !!c.v.diffexpr.log2 : spec.log2 === true} disabled={busy}
-            onChange={(e) => patch({ log2: e.target.checked })} /> log2
+          <Checkbox checked={c.v.diffexpr ? !!c.v.diffexpr.log2 : spec.log2 === true} disabled={busy}
+            onCheckedChange={(on) => patch({ log2: (on === true) })} /> log2
         </label>
         <label className="chk" title="preranked GSEA against the 50 MSigDB Hallmark sets; untick to draw the volcano alone">
-          <input type="checkbox" checked={!(Array.isArray(spec.geneSets) && spec.geneSets.length === 0)} disabled={busy}
-            onChange={(e) => patch({ geneSets: e.target.checked ? undefined : [] })} /> enrichment
+          <Checkbox checked={!(Array.isArray(spec.geneSets) && spec.geneSets.length === 0)} disabled={busy}
+            onCheckedChange={(on) => patch({ geneSets: (on === true) ? undefined : [] })} /> enrichment
         </label>
       </div>
     </div>
@@ -222,10 +226,10 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
         <label className="tbfield" title="a row per sample, carrying its patient's attributes too, or a row per patient with patient attributes only">
-          rows per <select value={spec.unit === "patient" ? "patient" : "sample"} disabled={busy}
-            onChange={(e) => patch({ unit: e.target.value === "patient" ? "patient" : undefined, sort: undefined, filters: undefined, columns: undefined, attributes: undefined, search: undefined })}>
+          rows per <OptionSelect value={spec.unit === "patient" ? "patient" : "sample"} disabled={busy}
+            onValueChange={(v) => patch({ unit: v === "patient" ? "patient" : undefined, sort: undefined, filters: undefined, columns: undefined, attributes: undefined, search: undefined })}>
             <option value="sample">sample</option><option value="patient">patient</option>
-          </select>
+          </OptionSelect>
         </label>
       </div>
     </div>
@@ -234,10 +238,10 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
     const profs = c.profiles.filter((p) => p !== "cna");
     const pick = (value: string, set: (v: string) => void, title: string, label: string) => (
       <label className="tbfield" title={title}>
-        {label} <select value={value} disabled={busy} onChange={(e) => set(e.target.value)}>
+        {label} <OptionSelect value={value} disabled={busy} onValueChange={(v) => set(v)}>
           {!profs.includes(value) && <option value={value}>{value || "choose…"}</option>}
           {profs.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
-        </select>
+        </OptionSelect>
       </label>
     );
     return (
@@ -249,9 +253,9 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
           {pick(spec.profileType || "", (v) => patch({ profileType: v }), "the query gene's profile", "on")}
           {pick(spec.otherProfile || spec.profileType || "", (v) => patch({ otherProfile: v === spec.profileType ? undefined : v }), "the profile every other gene is read from", "against")}
           <label className="tbfield" title="genes listed in each direction; every tested gene is in the histogram">
-            list <select value={String(spec.show ?? 100)} disabled={busy} onChange={(e) => patch({ show: Number(e.target.value) === 100 ? undefined : Number(e.target.value) })}>
+            list <OptionSelect value={String(spec.show ?? 100)} disabled={busy} onValueChange={(v) => patch({ show: Number(v) === 100 ? undefined : Number(v) })}>
               {[25, 100, 250].map((n) => <option key={n} value={n}>{n}</option>)}
-            </select> each way
+            </OptionSelect> each way
           </label>
         </div>
       </div>
@@ -261,15 +265,15 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
         <label className="tbfield" title="the generic-assay profile whose every entity is compared">
-          profile <select value={spec.profileType || ""} disabled={busy} onChange={(e) => patch({ profileType: e.target.value })}>
+          profile <OptionSelect value={spec.profileType || ""} disabled={busy} onValueChange={(v) => patch({ profileType: v })}>
             {!c.assays.includes(spec.profileType) && <option value={spec.profileType || ""}>{spec.profileType || "choose…"}</option>}
             {c.assays.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
-          </select>
+          </OptionSelect>
         </label>
         <label className="tbfield" title="an entity with fewer values than this in any cohort is counted but not tested">
-          test with ≥ <select value={String(spec.minN ?? 3)} disabled={busy} onChange={(e) => patch({ minN: Number(e.target.value) === 3 ? undefined : Number(e.target.value) })}>
+          test with ≥ <OptionSelect value={String(spec.minN ?? 3)} disabled={busy} onValueChange={(v) => patch({ minN: Number(v) === 3 ? undefined : Number(v) })}>
             {[2, 3, 5, 10, 20, 50].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select> per cohort
+          </OptionSelect> per cohort
         </label>
       </div>
     </div>
@@ -278,20 +282,20 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
         <label className="tbfield" title="which alteration to compare across every gene">
-          alteration <select value={spec.alteration || "mutation"} disabled={busy} onChange={(e) => patch({ alteration: e.target.value === "mutation" ? undefined : e.target.value })}>
+          alteration <OptionSelect value={spec.alteration || "mutation"} disabled={busy} onValueChange={(v) => patch({ alteration: v === "mutation" ? undefined : v })}>
             <option value="mutation">mutation</option><option value="cna">amp or deep deletion</option><option value="amp">amplification</option>
             <option value="homdel">deep deletion</option><option value="sv">structural variant</option>
-          </select>
+          </OptionSelect>
         </label>
         <label className="tbfield" title="count every alteration, or only OncoKB drivers">
-          count <select value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onChange={(e) => patch({ measure: e.target.value === "driver" ? "driver" : undefined })}>
+          count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : undefined })}>
             <option value="any">any</option><option value="driver">drivers</option>
-          </select>
+          </OptionSelect>
         </label>
         <label className="tbfield" title="genes altered in fewer samples than this across the cohorts are counted but not tested">
-          test genes altered in ≥ <select value={String(spec.minAltered ?? 5)} disabled={busy} onChange={(e) => patch({ minAltered: Number(e.target.value) })}>
+          test genes altered in ≥ <OptionSelect value={String(spec.minAltered ?? 5)} disabled={busy} onValueChange={(v) => patch({ minAltered: Number(v) })}>
             {[1, 5, 10, 20, 50].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
+          </OptionSelect>
         </label>
       </div>
     </div>
@@ -303,35 +307,35 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
       <div className="viewtb">
         <div className="tbz"><span className="tbl">data</span>
           <label className="tbfield" title="the portal's category type: the study, the cancer type or the detailed cancer type — or any other sample attribute">
-            category <select value={by} disabled={busy} onChange={(e) => patch({ groupBy: e.target.value === "CANCER_TYPE" ? undefined : e.target.value })}>
+            category <OptionSelect value={by} disabled={busy} onValueChange={(v) => patch({ groupBy: v === "CANCER_TYPE" ? undefined : v })}>
               <option value="study">Cancer Study</option>
               <option value="CANCER_TYPE">Cancer Type</option>
               <option value="CANCER_TYPE_DETAILED">Cancer Type Detailed</option>
               {!cats.includes(by) && !["study", "CANCER_TYPE", "CANCER_TYPE_DETAILED"].includes(by) && <option value={by}>{by}</option>}
               {cats.filter((a) => a !== "CANCER_TYPE" && a !== "CANCER_TYPE_DETAILED").map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
+            </OptionSelect>
           </label>
           <label className="tbfield" title="count patients (as the portal does by default — a patient counts in each group one of their samples is in) or samples">
-            count by <select value={spec.unit === "sample" ? "sample" : "patient"} disabled={busy} onChange={(e) => patch({ unit: e.target.value === "sample" ? "sample" : undefined })}>
+            count by <OptionSelect value={spec.unit === "sample" ? "sample" : "patient"} disabled={busy} onValueChange={(v) => patch({ unit: v === "sample" ? "sample" : undefined })}>
               <option value="patient">patients</option><option value="sample">samples</option>
-            </select>
+            </OptionSelect>
           </label>
           <label className="tbfield" title="count every alteration, or only OncoKB drivers">
-            count <select value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onChange={(e) => patch({ measure: e.target.value === "driver" ? "driver" : undefined })}>
+            count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : undefined })}>
               <option value="any">any alteration</option><option value="driver">drivers</option>
-            </select>
+            </OptionSelect>
           </label>
           <label className="tbfield" title="groups with fewer profiled patients (or samples) than this are pooled into one bar, never dropped">
-            min group <select value={String(spec.minSamples ?? 10)} disabled={busy} onChange={(e) => patch({ minSamples: Number(e.target.value) })}>
+            min group <OptionSelect value={String(spec.minSamples ?? 10)} disabled={busy} onValueChange={(v) => patch({ minSamples: Number(v) })}>
               {[1, 10, 50, 100, 200, 500].map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
+            </OptionSelect>
           </label>
         </div>
         <div className="tbz"><span className="tbl">view</span>
           <label className="tbfield" title="the y axis: each group's altered share, or its altered count">
-            y-axis <select value={spec.show === "count" ? "count" : "frequency"} disabled={busy} onChange={(e) => patch({ show: e.target.value === "count" ? "count" : undefined })}>
+            y-axis <OptionSelect value={spec.show === "count" ? "count" : "frequency"} disabled={busy} onValueChange={(v) => patch({ show: v === "count" ? "count" : undefined })}>
               <option value="frequency">Alteration Frequency</option><option value="count">Absolute Counts</option>
-            </select>
+            </OptionSelect>
           </label>
         </div>
       </div>
@@ -343,16 +347,16 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
       <div className="viewtb">
         <div className="tbz"><span className="tbl">data</span>
           <label className="tbfield" title="mutations counted as a gene's feature">
-            genes <select value={spec.measure || "any"} disabled={busy} onChange={(e) => patch({ measure: e.target.value })}>
+            genes <OptionSelect value={spec.measure || "any"} disabled={busy} onValueChange={(v) => patch({ measure: v })}>
               <option value="any">any mutation</option><option value="driver">OncoKB drivers</option>
-            </select>
+            </OptionSelect>
           </label>
           <label className="tbfield" title="a separate baseline hazard per value — use CANCER_TYPE on a cohort of several cancers, or a gene that marks a type carries its prognosis">
-            stratify by <select value={spec.strata || ""} disabled={busy} onChange={(e) => patch({ strata: e.target.value || undefined })}>
+            stratify by <OptionSelect value={spec.strata || ""} disabled={busy} onValueChange={(v) => patch({ strata: v || undefined })}>
               <option value="">nothing</option>
               {!cats.includes(spec.strata) && spec.strata && <option value={spec.strata}>{spec.strata}</option>}
               {cats.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
+            </OptionSelect>
           </label>
         </div>
         <div className="tbz"><span className="tbl">adjust</span>
@@ -361,12 +365,12 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
             chosen={spec.covariates || []} max={6} busy={busy} menuId={"risk-cov:" + c.vi} menuStore={RISK_MENUS}
             onChange={(next) => patch({ covariates: next.length ? next : undefined })} />
           <label className="tbfield" title="start each patient's clock at a timeline event instead of the study's day 0; they then enter the risk set at day 0 (delayed entry)">
-            clock from <select value={spec.anchor?.eventType || ""} disabled={busy}
-              onChange={(e) => patch({ anchor: e.target.value ? { ...(spec.anchor || {}), eventType: e.target.value } : undefined })}>
+            clock from <OptionSelect value={spec.anchor?.eventType || ""} disabled={busy}
+              onValueChange={(v) => patch({ anchor: v ? { ...(spec.anchor || {}), eventType: v } : undefined })}>
               <option value="">study's day 0</option>
               {spec.anchor?.eventType && !c.events.some((x) => x.label === spec.anchor.eventType) && <option value={spec.anchor.eventType}>{spec.anchor.eventType}</option>}
               {c.events.map((x) => <option key={x.label} value={x.label}>first {x.label}</option>)}
-            </select>
+            </OptionSelect>
           </label>
           {spec.anchor?.eventType && <>
             <label className="tbfield" title="only anchor events with this attribute (e.g. SUBTYPE); empty for any">
@@ -381,22 +385,22 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
         </div>
         <div className="tbz"><span className="tbl">model</span>
           <label className="chk" title="train only on the discovery half of the engine's fixed held-out split, and report the groups, table and C-index on the validation half, which the model never saw">
-            <input type="checkbox" checked={!!spec.validate} disabled={busy} onChange={(e) => patch({ validate: e.target.checked || undefined })} /> validate on held-out half
+            <Checkbox checked={!!spec.validate} disabled={busy} onCheckedChange={(on) => patch({ validate: (on === true) || undefined })} /> validate on held-out half
           </label>
           <label className="tbfield" title="the l1 share of the penalty: lasso keeps fewer genes, ridge keeps all of them shrunk">
-            penalty <select value={String(spec.alpha ?? 0.5)} disabled={busy} onChange={(e) => patch({ alpha: Number(e.target.value) })}>
+            penalty <OptionSelect value={String(spec.alpha ?? 0.5)} disabled={busy} onValueChange={(v) => patch({ alpha: Number(v) })}>
               <option value="1">lasso</option><option value="0.5">elastic net</option><option value="0.1">mostly ridge</option>
-            </select>
+            </OptionSelect>
           </label>
           <label className="tbfield" title="random two-thirds / one-third splits; each patient's score is the mean over the runs that held them out (OncoCast recommends 50 or more)">
-            runs <select value={String(spec.runs ?? 10)} disabled={busy} onChange={(e) => patch({ runs: Number(e.target.value) })}>
+            runs <OptionSelect value={String(spec.runs ?? 10)} disabled={busy} onValueChange={(v) => patch({ runs: Number(v) })}>
               {[5, 10, 20, 50].map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
+            </OptionSelect>
           </label>
           <label className="tbfield" title="risk groups, cut at equal quantiles of the score">
-            groups <select value={String(spec.groups ?? 3)} disabled={busy} onChange={(e) => patch({ groups: Number(e.target.value) })}>
+            groups <OptionSelect value={String(spec.groups ?? 3)} disabled={busy} onValueChange={(v) => patch({ groups: Number(v) })}>
               {[2, 3, 4, 5].map((g) => <option key={g} value={g}>{g}</option>)}
-            </select>
+            </OptionSelect>
           </label>
         </div>
       </div>
@@ -412,17 +416,17 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
             <DraftInput value={spec.test || ""} disabled={busy} width="7rem" onCommit={(t) => patch({ test: t.trim() })} />
           </label>
           <label className="tbfield" title="a responder's best fall from baseline, in percent">
-            responder <select value={String(spec.responseDrop ?? 50)} disabled={busy} onChange={(e) => patch({ responseDrop: Number(e.target.value) })}>
+            responder <OptionSelect value={String(spec.responseDrop ?? 50)} disabled={busy} onValueChange={(v) => patch({ responseDrop: Number(v) })}>
               {[30, 50, 90].map((d) => <option key={d} value={d}>fell ≥{d}%</option>)}
-            </select>
+            </OptionSelect>
           </label>
         </div>
         <div className="tbz"><span className="tbl">clock</span>
           <label className="tbfield" title="the treatment start the course is read from">
-            from first <select value={an.eventType || ""} disabled={busy} onChange={(e) => patch({ anchor: { ...an, eventType: e.target.value } })}>
+            from first <OptionSelect value={an.eventType || ""} disabled={busy} onValueChange={(v) => patch({ anchor: { ...an, eventType: v } })}>
               {!types.includes(an.eventType) && <option value={an.eventType || ""}>{an.eventType || "choose…"}</option>}
               {types.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+            </OptionSelect>
           </label>
           <label className="tbfield" title="only anchor events with this attribute (e.g. SUBTYPE); empty for any">
             where <DraftInput value={an.key || ""} disabled={busy} width="6rem" placeholder="attribute"
@@ -433,9 +437,9 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
               onCommit={(t) => patch({ anchor: { ...an, value: t } })} />
           </label>
           <label className="tbfield" title="how far after the start to follow">
-            to <select value={String(spec.toWeeks ?? 52)} disabled={busy} onChange={(e) => patch({ toWeeks: Number(e.target.value) })}>
+            to <OptionSelect value={String(spec.toWeeks ?? 52)} disabled={busy} onValueChange={(v) => patch({ toWeeks: Number(v) })}>
               {[12, 26, 52, 104].map((w) => <option key={w} value={w}>{w} weeks</option>)}
-            </select>
+            </OptionSelect>
           </label>
         </div>
       </div>
@@ -450,10 +454,10 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
       <div className="viewtb">
         <div className="tbz"><span className="tbl">event</span>
           <label className="tbfield" title="the timeline event whose first occurrence after the anchor is counted">
-            type <select value={e.eventType || ""} disabled={busy} onChange={(ev) => setEvent({ ...e, eventType: ev.target.value })}>
+            type <OptionSelect value={e.eventType || ""} disabled={busy} onValueChange={(v) => setEvent({ ...e, eventType: v })}>
               {!types.includes(e.eventType) && <option value={e.eventType || ""}>{e.eventType || "choose…"}</option>}
               {types.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+            </OptionSelect>
           </label>
           <label className="tbfield" title="only events with this attribute (e.g. TUMOR_SITE); leave empty for any">
             where <DraftInput value={a0.key || ""} disabled={busy} width="8rem" placeholder="attribute"
@@ -466,11 +470,11 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
         </div>
         <div className="tbz"><span className="tbl">clock</span>
           <label className="tbfield" title="when the clock starts: the study's day 0, or the first event of a type (left truncation applies, as in survival)">
-            from <select value={an ? an.eventType : ""} disabled={busy}
-              onChange={(ev) => patch({ anchor: ev.target.value ? { eventType: ev.target.value, occurrence: "FIRST" } : undefined })}>
+            from <OptionSelect value={an ? an.eventType : ""} disabled={busy}
+              onValueChange={(v) => patch({ anchor: v ? { eventType: v, occurrence: "FIRST" } : undefined })}>
               <option value="">day 0</option>
               {types.map((t) => <option key={t} value={t}>first {t}</option>)}
-            </select>
+            </OptionSelect>
           </label>
           {an && an.key && <span className="meta" title="set in the document; choosing another clock drops it">where {an.key} = {String(an.value ?? "")}</span>}
         </div>
@@ -481,12 +485,12 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
         <label className="tbfield" title="OncoKB driver mutations only, or every mutation call">
-          count <select value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onChange={(e) => patch({ measure: e.target.value === "any" ? "any" : undefined })}>
+          count <OptionSelect value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onValueChange={(v) => patch({ measure: v === "any" ? "any" : undefined })}>
             <option value="driver">driver mutations</option><option value="any">every mutation</option>
-          </select>
+          </OptionSelect>
         </label>
         <label className="chk" title="use only samples whose FACETS_QC is Pass">
-          <input type="checkbox" checked={spec.qc !== false} disabled={busy} onChange={(e) => patch({ qc: e.target.checked ? undefined : false })} /> FACETS QC pass only
+          <Checkbox checked={spec.qc !== false} disabled={busy} onCheckedChange={(on) => patch({ qc: (on === true) ? undefined : false })} /> FACETS QC pass only
         </label>
       </div>
     </div>
@@ -517,22 +521,22 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
             </label>
           </>}
           <label className="tbfield" title="test the genes you chose, or scan every gene altered in a paired patient and draw the most one-sided">
-            genes <select value={scanning ? "scan" : "chosen"} disabled={busy}
-              onChange={(e) => patch(e.target.value === "scan" ? { genes: undefined } : { genes: PAIRED_DEFAULT_GENES, top: undefined })}>
+            genes <OptionSelect value={scanning ? "scan" : "chosen"} disabled={busy}
+              onValueChange={(v) => patch(v === "scan" ? { genes: undefined } : { genes: PAIRED_DEFAULT_GENES, top: undefined })}>
               <option value="chosen">chosen</option><option value="scan">scan all</option>
-            </select>
+            </OptionSelect>
           </label>
           {scanning && (
             <label className="tbfield" title="how many of the most one-sided genes to draw; q is still taken across every gene tested">
-              drawn <select value={String(spec.top ?? 20)} disabled={busy} onChange={(e) => patch({ top: Number(e.target.value) === 20 ? undefined : Number(e.target.value) })}>
+              drawn <OptionSelect value={String(spec.top ?? 20)} disabled={busy} onValueChange={(v) => patch({ top: Number(v) === 20 ? undefined : Number(v) })}>
                 {[...new Set([10, 20, 30, 40, Number(spec.top ?? 20)])].sort((x, y) => x - y).map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
+              </OptionSelect>
             </label>
           )}
           <label className="tbfield" title="count only OncoKB drivers, or every alteration">
-            count <select value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onChange={(e) => patch({ measure: e.target.value === "any" ? "any" : undefined })}>
+            count <OptionSelect value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onValueChange={(v) => patch({ measure: v === "any" ? "any" : undefined })}>
               <option value="driver">drivers</option><option value="any">any alteration</option>
-            </select>
+            </OptionSelect>
           </label>
         </div>
       </div>
@@ -542,14 +546,14 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
         <label className="tbfield" title="count only OncoKB-annotated drivers (as the paper counted curated oncogenic events), or every alteration">
-          count <select value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onChange={(e) => patch({ measure: e.target.value === "any" ? "any" : undefined })}>
+          count <OptionSelect value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onValueChange={(v) => patch({ measure: v === "any" ? "any" : undefined })}>
             <option value="driver">drivers</option><option value="any">any alteration</option>
-          </select>
+          </OptionSelect>
         </label>
         <label className="tbfield" title="how many of each pathway's most-altered genes to draw; the rest are pooled and counted, never dropped">
-          genes shown <select value={String(spec.topGenes ?? 6)} disabled={busy} onChange={(e) => patch({ topGenes: Number(e.target.value) })}>
+          genes shown <OptionSelect value={String(spec.topGenes ?? 6)} disabled={busy} onValueChange={(v) => patch({ topGenes: Number(v) })}>
             {[3, 6, 9, 12].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
+          </OptionSelect>
         </label>
       </div>
     </div>

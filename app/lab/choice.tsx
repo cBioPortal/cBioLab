@@ -1,4 +1,5 @@
 "use client";
+import { Children, isValidElement } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../_ui/select";
 import { cn } from "../../lib/cn";
 
@@ -34,6 +35,48 @@ export function Choice({ value, onChange, options, placeholder, pending, disable
         {!known && <SelectItem value={value} className="text-md">{value}</SelectItem>}
         {options.map(([v, label]) => <SelectItem key={v || NONE} value={v || NONE} className="text-md">{label}</SelectItem>)}
         {pending && <SelectItem value={"\u0000pending"} disabled className="text-md">{pending}</SelectItem>}
+      </SelectContent>
+    </Select>
+  );
+}
+
+type Opt = { value: string; label: string; disabled: boolean };
+
+const textOf = (node: React.ReactNode): string =>
+  node == null || typeof node === "boolean" ? "" : Array.isArray(node) ? node.map(textOf).join("")
+    : isValidElement(node) ? textOf((node.props as { children?: React.ReactNode }).children) : String(node);
+
+/** the <option>s among `children`, however they are nested in fragments and arrays */
+function optionsOf(children: React.ReactNode): Opt[] {
+  return Children.toArray(children).flatMap((c): Opt[] => {
+    if (!isValidElement(c)) return [];
+    const props = c.props as { value?: string | number; children?: React.ReactNode; disabled?: boolean };
+    if (c.type === "option") return [{ value: props.value != null ? String(props.value) : textOf(props.children), label: textOf(props.children), disabled: !!props.disabled }];
+    return optionsOf(props.children);
+  });
+}
+
+/** A view toolbar's dropdown written as <option> children, the way a native select is. */
+export function OptionSelect({ value, onValueChange, children, disabled, title, className, style }: {
+  value: string | number;
+  onValueChange: (v: string) => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+  title?: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const options = optionsOf(children);
+  const v = String(value);
+  const hasNone = options.some((o) => o.value === "");
+  return (
+    <Select value={v === "" && hasNone ? NONE : v} onValueChange={(x) => onValueChange(x === NONE ? "" : x)} disabled={disabled}>
+      <SelectTrigger size="sm" title={title} style={style}
+        className={cn("h-ctl gap-1 bg-card px-2 text-md data-[size=sm]:h-ctl [&_svg:not([class*='size-'])]:size-3.5", className)}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o, i) => <SelectItem key={i} value={o.value || (o.disabled ? "\u0000disabled" + i : NONE)} disabled={o.disabled} className="text-md">{o.label}</SelectItem>)}
       </SelectContent>
     </Select>
   );

@@ -10,6 +10,10 @@ import { timelineSvg, timelineSummary } from "../../lib/timeline-svg.ts";
 import { formatDays, sampleMarks, attr } from "../../lib/timeline-tracks.ts";
 import type { PatientEvent, TimelineResult } from "../../lib/types";
 import { PatientNav, PatientsDialog, patientKeys } from "./patient-nav.tsx";
+import { ChevronsUpDown } from "lucide-react";
+import { Button } from "../_ui/button";
+import { Checkbox } from "../_ui/checkbox";
+import { TB } from "./toolbar.ts";
 
 type Spec = { patient?: { study: string; id: string }; collapsed?: string[]; expandGaps?: boolean } & Record<string, unknown>;
 
@@ -68,10 +72,10 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch }: {
           <div className="viewtb tl-settings">
             <div className="tbz">
               <label className="chk" title="draw every year, rather than cutting runs of four or more years without an event to one dashed mark">
-                <input type="checkbox" checked={!!spec.expandGaps} onChange={(e) => patch({ expandGaps: e.target.checked || undefined })} /> every year
+                <Checkbox checked={!!spec.expandGaps} onCheckedChange={(on) => patch({ expandGaps: (on === true) || undefined })} /> every year
               </label>
-              <button type="button" className="tbbtn" disabled={!collapsed.length} title="unfold every nested track"
-                onClick={() => patch({ collapsed: undefined })}>expand all tracks</button>
+              <Button type="button" variant="outline" size="sm" className={TB} disabled={!collapsed.length} title="unfold every nested track"
+                onClick={() => patch({ collapsed: undefined })}><ChevronsUpDown />expand all tracks</Button>
             </div>
           </div>
         </div>

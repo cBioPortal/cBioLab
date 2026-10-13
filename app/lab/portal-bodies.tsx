@@ -13,6 +13,13 @@ import { enrichmentVolcanoSvg, enrichmentScatterSvg, enrichmentTopSvg } from "..
 import { frame, palette, SERIES } from "../../lib/svg-kit";
 import { api } from "./api.ts";
 import { ServerSvg as Svg } from "./view-chrome.tsx";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "../_ui/button";
+import { Checkbox } from "../_ui/checkbox";
+import { Input } from "../_ui/input";
+import { cn } from "../../lib/cn";
+import { OptionSelect } from "./choice.tsx";
+import { FIELD, TB } from "./toolbar.ts";
 
 const framed = (c: { body: string; width: number; height: number } | null) => c ? frame(c.width, c.height, c.body, palette("auto").bg, true) : null;
 export const pFmt = (x: number) => x === 0 ? "< 1e-300" : x < 1e-3 ? x.toExponential(2) : x.toFixed(3);
@@ -79,9 +86,9 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
     <div className="pb-tablewrap">
       <div className="pb-tablebar">
         {(filters || []).map((f, i) => (
-          <label key={f.label} className="chk"><input type="checkbox" checked={on[i]} onChange={(e) => { setOn((o) => o.map((x, j) => j === i ? e.target.checked : x)); setPage(0); }} /> {f.label}</label>
+          <label key={f.label} className="chk"><Checkbox checked={on[i]} onCheckedChange={(c) => { setOn((o) => o.map((x, j) => j === i ? (c === true) : x)); setPage(0); }} /> {f.label}</label>
         ))}
-        {search && <input type="search" placeholder="search" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />}
+        {search && <Input type="search" placeholder="search" className={cn(FIELD, "w-44")} value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />}
       </div>
       <table className="pb-table">
         <thead><tr>{cols.map((c) => (
@@ -95,9 +102,9 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
           </tr>))}</tbody>
       </table>
       <div className="viewtb pb-pager"><div className="tbz">
-        <button type="button" className="tbbtn" disabled={pg === 0} onClick={() => setPage(pg - 1)}>‹</button>
+        <Button type="button" variant="outline" size="sm" className={TB} disabled={pg === 0} aria-label="previous page" onClick={() => setPage(pg - 1)}><ChevronLeft /></Button>
         <span>Showing {shown.length ? pg * pageSize + 1 : 0}–{Math.min(shown.length, (pg + 1) * pageSize)} of {shown.length.toLocaleString()}</span>
-        <button type="button" className="tbbtn" disabled={pg >= pages - 1} onClick={() => setPage(pg + 1)}>›</button>
+        <Button type="button" variant="outline" size="sm" className={TB} disabled={pg >= pages - 1} aria-label="next page" onClick={() => setPage(pg + 1)}><ChevronRight /></Button>
         {note && <span>{note}</span>}
       </div></div>
     </div>
@@ -191,9 +198,9 @@ export function CorrelatesBody({ v, docJson }: { v: ViewResult; docJson?: () => 
       <div className="pb-row">
         <div>
           <label className="tbfield">
-            <select value={which} onChange={(e) => setWhich(e.target.value as typeof which)}>
+            <OptionSelect value={which} onValueChange={(v) => setWhich(v as typeof which)}>
               <option value="any">Show Any Correlation</option><option value="positive">Show Positive Correlations</option><option value="negative">Show Negative Correlations</option>
-            </select>
+            </OptionSelect>
           </label>
           <PortalTable rows={rows} cols={cols} initialSort={{ key: "q" }} search={(g) => g.gene + " " + (g.cytoband || "")} selected={picked} onSelect={setSel}
             note={"the " + r.positive.length + " most positive and " + r.negative.length + " most negative of " + r.tested.toLocaleString()} />

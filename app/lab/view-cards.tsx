@@ -19,11 +19,7 @@ import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
 import { Choice } from "./choice.tsx";
 import { GearMenu, MenuSeparator } from "./gear-menu.tsx";
-
-/** a button in a view toolbar, at the toolbar's control height */
-const TB = "h-ctl gap-1 px-2 text-md font-normal shadow-none";
-/** an option among several: an outline chip, filled while chosen */
-const CHIP = "rounded-pill px-2.5 text-sm font-normal aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:font-semibold aria-pressed:text-accent-foreground";
+import { CHIP, TB } from "./toolbar.ts";
 
 type ResultView = AnalysisResult["views"][number];
 type ViewChoice = NonNullable<React.ComponentProps<typeof ViewHead>["cohorts"]>;

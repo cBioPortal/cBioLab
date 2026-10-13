@@ -13,6 +13,7 @@ import type { ExploreState } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { Save, Tag, X } from "lucide-react";
 import { Button } from "../_ui/button";
+import { CHIP } from "./toolbar.ts";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
 import { Choice } from "./choice.tsx";
@@ -63,8 +64,6 @@ const CHIP_X = "ml-1 size-4 rounded-sm text-muted-foreground hover:text-foregrou
 /** a study row's action icon */
 const ICON = "text-muted-foreground hover:text-accent-foreground [&_svg]:size-3.5 [&_svg]:fill-current";
 
-/** a filter chip: an outline toggle, filled while pressed */
-const CHIP = "rounded-pill px-2.5 text-sm font-normal aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:font-semibold aria-pressed:text-accent-foreground";
 
 export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
   const { addMode, analyzeDraft, exDraftStudies, exPanelOpen, exSel, exStudies, explore, exploreBusy, sCaps, sQuery, setExDraftStudies, setExPanelOpen, setExploreStudies, setSCaps, setSQuery, setStudyChipsOpen, studies, studyChipsOpen } = ctx;

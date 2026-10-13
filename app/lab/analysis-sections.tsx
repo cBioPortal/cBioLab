@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { Braces, LoaderCircle, Play, Plus, Save, X } from "lucide-react";
 import { Button } from "../_ui/button";
+import { CHIP } from "./toolbar.ts";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Textarea } from "../_ui/textarea";
 import CohortPills from "./pills";
@@ -83,8 +84,6 @@ export interface AnalysisCtx {
   viewIds: number[];
 }
 
-/** a view kind in "Add a view": an outline chip, filled while the document has it */
-const CHIP = "rounded-pill px-2.5 text-sm font-normal aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:font-semibold aria-pressed:text-accent-foreground";
 
 export function GenesDialog({ ctx }: { ctx: AnalysisCtx }) {
   const { busy, doc, genesFor, setGenesFor, setViewGenes } = ctx;
