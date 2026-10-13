@@ -15,6 +15,7 @@ import { Save, Tag, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
+import { Choice } from "./choice.tsx";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 
@@ -54,6 +55,15 @@ export type ExploreCtx = ExploreState & {
   showClauseData: (cohort?: string) => OnCustomData;
   studies: { id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number; caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string; }[];
 };
+
+/** a search box in a toolbar row */
+const SEARCH = "h-8 w-44 text-md md:text-md";
+/** a text-sized action that reads as a link */
+const LINK = "h-auto px-0 text-sm text-link";
+/** the × that removes a chip */
+const CHIP_X = "ml-1 size-4 rounded-sm text-muted-foreground hover:text-foreground [&_svg:not([class*='size-'])]:size-3";
+/** a study row's action icon */
+const ICON = "text-muted-foreground hover:text-accent-foreground [&_svg]:size-3.5 [&_svg]:fill-current";
 
 /** a filter chip: an outline toggle, filled while pressed */
 const CHIP = "rounded-pill px-2.5 text-sm font-normal aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:font-semibold aria-pressed:text-accent-foreground";
@@ -127,9 +137,9 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
                   {shown.map(id => (
                     <span key={id} className="qchip" title={nameOf(id)}>
                       {id}
-                      <button className="linklike ml-1"
-                        title={"remove " + id + " from the selection"}
-                        onClick={() => toggle(id)}>×</button>
+                      <Button variant="ghost" size="icon-xs" className={CHIP_X}
+                        title={"remove " + id + " from the selection"} aria-label={"remove " + id}
+                        onClick={() => toggle(id)}><X /></Button>
                     </span>
                   ))}
                   {over > 1 && (
@@ -233,15 +243,15 @@ function StudyActions({ id, ctx }: { id: string; ctx: ExploreCtx }) {
   const act = (f: (id: string) => void) => (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); f(id); };
   return (
     <span className="studyacts">
-      <button className="iconbtn" onClick={act(exploreStudy)} title={"explore " + id + " now (replaces the current selection)"} aria-label={"explore " + id}>
+      <Button variant="ghost" size="icon-xs" className={ICON} onClick={act(exploreStudy)} title={"explore " + id + " now (replaces the current selection)"} aria-label={"explore " + id}>
         <svg viewBox="0 0 16 16" aria-hidden><path d="M7.25 1.54A6.5 6.5 0 1 0 14.46 8.75H7.25Z" /><path d="M8.75.04v6.71h6.71A6.5 6.5 0 0 0 8.75.04Z" /></svg>
-      </button>
-      {!addMode && <button className="iconbtn" onClick={act(analyzeStudy)} title={"start a fresh analysis of all of " + id + " (replaces the current document)"} aria-label={"analyze " + id}>
+      </Button>
+      {!addMode && <Button variant="ghost" size="icon-xs" className={ICON} onClick={act(analyzeStudy)} title={"start a fresh analysis of all of " + id + " (replaces the current document)"} aria-label={"analyze " + id}>
         <svg viewBox="0 0 16 16" aria-hidden><path d="M1.5 1v13.5H15V13H3V1Z" /><path d="M4.5 8h2v4h-2ZM8 5h2v7H8ZM11.5 2.5h2V12h-2Z" /></svg>
-      </button>}
-      <button className="iconbtn" onClick={act(addDataToStudy)} title={"explore " + id + " and add custom data to it"} aria-label={"add custom data to " + id}>
+      </Button>}
+      <Button variant="ghost" size="icon-xs" className={ICON} onClick={act(addDataToStudy)} title={"explore " + id + " and add custom data to it"} aria-label={"add custom data to " + id}>
         <svg viewBox="0 0 16 16" aria-hidden><path d="M8 1c-3.6 0-6.5 1.1-6.5 2.5v9C1.5 13.9 4.4 15 8 15c.4 0 .8 0 1.2-.04a4.5 4.5 0 0 1-.9-1.48H8c-3.1 0-5-.9-5-1.48V9.9c1.2.65 3 1.03 5 1.08.05-.5.17-.98.36-1.43C5 9.5 3 8.6 3 8V5.4C4.2 6 6 6.5 8 6.5s3.8-.5 5-1.1V8a4.5 4.5 0 0 1 1.5.5v-5C14.5 2.1 11.6 1 8 1Zm0 4C5 5 3 4.1 3 3.5S5 2 8 2s5 .9 5 1.5S11 5 8 5Z" /><path d="M12 9.5a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0v-1.5h-1.5a.75.75 0 0 1 0-1.5h1.5v-1.5A.75.75 0 0 1 12 9.5Z" /></svg>
-      </button>
+      </Button>
     </span>
   );
 }
@@ -338,8 +348,8 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                     // leave the reader to discover the gap study by study.
                     const partial = exStudies.length > 1 && (c.studyCount ?? 1) < exStudies.length;
                     return (
-                      <tr key={attrKey(c)} onClick={(e) => { if ((e.target as HTMLElement).tagName !== "INPUT") toggle(); }}>
-                        <td><input type="checkbox" checked={!hiddenAttrs.has(attrKey(c))} onChange={toggle} /></td>
+                      <tr key={attrKey(c)} onClick={(e) => { if (!(e.target as HTMLElement).closest("[role=checkbox]")) toggle(); }}>
+                        <td><Checkbox checked={!hiddenAttrs.has(attrKey(c))} onCheckedChange={toggle} aria-label={"chart " + (c.displayName || c.attribute)} /></td>
                         <td>
                           {c.displayName || c.attribute}
                           {partial && (
@@ -365,8 +375,8 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
               <div className="row baseline">
                 {custom.length > 0 && <>
                   <span className="meta">{checkedOf(custom)} of {custom.length} checked</span>
-                  <button className="linklike" onClick={() => setAll(custom, true)}>check all</button>
-                  <button className="linklike" onClick={() => setAll(custom, false)}>check none</button>
+                  <Button variant="link" size="xs" className={LINK} onClick={() => setAll(custom, true)}>check all</Button>
+                  <Button variant="link" size="xs" className={LINK} onClick={() => setAll(custom, false)}>check none</Button>
                 </>}
                 <span className="spacer" />
                 <Button variant="outline" size="sm" onClick={() => { setAddChartOpen(false); openCustomManager(custom.length ? "manage" : "add"); }}>
@@ -389,27 +399,23 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                 selected study — hover it for which share of the {exStudies.length} do.</>}
               </p>
               <div className="row baseline">
-                <input className="genesearch" type="search" placeholder="find an attribute" value={clinFilter}
+                <Input type="search" className={SEARCH} placeholder="find an attribute" value={clinFilter}
                   title="narrows this checklist by attribute name" autoFocus
                   onChange={e => setClinFilter(e.target.value)} />
                 <span className="meta">{checkedOf(builtin)} of {builtin.length} checked</span>
-                <button className="linklike" onClick={() => setAll(builtin, true)}>check all</button>
-                <button className="linklike" onClick={() => setAll(builtin, false)}>check none</button>
+                <Button variant="link" size="xs" className={LINK} onClick={() => setAll(builtin, true)}>check all</Button>
+                <Button variant="link" size="xs" className={LINK} onClick={() => setAll(builtin, false)}>check none</Button>
                 {exStudies.length > 1 && (
-                  <select value={String(attrCoverage)} disabled={exploreBusy}
+                  <Choice className="w-44" value={String(attrCoverage)} disabled={exploreBusy}
                     title="attributes carried by only one study are that study's own vocabulary, not something the selection shares"
-                    onChange={e => {
-                      const v = Number(e.target.value);
-                      setAttrCoverage(v);
+                    onChange={v => {
+                      setAttrCoverage(Number(v));
                       // Refetch UNNARROWED so the bar can be lowered again
                       // later; the filtering below is what the reader sees,
                       // and subsequent fetches narrow the server's work.
                       setTimeout(() => fetchExplore(undefined, undefined, []), 0);
-                    }}>
-                    <option value="0">every attribute</option>
-                    <option value="0.5">in most studies</option>
-                    <option value="1">in every study</option>
-                  </select>
+                    }}
+                    options={[["0", "every attribute"], ["0.5", "in most studies"], ["1", "in every study"]]} />
                 )}
               </div>
               {!rows.length && <p className="note my-3">No attribute matches “{clinFilter}”.</p>}
@@ -420,7 +426,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
         {chartTab === "gene" && (
           <div>
             <div className="row baseline g5">
-              <input className="genesearch" type="search" placeholder="chart a gene (e.g. EGFR)" autoFocus
+              <Input type="search" className={SEARCH} placeholder="chart a gene (e.g. EGFR)" autoFocus
                 value={geneChartInput} disabled={exploreBusy}
                 onChange={e => setGeneChartInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") chartGene(geneChartInput); }} />
@@ -436,8 +442,8 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
             {geneCharts.map(g => (
               <span key={g} className="qchip mr-1">
                 {g}
-                <button className="linklike ml-1" title={"stop charting " + g}
-                  onClick={() => unchartGene(g)}>×</button>
+                <Button variant="ghost" size="icon-xs" className={CHIP_X} title={"stop charting " + g} aria-label={"stop charting " + g}
+                  onClick={() => unchartGene(g)}><X /></Button>
               </span>
             ))}
             {geneCharts.length > 0 && (
@@ -462,43 +468,28 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                 </p>
                   <div className="setrow">
                     <span className="meta">event</span>
-                    <select value={seq.aType} onChange={e => setSeq(s => ({ ...s, aType: e.target.value }))}>
-                      <option value="">choose…</option>
-                      {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
-                      {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
-                        <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
-                      ))}
-                    </select>
+                    <Choice className="flex-1" placeholder="choose…" value={seq.aType} onChange={v => setSeq(s => ({ ...s, aType: v }))}
+                      options={[...(tx ? [[LINE_TYPE, "Treatment line (derived)"] as const] : []), ...[...explore.events].sort((x, y) => y.n - x.n).map(e => [e.type, e.type + " (" + e.n.toLocaleString() + ")"] as const)]} />
                     {seq.aType === LINE_TYPE ? (
                       <>
-                        <select value={seq.aLineOp} onChange={e => setSeq(s => ({ ...s, aLineOp: e.target.value as any }))}>
-                          <option value="=">line #</option>
-                          <option value=">=">line ≥</option>
-                          <option value="<=">line ≤</option>
-                        </select>
-                        <input type="number" min={1} placeholder="n" value={seq.aLineNo}
-                          onChange={e => setSeq(s => ({ ...s, aLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
+                        <Choice className="w-24" value={seq.aLineOp} onChange={v => setSeq(s => ({ ...s, aLineOp: v as any }))}
+                          options={[["=", "line #"], [">=", "line ≥"], ["<=", "line ≤"]]} />
+                        <Input type="number" min={1} placeholder="n" value={seq.aLineNo} className="h-8 w-16 text-md md:text-md"
+                          onChange={e => setSeq(s => ({ ...s, aLineNo: e.target.value }))} />
                       </>
                     ) : seq.aType && (
-                      <select value={seq.aOcc} onChange={e => setSeq(s => ({ ...s, aOcc: e.target.value as any }))}>
-                        <option value="ANY">any occurrence</option>
-                        <option value="FIRST">first</option>
-                        <option value="LAST">last</option>
-                      </select>
+                      <Choice className="w-40" value={seq.aOcc} onChange={v => setSeq(s => ({ ...s, aOcc: v as any }))}
+                        options={[["ANY", "any occurrence"], ["FIRST", "first"], ["LAST", "last"]]} />
                     )}
                   </div>
                   <div className="setrow">
                     <span className="meta">relationship</span>
-                    <select value={seq.rel} onChange={e => setSeq(s => ({ ...s, rel: e.target.value as any }))}>
-                      <option value="NONE">just has this event</option>
-                      <option value="BEFORE">→ followed by, within</option>
-                      <option value="DURING">happens during</option>
-                      <option value="NOT_FOLLOWED_BY">not followed by, within</option>
-                    </select>
+                    <Choice className="flex-1" value={seq.rel} onChange={v => setSeq(s => ({ ...s, rel: v as any }))}
+                      options={[["NONE", "just has this event"], ["BEFORE", "→ followed by, within"], ["DURING", "happens during"], ["NOT_FOLLOWED_BY", "not followed by, within"]]} />
                     {(seq.rel === "BEFORE" || seq.rel === "NOT_FOLLOWED_BY") && (
                       <>
-                        <input type="number" min={1} value={seq.days}
-                          onChange={e => setSeq(s => ({ ...s, days: e.target.value }))} style={{ width: "4rem" }} />
+                        <Input type="number" min={1} value={seq.days} className="h-8 w-20 text-md md:text-md"
+                          onChange={e => setSeq(s => ({ ...s, days: e.target.value }))} />
                         <span className="meta">days</span>
                       </>
                     )}
@@ -506,43 +497,31 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                   {seq.rel !== "NONE" && (
                     <div className="setrow">
                       <span className="meta">{seq.rel === "DURING" ? "during" : "second event"}</span>
-                      <select value={seq.bType} onChange={e => setSeq(s => ({ ...s, bType: e.target.value }))}>
-                        <option value="">choose…</option>
-                        {tx && <option value={LINE_TYPE}>Treatment line (derived)</option>}
-                        {[...explore.events].sort((x, y) => y.n - x.n).map(e => (
-                          <option key={e.type} value={e.type}>{e.type} ({e.n.toLocaleString()})</option>
-                        ))}
-                      </select>
+                      <Choice className="flex-1" placeholder="choose…" value={seq.bType} onChange={v => setSeq(s => ({ ...s, bType: v }))}
+                      options={[...(tx ? [[LINE_TYPE, "Treatment line (derived)"] as const] : []), ...[...explore.events].sort((x, y) => y.n - x.n).map(e => [e.type, e.type + " (" + e.n.toLocaleString() + ")"] as const)]} />
                       {seq.bType === LINE_TYPE ? (
                         <>
-                          <select value={seq.bLineOp} onChange={e => setSeq(s => ({ ...s, bLineOp: e.target.value as any }))}>
-                            <option value="=">line #</option>
-                            <option value=">=">line ≥</option>
-                            <option value="<=">line ≤</option>
-                          </select>
-                          <input type="number" min={1} placeholder="n" value={seq.bLineNo}
-                            onChange={e => setSeq(s => ({ ...s, bLineNo: e.target.value }))} style={{ width: "3.6rem" }} />
+                          <Choice className="w-24" value={seq.bLineOp} onChange={v => setSeq(s => ({ ...s, bLineOp: v as any }))}
+                          options={[["=", "line #"], [">=", "line ≥"], ["<=", "line ≤"]]} />
+                          <Input type="number" min={1} placeholder="n" value={seq.bLineNo} className="h-8 w-16 text-md md:text-md"
+                            onChange={e => setSeq(s => ({ ...s, bLineNo: e.target.value }))} />
                         </>
                       ) : seq.bType && (
-                        <select value={seq.bOcc} onChange={e => setSeq(s => ({ ...s, bOcc: e.target.value as any }))}>
-                          <option value="ANY">any occurrence</option>
-                          <option value="FIRST">first</option>
-                          <option value="LAST">last</option>
-                        </select>
+                        <Choice className="w-40" value={seq.bOcc} onChange={v => setSeq(s => ({ ...s, bOcc: v as any }))}
+                        options={[["ANY", "any occurrence"], ["FIRST", "first"], ["LAST", "last"]]} />
                       )}
                     </div>
                   )}
                   {(seq.aType === LINE_TYPE || seq.bType === LINE_TYPE) && (
                     <div className="setrow">
                       <span className="meta">new line after</span>
-                      <select value={String(seq.lineGap)} onChange={e => setSeq(s => ({ ...s, lineGap: Number(e.target.value) }))}>
-                        {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
-                      </select>
+                      <Choice className="flex-1" value={String(seq.lineGap)} onChange={v => setSeq(s => ({ ...s, lineGap: Number(v) }))}
+                        options={[30, 60, 90, 120, 180].map(g => [String(g), g + " days"] as const)} />
                     </div>
                   )}
                   <label className="chk" title="restricts the first event to patients with no treatment recorded before it">
-                    <input type="checkbox" checked={seq.priorGuard}
-                      onChange={e => setSeq(s => ({ ...s, priorGuard: e.target.checked }))} />
+                    <Checkbox checked={seq.priorGuard}
+                      onCheckedChange={v => setSeq(s => ({ ...s, priorGuard: v === true }))} />
                     treatment-naive before the first event
                   </label>
                   <hr />
@@ -947,7 +926,7 @@ export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
               ? rows.length.toLocaleString() + " of " + all.length.toLocaleString() + " loaded match"
               : "showing " + Math.min(rows.length, geneRowLimit).toLocaleString() +
                 " of " + (meta.total || rows.length).toLocaleString()}</span>
-            <input className="genesearch" type="search" placeholder="find gene" value={geneFilter[kind] || ""}
+            <Input type="search" className={SEARCH} placeholder="find gene" value={geneFilter[kind] || ""}
               title={"filters the " + all.length + " genes loaded for this table, not all " + (meta.total || all.length)}
               onChange={e => setGeneFilter({ ...geneFilter, [kind]: e.target.value })} />
             {(() => {
@@ -1014,7 +993,7 @@ export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
             </p>
           )}
           {!needle && rows.length > geneRowLimit && (
-            <button className="linklike" onClick={() => setGeneRowLimit(geneRowLimit + 50)}>show more</button>
+            <Button variant="link" size="xs" className={LINK} onClick={() => setGeneRowLimit(geneRowLimit + 50)}>show more</Button>
           )}
         </div>
       );
