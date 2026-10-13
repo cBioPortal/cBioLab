@@ -23,7 +23,8 @@
     "check:portal": "node --env-file=.env.local scripts/check-portal-parity.ts",
     "check:cohorts": "node --env-file=.env.local scripts/check-cohort-logic.ts",
     "check:mutants": "node --env-file=.env.local scripts/check-mutants.ts",
-    "verify": "npm test && npm run check:methods && RECORD=1 npm run check:portal && RECORD=1 npm run check:cohorts && RECORD=1 npm run check:mutants"
+    "verify": "npm test && npm run check:methods && RECORD=1 npm run check:portal && RECORD=1 npm run check:cohorts && RECORD=1 npm run check:mutants",
+    "visual": "node scripts/visual.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
@@ -47,7 +48,9 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "pixelmatch": "^7.2.0",
     "playwright": "1.62.1",
+    "pngjs": "^7.0.0",
     "typescript": "^6.0.3"
   }
 }
