@@ -339,7 +339,7 @@ export default function CustomDataManager({ tab, setTab, studies, onChanged }: {
           <SavedCustomData onChanged={onChanged} onAdd={() => setTab("add")} />
         </>}
       </div>
-      <div className="row mt-3">
+      <div className="row mt-2.5">
         <span className="spacer" />
         <button className="primary" onClick={() => ref.current?.close()}>Done</button>
       </div>

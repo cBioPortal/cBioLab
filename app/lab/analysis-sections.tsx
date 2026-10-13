@@ -91,7 +91,7 @@ export function GenesDialog({ ctx }: { ctx: AnalysisCtx }) {
           <h3>Genes <span className="plain">— {String(((doc.views || [])[genesFor] as any)?.kind || "view")}</span></h3>
           {/* the DOCUMENT's view, never the result (a result's genes are {gene, driverPct, …}) */}
           <GeneListEditor view={(doc.views || [])[genesFor] || {}} busy={busy} onGenes={(g) => setViewGenes(genesFor, g)} />
-          <div className="row mt-3 end">
+          <div className="row mt-2.5 end">
             <button className="primary" onClick={() => genesDialog.current?.close()}>Done</button>
           </div>
         </>
@@ -163,7 +163,7 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
           from. Cohorts come in through a view's "+ Add cohort". */}
       {names.length > 0 && (
         <section className="cohortsum" aria-label="cohorts in this analysis">
-          <h2 className="vtitle hflex items-center gap-3 mb-4">
+          <h2 className="vtitle flex items-center gap-2.5 mb-4">
             Cohorts in this analysis <span className="plain meta">— add one from a view</span>{busy && <span className="spinner" />}
           </h2>
           <div className="cohortlist">
@@ -248,7 +248,7 @@ export function DocDialog({ ctx }: { ctx: AnalysisCtx }) {
         rather than a permanent column, so the leftbar can just be cohorts. */}
     <dialog ref={docDialog} className="docdialog"
       onClick={e => { if (e.target === docDialog.current) docDialog.current?.close(); }}>
-      <div className="row between baseline mb-2">
+      <div className="row between baseline mb-1.5">
         <h3 className="flush">The document <span className="plain">— views</span></h3>
         <button className="linklike" onClick={() => docDialog.current?.close()}>close</button>
       </div>
@@ -257,7 +257,7 @@ export function DocDialog({ ctx }: { ctx: AnalysisCtx }) {
           able to say WHICH one. */}
       <textarea className="docjson" id="docjson" value={docText} onChange={e => docs.setText(e.target.value)} spellCheck={false}
         />
-      <div className="row mt-3">
+      <div className="row mt-2.5">
         <button className="primary" disabled={busy} onClick={applyText}>{busy && <span className="spinner onprimary" />}{busy ? "Running…" : "Run document"}</button>
         {doc.cohorts && Object.keys(doc.cohorts).length > 0 &&
           <button disabled={busy} title="empty the document — removes all cohorts and views" onClick={clearAnalysis}>Clear analysis</button>}
@@ -265,12 +265,12 @@ export function DocDialog({ ctx }: { ctx: AnalysisCtx }) {
       </div>
       <p className="note">Views: <code>{`{"kind":"compare","genes":[…]}`}</code> · <code>{`{"kind":"survival"}`}</code> · <code>{`{"kind":"oncoprint","genes":[…],"clinical":[attrs…]}`}</code></p>
       {result && (
-        <details className="mt-2">
+        <details className="mt-1.5">
           <summary className="meta clickable">
             Generated SQL (provenance) — the exact query each cohort compiled to, per study · OncoKB pin {result.oncokbPin || "none"}
           </summary>
           {Object.entries(result.cohorts).map(([n, c]) => (
-            <div className="mt-2" key={n}>
+            <div className="mt-1.5" key={n}>
               <p className="meta flush mb-1"><strong>{n}</strong> — {c.count.toLocaleString()} patients{c.studies && c.studies.length > 1 ? " across " + c.studies.length + " studies" : ""}</p>
               <pre className="sqlpre">{c.sql}</pre>
             </div>
@@ -288,7 +288,7 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
       {(busy || result || (doc.views || []).length > 0) && (
         <div className="row baseline mb-4">
           <h2 className="vtitle">
-            Analysis{busy && <span className="spinner ml-2" />}
+            Analysis{busy && <span className="spinner ml-1.5" />}
           </h2>
           <div className="vmeta">
             {/* The workspace lives behind this one button + a dialog, not
@@ -298,7 +298,7 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
                 saved is what the dialog it opens is for; this button's
                 own label stays fixed. */}
             {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
-              <button className="iflex items-center gap-2" disabled={busy} onClick={openWorkspaceSave}
+              <button className="inline-flex items-center gap-1.5" disabled={busy} onClick={openWorkspaceSave}
                 title={doc.title
                   ? "“" + doc.title + "” — " + (spaces[doc.title] && JSON.stringify(spaces[doc.title].doc) === JSON.stringify(doc)
                       ? "saved " + spaces[doc.title].savedAt : "unsaved changes")

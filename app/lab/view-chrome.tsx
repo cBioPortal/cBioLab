@@ -604,7 +604,7 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
         {save && !splitting && <>
           <button className="linklike" disabled={busy || saving} title={save.title}
             onClick={async () => { setSaving(true); try { await save.onSave(); } finally { setSaving(false); } }}>
-            {save.label}{saving && <span className="spinner ml-2" />}</button>
+            {save.label}{saving && <span className="spinner ml-1.5" />}</button>
           <hr />
         </>}
         {split && (splitting ? <>{split(() => { menuStore.set(menuId, false); setSplitting(false); })}<hr /></> : <>

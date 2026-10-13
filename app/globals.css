@@ -1,39 +1,47 @@
-/* Tailwind, alongside the stylesheet below while the app moves onto it. Tailwind's preflight
-   (its base reset) is left out: this file's own base rules are the base. Everything this file
-   declares sits in the `legacy` layer, ordered below `utilities`, so a Tailwind class on an
-   element always wins over a legacy rule that also reaches it (unlayered CSS would beat every
-   layer, whatever its specificity). */
+/* Tailwind, alongside the stylesheet below while the app moves onto it. Everything this file
+   declares itself sits in the `legacy` layer, between Tailwind's base (preflight, its reset) and
+   its utilities: legacy rules still override the reset, and a Tailwind class on an element always
+   wins over a legacy rule that also reaches it (unlayered CSS would beat every layer, whatever its
+   specificity). */
 @layer theme, base, legacy, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
 @import "tailwindcss/utilities.css" layer(utilities);
+@import "tw-animate-css";
 
-/* The theme is the scale below and nothing else: Tailwind's own palette, type sizes, radii and
-   fonts are cleared, so a class off the scale does not exist rather than quietly working. `inline`
-   makes each utility read the variable itself, so the dark-scheme overrides reach it. */
+/* The theme. Colours use shadcn's semantic names, mapped onto this app's palette (so its
+   components take the app's colours: the teal is `primary`; shadcn's `accent` is the soft hover
+   tint and `muted` a subtle background, with `muted-foreground` this app's grey text). Type sizes
+   are this app's seven steps under Tailwind's names, so shadcn components render at the app's
+   density. Spacing is Tailwind's 4px grid; the app's steps sit on it as 1 (--s1), 1.5 (--s2),
+   2.5 (--s3), 4 (--s4), 6 (--s5) and 9 (--s6), plus 0.5 for hairline gaps. `inline` makes each
+   utility read the variable itself, so the dark-scheme overrides reach it. */
 @theme inline {
   --color-*: initial;
-  --color-page: var(--page); --color-paper: var(--paper); --color-card: var(--card);
-  --color-ink: var(--ink); --color-muted: var(--muted);
-  --color-accent: var(--accent); --color-accent-ink: var(--accent-ink); --color-accent-soft: var(--accent-soft);
-  --color-line: var(--line); --color-code-bg: var(--code-bg); --color-mark: var(--mark); --color-mark-soft: var(--mark-soft);
-  --color-ok: var(--ok); --color-ok-soft: var(--ok-soft); --color-err: var(--err); --color-err-soft: var(--err-soft);
+  --color-background: var(--page); --color-foreground: var(--ink);
+  --color-card: var(--card); --color-card-foreground: var(--ink);
+  --color-popover: var(--card); --color-popover-foreground: var(--ink);
+  --color-primary: var(--accent); --color-primary-foreground: var(--on-accent);
+  --color-secondary: var(--paper); --color-secondary-foreground: var(--ink);
+  --color-muted: var(--code-bg); --color-muted-foreground: var(--muted);
+  --color-accent: var(--accent-soft); --color-accent-foreground: var(--accent-ink);
+  --color-destructive: var(--err); --color-destructive-soft: var(--err-soft);
+  --color-border: var(--line); --color-input: var(--line); --color-ring: var(--accent);
+  --color-paper: var(--paper); --color-link: var(--accent-ink);
+  --color-ok: var(--ok); --color-ok-soft: var(--ok-soft);
+  --color-mark: var(--mark); --color-mark-soft: var(--mark-soft);
   --color-amp: var(--amp); --color-del: var(--del);
-  --color-white: #fff; --color-transparent: transparent; --color-current: currentColor;
+  --color-white: #fff; --color-black: #000; --color-transparent: transparent; --color-current: currentColor;
 
   --text-*: initial;
   --text-xs: var(--t-xs); --text-sm: var(--t-sm); --text-md: var(--t-md); --text-base: var(--t-base);
   --text-lg: var(--t-lg); --text-xl: var(--t-xl); --text-2xl: var(--t-2xl);
 
-  /* Spacing is the seven steps, numbered as this file's own helpers number them (.mt-2 is --s2):
-     1–6 are --s1…--s6, 0.5 is --s0, 0 is zero. Tailwind's 0.25rem multiples are cleared. */
-  --spacing: initial;
-  --spacing-0: 0; --spacing-px: 1px; --spacing-0_5: var(--s0);
-  --spacing-1: var(--s1); --spacing-2: var(--s2); --spacing-3: var(--s3);
-  --spacing-4: var(--s4); --spacing-5: var(--s5); --spacing-6: var(--s6);
   --spacing-ctl: var(--ctl-h);
 
   --radius-*: initial;
-  --radius-sm: var(--r-sm); --radius-md: var(--r-md); --radius-lg: var(--r-lg); --radius-pill: var(--r-pill);
+  --radius-xs: 4px; --radius-sm: var(--r-sm); --radius-md: var(--r-md); --radius-lg: var(--r-lg);
+  --radius-xl: 16px; --radius-pill: var(--r-pill);
 
   --font-*: initial;
   --font-sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
@@ -42,6 +50,25 @@
 }
 
 @layer legacy {
+/* The browser defaults this stylesheet was written against, which Tailwind's preflight removes.
+   Measured, not guessed: each is a computed style that changed on a real page when preflight was
+   added. They apply only outside new UI (shadcn components mark every part with [data-slot]; a
+   converted area marks its root [data-tw]), and :where() keeps them at zero specificity so any
+   rule below wins. Delete this block once nothing outside those remains. */
+:where(a:not([data-slot] *, [data-tw] *, [data-slot], [data-tw])) { color: var(--accent-ink); text-decoration: underline; }
+:where(svg, canvas, img, video):where(:not([data-slot] *, [data-tw] *)) { display: inline; vertical-align: baseline; }
+:where(h1, h2, h3, h4, h5, h6, th, b, strong):where(:not([data-slot] *, [data-tw] *)) { font-weight: 700; }
+:where(dialog:not([data-slot])) { margin: auto; }
+:where(p, pre, dl, figure, blockquote):where(:not([data-slot] *, [data-tw] *, [data-slot])) { margin-block: 1em; }
+:where(ul, ol):where(:not([data-slot] *, [data-tw] *, [data-slot])) { margin-block: 1em; padding-left: 40px; }
+:where(ul):where(:not([data-slot] *, [data-tw] *, [data-slot])) { list-style: disc; }
+:where(ol):where(:not([data-slot] *, [data-tw] *, [data-slot])) { list-style: decimal; }
+:where(dd):where(:not([data-slot] *, [data-tw] *)) { margin-left: 40px; }
+:where(input[type=checkbox], input[type=radio]):where(:not([data-slot] *, [data-tw] *, [data-slot])) { margin: 3px 3px 3px 4px; }
+:where(table):where(:not([data-slot] *, [data-tw] *, [data-slot])) { border-collapse: separate; border-spacing: 2px; }
+:where(td, th):where(:not([data-slot] *, [data-tw] *)) { padding: 1px; }
+:where(hr) { color: var(--line); }
+
 :root {
   --page: #eef2f5; --paper: #fafbfc; --card: #ffffff; --ink: #1f2933; --muted: #5b6b76;
   --accent: #0f86a1; --accent-ink: #0b6478; --accent-soft: #e3f0f3;
@@ -62,6 +89,9 @@
 
   /* One height for every inline control, so a toolbar row has a single baseline. */
   --ctl-h: 1.75rem;
+
+  /* text set on a primary (teal) fill */
+  --on-accent: #fff;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -70,6 +100,7 @@
     --line: #2a353c; --code-bg: #1a242a; --mark: #e0a35c; --mark-soft: #35270f;
     --ok: #7bc47f; --ok-soft: #17301a; --err: #f2b8b5; --err-soft: #3a2323;
     --amp: #ff8a80; --del: #82b1ff;
+    --on-accent: #0d1417;
   }
 }
 * { box-sizing: border-box; }
@@ -1801,27 +1832,8 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 
 /* ---------------- spacing and layout utilities, on the scale ----------------
    Last in the file, so a utility on an element wins over a general rule of the same weight. */
-.mt-0 { margin-top: 0; }
-.mt-1 { margin-top: var(--s1); }
-.mt-2 { margin-top: var(--s2); }
-.mt-3 { margin-top: var(--s3); }
-.mt-4 { margin-top: var(--s4); }
-.mb-1 { margin-bottom: var(--s1); }
-.mb-2 { margin-bottom: var(--s2); }
-.mb-3 { margin-bottom: var(--s3); }
-.mb-4 { margin-bottom: var(--s4); }
-.ml-1 { margin-left: var(--s1); }
-.ml-2 { margin-left: var(--s2); }
-.mr-1 { margin-right: var(--s1); }
 .pad-tight { padding: var(--s0) var(--s1); }
 .t-md { font-size: var(--t-md); }
-.hflex { display: flex; }
-.iflex { display: inline-flex; }
-.items-center { align-items: center; }
-.wrap { flex-wrap: wrap; }
-.gap-1 { gap: var(--s1); }
-.gap-2 { gap: var(--s2); }
-.gap-3 { gap: var(--s3); }
 .row.g2 { gap: var(--s2); }
 .row.end { justify-content: flex-end; }
 .row.between { justify-content: space-between; }

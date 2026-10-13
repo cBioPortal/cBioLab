@@ -144,7 +144,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
           </div>
           {/* with nothing selected the picker is simply open: there is nothing else to do here */}
           {(exPanelOpen || exStudies.length === 0) && <>
-            <div className="row g5 center mt-3 mb-3">
+            <div className="row g5 center mt-2.5 mb-2.5">
               <input placeholder="search name, id, or cancer type…" value={sQuery} onChange={e => setSQuery(e.target.value)}
                 style={{ flex: 1, minWidth: "16rem" }} />
               {CAP_FILTERS.map(([k, label]) => (
@@ -269,10 +269,10 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
             </button>
             <button className="linklike" onClick={clearDraft}>clear</button>
           </div>
-          <div className="row mt-2">
+          <div className="row mt-1.5">
             {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} onCustomData={showClauseData()} />; })()}
           </div>
-          {exMsg && <p className="note flush mt-2">{exMsg}</p>}
+          {exMsg && <p className="note flush mt-1.5">{exMsg}</p>}
           {saving != null && <SaveCohortDialog initial={saving} onSave={confirmSave} onClose={() => setSaving(null)}
             meta={clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies")} />}
           {savingFeature != null && <SaveFeatureDialog initial={savingFeature} onSave={confirmSaveFeature} onClose={() => setSavingFeature(null)}
@@ -417,7 +417,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
               <button disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}>add</button>
             </div>
             {!geneCharts.length && (
-              <p className="note flush mt-2">
+              <p className="note flush mt-1.5">
                 Name a gene to see how many patients are altered, unaltered, or <strong>never tested</strong> for
                 it. The third is the one a frequency cannot show: in GENIE public, 86,353 patients are on no panel
                 covering EGFR copy number.
@@ -431,7 +431,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
               </span>
             ))}
             {geneCharts.length > 0 && (
-              <p className="note flush mt-2">
+              <p className="note flush mt-1.5">
                 Each charted gene's mutation and copy-number status is drawn as its own tile in the
                 facet grid, alongside the clinical attributes — close this dialog to see them.
               </p>
@@ -781,7 +781,7 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
               </div>
             );
           })()}
-          {c.kind === "num" && <div className="hflex items-center gap-1 mt-1 wrap">
+          {c.kind === "num" && <div className="flex items-center gap-1 mt-1 flex-wrap">
             <span className="meta">min {Math.round(c.min * 10) / 10} · median {Math.round(c.median * 10) / 10} · max {Math.round(c.max * 10) / 10}</span>
             <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>≥ median</button>
             <button className="facet" onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>&lt; median</button>
@@ -861,7 +861,7 @@ export function StudyBreakdown({ ctx }: { ctx: ExploreCtx }) {
             </div>
           ));
         })()}
-        {exStudies.length > 1 && <p className="note mt-2">
+        {exStudies.length > 1 && <p className="note mt-1.5">
           Patients are counted per study; a person enrolled in two studies counts in both (overlap is not deduplicated).
         </p>}
       </div>
@@ -997,7 +997,7 @@ export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
             ))}
           </div>
           {needle && !rows.length && (
-            <p className="note flush mt-2">
+            <p className="note flush mt-1.5">
               No match among the {all.length.toLocaleString()} genes loaded for this table
               {meta.total && meta.total > all.length ? " (of " + meta.total.toLocaleString() + " altered in this cohort)" : ""}.
             </p>
@@ -1017,7 +1017,7 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
   return <>
     <div className="card" style={{ display: "none" }}>
       <h2>Genes <span className="plain">— most-altered (click = OQL clause)</span></h2>
-      <div className="hflex wrap gap-1">
+      <div className="flex flex-wrap gap-1">
         {explore.genes.map(g => (
           <button key={g.gene} className="facet" onClick={() => addClause({ kind: "oql", q: g.gene + ":" })}>
             {g.gene} <span className="meta">{g.n.toLocaleString()}</span>
