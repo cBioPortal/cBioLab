@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "../_ui/input";
 import { Textarea } from "../_ui/textarea";
 import { Choice } from "../_ui/choice.tsx";
-import { GearMenu } from "./gear-menu.tsx";
+import { GearMenu } from "../_ui/gear-menu.tsx";
 import { FIELD, TB } from "../_ui/toolbar.ts";
 
 export type SplitSpec = { attribute: string } | { gene: string } | { oql: string[] };

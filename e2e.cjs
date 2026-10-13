@@ -460,10 +460,10 @@ async function main() {
           cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
           views: [{ kind: "oncoprint", genes: ["TP53", "KRAS"] }]
         })).toString("base64")));
-        await page.waitForSelector('summary[title="download or open this figure elsewhere"]', { timeout: 300000 });
+        await page.waitForSelector('button[title="download or open this figure elsewhere"]', { timeout: 300000 });
         const namedButton = await page.locator("button.genesbtn").first().innerText();
-        await page.locator('summary[title="download or open this figure elsewhere"]').click();
-        const gear = page.locator('details:has(summary[title="download or open this figure elsewhere"]) .gearmenu-items');
+        await page.locator('button[title="download or open this figure elsewhere"]').click();
+        const gear = page.locator("[data-slot=popover-content]");
         const gearHasEditor = (await gear.locator(".pillwrap").count()) > 0;
         const gearHasCbioportal = (await gear.locator('a:has-text("cBioPortal")').count()) > 0;
         const gearHasDownloads = (await gear.locator("text=download figures").count()) > 0;

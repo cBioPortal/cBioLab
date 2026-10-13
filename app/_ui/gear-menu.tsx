@@ -3,9 +3,9 @@
 // Whether it is open is kept in a store the page owns, keyed by `menuId`, so a menu stays open
 // when an edit replaces its card (and with it the card's key) and the menu remounts.
 import { useEffect, useState } from "react";
-import { Button } from "../_ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "../_ui/popover";
-import { Separator } from "../_ui/separator";
+import { Button } from "./button";
+import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+import { Separator } from "./separator";
 import { cn } from "../../lib/cn";
 
 const CLOSE = "gearmenu-close";

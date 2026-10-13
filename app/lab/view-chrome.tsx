@@ -15,7 +15,7 @@ import { cn } from "../../lib/cn";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { FIELD } from "../_ui/toolbar.ts";
 import { Checkbox } from "../_ui/checkbox";
-import { GearMenu, MenuItem, MenuSeparator } from "./gear-menu.tsx";
+import { GearMenu, MenuItem, MenuSeparator } from "../_ui/gear-menu.tsx";
 
 /** the cohort colours, in order, for every chart on the page */
 export const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
