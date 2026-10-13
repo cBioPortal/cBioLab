@@ -402,6 +402,46 @@ describe("plot highlights: other cohorts drawn over the plotted one", () => {
   });
 });
 
+describe("plot points: every case, or the outliers over the density", () => {
+  const base = { x: { label: "AGE", kind: "num" }, y: { label: "TMB", kind: "num" },
+    extent: { x0: 0, x1: 10, y0: 0, y1: 10 }, grid: [10, 10],
+    stats: { pearson: 0.1, spearman: 0.1, slope: 0, intercept: 0, pPearson: 0.5, pSpearman: 0.5 } };
+  const cells = (svg: string) => (svg.match(/<rect x="[^"]*" y="[^"]*" width="[^"]*" height="[^"]*" fill="[^"]*" fill-opacity/g) || []).length;
+  const dots = (svg: string) => (svg.match(/<circle /g) || []).length;
+
+  test("every case a point: no cell is shaded, and the caption says a dot is a case", () => {
+    const svg = viewToSvg({ kind: "plot", plot: { ...base, shape: "scatter", n: 3, bins: [{ bx: 1, by: 1, n: 2 }, { bx: 5, by: 5, n: 1 }],
+      xyPoints: [{ id: "a", x: 1, y: 1 }, { id: "b", x: 1.2, y: 1.1 }, { id: "c", x: 5, y: 5 }], pointSet: { rule: "all", drawn: 3 } } as any })!;
+    assert.equal(cells(svg), 0);
+    assert.equal(dots(svg), 3);
+    assert.match(svg, /Each dot is one case\./);
+    assert.doesNotMatch(svg, /Darker is more/);
+  });
+
+  test("outliers: the sparse cells are left to their points, the dense ones stay shaded", () => {
+    const svg = viewToSvg({ kind: "plot", plot: { ...base, shape: "scatter", n: 105,
+      bins: [{ bx: 1, by: 1, n: 100 }, { bx: 2, by: 2, n: 3 }, { bx: 9, by: 9, n: 2 }],
+      xyPoints: [{ id: "a", x: 2.1, y: 2.1 }, { id: "b", x: 2.2, y: 2.3 }, { id: "c", x: 2.4, y: 2.2 }, { id: "d", x: 9.5, y: 9.5 }, { id: "e", x: 9.6, y: 9.1 }],
+      pointSet: { rule: "outliers", drawn: 5, cellMax: 3 } } as any })!;
+    assert.equal(cells(svg), 1, "only the cell of 100 is shaded");
+    assert.equal(dots(svg), 5);
+    assert.match(svg, /Darker is more cases; the shade is logarithmic\. Each dot is one case\./);
+  });
+
+  test("a box's axis reaches its outliers, at most a whisker span past the whiskers; beyond that a counted triangle", () => {
+    const svg = viewToSvg({ kind: "plot", plot: { shape: "box", n: 1000, x: { label: "CANCER_TYPE", kind: "cat" }, y: { label: "TMB", kind: "num" },
+      groups: [{ g: "A", n: 1000, lo: 0, hi: 570, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 10 }],
+      overlay: "violin", violin: [{ g: "A", b: 0, n: 500 }, { g: "A", b: 15, n: 3 }], violinBins: 40, violinExtent: [0, 40],
+      points: [{ id: "a", g: "A", v: 15 }, { id: "b", g: "A", v: 570 }], pointSet: { rule: "outliers", drawn: 2 } } as any })!;
+    assert.match(svg, />20<\/text>/, "the axis tops out at whisker + one whisker span (10 + 10)");
+    assert.equal((svg.match(/<circle /g) || []).length, 1, "the 15 is a dot on the axis");
+    assert.equal((svg.match(/<path d="M[^"]*Z"/g) || []).length, 1, "the 570 is a triangle at the edge");
+    assert.match(svg, /1 value lies more than a whisker span past the whiskers and is drawn as a triangle/);
+    // the violin stops at the whiskers: its bin at 15..16 lies past them but inside the axis, where the points are
+    assert.equal((svg.match(/fill-opacity="0\.28"/g) || []).length, 1, "one violin bin drawn, the one inside the whiskers");
+  });
+});
+
 describe("plot figures draw every group and category they are given", () => {
   const box = (nGroups: number, extra: Partial<any> = {}): ViewResult => ({
     kind: "plot", plot: {

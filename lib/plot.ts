@@ -68,6 +68,13 @@ export const POINTS_CAP = 5000;
 export { HIGHLIGHT_CAP, HIGHLIGHT_COLORS, HIGHLIGHT_BASE } from "./plot-highlight.ts";
 export { isAbsent, jitterFor } from "./plot-draw.ts";
 import { isAbsent } from "./plot-draw.ts";
+/**
+ * Over the points cap, a scatter cell holding at most this many cases is drawn as its cases
+ * rather than as a shade: the sparse fringe of the density, which is where the outliers are.
+ * The threshold actually used is the largest value up to this whose points fit under the cap
+ * (`sparseCellMax`).
+ */
+export const OUTLIER_CELL_MAX = 3;
 /** bins per group in a violin */
 export const VIOLIN_BINS = 40;
 /** distinct colours a legend can carry before it stops being a legend */
@@ -358,21 +365,51 @@ export function plotMomentsSql(xSel: string, ySel: string, cohortSql: string): s
  */
 export function plotBinsSql(xSel: string, ySel: string, cohortSql: string, bins: [number, number] = DEFAULT_BINS,
   extent?: { x0: number; x1: number; y0: number; y1: number }): string {
-  const [bx, by] = [Math.max(2, Math.min(600, Math.round(bins[0]))), Math.max(2, Math.min(600, Math.round(bins[1])))];
+  const [bx, by] = clampGrid(bins);
   const eCte = extent
     ? ",    e AS (SELECT " + num(extent.x0) + " AS x0, " + num(extent.x1) + " AS x1, " +
         num(extent.y0) + " AS y0, " + num(extent.y1) + " AS y1)\n"
     : ",    e AS (SELECT min(x) x0, max(x) x1, min(y) y0, max(y) y1 FROM pair)\n";
   return pairCte(xSel, ySel, cohortSql) + eCte +
-    "SELECT least(" + (bx - 1) + ", toUInt32(floor((x - x0) / nullIf(x1 - x0, 0) * " + bx + "))) AS bx,\n" +
-    "       least(" + (by - 1) + ", toUInt32(floor((y - y0) / nullIf(y1 - y0, 0) * " + by + "))) AS by,\n" +
+    "SELECT " + binIndex("x", bx) + " AS bx,\n" +
+    "       " + binIndex("y", by) + " AS by,\n" +
     "       count() AS n\n" +
     "FROM pair, e GROUP BY bx, by";
 }
 
-/** a finite number as a SQL literal — extents cross this module's boundary as numbers, never strings */
+/** the grid a request asks for, held to what a figure can draw */
+function clampGrid(bins: [number, number]): [number, number] {
+  return [Math.max(2, Math.min(600, Math.round(bins[0]))), Math.max(2, Math.min(600, Math.round(bins[1])))];
+}
+
+/**
+ * Which of `n` cells a value falls in, against the extent CTE `e`. One expression for the
+ * density and for the sparse-cell points, so a point is never assigned a cell the density did
+ * not count it in.
+ */
+function binIndex(col: "x" | "y", n: number): string {
+  return "least(" + (n - 1) + ", toUInt32(floor((" + col + " - " + col + "0) / nullIf(" + col + "1 - " + col + "0, 0) * " + n + ")))";
+}
+
+/**
+ * The cell threshold for a scatter's outlier points: the largest k up to `max` such that every
+ * case in a cell of at most k cases fits under `cap` points. 0 when even the cells of one case
+ * hold more than `cap` — then no subset is drawn, and the caller says so rather than drawing
+ * some of them.
+ */
+export function sparseCellMax(bins: { n: number }[], cap: number, max = OUTLIER_CELL_MAX): number {
+  let k = 0;
+  for (let t = 1; t <= max; t++) {
+    const cases = bins.reduce((a, b) => b.n <= t ? a + b.n : a, 0);
+    if (cases > cap) break;
+    k = t;
+  }
+  return k;
+}
+
+/** a finite number as a SQL literal — extents and whiskers cross this module's boundary as numbers, never strings */
 function num(x: number): string {
-  if (!Number.isFinite(x)) throw new Error("plotBinsSql: extent must be finite numbers");
+  if (!Number.isFinite(x)) throw new Error("a plot's extent and whiskers must be finite numbers");
   return String(x);
 }
 
@@ -420,7 +457,7 @@ export function plotViolinSql(numSel: string, catSel: string, cohortSql: string,
  * site has no method that could call it — see docs/DATA-BOUNDARY.md.
  */
 export function plotPointsSql(numSel: string, catSel: string, cohortSql: string, cap = POINTS_CAP,
-  colorSel?: string, ringSel?: string): string {
+  colorSel?: string, ringSel?: string, outside?: Whiskers[]): string {
   return "WITH cohort AS (" + cohortSql + "),\n" +
     "     vs AS (" + numSel + "),\n" +
     "     gs AS (" + catSel + ")" +
@@ -430,7 +467,24 @@ export function plotPointsSql(numSel: string, catSel: string, cohortSql: string,
     "FROM vs INNER JOIN gs ON gs.id = vs.id" +
     (colorSel ? "\n  LEFT JOIN cs ON cs.id = vs.id" : "") +
     (ringSel ? "\n  LEFT JOIN rs ON rs.id = vs.id" : "") + "\n" +
+    (outside ? outsideWhiskers(outside) + "\n" : "") +
     "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
+}
+
+/** one group's whiskers, which is all a box's outlier query needs to know about it */
+export interface Whiskers { g: string; loWhisker: number; hiWhisker: number }
+
+/**
+ * WHERE a value lies beyond its own group's Tukey whiskers. The whiskers were computed by the
+ * box query and cross back in as literals, a group label quoted and a bound a finite number. A
+ * group not listed has no whiskers to be outside of, so none of its values match.
+ */
+function outsideWhiskers(ws: Whiskers[]): string {
+  if (!ws.length) return "WHERE 0";
+  const at = "indexOf([" + ws.map((w) => sq(w.g)).join(", ") + "], gs.v)";
+  const arr = (f: (w: Whiskers) => number) => "[" + ws.map((w) => num(f(w))).join(", ") + "]";
+  return "WHERE " + at + " > 0 AND (vs.v < arrayElement(" + arr((w) => w.loWhisker) + ", " + at + ")" +
+    " OR vs.v > arrayElement(" + arr((w) => w.hiWhisker) + ", " + at + "))";
 }
 
 /**
@@ -453,15 +507,30 @@ export function plotHighlightCountSql(cohortSql: string, highlightSql: string): 
  * Like plotPointsSql it returns identifiers, so it stays out of lib/federation.ts's aggregate
  * builders and is reachable only from `PatientLevelResolver`.
  */
-export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: string, cap = POINTS_CAP): string {
-  return "WITH cohort AS (" + cohortSql + "),\n" +
+export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: string, cap = POINTS_CAP,
+  sparse?: SparseCells): string {
+  const limit = "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
+  if (!sparse) return "WITH cohort AS (" + cohortSql + "),\n" +
     "     xs AS (" + xSel + "),\n" +
     "     ys AS (" + ySel + ")\n" +
     "SELECT xs.id AS id, xs.v AS x, ys.v AS y\n" +
-    "FROM xs INNER JOIN ys ON ys.id = xs.id\n" +
-    "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
+    "FROM xs INNER JOIN ys ON ys.id = xs.id\n" + limit;
+  // the cases of every cell holding at most `cellMax` of them, binned exactly as plotBinsSql
+  // bins the density over the same extent and grid
+  const [bx, by] = clampGrid(sparse.grid), e = sparse.extent;
+  if (!(sparse.cellMax >= 1)) throw new Error("plotScatterPointsSql: cellMax must be at least 1");
+  return "WITH cohort AS (" + cohortSql + "),\n" +
+    "     xs AS (" + xSel + "),\n" +
+    "     ys AS (" + ySel + "),\n" +
+    "     e AS (SELECT " + num(e.x0) + " AS x0, " + num(e.x1) + " AS x1, " + num(e.y0) + " AS y0, " + num(e.y1) + " AS y1),\n" +
+    "     c AS (SELECT xs.id AS id, xs.v AS x, ys.v AS y, " + binIndex("x", bx) + " AS bx, " + binIndex("y", by) + " AS by\n" +
+    "           FROM xs INNER JOIN ys ON ys.id = xs.id, e),\n" +
+    "     sparse AS (SELECT bx, by FROM c GROUP BY bx, by HAVING count() <= " + Math.round(sparse.cellMax) + ")\n" +
+    "SELECT id, x, y FROM c WHERE (bx, by) IN (SELECT bx, by FROM sparse)\n" + limit;
 }
 
+/** which cells of a scatter's density are drawn as their cases: the plot's own grid and extent, and the threshold */
+export interface SparseCells { grid: [number, number]; extent: { x0: number; x1: number; y0: number; y1: number }; cellMax: number }
 
 /** the contingency table, one row per occupied cell */
 export function plotTableSql(xSel: string, ySel: string, cohortSql: string): string {
@@ -531,6 +600,21 @@ function lgamma(z: number): number {
 /** what a plot asks for; the shape it draws as is decided from the axes, not requested */
 /** one drawn value, with its case id and whatever it is coloured by */
 export interface PlotPoint { id: string; g: string; v: number; c?: string; r?: string }
+/** one drawn scatter case, with its id */
+export interface PlotXYPoint { id: string; x: number; y: number }
+/**
+ * Which cases a plot draws as points, and why the rest are not. `all`: every case. `outliers`:
+ * over the points cap, the values beyond a box's whiskers or the cases in a scatter's sparse
+ * cells, over the density of the rest. `none`: density alone, and `why` says why.
+ */
+export interface PointSet {
+  rule: "all" | "outliers" | "none";
+  /** points drawn */
+  drawn: number;
+  /** a scatter's outliers: every cell holding at most this many cases is drawn as its cases */
+  cellMax?: number;
+  why?: string;
+}
 
 export interface PlotRequest {
   x: PlotAxis; y: PlotAxis; unit?: "patient" | "sample"; bins?: [number, number];
@@ -572,8 +656,12 @@ export interface PlotData {
   stats?: { pearson: number | null; spearman: number | null; slope: number | null; intercept: number | null;
             pPearson: number | null; pSpearman: number | null };
   groups?: PlotGroup[];
-  /** the values behind the boxes: points when few enough and the reader may see cases, else a density */
+  /** the values behind the boxes: every one when few enough and the reader may see cases, else the outliers */
   points?: PlotPoint[];
+  /** a scatter's cases drawn as points: every one when few enough, else those in sparse cells */
+  xyPoints?: PlotXYPoint[];
+  /** which rule chose the points, how many, and why there are none when there are none */
+  pointSet?: PointSet;
   violin?: { g: string; b: number; n: number; c?: string }[];
   /** what the colours mean: the fill category, the ring category, and the key to draw */
   colorLabel?: string;
