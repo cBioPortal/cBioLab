@@ -491,6 +491,74 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   proves nothing; in Playwright, `page.route()` the endpoint and hold it, check the loader is on
   screen and the controls are still usable, then release it and check the loader is gone.
 
+## Code standards — what `npm run lint` enforces
+
+`npm run lint` runs ESLint (`eslint.config.mjs`), knip (`knip.json`) and ruff (`python/pyproject.toml`),
+and it is the first stage of `scripts/gate.sh` and CI, so code that breaks these rules does not
+merge. The rules target bugs, not style. Write code that passes them from the start:
+
+**Promises**
+- Every promise is awaited, returned, given a `.catch`, or explicitly discarded with `void`
+  (`void load();`, `void (async () => { … })();`). A bare `load();` is an error.
+- Where a callback must return nothing (`setTimeout`, `setInterval`, a menu item's `onClick:` in an
+  object), wrap it: `setInterval(() => void load(), 2000)`. An async handler in a JSX attribute
+  (`onClick={async () => …}`) is fine.
+- A rethrown error keeps its cause: `catch (e) { throw new Error("…: " + msg, { cause: e }); }`.
+
+**Dead code**
+- No unused imports, variables, parameters or files, and no dependency `package.json`
+  doesn't list (import `@tanstack/react-query`, not `@tanstack/query-core`). Delete what you stop
+  using; never park it as `void x;` or behind an `_` name. `_` is for a parameter a signature forces
+  on you; `const { drop, ...rest } = o` to omit fields is fine.
+- No conditional whose branches are identical (`a ? "" : ""`), no initial value that is always
+  overwritten before it is read (declare `let x: T;` instead), `const` unless reassigned.
+- A new standalone script goes in `scripts/` (knip treats those as entry points); anywhere else,
+  add it to `entry` in `knip.json`.
+
+**Expressions**
+- No statement that is only an expression: write `if (n.has(k)) n.delete(k); else n.add(k);`, not a
+  ternary or comma expression for its side effects.
+- Template literals interpolate strings and numbers only; wrap anything else: `${String(i)}`.
+- `reduce` gets an initial value. Number literals must be exactly representable (copied published
+  coefficients are the exception — disable the line, saying so).
+- Regexes: write invisible characters as escapes (`/^\uFEFF/`), repeated spaces as ` {2}`.
+- `catch {}` may be empty when swallowing is the point; other empty blocks may not.
+- `// @ts-expect-error — why` always carries its reason, on the line above the statement.
+
+**React (`app/`)**
+- Rules of hooks, and `exhaustive-deps` is an **error**: list every dependency. A value built each
+  render (`v.list || []`, an object literal) that feeds a dependency list gets its own `useMemo`.
+- Never call `setState` inside `useMemo` or during render.
+
+**Next.js API routes**
+- A GET handler that never reads the request is prerendered at build time (Cache Components) and
+  then answers every request with whatever the build saw — "no login" from a build without
+  `LOGIN_PASSWORD`, an empty warehouse. Call `await connection()` (`next/server`) first.
+  `scripts/gate.sh` fails on any prerendered API route outside its allowlist
+  (`api/version`, `api/campaign/format`).
+
+**Python (`python/`)**
+- No unused imports or names (pyflakes); bugbear's checks (a closure over a loop variable, mutable
+  default arguments, …). One-line statements with `;` and short names are allowed — they mirror
+  the TypeScript this package ports.
+
+**Disabling a rule** — only for a line where the rule is wrong, never a file, and always with the
+reason after `--`:
+`// eslint-disable-next-line react-hooks/exhaustive-deps -- measures after every render`, or in
+Python `# noqa: B023` with a comment saying why. A disable that no longer suppresses anything is
+itself an error. Don't change `eslint.config.mjs`, `knip.json` or the ruff rules as part of other
+work: turning a rule on or off is its own change, and it fixes or justifies everything it reports.
+
+**Deliberately not enforced** (off in the config — don't "fix" code for them): `any` and the
+`no-unsafe-*` family at JSON boundaries, nesting and cognitive complexity, readonly props,
+assertions TypeScript considers unnecessary, and formatting.
+
+**Reports, not checks** — `npm run report:dupes` (jscpd) and `npm run report:security` (Semgrep)
+write to `quality-report/`; CI keeps both as an artifact. Don't add to them: factor out a block
+rather than copy one longer than ~15 lines, quote user values into SQL only through `sq()` /
+the `PIDS_SQL` path (invariant 5 above), and never turn off TLS verification. The one open
+Semgrep finding is `lib/db.ts`'s `rejectUnauthorized: false`, pending Supabase's CA certificate.
+
 ## Workflows
 
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
@@ -511,17 +579,8 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   `node e2e.cjs` — 81 checks (Playwright + docs gate + the boundary suite + the
   denominator gate).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
-- Lint: `npm run lint` (~2 min) — ESLint with type-aware rules (`eslint.config.mjs`: typescript-eslint,
-  the hooks rules, Next's rules and the SonarJS rules that point at wrong code; style rules are off
-  on purpose), knip (`knip.json`: unused files and dependencies) and ruff on `python/` (rules in
-  `python/pyproject.toml`; `pip install -e 'python[dev]'` puts it in the venv). It is the gate's
-  first stage, so it fails fast: fix what it reports, or disable that line with a `-- reason`.
-  `npm run report:dupes` (jscpd) and `npm run report:security` (Semgrep's registry packs, via
-  `uvx`) write to `quality-report/`; CI runs both as a report-only job and keeps the artifact.
-- **An API GET handler that never reads the request is prerendered at build time** (Cache
-  Components) and then answers every request with what the build saw — e.g. "no login" from a
-  build without `LOGIN_PASSWORD`. Call `await connection()` (`next/server`) first. `scripts/gate.sh`
-  fails on any prerendered API route outside its short allowlist.
+- Lint: `npm run lint` (~2 min, the gate's first stage) — see "Code standards" above for what it
+  holds code to. While iterating, `npx eslint <files you touched>` is enough.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push **your own branch**. **Stop there.**
   This is the checkpoint for a *finished* piece of work, not a loop to run after every edit —
