@@ -30,7 +30,8 @@ echo "== $(git branch --show-current 2>/dev/null || echo detached) @ $(git rev-p
 # matplotlib, so a venv without the plot extra would turn that page's "not present" note into a traceback
 [ -d python/.venv ] || python3 -m venv python/.venv
 python/.venv/bin/pip install -q -e 'python[plot,dev]'
-echo "== lint (eslint, knip, ruff) ==" && npm run lint 2>&1 | summary tail -15
+# CI runs lint as a job of its own and sets GATE_SKIP_LINT
+if [ -z "${GATE_SKIP_LINT:-}" ]; then echo "== lint (eslint, knip, ruff) ==" && npm run lint 2>&1 | summary tail -15; fi
 echo "== build (-> $NEXT_DIST_DIR) ==" && npm run build 2>&1 | summary tail -3
 # A GET route that never reads the request is prerendered at build time under Cache Components, and
 # then answers every request with what the build saw (no LOGIN_PASSWORD, no warehouse). Only these

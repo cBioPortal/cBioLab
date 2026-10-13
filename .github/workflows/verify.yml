@@ -1,4 +1,7 @@
-# The whole gate, on every pull request and every push to master: lint, build, unit tests, the stores'
+# Three jobs, run side by side: lint (ESLint, knip, ruff; no secrets), the gate below, and the
+# report-only duplication and security reports.
+#
+# The whole gate, on every pull request and every push to master: build, unit tests, the stores'
 # Postgres tests, the counts against cBioPortal, the cohort logic, the method scripts, the Python
 # port's conformance and the e2e suite (scripts/gate.sh), then the planted-bug check. The report
 # /verification displays (docs/verification/*.json) is kept as this run's artifact.
@@ -20,6 +23,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Its own job, so a pull request shows lint as a check of its own, and in a couple of minutes
+  # rather than after the gate's build and e2e.
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - run: npm ci
+
+      - name: Python venv with ruff
+        run: python3 -m venv python/.venv && python/.venv/bin/pip install -q -e 'python[dev]'
+
+      - name: ESLint, knip, ruff
+        run: npm run lint
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -75,7 +105,10 @@ jobs:
           done
           true
 
-      - name: Gate (lint, build, unit, db, cBioPortal, cohort logic, method scripts, Python, e2e)
+      - name: Gate (build, unit, db, cBioPortal, cohort logic, method scripts, Python, e2e)
+        # the lint job above covers lint
+        env:
+          GATE_SKIP_LINT: "1"
         run: scripts/gate.sh
 
       - name: Planted bugs
