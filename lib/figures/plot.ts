@@ -16,6 +16,12 @@ import {
 type Pal = ReturnType<typeof palette>;
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
+/**
+ * The radius of every case drawn as a point on a plot — scatter or box, the plotted cohort or a
+ * highlight, five points or five thousand — so a dot means the same thing on every figure.
+ */
+export const PLOT_POINT_R = 2.5;
+
 /** the plot's height for a figure `w` wide */
 const plotHeight = (w: number) => Math.round(Math.max(240, Math.min(420, w * 0.36)));
 
@@ -94,18 +100,15 @@ function scatter(v: ViewResult, d: PlotData, W: number, p: Pal): string {
   // under highlights the plotted cohort is a floor-raised grey, so its faintest cells still read
   for (const b of shaded) out.push(cell(b, base, hs.length ? 0.3 + 0.7 * shade(b.n) : shade(b.n)));
   const own = d.xyPoints || [];
-  const rOwn = Math.max(1.4, Math.min(3.4, 80 / Math.sqrt(Math.max(1, own.length))));
   for (const pt of own)
-    out.push(`<circle cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${r1(rOwn)}" fill="${base}" fill-opacity="0.7"/>`);
+    out.push(`<circle cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${base}" fill-opacity="0.7"/>`);
   // a highlight too large to draw as points is cells on the same grid, shaded by its own densest cell
   for (const h of hs) if (h.shown === "density" && h.bins) {
     const hMax = Math.max(1, ...h.bins.map((b) => b.n));
     for (const b of h.bins) out.push(cell(b, h.color, 0.3 + 0.7 * Math.log1p(b.n) / Math.log1p(hMax)));
   }
-  const nPts = hs.reduce((a, h) => a + (h.shown === "points" ? h.points!.length : 0), 0);
-  const rPt = Math.max(1.8, Math.min(3.6, 70 / Math.sqrt(Math.max(1, nPts))));
   for (const h of hs) if (h.shown === "points") for (const pt of h.points!) if ("x" in pt)
-    out.push(`<circle cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${r1(rPt)}" fill="${h.color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`);
+    out.push(`<circle cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${h.color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`);
   // the fitted line, over every case rather than over what is visible, clipped to the frame
   if (st && st.slope != null && st.intercept != null && x1 > x0) {
     const yAt = (xv: number) => st.intercept! + st.slope! * xv;
@@ -233,8 +236,7 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
       }
     }
     if (byGroup.has(g.g)) {
-      // two encodings on one dot need a dot big enough to carry them; a crowded plot gets smaller ones
-      const rBase = Math.max(1.4, Math.min(4.5, 90 / Math.sqrt(Math.max(1, d.points!.length))));
+      const rBase = PLOT_POINT_R;
       for (const pt of byGroup.get(g.g)!) {
         const fill = pt.c != null && colorKey.length ? fillOf(pt.c) : base;
         const ring = pt.r != null && !isAbsent(pt.r) ? ringOf(pt.r) : null;
@@ -244,8 +246,8 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
           continue;
         }
         out.push(`<circle cx="${r1(cx + jitterFor(pt.id) * half * 0.9)}" cy="${r1(ys(pt.v))}" ` +
-          `r="${r1(ring ? rBase * 1.25 : rBase)}" fill="${fill}" fill-opacity="0.85"` +
-          (ring ? ` stroke="${ring}" stroke-width="${r1(Math.max(0.6, rBase * 0.28))}"` : "") + `/>`);
+          `r="${rBase}" fill="${fill}" fill-opacity="0.85"` +
+          (ring ? ` stroke="${ring}" stroke-width="${r1(rBase * 0.36)}"` : "") + `/>`);
       }
     }
     out.push(`<line x1="${r1(cx)}" y1="${r1(ys(g.loWhisker))}" x2="${r1(cx)}" y2="${r1(ys(g.hiWhisker))}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);
@@ -267,7 +269,7 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
     // a highlighted value past the axis is pinned to the frame's edge as a triangle pointing off
     // it, and counted in the caption, rather than drawn outside the figure
     for (const h of hs) if (h.shown === "points") {
-      const rH = Math.max(1.8, Math.min(4.2, 80 / Math.sqrt(Math.max(1, h.points!.length))));
+      const rH = PLOT_POINT_R;
       for (const pt of h.points!) if ("g" in pt && pt.g === g.g) {
         const px = cx + jitterFor(pt.id) * half * 0.9;
         if (pt.v > vhi || pt.v < vlo) {
@@ -275,7 +277,7 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
           out.push(edgeMark(px, pt.v > vhi, rH, h.color));
           continue;
         }
-        out.push(`<circle cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${r1(rH)}" fill="${h.color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`);
+        out.push(`<circle cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${rH}" fill="${h.color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`);
       }
     }
   });
