@@ -11,6 +11,9 @@ import { CAT_COLORS } from "./view-chrome.tsx";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import type { ExploreState } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
+import { Button } from "../_ui/button";
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 
 /** The most studies "add all" stages at once (each adds dozens of queries to Explore's facets). */
 export const ADD_ALL_LIMIT = 30;
@@ -284,19 +287,20 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
 }
 
 export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
-  const { addChartDialog, addSeqFilter, attrCoverage, attrKey, chartGene, chartTab, clinFilter, exStudies, exploreBusy, fetchExplore, geneChartInput, openCustomManager, geneCharts, hiddenAttrs, seq, seqReady, setAttrCoverage, setChartTab, setClinFilter, setGeneChartInput, setHiddenAttrs, setSeq, treatmentEventType, unchartGene, visibleClinical } = ctx;
+  const { addChartOpen, setAddChartOpen, addSeqFilter, attrCoverage, attrKey, chartGene, chartTab, clinFilter, exStudies, exploreBusy, fetchExplore, geneChartInput, openCustomManager, geneCharts, hiddenAttrs, seq, seqReady, setAttrCoverage, setChartTab, setClinFilter, setGeneChartInput, setHiddenAttrs, setSeq, treatmentEventType, unchartGene, visibleClinical } = ctx;
   const explore = ctx.explore!;
   return <>
     {explore && (
-      <dialog ref={addChartDialog} className="addchartdialog"
-        onClick={e => { if (e.target === addChartDialog.current) addChartDialog.current?.close(); }}>
-        <h3>Add chart</h3>
-        <div className="tabs">
-          <button className={chartTab === "clinical" ? "active" : ""} onClick={() => setChartTab("clinical")}>Clinical</button>
-          <button className={chartTab === "gene" ? "active" : ""} onClick={() => setChartTab("gene")}>Gene status</button>
-          <button className={chartTab === "derived" ? "active" : ""} onClick={() => setChartTab("derived")}>Derived timeline filters</button>
-          <button className={chartTab === "custom" ? "active" : ""} onClick={() => setChartTab("custom")}>Custom data</button>
-        </div>
+      <Dialog open={addChartOpen} onOpenChange={setAddChartOpen}>
+      <DialogContent aria-describedby={undefined}
+        className="addchart flex h-[90vh] w-[94vw] max-w-[94vw] flex-col gap-0 overflow-auto p-6 sm:max-w-[94vw]">
+        <DialogHeader className="mb-2"><DialogTitle className="text-base">Add chart</DialogTitle></DialogHeader>
+        <Tabs value={chartTab} onValueChange={(v) => setChartTab(v as typeof chartTab)} className="mb-3">
+          <TabsList variant="line" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
+            {([["clinical", "Clinical"], ["gene", "Gene status"], ["derived", "Derived timeline filters"], ["custom", "Custom data"]] as const).map(([t, label]) =>
+              <TabsTrigger key={t} value={t} className="h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary">{label}</TabsTrigger>)}
+          </TabsList>
+        </Tabs>
         {(() => {
           const custom = explore.clinical.filter((c) => isCustomAttr(c.attribute));
           const builtin = explore.clinical.filter((c) => !isCustomAttr(c.attribute));
@@ -348,7 +352,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
           );
           if (chartTab === "custom") return (
             <div>
-              <p className="note mt-0">
+              <p className="note mt-0 mb-3">
                 Check a custom attribute to draw it as a tile in the facet grid below; uncheck to hide it.
                 These are the saved datasets that cover the explored {exStudies.length === 1 ? "study" : "studies"}.
               </p>
@@ -359,11 +363,11 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                   <button className="linklike" onClick={() => setAll(custom, false)}>check none</button>
                 </>}
                 <span className="spacer" />
-                <button className="tbbtn" onClick={() => { addChartDialog.current?.close(); openCustomManager(custom.length ? "manage" : "add"); }}>
-                  {custom.length ? "Manage custom data…" : "Add custom data…"}</button>
+                <Button variant="outline" size="sm" onClick={() => { setAddChartOpen(false); openCustomManager(custom.length ? "manage" : "add"); }}>
+                  {custom.length ? "Manage custom data…" : "Add custom data…"}</Button>
               </div>
               {custom.length ? table(custom, true)
-                : <p className="note">No custom data covers {exStudies.length === 1 ? exStudies[0] : "these studies"} yet.</p>}
+                : <p className="note my-3">No custom data covers {exStudies.length === 1 ? exStudies[0] : "these studies"} yet.</p>}
             </div>
           );
           if (chartTab !== "clinical") return null;
@@ -372,7 +376,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
             (c.attribute || "").toLowerCase().includes(q) || (c.displayName || "").toLowerCase().includes(q));
           return (
             <div>
-              <p className="note mt-0">
+              <p className="note mt-0 mb-3">
                 Check an attribute to draw it as a tile in the facet grid below; uncheck to hide
                 it. The search here only narrows this list — it doesn't touch the grid itself.
                 {exStudies.length > 1 && <> An attribute marked <b>*</b> isn't carried by every
@@ -402,7 +406,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                   </select>
                 )}
               </div>
-              {!rows.length && <p className="note">No attribute matches “{clinFilter}”.</p>}
+              {!rows.length && <p className="note my-3">No attribute matches “{clinFilter}”.</p>}
               {table(rows, false)}
             </div>
           );
@@ -414,7 +418,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                 value={geneChartInput} disabled={exploreBusy}
                 onChange={e => setGeneChartInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") chartGene(geneChartInput); }} />
-              <button disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}>add</button>
+              <Button variant="outline" size="sm" disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}>Add</Button>
             </div>
             {!geneCharts.length && (
               <p className="note flush mt-1.5">
@@ -439,7 +443,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
           </div>
         )}
         {chartTab === "derived" && (explore.events.length === 0 ? (
-          <p className="note mt-0">This study has no clinical timeline events to derive a filter from.</p>
+          <p className="note mt-0 mb-3">This study has no clinical timeline events to derive a filter from.</p>
         ) : (() => {
           const tx = treatmentEventType();
           return (
@@ -536,15 +540,16 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                     treatment-naive before the first event
                   </label>
                   <hr />
-                  <button className="facet" disabled={!seqReady} onClick={addSeqFilter}>add filter</button>
+                  <Button variant="outline" size="sm" className="self-start" disabled={!seqReady} onClick={addSeqFilter}>Add filter</Button>
               </div>
             </div>
           );
         })())}
-        <div className="row mt-4 end">
-          <button className="primary" onClick={() => addChartDialog.current?.close()}>Done</button>
-        </div>
-      </dialog>
+        <DialogFooter className="mt-auto pt-4">
+          <DialogClose asChild><Button>Done</Button></DialogClose>
+        </DialogFooter>
+      </DialogContent>
+      </Dialog>
     )}
   </>;
 }

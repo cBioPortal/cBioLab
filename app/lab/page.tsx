@@ -311,7 +311,7 @@ export default function AnalysisPage() {
   const cohortEdits = useCohortEdits({ doc, docs, evalOf: (n) => { const c = result?.cohorts[n]; return c ? { count: c.count, text: c.text } : null; }, persist, proposePartition, saved, savedReady, setError, setToast, study });
   const { analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary } = cohortEdits;
   const exploreState = useExploreState({ addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
-  const { addChartDialog, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies } = exploreState;
+  const { setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies } = exploreState;
   const viewOptions = useViewOptions({ cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading });
   const { VIEW_KINDS, assayOptions, attrsLoading, catalogAttrs, contProfile, drawsOwnHead, geneChoices, numericAttrs, profileOptions, viewAttrs, viewEvents, viewGenes } = viewOptions;
   const viewEdits = useViewEdits({ VIEW_KINDS, assayOptions, busy, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, setChooser, setToast, study, viewAttrs, viewEvents, viewGenes, viewIds });
@@ -408,7 +408,7 @@ export default function AnalysisPage() {
               touched any of them. One button, one modal with a tab per kind instead. */}
           {explore && (
             <div className="row mb-4">
-              <Button variant="outline" size="sm" onClick={() => addChartDialog.current?.showModal()}><Plus />Add chart</Button>
+              <Button variant="outline" size="sm" onClick={() => setAddChartOpen(true)}><Plus />Add chart</Button>
               <Button variant="outline" size="sm" title="upload your own annotations and chart, filter and analyse them like clinical attributes"
                 onClick={() => openCustomManager(customState.unlocked && customState.datasets.length ? "manage" : "add")}>
                 <Upload />Custom data{customState.datasets.length ? " (" + customState.datasets.length + ")" : ""}</Button>
