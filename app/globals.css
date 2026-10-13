@@ -621,8 +621,6 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 .row.g5 { gap: 0.5rem; }
 .facettitle { font-size: var(--t-md); font-weight: 600; }
 /* a row of link-buttons that switch what a menu shows, the current one bold */
-.linklike.tabtoggle { font-weight: 400; }
-.linklike.tabtoggle.on { font-weight: 600; }
 /* a menu's items, the one in effect bold */
 /* the document dialog's JSON and its compiled SQL */
 

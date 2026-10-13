@@ -13,6 +13,17 @@ import { heatmapTrackLabel } from "../../lib/profile-names.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
+import { Plus, Rows3 } from "lucide-react";
+import { Button } from "../_ui/button";
+import { Checkbox } from "../_ui/checkbox";
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
+import { GearMenu } from "../_ui/gear-menu.tsx";
+import { Input } from "../_ui/input";
+import { OptionSelect } from "../_ui/choice.tsx";
+import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
+import { Textarea } from "../_ui/textarea";
+import { FIELD, TB } from "../_ui/toolbar.ts";
+import { cn } from "../../lib/cn";
 
 type V = Record<string, any>;   // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -132,28 +143,28 @@ export function GeneListEditor({ view, busy, onGenes }: { view: V; busy: boolean
               {r.label} <span aria-hidden="true">×</span>
             </button>
             {merges && r.members.length > 1 && (
-              <button type="button" className="linklike" disabled={busy} style={{ fontSize: "var(--t-sm)", marginLeft: "0.2rem" }}
-                title="draw each of these genes as its own row" onClick={() => onGenes(splitGeneTrack(view, r.label).genes)}>split</button>
+              <Button type="button" variant="link" size="inline" className="ml-1" disabled={busy}
+                title="draw each of these genes as its own row" onClick={() => onGenes(splitGeneTrack(view, r.label).genes)}>split</Button>
             )}
           </span>
         ))}
       </div>
       <div className="setrow">
-        <input list="view-genes" placeholder="add a gene…" value={add} disabled={busy || rows.length >= 12}
+        <Input list="view-genes" placeholder="add a gene…" value={add} disabled={busy || rows.length >= 12} className={cn(FIELD, "w-40 uppercase placeholder:normal-case")}
           onChange={e => setAdd(e.target.value.toUpperCase())}
           onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); } }} />
-        <button type="button" className="facet" disabled={busy || !add.trim() || rows.length >= 12}
-          onClick={commit}>add</button>
+        <Button type="button" variant="outline" size="sm" className={TB} disabled={busy || !add.trim() || rows.length >= 12}
+          onClick={commit}><Plus />add</Button>
       </div>
       {merges && (
         <details onToggle={(e) => { if ((e.target as HTMLDetailsElement).open && text === null) setText(formatGeneList(list)); }}>
           <summary className="meta">edit as text — cBioPortal&apos;s gene list, where <code>[TP53 MDM2]</code> is one merged row</summary>
           <div className="setcol" style={{ marginTop: "0.3rem" }}>
-            <textarea value={text ?? formatGeneList(list)} spellCheck={false} rows={3} disabled={busy}
-              onChange={(e) => setText(e.target.value)} style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: "var(--t-md)" }} />
+            <Textarea value={text ?? formatGeneList(list)} spellCheck={false} rows={3} disabled={busy}
+              onChange={(e) => setText(e.target.value)} className="min-h-16 bg-muted font-mono text-md md:text-md" />
             <div className="setrow">
-              <button type="button" className="facet" disabled={busy} onClick={applyText}>apply</button>
-              <button type="button" className="linklike" onClick={() => { setText(formatGeneList(list)); setTextErr(null); }}>reset</button>
+              <Button type="button" variant="outline" size="sm" className={TB} disabled={busy} onClick={applyText}>apply</Button>
+              <Button type="button" variant="link" size="inline" onClick={() => { setText(formatGeneList(list)); setTextErr(null); }}>reset</Button>
               <span className="meta">a label is optional: <code>[&quot;TP53 pathway&quot; TP53 MDM2]</code></span>
             </div>
             {textErr && <span className="mark">{textErr}</span>}
@@ -214,17 +225,18 @@ export function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derive
     onHeatmap(heatmap.map((h) => h.profileType === profileType ? (genes.length ? { ...h, genes } : { profileType }) : h));
   };
   return (
-    <details className="gearmenu">
-      <summary className="tbbtn" title="add or remove tracks">tracks{chosen.length ? " (" + chosen.length + ")" : ""}</summary>
-      <div className="gearmenu-items wide" style={{ minWidth: 340 }}>
-        <div className="row center g5">
-          <button className={"linklike tabtoggle" + (tab === "clinical" ? " on" : "")} onClick={() => setTab("clinical")}>Clinical {studyAttrs.length ? "(" + studyAttrs.length + ")" : ""}</button>
-          <button className={"linklike tabtoggle" + (tab === "custom" ? " on" : "")} onClick={() => setTab("custom")}
-            title="attributes from your uploads (Explore → Custom data)">Custom ({customAttrs.length})</button>
-          <button className={"linklike tabtoggle" + (tab === "heatmap" ? " on" : "")} onClick={() => setTab("heatmap")}>Heatmap ({heatOptions.length})</button>
-          <button className={"linklike tabtoggle" + (tab === "cohorts" ? " on" : "")} onClick={() => setTab("cohorts")}>Cohort rows ({cohorts.length})</button>
-          <span className="spacer" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search…" style={{ fontSize: "var(--t-md)", width: 120 }} />
+    <GearMenu menuId="onco-tracks" title="add or remove tracks" wide contentClassName="min-w-[340px] max-w-[34rem] px-2.5"
+      label={<><Rows3 />tracks{chosen.length ? " (" + chosen.length + ")" : ""}</>}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+            <TabsList className="h-7">
+              <TabsTrigger value="clinical" className="px-2 text-sm">Clinical {studyAttrs.length ? "(" + studyAttrs.length + ")" : ""}</TabsTrigger>
+              <TabsTrigger value="custom" className="px-2 text-sm" title="attributes from your uploads (Explore → Custom data)">Custom ({customAttrs.length})</TabsTrigger>
+              <TabsTrigger value="heatmap" className="px-2 text-sm">Heatmap ({heatOptions.length})</TabsTrigger>
+              <TabsTrigger value="cohorts" className="px-2 text-sm">Cohort rows ({cohorts.length})</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="search…" className={cn(FIELD, "ml-auto w-32")} />
         </div>
         <span className="meta">{chosen.length} of {cap} chosen{
           tab === "clinical" ? " · cases with data, most first"
@@ -242,20 +254,19 @@ export function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derive
             return (
               <div key={name}>
                 <label className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "baseline", padding: "0.1rem 0" }}>
-                  <input type="checkbox" checked={on} disabled={busy || (!on && chosen.length >= cap)} onChange={() => toggle(name)} />
+                  <Checkbox className="self-center" checked={on} disabled={busy || (!on && chosen.length >= cap)} onCheckedChange={() => toggle(name)} />
                   <span style={{ flex: 1 }} title={tab === "custom" ? name : undefined}>{name === "VAF" ? "VAF (mutation allele fraction)" : attributeLabel(name, tab === "custom" ? "short" : "long")}{a?.kind === "num" ? " (numeric)" : ""}
                     {tab === "custom" && <span className="meta"> · {parseCustomAttr(name)?.dataset}</span>}</span>
                   {a && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
                 </label>
-                {h && <input defaultValue={(h.genes || []).join(" ")} placeholder="genes for this profile — blank follows the figure"
+                {h && <Input defaultValue={(h.genes || []).join(" ")} placeholder="genes for this profile — blank follows the figure"
                   disabled={busy} onBlur={(e) => setHeatGenes(name, e.target.value)}
-                  style={{ fontSize: "var(--t-sm)", width: "100%", margin: "0 0 0.3rem 1.4rem" }} />}
+                  className="mb-1.5 ml-6 h-7 w-[calc(100%-1.5rem)] text-sm md:text-sm" />}
               </div>
             );
           })}
         </div>
-      </div>
-    </details>
+    </GearMenu>
   );
 }
 
@@ -291,7 +302,7 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
 }) {
   const [own, setOwn] = useState<UnpackedContract | null>(null);
   const c = contract !== undefined ? contract : own;
-  const genesDialog = React.useRef<HTMLDialogElement | null>(null);
+  const [genesOpen, setGenesOpen] = useState(false);
   const edit = (next: V) => onView(next, true);
   const disp = (view.display || {}) as V;
   return (
@@ -311,21 +322,21 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
         onSaveFeature={onSaveFeature}
         busy={busy}
         controls={<>
-          <button className="tbbtn genesbtn" disabled={busy}
-            title="choose the genes this oncoprint draws" onClick={() => onGenes ? onGenes() : genesDialog.current?.showModal()}>genes ({geneRowCount(view)})</button>
-          <label className="tbfield" title="a cohort selects patients; sample mode draws every sample of those patients">columns <select
+          <Button variant="outline" size="sm" className={cn(TB, "genesbtn")} disabled={busy}
+            title="choose the genes this oncoprint draws" onClick={() => onGenes ? onGenes() : setGenesOpen(true)}>genes ({geneRowCount(view)})</Button>
+          <label className="tbfield" title="a cohort selects patients; sample mode draws every sample of those patients">columns <OptionSelect
             value={view.unit || "patient"} disabled={busy}
-            onChange={(e) => { const n = { ...view }; if (e.target.value === "sample") n.unit = "sample"; else delete n.unit; edit(n); }}>
+            onValueChange={(v) => { const n = { ...view }; if (v === "sample") n.unit = "sample"; else delete n.unit; edit(n); }}>
             <option value="patient">patients</option><option value="sample">samples</option>
-          </select></label>
-          <label className="tbfield" title="driver calls come from the version-pinned OncoKB store">annotate <select
+          </OptionSelect></label>
+          <label className="tbfield" title="driver calls come from the version-pinned OncoKB store">annotate <OptionSelect
             value={disp.annotate || "oncokb"} disabled={busy}
-            onChange={(e) => edit(setDisplayKey(view, "annotate", e.target.value === "none" ? "none" : undefined))}>
+            onValueChange={(v) => edit(setDisplayKey(view, "annotate", v === "none" ? "none" : undefined))}>
             <option value="oncokb">OncoKB</option><option value="none">none</option>
-          </select></label>
+          </OptionSelect></label>
           <label className="chk tbchk" title="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
-            <input type="checkbox" checked={!!disp.hideVUS} disabled={busy}
-              onChange={(e) => edit(setDisplayKey(view, "hideVUS", e.target.checked || undefined))} /> drivers only</label>
+            <Checkbox checked={!!disp.hideVUS} disabled={busy}
+              onCheckedChange={(on) => edit(setDisplayKey(view, "hideVUS", on === true || undefined))} /> drivers only</label>
         </>}
         tracksMenu={<TracksMenu
           attrs={catalog.attrs} profiles={catalog.profiles} loading={catalog.loading}
@@ -358,13 +369,13 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
         </>}
       />
       {!onGenes && (
-        <dialog ref={genesDialog} className="genedialog" onClick={(e) => { if (e.target === genesDialog.current) genesDialog.current?.close(); }}>
-          <div className="setcol">
-            <strong>Genes</strong>
+        <Dialog open={genesOpen} onOpenChange={setGenesOpen}>
+          <DialogContent aria-describedby={undefined} className="genedialog gap-3 sm:max-w-md">
+            <DialogHeader><DialogTitle className="text-base">Genes</DialogTitle></DialogHeader>
             <GeneListEditor view={view} busy={busy} onGenes={(g) => edit(withGenes(view, g))} />
-            <div className="setrow"><button className="primary" onClick={() => genesDialog.current?.close()}>Done</button></div>
-          </div>
-        </dialog>
+            <DialogFooter><DialogClose asChild><Button>Done</Button></DialogClose></DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );
