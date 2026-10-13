@@ -1,17 +1,21 @@
 "use client";
-// Explore's "Custom data" tab: upload a table of curated annotations, check how it matched the
-// selected studies, and manage what is stored on the server (the only place uploads live). Owns its own draft state, so
-// typing into the paste box never re-renders the analysis page (see "Keystrokes stay in the
-// field" in CLAUDE.md).
-import { useEffect, useState, useSyncExternalStore } from "react";
+// The Custom data dialog: upload a table of curated annotations and check how it matched the
+// explored studies (Add data), and see, export or delete what is stored on the server, the only
+// place uploads live (Manage). Owns its own draft state, so typing into the paste box never
+// re-renders the analysis page (see "Keystrokes stay in the field" in CLAUDE.md). Which custom
+// attributes are drawn as charts is chosen in Explore's Add chart dialog, like any other attribute.
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   onCustomDataChange, loadCustomData, parseUpload, buildDataset, datasetToTsv, serverState, requestLogin, saveToServer,
-  deleteServerDataset, serverBySlug, fetchServerVersion, resolveIds, type ParsedUpload, type ResolveResponse, type ServerState, type StoredDataset
+  deleteServerDataset, serverBySlug, fetchServerVersion, resolveIds, exampleUpload, type ParsedUpload, type ResolveResponse, type ServerState, type StoredDataset
 } from "./custom-data-client.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
 import { LIMITS } from "../../lib/custom-data-names.ts";
 
-const EXAMPLE = "PATIENT_ID\tMET_SITE\tKPS\nP-0000012\tBrain\t80\nP-0000015\tPrimary\t90\n";
+/** what an upload looks like, shown in the empty paste box */
+const PLACEHOLDER = "PATIENT_ID\tMET_SITE\tKPS\nP-0001\tBrain\t80\nP-0002\tLiver\t90";
+/** what the file picker and the drop zone take: delimited text */
+const TEXT_FILE = /\.(tsv|csv|txt|tab)$/i;
 /** a match rate under this needs a deliberate second click: the ids are probably the wrong kind */
 const LOW_MATCH = 0.5;
 
@@ -23,8 +27,10 @@ export function useCustomDataState(): ServerState {
   return useSyncExternalStore(onCustomDataChange, serverState, serverState);
 }
 
-export default function CustomDataPanel({ studies, onChanged }: { studies: string[]; onChanged: () => void }) {
-  const server = useCustomDataState();
+/** the dialog's two tabs */
+export type CustomDataTab = "add" | "manage";
+
+function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name: string) => void }) {
   const [text, setText] = useState("");
   const [name, setName] = useState("");
   const [parsed, setParsed] = useState<ParsedUpload | null>(null);
@@ -36,12 +42,46 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
   /** the studies the preview was matched against: what the dataset is added to */
   const [matchedStudies, setMatchedStudies] = useState<string[]>([]);
 
+  const [dragging, setDragging] = useState(false);
+  // a file dropped just outside the drop zone would otherwise open in place of the page
+  useEffect(() => {
+    const stop = (e: DragEvent) => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); };
+    window.addEventListener("dragover", stop);
+    window.addEventListener("drop", stop);
+    return () => { window.removeEventListener("dragover", stop); window.removeEventListener("drop", stop); };
+  }, []);
+  const [exampleBusy, setExampleBusy] = useState(false);
+  /** new text from a file, a drop or the example: checked at once, since nothing about it is half-typed */
+  const load = (t: string, defaultName: string) => {
+    setText(t); setParsed(null); setResolved(null);
+    if (!name) setName(defaultName);
+    preview(t);
+  };
+  const loadFile = async (f: File | undefined) => {
+    if (!f) return;
+    if (!TEXT_FILE.test(f.name) && f.type && !f.type.startsWith("text/")) {
+      setErr(f.name + " is not a text table: save it as tab- or comma-separated text (.tsv, .csv) first"); return;
+    }
+    load(await f.text(), f.name.replace(/\.[^.]+$/, ""));
+  };
+  const loadExample = async () => {
+    const study = studies[0];
+    setExampleBusy(true); setErr(null);
+    // stamped, so loading the example again never asks for a name already taken, or kept by a deleted example;
+    // the stamp comes first because a dataset's id keeps only the name's first 40 characters
+    const stamp = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
+    try { load(await exampleUpload(study), "Example " + stamp + " (" + study + ")"); }
+    catch (e) { setErr("could not build example data: " + String((e as Error).message || e)); }
+    finally { setExampleBusy(false); }
+  };
+
   const reset = () => { setText(""); setName(""); setParsed(null); setResolved(null); setTypes({}); setErr(null); setConfirmLow(false); setMatchedStudies([]); };
 
-  const preview = async () => {
+  /** parse the table and match its ids against the studies being explored */
+  const preview = async (t = text) => {
     setErr(null); setResolved(null); setConfirmLow(false);
     let p: ParsedUpload;
-    try { p = parseUpload(text); } catch (e) { setParsed(null); setErr(String((e as Error).message || e)); return; }
+    try { p = parseUpload(t); } catch (e) { setParsed(null); setErr(String((e as Error).message || e)); return; }
     setParsed(p);
     setTypes(Object.fromEntries(p.columns.map((c) => [c.name, c.datatype])));
     if (!studies.length) { setErr("select a study above first: ids are matched against the studies being explored"); return; }
@@ -52,19 +92,6 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
     } catch (e) { setErr(String((e as Error).message || e)); }
     finally { setBusy(false); }
   };
-
-  const [serverBusy, setServerBusy] = useState<string | null>(null);
-  const [serverErr, setServerErr] = useState<string | null>(null);
-  const serverAct = async (label: string, f: () => Promise<unknown>) => {
-    setServerBusy(label); setServerErr(null);
-    try { await f(); onChanged(); } catch (e) { setServerErr(String((e as Error).message || e)); }
-    finally { setServerBusy(null); }
-  };
-  const removeServer = (d: DatasetMeta) => {
-    if (!confirm("Delete “" + d.name + "” from the server? Analyses pinned to it will be refused, with the date it was deleted.")) return;
-    serverAct("deleting…", () => deleteServerDataset(d.id));
-  };
-  const exportServer = (d: DatasetMeta) => serverAct("exporting…", async () => download(await fetchServerVersion(d.id, d.latestVersion)));
 
   /** a new dataset, or the next version of the server one of that name */
   const save = async () => {
@@ -80,13 +107,7 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
     catch (e) { setErr(String((e as Error).message || e)); setBusy(false); return; }
     setBusy(false);
     reset();
-    onChanged();
-  };
-
-  const download = (d: StoredDataset) => {
-    const url = URL.createObjectURL(new Blob([datasetToTsv(d)], { type: "text/tab-separated-values" }));
-    const a = document.createElement("a"); a.href = url; a.download = d.id + ".tsv"; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    onAdded(d.name);
   };
 
   const matchedRows = resolved ? resolved.matches.filter((m) => m.length).length : 0;
@@ -107,149 +128,221 @@ export default function CustomDataPanel({ studies, onChanged }: { studies: strin
     ? parsed.rows.filter((_, i) => !resolved.matches[i]?.length).slice(0, 5).map((r) => r[0]) : [];
 
   return (
-    <div className="customdata">
-      <p className="note" style={{ marginTop: 0 }}>
-        Add your own annotations (a curated metastasis site, a field extracted from the record) and use
-        them like any clinical attribute: as a chart and filter here, as an oncoprint track or split, and
-        in comparisons and survival. Uploads are stored on the server, so an analysis that uses one can be
-        shared with anyone who can log in.
-      </p>
-      {!server.enabled && <p className="meta">
-        This deployment does not store custom data: it has no login (<code>LOGIN_PASSWORD</code> is not set).
-        The gallery&apos;s custom-data example still runs, on demo data bundled with the app.</p>}
-
-      {server.enabled && <>
-        <h4>On the server</h4>
-        {!server.unlocked ? (
-          <p className="row" style={{ alignItems: "center" }}>
-            <span className="meta">Custom data is stored on the server.</span>
-            <button className="primary" onClick={requestLogin}>Log in</button>
-            <span className="meta">to see, add and use it.</span>
-          </p>
-        ) : (
-          <>
-            <p className="meta" style={{ margin: "0 0 var(--s2)" }}>
-              Everyone who logs in sees these: there is one shared login and no per-user permissions yet.
-              A version, once saved, never changes; an analysis that uses one is pinned to it.
-            </p>
-            {server.datasets.length ? (
-              <div className="attrtablewrap" style={{ maxHeight: "30vh" }}>
-                <table className="attrtable customlist">
-                  <thead><tr><th>Dataset</th><th>Columns</th><th>Rows</th><th>Studies</th><th></th></tr></thead>
-                  <tbody>
-                    {server.datasets.map((d) => {
-                      const v = d.versions.find((x) => x.version === d.latestVersion);
-                      return (
-                        <tr key={d.id} style={{ cursor: "default" }}>
-                          <td><b>{d.name}</b> <span className="meta">custom:{d.slug} · {d.level} level · v{d.latestVersion}
-                            {d.versions.length > 1 ? " of " + d.versions.length : ""} · {new Date(d.updatedAt).toLocaleDateString()}</span></td>
-                          <td className="meta">{v?.columns.map((c) => c.name).join(", ")}</td>
-                          <td className="meta">{v?.rowCount.toLocaleString()} {d.level}s</td>
-                          <td className="meta">{v?.studies.join(", ")}</td>
-                          <td style={{ whiteSpace: "nowrap" }}>
-                            <button className="tbbtn" disabled={!!serverBusy} onClick={() => exportServer(d)}>Export</button>{" "}
-                            <button className="tbbtn" disabled={!!serverBusy} onClick={() => removeServer(d)}>Delete</button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+    <section className="cd-add">
+        <div className="cd-step"><span className="cd-num">1</span><h4>Load a table</h4>
+          {studies.length > 0 && <span className="cd-target">
+            for {studies.map((st) => <span key={st} className="qchip">{st}</span>)}
+          </span>}
+        </div>
+        {!studies.length
+          ? <p className="error">Select the study this data belongs to (top of Explore) before uploading: ids are matched against it.</p>
+          : <div className={"cd-drop" + (dragging ? " over" : "")}
+              onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
+              onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false); }}
+              onDrop={(e) => { e.preventDefault(); setDragging(false); loadFile(e.dataTransfer.files?.[0]); }}>
+              <div className="cd-drophead">
+                <svg viewBox="0 0 16 16" aria-hidden><path d="M8 1.5 4.5 5h2.25v5h2.5V5h2.25ZM2 11v3h12v-3h-1.5v1.5h-9V11Z" /></svg>
+                <span><b>Drag a .tsv or .csv file here</b>, <label className="cd-pick">choose a file
+                  <input type="file" accept=".tsv,.txt,.csv,.tab,text/plain,text/csv,text/tab-separated-values"
+                    onChange={(e) => { loadFile(e.target.files?.[0]); e.target.value = ""; }} /></label>, or paste below</span>
+                <span className="spacer" />
+                <button className="tbbtn" disabled={exampleBusy} onClick={loadExample}
+                  title={"a few of " + studies[0] + "'s own patients with made-up values, so it can be added as it stands"}>
+                  {exampleBusy ? <><span className="spinner" /> loading…</> : "Use example data for " + studies[0]}
+                </button>
               </div>
-            ) : <p className="meta">Nothing saved on the server yet.</p>}
-          </>
-        )}
-        {serverBusy && <p className="meta"><span className="spinner" /> {serverBusy}</p>}
-        {serverErr && <p className="error">{serverErr}</p>}
-      </>}
+              <textarea className="customdata-text" rows={text ? 8 : 4} spellCheck={false} value={text}
+                placeholder={PLACEHOLDER} onChange={(e) => { setText(e.target.value); setParsed(null); setResolved(null); }} />
+              {dragging && <div className="cd-dropover">Drop to load</div>}
+            </div>}
+        <details className="cd-format">
+          <summary>File format</summary>
+          A header row, then one row per case, tab- or comma-separated. The first column is the case id: name it{" "}
+          <code>PATIENT_ID</code> or <code>SAMPLE_ID</code>{studies.length > 1 && <>; prefix one as <code>study:id</code> to pin it to one of the studies</>}.
+          Every other column becomes an attribute. Rows whose id matches no {studies.length === 1 ? "patient or sample of the study" : "patient or sample of these studies"} are dropped, and the check below says which.
+        </details>
+        {text.trim() && !parsed && !busy && <div className="row center g5">
+          <button className="tbbtn" onClick={() => preview()}>Check ids</button>
+          <button className="linklike" onClick={reset}>clear</button>
+        </div>}
+        {busy && !parsed && <p className="meta"><span className="spinner" /> matching ids…</p>}
+        {err && <p className="error">{err}</p>}
 
-      {server.unlocked && <>
-      <h4>Add custom data</h4>
-      <div className="customtarget">
-        {studies.length ? <>
-          <div>This upload will be added to {studies.length === 1 ? "the current study" : "the " + studies.length + " current studies"}:{" "}
-            {studies.map((st) => <span key={st} className="qchip">{st}</span>)}</div>
-          <div className="meta">Its ids are matched against {studies.length === 1 ? "this study" : "these studies"} only, and{" "}
-            <b>any row whose id matches no {studies.length === 1 ? "patient or sample in it" : "patient or sample in them"} is dropped</b>.
-            To add data to a different study, change the studies being explored first.</div>
-        </> : <div className="error" style={{ margin: 0 }}>Select the study this data belongs to (top of Explore) before uploading.</div>}
-      </div>
-      <p className="note">
-        A header row, then one row per case, tab- or comma-separated. The first column is the case id:
-        name it <code>PATIENT_ID</code> or <code>SAMPLE_ID</code>{studies.length > 1 && <>; prefix one as <code>study:id</code> to pin it to one of the studies</>}.
-        Every other column becomes an attribute.
+        {parsed && <>
+          <div className="cd-step"><span className="cd-num">2</span><h4>Check</h4>
+            <span className="meta">{parsed.rows.length.toLocaleString()} rows · id column <code>{parsed.idColumn}</code> → {parsed.level} level
+              {parsed.warnings.length > 0 && <> · {parsed.warnings.join("; ")}</>}</span>
+          </div>
+          {busy && <p className="meta"><span className="spinner" /> matching ids…</p>}
+          {resolved && <p className={"cd-match" + (resolved.unmatched ? "" : " ok")}>
+            <b>{matchedRows.toLocaleString()} of {parsed.rows.length.toLocaleString()}</b> rows matched a {parsed.level} of {matchedStudies.join(", ")}
+            {!resolved.unmatched && " ✓"}
+            {resolved.multiStudy > 0 && <> · {resolved.multiStudy} ids exist in more than one study and apply to each</>}
+            {resolved.refused.length > 0 && <> · not matched against {resolved.refused.map((r) => r.study + " (" + r.reason + ")").join(", ")}</>}
+          </p>}
+          {resolved && resolved.unmatched > 0 && <p className={rate < LOW_MATCH ? "error" : "customdrop"}>
+            <b>{resolved.unmatched.toLocaleString()} row{resolved.unmatched === 1 ? "" : "s"} will be dropped</b>: {resolved.unmatched === 1 ? "its id matches" : "their ids match"} no {parsed.level} in {matchedStudies.join(", ")}
+            {" "}(e.g. {unmatchedExamples.map((x) => <code key={x}>{x}</code>).reduce((a: React.ReactNode[], x, i) => i ? [...a, ", ", x] : [x], [])}).{" "}
+            <button className="linklike" onClick={downloadDropped}>download them</button>
+            {rate < LOW_MATCH && <> — are these {parsed.level === "patient" ? "sample" : "patient"} ids, or ids from another study?</>}
+          </p>}
+          {stale && <p className="error">The studies being explored changed since this check. <button className="linklike" onClick={() => preview()}>Check again</button> against {studies.join(", ") || "the new selection"}.</p>}
+          <div className="attrtablewrap" style={{ maxHeight: "30vh" }}>
+            <table className="attrtable">
+              <thead><tr><th>Attribute</th><th>Type</th><th>Values</th><th>Distinct</th><th></th></tr></thead>
+              <tbody>
+                {parsed.columns.map((c) => (
+                  <tr key={c.name} style={{ cursor: "default" }}>
+                    <td><code>{c.name}</code></td>
+                    <td>
+                      <select value={types[c.name] ?? c.datatype}
+                        onChange={(e) => setTypes((t) => ({ ...t, [c.name]: e.target.value as "STRING" | "NUMBER" }))}>
+                        <option value="STRING">categorical</option>
+                        <option value="NUMBER" disabled={c.datatype !== "NUMBER"}>numeric</option>
+                      </select>
+                    </td>
+                    <td className="meta">{c.filled.toLocaleString()} of {parsed.rows.length.toLocaleString()}</td>
+                    <td className="meta">{c.distinct.toLocaleString()}</td>
+                    <td className="meta">
+                      {c.datatype !== "NUMBER" && c.distinct > 50 && "many distinct values: free text charts poorly"}
+                      {c.looksLikeDate && "dates are kept as text"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="cd-step"><span className="cd-num">3</span><h4>Name and add</h4></div>
+          <div className="row center g5">
+            <input type="text" placeholder="dataset name (e.g. Brain mets — curated)" value={name}
+              onChange={(e) => setName(e.target.value)} style={{ minWidth: "24rem" }} />
+            {rate < LOW_MATCH && !confirmLow
+              ? <button className="tbbtn" disabled={!resolved || !matchedRows || stale} onClick={() => setConfirmLow(true)}>Save anyway…</button>
+              : <button className="primary" disabled={!resolved || !matchedRows || busy || stale} onClick={save}
+                  title="stored on the server: anyone who logs in can read it, and analyses that use it can be shared">
+                  Add data to {target}{serverBySlug(slugPreview) ? " (as v" + (serverBySlug(slugPreview)!.latestVersion + 1) + " of " + slugPreview + ")" : ""}</button>}
+            <button className="linklike" onClick={reset}>start over</button>
+          </div>
+          <p className="meta">Its columns become <code>custom:{slugPreview}/…</code> attributes.</p>
+        </>}
+    </section>
+  );
+}
+
+function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: () => void }) {
+  const server = useCustomDataState();
+  const [serverBusy, setServerBusy] = useState<string | null>(null);
+  const [serverErr, setServerErr] = useState<string | null>(null);
+  const serverAct = async (label: string, f: () => Promise<unknown>) => {
+    setServerBusy(label); setServerErr(null);
+    try { await f(); onChanged(); } catch (e) { setServerErr(String((e as Error).message || e)); }
+    finally { setServerBusy(null); }
+  };
+  const removeServer = (d: DatasetMeta) => {
+    if (!confirm("Delete “" + d.name + "” from the server? Analyses pinned to it will be refused, with the date it was deleted.")) return;
+    serverAct("deleting…", () => deleteServerDataset(d.id));
+  };
+  const exportServer = (d: DatasetMeta) => serverAct("exporting…", async () => download(await fetchServerVersion(d.id, d.latestVersion)));
+
+  const download = (d: StoredDataset) => {
+    const url = URL.createObjectURL(new Blob([datasetToTsv(d)], { type: "text/tab-separated-values" }));
+    const a = document.createElement("a"); a.href = url; a.download = d.id + ".tsv"; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  return (
+    <section className="cd-saved">
+      <h4>Saved datasets{server.datasets.length ? " (" + server.datasets.length + ")" : ""}</h4>
+      <p className="meta flush">
+        Shared with everyone who logs in (one shared login, no per-user permissions yet). A saved version never
+        changes; an analysis that uses one is pinned to it.
       </p>
-      <div className="row" style={{ alignItems: "center" }}>
-        <input type="file" accept=".tsv,.txt,.csv,text/plain,text/csv,text/tab-separated-values"
-          onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setText(await f.text()); if (!name) setName(f.name.replace(/\.[^.]+$/, "")); setParsed(null); setResolved(null); } }} />
-        <button className="linklike" onClick={() => { setText(EXAMPLE); setParsed(null); setResolved(null); }}>paste an example</button>
-      </div>
-      <textarea className="customdata-text" rows={8} spellCheck={false} value={text}
-        placeholder={EXAMPLE} onChange={(e) => { setText(e.target.value); setParsed(null); setResolved(null); }} />
-      <div className="row" style={{ alignItems: "center" }}>
-        <input type="text" placeholder="dataset name (e.g. Brain mets — curated)" value={name}
-          onChange={(e) => setName(e.target.value)} style={{ minWidth: "18rem" }} />
-        <button className="tbbtn" disabled={!text.trim() || busy} onClick={preview}>
-          {busy ? <><span className="spinner" /> matching ids…</> : "Preview"}
-        </button>
-        {(text || parsed) && <button className="linklike" onClick={reset}>clear</button>}
-      </div>
-      {err && <p className="error">{err}</p>}
-
-      {parsed && <>
-        <p className="meta" style={{ marginTop: "0.6rem" }}>
-          {parsed.rows.length.toLocaleString()} rows · id column <code>{parsed.idColumn}</code> → <b>{parsed.level}</b> level
-          {parsed.warnings.length > 0 && <> · {parsed.warnings.join("; ")}</>}
-        </p>
+      {server.datasets.length ? (
         <div className="attrtablewrap" style={{ maxHeight: "30vh" }}>
-          <table className="attrtable">
-            <thead><tr><th>Attribute</th><th>Type</th><th>Values</th><th>Distinct</th><th></th></tr></thead>
+          <table className="attrtable customlist">
+            <thead><tr><th>Dataset</th><th>Columns</th><th>Rows</th><th>Studies</th><th></th></tr></thead>
             <tbody>
-              {parsed.columns.map((c) => (
-                <tr key={c.name} style={{ cursor: "default" }}>
-                  <td><code>custom:…/{c.name}</code></td>
-                  <td>
-                    <select value={types[c.name] ?? c.datatype}
-                      onChange={(e) => setTypes((t) => ({ ...t, [c.name]: e.target.value as "STRING" | "NUMBER" }))}>
-                      <option value="STRING">categorical</option>
-                      <option value="NUMBER" disabled={c.datatype !== "NUMBER"}>numeric</option>
-                    </select>
-                  </td>
-                  <td className="meta">{c.filled.toLocaleString()} of {parsed.rows.length.toLocaleString()}</td>
-                  <td className="meta">{c.distinct.toLocaleString()}</td>
-                  <td className="meta">
-                    {c.datatype !== "NUMBER" && c.distinct > 50 && "many distinct values: free text charts poorly"}
-                    {c.looksLikeDate && "dates are kept as text"}
-                  </td>
-                </tr>
-              ))}
+              {server.datasets.map((d) => {
+                const v = d.versions.find((x) => x.version === d.latestVersion);
+                return (
+                  <tr key={d.id} style={{ cursor: "default" }}>
+                    <td><b>{d.name}</b> <span className="meta">custom:{d.slug} · {d.level} level · v{d.latestVersion}
+                      {d.versions.length > 1 ? " of " + d.versions.length : ""} · {new Date(d.updatedAt).toLocaleDateString()}</span></td>
+                    <td className="meta">{v?.columns.map((c) => c.name).join(", ")}</td>
+                    <td className="meta">{v?.rowCount.toLocaleString()} {d.level}s</td>
+                    <td className="meta">{v?.studies.join(", ")}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <button className="tbbtn" disabled={!!serverBusy} onClick={() => exportServer(d)}>Export</button>{" "}
+                      <button className="tbbtn" disabled={!!serverBusy} onClick={() => removeServer(d)}>Delete</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-      </>}
+      ) : <p className="meta">Nothing saved yet. <button className="linklike" onClick={onAdd}>Add data</button></p>}
+      {serverBusy && <p className="meta"><span className="spinner" /> {serverBusy}</p>}
+      {serverErr && <p className="error">{serverErr}</p>}
+    </section>
+  );
+}
 
-      {parsed && resolved && <div style={{ marginTop: "0.6rem" }}>
-        <p className="meta">
-          <b>{matchedRows.toLocaleString()} of {parsed.rows.length.toLocaleString()}</b> rows matched a {parsed.level} of {matchedStudies.join(", ")}
-          {resolved.multiStudy > 0 && <> · {resolved.multiStudy} ids exist in more than one study and apply to each</>}
-          {resolved.refused.length > 0 && <> · not matched against {resolved.refused.map((r) => r.study + " (" + r.reason + ")").join(", ")}</>}
+/**
+ * The Custom data dialog, opened on one of its tabs (`tab`), closed with null. Uploads match their
+ * ids against the explored studies (`studies`); `onChanged` re-runs Explore so a new or deleted
+ * dataset's attributes appear or go.
+ */
+export default function CustomDataManager({ tab, setTab, studies, onChanged }: {
+  tab: CustomDataTab | null; setTab: (t: CustomDataTab | null) => void; studies: string[]; onChanged: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement | null>(null);
+  const server = useCustomDataState();
+  const [added, setAdded] = useState<string | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (tab && !el.open) el.showModal();
+    if (!tab && el.open) el.close();
+    if (!tab) setAdded(null);
+  }, [tab]);
+  return (
+    <dialog ref={ref} className="addchartdialog customdatamanager" onClose={() => setTab(null)}
+      onClick={(e) => { if (e.target === ref.current) ref.current?.close(); }}>
+      <h3>Custom data</h3>
+      <div className="tabs">
+        <button className={tab === "add" ? "active" : ""} onClick={() => setTab("add")}>Add data</button>
+        <button className={tab === "manage" ? "active" : ""} onClick={() => setTab("manage")}>
+          Manage{server.unlocked && server.datasets.length ? " (" + server.datasets.length + ")" : ""}</button>
+      </div>
+      <div className="customdata">
+        <p className="note flush">
+          Your own annotations (a curated metastasis site, a field extracted from the record), used like any clinical
+          attribute: as a chart and filter in Explore, an oncoprint track or split, in comparisons and survival.
         </p>
-        {resolved.unmatched > 0 && <p className={rate < LOW_MATCH ? "error" : "customdrop"}>
-          <b>{resolved.unmatched.toLocaleString()} row{resolved.unmatched === 1 ? "" : "s"} will be dropped</b>: {resolved.unmatched === 1 ? "its id matches" : "their ids match"} no {parsed.level} in {matchedStudies.join(", ")}
-          {" "}(e.g. {unmatchedExamples.map((x) => <code key={x}>{x}</code>).reduce((a: React.ReactNode[], x, i) => i ? [...a, ", ", x] : [x], [])}).{" "}
-          <button className="linklike" onClick={downloadDropped}>download them</button>
-          {rate < LOW_MATCH && <> — are these {parsed.level === "patient" ? "sample" : "patient"} ids, or ids from another study?</>}
-        </p>}
-        {stale && <p className="error">The studies being explored changed since this preview. Preview again to match the ids against {studies.join(", ") || "the new selection"}.</p>}
-        <div className="row" style={{ alignItems: "center" }}>
-          {rate < LOW_MATCH && !confirmLow
-            ? <button className="tbbtn" disabled={!matchedRows || stale} onClick={() => setConfirmLow(true)}>Save anyway…</button>
-            : <button className="primary" disabled={!matchedRows || busy || stale} onClick={save}
-                title="stored on the server: anyone who logs in can read it, and analyses that use it can be shared">
-                Add {matchedRows.toLocaleString()} {parsed.level}s to {target}{serverBySlug(slugPreview) ? " (as v" + (serverBySlug(slugPreview)!.latestVersion + 1) + " of " + slugPreview + ")" : ""}</button>}
-        </div>
-      </div>}
-      </>}
-    </div>
+        {!server.enabled && <p className="meta">
+          This deployment does not store custom data: it has no login (<code>LOGIN_PASSWORD</code> is not set).
+          The gallery&apos;s custom-data example still runs, on demo data bundled with the app.</p>}
+        {server.enabled && !server.unlocked && (
+          <div className="cd-login">
+            <span>Custom data is stored on the server. Log in to add, see and use it.</span>
+            <button className="primary" onClick={requestLogin}>Log in</button>
+          </div>
+        )}
+        {server.unlocked && tab === "add" && <AddCustomData studies={studies}
+          onAdded={(name) => { setAdded(name); onChanged(); setTab("manage"); }} />}
+        {server.unlocked && tab === "manage" && <>
+          {added && <p className="cd-added">Added &ldquo;{added}&rdquo;. Its attributes are charted in Explore; choose which
+            under <b>+ Add chart → Custom data</b>.</p>}
+          <SavedCustomData onChanged={onChanged} onAdd={() => setTab("add")} />
+        </>}
+      </div>
+      <div className="row mt-3">
+        <span className="spacer" />
+        <button className="primary" onClick={() => ref.current?.close()}>Done</button>
+      </div>
+    </dialog>
   );
 }

@@ -301,6 +301,20 @@ export async function resolveIds(studies: string[], level: CustomLevel, ids: str
   return j;
 }
 
+const EXAMPLE_SITES = ["Brain", "Liver", "Lung", "Bone", "Primary only"];
+const EXAMPLE_KPS = [90, 80, 70, 100, 60, 80, 90, 70];
+
+/** An example upload for one study: a few of its own patients with a made-up metastasis site and
+ *  performance score, so it matches the study and can be added as it stands. */
+export async function exampleUpload(study: string): Promise<string> {
+  const res = await fetch("/api/custom-data/example?study=" + encodeURIComponent(study));
+  const j = await res.json() as { patients?: string[]; error?: string };
+  if (!res.ok || j.error) throw new Error(j.error || res.statusText);
+  if (!j.patients?.length) throw new Error(study + " has no patients to build an example from");
+  return ["PATIENT_ID\tMET_SITE\tKPS",
+    ...j.patients.map((id, i) => id + "\t" + EXAMPLE_SITES[i % EXAMPLE_SITES.length] + "\t" + EXAMPLE_KPS[i % EXAMPLE_KPS.length])].join("\n") + "\n";
+}
+
 export interface ResolveResponse { matches: { study: string; patient: string; sample?: string }[][]; unmatched: number; multiStudy: number; refused: { study: string; reason: string }[] }
 
 /** The parsed upload, matched to the studies, as a dataset ready to save. */

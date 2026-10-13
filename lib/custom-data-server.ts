@@ -7,7 +7,7 @@ import { requirePrincipal } from "./auth.ts";
 import { loadVersionForRequest } from "./custom-store.ts";
 import { chQueryRows, registerChExternal, withChContext, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
-import { studyRouting, instanceForStudy, resolverFor, isPatientLevel } from "./federation.ts";
+import { studyRouting, instanceForStudy, patientLevelConn, resolverFor, isPatientLevel } from "./federation.ts";
 import { studyProfiles } from "./analysis.ts";
 import { oncokbPin } from "./annotation.ts";
 import type { CohortDef } from "./types.ts";
@@ -141,6 +141,23 @@ export async function resolveCaseIds(studies: string[], level: "patient" | "samp
     return hits;
   });
   return { matches, unmatched, multiStudy, refused };
+}
+
+/** how many patients the upload panel's example data names */
+export const EXAMPLE_PATIENTS = 8;
+
+/**
+ * A few of a study's own patient ids, for the upload panel's example data: an example built from
+ * them matches the study, so it can be added as it stands. Patient-level studies only.
+ */
+export async function exampleCaseIds(study: string): Promise<string[]> {
+  if (peerForStudy(study)) throw new Error("example data cannot name patients of " + study + ": it is held by a remote peer");
+  const conn = await patientLevelConn(study, "example data names patients");
+  const r = await chQueryRows(
+    "SELECT DISTINCT patient_stable_id FROM " + conn.db + ".sample_derived\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + "\n" +
+    "ORDER BY patient_stable_id LIMIT " + EXAMPLE_PATIENTS, conn);
+  return (r.rows as string[][]).map((x) => x[0]);
 }
 
 /** a frozen feature marks every patient of the study, so it is bounded by what one upload may hold */

@@ -58,6 +58,8 @@ export function customStoreContract(backend: string): void {
       await deleteDataset(P, d.id);
       assert.ok(!(await listDatasets(P)).some((x) => x.id === d.id));
       await assert.rejects(readVersion(P, d.id, 1), /was deleted on \d{4}-\d{2}-\d{2}/);
+      // its name stays taken, so a link pinned to it cannot quietly read a newer upload
+      await assert.rejects(saveDataset(P, ds("gone"), {}), /belonged to a dataset that was deleted, and is not reused: rename/);
     });
 
     test("another principal can read nothing it was not granted", async () => {

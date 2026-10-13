@@ -13,6 +13,7 @@ import { armsFromSelection, editSplits, splitKey, type ChartKey } from "../../li
 import { DOC_VERSION } from "../../lib/doc-version.ts";
 import { saveToServer, customDataKey, featureFromCohort, type StoredDataset } from "./custom-data-client.ts";
 import type { AddCohortTarget } from "./add-cohort-dialog.tsx";
+import type { CustomDataTab } from "./custom-data-panel.tsx";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { useExplore, type ExploreAsk } from "./use-explore.ts";
 
@@ -53,11 +54,11 @@ export function useExploreState(page: ExplorePage) {
    * state it replaced, restored when it closes so the Explore tab is as the reader left it.
    */
   const [addMode, setAddMode] = useState<null | { ids: string[]; text: string; explore: ExploreAsk | null; target: AddCohortTarget }>(null);
-  // Explore → Custom data lives in the add-chart dialog, which exists only once Explore has
-  // facets; asked for from elsewhere (a banner, the data dialog) it opens when they arrive
-  const [wantCustomManager, setWantCustomManager] = useState(false);
+  /** the Custom data dialog's open tab, or null when it is closed */
+  const [customTab, setCustomTab] = useState<CustomDataTab | null>(null);
   /** Explore's save dialog is open, prefilled with this name */
   const [saving, setSaving] = useState<string | null>(null);
+  const [savingFeature, setSavingFeature] = useState<string | null>(null);
   /** Explore's "+ Add chart": clinical/gene/derived-timeline filter builders live
    *  here instead of as three permanent cards above the facet grid. */
   const addChartDialog = useRef<HTMLDialogElement | null>(null);
@@ -237,26 +238,23 @@ export function useExploreState(page: ExplorePage) {
     setTimeout(() => setExMsg(null), 3200);
   };
 
-  const openCustomManager = () => {
+  /** the Custom data dialog, over Explore: an upload is matched against the explored studies, and its charts land there */
+  const openCustomManager = (on: CustomDataTab = "manage") => {
     goTab("explore");
-    if (!explore) fetchExplore();
-    setChartTab("custom");
-    setWantCustomManager(true);
+    setCustomTab(on);
   };
-  useEffect(() => {
-    if (!wantCustomManager || tab !== "explore" || !explore || !addChartDialog.current) return;
-    if (!addChartDialog.current.open) addChartDialog.current.showModal();
-    setWantCustomManager(false);
-  }, [wantCustomManager, tab, explore]);
-  const saveDraftAsFeature = async () => {
+  const saveDraftAsFeature = () => {
+    if (!barDef()) { setExMsg("select at least one study first"); return; }
+    if (!canSave()) return;
+    setExMsg(null);
+    setSavingFeature(parseDraft() ? "explored cohort" : "selected studies");
+  };
+  const confirmSaveFeature = async (name: string) => {
     const def = barDef();
-    if (!def) { setExMsg("select at least one study first"); return; }
-    const name = window.prompt("Name this feature. Patients matching the current filters are Yes, every other patient of the selected studies No.",
-      parseDraft() ? "explored cohort" : "selected studies");
-    if (!name || !name.trim()) return;
+    if (!def) return;
     setExMsg("saving feature\u2026");
     try {
-      const d = await featureFromCohort(name.trim(), def, exSel.current);
+      const d = await featureFromCohort(name, def, exSel.current);
       await saveToServer(d);
       setExMsg(featureSaved(d) + " \u2014 charted below");
       fetchExplore();
@@ -528,6 +526,26 @@ export function useExploreState(page: ExplorePage) {
     exFetchTimer.current = setTimeout(() => fetchExplore(d.all!.length ? d : null, ids), 350);
   };
 
+  /** The study list's row actions, which act on that one study rather than on the staged set. */
+  const exploreStudy = (id: string) => {
+    setExDraftStudies(null);
+    setExPanelOpen(false);
+    setExploreStudies([id]);
+  };
+  /** A fresh analysis of the whole of one study, as Analyze does for the explored cohort. */
+  const analyzeStudy = (id: string) => {
+    setExMsg(null);
+    setStudy(id);
+    docs.replace({ dsl: DOC_VERSION, study: id, cohorts: { ["all of " + id]: draftScaffold([id]) }, views: [] });
+    setError(null);
+    goTab("analysis");
+  };
+  /** Explore one study and open Custom data → Add data on it: an upload matches its ids against the explored studies. */
+  const addDataToStudy = (id: string) => {
+    exploreStudy(id);
+    setCustomTab("add");
+  };
+
   // the creator's quick-add row needs the study catalog even before Explore is visited
   useEffect(() => {
     if (tab === "cohorts" && !explore && !exploreBusy && exStudies.length) fetchExplore(null);
@@ -559,7 +577,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, wantCustomManager, setWantCustomManager, saving, setSaving, addChartDialog, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exExtraDerived, setExExtraDerived, exExtraDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, hiddenAttrs, setHiddenAttrs, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, exploreEventTypes, treatmentEventType, EXTRA_DERIVED_KINDS, extraDerivedOn, toggleExtraDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartDialog, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exExtraDerived, setExExtraDerived, exExtraDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, hiddenAttrs, setHiddenAttrs, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, exploreEventTypes, treatmentEventType, EXTRA_DERIVED_KINDS, extraDerivedOn, toggleExtraDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;
