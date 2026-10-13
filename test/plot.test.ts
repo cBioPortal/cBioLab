@@ -4,7 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotBinsSql, plotBoxSql, plotCountSql,
   plotShape, plotStatsSql, plotTableSql, plotPointsSql, plotViolinSql, categoryColor, isAbsent,
-  tukey, validateAxis, CATEGORY_CAP, DEFAULT_BINS , coverageNote } from "../lib/plot.ts";
+  tukey, validateAxis, CATEGORY_CAP, DEFAULT_BINS , coverageNote, plotScatterPointsSql } from "../lib/plot.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
 
 const ctx = { study: "x", db: "db", unit: "sample" as const, cohortSql: "SELECT pid FROM p" };
@@ -224,4 +224,34 @@ test("an OQL axis is refused when its query is, and says which axis", () => {
 test("unaltered is absence: neutral, and never a ring", () => {
   assert.equal(isAbsent("Unaltered"), true);
   assert.equal(isAbsent("Altered"), false);
+});
+
+test("a box's outlier query keeps the values beyond their own group's whiskers, labels quoted", () => {
+  const numSel = "SELECT 1 AS id, 1 AS v", catSel = "SELECT 1 AS id, 'g' AS v";
+  const sql = plotPointsSql(numSel, catSel, "SELECT '' AS pid", 100, undefined, undefined,
+    [{ g: "Missense", loWhisker: 0.5, hiWhisker: 12 }, { g: "it's", loWhisker: -1, hiWhisker: 3 }]);
+  assert.match(sql, /indexOf\(\['Missense', 'it\\'s'\], gs\.v\)/, "a label is a quoted literal, never spliced");
+  assert.match(sql, /vs\.v < arrayElement\(\[0\.5, -1\]/);
+  assert.match(sql, /vs\.v > arrayElement\(\[12, 3\]/);
+  assert.match(sql, /WHERE indexOf\([^)]*\) > 0 AND/, "a group with no whiskers matches nothing");
+  assert.match(plotPointsSql(numSel, catSel, "SELECT '' AS pid", 100, undefined, undefined, []), /WHERE 0/);
+  assert.throws(() => plotPointsSql(numSel, catSel, "SELECT '' AS pid", 100, undefined, undefined,
+    [{ g: "A", loWhisker: NaN, hiWhisker: 1 }]), /finite/);
+});
+
+test("a scatter's sparse cells are binned exactly as its density is", () => {
+  const x = "SELECT 1 AS id, 1 AS v", y = "SELECT 1 AS id, 2 AS v";
+  const extent = { x0: 0, x1: 696, y0: 0, y1: 1 };
+  const bins = plotBinsSql(x, y, "SELECT '' AS pid", [240, 160], extent);
+  const pts = plotScatterPointsSql(x, y, "SELECT '' AS pid", 5000, { grid: [240, 160], extent, cellMax: 3 });
+  // the same cell expression on both sides, so a point is in a cell the density did not shade
+  for (const axis of ["x", "y"]) {
+    const expr = bins.match(new RegExp("least\\(\\d+, toUInt32\\(floor\\(\\(" + axis + " - [^\\n]*?\\)\\)\\)"))![0];
+    assert.ok(pts.includes(expr), axis + ": " + expr);
+  }
+  assert.match(pts, /HAVING count\(\) <= 3/);
+  assert.match(pts, /0 AS x0, 696 AS x1, 0 AS y0, 1 AS y1/);
+  assert.match(pts, /LIMIT 5001$/, "one past the cap, so an overflow is seen and refused rather than cut");
+  assert.throws(() => plotScatterPointsSql(x, y, "SELECT '' AS pid", 5000, { grid: [240, 160], extent, cellMax: 0 }), /cellMax/);
+  assert.throws(() => plotScatterPointsSql(x, y, "SELECT '' AS pid", 5000, { grid: [240, 160], extent: { ...extent, x1: Infinity }, cellMax: 2 }), /finite/);
 });

@@ -1,8 +1,9 @@
 // The plot view, from the aggregated contract: a density field for a scatter, boxes for a numeric
 // axis grouped by a categorical one, a shaded contingency for two categoricals.
 //
-// Nothing here has ever seen a point. The cells, the quartiles and the coefficients arrive already
-// computed, which is why the same picture draws for a hundred cases or four hundred thousand.
+// The cells, the quartiles and the coefficients arrive already computed, which is why the same
+// picture draws for a hundred cases or four hundred thousand. The only cases drawn one by one are
+// the points the engine chose (every case under the cap, the outliers over it), at most POINTS_CAP.
 import type { ViewResult } from "../types.ts";
 import type { PlotData } from "../plot.ts";
 import { isAbsent, jitterFor } from "../plot-draw.ts";
@@ -85,8 +86,17 @@ function scatter(v: ViewResult, d: PlotData, W: number, p: Pal): string {
   const cell = (b: { bx: number; by: number }, fill: string, opacity: number) =>
     `<rect x="${r1(L + b.bx * cw)}" y="${r1(T + PLOT - (b.by + 1) * ch)}" width="${r1(Math.max(cw, 0.8))}" ` +
     `height="${r1(Math.max(ch, 0.8))}" fill="${fill}" fill-opacity="${r1(opacity * 100) / 100}"/>`;
+  // Cells whose cases are drawn as points are not also shaded: every case, or the sparse
+  // cells (at most cellMax cases) the outlier points stand in for.
+  const ps = d.pointSet;
+  const shaded = ps?.rule === "all" && d.xyPoints?.length ? []
+    : ps?.rule === "outliers" && ps.cellMax ? d.bins!.filter((b) => b.n > ps.cellMax!) : d.bins!;
   // under highlights the plotted cohort is a floor-raised grey, so its faintest cells still read
-  for (const b of d.bins!) out.push(cell(b, base, hs.length ? 0.3 + 0.7 * shade(b.n) : shade(b.n)));
+  for (const b of shaded) out.push(cell(b, base, hs.length ? 0.3 + 0.7 * shade(b.n) : shade(b.n)));
+  const own = d.xyPoints || [];
+  const rOwn = Math.max(1.4, Math.min(3.4, 80 / Math.sqrt(Math.max(1, own.length))));
+  for (const pt of own)
+    out.push(`<circle cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${r1(rOwn)}" fill="${base}" fill-opacity="0.7"/>`);
   // a highlight too large to draw as points is cells on the same grid, shaded by its own densest cell
   for (const h of hs) if (h.shown === "density" && h.bins) {
     const hMax = Math.max(1, ...h.bins.map((b) => b.n));
@@ -108,7 +118,9 @@ function scatter(v: ViewResult, d: PlotData, W: number, p: Pal): string {
   let y = T + PLOT + bottomAxisHeight(xTitle) + 8;
   const hk = highlightItems(d);
   if (hk.length) { const lg = legend(hk, 8, y, W - 16, p, { title: "highlighted" }); out.push(lg.svg); y += lg.height + 4; }
-  const cap = caption((v.note ? v.note + "  " : "") + "Darker is more " + (d.n > 1 ? "cases" : "case") + "; the shade is logarithmic." +
+  const cap = caption((v.note ? v.note + "  " : "") + (shaded.length
+    ? "Darker is more " + (d.n > 1 ? "cases" : "case") + "; the shade is logarithmic." + (own.length ? " Each dot is one case." : "")
+    : "Each dot is one case.") +
     (st && st.slope != null ? " The dashed line is the least-squares fit over every case." : ""), W, y, p.muted);
   return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, false, "Plot — " + yTitle + " against " + xTitle);
 }
@@ -123,7 +135,13 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
   const numAxis = d.x.kind === "num" ? d.x : d.y, catAxis = d.x.kind === "num" ? d.y : d.x;
   const numTitle = axisTitle(numAxis), catTitle = axisTitle(catAxis);
   const T = 12, R = 16, PLOT = plotHeight(W0);
-  const lo = Math.min(...gs.map((g) => g.loWhisker)), hi = Math.max(...gs.map((g) => g.hiWhisker));
+  // The axis spans the whiskers and the points beyond them, but reaches at most one whisker
+  // span further each way: one TMB of 570 would otherwise flatten every box to a line. A point
+  // past that is pinned to the frame's edge as a triangle and counted in the caption.
+  const ptVals = (d.points || []).map((pt) => pt.v);
+  const wLo = Math.min(...gs.map((g) => g.loWhisker)), wHi = Math.max(...gs.map((g) => g.hiWhisker));
+  const wSpan = Math.max(1e-9, wHi - wLo);
+  const lo = Math.max(Math.min(wLo, ...ptVals), wLo - wSpan), hi = Math.min(Math.max(wHi, ...ptVals), wHi + wSpan);
   // the whiskers' own range, padded a little, with round ticks inside it: rounding the ends out
   // would stretch a −1 whisker into an empty band down to −20
   const pad = (hi - lo) * 0.03 || 1;
@@ -174,7 +192,13 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
   const otherLabel = (n: number, noValue: boolean) =>
     "other (" + [n ? n + " more categor" + (n === 1 ? "y" : "ies") : "", noValue ? "no value" : ""].filter(Boolean).join(", ") + ")";
   const vBins = d.violinBins || 40;
-  let offScale = 0;
+  let offScale = 0, ptOffScale = 0;
+  /** a value off the axis: a triangle at the frame's edge pointing the way it lies */
+  const edgeMark = (px: number, up: boolean, r: number, fill: string) => {
+    const ty = up ? T + 1 : T + PLOT - 1, k = r * 1.3;
+    return `<path d="M${r1(px - k)} ${r1(up ? ty + k * 1.6 : ty - k * 1.6)} L${r1(px + k)} ${r1(up ? ty + k * 1.6 : ty - k * 1.6)} ` +
+      `L${r1(px)} ${r1(ty)} Z" fill="${fill}" stroke="${p.bg}" stroke-width="0.5"/>`;
+  };
   const inAxis = (val: number) => Math.max(vlo, Math.min(vhi, val));
 
   gs.forEach((g, i) => {
@@ -184,13 +208,15 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
       // a bin stands for a range of VALUES, mapped through the extent the bins were cut over
       const [vx0, vx1] = d.violinExtent || [lo, hi];
       const binW = (vx1 - vx0) / vBins;
+      // with the outliers drawn as points, the density stops at this group's whiskers
+      const [cLo, cHi] = d.pointSet?.rule === "outliers" ? [g.loWhisker, g.hiWhisker] : [vlo, vhi];
       for (const [b, byClass] of cells) {
         const vLo = vx0 + b * binW, vHi = vLo + binW;
-        if (vHi < vlo || vLo > vhi) continue;
+        if (vHi < cLo || vLo > cHi) continue;
         const total = [...byClass.values()].reduce((a, n) => a + n, 0);
         const w = half * 1.6 * Math.sqrt(total / (vioMax.get(g.g) || 1));
-        const yTop = ys(Math.min(vhi, vHi));
-        const step = Math.max(1.2, ys(Math.max(vlo, vLo)) - yTop);
+        const yTop = ys(Math.min(cHi, vHi));
+        const step = Math.max(1.2, ys(Math.max(cLo, vLo)) - yTop);
         if (!colorKey.length) {
           out.push(`<rect x="${r1(cx - w)}" y="${r1(yTop)}" width="${r1(w * 2)}" height="${r1(step)}" fill="${base}" fill-opacity="0.28"/>`);
           continue;
@@ -206,12 +232,17 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
         }
       }
     }
-    if (d.overlay === "points" && byGroup.has(g.g)) {
+    if (byGroup.has(g.g)) {
       // two encodings on one dot need a dot big enough to carry them; a crowded plot gets smaller ones
       const rBase = Math.max(1.4, Math.min(4.5, 90 / Math.sqrt(Math.max(1, d.points!.length))));
       for (const pt of byGroup.get(g.g)!) {
         const fill = pt.c != null && colorKey.length ? fillOf(pt.c) : base;
         const ring = pt.r != null && !isAbsent(pt.r) ? ringOf(pt.r) : null;
+        if (pt.v > vhi || pt.v < vlo) {
+          ptOffScale++;
+          out.push(edgeMark(cx + jitterFor(pt.id) * half * 0.9, pt.v > vhi, rBase, fill));
+          continue;
+        }
         out.push(`<circle cx="${r1(cx + jitterFor(pt.id) * half * 0.9)}" cy="${r1(ys(pt.v))}" ` +
           `r="${r1(ring ? rBase * 1.25 : rBase)}" fill="${fill}" fill-opacity="0.85"` +
           (ring ? ` stroke="${ring}" stroke-width="${r1(Math.max(0.6, rBase * 0.28))}"` : "") + `/>`);
@@ -241,9 +272,7 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
         const px = cx + jitterFor(pt.id) * half * 0.9;
         if (pt.v > vhi || pt.v < vlo) {
           offScale++;
-          const up = pt.v > vhi, ty = up ? T + 1 : T + PLOT - 1, k = rH * 1.3;
-          out.push(`<path d="M${r1(px - k)} ${r1(up ? ty + k * 1.6 : ty - k * 1.6)} L${r1(px + k)} ${r1(up ? ty + k * 1.6 : ty - k * 1.6)} ` +
-            `L${r1(px)} ${r1(ty)} Z" fill="${h.color}" stroke="${p.bg}" stroke-width="0.5"/>`);
+          out.push(edgeMark(px, pt.v > vhi, rH, h.color));
           continue;
         }
         out.push(`<circle cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${r1(rH)}" fill="${h.color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`);
@@ -281,6 +310,8 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
     (d.overlay === "points" ? " Every value is drawn over its box; the jitter is fixed per case."
       : d.overlay === "violin" ? " The shaded width is the share of that group's values sitting at that height, scaled per group."
       : "") +
+    (ptOffScale ? " " + fmtInt(ptOffScale) + " value" + (ptOffScale === 1 ? " lies" : "s lie") + " more than a whisker span" +
+      " past the whiskers and " + (ptOffScale === 1 ? "is" : "are") + " drawn as a triangle at the frame's edge." : "") +
     (offScale ? " " + fmtInt(offScale) + " highlighted value" + (offScale === 1 ? " lies" : "s lie") +
       " beyond the axis and " + (offScale === 1 ? "is" : "are") + " drawn as a triangle at the frame's edge." : ""), W, y, p.muted);
   return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, W > W0, "Plot — " + numTitle + " by " + catTitle);

@@ -32,6 +32,10 @@ function fake(mode: "patient-level" | "aggregate-only", calls: Calls, o: {
     plotHighlightBoxRows: async () => { calls.push("boxRows"); return o.boxRows || [{ g: "A", n: 7, lo: 1, hi: 9, q1: 3, median: 5, q3: 7 }]; },
   };
   // the case-level method exists only where the entitlement does, exactly as on the real resolvers
+  if (mode === "patient-level") {
+    r.plotScatterPoints = async () => [{ id: "P1", x: 10, y: 5 }];
+    r.plotPoints = async () => [{ id: "P1", g: "A", v: 5 }];
+  }
   if (mode === "patient-level")
     r.plotHighlightPoints = async (_d: unknown, _h: unknown, _s: unknown, _xk: unknown, _yk: unknown, cap: number) => {
       calls.push("points cap=" + cap);

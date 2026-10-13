@@ -3,7 +3,7 @@
 import type { PlotView, ViewResult } from "../types.ts";
 import { pearsonFromMoments, regressionFromMoments, type Moments } from "../stats.ts";
 import { isPatientLevel, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable } from "../federation.ts";
-import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, HIGHLIGHT_CAP, HIGHLIGHT_COLORS, tukey, coverageNote,
+import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, HIGHLIGHT_CAP, HIGHLIGHT_COLORS, OUTLIER_CELL_MAX, tukey, coverageNote, sparseCellMax,
   type PlotData, type PlotGroup, type PlotHighlight, type PlotRequest } from "../plot.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
 
@@ -114,6 +114,87 @@ function highlightNote(hs: PlotHighlight[], unit: "patient" | "sample"): string 
     (hs.some((h) => h.shown !== "none") ? " The statistics are over the whole plotted cohort." : "");
 }
 
+/**
+ * The cases a single-study plot draws as points, set on `data`, and the sentence its caption says
+ * about them. At or under POINTS_CAP every case is a point. Over it the crowd stays density and
+ * the outliers are points: on a box the values beyond each group's whiskers (over a violin), on
+ * a scatter the cases in cells of at most `cellMax` (the cells the figure then leaves unshaded).
+ * Points come only from a participant entitled to see cases — isPatientLevel is a type guard,
+ * so asking an aggregate-only one is a compile error rather than a review catch.
+ */
+async function pointLayer(pv: PlotView, r0: Resolver, def: ViewRun["doc"]["cohorts"][string], spec: PlotRequest,
+  data: PlotData, unit: "patient" | "sample", site: string): Promise<string | undefined> {
+  const f = (n: number) => n.toLocaleString("en-US");
+  const cases = (n: number) => f(n) + " " + unit + (n === 1 ? "" : "s");
+  if (data.shape === "table" || !data.n) return undefined;
+  const none = (why: string) => { data.pointSet = { rule: "none", drawn: 0, why }; };
+  const densityNote = data.shape === "scatter"
+    ? "Drawn as density: " + cases(data.n) + " counted into " + f((data.bins || []).length) + " cells. The coefficients are over every " +
+      unit + ", not over what you can see."
+    : "Drawn as a density per group: " + f(data.n) + " values is past what a cloud of dots can show, and the quartiles are over every one of them.";
+  if (pv.points === false) { none("points: false"); return data.n > POINTS_CAP ? densityNote : undefined; }
+  if (!isPatientLevel(r0)) {
+    none(site + " may not show individual cases");
+    return densityNote + " No case is drawn as a point: " + site + " may not show individual cases.";
+  }
+  const colourKey = (pts: { c?: string; r?: string }[]) => {
+    if (pv.colorBy) data.legend = legendFor(pts.map((x) => x.c || ""));
+    if (pv.ringBy) data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true)];
+  };
+
+  if (data.shape === "box") {
+    const all = data.n <= POINTS_CAP ? await r0.plotPoints(def, spec) : null;
+    if (all && all.length) {
+      data.points = all; data.overlay = "points";
+      data.pointSet = { rule: "all", drawn: all.length };
+      colourKey(all);
+      return undefined;
+    }
+    const groups = data.groups || [];
+    const outliers = await r0.plotPoints(def, spec, POINTS_CAP, groups);
+    if (!outliers) {
+      none("more than " + f(POINTS_CAP) + " values lie beyond the whiskers");
+      return densityNote + " More than " + f(POINTS_CAP) + " values lie beyond the whiskers, too many to draw as points.";
+    }
+    data.points = outliers;
+    data.pointSet = { rule: "outliers", drawn: outliers.length };
+    // the key describes what is drawn: the violin's classes, and any the outliers add
+    if (pv.colorBy || pv.ringBy) {
+      const fromViolin = data.legend || [];
+      colourKey(outliers);
+      const fromPoints = data.legend || [];
+      data.legend = [...fromViolin, ...fromPoints.filter((k) => !fromViolin.some((v) => v.label === k.label && !!v.ring === !!k.ring))];
+    }
+    return densityNote + " " + (outliers.length
+      ? f(outliers.length) + " value" + (outliers.length === 1 ? "" : "s") + " beyond the whiskers " +
+        (outliers.length === 1 ? "is" : "are") + " drawn as points."
+      : "No value lies beyond the whiskers.");
+  }
+
+  if (data.n <= POINTS_CAP) {
+    const all = await r0.plotScatterPoints(def, spec);
+    if (all && all.length) {
+      data.xyPoints = all;
+      data.pointSet = { rule: "all", drawn: all.length };
+      return undefined;
+    }
+  }
+  if (!data.bins || !data.grid || !data.extent) return densityNote;
+  const cellMax = sparseCellMax(data.bins, POINTS_CAP, OUTLIER_CELL_MAX);
+  if (!cellMax) {
+    const lone = data.bins.reduce((a, b) => b.n === 1 ? a + b.n : a, 0);
+    none(f(lone) + " " + unit + "s sit alone in a cell, more than the " + f(POINTS_CAP) + " a figure draws as points");
+    return densityNote + " " + f(lone) + " " + unit + "s sit alone in a cell, more than the " + f(POINTS_CAP) +
+      " drawn as points, so none is.";
+  }
+  const pts = await r0.plotScatterPoints(def, spec, POINTS_CAP, { grid: data.grid, extent: data.extent, cellMax });
+  if (!pts) { none("the sparse cells hold more than " + f(POINTS_CAP) + " cases"); return densityNote; }
+  data.xyPoints = pts;
+  data.pointSet = { rule: "outliers", drawn: pts.length, cellMax };
+  return densityNote + " " + cases(pts.length) + " in cells holding at most " + cellMax + " " +
+    (pts.length === 1 ? "is" : "are") + " drawn as points; the other " + cases(data.n - pts.length) + " as shaded cells.";
+}
+
 export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor } = c;
   const pv = view as PlotView;
@@ -130,29 +211,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
     if (sites.length === 1) {
       const r0 = resolvers[sites[0]];
       const data = await r0.plot(doc.cohorts[cn], { ...spec, bins: pv.bins ? bins : undefined });
-      // The points behind a box come only from a participant entitled to see cases, and only
-      // when there are few enough to be a drawing. isPatientLevel is a type guard, so asking an
-      // aggregate-only participant for them is a compile error rather than a review catch.
-      if (data.shape === "box" && pv.points !== false && isPatientLevel(r0)) {
-        const pts = await r0.plotPoints(doc.cohorts[cn], spec);
-        if (pts.length) {
-          data.points = pts;
-          data.overlay = "points";
-          // the key describes what is drawn, so it is built from the points themselves
-          if (pv.colorBy) data.legend = legendFor(pts.map((x) => x.c || ""));
-          if (pv.ringBy) data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true)];
-        }
-      }
-      const shapeNote = data.shape === "box" && data.overlay === "violin"
-          ? "Drawn as a density per group: " + data.n.toLocaleString("en-US") + " values is past what a cloud of dots can show, " +
-            "and the quartiles are over every one of them."
-          : data.shape === "box" && data.overlay === "points"
-          ? "Every value is drawn over its box; the jitter is fixed per case, so the figure does not move between renderings."
-          : data.shape === "scatter" && data.n > 5000
-          ? "Drawn as density: " + data.n.toLocaleString("en-US") + " " + (unit === "sample" ? "samples" : "patients") +
-            " counted into " + (data.bins || []).length.toLocaleString("en-US") + " cells. The coefficients are over every " +
-            (unit === "sample" ? "sample" : "patient") + ", not over what you can see."
-          : undefined;
+      const shapeNote = await pointLayer(pv, r0, doc.cohorts[cn], spec, data, unit, sites[0]);
       const hs = await highlightLayers(pv, data, c, cn, sites, spec);
       if (hs.length) data.highlights = hs;
       // what the pair left out leads: cases missing either axis are not on the figure at all
@@ -251,7 +310,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
         if (pv.points !== false) {
           const perSite = await Promise.all(sites.map((s) =>
             isPatientLevel(resolvers[s]) ? resolvers[s].plotPoints(doc.cohorts[cn], spec) : Promise.resolve([])));
-          const pts = perSite.flat();
+          const pts = perSite.every((p) => p) ? perSite.flatMap((p) => p!) : [];
           if (pts.length && pts.length <= POINTS_CAP) {
             data.points = pts; data.overlay = "points";
             if (pv.colorBy) data.legend = legendFor(pts.map((x) => x.c || ""));
