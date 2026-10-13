@@ -1,3 +1,47 @@
+/* Tailwind, alongside the stylesheet below while the app moves onto it. Tailwind's preflight
+   (its base reset) is left out: this file's own base rules are the base. Everything this file
+   declares sits in the `legacy` layer, ordered below `utilities`, so a Tailwind class on an
+   element always wins over a legacy rule that also reaches it (unlayered CSS would beat every
+   layer, whatever its specificity). */
+@layer theme, base, legacy, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* The theme is the scale below and nothing else: Tailwind's own palette, type sizes, radii and
+   fonts are cleared, so a class off the scale does not exist rather than quietly working. `inline`
+   makes each utility read the variable itself, so the dark-scheme overrides reach it. */
+@theme inline {
+  --color-*: initial;
+  --color-page: var(--page); --color-paper: var(--paper); --color-card: var(--card);
+  --color-ink: var(--ink); --color-muted: var(--muted);
+  --color-accent: var(--accent); --color-accent-ink: var(--accent-ink); --color-accent-soft: var(--accent-soft);
+  --color-line: var(--line); --color-code-bg: var(--code-bg); --color-mark: var(--mark); --color-mark-soft: var(--mark-soft);
+  --color-ok: var(--ok); --color-ok-soft: var(--ok-soft); --color-err: var(--err); --color-err-soft: var(--err-soft);
+  --color-amp: var(--amp); --color-del: var(--del);
+  --color-white: #fff; --color-transparent: transparent; --color-current: currentColor;
+
+  --text-*: initial;
+  --text-xs: var(--t-xs); --text-sm: var(--t-sm); --text-md: var(--t-md); --text-base: var(--t-base);
+  --text-lg: var(--t-lg); --text-xl: var(--t-xl); --text-2xl: var(--t-2xl);
+
+  /* Spacing is the seven steps, numbered as this file's own helpers number them (.mt-2 is --s2):
+     1–6 are --s1…--s6, 0.5 is --s0, 0 is zero. Tailwind's 0.25rem multiples are cleared. */
+  --spacing: initial;
+  --spacing-0: 0; --spacing-px: 1px; --spacing-0_5: var(--s0);
+  --spacing-1: var(--s1); --spacing-2: var(--s2); --spacing-3: var(--s3);
+  --spacing-4: var(--s4); --spacing-5: var(--s5); --spacing-6: var(--s6);
+  --spacing-ctl: var(--ctl-h);
+
+  --radius-*: initial;
+  --radius-sm: var(--r-sm); --radius-md: var(--r-md); --radius-lg: var(--r-lg); --radius-pill: var(--r-pill);
+
+  --font-*: initial;
+  --font-sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "IBM Plex Serif", Georgia, serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+@layer legacy {
 :root {
   --page: #eef2f5; --paper: #fafbfc; --card: #ffffff; --ink: #1f2933; --muted: #5b6b76;
   --accent: #0f86a1; --accent-ink: #0b6478; --accent-soft: #e3f0f3;
@@ -454,8 +498,8 @@ details.gearmenu[open] > .tbbtn { border-color: var(--accent); color: var(--acce
 
 /* Explore: data-types rows */
 .generow.dtrow { grid-template-columns: minmax(6rem, 1fr) minmax(6rem, 1.4fr) minmax(3rem, 1.2fr) 6rem; }
-.generow.dtrow.static { cursor: default; }
-.generow.dtrow.static:hover { background: none; }
+.generow.dtrow.is-static { cursor: default; }
+.generow.dtrow.is-static:hover { background: none; }
 /* Selected, not just hovered: a flat accent tint flush with the row above and
    below it, not a boxed, rounded outline — this is a dense list, not a card. */
 .generow.dtrow.on { background: var(--accent-soft); border-radius: 0; }
@@ -632,7 +676,7 @@ label.dlgsection { display: block; }
 .extag:hover { background: var(--code-bg); }
 .extag.on { background: var(--accent-ink); border-color: var(--accent-ink); color: var(--bg); }
 .extag.on .meta { color: var(--bg); opacity: 0.8; }
-.extag.static { cursor: default; }
+.extag.is-static { cursor: default; }
 .vkind {
   font-size: var(--t-xs); padding: 0.1rem 0.45rem; border-radius: var(--r-pill); white-space: nowrap;
   background: color-mix(in oklab, var(--accent-ink) 16%, transparent); color: var(--accent-ink);
@@ -834,21 +878,21 @@ label.dlgsection { display: block; }
 /* A gear that sits next to the card title rather than at the far right of the
    header. The panel is anchored to the LEFT edge here — the default right:0
    would open it leftward, off the side of the card. */
-.gearmenu.inline { margin-left: 0.4rem; }
-.gearmenu.inline > .gearmenu-items { right: auto; left: 0; top: 1.9rem; }
+.gearmenu.gm-inline { margin-left: 0.4rem; }
+.gearmenu.gm-inline > .gearmenu-items { right: auto; left: 0; top: 1.9rem; }
 
 /* The inline gear reads as a text link rather than an icon: it sits in the
    run of the card title, where a lone glyph is easy to miss and says nothing
    about what it opens. Sized and baselined to sit quietly beside the heading,
    not to compete with it. */
-.gearmenu.inline > summary {
+.gearmenu.gm-inline > summary {
   font-size: var(--t-md); font-weight: 500; letter-spacing: 0.01em;
   color: var(--accent-ink); padding: 0 0.1rem;
   text-decoration: underline; text-decoration-style: dotted;
   text-underline-offset: 0.18em;
 }
-.gearmenu.inline > summary:hover,
-details.gearmenu.inline[open] > summary {
+.gearmenu.gm-inline > summary:hover,
+details.gearmenu.gm-inline[open] > summary {
   color: var(--accent-ink); background: none;
   text-decoration-style: solid;
 }
@@ -1690,7 +1734,7 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .dt-filter input[type=number] { width: 6.5rem; }
 .dt-values { max-height: 14rem; overflow-y: auto; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: var(--s1) 0; }
 .dt-values label { display: flex; gap: var(--s2); align-items: baseline; padding: 1px 0; cursor: pointer; }
-.dt-values .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.dt-values .dt-grow { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
 .dt-values .n { font-variant-numeric: tabular-nums; color: var(--muted); }
 .dt-values .mono, .dt-table .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
 .dt-chips { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; font-size: var(--t-sm); }
@@ -1826,3 +1870,4 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .dt-table tr.dt-pick:hover td { background: var(--code-bg); }
 .dt-table tr.dt-pick.sel td { background: var(--accent-soft); }
 .cohortsum-skel { display: inline-block; width: 4rem; height: 0.9rem; }
+} /* @layer legacy */

@@ -898,7 +898,7 @@ export function DataTypes({ ctx }: { ctx: ExploreCtx }) {
                 title={"click to require " + t + " data (profiled clause)"}
                 onClick={() => addClause({ kind: "profiled", type: t })}>{row}</button>
             ) : (
-              <div key={dt.profile} className="generow dtrow static"
+              <div key={dt.profile} className="generow dtrow is-static"
                 title="no membership filter for this data type in the DSL — shown for completeness">{row}</div>
             );
           });

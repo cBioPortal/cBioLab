@@ -239,7 +239,7 @@ function FilterMenu({ col, current, vi, docJson, table, onApply }: {
         {shown.map((x) => (
           <label key={x.value} className="meta">
             <input type="checkbox" checked={isOn(x.value)} onChange={() => toggle(x.value)} />
-            <span className="grow">{x.value === "" ? <i>(blank)</i> : x.value}</span>
+            <span className="dt-grow">{x.value === "" ? <i>(blank)</i> : x.value}</span>
             <span className="n">{x.n.toLocaleString()}</span>
           </label>))}
       </div>
@@ -272,7 +272,7 @@ function ColumnsMenu({ columns, shown, onShown }: { columns: { id: string; name:
         {columns.filter(match).map((c) => (
           <label key={c.id} className="meta">
             <input type="checkbox" checked={shown.includes(c.id)} disabled={shown.length === 1 && shown.includes(c.id)} onChange={() => toggle(c.id)} />
-            <span className="grow">{c.name}</span>
+            <span className="dt-grow">{c.name}</span>
             {c.name !== c.id && <span className="n mono">{c.id}</span>}
           </label>))}
       </div>

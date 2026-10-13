@@ -58,7 +58,7 @@ export function ExamplesTab({ tag, onTag, busy, onRun, link, onError }: {
               <h3>{ex.title}</h3>
               <div className="extags small">
                 {kinds.map(k => <span key={k} className="vkind">{k}</span>)}
-                {(ex.tags || []).filter(t => !kinds.includes(t)).map(t => <span key={t} className="extag static">{t}</span>)}
+                {(ex.tags || []).filter(t => !kinds.includes(t)).map(t => <span key={t} className="extag is-static">{t}</span>)}
               </div>
               {ex.demonstrates && <p className="exdem">{ex.demonstrates}</p>}
               {ex.customData?.length ? <p className="meta flush">

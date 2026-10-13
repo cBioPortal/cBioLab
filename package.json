@@ -43,6 +43,7 @@
   "type": "module",
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.0",
     "@types/pg": "^8.23.1",
@@ -51,6 +52,8 @@
     "pixelmatch": "^7.2.0",
     "playwright": "1.62.1",
     "pngjs": "^7.0.0",
+    "postcss": "^8.5.30",
+    "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
   }
 }

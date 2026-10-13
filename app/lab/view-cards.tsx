@@ -808,7 +808,7 @@ function SequenceCard({ ctx, v, vi }: CardProps) {
             menuId={"pick:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} onAdd={() => openCohortChooser(vi)}
             onChange={(next) => setViewCohorts(vi, next, cohortChoice(vi, docView(vi)).all)} />
         {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
-          <details className="gearmenu inline">
+          <details className="gearmenu gm-inline">
             <summary title="treatment sequence options">settings</summary>
             {/* Label granularity is the choice that most changes this chart, and
                 the keys are not interchangeable: in MSK-CHORD SUBTYPE has 10
@@ -870,7 +870,7 @@ function CourseCard({ ctx, v, vi }: CardProps) {
           <CohortPicker nodes={cohortChoice(vi, docView(vi)).nodes} chosen={cohortChoice(vi, docView(vi)).chosen} busy={busy}
             menuId={"pick:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} onAdd={() => openCohortChooser(vi)}
             onChange={(next) => setViewCohorts(vi, next, cohortChoice(vi, docView(vi)).all)} />
-        <details className="gearmenu inline">
+        <details className="gearmenu gm-inline">
           <summary title="clinical course options">settings</summary>
           {/* Every parameter of this chart is a choice, and the defaults are only a
             guess at a good one — so all of them are settable. They live behind
