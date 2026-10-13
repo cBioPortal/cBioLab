@@ -721,10 +721,15 @@ async function main() {
       let basis = { types: 0, changed: false, truncated: false, anchor: null };
       try {
         await page.waitForSelector(".basis", { timeout: 300000 });
-        await page.waitForFunction(() => document.querySelectorAll(".basis select")[1]?.options.length > 2, null, { timeout: 180000 });
-        basis.types = await page.locator(".basis select").nth(1).locator("option").count();
         const before = await page.locator(".logrank").innerText();
-        await page.locator(".basis select").nth(1).selectOption("Treatment");
+        // the second control is what the clock starts from; its options arrive with the study's catalog
+        await page.locator(".basis [role=combobox]").nth(1).click();
+        await page.waitForFunction(() => {
+          const opts = [...document.querySelectorAll("[role=option]")];
+          return opts.length > 2 && !opts.some((o) => /loading/.test(o.textContent || ""));
+        }, null, { timeout: 180000 });
+        basis.types = await page.getByRole("option").count();
+        await page.getByRole("option", { name: "Treatment", exact: true }).click();
         await page.waitForFunction(() => document.querySelector(".trunc") !== null, null, { timeout: 300000 });
         await page.waitForFunction((b) => {
           const el = document.querySelector(".logrank");

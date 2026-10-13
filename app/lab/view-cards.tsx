@@ -12,7 +12,18 @@ import type { AnalysisDoc, AnalysisResult, OncoprintView, ExploreResult, KmCurve
 import { survivalAxis } from "../../lib/stats.ts";
 import { MethodPanel } from "./method-panel.tsx";
 import { AxisPicker, HighlightPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, CAT_COLORS, Participation, ServerSvg, ViewFigure } from "./view-chrome.tsx";
+import { ArrowLeftRight, Plus, Settings2, X } from "lucide-react";
+import { Button } from "../_ui/button";
+import { Checkbox } from "../_ui/checkbox";
+import { Input } from "../_ui/input";
+import { cn } from "../../lib/cn";
+import { Choice } from "./choice.tsx";
+import { GearMenu, MenuSeparator } from "./gear-menu.tsx";
 
+/** a button in a view toolbar, at the toolbar's control height */
+const TB = "h-ctl gap-1 px-2 text-md font-normal shadow-none";
+/** an option among several: an outline chip, filled while chosen */
+const CHIP = "rounded-pill px-2.5 text-sm font-normal aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:font-semibold aria-pressed:text-accent-foreground";
 
 type ResultView = AnalysisResult["views"][number];
 type ViewChoice = NonNullable<React.ComponentProps<typeof ViewHead>["cohorts"]>;
@@ -163,18 +174,16 @@ function CovariateList({ covariates, ratio, observedLevels, busy, attrs, profile
               profiles={profiles} loading={loading} busy={busy}
               onChange={(next) => onChange(ci, next)} />
             {levels.length > 1 && <label className="tbfield" title={(ratio === "hazard" ? "the level a hazard ratio" : "the level an odds ratio") + " is measured against; unset uses this covariate's default (mutated/not always compares against 'Not mutated', other categoricals use whichever level is most frequent)"}>
-              ref <select value={c.reference && levels.includes(c.reference) ? c.reference : ""} disabled={busy}
-                onChange={e => onChange(ci, { ...c, reference: e.target.value || undefined })}>
-                <option value="">(default)</option>
-                {levels.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
+              ref <Choice size="ctl" value={c.reference && levels.includes(c.reference) ? c.reference : ""} disabled={busy}
+                onChange={v => onChange(ci, { ...c, reference: v || undefined })}
+                options={[["", "(default)"], ...levels.map(l => [l, l] as const)]} />
             </label>}
-            <button type="button" className="tbbtn" disabled={busy} title="remove this covariate"
-              onClick={() => onRemove(ci)}>remove</button>
+            <Button type="button" variant="outline" size="sm" className={TB} disabled={busy} title="remove this covariate"
+              onClick={() => onRemove(ci)}><X />remove</Button>
           </span>
         );
       })}
-      <button type="button" className="tbbtn covadd" disabled={busy} onClick={onAdd}>+ add covariate</button>
+      <Button type="button" variant="outline" size="sm" className={cn(TB, "covadd")} disabled={busy} onClick={onAdd}><Plus />add covariate</Button>
     </div>
   );
 }
@@ -248,7 +257,7 @@ function CompareCard({ ctx, v, vi }: CardProps) {
   return <>
     {v.kind === "compare" && v.rows && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} {...placement(ctx, vi)}
-        actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
+        actions={<Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>} />
       {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
         style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
       <div className="vscroll">
@@ -292,7 +301,7 @@ function HotspotsCard({ ctx, v, vi }: CardProps) {
   return <>
     {v.kind === "hotspots" && v.hotspots && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi), 1)} sub="lollipop by protein position, as the portal's mutation tab draws it" {...placement(ctx, vi)}
-        actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
+        actions={<Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>} />
       {/* the plot from the same renderer MCP uses (lib/view-svg.ts), with the gene summary and the
           alteration grid beside it as controls; the grid's selection re-runs nothing */}
       <HotspotsBody v={v} hide={docView(vi).hide} onHide={(h) => updateViewLocal(vi, (vv: any) => {
@@ -308,14 +317,11 @@ function CoexpressionCard({ ctx, v, vi }: CardProps) {
     {v.kind === "coexpression" && v.coexpression && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi), 1)} sub="Pearson correlation from per-site sums" {...placement(ctx, vi)}
         actions={<>
-          <label className="tbfield" title="the molecular profile the correlation is computed over">profile <select
-            value={docView(vi).profileType || ""} disabled={busy}
-            onChange={(e) => updateView(vi, (vv: any) => ({ ...vv, profileType: e.target.value }))}>
-            {!((explore && explore.profiles) || []).includes(docView(vi).profileType || "") &&
-              <option value={docView(vi).profileType || ""}>{docView(vi).profileType || "(none)"}</option>}
-            {((explore && explore.profiles) || []).map((pt: string) => <option key={pt} value={pt}>{pt}</option>)}
-          </select></label>
-          <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
+          <label className="tbfield" title="the molecular profile the correlation is computed over">profile <Choice size="ctl"
+            value={docView(vi).profileType || ""} disabled={busy} placeholder="(none)"
+            onChange={(v) => updateView(vi, (vv: any) => ({ ...vv, profileType: v }))}
+            options={((explore && explore.profiles) || []).map((pt: string) => [pt, pt] as const)} /></label>
+          <Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>
         </>} />
       {v.note && <p className="note">{v.note}</p>}
       <div className="vscroll">
@@ -409,7 +415,7 @@ function CooccurrenceCard({ ctx, v, vi }: CardProps) {
   return <>
     {v.kind === "cooccurrence" && v.pairs && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi), 1)} sub="pairwise, among patients profiled for both genes" {...placement(ctx, vi)}
-        actions={<button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>} />
+        actions={<Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>} />
       {v.note && <p className="note">{v.note}</p>}
       <div className="vscroll">
         <table className="vtable">
@@ -474,55 +480,39 @@ function SurvivalCard({ ctx, v, vi }: CardProps) {
         return (
           <div className="basis">
             <span className="meta">endpoint</span>
-            <select value={sv.endpoint || "OS"} disabled={busy}
-              onChange={e => patchView(vi, { endpoint: e.target.value })}>
-              {(eps.length ? eps : [sv.endpoint || "OS"]).map(x => <option key={x} value={x}>{x}</option>)}
-            {!cat && <option disabled>loading…</option>}
-            </select>
+            <Choice size="ctl" value={sv.endpoint || "OS"} disabled={busy} onChange={v => patchView(vi, { endpoint: v })}
+              options={(eps.length ? eps : [sv.endpoint || "OS"]).map(x => [x, x] as const)} pending={!cat ? "loading…" : undefined} />
             {catLoading && !cat && <Waiting what="endpoints" />}
             <span className="meta">measured from</span>
-            <select value={a ? a.eventType : ""} disabled={busy}
-              onChange={e => patchView(vi, { anchor: e.target.value
-                ? { eventType: e.target.value, occurrence: "FIRST" } : null })}>
-              <option value="">study baseline (day 0)</option>
-              {!cat && <option disabled>loading this study's events…</option>}
-              {types.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <Choice size="ctl" value={a ? a.eventType : ""} disabled={busy}
+              onChange={v => patchView(vi, { anchor: v ? { eventType: v, occurrence: "FIRST" } : null })}
+              options={[["", "study baseline (day 0)"], ...types.map(t => [t, t] as const)]}
+              pending={!cat ? "loading this study's events…" : undefined} />
             {a && <>
-              <select value={a.occurrence || "FIRST"} disabled={busy}
-                onChange={e => patchView(vi, { anchor: { ...a, occurrence: e.target.value } })}>
-                <option value="FIRST">first</option><option value="LAST">last</option>
-              </select>
+              <Choice size="ctl" value={a.occurrence || "FIRST"} disabled={busy}
+                onChange={v => patchView(vi, { anchor: { ...a, occurrence: v } })} options={[["FIRST", "first"], ["LAST", "last"]]} />
               <span className="meta">where</span>
-              <select value={a.key || ""} disabled={busy}
-                onChange={e => patchView(vi, { anchor: e.target.value
-                  ? { ...a, key: e.target.value, value: (cat.values[a.eventType] || {})[e.target.value]?.[0] ?? "" }
-                  : { eventType: a.eventType, occurrence: a.occurrence || "FIRST" } })}>
-                <option value="">(any)</option>
-                {keys.map(k => <option key={k} value={k}>{k}</option>)}
-              </select>
+              <Choice size="ctl" value={a.key || ""} disabled={busy}
+                onChange={v => patchView(vi, { anchor: v
+                  ? { ...a, key: v, value: (cat.values[a.eventType] || {})[v]?.[0] ?? "" }
+                  : { eventType: a.eventType, occurrence: a.occurrence || "FIRST" } })}
+                options={[["", "(any)"], ...keys.map(k => [k, k] as const)]} />
               {a.key && (
-                <select value={a.value ?? ""} disabled={busy}
-                  onChange={e => patchView(vi, { anchor: { ...a, value: e.target.value } })}>
-                  {vals.map(x => <option key={x} value={x}>{x}</option>)}
-                </select>
+                <Choice size="ctl" value={a.value ?? ""} disabled={busy}
+                  onChange={v => patchView(vi, { anchor: { ...a, value: v } })} options={vals.map(x => [x, x] as const)} />
               )}
             </>}
             <span className="meta">display</span>
-            <select value={sv.display === "incidence" ? "incidence" : "survival"} disabled={busy}
-              onChange={e => patchView(vi, { display: e.target.value === "incidence" ? "incidence" : undefined })}>
-              <option value="survival">survival</option>
-              <option value="incidence">cumulative incidence</option>
-            </select>
+            <Choice size="ctl" value={sv.display === "incidence" ? "incidence" : "survival"} disabled={busy}
+              onChange={v => patchView(vi, { display: v === "incidence" ? "incidence" : undefined })}
+              options={[["survival", "survival"], ["incidence", "cumulative incidence"]]} />
             <span className="meta">ticks</span>
-            <select value={sv.tickMonths || ""} disabled={busy}
-              onChange={e => patchView(vi, { tickMonths: e.target.value ? Number(e.target.value) : undefined })}>
-              <option value="">auto</option>
-              {[6, 12, 24, 60].map(m => <option key={m} value={m}>{m}mo</option>)}
-            </select>
+            <Choice size="ctl" value={String(sv.tickMonths || "")} disabled={busy}
+              onChange={v => patchView(vi, { tickMonths: v ? Number(v) : undefined })}
+              options={[["", "auto"], ...[6, 12, 24, 60].map(m => [String(m), m + "mo"] as const)]} />
             <span className="meta">cutoff</span>
-            <input type="number" min={1} placeholder="none" disabled={busy}
-              value={sv.cutoffMonths ?? ""} style={{ width: "5rem" }}
+            <Input type="number" min={1} placeholder="none" disabled={busy} className="h-ctl w-20 bg-card text-md md:text-md"
+              value={sv.cutoffMonths ?? ""}
               onChange={e => patchView(vi, { cutoffMonths: e.target.value ? Number(e.target.value) : undefined })} />
             <span className="meta">mo</span>
           </div>
@@ -596,25 +586,22 @@ function CoxCard({ ctx, v, vi }: CardProps) {
         return (
           <div className="basis wraps">
             <span className="meta">endpoint</span>
-            <select value={sv.endpoint || "OS"} disabled={busy}
-              onChange={e => patchView(vi, { endpoint: e.target.value })}>
-              {(eps.length ? eps : [sv.endpoint || "OS"]).map(x => <option key={x} value={x}>{x}</option>)}
-              {!cat && <option disabled>loading…</option>}
-            </select>
+            <Choice size="ctl" value={sv.endpoint || "OS"} disabled={busy} onChange={v => patchView(vi, { endpoint: v })}
+              options={(eps.length ? eps : [sv.endpoint || "OS"]).map(x => [x, x] as const)} pending={!cat ? "loading…" : undefined} />
             {catLoading && !cat && <Waiting what="endpoints" />}
             <span className="meta">cutoff</span>
-            <input type="number" min={1} placeholder="none" disabled={busy}
-              value={sv.cutoffMonths ?? ""} style={{ width: "5rem" }}
+            <Input type="number" min={1} placeholder="none" disabled={busy} className="h-ctl w-20 bg-card text-md md:text-md"
+              value={sv.cutoffMonths ?? ""}
               onChange={e => patchView(vi, { cutoffMonths: e.target.value ? Number(e.target.value) : undefined })} />
             <span className="meta">mo</span>
             <label className="chk" title="fit a separate baseline hazard per study instead of pooling them">
-              <input type="checkbox" checked={!!sv.stratifyByStudy} disabled={busy}
-                onChange={e => patchView(vi, { stratifyByStudy: e.target.checked || undefined })} />
+              <Checkbox checked={!!sv.stratifyByStudy} disabled={busy}
+                onCheckedChange={c => patchView(vi, { stratifyByStudy: c === true || undefined })} />
               stratify by study
             </label>
             <label className="chk" title="fit each cohort as its own separate model — own coefficients, own reference levels — instead of pooling them into one fit; a no-op with only one cohort">
-              <input type="checkbox" checked={!!sv.stratifyByCohort} disabled={busy}
-                onChange={e => patchView(vi, { stratifyByCohort: e.target.checked || undefined })} />
+              <Checkbox checked={!!sv.stratifyByCohort} disabled={busy}
+                onCheckedChange={c => patchView(vi, { stratifyByCohort: c === true || undefined })} />
               stratify by cohort
             </label>
             <CovariateList covariates={covariates} ratio="hazard" observedLevels={observedLevels} busy={busy}
@@ -637,7 +624,7 @@ function KindCard({ ctx, v, vi }: CardProps) {
         cohorts={cohortChoice(vi, docView(vi), KIND_CARDS[v.kind].maxCohorts)} cohortInSub={KIND_CARDS[v.kind].cohortInHeader}
         {...placement(ctx, vi)}
         actions={KIND_CARDS[v.kind].genes
-          ? <button className="linklike genesbtn" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</button>
+          ? <Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>
           : undefined} />
       {(() => {
         const mc = { vi, spec: docView(vi), v, busy, updating: busy || pendingKeys.has(viewIds[vi]), patch: (p: Record<string, unknown>) => patchView(vi, p),
@@ -694,7 +681,7 @@ function LogisticCard({ ctx, v, vi }: CardProps) {
               profiles={profileOptions()} loading={attrsLoading()} busy={busy}
               onChange={(next) => patchView(vi, { outcome: next })} />
             {!outcomeIsAlteration && <label className="tbfield" title="which observed value of the outcome counts as the event (1); every other observed value is treated as 'not event' and disclosed in the caveat. Required for a categorical outcome; not used for a numeric one, which must already be coded 0/1">
-              event <input type="text" list={"outcome-levels-" + vi} disabled={busy} style={{ width: "9rem" }}
+              event <Input type="text" list={"outcome-levels-" + vi} disabled={busy} className="h-ctl w-36 bg-card text-md md:text-md"
                 placeholder="e.g. Responder" value={sv.outcomeEvent || ""}
                 onChange={e => patchView(vi, { outcomeEvent: e.target.value || undefined })} />
               <datalist id={"outcome-levels-" + vi}>
@@ -718,12 +705,8 @@ function SequenceKeyHint({ ctx, v, vi }: CardProps) {
     {v.kind === "sequence" && !v.svg && v.error && v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
       <div className="basis">
         <span className="meta">label lines by</span>
-        <select value={v.sequence.labelKey} disabled={busy}
-          onChange={e => patchView(vi, { labelKey: e.target.value })}>
-          {v.sequence.keyOptions.map(k => (
-            <option key={k.key} value={k.label}>{k.label} — {k.values} value{k.values === 1 ? "" : "s"}</option>
-          ))}
-        </select>
+        <Choice size="ctl" value={v.sequence.labelKey} disabled={busy} onChange={k => patchView(vi, { labelKey: k })}
+          options={v.sequence.keyOptions.map(k => [k.label, k.label + " — " + k.values + " value" + (k.values === 1 ? "" : "s")] as const)} />
       </div>
     )}
   </>;
@@ -774,19 +757,18 @@ function PlotCard({ ctx, v, vi }: CardProps) {
           </div>;
         })()}
         <div className="tbz">
-          <label className="tbfield" title="what a point is; patient mode averages a patient's samples">unit <select
+          <label className="tbfield" title="what a point is; patient mode averages a patient's samples">unit <Choice size="ctl"
             value={docView(vi).unit || "patient"} disabled={busy}
-            onChange={(e) => updateView(vi, (vv: any) => ({ ...vv, unit: e.target.value }))}>
-            <option value="patient">patients</option><option value="sample">samples</option>
-          </select></label>
+            onChange={(u) => updateView(vi, (vv: any) => ({ ...vv, unit: u }))}
+            options={[["patient", "patients"], ["sample", "samples"]]} /></label>
           {/* a box plot is always drawn categories-on-x, values-on-y regardless of
               which axis is which in the document (lib/federation.ts's box branch
               routes by kind, not by x/y) — swapping which is "x" changes nothing a
               reader can see, so the button is disabled rather than pretending to act */}
-          <button className="tbbtn" disabled={busy || v.plot?.shape === "box"}
+          <Button variant="outline" size="sm" className={TB} disabled={busy || v.plot?.shape === "box"}
             title={v.plot?.shape === "box" ? "a box plot is always drawn by category, whichever axis holds it — nothing to swap"
               : "put the x axis on y and the y axis on x"}
-            onClick={() => updateView(vi, (vv: any) => ({ ...vv, x: vv.y, y: vv.x }))}>swap</button>
+            onClick={() => updateView(vi, (vv: any) => ({ ...vv, x: vv.y, y: vv.x }))}><ArrowLeftRight />swap</Button>
         </div>
       </div>
       <ViewFigure svg={v.svg} empty={v.plot?.note || "nothing to draw"} />
@@ -808,42 +790,30 @@ function SequenceCard({ ctx, v, vi }: CardProps) {
             menuId={"pick:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} onAdd={() => openCohortChooser(vi)}
             onChange={(next) => setViewCohorts(vi, next, cohortChoice(vi, docView(vi)).all)} />
         {v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
-          <details className="gearmenu gm-inline">
-            <summary title="treatment sequence options">settings</summary>
+          <GearMenu menuId={"settings:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} wide
+            label={<><Settings2 />settings</>} title="treatment sequence options">
             {/* Label granularity is the choice that most changes this chart, and
                 the keys are not interchangeable: in MSK-CHORD SUBTYPE has 10
                 values, AGENT hundreds, TREATMENT_TYPE exactly one. So each option
                 carries its value count rather than leaving the reader to discover
                 a useless key by picking it. */}
-            <div className="gearmenu-items wide">
               <div className="setrow">
                 <span className="meta">label lines by</span>
-                <select value={v.sequence.labelKey} disabled={busy}
-                  onChange={e => patchView(vi, { labelKey: e.target.value })}>
-                  {v.sequence.keyOptions.map(k => (
-                    <option key={k.key} value={k.label}>
-                      {k.label} — {k.values} value{k.values === 1 ? "" : "s"}
-                      {k.values === 1 ? " (unusable)" : k.values > 60 ? " (very granular)" : ""}
-                    </option>
-                  ))}
-                </select>
+                <Choice className="flex-1" value={v.sequence.labelKey} disabled={busy} onChange={k => patchView(vi, { labelKey: k })}
+                  options={v.sequence.keyOptions.map(k => [k.label, k.label + " — " + k.values + " value" + (k.values === 1 ? "" : "s") +
+                    (k.values === 1 ? " (unusable)" : k.values > 60 ? " (very granular)" : "")] as const)} />
               </div>
               <div className="setrow">
                 <span className="meta">new line after</span>
-                <select value={String(v.sequence.lineGap)} disabled={busy}
-                  onChange={e => patchView(vi, { lineGap: Number(e.target.value) })}>
-                  {[30, 60, 90, 120, 180].map(g => <option key={g} value={g}>{g} days</option>)}
-                </select>
+                <Choice className="flex-1" value={String(v.sequence.lineGap)} disabled={busy} onChange={g => patchView(vi, { lineGap: Number(g) })}
+                  options={[30, 60, 90, 120, 180].map(g => [String(g), g + " days"] as const)} />
               </div>
               <div className="setrow">
                 <span className="meta">lines shown</span>
-                <select value={String(v.sequence.steps)} disabled={busy}
-                  onChange={e => patchView(vi, { maxSteps: Number(e.target.value) })}>
-                  {[2, 3, 4, 5].map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
+                <Choice className="flex-1" value={String(v.sequence.steps)} disabled={busy} onChange={m => patchView(vi, { maxSteps: Number(m) })}
+                  options={[2, 3, 4, 5].map(m => [String(m), String(m)] as const)} />
               </div>
-            </div>
-          </details>
+          </GearMenu>
         )}
         <Latency v={v} /><Participation p={v.participation} />
         <ViewMenu menuId={"reorder:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} {...placement(ctx, vi)} hasNote={!!v.annotationNote} />
@@ -870,8 +840,8 @@ function CourseCard({ ctx, v, vi }: CardProps) {
           <CohortPicker nodes={cohortChoice(vi, docView(vi)).nodes} chosen={cohortChoice(vi, docView(vi)).chosen} busy={busy}
             menuId={"pick:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} onAdd={() => openCohortChooser(vi)}
             onChange={(next) => setViewCohorts(vi, next, cohortChoice(vi, docView(vi)).all)} />
-        <details className="gearmenu gm-inline">
-          <summary title="clinical course options">settings</summary>
+        <GearMenu menuId={"settings:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} wide
+          label={<><Settings2 />settings</>} title="clinical course options">
           {/* Every parameter of this chart is a choice, and the defaults are only a
             guess at a good one — so all of them are settable. They live behind
             the gear rather than above the figure because they are read when
@@ -887,11 +857,11 @@ function CourseCard({ ctx, v, vi }: CardProps) {
           if (next.length && next.length <= 6) patchView(vi, { eventTypes: next });
         };
         return (
-          <div className="gearmenu-items wide">
+          <>
             <div className="setcol"><span className="meta">measuring</span><div className="pillwrap">
             {v.eventOptions.map(e => (
-              <button key={e.canonical} type="button" disabled={busy || (!chosen.includes(e.canonical) && chosen.length >= 6)}
-                className={"pill" + (chosen.includes(e.canonical) ? " on" : "")}
+              <Button key={e.canonical} type="button" variant="outline" size="xs" disabled={busy || (!chosen.includes(e.canonical) && chosen.length >= 6)}
+                className={CHIP} aria-pressed={chosen.includes(e.canonical)}
                 onClick={() => toggle(e.canonical)}
                 title={(!chosen.includes(e.canonical) && chosen.length >= 6 ? "a course view measures at most 6 event types — drop one first. " : "") +
                   e.patients.toLocaleString() + " patients · " + e.perPatient + " events each · " +
@@ -899,46 +869,38 @@ function CourseCard({ ctx, v, vi }: CardProps) {
                     : e.perPatient < 1.5 ? "about one per patient and no duration — likely a filing record rather than a clinical course"
                     : "no durations, so it is drawn as an event that HAPPENED")}>
                 {e.label}{e.hasDurations ? " ⏱" : ""}
-              </button>
+              </Button>
             ))}
             </div></div>
-            <hr />
+            <MenuSeparator />
             <div className="setrow"><span className="meta">aligned on</span>
-            <select value={anchor ? String(anchor.eventType).trim().toLowerCase() : ""} disabled={busy}
-              onChange={e => patchView(vi, { anchor: e.target.value
-                ? { eventType: e.target.value, occurrence: anchor ? anchor.occurrence || "FIRST" : "FIRST" } : null })}>
-              <option value="">study day 0 (single study only)</option>
-              {v.eventOptions.map(e => <option key={e.canonical} value={e.canonical}>{e.label}</option>)}
-            </select>
+            <Choice className="flex-1" value={anchor ? String(anchor.eventType).trim().toLowerCase() : ""} disabled={busy}
+              onChange={ev => patchView(vi, { anchor: ev
+                ? { eventType: ev, occurrence: anchor ? anchor.occurrence || "FIRST" : "FIRST" } : null })}
+              options={[["", "study day 0 (single study only)"], ...v.eventOptions.map(e => [e.canonical, e.label] as const)]} />
             {anchor && (
-              <select style={{ flex: "none" }} value={anchor.occurrence || "FIRST"} disabled={busy}
-                onChange={e => patchView(vi, { anchor: { ...anchor, occurrence: e.target.value } })}>
-                <option value="FIRST">first</option>
-                <option value="LAST">last</option>
-              </select>
+              <Choice className="flex-none" value={anchor.occurrence || "FIRST"} disabled={busy}
+                onChange={o => patchView(vi, { anchor: { ...anchor, occurrence: o } })} options={[["FIRST", "first"], ["LAST", "last"]]} />
             )}
             </div>
             <div className="setrow"><span className="meta">bins</span>
-            <select value={String(v.courseAxis ? v.courseAxis.binMonths : 3)} disabled={busy}
-              onChange={e => patchView(vi, { binMonths: Number(e.target.value) })}>
-              {[1, 3, 6, 12].map(b => <option key={b} value={b}>{b} month{b === 1 ? "" : "s"}</option>)}
-            </select>
+            <Choice className="flex-1" value={String(v.courseAxis ? v.courseAxis.binMonths : 3)} disabled={busy}
+              onChange={b => patchView(vi, { binMonths: Number(b) })}
+              options={[1, 3, 6, 12].map(b => [String(b), b + " month" + (b === 1 ? "" : "s")] as const)} />
             </div>
             <div className="setrow"><span className="meta">window</span>
-            <select value={String(v.courseAxis ? v.courseAxis.from : -12)} disabled={busy}
-              onChange={e => patchView(vi, { fromMonths: Number(e.target.value) })}>
-              {[0, -6, -12, -24, -60].map(f => <option key={f} value={f}>{f === 0 ? "the anchor" : f + "mo"}</option>)}
-            </select>
-            <span className="meta" style={{ minWidth: 0 }}>to</span>
-            <select value={String(v.courseAxis ? v.courseAxis.to : 60)} disabled={busy}
-              onChange={e => patchView(vi, { toMonths: Number(e.target.value) })}>
-              {[12, 24, 60, 120, 240].map(t => <option key={t} value={t}>+{t}mo</option>)}
-            </select>
+            <Choice className="flex-1" value={String(v.courseAxis ? v.courseAxis.from : -12)} disabled={busy}
+              onChange={f => patchView(vi, { fromMonths: Number(f) })}
+              options={[0, -6, -12, -24, -60].map(f => [String(f), f === 0 ? "the anchor" : f + "mo"] as const)} />
+            <span className="meta min-w-0">to</span>
+            <Choice className="flex-1" value={String(v.courseAxis ? v.courseAxis.to : 60)} disabled={busy}
+              onChange={t => patchView(vi, { toMonths: Number(t) })}
+              options={[12, 24, 60, 120, 240].map(t => [String(t), "+" + t + "mo"] as const)} />
             </div>
-          </div>
+          </>
         );
       })()}
-        </details>
+        </GearMenu>
         <Latency v={v} /><Participation p={v.participation} />
         <ViewMenu menuId={"reorder:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} {...placement(ctx, vi)} hasNote={!!v.annotationNote} />
         </div>
