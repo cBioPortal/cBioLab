@@ -17,9 +17,9 @@ import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
-import { Choice } from "./choice.tsx";
+import { Choice } from "../_ui/choice.tsx";
 import { GearMenu, MenuSeparator } from "./gear-menu.tsx";
-import { CHIP, TB } from "./toolbar.ts";
+import { CHIP, TB } from "../_ui/toolbar.ts";
 
 type ResultView = AnalysisResult["views"][number];
 type ViewChoice = NonNullable<React.ComponentProps<typeof ViewHead>["cohorts"]>;

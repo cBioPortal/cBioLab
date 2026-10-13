@@ -9,7 +9,7 @@ import { useCustomDataState } from "./custom-data-panel.tsx";
 import { Button } from "../_ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Input } from "../_ui/input";
-import { TB } from "./toolbar.ts";
+import { TB } from "../_ui/toolbar.ts";
 
 export default function LoginButton() {
   const server = useCustomDataState();

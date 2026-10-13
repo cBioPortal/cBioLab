@@ -13,7 +13,7 @@ import { PatientNav, PatientsDialog, patientKeys } from "./patient-nav.tsx";
 import { ChevronsUpDown } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
-import { TB } from "./toolbar.ts";
+import { TB } from "../_ui/toolbar.ts";
 
 type Spec = { patient?: { study: string; id: string }; collapsed?: string[]; expandGaps?: boolean } & Record<string, unknown>;
 

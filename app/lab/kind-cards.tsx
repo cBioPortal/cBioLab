@@ -11,8 +11,8 @@ import { TimelineBody } from "./timeline-body";
 import { AlterationsBody } from "./alterations-body";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
-import { OptionSelect } from "./choice.tsx";
-import { FIELD } from "./toolbar.ts";
+import { OptionSelect } from "../_ui/choice.tsx";
+import { FIELD } from "../_ui/toolbar.ts";
 
 /**
  * A text field that keeps what is being typed to itself and hands the page the value only on

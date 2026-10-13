@@ -12,8 +12,8 @@ import { ArrowDown, ArrowUp, Ellipsis, Pencil, Plus, Save, Split, StickyNote, Tr
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
-import { OptionSelect } from "./choice.tsx";
-import { FIELD } from "./toolbar.ts";
+import { OptionSelect } from "../_ui/choice.tsx";
+import { FIELD } from "../_ui/toolbar.ts";
 import { Checkbox } from "../_ui/checkbox";
 import { GearMenu, MenuItem, MenuSeparator } from "./gear-menu.tsx";
 

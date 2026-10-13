@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Braces, LoaderCircle, Play, Plus, Save, X } from "lucide-react";
 import { Button } from "../_ui/button";
-import { CHIP } from "./toolbar.ts";
+import { CHIP } from "../_ui/toolbar.ts";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Textarea } from "../_ui/textarea";
 import CohortPills from "./pills";

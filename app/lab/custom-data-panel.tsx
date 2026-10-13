@@ -18,8 +18,8 @@ import { Input } from "../_ui/input";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { Textarea } from "../_ui/textarea";
 import { cn } from "../../lib/cn";
-import { OptionSelect } from "./choice.tsx";
-import { TB } from "./toolbar.ts";
+import { OptionSelect } from "../_ui/choice.tsx";
+import { TB } from "../_ui/toolbar.ts";
 
 /** a tab of the custom-data manager */
 const TAB = "h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary";

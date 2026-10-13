@@ -5,7 +5,7 @@
 // The density is a filter: drag a rectangle over it to add both axes' ranges to the selection.
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api.ts";
-import { Choice } from "./choice.tsx";
+import { Choice } from "../_ui/choice.tsx";
 import type { CohortDef, View } from "../../lib/types.ts";
 
 type Clause = Record<string, unknown>;

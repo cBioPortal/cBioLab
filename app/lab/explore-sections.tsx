@@ -13,10 +13,10 @@ import type { ExploreState } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { Save, Tag, X } from "lucide-react";
 import { Button } from "../_ui/button";
-import { CHIP } from "./toolbar.ts";
+import { CHIP } from "../_ui/toolbar.ts";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
-import { Choice } from "./choice.tsx";
+import { Choice } from "../_ui/choice.tsx";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 

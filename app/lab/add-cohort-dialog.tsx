@@ -12,7 +12,7 @@ import { Button } from "../_ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Input } from "../_ui/input";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
-import { TB } from "./toolbar.ts";
+import { TB } from "../_ui/toolbar.ts";
 
 export interface AddCohortTarget {
   /** the view's id in the doc store: an edit made while the dialog is open cannot retarget it */

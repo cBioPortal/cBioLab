@@ -12,9 +12,9 @@ import { Button } from "../_ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../_ui/dropdown-menu";
 import { Input } from "../_ui/input";
 import { Textarea } from "../_ui/textarea";
-import { Choice } from "./choice.tsx";
+import { Choice } from "../_ui/choice.tsx";
 import { GearMenu } from "./gear-menu.tsx";
-import { FIELD, TB } from "./toolbar.ts";
+import { FIELD, TB } from "../_ui/toolbar.ts";
 
 export type SplitSpec = { attribute: string } | { gene: string } | { oql: string[] };
 

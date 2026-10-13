@@ -6,7 +6,7 @@
 import React, { useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, List, X } from "lucide-react";
 import { Button } from "../_ui/button";
-import { TB } from "./toolbar.ts";
+import { TB } from "../_ui/toolbar.ts";
 
 export type PatientKey = { study: string; id: string };
 export type ListPosition = { index: number; prev: PatientKey | null; next: PatientKey | null } | null | undefined;

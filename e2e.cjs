@@ -910,7 +910,7 @@ async function main() {
         await page.route("**/api/view-page", async (route) => { if (!open && /"values"/.test(route.request().postData() || "")) await gate; try { await route.continue(); } catch {} });
         await page.getByRole("button", { name: "filter Mutation Type" }).click();
         await page.waitForTimeout(600);
-        const w = { loader: await page.locator(".dt-pop .dt-loading .waiting").isVisible().catch(() => false), condition: await page.locator(".dt-pop select").isEnabled().catch(() => false) };
+        const w = { loader: await page.locator(".dt-pop .dt-loading .waiting").isVisible().catch(() => false), condition: await page.locator(".dt-pop [role=combobox]").isEnabled().catch(() => false) };
         release(); await page.unroute("**/api/view-page");
         await page.locator(".dt-values label").first().waitFor({ timeout: 60000 });
         ok("table: a filter whose values are loading shows a loader, not an empty list", w.loader && w.condition, JSON.stringify(w));
@@ -921,7 +921,7 @@ async function main() {
       const top = await page.locator(".dt-values label").first().innerText();
       const [value, n] = top.trim().split(/\s+/);
       await page.locator(".dt-pop").getByRole("button", { name: "none" }).click();
-      await page.locator(".dt-values label").first().locator("input").check();
+      await page.locator(".dt-values label").first().locator("[role=checkbox]").check();
       await page.locator(".dt-pop").getByRole("button", { name: "apply" }).click();
       await settle();
       const picked = await count();

@@ -15,7 +15,7 @@ import { Checkbox } from "../_ui/checkbox";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "../_ui/dialog";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
-import { FIELD, TB } from "./toolbar.ts";
+import { FIELD, TB } from "../_ui/toolbar.ts";
 
 export interface CustomDataFocus {
   /** dataset ids to show, in order */

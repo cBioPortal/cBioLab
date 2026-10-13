@@ -1,6 +1,6 @@
 "use client";
 import { Children, isValidElement } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../_ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 import { cn } from "../../lib/cn";
 
 /** stands in for "" among the options: a select item cannot have an empty value */
@@ -57,12 +57,13 @@ function optionsOf(children: React.ReactNode): Opt[] {
 }
 
 /** A view toolbar's dropdown written as <option> children, the way a native select is. */
-export function OptionSelect({ value, onValueChange, children, disabled, title, className, style }: {
+export function OptionSelect({ value, onValueChange, children, disabled, title, ariaLabel, className, style }: {
   value: string | number;
   onValueChange: (v: string) => void;
   children: React.ReactNode;
   disabled?: boolean;
   title?: string;
+  ariaLabel?: string;
   className?: string;
   style?: React.CSSProperties;
 }) {
@@ -71,7 +72,7 @@ export function OptionSelect({ value, onValueChange, children, disabled, title, 
   const hasNone = options.some((o) => o.value === "");
   return (
     <Select value={v === "" && hasNone ? NONE : v} onValueChange={(x) => onValueChange(x === NONE ? "" : x)} disabled={disabled}>
-      <SelectTrigger size="sm" title={title} style={style}
+      <SelectTrigger size="sm" title={title} aria-label={ariaLabel} style={style}
         className={cn("h-ctl gap-1 bg-card px-2 text-md data-[size=sm]:h-ctl [&_svg:not([class*='size-'])]:size-3.5", className)}>
         <SelectValue />
       </SelectTrigger>

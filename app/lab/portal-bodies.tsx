@@ -18,8 +18,8 @@ import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
-import { OptionSelect } from "./choice.tsx";
-import { FIELD, TB } from "./toolbar.ts";
+import { OptionSelect } from "../_ui/choice.tsx";
+import { FIELD, TB } from "../_ui/toolbar.ts";
 
 const framed = (c: { body: string; width: number; height: number } | null) => c ? frame(c.width, c.height, c.body, palette("auto").bg, true) : null;
 export const pFmt = (x: number) => x === 0 ? "< 1e-300" : x < 1e-3 ? x.toExponential(2) : x.toFixed(3);
