@@ -2,14 +2,24 @@
 // A view or cohort header's menu: a small button that opens a popover of actions or settings.
 // Whether it is open is kept in a store the page owns, keyed by `menuId`, so a menu stays open
 // when an edit replaces its card (and with it the card's key) and the menu remounts.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../_ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../_ui/popover";
 import { Separator } from "../_ui/separator";
 import { cn } from "../../lib/cn";
 
+const CLOSE = "gearmenu-close";
+
+/** close the menu `menuId` wherever it is mounted now — after an edit that remounted its card, too */
+export function closeGearMenu(menuId: string, menuStore?: Map<string, boolean>) {
+  menuStore?.set(menuId, false);
+  window.dispatchEvent(new CustomEvent<string>(CLOSE, { detail: menuId }));
+}
+
 export function GearMenu({ menuId, menuStore, label, title, ariaLabel, className, contentClassName, wide, onOpenChange, children }: {
-  menuId: string; menuStore: Map<string, boolean>;
+  menuId: string;
+  /** where the open state outlives a remount; without one the menu opens closed */
+  menuStore?: Map<string, boolean>;
   /** what the button shows */
   label: React.ReactNode;
   title: string;
@@ -23,8 +33,13 @@ export function GearMenu({ menuId, menuStore, label, title, ariaLabel, className
   /** the menu's contents; a function is given `close` */
   children: React.ReactNode | ((close: () => void) => React.ReactNode);
 }) {
-  const [open, setOpenState] = useState(() => !!menuStore.get(menuId));
-  const setOpen = (o: boolean) => { menuStore.set(menuId, o); setOpenState(o); onOpenChange?.(o); };
+  const [open, setOpenState] = useState(() => !!menuStore?.get(menuId));
+  const setOpen = (o: boolean) => { menuStore?.set(menuId, o); setOpenState(o); onOpenChange?.(o); };
+  useEffect(() => {
+    const onClose = (e: Event) => { if ((e as CustomEvent<string>).detail === menuId) { setOpenState(false); onOpenChange?.(false); } };
+    window.addEventListener(CLOSE, onClose);
+    return () => window.removeEventListener(CLOSE, onClose);
+  }, [menuId, onOpenChange]);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -35,7 +50,7 @@ export function GearMenu({ menuId, menuStore, label, title, ariaLabel, className
       </PopoverTrigger>
       <PopoverContent align="end" collisionPadding={8}
         className={cn("gearmenu-items flex w-auto max-w-sm min-w-44 flex-col gap-0.5 p-1.5 text-md", wide && "max-w-[31rem] min-w-[23rem]", contentClassName)}>
-        {typeof children === "function" ? children(() => setOpen(false)) : children}
+        {typeof children === "function" ? children(() => closeGearMenu(menuId, menuStore)) : children}
       </PopoverContent>
     </Popover>
   );

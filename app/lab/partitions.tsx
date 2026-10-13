@@ -7,9 +7,14 @@
 import { useState } from "react";
 import type { PartitionDef, PartitionResult } from "../../lib/types.ts";
 import { moveArm, removeArm, mergeArms, canMergeArms } from "../../lib/partition-arms.ts";
-import { Ellipsis, LoaderCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, Ellipsis, LoaderCircle, Merge, Minus, Plus, Split, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../_ui/dropdown-menu";
+import { Input } from "../_ui/input";
+import { Textarea } from "../_ui/textarea";
+import { Choice } from "./choice.tsx";
+import { GearMenu } from "./gear-menu.tsx";
+import { FIELD, TB } from "./toolbar.ts";
 
 export type SplitSpec = { attribute: string } | { gene: string } | { oql: string[] };
 
@@ -19,12 +24,12 @@ type SplitProps = {
 };
 
 /** "split this cohort by …" behind its own button */
-export function SplitMenu({ label, ...props }: SplitProps & { label?: string }) {
+export function SplitMenu({ label, ...props }: SplitProps & { label?: React.ReactNode }) {
   return (
-    <details className="gearmenu splitmenu">
-      <summary className="tbbtn" title={"split “" + props.cohort + "” into arms that add up to it"}>{label || "Split…"}</summary>
-      <div className="gearmenu-items wide"><SplitForm {...props} /></div>
-    </details>
+    <GearMenu menuId={"split:" + props.cohort} label={label || "Split…"} wide className="splitmenu h-6 px-1.5"
+      title={"split “" + props.cohort + "” into arms that add up to it"} ariaLabel={"split “" + props.cohort + "”"}>
+      {(close) => <SplitForm {...props} onDone={close} />}
+    </GearMenu>
   );
 }
 
@@ -44,19 +49,14 @@ export function SplitForm({ cohort, attrs, busy, onSplit, onDone }: SplitProps &
     mode === "attribute" ? (attribute ? { attribute } : null)
       : mode === "gene" ? (gene.trim() ? { gene: gene.trim() } : null)
         : (oql.trim() ? { oql: oql.split("\n").map((q) => q.trim()).filter(Boolean) } : null);
-  const go = async (e: React.MouseEvent) => {
+  const go = async () => {
     const s = spec();
     if (!s) return;
     setErr(null); setWorking(true);
-    // The menu may be re-rendered while the split runs (the page re-mounts it and restores it open),
-    // so close the one on screen afterwards, found by its id, not the element clicked.
-    const menu = (e.currentTarget as HTMLElement).closest("details");
-    const menuId = menu?.dataset.menuId;
     try {
       await onSplit(cohort, s);
+      // the page may have remounted the menu while the split ran; onDone closes it wherever it is now
       onDone?.();
-      const live = menuId ? [...document.querySelectorAll<HTMLDetailsElement>("details[data-menu-id]")].filter((d) => d.dataset.menuId === menuId) : menu ? [menu] : [];
-      for (const d of live) d.open = false;
     }
     catch (x) { setErr(String((x as Error)?.message || x)); }
     setWorking(false);
@@ -65,37 +65,32 @@ export function SplitForm({ cohort, attrs, busy, onSplit, onDone }: SplitProps &
       <>
         <div className="setrow">
           <span className="meta">split by</span>
-          <select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}>
-            <option value="attribute">a clinical attribute</option>
-            <option value="gene">a gene (mutated / wild-type)</option>
-            <option value="oql">OQL queries, one arm each</option>
-          </select>
+          <Choice className="flex-1" value={mode} onChange={(m) => setMode(m as typeof mode)}
+            options={[["attribute", "a clinical attribute"], ["gene", "a gene (mutated / wild-type)"], ["oql", "OQL queries, one arm each"]]} />
         </div>
         {mode === "attribute" && <div className="setrow">
           <span className="meta">attribute</span>
           {attrs.length
-            ? <select value={attribute} onChange={(e) => setAttribute(e.target.value)}>
-                <option value="">choose…</option>
-                {attrs.map((a) => <option key={a.attribute} value={a.attribute}>{a.attribute}{a.kind === "num" ? " (numeric: median split)" : ""}</option>)}
-              </select>
+            ? <Choice className="flex-1" value={attribute} onChange={setAttribute} placeholder="choose…"
+                options={attrs.map((a) => [a.attribute, a.attribute + (a.kind === "num" ? " (numeric: median split)" : "")] as const)} />
             : <span className="waiting"><span className="spinner" />loading attributes…</span>}
         </div>}
         {mode === "gene" && <div className="setrow">
           <span className="meta">gene</span>
-          <input value={gene} onChange={(e) => setGene(e.target.value)} placeholder="KRAS" spellCheck={false} />
+          <Input className="h-8 flex-1 text-md md:text-md" value={gene} onChange={(e) => setGene(e.target.value)} placeholder="KRAS" spellCheck={false} />
         </div>}
         {mode === "oql" && <div className="setcol">
           <span className="meta">one query per line, tested in order; the first match wins</span>
-          <textarea className="splitoql" value={oql} onChange={(e) => setOql(e.target.value)} placeholder={"KRAS: G12C\nKRAS: MUT"} spellCheck={false} />
+          <Textarea className="min-h-18 bg-muted font-mono text-md md:text-md" value={oql} onChange={(e) => setOql(e.target.value)} placeholder={"KRAS: G12C\nKRAS: MUT"} spellCheck={false} />
         </div>}
-        <p className="meta" style={{ margin: 0 }}>
+        <p className="text-sm text-muted-foreground">
           The arms never overlap and add up to “{cohort}”. Patients not profiled for the gene, or with
           no value recorded, get their own row rather than counting as wild-type or Other.
         </p>
-        {err && <p className="error" style={{ margin: 0 }}>{err}</p>}
-        <div><button className="primary" disabled={busy || working || !spec()} onClick={go}>
-          {working && <span className="spinner onprimary" />}Split
-        </button></div>
+        {err && <p className="error m-0">{err}</p>}
+        <Button size="sm" className="self-start" disabled={busy || working || !spec()} onClick={go}>
+          {working ? <LoaderCircle className="animate-spin" /> : <Split />}Split
+        </Button>
       </>
   );
 }
@@ -104,9 +99,9 @@ function AddArm({ busy, onAdd }: { busy?: boolean; onAdd: (q: string) => void })
   const [q, setQ] = useState("");
   return (
     <form className="partadd" onSubmit={(e) => { e.preventDefault(); if (q.trim()) { onAdd(q.trim()); setQ(""); } }}>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="add an arm: OQL, e.g. KRAS: G12D" spellCheck={false} />
-      <button className="tbbtn" type="submit" disabled={busy || !q.trim()}
-        title="added as the FIRST arm, so a broader arm below cannot take its patients; move it with ↑ ↓">add arm</button>
+      <Input className={FIELD} value={q} onChange={(e) => setQ(e.target.value)} placeholder="add an arm: OQL, e.g. KRAS: G12D" spellCheck={false} />
+      <Button variant="outline" size="sm" className={TB} type="submit" disabled={busy || !q.trim()}
+        title="added as the FIRST arm, so a broader arm below cannot take its patients; move it with ↑ ↓"><Plus />add arm</Button>
     </form>
   );
 }
@@ -162,7 +157,8 @@ export function PartitionPanel({ name, partitions, results, cohortText, attrs, b
       <div className="parthead">
         <span className="partname" title={"split “" + name + "”: arms tested in order, the first match wins"}>⑂ {def.split || name}</span>
         <span className="meta">splits “{def.of}”{res ? " · " + res.parentCount.toLocaleString() + " patients" : ""}</span>
-        <button className="tbbtn partrm" disabled={busy} title="remove this split (and any split nested under it)" onClick={() => onRemove(name)}>✕</button>
+        <Button variant="ghost" size="icon-xs" className="partrm ml-auto text-muted-foreground" disabled={busy} title="remove this split (and any split nested under it)"
+          aria-label="remove this split" onClick={() => onRemove(name)}><X /></Button>
       </div>
       <div className="partrows" role="table">
         {rows.map((c) => {
@@ -186,17 +182,19 @@ export function PartitionPanel({ name, partitions, results, cohortText, attrs, b
                 </span>
                 <span className="partacts">
                   {i >= 0 && <>
-                    <button className="tbbtn" disabled={busy || i === 0} title="test this arm earlier" onClick={() => onChange(name, moveArm(def, i, i - 1))}>↑</button>
-                    <button className="tbbtn" disabled={busy || i === def.arms.length - 1} title="test this arm later" onClick={() => onChange(name, moveArm(def, i, i + 1))}>↓</button>
-                    <button className="tbbtn" disabled={busy || !canMergeArms(def, i, i + 1)}
+                    <Button variant="ghost" size="icon-xs" disabled={busy || i === 0} title="test this arm earlier" aria-label="move this arm up"
+                      onClick={() => onChange(name, moveArm(def, i, i - 1))}><ArrowUp /></Button>
+                    <Button variant="ghost" size="icon-xs" disabled={busy || i === def.arms.length - 1} title="test this arm later" aria-label="move this arm down"
+                      onClick={() => onChange(name, moveArm(def, i, i + 1))}><ArrowDown /></Button>
+                    <Button variant="ghost" size="icon-xs" disabled={busy || !canMergeArms(def, i, i + 1)} aria-label="merge with the next arm"
                       title={i === def.arms.length - 1 ? "the last arm has no next arm to merge with" : "merge with the next arm: one arm matching either"}
-                      onClick={() => onChange(name, mergeArms(def, i, i + 1))}>⊕</button>
-                    <button className="tbbtn" disabled={busy || def.arms.length < 2}
+                      onClick={() => onChange(name, mergeArms(def, i, i + 1))}><Merge /></Button>
+                    <Button variant="ghost" size="icon-xs" disabled={busy || def.arms.length < 2} aria-label="remove this arm"
                       title={def.arms.length < 2 ? "a split needs at least one arm — remove the split instead" : "remove this arm: its patients move to a later arm or Other"}
-                      onClick={() => onChange(name, removeArm(def, i))}>−</button>
+                      onClick={() => onChange(name, removeArm(def, i))}><Minus /></Button>
                   </>}
                   {c.role !== "notEvaluable" && !nested.length &&
-                    <SplitMenu cohort={c.name} attrs={attrs} busy={busy} label="⑂" onSplit={onSplit} />}
+                    <SplitMenu cohort={c.name} attrs={attrs} busy={busy} label={<Split />} onSplit={onSplit} />}
                 </span>
               </div>
               {nested.map((n) => (

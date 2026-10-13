@@ -825,7 +825,8 @@ async function main() {
           if (!chip || !/^\d[\d,]*ms$/.test(chip.textContent.trim())) missing.push(name);
           else per.push(name + " " + chip.textContent.trim());
         }
-        const totalEl = [...document.querySelectorAll(".meta")].map(e => e.textContent).find(t => /ms · OncoKB/.test(t));
+        // the run's total sits in the document dialog, which stays in the page while closed
+        const totalEl = ((document.querySelector("dialog.docdialog")?.textContent || "").match(/[\d,]+ms · OncoKB/) || [])[0];
         return { per, missing, total: totalEl || null };
       });
       ok("every view reports its own latency, and the run reports a total",
