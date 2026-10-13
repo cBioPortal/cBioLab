@@ -11,6 +11,7 @@ import { CAT_COLORS } from "./view-chrome.tsx";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import type { ExploreState } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
+import { Save, Tag, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
@@ -267,15 +268,15 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
             {/* Naming is asked for on demand rather than sitting in the bar:
                 Analyze needs no name, so a permanent field implied one was
                 required for both. */}
-            <button onClick={openSaveDialog} disabled={!ready}
+            <Button variant="outline" size="sm" onClick={openSaveDialog} disabled={!ready}
               title={ready ? "keep this definition on the Saved tab without running anything" : "select a study first"}>
-              Save as a Cohort
-            </button>
-            <button onClick={saveDraftAsFeature} disabled={!ready}
+              <Save />Save as a Cohort
+            </Button>
+            <Button variant="outline" size="sm" onClick={saveDraftAsFeature} disabled={!ready}
               title={ready ? "freeze who matches these filters into a yes/no custom attribute you can chart, split and filter on" : "select a study first"}>
-              Save as feature
-            </button>
-            <button className="linklike" onClick={clearDraft}>clear</button>
+              <Tag />Save as feature
+            </Button>
+            <Button variant="ghost" size="sm" onClick={clearDraft}><X />Clear</Button>
           </div>
           <div className="row mt-1.5">
             {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} onCustomData={showClauseData()} />; })()}
