@@ -252,6 +252,7 @@ export function DocDialog({ ctx }: { ctx: AnalysisCtx }) {
         permanent column, so the leftbar can just be cohorts. A native <dialog>, so the editor
         stays in the page while it is closed — anything reading the document from outside
         React finds #docjson. */}
+    {/* eslint-disable-next-line jsx-a11y-x/click-events-have-key-events, jsx-a11y-x/no-noninteractive-element-interactions -- a click on the backdrop closes the modal; Escape closes it from the keyboard */}
     <dialog ref={docDialog} data-tw aria-labelledby="doctitle"
       className="docdialog m-auto max-h-[85vh] w-[min(90vw,48rem)] max-w-3xl overflow-auto rounded-lg border bg-card p-6 text-foreground shadow-lg backdrop:bg-black/50"
       onClick={e => { if (e.target === docDialog.current) docDialog.current?.close(); }}>

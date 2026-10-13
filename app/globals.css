@@ -918,8 +918,10 @@ button.customtag:hover { text-decoration: underline; }
 .toast {
   position: fixed; left: 50%; bottom: var(--s5); transform: translateX(-50%); z-index: 50; max-width: min(46rem, 92vw);
   background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-md);
-  padding: var(--s3) var(--s4); font-size: var(--t-md); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22); cursor: pointer;
+  padding: var(--s3) var(--s4); font-size: var(--t-md); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
 }
+.toast button { all: unset; cursor: pointer; }
+.toast button:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .customdata h4 { margin: 0; font-size: var(--t-md); font-weight: 600; }
 .customdata-text { width: 100%; box-sizing: border-box; font-family: "IBM Plex Mono", monospace; font-size: var(--t-sm); margin: 0; resize: vertical; }
 /* the upload as three numbered steps: load, check, name and add */

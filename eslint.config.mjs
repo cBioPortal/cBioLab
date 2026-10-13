@@ -7,6 +7,7 @@ import tseslint from "typescript-eslint";
 import reactHooks from "eslint-plugin-react-hooks";
 import nextPlugin from "@next/eslint-plugin-next";
 import sonarjs from "eslint-plugin-sonarjs";
+import jsxA11y from "eslint-plugin-jsx-a11y-x";
 import globals from "globals";
 
 export default tseslint.config(
@@ -116,6 +117,19 @@ export default tseslint.config(
   {
     files: ["app/**/*.{ts,tsx}"],
     ...nextPlugin.configs["core-web-vitals"],
+  },
+  {
+    files: ["app/**/*.tsx"],
+    ...jsxA11y.configs.recommended,
+  },
+  {
+    files: ["app/**/*.tsx"],
+    rules: {
+      // our wrappers around an <input> or a labelable Radix trigger
+      "jsx-a11y-x/label-has-associated-control": ["error", { controlComponents: ["DraftInput", "Input", "Checkbox", "OptionSelect", "Choice"] }],
+      // autofocus only ever lands on the first field of a dialog or inline editor the user just opened
+      "jsx-a11y-x/no-autofocus": "off",
+    },
   },
   {
     files: ["app/**/*.{ts,tsx}"],

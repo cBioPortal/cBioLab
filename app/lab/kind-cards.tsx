@@ -412,9 +412,9 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
     return (
       <div className="viewtb">
         <div className="tbz"><span className="tbl">test</span>
-          <label className="tbfield" title="the lab test, as its timeline attribute names it (e.g. PSA, CEA, CA_19-9)">
-            <DraftInput value={spec.test || ""} disabled={busy} width="7rem" onCommit={(t) => patch({ test: t.trim() })} />
-          </label>
+          <span className="tbfield">
+            <DraftInput value={spec.test || ""} disabled={busy} width="7rem" title="the lab test, as its timeline attribute names it (e.g. PSA, CEA, CA_19-9)" onCommit={(t) => patch({ test: t.trim() })} />
+          </span>
           <label className="tbfield" title="a responder's best fall from baseline, in percent">
             responder <OptionSelect value={String(spec.responseDrop ?? 50)} disabled={busy} onValueChange={(v) => patch({ responseDrop: Number(v) })}>
               {[30, 50, 90].map((d) => <option key={d} value={d}>fell ≥{d}%</option>)}
@@ -513,9 +513,9 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
             <label className="tbfield" title="a SAMPLE-level attribute that says which kind each sample is">
               pair by <DraftInput value={pb.attribute} disabled={busy} width="9rem" onCommit={(t) => setBy("attribute", t)} />
             </label>
-            <label className="tbfield" title="the value(s) of that attribute on the first side; comma-separated for several">
-              <DraftInput value={csv(pb.a)} disabled={busy} onCommit={(t) => setBy("a", t)} />
-            </label>
+            <span className="tbfield">
+              <DraftInput value={csv(pb.a)} disabled={busy} title="the value(s) of that attribute on the first side; comma-separated for several" onCommit={(t) => setBy("a", t)} />
+            </span>
             <label className="tbfield" title="the value(s) on the second side">
               vs <DraftInput value={csv(pb.b)} disabled={busy} onCommit={(t) => setBy("b", t)} />
             </label>

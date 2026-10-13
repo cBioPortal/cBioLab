@@ -56,6 +56,7 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch }: {
   const onKey = patientKeys(t.position, go);
 
   return (
+    // eslint-disable-next-line jsx-a11y-x/no-static-element-interactions -- arrow-key shortcuts for the patient buttons PatientNav already provides
     <div className="tl-view" tabIndex={-1} onKeyDown={onKey}>
       <PatientNav shown={p ? p.patient : null} position={t.position} total={t.total} updating={updating} go={go} what="draw it"
         openList={() => setListOpen(true)} first={() => patch({ patient: undefined })} />
@@ -80,6 +81,7 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch }: {
           </div>
         </div>
       ) : <p className="meta">No patient to draw: the cohort's patient list is empty.</p>}
+      {/* eslint-disable-next-line jsx-a11y-x/click-events-have-key-events, jsx-a11y-x/no-static-element-interactions -- track groups in the drawn SVG expand on click only; there is no keyboard equivalent yet */}
       <div ref={box} className={"tl-fig" + (updating ? " stale" : "")} onClick={onClick} onMouseMove={onMove} onMouseLeave={() => setTip(null)}>
         {drawn && (p!.events.length
           ? <div dangerouslySetInnerHTML={{ __html: drawn.svg }} />

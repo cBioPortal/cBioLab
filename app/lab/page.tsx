@@ -476,7 +476,7 @@ export default function AnalysisPage() {
         onExplore={() => { if (!chooser) return; const t = chooser; setChooser(null); openAddCohort(t); }}
         onLogin={requestLogin}
         onClose={() => setChooser(null)} />
-      {toast && <div className="toast" role="status" onClick={() => setToast(null)}>{toast}</div>}
+      {toast && <div className="toast" role="status"><button type="button" title="dismiss" onClick={() => setToast(null)}>{toast}</button></div>}
       <CustomDataManager tab={exploreState.customTab} setTab={exploreState.setCustomTab} studies={exStudies} onChanged={() => fetchExplore()} />
       <CustomDataDialog focus={cdFocus} onClose={() => setCdFocus(null)}
         bindings={doc.uploads || []}

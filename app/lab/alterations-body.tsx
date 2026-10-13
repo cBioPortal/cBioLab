@@ -58,6 +58,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch }: {
   };
 
   return (
+    // eslint-disable-next-line jsx-a11y-x/no-static-element-interactions -- arrow-key shortcuts for the patient buttons PatientNav already provides
     <div className="tl-view" tabIndex={-1} onKeyDown={patientKeys(a.position, go)}>
       <PatientNav shown={p ? p.id : null} position={a.position} total={a.total} updating={updating} go={go} what="list its alterations"
         openList={() => setListOpen(true)} first={() => patch({ patient: undefined })} />
