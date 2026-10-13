@@ -932,9 +932,6 @@ details.gearmenu.gm-inline[open] > summary {
 .namedialog::backdrop, .genedialog::backdrop, .exportdialog::backdrop, .addchartdialog::backdrop { background: rgba(0, 0, 0, 0.32); }
 .namedialog h3, .genedialog h3, .exportdialog h3, .addchartdialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
 /* "+ Add cohort" on a view: the analysis's cohorts, the library, or Explore, as three tabs */
-.addcohortdialog[open] { width: min(94vw, 40rem); max-width: 40rem; max-height: 85vh; display: flex; flex-direction: column; }
-.acd-tabs { margin: var(--s2) 0 var(--s3); }
-.acd-tabs button { display: inline-flex; align-items: baseline; gap: var(--s1); white-space: nowrap; }
 .acd-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; grid-template-columns: fit-content(16rem) minmax(8rem, 1fr) fit-content(40%) auto; column-gap: var(--s3); }
 .acd-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; padding: var(--s1) 0; border-top: 1px solid var(--line); }
 .acd-row:first-child { border-top: none; }
@@ -949,10 +946,8 @@ details.gearmenu.gm-inline[open] > summary {
   .acd-list { grid-template-columns: minmax(0, 1fr) auto; }
   .acd-main { display: flex; flex-direction: column; gap: var(--s1); min-width: 0; }
 }
-.acd-search { width: 100%; height: var(--ctl-h); font-size: var(--t-md); margin-bottom: var(--s2); }
 .acd-h { margin: var(--s3) 0 var(--s1); font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .acd-explore { padding: var(--s2) 0; }
-.addcohortdialog { overflow-y: auto; }
 /* A view with no cohorts yet: what it will draw, and the one thing to do next */
 .emptyview-body { display: flex; flex-direction: column; align-items: center; gap: var(--s3); padding: var(--s5) var(--s3); text-align: center;
   border: 1px dashed var(--line); border-radius: var(--r-md); background: var(--paper); }

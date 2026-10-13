@@ -2,11 +2,17 @@
 // "+ Add cohort" on a view: one dialog with the three places a cohort comes from — the analysis's
 // own cohorts, the library (the login's saved cohorts and the built-in examples), and Explore,
 // where a new one is built and comes back to this view.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import type { CohortDef } from "../../lib/types.ts";
 import { cohortHash } from "../../lib/cohort-hash.ts";
 import CohortPills from "./pills";
 import { CAT_COLORS } from "./view-chrome.tsx";
+import { Button } from "../_ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../_ui/dialog";
+import { Input } from "../_ui/input";
+import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
+import { TB } from "./toolbar.ts";
 
 export interface AddCohortTarget {
   /** the view's id in the doc store: an edit made while the dialog is open cannot retarget it */
@@ -40,19 +46,14 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
   onLogin: () => void;
   onClose: () => void;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
   const [source, setSource] = useState<Source>("analysis");
   const [q, setQ] = useState("");
   const available = target ? analysis.filter((c) => !target.has.includes(c.name)) : [];
+  // each opening starts on the analysis's own cohorts, or the library when it has none to offer
   useEffect(() => {
-    const d = ref.current;
-    if (!d) return;
-    if (target && !d.open) {
-      setQ("");
-      setSource(analysis.some((c) => !target.has.includes(c.name)) ? "analysis" : "library");
-      d.showModal();
-    }
-    if (!target && d.open) d.close();
+    if (!target) return;
+    setQ("");
+    setSource(analysis.some((c) => !target.has.includes(c.name)) ? "analysis" : "library");
   }, [target]); // eslint-disable-line
 
   const full = !!target && target.max != null && target.max > 1 && target.has.length >= target.max;
@@ -81,7 +82,7 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
           <div className="meta" title={desc}>{desc}</div>
           <div className="acd-def"><CohortPills def={def} /></div>
         </div>
-        <button className="tbbtn" disabled={full} title={addTitle("“" + as + "”")} onClick={() => onAdd(as, copy)}>{replaces ? "Use" : "Add"}</button>
+        <Button variant="outline" size="sm" className={TB} disabled={full} title={addTitle("“" + as + "”")} onClick={() => onAdd(as, copy)}>{replaces ? "Use" : <><Plus />Add</>}</Button>
       </li>
     );
   };
@@ -89,25 +90,23 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
   const examples = library.examples.filter((c) => match(c.name) || match(c.desc));
 
   return (
-    <dialog ref={ref} className="namedialog addcohortdialog" aria-label="add a cohort to this view"
-      onClose={onClose} onClick={(e) => { if (e.target === ref.current) ref.current?.close(); }}>
-      {target && <>
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-          <h3>Add a cohort to <span className="plain">{target.title}</span></h3>
-          <button className="linklike" onClick={() => ref.current?.close()}>close</button>
-        </div>
-        {(full || replaces) && <p className="note" style={{ marginTop: 0 }}>
+    <Dialog open={!!target} onOpenChange={(open) => { if (!open) onClose(); }}>
+      {target && <DialogContent aria-describedby={undefined}
+        className="addcohortdialog flex max-h-[85vh] w-[min(94vw,40rem)] max-w-[40rem] flex-col gap-3 overflow-y-auto sm:max-w-[40rem]">
+        <DialogHeader>
+          <DialogTitle className="text-base">Add a cohort to <span className="font-normal text-muted-foreground">{target.title}</span></DialogTitle>
+        </DialogHeader>
+        {(full || replaces) && <p className="note m-0">
           {full ? "This view already draws its maximum of " + target.max + " cohorts — untick one in its cohorts menu to add another."
             : "This view draws one cohort, so the one you pick replaces “" + target.has[0] + "”."}
         </p>}
-        <div className="tabs acd-tabs" role="tablist">
-          <button role="tab" aria-selected={source === "analysis"} className={source === "analysis" ? "active" : ""} onClick={() => setSource("analysis")}>
-            In this analysis <span className="meta">{available.length}</span></button>
-          <button role="tab" aria-selected={source === "library"} className={source === "library" ? "active" : ""} onClick={() => setSource("library")}>
-            Library</button>
-          <button role="tab" aria-selected={source === "explore"} className={source === "explore" ? "active" : ""} onClick={() => setSource("explore")}>
-            Build in Explore</button>
-        </div>
+        <Tabs value={source} onValueChange={(v) => setSource(v as Source)}>
+          <TabsList className="h-8">
+            <TabsTrigger value="analysis" className="px-3 text-md">In this analysis <span className="text-muted-foreground">{available.length}</span></TabsTrigger>
+            <TabsTrigger value="library" className="px-3 text-md">Library</TabsTrigger>
+            <TabsTrigger value="explore" className="px-3 text-md">Build in Explore</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {source === "analysis" && (available.length ? (
           <ul className="acd-list">
@@ -121,7 +120,7 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
                   <div className="meta" title={c.views.join(", ")}>{c.views.length ? "in " + c.views.join(", ") : "in no view yet"}</div>
                   <div className="acd-def"><CohortPills def={c.def} /></div>
                 </div>
-                <button className="tbbtn" disabled={full} title={addTitle("“" + c.name + "”")} onClick={() => onAdd(c.name)}>{replaces ? "Use" : "Add"}</button>
+                <Button variant="outline" size="sm" className={TB} disabled={full} title={addTitle("“" + c.name + "”")} onClick={() => onAdd(c.name)}>{replaces ? "Use" : <><Plus />Add</>}</Button>
               </li>
             ))}
           </ul>
@@ -132,10 +131,10 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
         ))}
 
         {source === "library" && <>
-          <input className="acd-search" placeholder="search the library…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+          <Input className="h-8 text-md md:text-md" placeholder="search the library…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
           <h4 className="acd-h">Your saved cohorts</h4>
           {library.saved === "off" ? <p className="note">This deployment has no login, so it keeps no saved cohorts.</p>
-            : library.saved === "locked" ? <p className="note"><button className="linklike" onClick={onLogin}>Log in</button> to see your saved cohorts.</p>
+            : library.saved === "locked" ? <p className="note"><Button variant="link" size="inline" className="text-md" onClick={onLogin}>Log in</Button> to see your saved cohorts.</p>
             : library.saved === "loading" ? <p className="note"><span className="spinner" /> loading your saved cohorts…</p>
             : library.saved === "error" ? <p className="error">Your saved cohorts could not be loaded: {library.savedError || "unknown error"}</p>
             : !library.cohorts.length ? <p className="note">You have no saved cohorts yet — save one from Explore (“Save as a cohort”).</p>
@@ -148,14 +147,14 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
 
         {source === "explore" && (
           <div className="acd-explore">
-            <p className="note" style={{ marginTop: 0 }}>
+            <p className="note mt-0">
               Explore opens over this analysis with the studies it already uses. Filter with its charts, name the
               selection, and it comes back as a cohort of <strong>{target.title}</strong>; Cancel returns here with nothing added.
             </p>
-            <button className="primary" disabled={full} title={full ? addTitle("") : undefined} onClick={onExplore}>Open Explore</button>
+            <Button disabled={full} title={full ? addTitle("") : undefined} onClick={onExplore}>Open Explore</Button>
           </div>
         )}
-      </>}
-    </dialog>
+      </DialogContent>}
+    </Dialog>
   );
 }
