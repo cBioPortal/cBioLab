@@ -9,6 +9,7 @@ import { GeneListEditor } from "../_oncoprint/OncoprintCard.tsx";
 import type { GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef } from "../../lib/types.ts";
 import type { CustomDataFocus } from "./custom-data-dialog.tsx";
+import type { CustomDataTab } from "./custom-data-panel.tsx";
 import { PartitionPanel, SplitForm, type SplitSpec } from "./partitions.tsx";
 import type { DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
@@ -55,7 +56,7 @@ export interface AnalysisCtx {
   moveView: (i: number, dir: -1 | 1) => void;
   removeView: (i: number) => void;
   openCohortEdit: (name: string) => void;
-  openCustomManager: () => void;
+  openCustomManager: (on?: CustomDataTab) => void;
   openWorkspaceSave: () => void;
   removeCohort: (name: string) => void;
   removePartitionNamed: (name: string) => void;
@@ -106,7 +107,7 @@ export function CustomDataWarning({ ctx }: { ctx: AnalysisCtx }) {
       // a shared document can name server custom data that is locked here, deleted, or absent
       const unresolved = unresolvedUploads(doc);
       const of = (why: string) => unresolved.filter((u) => u.why === why).map((u) => u.as);
-      const manage = <button className="linklike" onClick={openCustomManager}>Explore → Custom data</button>;
+      const manage = <button className="linklike" onClick={() => openCustomManager()}>Explore → Custom data</button>;
       const names = (ids: string[]) => ids.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>);
       return unresolved.length > 0 && (
         <div className="card customwarn">

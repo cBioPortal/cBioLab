@@ -195,8 +195,9 @@ export async function saveDataset(principal: string, input: unknown, source: unk
     if (target.level !== ds.level) throw new Error("“" + target.name + "” is " + target.level + "-level; a new version must be too");
   } else {
     const clash = await b.bySlug(principal, ds.id);
-    if (clash) throw new Error("a server dataset is already named " + ds.id + (clash.deleted_at ? " (deleted)" : "") +
-      ": save as a new version of it, or rename this upload");
+    // a deleted dataset keeps its name, so an analysis pinned to it is still refused as deleted rather than reading another
+    if (clash?.deleted_at) throw new Error("the name " + ds.id + " belonged to a dataset that was deleted, and is not reused: rename this upload");
+    if (clash) throw new Error("a server dataset is already named " + ds.id + ": save as a new version of it, or rename this upload");
   }
   const id = target?.id ?? randomUUID(), version = target ? target.latest_version + 1 : 1;
   await b.write({ id, slug: target?.slug ?? ds.id, name: ds.name, owner: target?.owner ?? principal, level: ds.level, create: !target },

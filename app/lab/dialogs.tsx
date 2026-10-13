@@ -38,6 +38,30 @@ export function SaveCohortDialog({ initial, meta, onSave, onClose }: {
   );
 }
 
+/** Explore's "Save as feature": the name of the yes/no attribute the current filters become. */
+export function SaveFeatureDialog({ initial, meta, onSave, onClose }: {
+  initial: string; meta: string; onSave: (name: string) => void; onClose: () => void;
+}) {
+  const { props, close } = useModal(onClose);
+  const [name, setName] = useState(initial);
+  return (
+    <dialog {...props} className="namedialog savedialog featuredialog">
+      <form method="dialog" onSubmit={(e) => { e.preventDefault(); const n = name.trim(); if (!n) return; close(); onSave(n); }}>
+        <h3>Save as feature</h3>
+        <p className="meta">{meta}</p>
+        <p className="note flush">Patients matching the current filters are <b>Yes</b>, every other patient of the selected
+          studies <b>No</b>. The feature is saved with your custom data, frozen as it is now, and can be charted, split
+          and filtered on like any attribute.</p>
+        <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="feature name…" />
+        <div className="row dlgactions">
+          <button type="button" className="linklike" onClick={close}>cancel</button>
+          <button className="primary" type="submit" disabled={!name.trim()}>Save</button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
 /** The cohort gear menu's "edit…": name and note together, since renaming is the one cohort-level
  *  edit the app supports without reopening Explore or the JSON editor. */
 export function CohortEditDialog({ name: initialName, notes: initialNotes, taken, onSave, onClose }: {

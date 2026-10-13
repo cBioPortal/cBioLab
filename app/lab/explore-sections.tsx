@@ -3,13 +3,12 @@
 // cards. The page owns Explore's state (app/lab/use-explore.ts and the draft) and hands every
 // section the same ExploreCtx — what it reads and the edits it can make.
 import CohortPills from "./pills";
-import CustomDataPanel from "./custom-data-panel.tsx";
 import { ChartMenu } from "./partitions.tsx";
 import type { ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
 import { isCustomAttr } from "../../lib/custom-data-names.ts";
 import { CAT_COLORS } from "./view-chrome.tsx";
-import { SaveCohortDialog } from "./dialogs.tsx";
+import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import type { ExploreState } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 
@@ -189,25 +188,27 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               </button>
             </div>
             {!studies.length && <div className="loading-block"><span className="spinner" /> Loading studies…</div>}
-            <div className="scrollbox">
+            {/* One grid for the whole list (each row a subgrid), so every column lines up
+                however wide its cells are, and every row renders every cell. */}
+            <div className="scrollbox studylist">
+              {hits.length > 0 && <div className="study-row study-head" aria-hidden>
+                <span /><span>Study</span><span>Cancer type</span>
+                <span className="pts">Patients</span><span />
+              </div>}
               {hits.slice(0, 200).map(s => (
-                <label key={s.id} title={s.name} className={"study-row" + (staged.includes(s.id) ? " sel" : "")}>
+                <label key={s.id} title={s.name + " (" + s.id + ")"} className={"study-row" + (staged.includes(s.id) ? " sel" : "")}>
                   <input type="checkbox" checked={staged.includes(s.id)} onChange={() => toggleStaged(s.id)} />
-                  <strong>{s.name}</strong>
-                  <span className="meta mono">{s.id}</span>
+                  <span className="studyname">
+                    <strong>{s.name}</strong>
+                    {s.instance && s.instance !== "a" &&
+                      <span className="peerbadge" title={"held by the federated peer " + s.instanceLabel}>⧉ {s.instanceLabel}</span>}
+                  </span>
                   <span className="meta">{s.cancerType}</span>
-                  {s.instance && s.instance !== "a" &&
-                    <span className="meta accentink" title={"held by " + s.instanceLabel}>⧉ {s.instanceLabel}</span>}
                   <span className="meta pts">{s.patients.toLocaleString()}</span>
-                  <span className="meta caps">{[
-                    s.timelinePatients > 0 ? "timeline" : null,
-                    s.caps && s.caps.mrna ? "mRNA" : null,
-                    s.caps && s.caps.protein ? "protein" : null,
-                    s.oncokb ? "OncoKB ✓" : null
-                  ].filter(Boolean).join(" · ")}</span>
+                  <StudyActions id={s.id} ctx={ctx} />
                 </label>
               ))}
-              {hits.length > 200 && <p className="note">Showing the 200 largest of {hits.length.toLocaleString()} matches — refine the search.</p>}
+              {hits.length > 200 && <p className="note studylist-note">Showing the 200 largest of {hits.length.toLocaleString()} matches — refine the search.</p>}
             </div>
           </>}
         </div>
@@ -216,8 +217,28 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
   </>;
 }
 
+/** A study row's actions, like the portal home page's per-study icons. They act on this
+ *  study alone, whatever is staged; a click on one does not tick the row. */
+function StudyActions({ id, ctx }: { id: string; ctx: ExploreCtx }) {
+  const { addMode, exploreStudy, analyzeStudy, addDataToStudy } = ctx;
+  const act = (f: (id: string) => void) => (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); f(id); };
+  return (
+    <span className="studyacts">
+      <button className="iconbtn" onClick={act(exploreStudy)} title={"explore " + id + " now (replaces the current selection)"} aria-label={"explore " + id}>
+        <svg viewBox="0 0 16 16" aria-hidden><path d="M7.25 1.54A6.5 6.5 0 1 0 14.46 8.75H7.25Z" /><path d="M8.75.04v6.71h6.71A6.5 6.5 0 0 0 8.75.04Z" /></svg>
+      </button>
+      {!addMode && <button className="iconbtn" onClick={act(analyzeStudy)} title={"start a fresh analysis of all of " + id + " (replaces the current document)"} aria-label={"analyze " + id}>
+        <svg viewBox="0 0 16 16" aria-hidden><path d="M1.5 1v13.5H15V13H3V1Z" /><path d="M4.5 8h2v4h-2ZM8 5h2v7H8ZM11.5 2.5h2V12h-2Z" /></svg>
+      </button>}
+      <button className="iconbtn" onClick={act(addDataToStudy)} title={"explore " + id + " and add custom data to it"} aria-label={"add custom data to " + id}>
+        <svg viewBox="0 0 16 16" aria-hidden><path d="M8 1c-3.6 0-6.5 1.1-6.5 2.5v9C1.5 13.9 4.4 15 8 15c.4 0 .8 0 1.2-.04a4.5 4.5 0 0 1-.9-1.48H8c-3.1 0-5-.9-5-1.48V9.9c1.2.65 3 1.03 5 1.08.05-.5.17-.98.36-1.43C5 9.5 3 8.6 3 8V5.4C4.2 6 6 6.5 8 6.5s3.8-.5 5-1.1V8a4.5 4.5 0 0 1 1.5.5v-5C14.5 2.1 11.6 1 8 1Zm0 4C5 5 3 4.1 3 3.5S5 2 8 2s5 .9 5 1.5S11 5 8 5Z" /><path d="M12 9.5a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0v-1.5h-1.5a.75.75 0 0 1 0-1.5h1.5v-1.5A.75.75 0 0 1 12 9.5Z" /></svg>
+      </button>
+    </span>
+  );
+}
+
 export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
-  const { clearDraft, confirmSave, exMsg, exStudies, explore, exploreBusy, openSaveDialog, parseDraft, removeDraftClause, saveDraftAsFeature, saving, setSaving, showClauseData } = ctx;
+  const { clearDraft, confirmSave, exMsg, exStudies, explore, exploreBusy, openSaveDialog, parseDraft, removeDraftClause, saveDraftAsFeature, confirmSaveFeature, saving, setSaving, savingFeature, setSavingFeature, showClauseData } = ctx;
   return <>
     {(() => {
       const d = parseDraft();
@@ -254,6 +275,8 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
           {exMsg && <p className="note flush mt-2">{exMsg}</p>}
           {saving != null && <SaveCohortDialog initial={saving} onSave={confirmSave} onClose={() => setSaving(null)}
             meta={clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies")} />}
+          {savingFeature != null && <SaveFeatureDialog initial={savingFeature} onSave={confirmSaveFeature} onClose={() => setSavingFeature(null)}
+            meta={clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies")} />}
         </div>
       );
     })()}
@@ -261,7 +284,7 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
 }
 
 export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
-  const { addChartDialog, addSeqFilter, attrCoverage, attrKey, chartGene, chartTab, clinFilter, exStudies, exploreBusy, fetchExplore, geneChartInput, geneCharts, hiddenAttrs, seq, seqReady, setAttrCoverage, setChartTab, setClinFilter, setGeneChartInput, setHiddenAttrs, setSeq, treatmentEventType, unchartGene, visibleClinical } = ctx;
+  const { addChartDialog, addSeqFilter, attrCoverage, attrKey, chartGene, chartTab, clinFilter, exStudies, exploreBusy, fetchExplore, geneChartInput, openCustomManager, geneCharts, hiddenAttrs, seq, seqReady, setAttrCoverage, setChartTab, setClinFilter, setGeneChartInput, setHiddenAttrs, setSeq, treatmentEventType, unchartGene, visibleClinical } = ctx;
   const explore = ctx.explore!;
   return <>
     {explore && (
@@ -274,12 +297,79 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
           <button className={chartTab === "derived" ? "active" : ""} onClick={() => setChartTab("derived")}>Derived timeline filters</button>
           <button className={chartTab === "custom" ? "active" : ""} onClick={() => setChartTab("custom")}>Custom data</button>
         </div>
-        {chartTab === "custom" && <CustomDataPanel studies={exStudies} onChanged={() => fetchExplore()} />}
-        {chartTab === "clinical" && (() => {
+        {(() => {
+          const custom = explore.clinical.filter((c) => isCustomAttr(c.attribute));
+          const builtin = explore.clinical.filter((c) => !isCustomAttr(c.attribute));
+          const keysOf = (list: typeof explore.clinical) => list.map(attrKey);
+          /** check every attribute of `list` (shown) or none of it (hidden), leaving the other tab's alone */
+          const setAll = (list: typeof explore.clinical, shown: boolean) => setHiddenAttrs(prev => {
+            const next = new Set(prev);
+            for (const k of keysOf(list)) { if (shown) next.delete(k); else next.add(k); }
+            return next;
+          });
+          const checkedOf = (list: typeof explore.clinical) => visibleClinical(list as never).length;
+          const table = (rows: typeof explore.clinical, showDataset: boolean) => (
+            <div className="attrtablewrap">
+              <table className="attrtable">
+                <thead>
+                  <tr><th></th><th>Attribute</th>{showDataset && <th>Dataset</th>}<th>Type</th><th>Level</th></tr>
+                </thead>
+                <tbody>
+                  {rows.map((c) => {
+                    const toggle = () => setHiddenAttrs(prev => {
+                      const next = new Set(prev);
+                      if (next.has(attrKey(c))) next.delete(attrKey(c)); else next.add(attrKey(c));
+                      return next;
+                    });
+                    // Shown regardless — the checklist is the union across the
+                    // selection (see visibleClinical's own comment) — but an
+                    // attribute only SOME of the selected studies actually carry
+                    // reads as universal without this, so mark it rather than
+                    // leave the reader to discover the gap study by study.
+                    const partial = exStudies.length > 1 && (c.studyCount ?? 1) < exStudies.length;
+                    return (
+                      <tr key={attrKey(c)} onClick={(e) => { if ((e.target as HTMLElement).tagName !== "INPUT") toggle(); }}>
+                        <td><input type="checkbox" checked={!hiddenAttrs.has(attrKey(c))} onChange={toggle} /></td>
+                        <td>
+                          {c.displayName || c.attribute}
+                          {partial && (
+                            <span className="meta" title={"carried by " + (c.studyCount ?? 1) + " of " + exStudies.length + " selected studies, not all of them"}> *</span>
+                          )}
+                        </td>
+                        {showDataset && <td className="meta" title={c.description}>{(c.attribute || "").replace(/^custom:/, "").split("/")[0]}</td>}
+                        <td className="meta">{c.kind === "num" ? "numeric" : "categorical"}</td>
+                        <td className="meta">{c.per === "sample" ? "sample" : "patient"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
+          if (chartTab === "custom") return (
+            <div>
+              <p className="note mt-0">
+                Check a custom attribute to draw it as a tile in the facet grid below; uncheck to hide it.
+                These are the saved datasets that cover the explored {exStudies.length === 1 ? "study" : "studies"}.
+              </p>
+              <div className="row baseline">
+                {custom.length > 0 && <>
+                  <span className="meta">{checkedOf(custom)} of {custom.length} checked</span>
+                  <button className="linklike" onClick={() => setAll(custom, true)}>check all</button>
+                  <button className="linklike" onClick={() => setAll(custom, false)}>check none</button>
+                </>}
+                <span className="spacer" />
+                <button className="tbbtn" onClick={() => { addChartDialog.current?.close(); openCustomManager(custom.length ? "manage" : "add"); }}>
+                  {custom.length ? "Manage custom data…" : "Add custom data…"}</button>
+              </div>
+              {custom.length ? table(custom, true)
+                : <p className="note">No custom data covers {exStudies.length === 1 ? exStudies[0] : "these studies"} yet.</p>}
+            </div>
+          );
+          if (chartTab !== "clinical") return null;
           const q = clinFilter.trim().toLowerCase();
-          const rows = !q ? explore.clinical : explore.clinical.filter((c) =>
+          const rows = !q ? builtin : builtin.filter((c) =>
             (c.attribute || "").toLowerCase().includes(q) || (c.displayName || "").toLowerCase().includes(q));
-          const shownCount = visibleClinical(explore.clinical as never).length;
           return (
             <div>
               <p className="note mt-0">
@@ -292,9 +382,9 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                 <input className="genesearch" type="search" placeholder="find an attribute" value={clinFilter}
                   title="narrows this checklist by attribute name" autoFocus
                   onChange={e => setClinFilter(e.target.value)} />
-                <span className="meta">{shownCount} of {explore.clinical.length} checked</span>
-                <button className="linklike" onClick={() => setHiddenAttrs(new Set())}>check all</button>
-                <button className="linklike" onClick={() => setHiddenAttrs(new Set(explore.clinical.map(attrKey)))}>check none</button>
+                <span className="meta">{checkedOf(builtin)} of {builtin.length} checked</span>
+                <button className="linklike" onClick={() => setAll(builtin, true)}>check all</button>
+                <button className="linklike" onClick={() => setAll(builtin, false)}>check none</button>
                 {exStudies.length > 1 && (
                   <select value={String(attrCoverage)} disabled={exploreBusy}
                     title="attributes carried by only one study are that study's own vocabulary, not something the selection shares"
@@ -313,42 +403,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                 )}
               </div>
               {!rows.length && <p className="note">No attribute matches “{clinFilter}”.</p>}
-              <div className="attrtablewrap">
-                <table className="attrtable">
-                  <thead>
-                    <tr><th></th><th>Attribute</th><th>Type</th><th>Level</th></tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((c) => {
-                      const toggle = () => setHiddenAttrs(prev => {
-                        const next = new Set(prev);
-                        if (next.has(attrKey(c))) next.delete(attrKey(c)); else next.add(attrKey(c));
-                        return next;
-                      });
-                      // Shown regardless — the checklist is the union across the
-                      // selection (see visibleClinical's own comment) — but an
-                      // attribute only SOME of the selected studies actually carry
-                      // reads as universal without this, so mark it rather than
-                      // leave the reader to discover the gap study by study.
-                      const partial = exStudies.length > 1 && (c.studyCount ?? 1) < exStudies.length;
-                      return (
-                        <tr key={attrKey(c)} onClick={(e) => { if ((e.target as HTMLElement).tagName !== "INPUT") toggle(); }}>
-                          <td><input type="checkbox" checked={!hiddenAttrs.has(attrKey(c))} onChange={toggle} /></td>
-                          <td>
-                            {isCustomAttr(c.attribute) && <span className="customtag" title={c.description}>custom</span>}
-                            {c.displayName || c.attribute}
-                            {partial && (
-                              <span className="meta" title={"carried by " + (c.studyCount ?? 1) + " of " + exStudies.length + " selected studies, not all of them"}> *</span>
-                            )}
-                          </td>
-                          <td className="meta">{c.kind === "num" ? "numeric" : "categorical"}</td>
-                          <td className="meta">{c.per === "sample" ? "sample" : "patient"}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              {table(rows, false)}
             </div>
           );
         })()}

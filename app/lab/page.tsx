@@ -8,6 +8,7 @@ import { useLabTools, LAB_TOOL_NAMES } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
+import CustomDataManager from "./custom-data-panel.tsx";
 import LoginButton from "./login-button.tsx";
 import { upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
@@ -306,7 +307,7 @@ export default function AnalysisPage() {
   const cohortEdits = useCohortEdits({ doc, docs, evalOf: (n) => { const c = result?.cohorts[n]; return c ? { count: c.count, text: c.text } : null; }, persist, proposePartition, saved, savedReady, setError, setToast, study });
   const { analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary } = cohortEdits;
   const exploreState = useExploreState({ addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
-  const { addChartDialog, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setChartTab, setExStudies, setExploreStudies } = exploreState;
+  const { addChartDialog, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies } = exploreState;
   const viewOptions = useViewOptions({ cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading });
   const { VIEW_KINDS, assayOptions, attrsLoading, catalogAttrs, contProfile, drawsOwnHead, geneChoices, numericAttrs, profileOptions, viewAttrs, viewEvents, viewGenes } = viewOptions;
   const viewEdits = useViewEdits({ VIEW_KINDS, assayOptions, busy, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, setChooser, setToast, study, viewAttrs, viewEvents, viewGenes, viewIds });
@@ -405,7 +406,7 @@ export default function AnalysisPage() {
             <div className="row mb-4">
               <button className="tbbtn" onClick={() => addChartDialog.current?.showModal()}>+ Add chart</button>
               <button className="tbbtn" title="upload your own annotations and chart, filter and analyse them like clinical attributes"
-                onClick={() => { setChartTab("custom"); addChartDialog.current?.showModal(); }}>
+                onClick={() => openCustomManager(customState.unlocked && customState.datasets.length ? "manage" : "add")}>
                 Custom data{customState.datasets.length ? " (" + customState.datasets.length + ")" : ""}</button>
               {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
             </div>
@@ -472,6 +473,7 @@ export default function AnalysisPage() {
         onLogin={requestLogin}
         onClose={() => setChooser(null)} />
       {toast && <div className="toast" role="status" onClick={() => setToast(null)}>{toast}</div>}
+      <CustomDataManager tab={exploreState.customTab} setTab={exploreState.setCustomTab} studies={exStudies} onChanged={() => fetchExplore()} />
       <CustomDataDialog focus={cdFocus} onClose={() => setCdFocus(null)}
         bindings={doc.uploads || []}
         onRepin={(as, version) => {
