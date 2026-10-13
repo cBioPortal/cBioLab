@@ -352,6 +352,22 @@ still holds, against a running server.
   steps (`--s0` … `--s6`), four radii, one control height (`--ctl-h`). Nothing declares a font
   size or a border radius outside it — the app once had 36 distinct font sizes, five of them
   meaning "small text".
+- **New UI is Tailwind and shadcn; the app is moving onto them area by area.** The `@theme` in
+  `app/globals.css` IS the scale above under Tailwind's names: `text-xs` … `text-2xl` are the
+  seven type steps (Tailwind's own sizes are cleared, so an off-scale size does not exist);
+  spacing is Tailwind's 4px grid, on which the steps are `1`, `1.5`, `2.5`, `4`, `6`, `9` (prefer
+  those; `h-ctl` is the control height); colours use shadcn's semantic names mapped onto the
+  palette — `primary` is the teal, `accent` the soft tint, `muted-foreground` the grey text,
+  `destructive`, `border`, `ring`. shadcn components live in `app/_ui/` (`npx shadcn add …`,
+  configured by `components.json`) and are this repo's code to edit; join classes with `cn()`
+  from `lib/cn.ts`, never by string concatenation (it knows the app's theme names, so a later
+  class overrides an earlier one of the same kind). The old stylesheet sits in the `legacy`
+  layer, below Tailwind's utilities, so a utility always wins over a legacy rule; its first
+  block restores the browser defaults it was written against, outside `[data-slot]` (shadcn)
+  and `[data-tw]` — **mark the root of each area you convert with `data-tw`**, and delete that
+  area's legacy rules in the same commit. Converting must not change what the page shows except
+  where meant: run `npm run visual` (baseline first with `-- --update`, from the commit before)
+  and account for every diff it reports.
 - **One header per view: `ViewHead`.** Title, then this view's actions, then its status chips,
   then remove, on one baseline. Every view kind renders through it; a view that builds its own
   header is a bug, because the timing chip and the close control then move between cards.
@@ -377,7 +393,9 @@ still holds, against a running server.
   a step down in weight, so they read as apparatus rather than as findings.
 - **Server-rendered figures share the palette.** `lib/svg-kit.ts` owns `palette()`, `SERIES` and
   the frame/caption helpers, for `lib/view-svg.ts` and `lib/figures/` alike; a renderer
-  that invents a colour is drifting from every other view.
+  that invents a colour is drifting from every other view. Page CSS never reaches them — the
+  same drawing goes to MCP, exports, the CLI and the Python port — so they stay out of the
+  Tailwind migration.
 - **Geometry stays inline, styling does not.** A tooltip's position and a legend swatch's colour
   are data computed from the drawing; borders, padding and type are classes.
 
