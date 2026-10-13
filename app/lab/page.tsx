@@ -312,6 +312,7 @@ export default function AnalysisPage() {
   const { analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary } = cohortEdits;
   const exploreState = useExploreState({ addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
   const { setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies } = exploreState;
+  const openTab = (t: typeof TABS[number]) => { goTab(t); if (t === "explore" && !explore) fetchExplore(); };
   const viewOptions = useViewOptions({ cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading });
   const { VIEW_KINDS, assayOptions, attrsLoading, catalogAttrs, contProfile, drawsOwnHead, geneChoices, numericAttrs, profileOptions, viewAttrs, viewEvents, viewGenes } = viewOptions;
   const viewEdits = useViewEdits({ VIEW_KINDS, assayOptions, busy, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, setChooser, setToast, study, viewAttrs, viewEvents, viewGenes, viewIds });
@@ -373,9 +374,10 @@ export default function AnalysisPage() {
         {viewNoteEditing != null && <ViewNoteDialog note={(doc.views || [])[viewNoteEditing]?.note || ""}
           onSave={confirmViewNoteEdit} onClose={() => setViewNoteEditing(null)} />}
         <GenesDialog ctx={analysisCtx} />
-        <Tabs value={tab} className="mb-4" onValueChange={(v) => { goTab(v as typeof TABS[number]); if (v === "explore" && !explore) fetchExplore(); }}>
+        {/* a click on the open tab still writes it to the URL */}
+        <Tabs value={tab} className="mb-4" onValueChange={(v) => openTab(v as typeof TABS[number])}>
           <TabsList variant="line" aria-label="lab sections" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
-            {TAB_LABELS.map(([t, label]) => <TabsTrigger key={t} value={t}
+            {TAB_LABELS.map(([t, label]) => <TabsTrigger key={t} value={t} onClick={() => { if (t === tab) openTab(t); }}
               className="h-auto flex-none rounded-none px-3.5 pt-2 pb-1.5 text-base leading-normal after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary">{label}</TabsTrigger>)}
           </TabsList>
         </Tabs>
