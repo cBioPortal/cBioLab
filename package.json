@@ -47,6 +47,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.0",
     "@types/pg": "^8.23.1",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "pixelmatch": "^7.2.0",
