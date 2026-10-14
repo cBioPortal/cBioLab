@@ -86,7 +86,13 @@ export function kaplanMeier(data: SurvRecord[]): Omit<KmCurve, "cohort"> {
       events += d;
     }
   }
-  return { points, median, n: n0, events, ...(unobserved ? { unobserved } : {}) };
+  // the number at risk at each whole month (a KM figure's risk table reads it at its ticks): under
+  // observation at that time — entered before it, not yet left
+  const riskAt = riskSweep(clean);
+  const last = clean.length ? Math.floor(clean[clean.length - 1].t) : -1;
+  const atRisk: number[] = [];
+  for (let m = 0; m <= last; m++) atRisk.push(riskAt(m));
+  return { points, median, n: n0, events, atRisk, ...(unobserved ? { unobserved } : {}) };
 }
 
 /**

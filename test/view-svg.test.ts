@@ -122,6 +122,24 @@ describe("survival: tick interval and cutoff controls reach the SVG", () => {
   });
 });
 
+describe("survival: the number at risk under each tick", () => {
+  const withRisk = (): ViewResult => ({ kind: "survival", cohorts: ["A", "B"], curves: [
+    { cohort: "A", points: [{ t: 0, s: 1 }, { t: 6, s: 0.5 }, { t: 25, s: 0.3 }], median: 6, n: 1200, events: 600, atRisk: Array.from({ length: 30 }, (_, m) => 1200 - m * 40) },
+    { cohort: "B", points: [{ t: 0, s: 1 }, { t: 10, s: 0.7 }], median: null, n: 80, events: 20, atRisk: Array.from({ length: 13 }, (_, m) => 80 - m * 5) },
+  ] } as any);
+  test("each cohort's row gives its count at every tick, zero past its follow-up", () => {
+    const svg = viewToSvg(withRisk(), { width: 900 })!;
+    assert.match(svg, />Number at risk</);
+    assert.match(svg, /<title>A: 1,200 at risk at 0 months<\/title>1,200</);
+    assert.match(svg, /<title>A: 720 at risk at 12 months<\/title>720</);
+    assert.match(svg, /<title>B: 20 at risk at 12 months<\/title>20</);
+    assert.match(svg, /<title>B: 0 at risk at 24 months<\/title>0</);
+  });
+  test("a result without counts draws no table", () => {
+    assert.doesNotMatch(viewToSvg(survival("A"))!, />Number at risk</);
+  });
+});
+
 describe("survival: cumulative incidence display mode", () => {
   test("the legend reads as incidence, not median survival", () => {
     const svg = viewToSvg({ ...survival("A"), display: "incidence" })!;
