@@ -52,7 +52,7 @@ describe("cox: pooled vs stratified-by-cohort forest plots", () => {
   test("a pooled fit draws one panel, one HR=1 reference line", () => {
     const v: ViewResult = { kind: "cox", cohorts: ["all"], cox: { coefficients: [coef("TP53", 1.2)], n: 100, events: 40 }, caveat: "pooled" };
     const svg = viewToSvg(v)!;
-    assert.equal((svg.match(/HR=1/g) || []).length, 1);
+    assert.equal((svg.match(/HR = 1/g) || []).length, 1);
     assert.ok(svg.includes("TP53"));
   });
   test("stratifyByCohort draws one panel per cohort that fit, each headed by its own name and n", () => {
@@ -63,10 +63,10 @@ describe("cox: pooled vs stratified-by-cohort forest plots", () => {
       ] },
       caveat: "stratified" };
     const svg = viewToSvg(v)!;
-    assert.ok(svg.includes("NSCLC (n=100, 40 events)"));
-    assert.ok(svg.includes("CRC (n=50, 15 events)"));
+    assert.ok(svg.includes("NSCLC — n = 100, 40 events"));
+    assert.ok(svg.includes("CRC — n = 50, 15 events"));
     // one shared HR=1 axis label, not one per panel — the scale is shared across panels
-    assert.equal((svg.match(/HR=1/g) || []).length, 1);
+    assert.equal((svg.match(/HR = 1/g) || []).length, 1);
   });
   test("a cohort that failed to fit is simply not drawn, not a blank panel", () => {
     const v: ViewResult = { kind: "cox", cohorts: ["NSCLC", "Empty"],
@@ -77,7 +77,7 @@ describe("cox: pooled vs stratified-by-cohort forest plots", () => {
       caveat: "stratified, one failed" };
     const svg = viewToSvg(v)!;
     assert.ok(svg.includes("NSCLC"));
-    assert.equal(svg.includes("Empty ("), false);
+    assert.equal(svg.includes("Empty —"), false);
   });
   test("a view with every cohort's fit empty yields no figure, same as any other empty payload", () => {
     assert.equal(viewToSvg({ kind: "cox", cox: { coefficients: [], n: 0, events: 0, byCohort: [] } }), null);
@@ -89,8 +89,8 @@ describe("logistic: forest plot of odds ratios", () => {
   test("draws one panel, one OR=1 reference line — same shape as cox's forest plot, an odds ratio instead of a hazard ratio", () => {
     const v: ViewResult = { kind: "logistic", cohorts: ["all"], logistic: { coefficients: [coef("APC", 0.3)], n: 471, events: 27 }, caveat: "logistic" };
     const svg = viewToSvg(v)!;
-    assert.equal((svg.match(/OR=1/g) || []).length, 1);
-    assert.equal((svg.match(/HR=1/g) || []).length, 0);
+    assert.equal((svg.match(/OR = 1/g) || []).length, 1);
+    assert.equal((svg.match(/HR = 1/g) || []).length, 0);
     assert.ok(svg.includes("APC"));
     assert.ok(svg.includes("0.3"));
   });

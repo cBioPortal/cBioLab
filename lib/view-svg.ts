@@ -25,6 +25,7 @@ export { lollipopSummaryText };
 import type { ViewResult, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind, PlotData } from "./types.ts";
 import { kindFigure, kindTitle } from "./figures/index.ts";
 import { survivalSvg } from "./figures/survival.ts";
+import { coxSvg, logisticSvg } from "./figures/forest.ts";
 import { esc, SERIES, palette, num, fmt, pFmt, frame, caption, type SvgOpts } from "./svg-kit.ts";
 export { esc, SERIES, type SvgOpts };
 
@@ -615,71 +616,6 @@ function plotSvg(v: ViewResult, o: SvgOpts): string {
     return frame(Wt, h + cap.height + 10, out.join("") + cap.svg, p.bg, Wt > W);
   }
   return "";
-}
-
-/**
- * A forest plot's shared body: N panels (one per cohort, when stratified — otherwise just one),
- * all sharing ONE ratio scale computed across every panel together, so effect sizes are directly
- * comparable at a glance. `refLabel` names what ratio=1 means ("HR=1" for Cox, "OR=1" for
- * logistic) — everything else about a hazard ratio and an odds ratio's forest plot is identical.
- */
-function forestBody(
-  panels: { heading: string | null; coefs: { label: string; reference?: string; ciLow: number; ciHigh: number; ratio: number; p: number }[] }[],
-  W: number, p: ReturnType<typeof palette>, refLabel: string
-): { svg: string; bottom: number } {
-  const L = 175, R = 215, rowH = 22, panelGap = 26;
-  const allRatio = panels.flatMap((pn) => pn.coefs).flatMap((c) => [c.ciLow, c.ciHigh, c.ratio, 1]).filter((n) => Number.isFinite(n) && n > 0);
-  const lo = Math.max(1e-3, Math.min(...allRatio) * 0.85), hi = Math.max(...allRatio) * 1.15;
-  const lLo = Math.log(lo), lHi = Math.log(Math.max(hi, lo * 1.01));
-  const x = (r: number) => L + (W - L - R) * (Math.log(Math.max(r, 1e-6)) - lLo) / (lHi - lLo);
-  const out: string[] = [];
-  let y = 30;
-  panels.forEach((pn) => {
-    const panelTop = y;
-    if (pn.heading) {
-      out.push(`<text x="${L - 10}" y="${num(y - 6)}" font-size="11" fill="${p.ink}" text-anchor="end" font-weight="600">${esc(pn.heading)}</text>`);
-    }
-    const plotH = rowH * pn.coefs.length;
-    out.push(`<line x1="${num(x(1))}" y1="${panelTop - 10}" x2="${num(x(1))}" y2="${num(panelTop + plotH)}" stroke="${p.line}" stroke-width="1" stroke-dasharray="3,3"/>`);
-    if (panelTop === 30) out.push(`<text x="${num(x(1))}" y="${panelTop - 14}" font-size="10" fill="${p.muted}" text-anchor="middle">${esc(refLabel)}</text>`);
-    pn.coefs.forEach((c, i) => {
-      const cy = panelTop + rowH * i + rowH / 2;
-      const label = c.label + (c.reference ? " vs " + c.reference : "");
-      out.push(`<text x="${L - 10}" y="${num(cy + 3)}" font-size="11" fill="${p.ink}" text-anchor="end">` +
-        `${esc(label.length > 26 ? label.slice(0, 25) + "…" : label)}</text>`);
-      out.push(`<line x1="${num(x(c.ciLow))}" y1="${num(cy)}" x2="${num(x(c.ciHigh))}" y2="${num(cy)}" stroke="${SERIES[0]}" stroke-width="2"/>`);
-      out.push(`<circle cx="${num(x(c.ratio))}" cy="${num(cy)}" r="4" fill="${SERIES[0]}"/>`);
-      out.push(`<text x="${num(W - R + 10)}" y="${num(cy + 3)}" font-size="10" fill="${p.muted}">` +
-        `${num(c.ratio)} (${num(c.ciLow)}–${num(c.ciHigh)}), ${pFmt(c.p)}</text>`);
-    });
-    y = panelTop + plotH + panelGap;
-  });
-  return { svg: out.join(""), bottom: y - panelGap };
-}
-
-/** A forest plot: one row per covariate/level, its hazard ratio and Wald CI on a log axis. */
-function coxSvg(v: ViewResult, o: SvgOpts): string {
-  const p = palette(o.theme), W = o.width || 760;
-  const byCohort = v.cox?.byCohort;
-  // stratifyByCohort: one panel per cohort that fit, sharing forestBody's one scale — the
-  // whole point of stratifying is seeing where cohorts agree or disagree at a glance.
-  const panels = byCohort
-    ? byCohort.filter((c) => c.coefficients.length).map((c) => ({ heading: c.cohort + " (n=" + c.n + ", " + c.events + " events)", coefs: c.coefficients.map((cf) => ({ ...cf, ratio: cf.hr })) }))
-    : [{ heading: null as string | null, coefs: (v.cox?.coefficients || []).map((cf) => ({ ...cf, ratio: cf.hr })) }];
-  const body = forestBody(panels, W, p, "HR=1");
-  const cap = caption(v.caveat || "", W, body.bottom + 20, p.muted);
-  const H = body.bottom + 20 + cap.height + 16;
-  return frame(W, H, body.svg + cap.svg, p.bg);
-}
-
-/** Same forest-plot shape as coxSvg, but for an odds ratio: one panel, no stratifyByCohort yet. */
-function logisticSvg(v: ViewResult, o: SvgOpts): string {
-  const p = palette(o.theme), W = o.width || 760;
-  const panels = [{ heading: null as string | null, coefs: (v.logistic?.coefficients || []).map((cf) => ({ ...cf, ratio: cf.or })) }];
-  const body = forestBody(panels, W, p, "OR=1");
-  const cap = caption(v.caveat || "", W, body.bottom + 20, p.muted);
-  const H = body.bottom + 20 + cap.height + 16;
-  return frame(W, H, body.svg + cap.svg, p.bg);
 }
 
 export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {

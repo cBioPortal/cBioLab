@@ -30,10 +30,11 @@ export function linear(lo: number, hi: number, r0: number, r1: number, o: { coun
 
 /**
  * A log₁₀ scale over [lo, hi] (both > 0). Ticks at powers of ten; with under three decades, 2 and 5
- * between them as well, so a short range still has more than two labels.
+ * between them as well, and under one decade the plain steps, so a short range still has labels.
+ * `nice` (the default) widens the domain to whole decades.
  */
 export function log(lo: number, hi: number, r0: number, r1: number, o: { nice?: boolean } = {}): Scale {
-  lo = Math.max(lo, 1e-300); hi = Math.max(hi, lo * 10);
+  lo = Math.max(lo, 1e-300); if (!(hi > lo)) hi = lo * 10;
   const s = scaleLog().domain([lo, hi]).range([r0, r1]);
   if (o.nice !== false) s.nice();
   const [d0, d1] = s.domain();
@@ -42,7 +43,8 @@ export function log(lo: number, hi: number, r0: number, r1: number, o: { nice?: 
   const keep = decades > 6 ? (t: number) => isPow10(t) && Math.round(Math.log10(t)) % Math.ceil(decades / 6) === 0
     : decades >= 3 ? isPow10
     : (t: number) => [1, 2, 5].includes(lead(t));
-  const ticks = all.filter(keep);
+  // under a decade, the round linear steps within it (0.6, 0.8, 1, 1.2 …)
+  const ticks = decades < 1 ? scaleLinear().domain([d0, d1]).ticks(5) : all.filter(keep);
   const f = (v: number) => s(v);
   return Object.assign(f, { domain: [d0, d1] as [number, number], range: [r0, r1] as [number, number], ticks,
     fmt: (v: number) => v >= 1e5 && isPow10(v) ? "10" + sup(Math.round(Math.log10(v))) : fmtNum(v), log: true });

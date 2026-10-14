@@ -49,8 +49,8 @@ export const fmtP = (p: number, name = "p"): string => {
 };
 export const fmtQ = (q: number): string => fmtP(q, "q");
 
-/** a ratio (hazard, odds): three significant figures */
-export const fmtRatio = (r: number): string => fmtNum(r, 3);
+/** a ratio (hazard, odds): two decimals, so an estimate and its interval line up */
+export const fmtRatio = (r: number): string => Number.isFinite(r) && r >= 0.01 && r < 100 ? r.toFixed(2) : fmtNum(r, 2);
 
 /** months, to one decimal: "37.2 mo" */
 export const fmtMonths = (m: number): string => (Math.round(m * 10) / 10).toLocaleString("en-US") + " mo";
