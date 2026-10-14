@@ -31,7 +31,7 @@ msk_chord_2024 counts. A machine-readable contract is in
 | `PORTAL_URL` | `https://www.cbioportal.org` |
 | `CHAT_PROVIDER` | optional: `anthropic` (with `ANTHROPIC_API_KEY`) or `bedrock` (with `AWS_REGION` and AWS credentials) turns on the Assistant sidebar on a dev server (`next dev`) |
 | `CHAT_ON_DEPLOYMENT` | `1` also turns it on in a built deployment (never on Vercel), for signed-in users only |
-| `CHAT_MODEL` / `CHAT_EFFORT` | optional: the model id (default Claude Opus 5.5, `claude-opus-5-5` / `anthropic.claude-opus-5-5`) and effort (default `medium`) |
+| `CHAT_MODEL` / `CHAT_EFFORT` | optional: the model id (default Claude Sonnet 5.5, `claude-sonnet-5-5` / `anthropic.claude-sonnet-5-5`) and effort (default `medium`) |
 
 Copy them into `.env.local` for local dev; set them in Vercel Project Settings → Environment Variables for deploys.
 

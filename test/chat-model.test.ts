@@ -18,7 +18,7 @@ test("a built deployment has no chat unless it opts in", () => {
 });
 test("a deployment that opts in has chat behind a sign-in, except on Vercel", () => {
   const env = { NODE_ENV: "production", CHAT_PROVIDER: "bedrock", CHAT_ON_DEPLOYMENT: "1" };
-  assert.deepEqual(chatConfig(env), { provider: "bedrock", model: "anthropic.claude-opus-5-5", effort: "medium", signIn: true });
+  assert.deepEqual(chatConfig(env), { provider: "bedrock", model: "anthropic.claude-sonnet-5-5", effort: "medium", signIn: true });
   assert.equal(chatConfig({ ...env, CHAT_ON_DEPLOYMENT: "true" }), null);
   for (const VERCEL of ["1", "true"]) assert.equal(chatConfig({ ...env, VERCEL }), null);
 });
@@ -27,9 +27,9 @@ test("no provider, no chat", () => {
   assert.equal(chatConfig(DEV), null);
   assert.equal(chatConfig({ ...DEV, CHAT_PROVIDER: "  " }), null);
 });
-test("each provider defaults to Opus 5.5 under its own id, at medium effort", () => {
-  assert.deepEqual(chatConfig({ ...DEV, CHAT_PROVIDER: "anthropic" }), { provider: "anthropic", model: "claude-opus-5-5", effort: "medium", signIn: false });
-  assert.deepEqual(chatConfig({ ...DEV, CHAT_PROVIDER: "Bedrock" }), { provider: "bedrock", model: "anthropic.claude-opus-5-5", effort: "medium", signIn: false });
+test("each provider defaults to Sonnet 5.5 under its own id, at medium effort", () => {
+  assert.deepEqual(chatConfig({ ...DEV, CHAT_PROVIDER: "anthropic" }), { provider: "anthropic", model: "claude-sonnet-5-5", effort: "medium", signIn: false });
+  assert.deepEqual(chatConfig({ ...DEV, CHAT_PROVIDER: "Bedrock" }), { provider: "bedrock", model: "anthropic.claude-sonnet-5-5", effort: "medium", signIn: false });
 });
 test("CHAT_MODEL and CHAT_EFFORT override the defaults", () => {
   assert.deepEqual(chatConfig({ ...DEV, CHAT_PROVIDER: "bedrock", CHAT_MODEL: "us.anthropic.claude-sonnet-5-5", CHAT_EFFORT: "high" }),
@@ -40,8 +40,8 @@ test("an unknown provider or effort is refused, not ignored", () => {
   assert.throws(() => chatConfig({ ...DEV, CHAT_PROVIDER: "anthropic", CHAT_EFFORT: "extreme" }), /CHAT_EFFORT/);
 });
 test("thinking blocks survive a change of page; the refusal fallback is Anthropic's API only", () => {
-  const a = chatProviderOptions({ provider: "anthropic", model: "claude-opus-5-5", effort: "medium", signIn: false }).anthropic;
-  const b = chatProviderOptions({ provider: "bedrock", model: "anthropic.claude-opus-5-5", effort: "medium", signIn: false }).anthropic;
+  const a = chatProviderOptions({ provider: "anthropic", model: "claude-sonnet-5-5", effort: "medium", signIn: false }).anthropic;
+  const b = chatProviderOptions({ provider: "bedrock", model: "anthropic.claude-sonnet-5-5", effort: "medium", signIn: false }).anthropic;
   for (const o of [a, b]) assert.deepEqual(o.thinking.blockBinding, { prefixMismatchBehavior: "drop_block" });
   assert.equal(a.fallbacks, "default");
   assert.equal("fallbacks" in b, false);
@@ -62,7 +62,7 @@ test("Bedrock signs each request with the credentials file as it is then, so a r
     return new Response(JSON.stringify({ message: "stub" }), { status: 403 });
   }) as typeof fetch;
   try {
-    const model = chatModel({ provider: "bedrock", model: "anthropic.claude-opus-5-5", effort: "medium", signIn: true });
+    const model = chatModel({ provider: "bedrock", model: "anthropic.claude-sonnet-5-5", effort: "medium", signIn: true });
     const call = () => generateText({ model, prompt: "hi", maxRetries: 0 }).catch(() => undefined);
     write("AKIAFIRST");
     await call();

@@ -5,7 +5,7 @@
 //                             environment, ~/.aws/credentials (re-read on every request, so a
 //                             credentials file a job refreshes is picked up without a restart), or
 //                             the pod's web identity; or AWS_BEARER_TOKEN_BEDROCK
-//   CHAT_MODEL                optional; defaults to Claude Opus 5.5 under the provider's own id
+//   CHAT_MODEL                optional; defaults to Claude Sonnet 5.5 under the provider's own id
 //   CHAT_EFFORT               optional; low | medium | high | xhigh | max (default medium)
 //   CHAT_ON_DEPLOYMENT=1      lets a built deployment have chat (never one on Vercel)
 //
@@ -30,8 +30,8 @@ export interface ChatConfig {
 }
 
 const DEFAULT_MODEL: Record<ChatProvider, string> = {
-  anthropic: "claude-opus-5-5",
-  bedrock: "anthropic.claude-opus-5-5"
+  anthropic: "claude-sonnet-5-5",
+  bedrock: "anthropic.claude-sonnet-5-5"
 };
 
 /** The configured chat model, or null when this deployment has none. Throws on a malformed setting. */
