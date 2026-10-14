@@ -1,6 +1,6 @@
 "use client";
 // A prompt for the researcher's AI assistant (Claude in the Chrome sidebar), with a copy
-// button. The app never calls a model itself; this is how a page hands work to the sidebar.
+// button. The campaign never calls a model itself; this is how a page hands work to an assistant.
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Button } from "../_ui/button";

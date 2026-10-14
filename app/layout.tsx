@@ -1,5 +1,6 @@
 import "./globals.css";
 import { BUILD_INFO } from "../lib/build-info.ts";
+import { ChatSidebar } from "./_agent/ChatSidebar.tsx";
 
 export const metadata = {
   title: "cbio-lab",
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             ? <a className="mono" href={BUILD_INFO.url} title={BUILD_INFO.commit ?? undefined}>{BUILD_INFO.label}</a>
             : <span className="mono" title={BUILD_INFO.commit ? undefined : "this build was not told which commit it is"}>{BUILD_INFO.label}</span>}
         </footer>
+        <ChatSidebar />
       </body>
     </html>
   );

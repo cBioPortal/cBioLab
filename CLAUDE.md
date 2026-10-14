@@ -224,8 +224,22 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
 - **WebMCP (`lib/webmcp.ts`)** — every page's tools for the researcher's assistant in the
   browser (Claude in the Chrome sidebar): registered with `document.modelContext` and published
   as `window.cohortLab`. The analysis page's (`app/lab/agent-tools.ts`) read and edit the
-  document; edits are run by the engine and reach the page only if accepted. **The app never
-  calls a model** — there is no server-side model route; don't add one.
+  document; edits are run by the engine and reach the page only if accepted.
+- **The chat sidebar is the app's only model call, and it is just another WebMCP client**
+  (`app/_agent/ChatSidebar.tsx` in the root layout; `/api/chat`; the provider in
+  `lib/chat-model.ts`: `CHAT_PROVIDER=anthropic|bedrock`, `CHAT_MODEL`, `CHAT_EFFORT`). **Where it
+  runs:** a dev server (`next dev`) with `CHAT_PROVIDER` set; a built deployment only with
+  `CHAT_ON_DEPLOYMENT=1`, never on Vercel (no public URL spends the key), and there only for a
+  signed-in user — a deployment that signs nobody in has none. The internal instance
+  (cbiolab.cbioportal.aws.mskcc.org) uses Bedrock with the credentials file the cluster's SAML job
+  refreshes every 3 h; Bedrock reads AWS credentials through the standard chain, re-read on every
+  request, so a refreshed file needs no restart. It must work the app exactly as an outside
+  assistant (Claude in Chrome, Claude Desktop) does: each request sends the tools the page exposes
+  (`window.cohortLab.tools`), the route declares them **without implementations**, and every call
+  runs in the browser through `window.cohortLab.call`. **Never give it a private way in** — no
+  tools in the route, no reading page state or calling the engine or an API directly. A capability
+  it lacks is a new WebMCP tool, which every assistant then gets. Opening a page reloads it, so the conversation lives in
+  `sessionStorage` and resumes on the new page's tools. No other route calls a model.
 - **`mcp/tools.ts`** — MCP registry: `describe_dsl`, `run_analysis`, `render_oncoprint` (+v1
   event tools). MCP returns oncoprints as a static image rendered from the server SVG; the
   interactive figure is the web app's, not a third renderer.
@@ -236,10 +250,11 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   `extractPrimary` reads the deciding number; campaign-wide BH and the replication rule.
   **`lib/campaign.ts`**: the Postgres ledger (`db/migrations/0002_campaigns.sql`) and the procedure
   (feasibility from cohort sizes only → lock → discovery half → one correction → survivors on the
-  validation half). **The app never calls a model**: hypotheses are written by the
-  researcher's AI assistant in the browser (Claude in the Chrome sidebar) through the campaign
-  page's tools — WebMCP plus `window.cohortLab` (`app/campaign/[id]/agent-tools.ts`) — or by
-  any MCP client. Do not add a server-side model call. The held-out half is the
+  validation half). **The campaign engine never calls a model**: hypotheses are written by the
+  researcher's AI assistant through the campaign page's tools — WebMCP plus `window.cohortLab`
+  (`app/campaign/[id]/agent-tools.ts`), whether that assistant is Claude in Chrome or the app's own
+  chat sidebar, which drives the same tools — or by any MCP client. Do not add a model call to
+  the campaign code. The held-out half is the
   engine's `split` leaf (`lib/cohort2.ts`): a salted hash of the patient id inside ClickHouse,
   salt pinned by `test/cohort.test.ts` — changing it reshuffles every reported result.
   **A locked campaign is immutable at the database level** (triggers); never work around them in
