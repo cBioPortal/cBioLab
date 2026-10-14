@@ -471,6 +471,12 @@ still holds, against a running server.
   invents a colour, a size or a tick rule is drifting from every other view. Page CSS never
   reaches figures — the same drawing goes to MCP, exports, the CLI and the Python port — so they
   stay out of the Tailwind migration.
+- **A figure's text is linted, at every width a card takes.** `lib/chart/lint.ts` reads a drawn
+  SVG back and reports type below `MIN_FS`, text running off the figure, and text printed over
+  text. `npm run check:figures` runs every documented example and every stress document
+  (`scripts/figure-stress.json`: the largest studies, many cohorts and categories, long names)
+  and lints each figure at 560, 936 and 1352px; it must report 0. A new view kind, or a change to
+  a renderer, adds a stress document when the existing ones do not reach its crowded case.
 - **Geometry stays inline, styling does not.** A tooltip's position and a legend swatch's colour
   are data computed from the drawing; borders, padding and type are classes.
 

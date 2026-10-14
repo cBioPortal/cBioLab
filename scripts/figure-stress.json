@@ -1,0 +1,1968 @@
+{
+ "survival-15arms": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "Non-Small Cell Lung Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Breast Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Colorectal Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Prostate Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Prostate Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Pancreatic Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Pancreatic Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Endometrial Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Endometrial Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Soft Tissue Sarcoma": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Soft Tissue Sarcoma"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Ovarian Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Ovarian Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Bladder Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Bladder Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Glioma": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Glioma"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Melanoma": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Melanoma"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Esophagogastric Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Esophagogastric Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Cancer of Unknown Primary": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Cancer of Unknown Primary"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Hepatobiliary Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Hepatobiliary Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Gastrointestinal Neuroendocrine Tumor": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Gastrointestinal Neuroendocrine Tumor"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "survival",
+    "cohorts": [
+     "Non-Small Cell Lung Cancer",
+     "Breast Cancer",
+     "Colorectal Cancer",
+     "Prostate Cancer",
+     "Pancreatic Cancer",
+     "Endometrial Cancer",
+     "Soft Tissue Sarcoma",
+     "Ovarian Cancer",
+     "Bladder Cancer",
+     "Glioma",
+     "Melanoma",
+     "Esophagogastric Cancer",
+     "Cancer of Unknown Primary",
+     "Hepatobiliary Cancer",
+     "Gastrointestinal Neuroendocrine Tumor"
+    ]
+   }
+  ]
+ },
+ "survival-longnames": {
+  "study": "msk_chord_2024",
+  "cohorts": {
+   "Non-small cell lung cancer, TP53-mutant, never treated with immunotherapy": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     },
+     {
+      "kind": "oql",
+      "q": "TP53: MUT"
+     }
+    ]
+   },
+   "Non-small cell lung cancer, TP53 wild-type (profiled for mutations)": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     },
+     {
+      "not": {
+       "kind": "oql",
+       "q": "TP53:"
+      }
+     },
+     {
+      "kind": "profiled",
+      "type": "MUTATION"
+     }
+    ]
+   },
+   "Colorectal adenocarcinoma with KRAS mutation": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     },
+     {
+      "kind": "oql",
+      "q": "KRAS: MUT"
+     }
+    ]
+   },
+   "Colorectal adenocarcinoma without KRAS mutation": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     },
+     {
+      "not": {
+       "kind": "oql",
+       "q": "KRAS:"
+      }
+     },
+     {
+      "kind": "profiled",
+      "type": "MUTATION"
+     }
+    ]
+   },
+   "Pancreatic ductal adenocarcinoma, any": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Pancreatic Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Breast cancer, PIK3CA-mutant": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     },
+     {
+      "kind": "oql",
+      "q": "PIK3CA: MUT"
+     }
+    ]
+   },
+   "Breast cancer, PIK3CA wild-type": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     },
+     {
+      "not": {
+       "kind": "oql",
+       "q": "PIK3CA:"
+      }
+     },
+     {
+      "kind": "profiled",
+      "type": "MUTATION"
+     }
+    ]
+   },
+   "Prostate adenocarcinoma, all patients": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Prostate Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "survival",
+    "cohorts": [
+     "Non-small cell lung cancer, TP53-mutant, never treated with immunotherapy",
+     "Non-small cell lung cancer, TP53 wild-type (profiled for mutations)",
+     "Colorectal adenocarcinoma with KRAS mutation",
+     "Colorectal adenocarcinoma without KRAS mutation",
+     "Pancreatic ductal adenocarcinoma, any",
+     "Breast cancer, PIK3CA-mutant",
+     "Breast cancer, PIK3CA wild-type",
+     "Prostate adenocarcinoma, all patients"
+    ]
+   }
+  ]
+ },
+ "survival-splitby": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "all patients": {
+    "all": []
+   }
+  },
+  "views": [
+   {
+    "kind": "survival",
+    "splitBy": {
+     "cohort": "all patients",
+     "attribute": "CANCER_TYPE",
+     "maxArms": 8
+    }
+   }
+  ]
+ },
+ "compare-12x20": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "Non-Small Cell Lung Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Breast Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Colorectal Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Prostate Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Prostate Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Pancreatic Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Pancreatic Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Endometrial Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Endometrial Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Soft Tissue Sarcoma": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Soft Tissue Sarcoma"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Ovarian Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Ovarian Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Bladder Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Bladder Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Glioma": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Glioma"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Melanoma": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Melanoma"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Esophagogastric Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Esophagogastric Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "compare",
+    "cohorts": [
+     "Non-Small Cell Lung Cancer",
+     "Breast Cancer",
+     "Colorectal Cancer",
+     "Prostate Cancer",
+     "Pancreatic Cancer",
+     "Endometrial Cancer",
+     "Soft Tissue Sarcoma",
+     "Ovarian Cancer",
+     "Bladder Cancer",
+     "Glioma",
+     "Melanoma",
+     "Esophagogastric Cancer"
+    ],
+    "genes": [
+     "TP53",
+     "KRAS",
+     "PIK3CA",
+     "APC",
+     "EGFR",
+     "CDKN2A",
+     "PTEN",
+     "ARID1A",
+     "KMT2D",
+     "TERT",
+     "SMAD4",
+     "BRAF",
+     "RB1",
+     "NF1",
+     "ATM",
+     "BRCA2",
+     "ERBB2",
+     "MYC",
+     "CCND1",
+     "FGFR3"
+    ]
+   }
+  ]
+ },
+ "clinical-many": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "Non-Small Cell Lung Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Breast Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Colorectal Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Prostate Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Prostate Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Pancreatic Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Pancreatic Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Endometrial Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Endometrial Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Soft Tissue Sarcoma": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Soft Tissue Sarcoma"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Ovarian Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Ovarian Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Bladder Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Bladder Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Glioma": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Glioma"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "clinical",
+    "cohorts": [
+     "Non-Small Cell Lung Cancer",
+     "Breast Cancer",
+     "Colorectal Cancer",
+     "Prostate Cancer",
+     "Pancreatic Cancer",
+     "Endometrial Cancer",
+     "Soft Tissue Sarcoma",
+     "Ovarian Cancer",
+     "Bladder Cancer",
+     "Glioma"
+    ],
+    "attributes": [
+     "SAMPLE_TYPE",
+     "MSI_TYPE",
+     "ANCESTRY_LABEL",
+     "CANCER_TYPE_DETAILED",
+     "METASTATIC_SITE",
+     "TMB_SCORE",
+     "FRACTION_GENOME_ALTERED",
+     "AGE_AT_DX",
+     "TUMOR_PURITY",
+     "MUTATION_COUNT"
+    ]
+   }
+  ]
+ },
+ "clinical-2cohorts": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "TP53 mut": {
+    "all": [
+     {
+      "kind": "oql",
+      "q": "TP53: MUT"
+     }
+    ]
+   },
+   "TP53 wt": {
+    "all": [
+     {
+      "not": {
+       "kind": "oql",
+       "q": "TP53:"
+      }
+     },
+     {
+      "kind": "profiled",
+      "type": "MUTATION"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "clinical",
+    "cohorts": [
+     "TP53 mut",
+     "TP53 wt"
+    ],
+    "attributes": [
+     "CANCER_TYPE",
+     "PRIMARY_SITE",
+     "ONCOTREE_CODE",
+     "SAMPLE_TYPE",
+     "TMB_SCORE",
+     "AGE_AT_DX"
+    ]
+   }
+  ]
+ },
+ "cancertypes-genie": {
+  "study": "genie_public",
+  "cohorts": {
+   "all patients": {
+    "all": []
+   }
+  },
+  "views": [
+   {
+    "kind": "cancertypes",
+    "cohorts": [
+     "all patients"
+    ],
+    "genes": [
+     "TP53",
+     "KRAS",
+     "PIK3CA",
+     "APC",
+     "EGFR",
+     "CDKN2A",
+     "PTEN",
+     "ARID1A",
+     "KMT2D",
+     "TERT",
+     "SMAD4",
+     "BRAF",
+     "RB1",
+     "NF1",
+     "ATM",
+     "BRCA2",
+     "ERBB2",
+     "MYC",
+     "CCND1",
+     "FGFR3",
+     "IDH1",
+     "NRAS",
+     "HRAS",
+     "KIT",
+     "MET",
+     "ALK",
+     "ROS1",
+     "RET",
+     "NTRK1",
+     "ESR1"
+    ],
+    "minSamples": 10
+   }
+  ]
+ },
+ "cancertypes-detailed": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "all patients": {
+    "all": []
+   }
+  },
+  "views": [
+   {
+    "kind": "cancertypes",
+    "cohorts": [
+     "all patients"
+    ],
+    "genes": [
+     "KRAS",
+     "NRAS",
+     "HRAS"
+    ],
+    "groupBy": "CANCER_TYPE_DETAILED",
+    "minSamples": 20
+   }
+  ]
+ },
+ "plot-scatter-54k": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "all patients": {
+    "all": []
+   }
+  },
+  "views": [
+   {
+    "kind": "plot",
+    "cohorts": [
+     "all patients"
+    ],
+    "unit": "sample",
+    "x": {
+     "source": "clinical",
+     "attribute": "MUTATION_COUNT"
+    },
+    "y": {
+     "source": "clinical",
+     "attribute": "FRACTION_GENOME_ALTERED"
+    }
+   },
+   {
+    "kind": "plot",
+    "cohorts": [
+     "all patients"
+    ],
+    "unit": "sample",
+    "x": {
+     "source": "clinical",
+     "attribute": "TUMOR_PURITY"
+    },
+    "y": {
+     "source": "clinical",
+     "attribute": "FACETS_PURITY"
+    },
+    "colorBy": {
+     "source": "clinical",
+     "attribute": "SAMPLE_TYPE"
+    }
+   }
+  ]
+ },
+ "plot-box-65types": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "all patients": {
+    "all": []
+   }
+  },
+  "views": [
+   {
+    "kind": "plot",
+    "cohorts": [
+     "all patients"
+    ],
+    "unit": "sample",
+    "x": {
+     "source": "clinical",
+     "attribute": "CANCER_TYPE"
+    },
+    "y": {
+     "source": "clinical",
+     "attribute": "TMB_SCORE"
+    }
+   },
+   {
+    "kind": "plot",
+    "cohorts": [
+     "all patients"
+    ],
+    "unit": "sample",
+    "x": {
+     "source": "clinical",
+     "attribute": "CANCER_TYPE"
+    },
+    "y": {
+     "source": "clinical",
+     "attribute": "SAMPLE_TYPE"
+    }
+   }
+  ]
+ },
+ "plot-genie-highlight": {
+  "study": "genie_public",
+  "cohorts": {
+   "all patients": {
+    "all": []
+   },
+   "KRAS mut": {
+    "all": [
+     {
+      "kind": "oql",
+      "q": "KRAS: MUT"
+     }
+    ]
+   },
+   "TP53 mut": {
+    "all": [
+     {
+      "kind": "oql",
+      "q": "TP53: MUT"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "plot",
+    "cohorts": [
+     "all patients"
+    ],
+    "x": {
+     "source": "clinical",
+     "attribute": "CANCER_TYPE"
+    },
+    "y": {
+     "source": "alteration",
+     "gene": "TP53",
+     "by": "mutationType"
+    },
+    "highlight": [
+     "KRAS mut"
+    ]
+   }
+  ]
+ },
+ "hotspots-tp53-genie": {
+  "study": "genie_public",
+  "cohorts": {
+   "all patients": {
+    "all": []
+   }
+  },
+  "views": [
+   {
+    "kind": "hotspots",
+    "cohorts": [
+     "all patients"
+    ],
+    "genes": [
+     "TP53"
+    ],
+    "minCount": 3
+   }
+  ]
+ },
+ "hotspots-12genes": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "all patients": {
+    "all": []
+   },
+   "NSCLC": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "hotspots",
+    "cohorts": [
+     "all patients",
+     "NSCLC"
+    ],
+    "genes": [
+     "TP53",
+     "KRAS",
+     "PIK3CA",
+     "APC",
+     "EGFR",
+     "CDKN2A",
+     "PTEN",
+     "ARID1A",
+     "KMT2D",
+     "TERT",
+     "SMAD4",
+     "BRAF"
+    ],
+    "minCount": 3
+   }
+  ]
+ },
+ "genome-4": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "Non-Small Cell Lung Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Breast Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Colorectal Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Prostate Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Prostate Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "genome",
+    "cohorts": [
+     "Non-Small Cell Lung Cancer",
+     "Breast Cancer",
+     "Colorectal Cancer",
+     "Prostate Cancer"
+    ],
+    "binMb": 1,
+    "includeX": true
+   }
+  ]
+ },
+ "enrichment-6": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "Non-Small Cell Lung Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Breast Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Colorectal Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Prostate Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Prostate Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Pancreatic Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Pancreatic Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Endometrial Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Endometrial Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "enrichment",
+    "cohorts": [
+     "Non-Small Cell Lung Cancer",
+     "Breast Cancer",
+     "Colorectal Cancer",
+     "Prostate Cancer",
+     "Pancreatic Cancer",
+     "Endometrial Cancer"
+    ]
+   }
+  ]
+ },
+ "enrichment-2": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "Colorectal Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Pancreatic Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Pancreatic Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "enrichment",
+    "cohorts": [
+     "Colorectal Cancer",
+     "Pancreatic Cancer"
+    ],
+    "label": 25
+   }
+  ]
+ },
+ "cooccurrence-12": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "all patients": {
+    "all": []
+   }
+  },
+  "views": [
+   {
+    "kind": "cooccurrence",
+    "cohorts": [
+     "all patients"
+    ],
+    "genes": [
+     "TP53",
+     "KRAS",
+     "PIK3CA",
+     "APC",
+     "EGFR",
+     "CDKN2A",
+     "PTEN",
+     "ARID1A",
+     "KMT2D",
+     "TERT",
+     "SMAD4",
+     "BRAF"
+    ]
+   }
+  ]
+ },
+ "coexpression-12": {
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+   "BRCA": {
+    "all": []
+   }
+  },
+  "views": [
+   {
+    "kind": "coexpression",
+    "cohorts": [
+     "BRCA"
+    ],
+    "profileType": "rna_seq_v2_mrna_median_Zscores",
+    "genes": [
+     "ERBB2",
+     "GRB7",
+     "ESR1",
+     "PGR",
+     "MKI67",
+     "FOXA1",
+     "GATA3",
+     "KRT5",
+     "KRT14",
+     "EGFR",
+     "CCNE1",
+     "TOP2A"
+    ]
+   }
+  ]
+ },
+ "pathways-4": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "Non-Small Cell Lung Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Breast Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Colorectal Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Prostate Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Prostate Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "pathways",
+    "cohorts": [
+     "Non-Small Cell Lung Cancer",
+     "Breast Cancer",
+     "Colorectal Cancer",
+     "Prostate Cancer"
+    ],
+    "topGenes": 10
+   }
+  ]
+ },
+ "overlap-6": {
+  "study": "msk_chord_2024",
+  "cohorts": {
+   "TP53 mutant": {
+    "all": [
+     {
+      "kind": "oql",
+      "q": "TP53: MUT"
+     }
+    ]
+   },
+   "KRAS mutant": {
+    "all": [
+     {
+      "kind": "oql",
+      "q": "KRAS: MUT"
+     }
+    ]
+   },
+   "Received immunotherapy at any time": {
+    "all": [
+     {
+      "kind": "event",
+      "a": {
+       "eventType": "Treatment",
+       "attrs": [
+        {
+         "key": "SUBTYPE",
+         "value": "Immuno"
+        }
+       ]
+      },
+      "rel": {
+       "type": "NONE"
+      }
+     }
+    ]
+   },
+   "Non-small cell lung cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "PIK3CA mutant": {
+    "all": [
+     {
+      "kind": "oql",
+      "q": "PIK3CA: MUT"
+     }
+    ]
+   },
+   "APC mutant": {
+    "all": [
+     {
+      "kind": "oql",
+      "q": "APC: MUT"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "overlap",
+    "cohorts": [
+     "TP53 mutant",
+     "KRAS mutant",
+     "Received immunotherapy at any time",
+     "Non-small cell lung cancer",
+     "PIK3CA mutant",
+     "APC mutant"
+    ]
+   }
+  ]
+ },
+ "overlap-3": {
+  "study": "msk_chord_2024",
+  "cohorts": {
+   "TP53 mutant": {
+    "all": [
+     {
+      "kind": "oql",
+      "q": "TP53: MUT"
+     }
+    ]
+   },
+   "KRAS mutant": {
+    "all": [
+     {
+      "kind": "oql",
+      "q": "KRAS: MUT"
+     }
+    ]
+   },
+   "Non-small cell lung cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "overlap",
+    "cohorts": [
+     "TP53 mutant",
+     "KRAS mutant",
+     "Non-small cell lung cancer"
+    ]
+   }
+  ]
+ },
+ "incidence-5": {
+  "study": "msk_chord_2024",
+  "cohorts": {
+   "Non-Small Cell Lung Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Breast Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Colorectal Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Prostate Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Prostate Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Pancreatic Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Pancreatic Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "incidence",
+    "cohorts": [
+     "Non-Small Cell Lung Cancer",
+     "Breast Cancer",
+     "Colorectal Cancer",
+     "Prostate Cancer",
+     "Pancreatic Cancer"
+    ],
+    "event": {
+     "eventType": "Diagnosis",
+     "attrs": [
+      {
+       "key": "TUMOR_SITE",
+       "value": "CNS/Brain"
+      }
+     ],
+     "label": "brain metastasis"
+    }
+   }
+  ]
+ },
+ "cox-8": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "all patients": {
+    "all": []
+   }
+  },
+  "views": [
+   {
+    "kind": "cox",
+    "cohorts": [
+     "all patients"
+    ],
+    "covariates": [
+     {
+      "source": "alteration",
+      "gene": "TP53",
+      "by": "mutated"
+     },
+     {
+      "source": "alteration",
+      "gene": "KRAS",
+      "by": "mutated"
+     },
+     {
+      "source": "alteration",
+      "gene": "PIK3CA",
+      "by": "mutated"
+     },
+     {
+      "source": "alteration",
+      "gene": "EGFR",
+      "by": "mutated"
+     },
+     {
+      "source": "clinical",
+      "attribute": "AGE_AT_DX"
+     },
+     {
+      "source": "clinical",
+      "attribute": "SEX"
+     },
+     {
+      "source": "clinical",
+      "attribute": "TMB_SCORE"
+     },
+     {
+      "source": "clinical",
+      "attribute": "SAMPLE_TYPE"
+     }
+    ]
+   }
+  ]
+ },
+ "sequence-top15": {
+  "study": "msk_chord_2024",
+  "cohorts": {
+   "TP53 mut": {
+    "all": [
+     {
+      "kind": "oql",
+      "q": "TP53: MUT"
+     }
+    ]
+   },
+   "TP53 wt": {
+    "all": [
+     {
+      "not": {
+       "kind": "oql",
+       "q": "TP53:"
+      }
+     },
+     {
+      "kind": "profiled",
+      "type": "MUTATION"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "sequence",
+    "cohorts": [
+     "TP53 mut",
+     "TP53 wt"
+    ],
+    "labelKey": "SUBTYPE",
+    "lineGap": 90,
+    "maxSteps": 4,
+    "topN": 15
+   }
+  ]
+ },
+ "attrition-6": {
+  "study": "msk_chord_2024",
+  "cohorts": {
+   "Non-Small Cell Lung Cancer, TP53-mutant, followed 2y+": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     },
+     {
+      "kind": "oql",
+      "q": "TP53: MUT"
+     },
+     {
+      "kind": "derived",
+      "metric": "followupMonths",
+      "range": {
+       "gte": 24
+      }
+     }
+    ]
+   },
+   "Breast Cancer, TP53-mutant, followed 2y+": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     },
+     {
+      "kind": "oql",
+      "q": "TP53: MUT"
+     },
+     {
+      "kind": "derived",
+      "metric": "followupMonths",
+      "range": {
+       "gte": 24
+      }
+     }
+    ]
+   },
+   "Colorectal Cancer, TP53-mutant, followed 2y+": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     },
+     {
+      "kind": "oql",
+      "q": "TP53: MUT"
+     },
+     {
+      "kind": "derived",
+      "metric": "followupMonths",
+      "range": {
+       "gte": 24
+      }
+     }
+    ]
+   },
+   "Prostate Cancer, TP53-mutant, followed 2y+": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Prostate Cancer"
+      ],
+      "per": "sample"
+     },
+     {
+      "kind": "oql",
+      "q": "TP53: MUT"
+     },
+     {
+      "kind": "derived",
+      "metric": "followupMonths",
+      "range": {
+       "gte": 24
+      }
+     }
+    ]
+   },
+   "Pancreatic Cancer, TP53-mutant, followed 2y+": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Pancreatic Cancer"
+      ],
+      "per": "sample"
+     },
+     {
+      "kind": "oql",
+      "q": "TP53: MUT"
+     },
+     {
+      "kind": "derived",
+      "metric": "followupMonths",
+      "range": {
+       "gte": 24
+      }
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "attrition",
+    "cohorts": [
+     "Non-Small Cell Lung Cancer, TP53-mutant, followed 2y+",
+     "Breast Cancer, TP53-mutant, followed 2y+",
+     "Colorectal Cancer, TP53-mutant, followed 2y+",
+     "Prostate Cancer, TP53-mutant, followed 2y+",
+     "Pancreatic Cancer, TP53-mutant, followed 2y+"
+    ]
+   }
+  ]
+ },
+ "paired-40": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "all patients": {
+    "all": []
+   }
+  },
+  "views": [
+   {
+    "kind": "paired",
+    "cohorts": [
+     "all patients"
+    ],
+    "top": 15
+   }
+  ]
+ },
+ "clonality-3x12": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "Colorectal Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Breast Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Non-Small Cell Lung Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "clonality",
+    "cohorts": [
+     "Colorectal Cancer",
+     "Breast Cancer",
+     "Non-Small Cell Lung Cancer"
+    ],
+    "genes": [
+     "TP53",
+     "KRAS",
+     "PIK3CA",
+     "APC",
+     "EGFR",
+     "CDKN2A",
+     "PTEN",
+     "ARID1A",
+     "KMT2D",
+     "TERT",
+     "SMAD4",
+     "BRAF"
+    ]
+   }
+  ]
+ },
+ "assays-6": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "Melanoma": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Melanoma"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Non-Small Cell Lung Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Colorectal Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Breast Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Bladder Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Bladder Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Endometrial Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Endometrial Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "assays",
+    "cohorts": [
+     "Melanoma",
+     "Non-Small Cell Lung Cancer",
+     "Colorectal Cancer",
+     "Breast Cancer",
+     "Bladder Cancer",
+     "Endometrial Cancer"
+    ],
+    "profileType": "mutational_signatures_contribution_v2"
+   }
+  ]
+ }
+}

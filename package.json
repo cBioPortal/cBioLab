@@ -32,7 +32,8 @@
     "check:access-mutants": "node scripts/check-access-mutants.ts",
     "check:mutants": "node --env-file=.env.local scripts/check-mutants.ts",
     "verify": "npm test && npm run check:methods && RECORD=1 npm run check:portal && RECORD=1 npm run check:cohorts && RECORD=1 npm run check:mutants",
-    "visual": "node scripts/visual.ts"
+    "visual": "node scripts/visual.ts",
+    "check:figures": "node --env-file=.env.local scripts/check-figures.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
@@ -40,7 +41,6 @@
     "@tanstack/react-query": "^5.104.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "d3-format": "3.1.2",
     "d3-scale": "4.0.2",
     "express": "^5.2.1",
     "lucide-react": "^1.56.0",
@@ -62,7 +62,6 @@
     "@eslint/js": "^10.0.1",
     "@next/eslint-plugin-next": "^16.4.0",
     "@tailwindcss/postcss": "^4.3.3",
-    "@types/d3-format": "3.0.4",
     "@types/d3-scale": "4.0.9",
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.0",
