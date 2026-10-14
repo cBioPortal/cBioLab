@@ -214,9 +214,9 @@ export default function AnalysisPage() {
   const { cat, catLoading } = useStudyCatalog(study);
   const { trackAttrs, trackAttrsLoading } = useTrackAttrs(result);
 
-  // Saved cohorts and analyses belong to the login (lib/auth.ts): see use-saved.ts.
+  // Saved cohorts and analyses belong to the signed-in user (lib/auth.ts): see use-saved.ts.
   const loggedIn = customState.unlocked;
-  const savedArtifacts = useSavedArtifacts(loggedIn);
+  const savedArtifacts = useSavedArtifacts(customState.user?.id ?? null);
   const { cohorts: saved, workspaces: spaces, saveCohort: persist, saveWorkspace: persistSpaces, removeWorkspace: removeSpace } = savedArtifacts;
   /** Saving needs the login: logged out, ask for it rather than fail. Returns true when saving may go ahead. */
   const canSave = (): boolean => {

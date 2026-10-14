@@ -2,8 +2,9 @@
 // (test/custom-store.test.ts) and on a Postgres the test supplies (test/postgres.db-test.ts).
 import { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
-import { listDatasets, saveDataset, readVersion, deleteDataset, unpackRows } from "../../lib/custom-store.ts";
-import { listArtifacts, getArtifact, createArtifact, updateArtifact, deleteArtifact } from "../../lib/artifacts.ts";
+import { listDatasets, saveDataset, readVersion, deleteDataset, unpackRows, shareDataset } from "../../lib/custom-store.ts";
+import { listArtifacts, getArtifact, createArtifact, updateArtifact, deleteArtifact, shareArtifact } from "../../lib/artifacts.ts";
+import { createGroup, addMember, getGroup, listGroups, removeMember, setRole, deleteGroup } from "../../lib/groups.ts";
 import { userForEmail, signIn, claimLegacy } from "../../lib/users.ts";
 import { dbQuery } from "../../lib/db.ts";
 
@@ -169,6 +170,140 @@ export function userContract(backend: string): void {
       assert.equal(r.user!.id, heir.id);
       assert.ok((await listArtifacts(heir.id)).some((a) => a.name === "legacy"));
       assert.equal((await claimLegacy("heir@example.org", true)).artifacts, 0);
+    });
+  });
+}
+
+/**
+ * Sharing (lib/access.ts) and groups (lib/groups.ts): the whole access matrix — owner, a member of
+ * the item's group, someone outside it — for every sharing, on saved items and custom datasets.
+ */
+export function sharingContract(backend: string): void {
+  describe("sharing and groups (" + backend + ")", () => {
+    let O = "", M = "", X = "", G = "", G2 = "";
+    const tag = Math.random().toString(36).slice(2, 8);
+    before(async () => {
+      O = (await userForEmail("owner-" + tag + "@share.test")).id;
+      M = (await userForEmail("member-" + tag + "@share.test")).id;
+      X = (await userForEmail("outsider-" + tag + "@share.test")).id;
+      G = (await createGroup(O, "lab " + tag)).id;
+      await addMember(O, G, "member-" + tag + "@share.test");
+      G2 = (await createGroup(X, "other " + tag)).id;
+    });
+
+    type Can = { read: boolean; edit: boolean };
+    const SHARINGS: [string, Record<string, unknown>, Can, Can][] = [
+      // [name, sharing, what the group member may do, what the outsider may do]
+      ["private", { visibility: "private" }, { read: false, edit: false }, { read: false, edit: false }],
+      ["group", { visibility: "group", groupId: "G" }, { read: true, edit: false }, { read: false, edit: false }],
+      ["group, group edits", { visibility: "group", groupId: "G", groupCanEdit: true }, { read: true, edit: true }, { read: false, edit: false }],
+      ["everyone", { visibility: "public" }, { read: true, edit: false }, { read: true, edit: false }],
+      ["everyone, group edits", { visibility: "public", groupId: "G", groupCanEdit: true }, { read: true, edit: true }, { read: true, edit: false }],
+    ];
+    const withGroup = (s: Record<string, unknown>) => ({ ...s, ...(s.groupId ? { groupId: G } : {}) });
+
+    for (const [name, sharing, member, outsider] of SHARINGS) {
+      test("a saved analysis shared " + name + ": owner, member and outsider each get exactly their rights", async () => {
+        const a = await createArtifact(O, "workspace", "shared " + name + " " + tag, { views: [] });
+        const r = await shareArtifact(O, a.id, withGroup(sharing));
+        assert.equal(r!.artifact.sharing.visibility, sharing.visibility);
+        for (const [who, can] of [[M, member], [X, outsider]] as [string, Can][]) {
+          const seen = await getArtifact(who, a.id);
+          assert.equal(!!seen, can.read, "read");
+          assert.equal((await listArtifacts(who, "workspace")).some((x) => x.id === a.id), can.read, "listed");
+          if (seen) assert.deepEqual(seen.rights, { edit: can.edit, share: false });
+          if (can.edit) assert.equal((await updateArtifact(who, a.id, { name: "edited by " + who }))!.name, "edited by " + who);
+          else if (can.read) await assert.rejects(updateArtifact(who, a.id, { name: "x" }), /shared with you to read, not to change/);
+          else assert.equal(await updateArtifact(who, a.id, { name: "x" }), null);
+          // only the owner deletes or reshares, whatever else the sharing allows
+          if (can.read) {
+            await assert.rejects(deleteArtifact(who, a.id), /only its owner can delete/);
+            await assert.rejects(shareArtifact(who, a.id, { visibility: "public" }), /only its owner can change who/);
+          } else {
+            assert.equal(await deleteArtifact(who, a.id), false);
+            assert.equal(await shareArtifact(who, a.id, { visibility: "public" }), null);
+          }
+        }
+        assert.deepEqual((await getArtifact(O, a.id))!.rights, { edit: true, share: true });
+        assert.equal(await deleteArtifact(O, a.id), true);
+      });
+
+      test("a custom dataset shared " + name + ": the same rights over its rows", async () => {
+        const d = await saveDataset(O, { ...ds("sh-" + tag + "-" + name.replace(/[^a-z]/g, "")) }, {});
+        await shareDataset(O, d.id, withGroup(sharing));
+        for (const [who, can] of [[M, member], [X, outsider]] as [string, Can][]) {
+          assert.equal((await listDatasets(who)).some((x) => x.id === d.id), can.read, "listed");
+          if (can.read) assert.deepEqual(unpackRows((await readVersion(who, d.id, 1)).rowsGz), ds("x").rows);
+          else await assert.rejects(readVersion(who, d.id, 1), /no custom dataset .* that you may read/);
+          if (can.edit) assert.equal((await saveDataset(who, ds("ignored", "Lung"), {}, d.id)).latestVersion >= 2, true);
+          else await assert.rejects(saveDataset(who, ds("ignored"), {}, d.id), can.read ? /but not add versions/ : /that you may read/);
+          await assert.rejects(deleteDataset(who, d.id), can.read ? /only its owner can delete/ : /that you may read/);
+          await assert.rejects(shareDataset(who, d.id, { visibility: "public" }), can.read ? /only its owner can change who/ : /that you may read/);
+        }
+      });
+    }
+
+    test("a sharing that does not make sense is refused, and one may share only with one's own group", async () => {
+      const a = await createArtifact(O, "cohort", "rules " + tag, { all: [] });
+      await assert.rejects(shareArtifact(O, a.id, { visibility: "private", groupId: G, groupCanEdit: true }), /can edit only what it can see/);
+      await assert.rejects(shareArtifact(O, a.id, { visibility: "group" }), /name the group/);
+      await assert.rejects(shareArtifact(O, a.id, { visibility: "friends" }), /visibility must be one of/);
+      await assert.rejects(shareArtifact(O, a.id, { visibility: "group", groupId: G2 }), /only with a group you belong to/);
+      // a group named where it does not matter is dropped, not kept
+      assert.equal((await shareArtifact(O, a.id, { visibility: "public", groupId: G }))!.artifact.sharing.groupId, null);
+    });
+
+    test("an edit made from a stale copy is refused, not merged", async () => {
+      const a = await createArtifact(O, "workspace", "stale " + tag, { views: [] });
+      await shareArtifact(O, a.id, { visibility: "group", groupId: G, groupCanEdit: true });
+      const mine = await updateArtifact(M, a.id, { definition: { views: [1] }, version: a.version });
+      assert.equal(mine!.version, a.version + 1);
+      await assert.rejects(updateArtifact(O, a.id, { definition: { views: [2] }, version: a.version }), /was changed .* since you opened it/);
+      assert.deepEqual((await getArtifact(O, a.id))!.definition, { views: [1] });
+    });
+
+    test("an analysis shared wider than a dataset it uses names that dataset, and stops once it is shared too", async () => {
+      const d = await saveDataset(O, ds("pinned-" + tag), {});
+      const a = await createArtifact(O, "workspace", "uses data " + tag, { views: [], uploads: [{ as: d.slug, dataset: d.id, version: 1 }] });
+      const r = await shareArtifact(O, a.id, { visibility: "group", groupId: G });
+      assert.deepEqual(r!.warnings.map((w) => [w.slug, w.visibility, w.yours]), [[d.slug, "private", true]]);
+      await shareDataset(O, d.id, { visibility: "group", groupId: G });
+      assert.deepEqual((await shareArtifact(O, a.id, { visibility: "group", groupId: G }))!.warnings, []);
+      assert.equal((await shareArtifact(O, a.id, { visibility: "public" }))!.warnings.length, 1, "everyone is wider than the group");
+    });
+
+    test("groups: admins manage them, members see them, and a group always keeps an admin", async () => {
+      const g = await getGroup(O, G);
+      assert.deepEqual(g.memberList.map((m) => m.role).sort(), ["admin", "member"]);
+      await assert.rejects(getGroup(X, G), /no group .* that you belong to/);
+      await assert.rejects(addMember(M, G, "intruder@share.test"), /only an admin/);
+      await assert.rejects(removeMember(O, G, O), /needs an admin/);
+      await assert.rejects(setRole(O, G, O, "member"), /needs an admin/);
+      assert.ok((await listGroups(M)).some((x) => x.id === G && x.role === "member"));
+      // someone added by email before they ever signed in is a member when they do
+      const later = "later-" + tag + "@share.test";
+      await addMember(O, G, later);
+      const u = await signIn({ provider: "https://issuer.test", subject: "later-" + tag, email: later, emailVerified: true });
+      assert.ok((await listGroups(u.id)).some((x) => x.id === G));
+      await removeMember(u.id, G, u.id);   // leaving
+      assert.ok(!(await listGroups(u.id)).some((x) => x.id === G));
+    });
+
+    test("leaving a group loses what it shared; deleting one makes what it shared private again", async () => {
+      const g = (await createGroup(O, "temporary " + tag)).id;
+      const leaver = "leaver-" + tag + "@share.test";
+      await addMember(O, g, leaver);
+      const L = (await userForEmail(leaver)).id;
+      const a = await createArtifact(O, "cohort", "group only " + tag, { all: [] });
+      const b = await createArtifact(O, "cohort", "public, group edits " + tag, { all: [] });
+      await shareArtifact(O, a.id, { visibility: "group", groupId: g });
+      await shareArtifact(O, b.id, { visibility: "public", groupId: g, groupCanEdit: true });
+      assert.ok(await getArtifact(L, a.id));
+      await removeMember(L, g, L);
+      assert.equal(await getArtifact(L, a.id), null);
+      await deleteGroup(O, g);
+      assert.deepEqual((await getArtifact(O, a.id))!.sharing, { visibility: "private", groupId: null, groupCanEdit: false, groupName: null });
+      assert.deepEqual((await getArtifact(O, b.id))!.sharing, { visibility: "public", groupId: null, groupCanEdit: false, groupName: null });
     });
   });
 }

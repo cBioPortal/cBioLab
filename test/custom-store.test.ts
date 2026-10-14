@@ -5,9 +5,10 @@
 
 delete process.env.SUPABASE_DB_URL;
 delete process.env.DATABASE_URL;
-const { customStoreContract, artifactContract, userContract } = await import("./support/store-contracts.ts");
+const { customStoreContract, artifactContract, userContract, sharingContract } = await import("./support/store-contracts.ts");
 
 customStoreContract("in-process fallback");
 artifactContract("in-process fallback");
 userContract("in-process fallback");
+sharingContract("in-process fallback");
 export {};

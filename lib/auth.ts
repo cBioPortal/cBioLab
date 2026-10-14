@@ -16,8 +16,8 @@ export const SESSION_COOKIE = "cl_session";
 const SESSION_DAYS = 14;
 
 export class AccessError extends Error {
-  readonly status: 403 | 404 | 410;
-  constructor(message: string, status: 403 | 404 | 410) { super(message); this.status = status; }
+  readonly status: 403 | 404 | 409 | 410;
+  constructor(message: string, status: 403 | 404 | 409 | 410) { super(message); this.status = status; }
 }
 
 export interface SessionUser { id: string; email: string; name: string | null }

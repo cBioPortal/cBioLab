@@ -44,6 +44,7 @@ if [ -n "$unexpected" ]; then
 fi
 echo "== unit =="                      && npm test 2>&1 | summary grep -E "^# (tests|pass|fail)"
 echo "== postgres (stores, migrations, triggers) ==" && npm run test:db 2>&1 | summary grep -E "^# (tests|pass|fail)"
+echo "== access (planted sharing bugs) ==" && npm run check:access-mutants 2>&1 | summary grep -E "SURVIVED|planted access bugs"
 echo "== counts against cBioPortal ==" && npm run check:portal 2>&1 | summary grep -E "^FAIL|comparisons"
 echo "== cohort logic =="              && npm run check:cohorts 2>&1 | summary grep -E "^FAIL|cohort-logic checks"
 echo "== method scripts =="            && npm run check:methods 2>&1 | summary grep -E "^FAIL|method records present|FAILED"

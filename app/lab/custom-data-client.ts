@@ -120,8 +120,11 @@ export function customDataKey(): string {
   return server.datasets.map((d) => d.slug + "@" + d.latestVersion).join(",");
 }
 
+/** The dataset a document's `custom:<slug>/…` means when it pins none: the reader's own by that
+ *  name, else one shared with them (a pinned document names its dataset by id instead). */
 export function serverBySlug(slug: string): DatasetMeta | undefined {
-  return server.datasets.find((d) => d.slug === slug);
+  const named = server.datasets.filter((d) => d.slug === slug);
+  return named.find((d) => d.owner === server.user?.id) ?? named[0];
 }
 
 async function gzip(text: string): Promise<Blob> {

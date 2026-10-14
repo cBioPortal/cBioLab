@@ -9,7 +9,7 @@ import { PGlite as PGliteDb } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { startPostgres, reapplyMigrations, migrationFiles, target } from "./support/postgres.ts";
 import { migrate, migrationSql } from "../lib/migrate.ts";
-import { customStoreContract, artifactContract, userContract } from "./support/store-contracts.ts";
+import { customStoreContract, artifactContract, userContract, sharingContract } from "./support/store-contracts.ts";
 import { saveDataset } from "../lib/custom-store.ts";
 import { userForEmail } from "../lib/users.ts";
 
@@ -17,13 +17,13 @@ const db: PGlite = await startPostgres();
 
 describe("migrations", () => {
   test("apply in order to an empty database, and again without harm", async () => {
-    assert.deepEqual(migrationFiles(), ["0001_saved_artifacts.sql", "0002_campaigns.sql", "0003_custom_datasets.sql", "0004_users.sql"]);
+    assert.deepEqual(migrationFiles(), ["0001_saved_artifacts.sql", "0002_campaigns.sql", "0003_custom_datasets.sql", "0004_users.sql", "0005_sharing.sql"]);
     const tables = async () => (await db.query<{ t: string }>(
       "select table_name as t from information_schema.tables where table_schema = 'public' order by 1")).rows.map((r) => r.t);
     const before = await tables();
     await reapplyMigrations(db);
     assert.deepEqual(await tables(), before);
-    for (const t of ["app_user", "user_identity", "saved_artifacts", "campaigns", "campaign_hypotheses", "custom_dataset", "custom_dataset_version", "custom_dataset_grant", "custom_data_access_log"])
+    for (const t of ["app_user", "user_identity", "saved_artifacts", "campaigns", "campaign_hypotheses", "custom_dataset", "custom_dataset_version", "custom_data_access_log", "user_group", "group_member"])
       assert.ok(before.includes(t), t + " exists");
   });
 
@@ -62,6 +62,7 @@ describe("migrations", () => {
 customStoreContract("Postgres");
 artifactContract("Postgres");
 userContract("Postgres");
+sharingContract("Postgres");
 
 describe("a stored dataset version is immutable in the database", () => {
   test("an update or delete of a version row is refused by its trigger", async () => {

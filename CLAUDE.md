@@ -175,6 +175,20 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   from before accounts have no owner and are seen by nobody until `npm run db:claim-legacy --
   <email>` gives them to someone. The OIDC flow is tested end to end against a stand-in provider
   (`test/oidc.test.ts`).
+- **Sharing** (`lib/access.ts` — THE place the rules live; `db/migrations/0005_sharing.sql`): a saved
+  cohort, analysis or custom dataset has an owner and a sharing — `visibility` private | group |
+  public (everyone signed in to the deployment), ONE `group_id`, and `group_can_edit`. The owner
+  alone deletes or reshares, and only with a group they belong to; a stale edit is refused (409,
+  `saved_artifacts.version`). Lists filter in SQL (`readableWhere`), single items in code
+  (`canRead`/`canWrite`/`canShare`); both stores call it, never a rule of their own. Sharing an
+  analysis wider than a custom dataset it pins returns `warnings` naming the dataset — patient-level
+  data is never shared but by its own owner, explicitly. **Groups** (`lib/groups.ts`) are run by
+  their admins (always at least one); people are added by email, signed in yet or not; deleting a
+  group makes what it shared private. The access matrix is in `test/support/store-contracts.ts`
+  (`sharingContract`), and `npm run check:access-mutants` (a gate stage) plants six sharing bugs
+  into a copy of `lib/access.ts` and requires each to fail it. A change to the rules updates both.
+  On the page, the reader's OWN items stay keyed by name (`use-saved.ts`); others' come separately,
+  keyed by id, since two people may use one name.
 - **The writable store** (`lib/db.ts`, the only Postgres client): saved cohorts and analyses,
   campaigns and custom data. `DATABASE_URL` (or its older name `SUPABASE_DB_URL`) names the
   Postgres; without one, outside Vercel production, `lib/db.ts` runs an in-process Postgres
