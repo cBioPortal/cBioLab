@@ -99,6 +99,11 @@ export class FailedQueriesError extends Error {
     this.count = count;
   }
 }
+/** Count a failed request to another participant (a peer over MCP) as a failed query: its answer is not cached either. */
+export function noteFailedQuery(): void {
+  const f = failedStore.getStore();
+  if (f) f.n++;
+}
 /** `fn`'s value, or a throw when any query under it failed — for the body of a cached function. */
 export async function withoutFailedQueries<T>(fn: () => Promise<T>): Promise<T> {
   const s = { n: 0 };
@@ -223,8 +228,7 @@ async function post(sql: string, conn: ChConn, format: string): Promise<string> 
       return await send();   // one retry: a dropped connection, not a bad query
     }
   } catch (e) {
-    const f = failedStore.getStore();
-    if (f) f.n++;
+    noteFailedQuery();
     throw e;
   } finally { release(); }
 }

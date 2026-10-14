@@ -53,9 +53,13 @@ export const ALTERATION_DEFAULT_COLUMNS: Record<AlterationTable, string[]> = {
 /** The patient list's columns: how much of each table a patient has, so a list can be sorted by it. */
 export const ALTERATION_PATIENT_COLUMNS: QueryColumn[] = [
   { id: "patient", name: "Patient ID", numeric: false, text: "patient" },
+  { id: "source", name: "Source", numeric: false, text: "source" },
   number("samples", "Samples"), number("mutations", "Mutations"), number("cna", "CNAs"), number("sv", "Structural Variants"),
 ];
-export const ALTERATION_PATIENT_DEFAULT_COLUMNS = ["patient", "samples", "mutations", "cna", "sv"];
+export const ALTERATION_PATIENT_DEFAULT_COLUMNS = ["patient", "source", "samples", "mutations", "cna", "sv"];
+
+/** One (cohort, study) part of the patient list, and the instance that holds it — the Source column. */
+export type AlterationPart = TablePart & { source: string };
 
 /** The patient's samples in their order (the numbered markers: lib/timeline-tracks.ts' sampleMarks), as an SQL array. */
 const orderArray = (order: string[]) => order.length ? "[" + order.map(sq).join(", ") + "]" : "CAST([] AS Array(String))";
@@ -238,7 +242,7 @@ export function alterationSource(table: AlterationTable, p: TablePart, patient: 
  * the list is the cohort. Patients with any alteration first, then by patient id. All parts must
  * live in this database.
  */
-export function alterationPatientRowSource(parts: TablePart[], db: string): RowSource {
+export function alterationPatientRowSource(parts: AlterationPart[], db: string): RowSource {
   if (!parts.length) throw new Error("alterationPatientRowSource needs at least one part");
   const ctes: string[] = [], rows: string[] = [];
   parts.forEach((p, i) => {
@@ -272,7 +276,7 @@ export function alterationPatientRowSource(parts: TablePart[], db: string): RowS
       "  GROUP BY pid\n" +
       "),\n");
     rows.push(
-      "  SELECT " + sq(p.cohort) + " AS cohort, " + st + " AS study, " + i + " AS ord, c.pid AS patient, '' AS sample,\n" +
+      "  SELECT " + sq(p.cohort) + " AS cohort, " + st + " AS study, " + i + " AS ord, c.pid AS patient, '' AS sample, " + sq(p.source) + " AS source,\n" +
       "         toUInt64(ifNull(sm.n, 0)) AS samples, toUInt64(ifNull(mu.n, 0)) AS mutations, toUInt64(ifNull(cn.n, 0)) AS cna, toUInt64(ifNull(sv.n, 0)) AS sv\n" +
       "  FROM (SELECT DISTINCT pid FROM c" + i + ") AS c\n" +
       "  LEFT JOIN sm" + i + " AS sm ON sm.pid = c.pid LEFT JOIN mu" + i + " AS mu ON mu.pid = c.pid\n" +
@@ -281,7 +285,7 @@ export function alterationPatientRowSource(parts: TablePart[], db: string): RowS
   return {
     with: "WITH " + ctes.join("") + "rows AS (\n" + rows.join("  UNION ALL\n") + ")\n",
     columns: ALTERATION_PATIENT_COLUMNS,
-    select: "cohort, study, patient, sample, samples, mutations, cna, sv",
+    select: "cohort, study, patient, sample, source, samples, mutations, cna, sv",
     defaultOrder: "mutations + cna + sv = 0, patient",
     tiebreak: "patient, ord",
   };

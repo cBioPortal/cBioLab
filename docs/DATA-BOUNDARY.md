@@ -82,30 +82,59 @@ The view renders what is permitted and states the covered fraction; if no
 participant permits patient-level access it errors with an explanation. It never
 silently drops those patients and reports a smaller cohort as if it were whole.
 
-## Opt-in patient-level federation (the timeline view only)
+## Opt-in patient-level federation (per study and kind of data)
 
 The trust change this document anticipates ("that instance becomes patient-level for this
-caller"), made in configuration on **both** sides and for **one** view: browsing patients of
-several portal instances in the `timeline` view, each labelled with the instance it came from.
+caller"), made in configuration on **both** sides and for named **kinds** of patient-level data
+only: browsing patients of several portal instances in the patient views, each row labelled with
+the instance it came from. Every other view treats the peer as aggregate-only, exactly as before.
+
+The kinds (`lib/disclosure.ts`, `PATIENT_KINDS`), each one view's needs and nothing more:
+
+| kind | view | what crosses |
+|---|---|---|
+| `timeline` | `timeline` | the cohort's patient list with timeline counts; one patient's events and samples |
+| `alterations` | `alterations` | the cohort's patient list with alteration counts; one patient's samples, mutations, copy-number calls and structural variants |
+
+Each side writes **rules**: a study (or `*`) and the kinds allowed for it, e.g.
+`genie_public:timeline+alterations, *:timeline`. A bare study id allows the timeline alone; an
+unknown kind is refused naming the setting, never ignored.
 
 | side | setting | effect |
 |---|---|---|
-| peer (data owner) | `MCP_DISCLOSE_PATIENTS=<study>,…` (or `*`) | registers `federated_patient_rows` and `federated_patient_timeline`; without it the tools **do not exist**. They answer only for listed studies the peer holds itself at patient level (never a study it reaches through a peer of its own, never an aggregate-only one) |
-| coordinator | `PEER_MCP_PATIENT_LEVEL=<study>,…` (or `*`) | the `PEER_MCP` peer for those studies becomes a `RemoteTimelineResolver` instead of a `RemoteAggregateResolver` |
+| peer (data owner) | `MCP_DISCLOSE_PATIENTS=<rules>` | registers `federated_patient_rows` and `federated_patient_timeline`; without it the tools **do not exist**. Every call is checked against the rules — the study and the kind its table belongs to (`PEER_TABLES` in `lib/federation.ts`), before anything is read — and answers only for studies the peer holds itself at patient level (never a study it reaches through a peer of its own, never an aggregate-only one) |
+| coordinator | `PEER_MCP_PATIENT_LEVEL=<rules>` | the `PEER_MCP` peer for a study becomes a `RemotePatientResolver` carrying the kinds accepted for it — a `RemoteTimelineResolver` when they include `timeline` — instead of a `RemoteAggregateResolver` |
 
-Either setting alone changes nothing: a coordinator that trusts a peer which has not opted in
-gets a refusal naming the missing setting; a peer that discloses to a coordinator that does not
-trust it is never asked.
+Data crosses only where both sides' rules allow the same study and kind. A coordinator that
+accepts a kind the peer does not disclose gets a refusal naming the peer's setting; a peer that
+discloses a kind the coordinator does not accept is never asked, and the view lists the peer's
+study as left out ("a remote peer this instance does not accept patient alterations from").
 
-The same structural rule holds. `RemoteTimelineResolver` adds exactly `patientTimeline()` and
-`timelineRows()` to the aggregate contract — no `members()`, no table rows, no plot points, no
-Cox/logistic rows — and its instance stays `aggregate-only`, so **every other view treats the peer
-exactly as before** (the clinical table names it as left out, an oncoprint degrades). The peer
-pages, searches and sorts its patient list in its own database from the cohort *definitions* it
-is sent; an explicit id list in a cohort is still refused before the network is touched. The
-patient whose timeline is drawn is the one identifier that crosses, and that is the entitlement.
-Every row and the drawn timeline carry their source ("Site B (shares patient timelines)", "from
-… over MCP"), and the view's caveat names the studies that came over MCP.
+The same structural rule holds. A remote patient resolver adds exactly `patientRows()` (the row
+tables of its accepted kinds, refusing any other kind **before** the network is touched) and,
+with timelines, `patientTimeline()` — no `members()`, no plot points, no Cox/logistic rows, no
+`rowsPage` — and its instance stays `aggregate-only`, so every view outside the kinds treats it as
+before (the clinical table names it as left out, an oncoprint degrades). The coordinator never
+sends SQL: it names a table and the cohort *definitions*, and the peer builds and runs the query
+in its own database; an explicit id list in a cohort is still refused before the network is
+touched. The patient whose record is shown is the one identifier the coordinator sends, and that
+is the entitlement. Every list row carries its Source ("GENIE site (shares patient timelines and
+patient alterations)"), a peer's patient is marked "from … over MCP", and the view's caveat names
+the studies that came over MCP. A failed or refused peer call keeps the answer out of the result
+cache, as a failed query does. A peer names the table it answered with, and an answer for any other table is refused:
+a peer on a build from before named tables answers every call with the timeline's list.
+
+**A simulated peer, for development and the gate.** `LOOPBACK_PEER=<connection>` (e.g. `b`, the
+`CLICKHOUSE2_*` database) has one app serve one of its own databases to itself over MCP
+(`lib/loopback-peer.ts`): the studies on that connection are reached through the remote resolvers
+at the app's own `/api/mcp` (`PORT` or `LOOPBACK_PEER_URL` names it), and the MCP side answers those
+calls — recognised by a per-process token — from that connection alone, never routing them back to
+the peer. With it set, the disclosing tools answer only for that connection's studies, and only to
+the app itself: an outside caller gets no patient-level data of either database. The study list and
+study catalog still read the connection directly, as they do wherever a coordinator also holds the
+peer's database. It does not simulate two processes, a network or a peer on another build; not for
+Vercel, whose instances do not share the token. `scripts/gate.sh` restarts its server this way and
+runs `scripts/e2e-federation.cjs` when a second database is configured.
 
 **Not built yet, and required before pointing this at restricted data:** caller authentication.
 Today anyone who can reach a disclosing peer's `/api/mcp` can read what it discloses; the setting
@@ -138,11 +167,15 @@ peer's patients also enter the coordinator's result cache (same trust boundary a
   `PatientLevelResolver` and the opt-in `RemoteTimelineResolver`; its queries
   (`lib/patient-timeline.ts`) are not among the aggregate builders, and neither aggregate resolver
   has the method.
-- The opt-in mode: the coordinator builds a `RemoteTimelineResolver` only for a study
-  `PEER_MCP_PATIENT_LEVEL` names; that resolver has no patient-level method beyond the timeline's
-  two and is not `isPatientLevel`; it refuses an id-list cohort before `fetch`; and a peer
-  registers the disclosing tools only with `MCP_DISCLOSE_PATIENTS` set (mutation-checked: removing
-  that condition, or adding `members()` to the resolver, fails the suite).
+- The opt-in mode: the rules parse as written (a bare study is the timeline alone; an unknown kind
+  is refused); the coordinator builds a remote patient resolver only for a study
+  `PEER_MCP_PATIENT_LEVEL` names, carrying only the kinds named; that resolver has no patient-level
+  method beyond `patientRows()` (and `patientTimeline()` with timelines) and is not
+  `isPatientLevel`; it refuses a table of a kind not accepted, and an id-list cohort, before
+  `fetch`; a peer registers the disclosing tools only with `MCP_DISCLOSE_PATIENTS` set, and refuses
+  a study or kind its rules do not allow; and only the timeline and alterations views ask a peer
+  for rows (mutation-checked: removing the registration condition, or adding `members()` to the
+  resolver, fails the suite).
 - Source tripwires: no query in `lib/explore.ts` projects a bare identifier
   column, and `ExploreResult` exposes no field that could carry one.
 

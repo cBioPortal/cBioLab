@@ -63,4 +63,19 @@ export AUTH_DEV_LOGIN=1
 for _ in $(seq 1 40); do curl -sf -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/lab" && break; sleep 3; done
 set +e; E2E_PORT=$PORT E2E_LOGIN_EMAIL=e2e@gate.test node e2e.cjs; RC=$?; set -e
 fuser -k $PORT/tcp 2>/dev/null || true
+# Patient-level federation: the same build restarted with its second database served to itself as a
+# simulated peer over MCP (lib/loopback-peer.ts), both sides' rules allowing timelines and alterations.
+# Skipped, and said so, where no second database is configured.
+if [ -n "${CLICKHOUSE2_URL:-}" ] || grep -q '^CLICKHOUSE2_URL=.' .env.local 2>/dev/null; then
+  echo "== e2e: federation (simulated peer) =="
+  sleep 2
+  (DATABASE_URL= SUPABASE_DB_URL= PORT=$PORT LOOPBACK_PEER=b MCP_DISCLOSE_PATIENTS='*:timeline+alterations' PEER_MCP_PATIENT_LEVEL='*:timeline+alterations' \
+    npm start -- -p $PORT >/tmp/gate-server-fed-$PORT.log 2>&1 &)
+  for _ in $(seq 1 40); do curl -sf -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/lab" && break; sleep 3; done
+  set +e; E2E_PORT=$PORT node scripts/e2e-federation.cjs; FRC=$?; set -e
+  fuser -k $PORT/tcp 2>/dev/null || true
+  [ $RC -eq 0 ] && RC=$FRC
+else
+  echo "== e2e: federation (simulated peer) == SKIPPED: no second database (CLICKHOUSE2_*) configured"
+fi
 exit $RC

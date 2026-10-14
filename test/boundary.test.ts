@@ -34,7 +34,9 @@ import { clinicalRowSource } from "../lib/clinical-table.ts";
 import { mutationRowSource } from "../lib/mutation-table.ts";
 import { alterationPatientRowSource, alterationSource, patientSamplesSource } from "../lib/patient-alterations.ts";
 import { pageSql } from "../lib/table-query.ts";
-import { RemoteAggregateResolver, RemoteTimelineResolver, peerSharesPatients } from "../lib/federation-remote.ts";
+import { RemoteAggregateResolver, RemotePatientResolver, RemoteTimelineResolver, peerPatientKinds } from "../lib/federation-remote.ts";
+import { parseRules, allowedKinds } from "../lib/disclosure.ts";
+import { asLoopbackPeer, isLoopbackRequest, loopbackHeaders, loopbackUrl, LOOPBACK_HEADER } from "../lib/loopback-peer.ts";
 import type { Instance } from "../lib/federation.ts";
 import { PRIMARY } from "../lib/ch.ts";
 
@@ -195,7 +197,7 @@ describe("remote peers: nothing identifying leaves before the network is touched
     assert.match(pageSql(clinicalRowSource(part, "db", "sample", [{ id: "AGE", name: "Age", per: "patient", numeric: true }]), {}, [], 10, 0), /AS patient, replaceOne\(u\.suid/);
     assert.match(pageSql(mutationRowSource(part, "db", "KRAS", "v7.5"), {}, [], 10, 0), /m\.sid AS sid/);
     // the alterations view's list and its three tables name one patient and their samples
-    assert.match(pageSql(alterationPatientRowSource(part, "db"), {}, [], 10, 0), /c\.pid AS patient/);
+    assert.match(pageSql(alterationPatientRowSource(part.map((p) => ({ ...p, source: "s" })), "db"), {}, [], 10, 0), /c\.pid AS patient/);
     for (const t of ["mutations", "cna", "sv"] as const)
       assert.match(pageSql(alterationSource(t, part[0], "P-1", "db", "v7.5", []), {}, [], 10, 0), /'P-1' AS patient/);
     assert.match(pageSql(patientSamplesSource(part[0], "P-1", "db"), {}, [], 10, 0), /s\.id AS sid/);
@@ -545,75 +547,173 @@ describe("a peer's federation tools refuse explicit id lists on their own", () =
 });
 
 // ---------------------------------------------------------------------------
-// The opt-in patient-level federation mode (docs/DATA-BOUNDARY.md): a peer both sides configured
-// may answer the timeline view — and nothing else.
-describe("patient-level federation is opt-in, on both sides, and timeline-only", () => {
+// The opt-in patient-level federation mode (docs/DATA-BOUNDARY.md): a peer both sides' rules allow
+// may answer the views of the kinds they name — and nothing else.
+describe("patient-level federation is opt-in, on both sides, per study and kind", () => {
   const withEnv = async (env: Record<string, string | undefined>, fn: () => Promise<void> | void) => {
     const saved = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]));
     for (const [k, v] of Object.entries(env)) { if (v == null) delete process.env[k]; else process.env[k] = v; }
     try { await fn(); } finally { for (const [k, v] of Object.entries(saved)) { if (v == null) delete process.env[k]; else process.env[k] = v; } }
   };
+  const PEERS = "s1=http://peer.invalid/api/mcp,s2=http://peer.invalid/api/mcp";
+  const PATIENT_METHODS = ["members", "rowsPage", "rowsCounts", "rowsValues", "rowsRank", "plotPoints", "plotHighlightPoints", "coxRows", "logisticRows", "viewRows", "viewAggregate"];
 
-  test("the coordinator trusts a peer only for the studies PEER_MCP_PATIENT_LEVEL names", async () => {
-    await withEnv({ PEER_MCP: "s1=http://peer.invalid/api/mcp,s2=http://peer.invalid/api/mcp", PEER_MCP_PATIENT_LEVEL: undefined }, async () => {
-      assert.equal(peerSharesPatients("s1"), false);
+  test("the rules: a study (or *) and the kinds allowed for it; a bare study is the timeline alone; an unknown kind is refused", () => {
+    const r = parseRules("s1:timeline+alterations, s2 *:alterations", "X");
+    assert.deepEqual([...allowedKinds(r, "s1")].sort(), ["alterations", "timeline"]);
+    assert.deepEqual([...allowedKinds(r, "s2")].sort(), ["alterations", "timeline"], "s2's own rule and the * rule together");
+    assert.deepEqual([...allowedKinds(r, "s3")], ["alterations"]);
+    assert.deepEqual([...allowedKinds(parseRules("s1", "X"), "s1")], ["timeline"]);
+    assert.deepEqual([...allowedKinds(parseRules("s1:*", "X"), "s1")].sort(), ["alterations", "timeline"]);
+    assert.equal(allowedKinds(parseRules("", "X"), "s1").size, 0);
+    assert.throws(() => parseRules("s1:timline", "PEER_MCP_PATIENT_LEVEL"), /PEER_MCP_PATIENT_LEVEL: unknown kind 'timline'/);
+    assert.throws(() => parseRules("s1:", "X"), /names no kind/);
+    assert.throws(() => parseRules("bad'study:timeline", "X"), /does not name a study/);
+  });
+
+  test("the coordinator accepts from a peer only the studies and kinds PEER_MCP_PATIENT_LEVEL names", async () => {
+    await withEnv({ PEER_MCP: PEERS, PEER_MCP_PATIENT_LEVEL: undefined }, async () => {
+      assert.equal(peerPatientKinds("s1").size, 0);
       const r = await federation.resolverFor("s1", {});
-      assert.equal(r instanceof RemoteTimelineResolver, false, "no setting: the peer is aggregate-only");
+      assert.equal(r instanceof RemotePatientResolver, false, "no setting: the peer is aggregate-only");
       assert.equal(federation.hasPatientTimeline(r), false);
+      assert.equal(federation.peerRowsFor(r, "timeline"), null);
     });
-    await withEnv({ PEER_MCP: "s1=http://peer.invalid/api/mcp,s2=http://peer.invalid/api/mcp", PEER_MCP_PATIENT_LEVEL: "s1" }, async () => {
-      assert.ok((await federation.resolverFor("s1", {})) instanceof RemoteTimelineResolver);
-      assert.equal((await federation.resolverFor("s2", {})) instanceof RemoteTimelineResolver, false, "only the named study");
+    await withEnv({ PEER_MCP: PEERS, PEER_MCP_PATIENT_LEVEL: "s1" }, async () => {
+      const r = await federation.resolverFor("s1", {});
+      assert.ok(r instanceof RemoteTimelineResolver);
+      assert.ok(federation.peerRowsFor(r, "timeline"));
+      assert.equal(federation.peerRowsFor(r, "alterations"), null, "a bare study is the timeline alone");
+      assert.equal((await federation.resolverFor("s2", {})) instanceof RemotePatientResolver, false, "only the named study");
+    });
+    await withEnv({ PEER_MCP: PEERS, PEER_MCP_PATIENT_LEVEL: "s1:alterations" }, async () => {
+      const r = await federation.resolverFor("s1", {});
+      assert.ok(r instanceof RemotePatientResolver);
+      assert.equal(r instanceof RemoteTimelineResolver, false, "no timelines accepted: no patientTimeline()");
+      assert.equal(federation.hasPatientTimeline(r), false);
+      assert.ok(federation.peerRowsFor(r, "alterations"));
+      assert.equal(federation.peerRowsFor(r, "timeline"), null);
     });
   });
 
-  test("the alterations view never asks a peer: its rows come from local patient-level participants alone", () => {
-    const src = readFileSync(new URL("../lib/views/alterations.ts", import.meta.url), "utf8");
-    assert.doesNotMatch(src, /RemoteTimeline|hasRemoteTimelineRows|timelineRows/, "the opt-in peer mode serves the timeline alone");
-  });
-
-  test("a trusted peer has the timeline's two methods and none of the other patient-level ones", () => {
-    const r = new RemoteTimelineResolver("s", "http://peer.invalid/api/mcp", AGG);
-    assert.equal(typeof r.patientTimeline, "function");
-    assert.equal(typeof r.timelineRows, "function");
-    for (const m of ["members", "rowsPage", "rowsCounts", "rowsValues", "rowsRank", "plotPoints", "plotHighlightPoints", "coxRows", "logisticRows", "viewRows", "viewAggregate"])
-      assert.equal(typeof (r as unknown as Record<string, unknown>)[m], "undefined", "a timeline peer must not have " + m);
-    // and it is not patient-level for any other view
-    assert.equal(federation.isPatientLevel(r), false);
+  test("a peer has the patient-row method and, with timelines, patientTimeline — none of the other patient-level ones", () => {
+    for (const r of [new RemoteTimelineResolver("s", "http://peer.invalid/api/mcp", AGG, ["timeline", "alterations"]),
+      new RemotePatientResolver("s", "http://peer.invalid/api/mcp", AGG, ["alterations"])]) {
+      assert.equal(typeof r.patientRows, "function");
+      for (const m of PATIENT_METHODS)
+        assert.equal(typeof (r as unknown as Record<string, unknown>)[m], "undefined", "a peer must not have " + m);
+      // and it is not patient-level for any other view
+      assert.equal(federation.isPatientLevel(r), false);
+    }
+    assert.equal(typeof (RemotePatientResolver.prototype as unknown as Record<string, unknown>).patientTimeline, "undefined");
     // the plain remote resolver is unchanged
-    assert.equal(typeof (RemoteAggregateResolver.prototype as unknown as Record<string, unknown>).patientTimeline, "undefined");
+    for (const m of ["patientTimeline", "patientRows"])
+      assert.equal(typeof (RemoteAggregateResolver.prototype as unknown as Record<string, unknown>)[m], "undefined");
   });
 
-  test("an explicit id list in a cohort is still refused before the network is touched", async () => {
+  test("a table of a kind not accepted, and an explicit id list in a cohort, are refused before the network is touched", async () => {
     const original = globalThis.fetch;
     let calls = 0;
     globalThis.fetch = (async () => { calls++; throw new Error("network must not be reached"); }) as typeof fetch;
     try {
-      const r = new RemoteTimelineResolver("s", "http://peer.invalid/api/mcp", AGG);
+      const timelineOnly = new RemoteTimelineResolver("s", "http://peer.invalid/api/mcp", AGG, ["timeline"]);
+      for (const table of ["alterations", "alterations:samples", "alterations:mutations", "alterations:cna", "alterations:sv"] as const)
+        await assert.rejects(() => timelineOnly.patientRows({ table, parts: [{ cohort: "c", def: {} }], query: {}, defaults: [], mode: "counts", subject: { patient: "P-1" } }),
+          /does not accept patient alterations/);
+      const alterationsOnly = new RemoteTimelineResolver("s", "http://peer.invalid/api/mcp", AGG, ["alterations"]);
+      await assert.rejects(() => alterationsOnly.patientTimeline("P-1"), /does not accept patient timelines/);
+      await assert.rejects(() => alterationsOnly.patientRows({ table: "timeline", parts: [{ cohort: "c", def: {} }], query: {}, defaults: [], mode: "counts" }), /does not accept patient timelines/);
+      const r = new RemoteTimelineResolver("s", "http://peer.invalid/api/mcp", AGG, ["timeline", "alterations"]);
       const def = { all: [{ kind: "patientList" as const, ids: ["s:P-0000123"] }] };
-      await assert.rejects(() => r.timelineRows({ parts: [{ cohort: "c", def }], query: {}, defaults: ["patient"], mode: "counts" }), /explicit sample or patient list/i);
+      for (const table of ["timeline", "alterations"] as const)
+        await assert.rejects(() => r.patientRows({ table, parts: [{ cohort: "c", def }], query: {}, defaults: ["patient"], mode: "counts" }), /explicit sample or patient list/i);
       await assert.rejects(() => r.count(def), /explicit sample or patient list/i);
       assert.equal(calls, 0);
     } finally { globalThis.fetch = original; }
   });
 
-  test("a peer registers the disclosing tools only when MCP_DISCLOSE_PATIENTS is set", async () => {
+  test("a peer that does not say which table it answered is believed only for the timeline's list", async () => {
+    const original = globalThis.fetch;
+    // a peer on an older build: whatever is asked, the timeline's list, naming no table
+    globalThis.fetch = (async () => new Response(JSON.stringify({ jsonrpc: "2.0", id: 2,
+      result: { structuredContent: { rows: [{ cohort: "c", study: "s", patient: "P-1" }] } } }), { headers: { "content-type": "application/json" } })) as typeof fetch;
+    try {
+      const r = new RemoteTimelineResolver("s", "http://peer.invalid/api/mcp", AGG, ["timeline", "alterations"]);
+      const ask = (table: "timeline" | "alterations" | "alterations:mutations") =>
+        r.patientRows({ table, parts: [{ cohort: "c", def: {} }], query: {}, defaults: [], mode: "page", subject: table === "alterations:mutations" ? { patient: "P-1" } : undefined });
+      assert.equal((await ask("timeline")).rows!.length, 1);
+      for (const t of ["alterations", "alterations:mutations"] as const)
+        await assert.rejects(() => ask(t), /answered with timeline rows when asked for alterations[\s\S]*update that instance/);
+    } finally { globalThis.fetch = original; }
+  });
+
+  test("the patient views ask a peer only through the kind they belong to", () => {
+    const read = (f: string) => readFileSync(new URL("../lib/views/" + f, import.meta.url), "utf8");
+    assert.match(read("timeline.ts"), /rowHolders\(ctx, "timeline"\)/);
+    assert.match(read("alterations.ts"), /rowHolders\(ctx, "alterations"\)/);
+    assert.doesNotMatch(read("timeline.ts"), /peerRowsFor\(\w+, "alterations"\)/);
+    assert.doesNotMatch(read("alterations.ts"), /peerRowsFor\(\w+, "timeline"\)|patientTimeline/);
+    // every other view's rows stay with local patient-level participants
+    for (const f of ["table.ts", "mutations.ts"]) assert.doesNotMatch(read(f), /peerRowsFor|rowHolders\(ctx, "/);
+  });
+
+  test("the simulated peer: only this process's own calls are answered as the peer, and one never makes another", async () => {
+    await withEnv({ LOOPBACK_PEER: undefined, LOOPBACK_PEER_URL: undefined, PORT: "4999" }, () => {
+      assert.deepEqual(loopbackHeaders("http://127.0.0.1:4999/api/mcp"), {}, "no simulated peer: no token is sent");
+    });
+    await withEnv({ LOOPBACK_PEER: "b", LOOPBACK_PEER_URL: undefined, PORT: undefined }, () => {
+      assert.throws(() => loopbackUrl(), /set PORT .* or LOOPBACK_PEER_URL/, "its own address must be known, not guessed");
+    });
+    await withEnv({ LOOPBACK_PEER: "b", LOOPBACK_PEER_URL: undefined, PORT: "4999" }, () => {
+      const own = loopbackUrl();
+      assert.equal(own, "http://127.0.0.1:4999/api/mcp");
+      const h = loopbackHeaders(own);
+      assert.ok(h[LOOPBACK_HEADER], "a call to itself carries the token");
+      assert.deepEqual(loopbackHeaders("http://peer.invalid/api/mcp"), {}, "a real peer is never sent the token");
+      const req = (v?: string) => new Request(own, { method: "POST", headers: v ? { [LOOPBACK_HEADER]: v } : {} });
+      assert.equal(isLoopbackRequest(req(h[LOOPBACK_HEADER])), true);
+      assert.equal(isLoopbackRequest(req("guess")), false, "a forged header is an ordinary call");
+      assert.equal(isLoopbackRequest(req()), false);
+      assert.throws(() => asLoopbackPeer(() => loopbackHeaders(own)), /cannot call itself/, "answering as the peer, it never calls itself again");
+    });
+    await withEnv({ LOOPBACK_PEER: undefined }, () => {
+      assert.equal(isLoopbackRequest(new Request("http://x/api/mcp", { headers: { [LOOPBACK_HEADER]: "anything" } })), false, "no simulated peer: the header means nothing");
+    });
+  });
+
+  test("a peer registers the disclosing tools only when MCP_DISCLOSE_PATIENTS is set, and answers only the kinds it allows", async () => {
     const { registerTools } = await import("../mcp/tools.ts");
-    const names = async () => {
-      const out: string[] = [];
-      const fake = { registerTool: (n: string) => out.push(n), tool: (n: string) => out.push(n), registerResource: () => {}, resource: () => {}, registerPrompt: () => {}, prompt: () => {} };
+    const tools = () => {
+      const out = new Map<string, (a: any) => Promise<any>>();
+      const fake = { registerTool: (n: string, _c: unknown, h: (a: any) => Promise<any>) => out.set(n, h), tool: (n: string) => out.set(n, async () => null),
+        registerResource: () => {}, resource: () => {}, registerPrompt: () => {}, prompt: () => {} };
       registerTools(fake);
       return out;
     };
     await withEnv({ MCP_DISCLOSE_PATIENTS: undefined }, async () => {
-      const n = await names();
+      const n = [...tools().keys()];
       assert.ok(n.includes("federated_aggregates"));
       assert.equal(n.some((x) => /federated_patient/.test(x)), false, "no opt-in, no tool");
     });
     await withEnv({ MCP_DISCLOSE_PATIENTS: "rms_msk_2026" }, async () => {
-      const n = await names();
-      assert.ok(n.includes("federated_patient_rows") && n.includes("federated_patient_timeline"));
+      const t = tools();
+      assert.ok(t.has("federated_patient_rows") && t.has("federated_patient_timeline"));
+      // a bare study discloses timelines alone: an alterations table of it is refused, as is another study
+      const ask = (study: string, table: string) => t.get("federated_patient_rows")!({ study, table, parts: [{ cohort: "c", cohortDef: {} }], source: "x",
+        defaults: [], mode: "counts", subject: { patient: "P-1" } });
+      for (const table of ["alterations", "alterations:samples", "alterations:mutations", "alterations:cna", "alterations:sv"]) {
+        const r = await ask("rms_msk_2026", table);
+        assert.equal(r.isError, true);
+        assert.match(r.content[0].text, /not a study this instance discloses patient alterations of/);
+      }
+      const other = await ask("msk_chord_2024", "timeline");
+      assert.match(other.content[0].text, /not a study this instance discloses patient timelines of/);
+      const tl = await t.get("federated_patient_timeline")!({ study: "msk_chord_2024", patient: "P-1" });
+      assert.match(tl.content[0].text, /not a study this instance discloses patient timelines of/);
+    });
+    await withEnv({ MCP_DISCLOSE_PATIENTS: "rms_msk_2026:alterations" }, async () => {
+      const tl = await tools().get("federated_patient_timeline")!({ study: "rms_msk_2026", patient: "P-1" });
+      assert.match(tl.content[0].text, /not a study this instance discloses patient timelines of/, "alterations alone: no timelines");
     });
   });
 });
-

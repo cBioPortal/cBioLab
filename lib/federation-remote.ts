@@ -13,8 +13,11 @@
 // a local aggregate-only instance.
 import type { CohortDef, ExploreResult } from "./types.ts";
 import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest } from "./federation.ts";
-import { carriesPatientIds } from "./federation.ts";
-import type { RemoteTimelineRows, TimelineRowsRequest, TimelineRowsAnswer } from "./federation.ts";
+import { carriesPatientIds, studyRouting } from "./federation.ts";
+import { loopbackConnId, loopbackHeaders, loopbackUrl, servingAsLoopbackPeer } from "./loopback-peer.ts";
+import { noteFailedQuery } from "./ch.ts";
+import { PEER_TABLES, type RemotePatientRows, type PeerRowsRequest, type PeerRowsAnswer } from "./federation.ts";
+import { acceptedFromPeers, allowedKinds, PATIENT_KIND_NAMES, type PatientKind } from "./disclosure.ts";
 import type { PatientTimeline, PatientEvent, PatientSample } from "./types.ts";
 
 interface RemoteAggregates {
@@ -30,8 +33,13 @@ interface RemoteAggregates {
   oncokbPin: string | null;
 }
 
-/** Peer registry: STUDY=URL pairs, e.g. "genie_public=http://127.0.0.1:3103/api/mcp". */
-export function peerForStudy(study: string): { url: string; label: string } | null {
+/**
+ * The peer that holds `study`, if one does: PEER_MCP's STUDY=URL pairs (e.g.
+ * "genie_public=http://127.0.0.1:3103/api/mcp"), else — with LOOPBACK_PEER — this app itself, for a
+ * study on the connection it serves as a simulated peer (lib/loopback-peer.ts). While answering as
+ * that peer, its studies are its own again, so they are read from their database.
+ */
+export async function peerForStudy(study: string): Promise<{ url: string; label: string } | null> {
   const raw = process.env.PEER_MCP || "";
   for (const entry of raw.split(/[,\s]+/).filter(Boolean)) {
     const i = entry.indexOf("=");
@@ -41,18 +49,21 @@ export function peerForStudy(study: string): { url: string; label: string } | nu
       return { url, label: process.env.PEER_LABEL || "peer via MCP" };
     }
   }
-  return null;
+  const id = loopbackConnId();
+  if (!id || servingAsLoopbackPeer()) return null;
+  const conn = (await studyRouting()).get(study);
+  if (conn?.id !== id) return null;
+  return { url: loopbackUrl(), label: process.env.LOOPBACK_PEER_LABEL || conn.label + " (simulated peer)" };
 }
 
 /**
- * The opt-in patient-level federation mode, as THIS instance (the coordinator) configures it:
- * the studies whose peer it trusts to send patient timelines — PEER_MCP_PATIENT_LEVEL, a list of
- * study ids, or "*" for every study PEER_MCP names. The peer must opt in too (MCP_DISCLOSE_PATIENTS
- * on its side registers the tools); either one alone changes nothing.
+ * The opt-in patient-level federation mode, as THIS instance (the coordinator) configures it: the
+ * kinds of patient-level data it accepts from the peer serving `study` — its PEER_MCP_PATIENT_LEVEL
+ * rules (lib/disclosure.ts). The peer must allow the same kinds in its MCP_DISCLOSE_PATIENTS; either
+ * side alone changes nothing.
  */
-export function peerSharesPatients(study: string): boolean {
-  const list = (process.env.PEER_MCP_PATIENT_LEVEL || "").split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
-  return list.includes("*") || list.includes(study);
+export function peerPatientKinds(study: string): Set<PatientKind> {
+  return allowedKinds(acceptedFromPeers(), study);
 }
 
 /**
@@ -60,9 +71,14 @@ export function peerSharesPatients(study: string): boolean {
  * dependency-free and stateless so a peer can be any conforming server.
  */
 async function mcpCall<T = RemoteAggregates>(url: string, name: string, args: unknown): Promise<T> {
+  // a peer that refused or did not answer is a failed query: whatever this answer becomes is not cached
+  try { return await mcpCallOnce<T>(url, name, args); } catch (e) { noteFailedQuery(); throw e; }
+}
+async function mcpCallOnce<T>(url: string, name: string, args: unknown): Promise<T> {
   const headers: Record<string, string> = {
     "content-type": "application/json",
-    accept: "application/json, text/event-stream"
+    accept: "application/json, text/event-stream",
+    ...loopbackHeaders(url),
   };
   const rpc = async (body: unknown, extra: Record<string, string> = {}) => {
     const res = await fetch(url, { method: "POST", headers: { ...headers, ...extra }, body: JSON.stringify(body), cache: "no-store" });
@@ -285,52 +301,76 @@ function asEvent(x: unknown): PatientEvent | null {
 
 /**
  * A peer in the opt-in patient-level federation mode: everything RemoteAggregateResolver answers,
- * plus the timeline view's two needs — the cohorts' patient list (the peer pages it in its own
- * database, from the cohort definitions it is sent) and one patient's record. Nothing else: no
- * members(), no table rows, no plot points, so every other view still treats this peer as
- * aggregate-only. It exists only where this instance names the study in PEER_MCP_PATIENT_LEVEL,
- * and it answers only if the peer has opted in (MCP_DISCLOSE_PATIENTS); a peer that has not lacks
- * the tools, and the call fails saying so.
+ * plus the row tables of the kinds this instance accepts from it (`patientKinds`, from its
+ * PEER_MCP_PATIENT_LEVEL rules) — the peer pages them in its own database from the cohort
+ * definitions it is sent. Nothing else: no members(), no plot points, no regression rows, so every
+ * other view still treats this peer as aggregate-only. A table of a kind not accepted is refused
+ * before the network is touched; the peer refuses what its own MCP_DISCLOSE_PATIENTS does not allow.
  */
-export class RemoteTimelineResolver extends RemoteAggregateResolver implements RemoteTimelineRows {
+export class RemotePatientResolver extends RemoteAggregateResolver implements RemotePatientRows {
   readonly peerUrl: string;
-  constructor(study: string, url: string, instance: Instance) {
+  readonly patientKinds: ReadonlySet<PatientKind>;
+  constructor(study: string, url: string, instance: Instance, kinds: Iterable<PatientKind>) {
     super(study, url, instance);
     this.peerUrl = url;
+    this.patientKinds = new Set(kinds);
   }
-  private refuseIds(defs: (CohortDef | null | undefined)[]): void {
+  protected refuseIds(defs: (CohortDef | null | undefined)[]): void {
     // the patient this view asks for is the entitlement; an explicit id LIST in a cohort is not part of it
     if (defs.some(carriesPatientIds))
       throw new Error("a cohort here contains an explicit sample or patient list, which is not sent to remote peer " + this.instance.label);
   }
-  private disclosed<T>(p: Promise<T>): Promise<T> {
+  /** a refusal from the peer, said in terms of the setting that decides it */
+  protected disclosed<T>(p: Promise<T>, kind: PatientKind): Promise<T> {
+    const what = PATIENT_KIND_NAMES[kind];
     return p.catch((e: Error) => {
       const m = String(e?.message || e);
       throw new Error(/tool .*not found|unknown tool|-32601/i.test(m)
-        ? "the peer serving " + this.study + " does not share patient timelines (it has not set MCP_DISCLOSE_PATIENTS), though this instance's PEER_MCP_PATIENT_LEVEL trusts it to"
-        : /not a study this instance discloses/.test(m)
-          ? "the peer serving " + this.study + " shares patient timelines, but not of " + this.study + " (its MCP_DISCLOSE_PATIENTS does not list it)"
+        ? "the peer serving " + this.study + " does not share patient-level data (it has not set MCP_DISCLOSE_PATIENTS), though this instance's PEER_MCP_PATIENT_LEVEL accepts " + what + " from it"
+        : /not a study this instance discloses|does not disclose/.test(m)
+          ? "the peer serving " + this.study + " does not share " + what + " of " + this.study + " (its MCP_DISCLOSE_PATIENTS does not allow it)"
           : m);
     });
   }
-  async timelineRows(req: TimelineRowsRequest): Promise<TimelineRowsAnswer> {
+  async patientRows(req: PeerRowsRequest): Promise<PeerRowsAnswer> {
+    const kind = PEER_TABLES[req.table];
+    if (!kind) throw new Error("not a table a peer serves: " + String(req.table).slice(0, 40));
+    if (!this.patientKinds.has(kind))
+      throw new Error("this instance does not accept " + PATIENT_KIND_NAMES[kind] + " from the peer serving " + this.study + " (PEER_MCP_PATIENT_LEVEL)");
     this.refuseIds(req.parts.map((p) => p.def));
-    const r = await this.disclosed(mcpCall<TimelineRowsAnswer & { queries?: QueryLogEntry[] | null }>(this.peerUrl, "federated_patient_rows", {
-      study: this.study, parts: req.parts.map((p) => ({ cohort: p.cohort, cohortDef: p.def || {} })), source: this.instance.label,
+    const r = await this.disclosed(mcpCall<PeerRowsAnswer & { queries?: QueryLogEntry[] | null }>(this.peerUrl, "federated_patient_rows", {
+      study: this.study, table: req.table, parts: req.parts.map((p) => ({ cohort: p.cohort, cohortDef: p.def || {} })), source: this.instance.label,
       query: req.query, defaults: req.defaults, mode: req.mode,
       ...(req.limit != null ? { limit: req.limit } : {}), ...(req.offset != null ? { offset: req.offset } : {}), ...(req.column ? { column: req.column } : {}),
-      ...(req.patient ? { patient: req.patient } : {}),
-    }));
+      ...(req.patient ? { patient: req.patient } : {}), ...(req.subject ? { subject: req.subject } : {}), ...(req.oncokbPin ? { oncokbPin: req.oncokbPin } : {}),
+    }), kind);
+    // the table the peer answered with: a peer on a build from before named tables answers every call with the
+    // timeline's list and names none, so anything else it sends without saying so is refused rather than shown
+    const served = (r as { table?: unknown }).table ?? "timeline";
+    if (served !== req.table)
+      throw new Error("the peer serving " + this.study + " answered with " + String(served).slice(0, 40) + " rows when asked for " + req.table +
+        "; it predates sharing " + PATIENT_KIND_NAMES[kind] + " over MCP — update that instance");
     if (Array.isArray(r.queries)) for (const q of r.queries) this.queries.push({ label: q.label, sql: q.sql, ms: q.ms, remote: true });
-    // what the peer answered for is what it was asked about: its own study and the asked cohorts
+    // what the peer answered for is what it was asked about: its own study, the asked cohorts — and a table of one patient's, that patient
     const cohorts = new Set(req.parts.map((p) => p.cohort));
     const own = <T extends Record<string, unknown>>(xs: T[] | undefined) => (xs || []).filter((x) => x.study === this.study && cohorts.has(String(x.cohort)));
+    const rows = own(r.rows).filter((x) => !req.subject || x.patient === req.subject.patient);
     const rank = typeof r.rank === "number" && Number.isInteger(r.rank) && r.rank >= 0 ? r.rank : null;
-    return { rows: own(r.rows), counts: own(r.counts as unknown as Record<string, unknown>[]) as unknown as TimelineRowsAnswer["counts"], values: r.values || [], rank };
+    return { rows, counts: own(r.counts as unknown as Record<string, unknown>[]) as unknown as PeerRowsAnswer["counts"], values: r.values || [], rank,
+      oncokbPin: typeof r.oncokbPin === "string" ? r.oncokbPin.slice(0, 40) : null };
   }
+}
+
+/**
+ * A peer whose rules allow timelines: RemotePatientResolver plus the timeline view's other need,
+ * one patient's record. Built only when this instance accepts timelines from it.
+ */
+export class RemoteTimelineResolver extends RemotePatientResolver {
   async patientTimeline(patient: string): Promise<PatientTimeline> {
+    if (!this.patientKinds.has("timeline"))
+      throw new Error("this instance does not accept patient timelines from the peer serving " + this.study + " (PEER_MCP_PATIENT_LEVEL)");
     const r = await this.disclosed(mcpCall<{ study: string; patient: string; events: unknown[]; samples: unknown[]; queries?: QueryLogEntry[] | null }>(
-      this.peerUrl, "federated_patient_timeline", { study: this.study, patient }));
+      this.peerUrl, "federated_patient_timeline", { study: this.study, patient }), "timeline");
     if (r.study !== this.study || r.patient !== patient) throw new Error("peer answered for " + r.study + "/" + r.patient + ", not " + this.study + "/" + patient);
     if (Array.isArray(r.queries)) for (const q of r.queries) this.queries.push({ label: q.label, sql: q.sql, ms: q.ms, remote: true });
     const events = (Array.isArray(r.events) ? r.events : []).map(asEvent);

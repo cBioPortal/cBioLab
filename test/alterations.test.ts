@@ -67,7 +67,8 @@ describe("the alterations view's patient list", () => {
   test("its columns, and a rank for prev / next in the same order as its pages", () => {
     const ids = ALTERATION_PATIENT_COLUMNS.map((c) => c.id);
     assert.deepEqual(ALTERATION_PATIENT_DEFAULT_COLUMNS.filter((id) => !ids.includes(id)), []);
-    const src = alterationPatientRowSource([part], "db");
+    const src = alterationPatientRowSource([{ ...part, source: "this portal (test)" }], "db");
+    assert.match(pageSql(src, {}, ALTERATION_PATIENT_DEFAULT_COLUMNS, 25, 0), /'this portal \(test\)' AS source/, "each part names the instance that holds it: the Source column");
     const q = { sort: { column: "sv", desc: true } };
     const order = (sql: string) => /ORDER BY ([^\n)]*)/.exec(sql)![1];
     assert.equal(order(rankSql(src, q, ALTERATION_PATIENT_DEFAULT_COLUMNS, part.study, "P-1")), order(pageSql(src, q, ALTERATION_PATIENT_DEFAULT_COLUMNS, 25, 0)));

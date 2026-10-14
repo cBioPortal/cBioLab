@@ -35,7 +35,7 @@ const _profileCache = new Map<string, { profiles: string[]; gaProfiles: string[]
 export async function studyProfiles(study: string): Promise<{ profiles: string[]; gaProfiles: string[] }> {
   if (_profileCache.has(study)) return _profileCache.get(study)!;
   const { peerForStudy } = await import("./federation-remote.ts");
-  if (peerForStudy(study)) return { profiles: [], gaProfiles: [] }; // the peer owns its own profile inventory
+  if (await peerForStudy(study)) return { profiles: [], gaProfiles: [] }; // the peer owns its own profile inventory
   const conn = (await studyRouting()).get(study) || PRIMARY;
   const profiles = (await chQuery(
     "SELECT DISTINCT profile_type FROM " + conn.db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study), conn)).data.map((r) => r.profile_type);
@@ -64,13 +64,17 @@ export async function validStudies(): Promise<Set<string>> {
 export async function resolveStudy(requested?: string | null, fallback?: string | null): Promise<string> {
   const study = String(requested || fallback || STUDY).replace(/[^A-Za-z0-9._-]/g, "");
   const { peerForStudy } = await import("./federation-remote.ts");
-  if (peerForStudy(study)) return study; // held by a peer; only it can validate
+  if (await peerForStudy(study)) return study; // held by a peer; only it can validate
   const set = await validStudies();
   if (!set.has(study)) {
     if (restrictedStudies.has(study))
       throw new Error("study '" + study.slice(0, 60) + "' is consortium/private-access and is excluded from this deployment");
     throw new Error("unknown study '" + study.slice(0, 60) + "'");
   }
+  // the simulated peer (lib/loopback-peer.ts) holds its own connection's studies and no others
+  const { servingAsLoopbackPeer, loopbackConnId } = await import("./loopback-peer.ts");
+  if (servingAsLoopbackPeer() && (await studyRouting()).get(study)?.id !== loopbackConnId())
+    throw new Error("unknown study '" + study.slice(0, 60) + "' (this peer holds only its own studies)");
   return study;
 }
 

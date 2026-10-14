@@ -61,7 +61,8 @@ async function exploreFor(body: any) {
   for (const s of studies) profilesByStudy.set(s, await studyProfiles(s));
   const routing = await studyRouting();
   // Studies held by a remote peer are faceted over MCP; the rest locally.
-  const remote = studies.filter((s) => !!peerForStudy(s));
+  const peers = new Map((await Promise.all(studies.map(async (s) => [s, await peerForStudy(s)] as const))).filter(([, p]) => p) as [string, { url: string; label: string }][]);
+  const remote = studies.filter((s) => peers.has(s));
   const local = studies.filter((s) => !remote.includes(s));
   const unreachable = local.filter((s) => !routing.has(s));
   if (unreachable.length)
@@ -101,7 +102,7 @@ async function exploreFor(body: any) {
       eventType: x.eventType.slice(0, 200), ...(x.lineGap != null ? { lineGap: Number(x.lineGap) } : {}) }))
     : undefined;
   const remoteParts = await Promise.all(remote.map((s) => {
-    const peer = peerForStudy(s)!;
+    const peer = peers.get(s)!;
     return remoteFacets(s, peer.url, draft, peer.label, geneSearch);
   }));
   if (!local.length) {

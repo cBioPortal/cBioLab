@@ -50,6 +50,7 @@ const num = (v: unknown): number | null => { const x = Number(v); return Number.
 import type { CohortDef, CompileCtx, ChRow, ChResult, PatientTimeline } from "./types.ts";
 import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } from "./patient-timeline.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";
+import type { PatientKind } from "./disclosure.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -1279,32 +1280,62 @@ export type Resolver = AggregateCapable | PatientLevelCapable;
 
 /**
  * What the timeline view needs from a participant: one patient's record, and its patient list.
- * A local patient-level resolver has it (rowsPage serves the list); so does a remote peer in the
- * opt-in patient-level federation mode (RemoteTimelineResolver, lib/federation-remote.ts) — and
- * nothing else: that peer stays aggregate-only for every other view, because this is the only
- * patient-level method it has.
+ * A local patient-level resolver has it (rowsPage serves the list); so does a remote peer whose
+ * rules allow timelines in the opt-in patient-level federation mode (RemoteTimelineResolver,
+ * lib/federation-remote.ts).
  */
 export interface PatientTimelineCapable {
   patientTimeline(patient: string): Promise<PatientTimeline>;
 }
-/** A peer that serves the timeline's patient list itself, from the cohort definitions it is sent. */
-export interface RemoteTimelineRows extends PatientTimelineCapable {
+/**
+ * The row tables a peer may page in its own database for a coordinator's view, and the kind of
+ * patient-level data (lib/disclosure.ts) each one belongs to: the timeline's patient list, and the
+ * alterations view's patient list, one patient's samples and that patient's three tables.
+ */
+export const PEER_TABLES = {
+  "timeline": "timeline",
+  "alterations": "alterations",
+  "alterations:samples": "alterations",
+  "alterations:mutations": "alterations",
+  "alterations:cna": "alterations",
+  "alterations:sv": "alterations",
+} as const satisfies Record<string, PatientKind>;
+export type PeerTable = keyof typeof PEER_TABLES;
+/**
+ * A peer in the opt-in patient-level mode: it serves the row tables of the kinds this instance's
+ * rules accept from it (`patientKinds`), paged in its own database from the cohort definitions it
+ * is sent. Every other view still treats it as aggregate-only — it has none of
+ * PatientLevelCapable's methods, and its instance is not patient-level.
+ */
+export interface RemotePatientRows {
   readonly peerUrl: string;
-  timelineRows(req: TimelineRowsRequest): Promise<TimelineRowsAnswer>;
+  readonly patientKinds: ReadonlySet<PatientKind>;
+  patientRows(req: PeerRowsRequest): Promise<PeerRowsAnswer>;
 }
-export interface TimelineRowsRequest {
+export interface PeerRowsRequest {
+  table: PeerTable;
   parts: { cohort: string; def: CohortDef | null | undefined }[];
   query: TableQuery; defaults: string[];
   /** a page, the per-part counts, one column's values, or one patient's place in the order */
   mode: "page" | "counts" | "values" | "rank";
   limit?: number; offset?: number; column?: string; patient?: string;
+  /** a table of one patient's: whose, and the order of their samples (the Samples column's) */
+  subject?: { patient: string; order?: string[] };
+  /** the OncoKB version this instance annotates with, for the tables that carry OncoKB's call */
+  oncokbPin?: string | null;
 }
-export interface TimelineRowsAnswer { rows?: ChRow[]; counts?: { cohort: string; study: string; n: number; all: number }[]; values?: ChRow[]; rank?: number | null }
+export interface PeerRowsAnswer {
+  rows?: ChRow[]; counts?: { cohort: string; study: string; n: number; all: number }[]; values?: ChRow[]; rank?: number | null;
+  /** the OncoKB version the peer annotated its rows with (null: not annotated) */
+  oncokbPin?: string | null;
+}
 export function hasPatientTimeline(r: Resolver): r is Resolver & PatientTimelineCapable {
   return typeof (r as unknown as Partial<PatientTimelineCapable>).patientTimeline === "function";
 }
-export function hasRemoteTimelineRows(r: Resolver): r is Resolver & RemoteTimelineRows {
-  return typeof (r as unknown as Partial<RemoteTimelineRows>).timelineRows === "function";
+/** The peer behind `r` when it may serve `kind`'s rows to this instance, else null. */
+export function peerRowsFor(r: Resolver, kind: PatientKind): (Resolver & RemotePatientRows) | null {
+  const p = r as unknown as Partial<RemotePatientRows>;
+  return typeof p.patientRows === "function" && !!p.patientKinds?.has(kind) ? r as Resolver & RemotePatientRows : null;
 }
 
 export function isPatientLevel(r: Resolver): r is PatientLevelCapable {
@@ -2068,14 +2099,16 @@ export class AggregateResolver extends BaseResolver {
 
 export async function resolverFor(study: string, ctx: Partial<CompileCtx>): Promise<Resolver> {
   // A peer reached over MCP takes precedence: its data is not ours to query.
-  const { peerForStudy, peerSharesPatients, RemoteAggregateResolver, RemoteTimelineResolver } = await import("./federation-remote.ts");
-  const peer = peerForStudy(study);
+  const { peerForStudy, peerPatientKinds, RemoteAggregateResolver, RemotePatientResolver, RemoteTimelineResolver } = await import("./federation-remote.ts");
+  const { kindsText } = await import("./disclosure.ts");
+  const peer = await peerForStudy(study);
   if (peer) {
     const inst: Instance = { id: "peer", mode: "aggregate-only", label: peer.label, conn: PRIMARY /* unused: nothing is queried locally */ };
-    // the opt-in patient-level mode: configured here AND on the peer, and only for the timeline view
-    return peerSharesPatients(study)
-      ? new RemoteTimelineResolver(study, peer.url, { ...inst, label: peer.label + " (shares patient timelines)" })
-      : new RemoteAggregateResolver(study, peer.url, inst);
+    // the opt-in patient-level mode: the kinds this instance's rules accept from the peer for this study
+    const kinds = peerPatientKinds(study);
+    if (!kinds.size) return new RemoteAggregateResolver(study, peer.url, inst);
+    const shared = { ...inst, label: peer.label + " (shares " + kindsText(kinds) + ")" };
+    return kinds.has("timeline") ? new RemoteTimelineResolver(study, peer.url, shared, kinds) : new RemotePatientResolver(study, peer.url, shared, kinds);
   }
   const inst = await instanceForStudy(study);
   return inst.mode === "patient-level"
