@@ -61,7 +61,7 @@ export function useExploreState(page: ExplorePage) {
   const [savingFeature, setSavingFeature] = useState<string | null>(null);
   /** Explore's "+ Add chart": clinical/gene/derived-timeline filter builders live
    *  here instead of as three permanent cards above the facet grid. */
-  const addChartDialog = useRef<HTMLDialogElement | null>(null);
+  const [addChartOpen, setAddChartOpen] = useState(false);
   const [chartTab, setChartTab] = useState<"clinical" | "gene" | "derived" | "custom">("clinical");
   const [cName, setCName] = useState("");
   const [cDefText, setCDefText] = useState(JSON.stringify({ all: [] }, null, 2));
@@ -577,7 +577,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartDialog, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exExtraDerived, setExExtraDerived, exExtraDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, hiddenAttrs, setHiddenAttrs, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, exploreEventTypes, treatmentEventType, EXTRA_DERIVED_KINDS, extraDerivedOn, toggleExtraDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exExtraDerived, setExExtraDerived, exExtraDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, hiddenAttrs, setHiddenAttrs, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, exploreEventTypes, treatmentEventType, EXTRA_DERIVED_KINDS, extraDerivedOn, toggleExtraDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

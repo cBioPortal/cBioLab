@@ -9,6 +9,9 @@ import React, { useMemo } from "react";
 import type { HotspotGene, ViewResult } from "../../lib/types.ts";
 import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellOf, type AlterationCell, type ImpactType } from "../../lib/lollipop.ts";
 import { lollipopPanelsSvg } from "../../lib/lollipop-svg.ts";
+import { X } from "lucide-react";
+import { Button } from "../_ui/button";
+import { TB } from "../_ui/toolbar.ts";
 
 type Col = "driver" | "vus";
 const COLS: Col[] = ["driver", "vus"];
@@ -119,7 +122,7 @@ export function HotspotsBody({ v, hide: hideList, onHide }: { v: ViewResult; hid
         <div className="lp-banner" role="status">
           Showing <b>{shown.toLocaleString()}</b> of {total.toLocaleString()} mutations
           {unclassed ? <span className="meta"> ({unclassed.toLocaleString()} from a site that reports no alteration class, drawn regardless)</span> : null}
-          <button type="button" className="tbbtn" onClick={() => set([])}>remove filter</button>
+          <Button type="button" variant="outline" size="sm" className={TB} onClick={() => set([])}><X />remove filter</Button>
         </div>
       )}
       {drawn.map((d, i) => (

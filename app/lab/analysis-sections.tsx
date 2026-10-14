@@ -4,6 +4,11 @@
 // document names custom data that is not here. The page holds the state; each section reads it
 // and the page's actions from one AnalysisCtx.
 import { useState } from "react";
+import { Braces, LoaderCircle, Play, Plus, Save, X } from "lucide-react";
+import { Button } from "../_ui/button";
+import { CHIP } from "../_ui/toolbar.ts";
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
+import { Textarea } from "../_ui/textarea";
 import CohortPills from "./pills";
 import { GeneListEditor } from "../_oncoprint/OncoprintCard.tsx";
 import type { GeneTrackSpec } from "../../lib/gene-tracks.ts";
@@ -38,7 +43,6 @@ export interface AnalysisCtx {
   docs: DocStore;
   explore: ExploreResult | null;
   fetchExplore: (draftOverride?: CohortDef | null, studiesOverride?: string[] | string, attrsOverride?: string[]) => void;
-  genesDialog: React.RefObject<HTMLDialogElement | null>;
   genesFor: number | null;
   goTab: (t: "explore" | "cohorts" | "analysis" | "examples") => void;
   menuOpenRef: React.RefObject<Map<string, boolean>>;
@@ -80,24 +84,25 @@ export interface AnalysisCtx {
   viewIds: number[];
 }
 
+
 export function GenesDialog({ ctx }: { ctx: AnalysisCtx }) {
-  const { busy, doc, genesDialog, genesFor, setGenesFor, setViewGenes } = ctx;
-  return <>
-    <dialog ref={genesDialog} className="genedialog"
-      onClose={() => setGenesFor(null)}
-      onClick={e => { if (e.target === genesDialog.current) genesDialog.current?.close(); }}>
+  const { busy, doc, genesFor, setGenesFor, setViewGenes } = ctx;
+  return (
+    <Dialog open={genesFor != null} onOpenChange={(open) => { if (!open) setGenesFor(null); }}>
       {genesFor != null && (
-        <>
-          <h3>Genes <span className="plain">— {String(((doc.views || [])[genesFor] as any)?.kind || "view")}</span></h3>
+        <DialogContent aria-describedby={undefined} className="genedialog gap-3 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Genes <span className="font-normal text-muted-foreground">— {String(((doc.views || [])[genesFor] as any)?.kind || "view")}</span></DialogTitle>
+          </DialogHeader>
           {/* the DOCUMENT's view, never the result (a result's genes are {gene, driverPct, …}) */}
           <GeneListEditor view={(doc.views || [])[genesFor] || {}} busy={busy} onGenes={(g) => setViewGenes(genesFor, g)} />
-          <div className="row mt-3 end">
-            <button className="primary" onClick={() => genesDialog.current?.close()}>Done</button>
-          </div>
-        </>
+          <DialogFooter>
+            <DialogClose asChild><Button>Done</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
       )}
-    </dialog>
-  </>;
+    </Dialog>
+  );
 }
 
 export function CustomDataWarning({ ctx }: { ctx: AnalysisCtx }) {
@@ -107,12 +112,12 @@ export function CustomDataWarning({ ctx }: { ctx: AnalysisCtx }) {
       // a shared document can name server custom data that is locked here, deleted, or absent
       const unresolved = unresolvedUploads(doc);
       const of = (why: string) => unresolved.filter((u) => u.why === why).map((u) => u.as);
-      const manage = <button className="linklike" onClick={() => openCustomManager()}>Explore → Custom data</button>;
+      const manage = <Button variant="link" size="inline" onClick={() => openCustomManager()}>Explore → Custom data</Button>;
       const names = (ids: string[]) => ids.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>);
       return unresolved.length > 0 && (
         <div className="card customwarn">
           {of("locked").length > 0 && <p className="flush">This analysis uses custom data ({names(of("locked"))}).{" "}
-            <button className="linklike" onClick={requestLogin}>Log in</button> to run it.</p>}
+            <Button variant="link" size="inline" onClick={requestLogin}>Log in</Button> to run it.</p>}
           {of("deleted").length > 0 && <p className="flush">This analysis is pinned to custom data that has since been deleted: {names(of("deleted"))}.</p>}
           {of("missing").length > 0 && <p className="flush">This analysis uses custom data that is not on the server: {names(of("missing"))}.</p>}
           {of("unavailable").length > 0 && <p className="flush">This analysis uses custom data ({names(of("unavailable"))}), which this deployment does not store.</p>}
@@ -135,7 +140,7 @@ function EmptyViewCard({ ctx, vi }: { ctx: AnalysisCtx; vi: number }) {
       <div className="emptyview-body">
         <p className="emptyview-lead">This view has no cohorts yet.</p>
         <p>{emptyViewHint(dv.kind)} Pick one from this analysis or your library, or build one in Explore.</p>
-        <button className="primary" disabled={busy} onClick={() => openCohortChooser(vi)}>+ Add cohort</button>
+        <Button disabled={busy} onClick={() => openCohortChooser(vi)}><Plus />Add cohort</Button>
       </div>
     </div>
   );
@@ -155,7 +160,7 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
         <p className="note upgradenote">
           This analysis was written {upgradeNote.from === "unversioned" ? "before analyses carried a version" : "for DSL " + upgradeNote.from} and has been upgraded to {upgradeNote.to}
           {upgradeNote.changes.length ? ": " + upgradeNote.changes.join("; ") : ""}. Saving it, or sharing its link, uses the new version.{" "}
-          <button className="linklike" onClick={() => setUpgradeNote(null)}>dismiss</button>
+          <Button variant="link" size="inline" onClick={() => setUpgradeNote(null)}>dismiss</Button>
         </p>
       )}
       {/* The analysis's cohorts are not its top level: each view names the ones it draws, and these
@@ -163,7 +168,7 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
           from. Cohorts come in through a view's "+ Add cohort". */}
       {names.length > 0 && (
         <section className="cohortsum" aria-label="cohorts in this analysis">
-          <h2 className="vtitle hflex items-center gap-3 mb-4">
+          <h2 className="vtitle flex items-center gap-2.5 mb-4">
             Cohorts in this analysis <span className="plain meta">— add one from a view</span>{busy && <span className="spinner" />}
           </h2>
           <div className="cohortlist">
@@ -217,9 +222,9 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
                         {src.state === "changed" && <span className="cohortsrc-changed"> The saved cohort has changed since (now <code title={src.now}>#{shortHash(src.now!)}</code>, saved {src.src!.savedAt}).</span>}
                         {(src.state === "changed" || (src.state === "current" && src.edited)) && <>
                           {src.state === "changed" && <div className="cohortsrc-new"><span className="meta">The saved version:</span> <CohortPills def={src.src!.def} /></div>}
-                          <button className="tbbtn" disabled={busy} onClick={() => updateFromSaved(n)}
+                          <Button variant="outline" size="sm" className="h-ctl" disabled={busy} onClick={() => updateFromSaved(n)}
                             title={"replace this copy's definition with the saved cohort's; every view drawing “" + n + "” re-runs"}>
-                            {src.state === "changed" ? "Update to the saved version" : "Revert to the saved version"}</button>
+                            {src.state === "changed" ? "Update to the saved version" : "Revert to the saved version"}</Button>
                         </>}
                       </div>
                     )}
@@ -244,35 +249,38 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
 export function DocDialog({ ctx }: { ctx: AnalysisCtx }) {
   const { applyText, busy, clearAnalysis, doc, docDialog, docText, docs, result } = ctx;
   return <>
-    {/* The document's JSON, generated SQL and run/clear controls: a dialog
-        rather than a permanent column, so the leftbar can just be cohorts. */}
-    <dialog ref={docDialog} className="docdialog"
+    {/* The document's JSON, generated SQL and run/clear controls: a dialog rather than a
+        permanent column, so the leftbar can just be cohorts. A native <dialog>, so the editor
+        stays in the page while it is closed — anything reading the document from outside
+        React finds #docjson. */}
+    <dialog ref={docDialog} data-tw aria-labelledby="doctitle"
+      className="docdialog m-auto max-h-[85vh] w-[min(90vw,48rem)] max-w-3xl overflow-auto rounded-lg border bg-card p-6 text-foreground shadow-lg backdrop:bg-black/50"
       onClick={e => { if (e.target === docDialog.current) docDialog.current?.close(); }}>
-      <div className="row between baseline mb-2">
-        <h3 className="flush">The document <span className="plain">— views</span></h3>
-        <button className="linklike" onClick={() => docDialog.current?.close()}>close</button>
+      <div className="mb-3 flex items-baseline justify-between">
+        <h3 id="doctitle" className="text-base font-semibold">The document <span className="font-normal text-muted-foreground">— views</span></h3>
+        <Button variant="ghost" size="icon-sm" aria-label="close" onClick={() => docDialog.current?.close()}><X /></Button>
       </div>
       {/* id, because the notes textarea above it also matches "textarea" —
           anything reading the document from outside React needs to be
           able to say WHICH one. */}
-      <textarea className="docjson" id="docjson" value={docText} onChange={e => docs.setText(e.target.value)} spellCheck={false}
-        />
-      <div className="row mt-3">
-        <button className="primary" disabled={busy} onClick={applyText}>{busy && <span className="spinner onprimary" />}{busy ? "Running…" : "Run document"}</button>
+      <Textarea id="docjson" value={docText} onChange={e => docs.setText(e.target.value)} spellCheck={false}
+        className="h-80 resize-y bg-muted font-mono text-xs md:text-xs" />
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button disabled={busy} onClick={applyText}>{busy ? <LoaderCircle className="animate-spin" /> : <Play />}{busy ? "Running…" : "Run document"}</Button>
         {doc.cohorts && Object.keys(doc.cohorts).length > 0 &&
-          <button disabled={busy} title="empty the document — removes all cohorts and views" onClick={clearAnalysis}>Clear analysis</button>}
-        {result && <span className="meta">{result.stats.ms}ms · OncoKB {result.oncokbPin}</span>}
+          <Button variant="outline" disabled={busy} title="empty the document — removes all cohorts and views" onClick={clearAnalysis}>Clear analysis</Button>}
+        {result && <span className="text-sm text-muted-foreground">{result.stats.ms}ms · OncoKB {result.oncokbPin}</span>}
       </div>
-      <p className="note">Views: <code>{`{"kind":"compare","genes":[…]}`}</code> · <code>{`{"kind":"survival"}`}</code> · <code>{`{"kind":"oncoprint","genes":[…],"clinical":[attrs…]}`}</code></p>
+      <p className="mt-3 text-md text-muted-foreground">Views: <code>{`{"kind":"compare","genes":[…]}`}</code> · <code>{`{"kind":"survival"}`}</code> · <code>{`{"kind":"oncoprint","genes":[…],"clinical":[attrs…]}`}</code></p>
       {result && (
-        <details className="mt-2">
-          <summary className="meta clickable">
+        <details className="mt-3">
+          <summary className="cursor-pointer text-sm text-muted-foreground">
             Generated SQL (provenance) — the exact query each cohort compiled to, per study · OncoKB pin {result.oncokbPin || "none"}
           </summary>
           {Object.entries(result.cohorts).map(([n, c]) => (
-            <div className="mt-2" key={n}>
-              <p className="meta flush mb-1"><strong>{n}</strong> — {c.count.toLocaleString()} patients{c.studies && c.studies.length > 1 ? " across " + c.studies.length + " studies" : ""}</p>
-              <pre className="sqlpre">{c.sql}</pre>
+            <div className="mt-2.5" key={n}>
+              <p className="mb-1 text-sm text-muted-foreground"><strong className="text-foreground">{n}</strong> — {c.count.toLocaleString()} patients{c.studies && c.studies.length > 1 ? " across " + c.studies.length + " studies" : ""}</p>
+              <pre className="max-h-64 overflow-auto rounded-lg border bg-muted p-2.5 text-xs whitespace-pre">{c.sql}</pre>
             </div>
           ))}
         </details>
@@ -288,7 +296,7 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
       {(busy || result || (doc.views || []).length > 0) && (
         <div className="row baseline mb-4">
           <h2 className="vtitle">
-            Analysis{busy && <span className="spinner ml-2" />}
+            Analysis{busy && <span className="spinner ml-1.5" />}
           </h2>
           <div className="vmeta">
             {/* The workspace lives behind this one button + a dialog, not
@@ -298,33 +306,28 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
                 saved is what the dialog it opens is for; this button's
                 own label stays fixed. */}
             {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
-              <button className="iflex items-center gap-2" disabled={busy} onClick={openWorkspaceSave}
+              <Button variant="outline" size="sm" disabled={busy} onClick={openWorkspaceSave}
                 title={doc.title
                   ? "“" + doc.title + "” — " + (spaces[doc.title] && JSON.stringify(spaces[doc.title].doc) === JSON.stringify(doc)
                       ? "saved " + spaces[doc.title].savedAt : "unsaved changes")
                   : "save this analysis as a named, reopenable workspace"}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
-                  <path d="M17 21v-8H7v8" />
-                  <path d="M7 3v5h8" />
-                </svg>
+                <Save />
                 Save analysis
-              </button>
+              </Button>
             )}
             {(() => {
               const used = referencedDatasets(doc);
               return used.length > 0 && (
-                <button className="linklike" onClick={() => setCdFocus({ datasets: used })}
+                <Button variant="link" size="inline" className="text-md" onClick={() => setCdFocus({ datasets: used })}
                   title="the uploads this analysis names, as stored in this browser">
                   custom data ({used.length})
-                </button>
+                </Button>
               );
             })()}
-            <button className="linklike" onClick={() => docDialog.current?.showModal()}
+            <Button variant="link" size="inline" className="text-md" onClick={() => docDialog.current?.showModal()}
               title="open the document's raw JSON — edit it, run it, or view generated SQL">
-              show document json
-            </button>
+              <Braces />show document json
+            </Button>
           </div>
         </div>
       )}
@@ -337,7 +340,7 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
           <p className="note t-md flush">
             Start with a view: choose below what you want to see — survival, an oncoprint, a gene comparison — and
             then add its cohorts, from your library, from this analysis, or built on the{" "}
-            <button className="linklike" onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore page</button>.
+            <Button variant="link" size="inline" onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore page</Button>.
           </p>
         </div>
       )}
@@ -351,9 +354,9 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
               // a kind already in the document is selected; clicking it again removes it
               const present = (doc.views || []).filter((v: any) => v.kind === kind).length;
               if (present) return (
-                <button key={kind} className="facet on" disabled={busy}
+                <Button key={kind} variant="outline" size="xs" className={CHIP} aria-pressed disabled={busy}
                   title={"remove the " + label.toLowerCase() + " view" + (present > 1 ? "s (" + present + ")" : "")}
-                  onClick={() => removeViews((v) => v.kind === kind)}>{label}{present > 1 && " ×" + present} <span aria-hidden="true">✕</span></button>
+                  onClick={() => removeViews((v) => v.kind === kind)}>{label}{present > 1 && " ×" + present}<X /></Button>
               );
               const full = (doc.views || []).length >= 6;
               // with no cohorts yet there is no study to ask about: the view's cohorts decide later
@@ -363,9 +366,9 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
                 : waiting ? "loading this study's catalog — a moment"
                 : (known && why ? why() : null);
               return (
-                <button key={kind} className="facet" disabled={!!blocked}
+                <Button key={kind} variant="outline" size="xs" className={CHIP} aria-pressed={false} disabled={!!blocked}
                   title={blocked || ("add a " + label.toLowerCase() + " view, then choose its cohorts")}
-                  onClick={() => addView(kind)}>+ {label}{waiting && <span className="spinner" />}</button>
+                  onClick={() => addView(kind)}><Plus />{label}{waiting && <span className="spinner" />}</Button>
               );
             })}
           </div>

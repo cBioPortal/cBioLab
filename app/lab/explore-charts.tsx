@@ -5,6 +5,7 @@
 // The density is a filter: drag a rectangle over it to add both axes' ranges to the selection.
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api.ts";
+import { Choice } from "../_ui/choice.tsx";
 import type { CohortDef, View } from "../../lib/types.ts";
 
 type Clause = Record<string, unknown>;
@@ -67,9 +68,8 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
         <div className="xc-head">
           <span className="xc-title">{ep === "OS" ? "Overall survival" : ep + " survival"} of the selection</span>
           {endpoints && endpoints.length > 1 && (
-            <label className="tbfield" title="the outcome the curve follows">
-              <select value={ep} onChange={(e) => setEndpoint(e.target.value)}>{endpoints.map((x) => <option key={x}>{x}</option>)}</select>
-            </label>
+            <Choice className="w-28" title="the outcome the curve follows" value={ep} onChange={setEndpoint}
+              options={endpoints.map((x) => [x, x] as const)} />
           )}
         </div>
         <div className="xc-body">

@@ -19,6 +19,19 @@ import { api } from "../lab/api.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
 import type { OncoprintBody } from "../../lib/api-schemas.ts";
 import type { OncoprintSpec } from "../../lib/types.ts";
+import { Check, Download, Ellipsis, ImageDown, ListOrdered, LoaderCircle, Minus, Plus, Sheet, SlidersHorizontal, Tag, X } from "lucide-react";
+import { Button } from "../_ui/button";
+import { Checkbox } from "../_ui/checkbox";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
+import { GearMenu, MenuItem } from "../_ui/gear-menu.tsx";
+import { Input } from "../_ui/input";
+import { OptionSelect } from "../_ui/choice.tsx";
+import { Slider } from "../_ui/slider";
+import { FIELD, TB } from "../_ui/toolbar.ts";
+import { cn } from "../../lib/cn";
+
+/** one of the zoom group's buttons: the group draws the border */
+const ZOOM = "h-full rounded-none text-muted-foreground hover:bg-muted hover:text-foreground";
 
 const MAX_ZOOM = 24;
 /** common page widths for the export dialog's preset picker; the number field beside it takes any value */
@@ -150,13 +163,13 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   // Export sizing is a one-off action, not a view of the figure — nobody else reading a shared
   // link needs to know what page width someone once exported it at — so it stays local state,
   // not a `display` field.
-  const exportDialog = useRef<HTMLDialogElement | null>(null);
-  const exportCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  // in state, so the preview draws once the dialog has mounted its canvas
+  const [exportCanvas, setExportCanvas] = useState<HTMLCanvasElement | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"png" | "svg">("png");
   const [exportWidthIn, setExportWidthIn] = useState(8.5);
   const [exportDpi, setExportDpi] = useState(150);
-  const openExport = () => { setExportOpen(true); exportDialog.current?.showModal(); };
+  const openExport = () => setExportOpen(true);
   const perfRef = useRef<Perf>({ frames: 0 });
   const bump = (p: Partial<Perf>) => {
     perfRef.current = { ...perfRef.current, ...p };
@@ -323,7 +336,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   // ---- export preview: the same draw() the PNG download uses, at the dialog's chosen width ----
   useEffect(() => {
     if (!exportOpen || !data || !visible) return;
-    const cv = exportCanvasRef.current; if (!cv) return;
+    const cv = exportCanvas; if (!cv) return;
     const w = Math.max(200, Math.round(exportWidthIn * EXPORT_LAYOUT_DPI));
     const H = canvasHeight(data.tracks.length);
     cv.width = w; cv.height = H;
@@ -334,7 +347,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     draw(ctx, data, visible.order, visible.groups, { zoom: fitZoom(visible.groups, w - GEOM.gutter, gapPx), scrollX: 0, whitespace: display.whitespace },
       w, paletteOf(S2), { gap: gapPx, pctLabels: pctMode, style: S2, colors: display.colors ?? data.display?.colors });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exportOpen, exportWidthIn, data, visible, gapPx, gapMode, display]);
+  }, [exportOpen, exportCanvas, exportWidthIn, data, visible, gapPx, gapMode, display]);
 
   /**
    * The scrollbar is ours rather than the browser's. A native one over a virtual width of
@@ -614,7 +627,6 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     Number(display.whitespace !== DEFAULT_FIGURE_DISPLAY.whitespace) +
     Number(display.colorByType !== DEFAULT_FIGURE_DISPLAY.colorByType) +
     Number(!!display.whiteBackground) + Number(display.gaps !== "none")) || 0;
-  const displayMenu = useRef<HTMLDetailsElement>(null);
 
   // The figure applies sort and viewing options in the browser. A server-rendered download has
   // to be told about them, or the file would not be the picture on screen.
@@ -698,25 +710,23 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           </div>
           <div className="tbz">
             <span className="tbl" title="these change how it is drawn, here in your browser">view</span>
-            <details className="gearmenu" ref={displayMenu}>
-              <summary className="tbbtn" title="how the figure is drawn — nothing here re-runs a query">
-                display{offDefaults ? " (" + offDefaults + ")" : ""}</summary>
-              <div className="gearmenu-items">
-                <label className="chk"><input type="checkbox" checked={display.showUnaltered} disabled={busy}
-                  onChange={(e) => set({ showUnaltered: e.target.checked })} /> show unaltered {data.unit}s</label>
-                <label className="chk"><input type="checkbox" checked={display.whitespace} disabled={busy}
-                  onChange={(e) => set({ whitespace: e.target.checked })} /> whitespace between cells</label>
+            <GearMenu menuId="onco-display" title="how the figure is drawn — nothing here re-runs a query" wide contentClassName="px-2.5"
+              label={<><SlidersHorizontal />display{offDefaults ? " (" + offDefaults + ")" : ""}</>}>
+                <label className="chk"><Checkbox checked={display.showUnaltered} disabled={busy}
+                  onCheckedChange={(c) => set({ showUnaltered: (c === true) })} /> show unaltered {data.unit}s</label>
+                <label className="chk"><Checkbox checked={display.whitespace} disabled={busy}
+                  onCheckedChange={(c) => set({ whitespace: (c === true) })} /> whitespace between cells</label>
                 <label className="chk" title="colour each mutation class separately, or draw them all as one">
-                  <input type="checkbox" checked={display.colorByType} disabled={busy}
-                    onChange={(e) => set({ colorByType: e.target.checked })} /> colour by mutation type</label>
+                  <Checkbox checked={display.colorByType} disabled={busy}
+                    onCheckedChange={(c) => set({ colorByType: (c === true) })} /> colour by mutation type</label>
                 <label className="chk" title="white instead of grey for unaltered cells — for print; profiled and unprofiled then look alike, apart from the stripe">
-                  <input type="checkbox" checked={!!display.whiteBackground} disabled={busy}
-                    onChange={(e) => set({ whiteBackground: e.target.checked || undefined })} /> white background (for print)</label>
+                  <Checkbox checked={!!display.whiteBackground} disabled={busy}
+                    onCheckedChange={(c) => set({ whiteBackground: (c === true) || undefined })} /> white background (for print)</label>
                 <label className="setrow" title={gapTrack ? "split each cohort into runs of " + gapTrack.label : "choose a categorical track as the sort key first"}>
                   <span className="meta">gaps</span>
-                  <select value={display.gaps} disabled={busy || !gapTrack} onChange={(e) => set({ gaps: e.target.value as FigureDisplay["gaps"] })}>
+                  <OptionSelect value={display.gaps} disabled={busy || !gapTrack} onValueChange={(v) => set({ gaps: v as FigureDisplay["gaps"] })}>
                     <option value="none">none</option><option value="gaps">gaps</option><option value="pct">gaps with % on the right</option><option value="pct-left">gaps with % on the left</option>
-                  </select>
+                  </OptionSelect>
                 </label>
                 <span className="meta">{view.zoom >= 1 ? view.zoom.toFixed(1) + " px per column" : (1 / view.zoom).toFixed(0) + " columns per pixel"} · {data.tracks.length} tracks</span>
                 {/* Everything above is written into the document, so a shared link, the server SVG,
@@ -726,12 +736,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 <div className="menu-aside">
                   <span className="meta">this browser only</span>
                   <label className="chk" title="an overview of the whole figure, with the part you are looking at marked">
-                    <input type="checkbox" checked={showMini} onChange={(e) => setShowMini(e.target.checked)} /> minimap</label>
+                    <Checkbox checked={showMini} onCheckedChange={(c) => setShowMini((c === true))} /> minimap</label>
                 </div>
-              </div>
-            </details>
-            <label className="tbfield">sort <select value={sortKeys[0] || ""} disabled={busy}
-              onChange={(e) => onSortKeys(e.target.value ? [e.target.value, ...sortKeys.slice(1)].slice(0, 4) : sortKeys.slice(1))}>
+            </GearMenu>
+            <label className="tbfield">sort <OptionSelect value={sortKeys[0] || ""} disabled={busy}
+              onValueChange={(v) => onSortKeys(v ? [v, ...sortKeys.slice(1)].slice(0, 4) : sortKeys.slice(1))}>
               <option value="">engine order ({data.conventions.sort.join(", ")})</option>
               {sortKeys[0]?.startsWith("cluster:") && !data.tracks.some((t) => t.profileType === sortKeys[0].slice(8)) &&
                 <option value={sortKeys[0]}>{sortKeys[0]}</option>}
@@ -743,47 +752,47 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               {data.tracks.filter((t) => t.kind !== "gene" && !/\(no data\)$/.test(t.label)).flatMap((t) => [
                 <option key={t.label} value={t.label}>{t.label} ↑</option>,
                 <option key={"-" + t.label} value={"-" + t.label}>{t.label} ↓</option>])}
-            </select></label>
+            </OptionSelect></label>
             <span className="zoomctl">
-              <button type="button" onClick={() => zoomAt(1 / 1.4)} title="zoom out" aria-label="zoom out">−</button>
-              <input type="range" min={0} max={100} value={pct} title="zoom" aria-label="zoom"
-                onChange={(e) => { const p = Number(e.target.value) / 100; setView((v) => ({ ...v, zoom: minZoom * Math.pow(MAX_ZOOM / minZoom, p) })); }} />
-              <button type="button" onClick={() => zoomAt(1.4)} title="zoom in" aria-label="zoom in">+</button>
-              <button type="button" onClick={() => setView((v) => ({ ...v, zoom: minZoom, scrollX: 0 }))} title="fit every column in the width">fit</button>
+              <Button type="button" variant="ghost" size="icon-xs" className={ZOOM} onClick={() => zoomAt(1 / 1.4)} title="zoom out" aria-label="zoom out"><Minus /></Button>
+              <Slider min={0} max={100} value={[pct]} title="zoom" aria-label="zoom" className="mx-2 w-24"
+                onValueChange={([x]) => { const p = x / 100; setView((v) => ({ ...v, zoom: minZoom * Math.pow(MAX_ZOOM / minZoom, p) })); }} />
+              <Button type="button" variant="ghost" size="icon-xs" className={ZOOM} onClick={() => zoomAt(1.4)} title="zoom in" aria-label="zoom in"><Plus /></Button>
+              <Button type="button" variant="ghost" size="xs" className={cn(ZOOM, "w-auto border-l px-2 text-sm")} onClick={() => setView((v) => ({ ...v, zoom: minZoom, scrollX: 0 }))} title="fit every column in the width">fit</Button>
             </span>
           </div>
           <div className="tbz">
-            <details className="gearmenu">
-              <summary className="tbbtn" title="download or open this figure elsewhere" aria-label="download or open this figure elsewhere">{saving ? "saving…" : "⋯"}</summary>
-              <div className="gearmenu-items">
-                <span className="meta">download figures</span>
-                <button className="linklike" onClick={openExport}>Export image (PNG or SVG)… — choose a page width</button>
-                <button className="linklike" onClick={() => download("tsv")}>Tabular TSV — one row per track, one column per {data.unit}</button>
-                <button className="linklike" onClick={() => download("ids")}>{data.unit} order — the ids as drawn</button>
+            <GearMenu menuId="onco-figure" title="download or open this figure elsewhere" ariaLabel="download or open this figure elsewhere" wide
+              label={saving ? "saving…" : <Ellipsis />}>
+              {(close) => <>
+                <span className="meta px-2">download figures</span>
+                <MenuItem onClick={() => { close(); openExport(); }}><ImageDown />Export image (PNG or SVG)… — choose a page width</MenuItem>
+                <MenuItem onClick={() => { close(); download("tsv"); }}><Sheet />Tabular TSV — one row per track, one column per {data.unit}</MenuItem>
+                <MenuItem onClick={() => { close(); download("ids"); }}><ListOrdered />{data.unit} order — the ids as drawn</MenuItem>
                 {/* Not a download: the same spec, opened where it can be run rather than looked at.
                     Nothing is exported — the link carries the definition, and the lab page re-runs it. */}
                 <div className="menu-aside">
                   <span className="meta">open this figure elsewhere</span>
                   {lab ? <>
-                    <a className="linklike" href={lab.cli} target="_blank" rel="noreferrer"
+                    <a className="block rounded-sm px-2 py-1 text-link hover:bg-accent" href={lab.cli} target="_blank" rel="noreferrer"
                       title="the node and Python command lines, run against this spec on this server">export to CLI emulator ↗</a>
-                    <a className="linklike" href={lab.python} target="_blank" rel="noreferrer"
+                    <a className="block rounded-sm px-2 py-1 text-link hover:bg-accent" href={lab.python} target="_blank" rel="noreferrer"
                       title="this figure in a Pyodide notebook — the cohortlab package, in your browser">export to Python notebook ↗</a>
-                    <a className="linklike" href={lab.ipynb} download="oncoprint.ipynb"
+                    <a className="block rounded-sm px-2 py-1 text-link hover:bg-accent" href={lab.ipynb} download="oncoprint.ipynb"
                       title="a real .ipynb with the package and this figure's contract embedded; it opens in JupyterLab, VS Code or Colab">export to Jupyter (.ipynb)</a>
                     {lab.cut && <span className="meta">{lab.cut}</span>}
                   </> : <span className="meta">this figure&apos;s spec is too large to travel in a link;
                     export the tabular TSV instead</span>}
                 </div>
-              </div>
-            </details>
+              </>}
+            </GearMenu>
           </div>
         </div>
         {sortKeys.length > 1 && <div className="viewtb-more">
           <span className="meta" title="ties in the first key are broken by these, in order">then</span>
           {sortKeys.slice(1).map((k) => (
-            <button key={k} className="linklike" disabled={busy} title="drop this tiebreaker"
-              onClick={() => onSortKeys(sortKeys.filter((x) => x !== k))}>{k.startsWith("-") ? k.slice(1) + " ↓" : k + " ↑"} ✕</button>
+            <Button key={k} variant="link" size="inline" disabled={busy} title="drop this tiebreaker"
+              onClick={() => onSortKeys(sortKeys.filter((x) => x !== k))}>{k.startsWith("-") ? k.slice(1) + " ↓" : k + " ↑"}<X /></Button>
           ))}
         </div>}
         <div ref={wrapRef} className="onco-plot">
@@ -811,8 +820,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             const setPrimary = (k: string | null) => onSortKeys(k ? [k, ...sortKeys.filter((x) => x.replace(/^-/, "") !== t.label)].slice(0, 4)
               : sortKeys.filter((x) => x.replace(/^-/, "") !== t.label));
             const item = (label: string, on: boolean, act: () => void, enabled = true) => (
-              <button className={"linklike menuitem" + (on ? " on" : "")} disabled={!enabled || busy}
-                onClick={() => { act(); setTrackMenu(null); }}>{label}</button>
+              <MenuItem className={on ? "font-semibold text-accent-foreground" : undefined} disabled={!enabled || busy}
+                onClick={() => { act(); setTrackMenu(null); }}>{label}{on && <Check className="ml-auto" />}</MenuItem>
             );
             return (
               <div className="onco-trackmenu" style={{ left: Math.min(trackMenu.x, cssW - 210), top: trackMenu.y + 6 }}
@@ -846,10 +855,10 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                         </label>
                       ))}
                       {display.colors?.[t.label] && (
-                        <button className="linklike" style={{ textAlign: "left" }} onClick={() => {
+                        <Button variant="link" size="inline" className="self-start" onClick={() => {
                           const next = { ...(display.colors || {}) }; delete next[t.label];
                           set({ colors: Object.keys(next).length ? next : undefined });
-                        }}>Reset colours</button>
+                        }}>Reset colours</Button>
                       )}
                     </div>
                   </details>
@@ -909,24 +918,24 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               {selGroups.length > 0 && <span className="meta">from {selGroups.join(", ")}</span>}
               <span className="spacer" />
               {props.onCreateCohort && <>
-                <label className="meta">name <input className="onco-select-name" value={selName}
+                <label className="meta">name <Input className={cn(FIELD, "w-40")} value={selName}
                   onChange={(e) => setSelName(e.target.value)} /></label>
-                <button className="primary" disabled={selBusy || tooMany} onClick={createCohort}>
-                  {selBusy ? "making the cohort…" : "New cohort"}</button>
+                <Button size="sm" disabled={selBusy || tooMany} onClick={createCohort}>
+                  {selBusy ? <><LoaderCircle className="animate-spin" />making the cohort…</> : <><Plus />New cohort</>}</Button>
               </>}
               {props.onSaveFeature && (
-                <button className="tbbtn" disabled={selBusy}
+                <Button variant="outline" size="sm" className={TB} disabled={selBusy}
                   title={"save this selection as a yes/no custom attribute: the selected " + data.unit + "s are Yes, every other " + data.unit + " in the figure No"}
-                  onClick={saveFeature}>Save as feature</button>
+                  onClick={saveFeature}><Tag />Save as feature</Button>
               )}
-              <button className="linklike" onClick={zoomToSelection}>Zoom to selection</button>
-              <button className="linklike" onClick={async () => {
+              <Button variant="link" size="inline" className="text-md" onClick={zoomToSelection}>Zoom to selection</Button>
+              <Button variant="link" size="inline" className="text-md" onClick={async () => {
                 const ids = selectionIds();
                 const text = ids.join("\n") + "\n";
                 try { await navigator.clipboard.writeText(text); setSelError(ids.length.toLocaleString() + " ids copied"); }
                 catch { save(new Blob([text], { type: "text/plain" }), "selection-" + data.unit + "s.txt"); }
-              }}>Copy ids</button>
-              <button className="linklike" onClick={clearSelection}>Cancel</button>
+              }}>Copy ids</Button>
+              <Button variant="link" size="inline" className="text-md" onClick={clearSelection}>Cancel</Button>
               {data.unit === "sample" && props.onCreateCohort && <span className="meta" style={{ flexBasis: "100%" }}>
                 a cohort selects patients — the patients these samples belong to become the cohort, so it may also carry
                 their other samples</span>}
@@ -957,50 +966,49 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             </tbody></table>
           </details>
         )}
-        <dialog ref={exportDialog} className="exportdialog"
-          onClose={() => setExportOpen(false)}
-          onClick={(e) => { if (e.target === exportDialog.current) exportDialog.current?.close(); }}>
-          {exportOpen && <>
-            <h3>Export image</h3>
+        <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+          {exportOpen && <DialogContent aria-describedby={undefined}
+            className="exportdialog flex h-[min(94vh,60rem)] w-[min(96vw,90rem)] max-w-[90rem] flex-col gap-2 overflow-auto sm:max-w-[90rem]">
+            <DialogHeader><DialogTitle className="text-base">Export image</DialogTitle></DialogHeader>
             <label className="setrow">
               <span className="meta">format</span>
-              <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value as "png" | "svg")}>
+              <OptionSelect value={exportFormat} onValueChange={(v) => setExportFormat(v as "png" | "svg")}>
                 <option value="png">PNG — raster</option>
                 <option value="svg">SVG — vector, sharp at any size</option>
-              </select>
+              </OptionSelect>
             </label>
             <label className="setrow">
               <span className="meta">page width</span>
-              <select value={EXPORT_PRESETS.some((p) => p.in === exportWidthIn) ? String(exportWidthIn) : "custom"}
-                onChange={(e) => { if (e.target.value !== "custom") setExportWidthIn(Number(e.target.value)); }}>
+              <OptionSelect value={EXPORT_PRESETS.some((p) => p.in === exportWidthIn) ? String(exportWidthIn) : "custom"}
+                onValueChange={(v) => { if (v !== "custom") setExportWidthIn(Number(v)); }}>
                 {EXPORT_PRESETS.map((p) => <option key={p.label} value={p.in}>{p.label}</option>)}
                 <option value="custom">custom</option>
-              </select>
-              <input type="number" min={1} max={60} step={0.25} value={exportWidthIn} style={{ width: "4.5rem" }}
+              </OptionSelect>
+              <Input type="number" min={1} max={60} step={0.25} value={exportWidthIn} className={cn(FIELD, "w-20")}
                 onChange={(e) => setExportWidthIn(Math.max(1, Math.min(60, Number(e.target.value) || 1)))} />
               <span className="meta">in</span>
             </label>
             {exportFormat === "png" ? (
               <label className="setrow">
                 <span className="meta">resolution</span>
-                <select value={exportDpi} onChange={(e) => setExportDpi(Number(e.target.value))}>
+                <OptionSelect value={exportDpi} onValueChange={(v) => setExportDpi(Number(v))}>
                   <option value={96}>96 dpi — screen</option>
                   <option value={150}>150 dpi — print</option>
                   <option value={300}>300 dpi — high-res print</option>
-                </select>
+                </OptionSelect>
                 <span className="meta">{(Math.round(exportWidthIn * exportDpi)).toLocaleString()}px wide</span>
               </label>
             ) : <p className="meta">vector — the same file prints sharp at 8.5in or 48in alike</p>}
             <div className="onco-export-preview">
-              <canvas ref={exportCanvasRef} />
+              <canvas ref={setExportCanvas} />
             </div>
-            <div className="row" style={{ marginTop: "0.7rem", justifyContent: "flex-end", gap: "0.4rem" }}>
-              <button type="button" className="linklike" onClick={() => exportDialog.current?.close()}>cancel</button>
-              <button className="primary" disabled={!!saving} onClick={() => download(exportFormat)}>
-                {saving ? "exporting…" : "Export " + exportFormat.toUpperCase()}</button>
-            </div>
-          </>}
-        </dialog>
+            <DialogFooter className="mt-1">
+              <Button type="button" variant="ghost" onClick={() => setExportOpen(false)}>Cancel</Button>
+              <Button disabled={!!saving} onClick={() => download(exportFormat)}>
+                <Download />{saving ? "exporting…" : "Export " + exportFormat.toUpperCase()}</Button>
+            </DialogFooter>
+          </DialogContent>}
+        </Dialog>
       </>}
     </>
   );

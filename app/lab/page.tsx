@@ -18,7 +18,7 @@ import { useExploreState } from "./use-explore-state.ts";
 import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
 import { useAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
-import { useGearmenuOpen } from "./view-chrome.tsx";
+import { Plus, Upload } from "lucide-react";
 import { api } from "./api.ts";
 import { useSavedArtifacts } from "./use-saved.ts";
 import { SavedTab } from "./saved-tab.tsx";
@@ -34,8 +34,12 @@ import { useWorkspace } from "./use-workspace.ts";
 import { useLibrary, EXAMPLES } from "./use-library.ts";
 import { useToolActions } from "./use-tool-actions.ts";
 import { AddCohortDialog, type AddCohortTarget } from "./add-cohort-dialog.tsx";
+import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
+import { Button } from "../_ui/button";
+import { Input } from "../_ui/input";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
+const TAB_LABELS: [typeof TABS[number], string][] = [["explore", "Explore"], ["cohorts", "Saved"], ["analysis", "Analysis"], ["examples", "Examples"]];
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -103,14 +107,14 @@ function AddCohortBar({ existing, target, ready, error, onAdd, onCancel }: {
       <span className="meta">filter below, name it, then add it — Cancel returns to the analysis</span>
       <span className="spacer" />
       <label className="addcohortname">name
-        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80}
+        <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} className="h-8 w-56 bg-card text-md md:text-md"
           onKeyDown={(e) => { if (e.key === "Enter" && ready && name.trim() && !clash) onAdd(name); }} />
       </label>
-      <button className="primary" disabled={!ready || !name.trim() || clash} onClick={() => onAdd(name)}
+      <Button disabled={!ready || !name.trim() || clash} onClick={() => onAdd(name)}
         title={!ready ? "select a study first" : clash ? "the analysis already has a cohort with this name" : "add this selection to " + target + " as “" + name.trim() + "”"}>
-        Add to {target}
-      </button>
-      <button onClick={onCancel} title="close without adding (Esc)">Cancel</button>
+        <Plus />Add to {target}
+      </Button>
+      <Button variant="outline" onClick={onCancel} title="close without adding (Esc)">Cancel</Button>
       {(clash || error) && <p className="error fullrow flush">{clash ? "the analysis already has a cohort named “" + name.trim() + "”" : error}</p>}
     </div>
   );
@@ -139,12 +143,10 @@ export default function AnalysisPage() {
   const showClauseData = (cohort?: string): OnCustomData => (attribute, leaf, negated) =>
     setCdFocus({ datasets: referencedDatasets({ a: attribute }), clause: { attribute, leaf, cohort, negated } });
   const [genesFor, setGenesFor] = useState<number | null>(null);
-  const genesDialog = useRef<HTMLDialogElement | null>(null);
   const customState = useCustomDataState();
   const tabRef = useRef<string>(tabFromParams(sp));            // the tab syncUrl should record
-  /** which gearmenus (view menu, cohorts picker, ...) are open; see useGearmenuOpen's comment */
+  /** which menus (view menu, cohorts picker, ...) are open, so a menu outlives its card remounting (GearMenu) */
   const menuOpenRef = useRef(new Map<string, boolean>());
-  const moreDerivedMenu = useGearmenuOpen("explore:more-derivations", menuOpenRef.current);
   /**
    * The document's raw JSON is a place to inspect and share what was asked, not something to
    * read while interpreting a figure — so it lives behind a button, in a dialog, rather than
@@ -294,7 +296,7 @@ export default function AnalysisPage() {
     return { count: c.count, text: c.text };
   };
 
-  const openGenes = (vi: number) => { setGenesFor(vi); genesDialog.current?.showModal(); };
+  const openGenes = (vi: number) => setGenesFor(vi);
 
   // ---- the page's actions, each group in its own hook; later groups use earlier ones ----------
   const toolActions = useToolActions({ doc, docs, goTab, persistSpaces, queryClient, setError, setStudy, setValidating, study });
@@ -307,7 +309,8 @@ export default function AnalysisPage() {
   const cohortEdits = useCohortEdits({ doc, docs, evalOf: (n) => { const c = result?.cohorts[n]; return c ? { count: c.count, text: c.text } : null; }, persist, proposePartition, saved, savedReady, setError, setToast, study });
   const { analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary } = cohortEdits;
   const exploreState = useExploreState({ addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
-  const { addChartDialog, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies } = exploreState;
+  const { setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies } = exploreState;
+  const openTab = (t: typeof TABS[number]) => { goTab(t); if (t === "explore" && !explore) fetchExplore(); };
   const viewOptions = useViewOptions({ cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading });
   const { VIEW_KINDS, assayOptions, attrsLoading, catalogAttrs, contProfile, drawsOwnHead, geneChoices, numericAttrs, profileOptions, viewAttrs, viewEvents, viewGenes } = viewOptions;
   const viewEdits = useViewEdits({ VIEW_KINDS, assayOptions, busy, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, setChooser, setToast, study, viewAttrs, viewEvents, viewGenes, viewIds });
@@ -315,11 +318,11 @@ export default function AnalysisPage() {
 
   // ---- what the sections read ------------------------------------------------------------
   /** what Explore's sections read and the edits they can make (app/lab/explore-sections.tsx) */
-  const exploreCtx: ExploreCtx = { ...exploreState, moreDerivedMenu, showClauseData, studies };
+  const exploreCtx: ExploreCtx = { ...exploreState, menuStore: menuOpenRef.current, showClauseData, studies };
   /** what every view card reads and the edits it can make (app/lab/view-cards.tsx) */
   const viewCtx = { VIEW_KINDS, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, maxCohortsOf, menuOpenRef, moveView, noteEdit, ocView, openCohortChooser, openGenes, patchView, pendingKeys, profileOptions, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
   /** what the Analysis tab's sections read and the actions they take (app/lab/analysis-sections.tsx) */
-  const analysisCtx: AnalysisCtx = { VIEW_KINDS, addView, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortSaveState, cohortSource, emptyViewHint, genesDialog, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, removeViews, renamePartitionRow, result, saveCohortToLibrary, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
+  const analysisCtx: AnalysisCtx = { VIEW_KINDS, addView, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortSaveState, cohortSource, emptyViewHint, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, removeViews, renamePartitionRow, result, saveCohortToLibrary, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
   // what the page offers the researcher's AI assistant (app/lab/agent-tools.ts), current every render
   const webmcp = useLabTools({
     doc, result, busy, error, tab, study, savedAs: analysisSaved ? doc.title || null : null,
@@ -369,12 +372,13 @@ export default function AnalysisPage() {
         {viewNoteEditing != null && <ViewNoteDialog note={(doc.views || [])[viewNoteEditing]?.note || ""}
           onSave={confirmViewNoteEdit} onClose={() => setViewNoteEditing(null)} />}
         <GenesDialog ctx={analysisCtx} />
-        <div className="tabs">
-          <button className={tab === "explore" ? "active" : ""} onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore</button>
-          <button className={tab === "cohorts" ? "active" : ""} onClick={() => goTab("cohorts")}>Saved</button>
-          <button className={tab === "analysis" ? "active" : ""} onClick={() => goTab("analysis")}>Analysis</button>
-          <button className={tab === "examples" ? "active" : ""} onClick={() => goTab("examples")}>Examples</button>
-        </div>
+        {/* a click on the open tab still writes it to the URL */}
+        <Tabs value={tab} className="mb-4" onValueChange={(v) => openTab(v as typeof TABS[number])}>
+          <TabsList variant="line" aria-label="lab sections" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
+            {TAB_LABELS.map(([t, label]) => <TabsTrigger key={t} value={t} onClick={() => { if (t === tab) openTab(t); }}
+              className="h-auto flex-none rounded-none px-3.5 pt-2 pb-1.5 text-base leading-normal after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary">{label}</TabsTrigger>)}
+          </TabsList>
+        </Tabs>
         {error && <div className="error">{error}</div>}
         <CustomDataWarning ctx={analysisCtx} />
 
@@ -404,10 +408,10 @@ export default function AnalysisPage() {
               touched any of them. One button, one modal with a tab per kind instead. */}
           {explore && (
             <div className="row mb-4">
-              <button className="tbbtn" onClick={() => addChartDialog.current?.showModal()}>+ Add chart</button>
-              <button className="tbbtn" title="upload your own annotations and chart, filter and analyse them like clinical attributes"
+              <Button variant="outline" size="sm" onClick={() => setAddChartOpen(true)}><Plus />Add chart</Button>
+              <Button variant="outline" size="sm" title="upload your own annotations and chart, filter and analyse them like clinical attributes"
                 onClick={() => openCustomManager(customState.unlocked && customState.datasets.length ? "manage" : "add")}>
-                Custom data{customState.datasets.length ? " (" + customState.datasets.length + ")" : ""}</button>
+                <Upload />Custom data{customState.datasets.length ? " (" + customState.datasets.length + ")" : ""}</Button>
               {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
             </div>
           )}

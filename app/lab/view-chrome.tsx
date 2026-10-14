@@ -2,12 +2,20 @@
 // The chrome every view card shares, and the small controls inside it: the header (ViewHead), its
 // menus, the cohort and value pickers, the axis picker, the gene inputs. Module-level components,
 // so React keeps their state across the analysis page's renders.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { attributeLabel } from "../../lib/custom-data-names.ts";
 import type { ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 import { HIGHLIGHT_CAP, HIGHLIGHT_COLORS } from "../../lib/plot-highlight.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
+import { ArrowDown, ArrowUp, Ellipsis, Pencil, Plus, Save, Split, StickyNote, Trash2, X } from "lucide-react";
+import { Button } from "../_ui/button";
+import { Input } from "../_ui/input";
+import { cn } from "../../lib/cn";
+import { OptionSelect } from "../_ui/choice.tsx";
+import { FIELD } from "../_ui/toolbar.ts";
+import { Checkbox } from "../_ui/checkbox";
+import { GearMenu, MenuItem, MenuSeparator } from "../_ui/gear-menu.tsx";
 
 /** the cohort colours, in order, for every chart on the page */
 export const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
@@ -70,9 +78,9 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
   return (
     <span className="axispick">
       <span className="tbl">{side}</span>
-      <select value={src} disabled={busy} title="what this axis measures"
-        onChange={(e) => {
-          const s = e.target.value;
+      <OptionSelect className="max-w-44" value={src} disabled={busy} title="what this axis measures"
+        onValueChange={(v) => {
+          const s = v;
           // Keep whatever this axis last held for each source (spreading `a` rather than
           // starting fresh), so switching away and back round-trips instead of always
           // reverting to the catalog's first entry — a molecular axis already did this for
@@ -86,22 +94,22 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
         <option value="clinical">clinical</option>
         {!categorical && <option value="molecular">molecular</option>}
         <option value="alteration">alteration</option>
-      </select>
+      </OptionSelect>
       {src === "clinical" && loading && !attrs.length && <Waiting what="attributes" />}
       {src === "clinical" && !(loading && !attrs.length) && (
-        <select value={a.attribute || ""} disabled={busy} title="which clinical attribute"
-          onChange={(e) => set({ ...a, attribute: e.target.value })}>
+        <OptionSelect className="max-w-44" value={a.attribute || ""} disabled={busy} title="which clinical attribute"
+          onValueChange={(v) => set({ ...a, attribute: v })}>
           {!attrs.some((x) => x.attribute === a.attribute) && <option value={a.attribute || ""}>{a.attribute || "(none)"}</option>}
           {attrs.map((x) => <option key={x.attribute} value={x.attribute}>{attributeLabel(x.attribute)}{x.kind === "num" ? "" : " (categorical)"}</option>)}
-        </select>
+        </OptionSelect>
       )}
       {src === "molecular" && <>
         {loading && !profiles.length ? <Waiting what="profiles" /> :
-        <select value={a.profileType || ""} disabled={busy} title="which molecular profile"
-          onChange={(e) => set({ ...a, profileType: e.target.value })}>
+        <OptionSelect className="max-w-44" value={a.profileType || ""} disabled={busy} title="which molecular profile"
+          onValueChange={(v) => set({ ...a, profileType: v })}>
           {!profiles.includes(a.profileType || "") && <option value={a.profileType || ""}>{a.profileType || "(none)"}</option>}
           {profiles.map((pt) => <option key={pt} value={pt}>{pt}</option>)}
-        </select>}
+        </OptionSelect>}
         <GeneInput gene={a.gene || ""} busy={busy} onCommit={(gene) => set({ ...a, gene })} />
       </>}
       {src === "alteration" && (() => {
@@ -121,11 +129,11 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
                   set(next.length > 1 ? { ...a, gene: undefined, genes: next, by }
                     : { ...a, genes: undefined, gene: next[0] || "", by });
                 }} />}
-          <select value={isOql ? "oql" : a.by || (isSet ? "mutated" : "mutationType")} disabled={busy}
+          <OptionSelect className="max-w-44" value={isOql ? "oql" : a.by || (isSet ? "mutated" : "mutationType")} disabled={busy}
             title={isOql ? "Altered when a case matches any line of the query, Unaltered otherwise"
               : isSet ? "a gene set is \"mutated vs not\", or write it as an OQL query" : "how the gene's alterations are grouped"}
-            onChange={(e) => {
-              const by = e.target.value;
+            onValueChange={(v) => {
+              const by = v;
               // to OQL: the genes become a query (a bare gene is "any alteration"); from OQL: the
               // query's first gene, so a round trip keeps the gene
               if (by === "oql") set({ source: "alteration", oql: genes.length ? genes.join("; ") : "TP53: MUT" });
@@ -136,7 +144,7 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
             <option value="mutated">mutated vs not</option>
             <option value="cna" disabled={isSet}>copy number</option>
             <option value="oql">matches OQL</option>
-          </select>
+          </OptionSelect>
         </>;
       })()}
     </span>
@@ -163,16 +171,16 @@ export function HighlightPicker({ chosen, options, busy, onChange }: {
         <span key={n} className="hlchip" title={"“" + n + "” drawn over the plotted cohort"}>
           <span className="hldot" style={{ background: HIGHLIGHT_COLORS[i] }} />
           <span className="hlname">{n}</span>
-          <button type="button" className="hlx" disabled={busy} aria-label={"stop highlighting " + n}
-            onClick={() => onChange(chosen.filter((x) => x !== n))}>×</button>
+          <Button type="button" variant="ghost" size="icon-xs" className="size-4 text-muted-foreground [&_svg:not([class*='size-'])]:size-3" disabled={busy}
+            aria-label={"stop highlighting " + n} onClick={() => onChange(chosen.filter((x) => x !== n))}><X /></Button>
         </span>
       ))}
       {chosen.length < HIGHLIGHT_CAP && left.length > 0 && (
-        <select value="" disabled={busy} aria-label="add a cohort to highlight"
-          onChange={(e) => { if (e.target.value) onChange([...chosen, e.target.value]); }}>
+        <OptionSelect className="max-w-40" value="" disabled={busy} aria-label="add a cohort to highlight"
+          onValueChange={(v) => { if (v) onChange([...chosen, v]); }}>
           <option value="">{chosen.length ? "+ another" : "+ cohort"}</option>
           {left.map((o) => <option key={o.name} value={o.name}>{"\u00a0".repeat(o.depth * 2) + o.label}</option>)}
-        </select>
+        </OptionSelect>
       )}
     </span>
   );
@@ -191,7 +199,7 @@ export function GeneInput({ gene, busy, onCommit }: { gene: string; busy?: boole
   useEffect(() => setDraft(gene), [gene]);
   const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); onCommit(v); };
   return (
-    <input className="axisgene" value={draft} disabled={busy} placeholder="gene"
+    <Input className={cn(FIELD, "w-22 px-1.5 uppercase")} value={draft} disabled={busy} placeholder="gene"
       onChange={(e) => {
         const v = e.target.value.toUpperCase();
         setDraft(v);
@@ -216,7 +224,7 @@ export function GeneSetInput({ genes, busy, onCommit }: { genes: string[]; busy?
   const parse = (v: string) => v.split(",").map((g) => g.trim().toUpperCase()).filter(Boolean);
   const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); onCommit(parse(v)); };
   return (
-    <input className="axisgene geneset" value={draft} disabled={busy} placeholder="gene, or gene,gene,... for a set" size={Math.max(8, Math.min(30, draft.length + 2))}
+    <Input className={cn(FIELD, "w-auto max-w-56 min-w-22 px-1.5 uppercase")} value={draft} disabled={busy} placeholder="gene, or gene,gene,... for a set" size={Math.max(8, Math.min(30, draft.length + 2))}
       title={'one gene, or a comma-separated gene set ("is any of these altered")'}
       onChange={(e) => {
         const v = e.target.value.toUpperCase();
@@ -239,7 +247,7 @@ export function OqlInput({ query, busy, onCommit }: { query: string; busy?: bool
   useEffect(() => setDraft(query), [query]);
   const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); if (v.trim() && v !== query) onCommit(v.trim()); };
   return (
-    <input className="axisgene axisoql" value={draft} disabled={busy} placeholder="KRAS: G12C; STK11: MUT" spellCheck={false}
+    <Input className={cn(FIELD, "w-auto max-w-88 px-1.5")} value={draft} disabled={busy} placeholder="KRAS: G12C; STK11: MUT" spellCheck={false}
       size={Math.max(16, Math.min(44, draft.length + 2))}
       title={"OQL, one gene per line or ';' — e.g. KRAS: G12C; STK11: MUT; EGFR: AMP; TP53: DRIVER; ERBB2: EXP>2. " +
         "A case is Altered when it matches any of them."}
@@ -255,40 +263,19 @@ export function OqlInput({ query, busy, onCommit }: { query: string; busy?: bool
 }
 
 /**
- * A gearmenu's open/closed state, keyed by a caller-chosen id, kept in a store the page owns (see
- * `menuOpenRef` in AnalysisPage) rather than in the menu itself. A native `<details>` has no
- * memory of its own, so when its card is remounted (an edit that replaces the view, and with it
- * the card's key) the menu would silently reopen closed. This restores it synchronously before
- * the browser paints, so the close is never visible, and stays current on every open/close
- * however it happens — a click on the summary, or PopoverAutoClose's outside-click/Escape
- * handler, both fire the same native "toggle" event this listens for.
- */
-export function useGearmenuOpen(id: string, store: Map<string, boolean>) {
-  const ref = useRef<HTMLDetailsElement>(null);
-  useLayoutEffect(() => {
-    if (store.get(id) && ref.current) ref.current.open = true;
-  }, [id, store]);
-  const onToggle = (e: React.SyntheticEvent<HTMLDetailsElement>) => store.set(id, e.currentTarget.open);
-  return { ref, onToggle };
-}
-
-/**
  * The "?" in every view's header: a plain-language explanation of what this KIND of view is —
  * for a reader who isn't a scientist, not the DSL's own precise documentation (lib/dsl-reference.ts
  * is for someone writing a document; this is for someone reading the figure). One component in
  * ViewHead means every view kind gets it for free, with nothing to add at each view's own JSX.
  */
 export function ViewHelpButton({ kind, menuId, menuStore }: { kind: string; menuId: string; menuStore: Map<string, boolean> }) {
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   const help = VIEW_HELP[kind];
   if (!help) return null;
   return (
-    <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title="what this view is, in plain language" aria-label="what this view is, in plain language">?</summary>
-      <div className="gearmenu-items">
-        <p className="viewhelp-text">{help.text}</p>
-      </div>
-    </details>
+    <GearMenu menuId={menuId} menuStore={menuStore} label="?" title="what this view is, in plain language"
+      ariaLabel="what this view is, in plain language" wide contentClassName="p-3">
+      <p className="viewhelp-text">{help.text}</p>
+    </GearMenu>
   );
 }
 
@@ -332,24 +319,21 @@ export function PickMenu({ label, title, options, chosen, onChange, min, max, bu
     if (has && min != null && chosen.length <= min) return;
     onChange(has ? chosen.filter((x) => x !== v) : [...chosen, v]);
   };
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   return (
-    <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title={title}>{label} ({chosen.length}){loading && !options.length && <span className="spinner" />}</summary>
-      <div className="gearmenu-items">
+    <GearMenu menuId={menuId} menuStore={menuStore} title={title} contentClassName="max-h-[65vh] overflow-y-auto px-2.5"
+      label={<>{label} ({chosen.length}){loading && !options.length && <span className="spinner" />}</>}>
         {options.length === 0 && (loading ? <Waiting what={label} /> : <span className="meta">nothing to choose from</span>)}
         {options.map((o) => {
           const on = chosen.includes(o.value);
           const stuck = on ? (min != null && chosen.length <= min) : (max != null && chosen.length >= max);
           return (
-            <label key={o.value} className="chk" title={stuck ? (on ? "a view needs at least " + min : "at most " + max) : undefined}>
-              <input type="checkbox" checked={on} disabled={busy || stuck} onChange={() => toggle(o.value)} />
-              {o.label}{o.hint && <span className="meta"> — {o.hint}</span>}
+            <label key={o.value} className="flex cursor-pointer items-center gap-2 py-1 text-md" title={stuck ? (on ? "a view needs at least " + min : "at most " + max) : undefined}>
+              <Checkbox checked={on} disabled={busy || stuck} onCheckedChange={() => toggle(o.value)} />
+              <span>{o.label}{o.hint && <span className="meta"> — {o.hint}</span>}</span>
             </label>
           );
         })}
-      </div>
-    </details>
+    </GearMenu>
   );
 }
 
@@ -373,7 +357,6 @@ export function CohortPicker({ nodes, chosen, max, busy, onChange, onAdd, menuId
   nodes: CohortNode[]; chosen: string[]; max?: number; busy?: boolean;
   onChange: (next: string[]) => void; onAdd?: () => void; menuId: string; menuStore: Map<string, boolean>;
 }) {
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   const byName = new Map(nodes.map((x) => [x.name, x] as const));
   const splits = nodes.filter((x) => x.kind === "split");
   /** the split a name draws from: itself if a split, else the deepest split it sits under */
@@ -433,20 +416,19 @@ export function CohortPicker({ nodes, chosen, max, busy, onChange, onAdd, menuId
     );
   };
   return (
-    <details className="gearmenu cohortpick" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title="which cohorts this view draws — a split draws each of its groups">
-        cohorts ({drawn === chosen.length ? drawn : drawn + " groups"})
-      </summary>
-      <div className="gearmenu-items">
+    <GearMenu menuId={menuId} menuStore={menuStore} className="cohortpick" title="which cohorts this view draws — a split draws each of its groups"
+      label={"cohorts (" + (drawn === chosen.length ? drawn : drawn + " groups") + ")"}
+      contentClassName="max-h-[65vh] max-w-[30rem] min-w-[22rem] gap-0 overflow-y-auto px-0 pt-0 pb-1">
+      {(close) => <>
         <div className="cpick-head">Draw in this view</div>
         {nodes.filter((o) => !hidden(o.name)).map(row)}
         {single ? <p className="cpick-foot">This view draws one cohort — pick one, or one group of a split.</p>
           : splits.length > 0 && <p className="cpick-foot">A view draws whole cohorts, or the groups of one split — not both. Choosing one replaces the other.</p>}
-        {onAdd && <button type="button" className="linklike cpick-add" disabled={busy}
+        {onAdd && <Button type="button" variant="link" size="inline" className="mx-2.5 mt-1 self-start text-md" disabled={busy}
           title="add a cohort from your library, or build one in Explore"
-          onClick={() => { menuStore.set(menuId, false); if (ref.current) ref.current.open = false; onAdd(); }}>+ add a cohort…</button>}
-      </div>
-    </details>
+          onClick={() => { close(); onAdd(); }}><Plus />add a cohort…</Button>}
+      </>}
+    </GearMenu>
   );
 }
 
@@ -547,25 +529,23 @@ export function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove, on
   menuId: string; menuStore: Map<string, boolean>; onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void;
   onEditNote?: () => void; hasNote?: boolean;
 }) {
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   return (
-    <details className="gearmenu" ref={ref} onToggle={onToggle}>
-      <summary className="tbbtn" title="reorder or remove this view" aria-label="reorder or remove this view">⋯</summary>
-      <div className="gearmenu-items">
-        <button className="linklike" disabled={!onMoveUp} onClick={onMoveUp}>move up</button>
-        <button className="linklike" disabled={!onMoveDown} onClick={onMoveDown}>move down</button>
+    <GearMenu menuId={menuId} menuStore={menuStore} className="viewgear" label={<Ellipsis />} title="reorder or remove this view" ariaLabel="reorder or remove this view">
+      {(close) => <>
+        <MenuItem disabled={!onMoveUp} onClick={() => { close(); onMoveUp?.(); }}><ArrowUp />move up</MenuItem>
+        <MenuItem disabled={!onMoveDown} onClick={() => { close(); onMoveDown?.(); }}><ArrowDown />move down</MenuItem>
         {/* a note belongs to a saved analysis, as a cohort's edits do (see CohortEditMenu), so the
             item only exists once there is a saved analysis for it to belong to */}
         {onEditNote && <>
-          <hr />
-          <button className="linklike" onClick={onEditNote}>{hasNote ? "edit note…" : "add note…"}</button>
+          <MenuSeparator />
+          <MenuItem onClick={() => { close(); onEditNote(); }}><StickyNote />{hasNote ? "edit note…" : "add note…"}</MenuItem>
         </>}
         {onRemove && <>
-          <hr />
-          <button className="linklike" onClick={onRemove}>remove</button>
+          <MenuSeparator />
+          <MenuItem className="text-destructive hover:text-destructive" onClick={() => { close(); onRemove(); }}><Trash2 />remove</MenuItem>
         </>}
-      </div>
-    </details>
+      </>}
+    </GearMenu>
   );
 }
 
@@ -593,32 +573,31 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
   splitCount?: number;
   menuId: string; menuStore: Map<string, boolean>;
 }) {
-  const { ref, onToggle } = useGearmenuOpen(menuId, menuStore);
   const [splitting, setSplitting] = useState(false);
   const [saving, setSaving] = useState(false);
   return (
-    <details className="gearmenu cohortgear" ref={ref} data-menu-id={menuId}
-      onToggle={(e) => { onToggle(e); if (!(e.currentTarget as HTMLDetailsElement).open) setSplitting(false); }}>
-      <summary className="tbbtn" title="edit this cohort" aria-label="edit this cohort">⋯</summary>
-      <div className={"gearmenu-items" + (splitting ? " wide" : "")}>
+    <GearMenu menuId={menuId} menuStore={menuStore} className="cohortgear" label={<Ellipsis />} title="edit this cohort" ariaLabel="edit this cohort"
+      wide={splitting} onOpenChange={(o) => { if (!o) setSplitting(false); }}>
+      {(close) => <>
         {save && !splitting && <>
-          <button className="linklike" disabled={busy || saving} title={save.title}
+          <MenuItem disabled={busy || saving} title={save.title}
             onClick={async () => { setSaving(true); try { await save.onSave(); } finally { setSaving(false); } }}>
-            {save.label}{saving && <span className="spinner ml-2" />}</button>
-          <hr />
+            <Save />{save.label}{saving && <span className="spinner ml-1.5" />}</MenuItem>
+          <MenuSeparator />
         </>}
-        {split && (splitting ? <>{split(() => { menuStore.set(menuId, false); setSplitting(false); })}<hr /></> : <>
-          <button className="linklike" disabled={busy} title="divide this cohort into arms that never overlap and add up to it"
-            onClick={() => setSplitting(true)}>{splitCount ? "split another way…" : "split into arms…"}</button>
-          <hr />
+        {split && (splitting ? <>{split(() => { close(); setSplitting(false); })}<MenuSeparator /></> : <>
+          <MenuItem disabled={busy} title="divide this cohort into arms that never overlap and add up to it"
+            onClick={() => setSplitting(true)}><Split />{splitCount ? "split another way…" : "split into arms…"}</MenuItem>
+          <MenuSeparator />
         </>)}
         {canEdit && <>
-          <button className="linklike" disabled={busy} onClick={onEdit}>edit…</button>
-          <hr />
+          <MenuItem disabled={busy} onClick={() => { close(); onEdit(); }}><Pencil />edit…</MenuItem>
+          <MenuSeparator />
         </>}
-        <button className="linklike" disabled={busy} title="remove it from the analysis and from every view that draws it" onClick={onRemove}>remove from analysis</button>
-      </div>
-    </details>
+        <MenuItem className="text-destructive hover:text-destructive" disabled={busy} title="remove it from the analysis and from every view that draws it"
+          onClick={() => { close(); onRemove(); }}><Trash2 />remove from analysis</MenuItem>
+      </>}
+    </GearMenu>
   );
 }
 

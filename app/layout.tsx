@@ -1,5 +1,4 @@
 import "./globals.css";
-import PopoverAutoClose from "./PopoverAutoClose";
 import { BUILD_INFO } from "../lib/build-info.ts";
 
 export const metadata = {
@@ -15,7 +14,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Serif:wght@600&display=swap" />
       </head>
       <body>
-        <PopoverAutoClose />
         {children}
         {/* which code this deployment runs (lib/build-info.ts); also served as /api/version */}
         <footer className="build-stamp">

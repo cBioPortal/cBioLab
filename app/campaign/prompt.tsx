@@ -2,6 +2,9 @@
 // A prompt for the researcher's AI assistant (Claude in the Chrome sidebar), with a copy
 // button. The app never calls a model itself; this is how a page hands work to the sidebar.
 import { useState } from "react";
+import { Check, Copy } from "lucide-react";
+import { Button } from "../_ui/button";
+import { TB } from "../_ui/toolbar.ts";
 
 export function Prompt({ label, text }: { label: string; text: string }) {
   const [copied, setCopied] = useState(false);
@@ -11,7 +14,7 @@ export function Prompt({ label, text }: { label: string; text: string }) {
   }
   return (
     <div className="camp-prompt">
-      <div className="camp-prompt-head"><strong>{label}</strong><button onClick={copy}>{copied ? "copied" : "copy prompt"}</button></div>
+      <div className="camp-prompt-head"><strong>{label}</strong><Button variant="outline" size="sm" className={TB} onClick={copy}>{copied ? <Check /> : <Copy />}{copied ? "copied" : "copy prompt"}</Button></div>
       <p>{text}{text.endsWith(": ") && <em>…</em>}</p>
     </div>
   );

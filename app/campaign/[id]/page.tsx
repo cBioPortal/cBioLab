@@ -13,6 +13,10 @@ import { Prompt } from "../prompt.tsx";
 import { AgentToolsMenu } from "../../_agent/AgentToolsMenu.tsx";
 import LoginButton from "../../lab/login-button.tsx";
 import { useCustomDataState } from "../../lab/custom-data-panel.tsx";
+import { LoaderCircle, Lock, Play } from "lucide-react";
+import { Button } from "../../_ui/button";
+import { Checkbox } from "../../_ui/checkbox";
+import { Textarea } from "../../_ui/textarea";
 
 type Prior = { campaignId: string; question: string; verdict: string | null; p: number | null; lockedAt: string | null };
 type View = { campaign: Campaign; funnel: Funnel; prior: Record<string, Prior[]>; note?: any };
@@ -176,20 +180,20 @@ export default function CampaignPage() {
               engine, not chosen by anyone.
             </p>
             {busy === "run" ? (
-              <button className="primary" disabled><span className="spinner onprimary" /> testing… {c.hypotheses.filter((h) => h.discovery).length}/{testable.length} on the discovery half</button>
+              <Button disabled><LoaderCircle className="animate-spin" /> testing… {c.hypotheses.filter((h) => h.discovery).length}/{testable.length} on the discovery half</Button>
             ) : c.status === "running" ? (
               // Marked running, but not by this page: another tab or agent is running it, or a run
               // was cut off (a server time limit). Results so far are saved and a resume re-runs
               // only what is missing, so offering it is safe either way.
               <div className="camp-act-row">
-                <button className="primary" disabled={!!busy || !!why} title={why || undefined} onClick={() => act("run")}>Resume the run</button>
+                <Button disabled={!!busy || !!why} title={why || undefined} onClick={() => act("run")}><Play />Resume the run</Button>
                 <span className="camp-dim">
                   {c.hypotheses.filter((h) => h.discovery).length}/{testable.length} tested so far. A run is in progress elsewhere or
                   was interrupted; resuming re-runs only what is missing.
                 </span>
               </div>
             ) : (
-              <button className="primary" disabled={!!busy || !!why} title={why || undefined} onClick={() => act("run")}>{`Run all ${testable.length} tests`}</button>
+              <Button disabled={!!busy || !!why} title={why || undefined} onClick={() => act("run")}><Play />{`Run all ${testable.length} tests`}</Button>
             )}
           </section>
         )}
@@ -218,9 +222,9 @@ export default function CampaignPage() {
               nothing can be added, removed or reworded — the database itself refuses. This is what lets the final report
               say “1 of {testable.length} tested” and mean it.
             </p>
-            <button className="primary" disabled={!!busy || !!why} title={why || undefined} onClick={() => act("lock")}>
-              {busy === "lock" ? <><span className="spinner onprimary" /> locking…</> : `Lock in ${testable.length} ${testable.length === 1 ? "hypothesis" : "hypotheses"}`}
-            </button>
+            <Button disabled={!!busy || !!why} title={why || undefined} onClick={() => act("lock")}>
+              {busy === "lock" ? <><LoaderCircle className="animate-spin" /> locking…</> : <><Lock />{`Lock in ${testable.length} ${testable.length === 1 ? "hypothesis" : "hypotheses"}`}</>}
+            </Button>
           </section>
         )}
         <AgentPanel c={c} webmcp={webmcp} busy={!!busy} why={why} onSubmit={(hs, source) => act("add", { hypotheses: hs, source })} />
@@ -271,11 +275,11 @@ function AgentPanel({ c, webmcp, busy, why, onSubmit }: { c: Campaign; webmcp: b
       </p>
       {c.status === "draft" && <>
         <label htmlFor="agent-json">Or paste hypotheses as JSON (one object or an array)</label>
-        <textarea id="agent-json" className="camp-json" rows={6} value={text} onChange={(e) => setText(e.target.value)}
+        <Textarea id="agent-json" className="camp-json font-mono text-md md:text-md" rows={6} value={text} onChange={(e) => setText(e.target.value)}
           placeholder='[{"statement": "…", "rationale": "…", "doc": {"study": "…", "cohorts": {…}, "views": [{…}]}, "primary": {"view": 0, "stat": "compare", "gene": "…"}, "direction": "higher"}]' />
         <div className="row">
-          <button disabled={busy || !text.trim() || !!why} title={why || undefined} onClick={submit}>Submit hypotheses</button>
-          <label className="chk camp-inline"><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> these are the researcher's own ideas</label>
+          <Button variant="outline" disabled={busy || !text.trim() || !!why} title={why || undefined} onClick={submit}>Submit hypotheses</Button>
+          <label className="chk camp-inline"><Checkbox checked={mine} onCheckedChange={(on) => setMine(on === true)} /> these are the researcher's own ideas</label>
           {bad && <span className="camp-err">{bad}</span>}
         </div>
       </>}
@@ -303,7 +307,7 @@ function HypCard({ h, prior, canRemove, removeWhy, onRemove }: { h: HypothesisRo
       {!!prior?.length && <p className="camp-prior">Tested before: {prior.map((p) => `“${p.question}” → ${p.verdict}${p.p != null ? ` (p=${fmtP(p.p)})` : ""}`).join("; ")}</p>}
       <div className="camp-links">
         <a href={labLink(h)} target="_blank" rel="noreferrer">open the analysis</a>
-        {canRemove && <button className="camp-x" disabled={!!removeWhy} title={removeWhy || undefined} onClick={onRemove}>remove</button>}
+        {canRemove && <Button variant="link" size="inline" className="text-destructive" disabled={!!removeWhy} title={removeWhy || undefined} onClick={onRemove}>remove</Button>}
       </div>
     </article>
   );

@@ -4,13 +4,25 @@
 // place uploads live (Manage). Owns its own draft state, so typing into the paste box never
 // re-renders the analysis page (see "Keystrokes stay in the field" in CLAUDE.md). Which custom
 // attributes are drawn as charts is chosen in Explore's Add chart dialog, like any other attribute.
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   onCustomDataChange, loadCustomData, parseUpload, buildDataset, datasetToTsv, serverState, requestLogin, saveToServer,
   deleteServerDataset, serverBySlug, fetchServerVersion, resolveIds, exampleUpload, type ParsedUpload, type ResolveResponse, type ServerState, type StoredDataset
 } from "./custom-data-client.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
 import { LIMITS } from "../../lib/custom-data-names.ts";
+import { Download, LoaderCircle, Trash2 } from "lucide-react";
+import { Button } from "../_ui/button";
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
+import { Input } from "../_ui/input";
+import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
+import { Textarea } from "../_ui/textarea";
+import { cn } from "../../lib/cn";
+import { OptionSelect } from "../_ui/choice.tsx";
+import { TB } from "../_ui/toolbar.ts";
+
+/** a tab of the custom-data manager */
+const TAB = "h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary";
 
 /** what an upload looks like, shown in the empty paste box */
 const PLACEHOLDER = "PATIENT_ID\tMET_SITE\tKPS\nP-0001\tBrain\t80\nP-0002\tLiver\t90";
@@ -147,12 +159,12 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
                   <input type="file" accept=".tsv,.txt,.csv,.tab,text/plain,text/csv,text/tab-separated-values"
                     onChange={(e) => { loadFile(e.target.files?.[0]); e.target.value = ""; }} /></label>, or paste below</span>
                 <span className="spacer" />
-                <button className="tbbtn" disabled={exampleBusy} onClick={loadExample}
+                <Button variant="outline" size="sm" className={TB} disabled={exampleBusy} onClick={loadExample}
                   title={"a few of " + studies[0] + "'s own patients with made-up values, so it can be added as it stands"}>
-                  {exampleBusy ? <><span className="spinner" /> loading…</> : "Use example data for " + studies[0]}
-                </button>
+                  {exampleBusy ? <><LoaderCircle className="animate-spin" /> loading…</> : "Use example data for " + studies[0]}
+                </Button>
               </div>
-              <textarea className="customdata-text" rows={text ? 8 : 4} spellCheck={false} value={text}
+              <Textarea className="customdata-text bg-card font-mono text-md md:text-md" rows={text ? 8 : 4} spellCheck={false} value={text}
                 placeholder={PLACEHOLDER} onChange={(e) => { setText(e.target.value); setParsed(null); setResolved(null); }} />
               {dragging && <div className="cd-dropover">Drop to load</div>}
             </div>}
@@ -163,8 +175,8 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
           Every other column becomes an attribute. Rows whose id matches no {studies.length === 1 ? "patient or sample of the study" : "patient or sample of these studies"} are dropped, and the check below says which.
         </details>
         {text.trim() && !parsed && !busy && <div className="row center g5">
-          <button className="tbbtn" onClick={() => preview()}>Check ids</button>
-          <button className="linklike" onClick={reset}>clear</button>
+          <Button variant="outline" size="sm" className={TB} onClick={() => preview()}>Check ids</Button>
+          <Button variant="link" size="inline" className="text-md" onClick={reset}>clear</Button>
         </div>}
         {busy && !parsed && <p className="meta"><span className="spinner" /> matching ids…</p>}
         {err && <p className="error">{err}</p>}
@@ -184,10 +196,10 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
           {resolved && resolved.unmatched > 0 && <p className={rate < LOW_MATCH ? "error" : "customdrop"}>
             <b>{resolved.unmatched.toLocaleString()} row{resolved.unmatched === 1 ? "" : "s"} will be dropped</b>: {resolved.unmatched === 1 ? "its id matches" : "their ids match"} no {parsed.level} in {matchedStudies.join(", ")}
             {" "}(e.g. {unmatchedExamples.map((x) => <code key={x}>{x}</code>).reduce((a: React.ReactNode[], x, i) => i ? [...a, ", ", x] : [x], [])}).{" "}
-            <button className="linklike" onClick={downloadDropped}>download them</button>
+            <Button variant="link" size="inline" className="text-md" onClick={downloadDropped}>download them</Button>
             {rate < LOW_MATCH && <> — are these {parsed.level === "patient" ? "sample" : "patient"} ids, or ids from another study?</>}
           </p>}
-          {stale && <p className="error">The studies being explored changed since this check. <button className="linklike" onClick={() => preview()}>Check again</button> against {studies.join(", ") || "the new selection"}.</p>}
+          {stale && <p className="error">The studies being explored changed since this check. <Button variant="link" size="inline" className="text-md" onClick={() => preview()}>Check again</Button> against {studies.join(", ") || "the new selection"}.</p>}
           <div className="attrtablewrap" style={{ maxHeight: "30vh" }}>
             <table className="attrtable">
               <thead><tr><th>Attribute</th><th>Type</th><th>Values</th><th>Distinct</th><th></th></tr></thead>
@@ -196,11 +208,11 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
                   <tr key={c.name} style={{ cursor: "default" }}>
                     <td><code>{c.name}</code></td>
                     <td>
-                      <select value={types[c.name] ?? c.datatype}
-                        onChange={(e) => setTypes((t) => ({ ...t, [c.name]: e.target.value as "STRING" | "NUMBER" }))}>
+                      <OptionSelect value={types[c.name] ?? c.datatype}
+                        onValueChange={(v) => setTypes((t) => ({ ...t, [c.name]: v as "STRING" | "NUMBER" }))}>
                         <option value="STRING">categorical</option>
                         <option value="NUMBER" disabled={c.datatype !== "NUMBER"}>numeric</option>
-                      </select>
+                      </OptionSelect>
                     </td>
                     <td className="meta">{c.filled.toLocaleString()} of {parsed.rows.length.toLocaleString()}</td>
                     <td className="meta">{c.distinct.toLocaleString()}</td>
@@ -216,14 +228,14 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
 
           <div className="cd-step"><span className="cd-num">3</span><h4>Name and add</h4></div>
           <div className="row center g5">
-            <input type="text" placeholder="dataset name (e.g. Brain mets — curated)" value={name}
-              onChange={(e) => setName(e.target.value)} style={{ minWidth: "24rem" }} />
+            <Input type="text" placeholder="dataset name (e.g. Brain mets — curated)" value={name}
+              onChange={(e) => setName(e.target.value)} className="h-8 w-96 text-md md:text-md" />
             {rate < LOW_MATCH && !confirmLow
-              ? <button className="tbbtn" disabled={!resolved || !matchedRows || stale} onClick={() => setConfirmLow(true)}>Save anyway…</button>
-              : <button className="primary" disabled={!resolved || !matchedRows || busy || stale} onClick={save}
+              ? <Button variant="outline" size="sm" className={TB} disabled={!resolved || !matchedRows || stale} onClick={() => setConfirmLow(true)}>Save anyway…</Button>
+              : <Button size="sm" disabled={!resolved || !matchedRows || busy || stale} onClick={save}
                   title="stored on the server: anyone who logs in can read it, and analyses that use it can be shared">
-                  Add data to {target}{serverBySlug(slugPreview) ? " (as v" + (serverBySlug(slugPreview)!.latestVersion + 1) + " of " + slugPreview + ")" : ""}</button>}
-            <button className="linklike" onClick={reset}>start over</button>
+                  Add data to {target}{serverBySlug(slugPreview) ? " (as v" + (serverBySlug(slugPreview)!.latestVersion + 1) + " of " + slugPreview + ")" : ""}</Button>}
+            <Button variant="link" size="inline" className="text-md" onClick={reset}>start over</Button>
           </div>
           <p className="meta">Its columns become <code>custom:{slugPreview}/…</code> attributes.</p>
         </>}
@@ -274,8 +286,8 @@ function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: (
                     <td className="meta">{v?.rowCount.toLocaleString()} {d.level}s</td>
                     <td className="meta">{v?.studies.join(", ")}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
-                      <button className="tbbtn" disabled={!!serverBusy} onClick={() => exportServer(d)}>Export</button>{" "}
-                      <button className="tbbtn" disabled={!!serverBusy} onClick={() => removeServer(d)}>Delete</button>
+                      <Button variant="outline" size="sm" className={TB} disabled={!!serverBusy} onClick={() => exportServer(d)}><Download />Export</Button>{" "}
+                      <Button variant="outline" size="sm" className={cn(TB, "text-destructive hover:text-destructive")} disabled={!!serverBusy} onClick={() => removeServer(d)}><Trash2 />Delete</Button>
                     </td>
                   </tr>
                 );
@@ -283,7 +295,7 @@ function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: (
             </tbody>
           </table>
         </div>
-      ) : <p className="meta">Nothing saved yet. <button className="linklike" onClick={onAdd}>Add data</button></p>}
+      ) : <p className="meta">Nothing saved yet. <Button variant="link" size="inline" className="text-md" onClick={onAdd}>Add data</Button></p>}
       {serverBusy && <p className="meta"><span className="spinner" /> {serverBusy}</p>}
       {serverErr && <p className="error">{serverErr}</p>}
     </section>
@@ -298,25 +310,21 @@ function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: (
 export default function CustomDataManager({ tab, setTab, studies, onChanged }: {
   tab: CustomDataTab | null; setTab: (t: CustomDataTab | null) => void; studies: string[]; onChanged: () => void;
 }) {
-  const ref = useRef<HTMLDialogElement | null>(null);
   const server = useCustomDataState();
   const [added, setAdded] = useState<string | null>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (tab && !el.open) el.showModal();
-    if (!tab && el.open) el.close();
-    if (!tab) setAdded(null);
-  }, [tab]);
+  useEffect(() => { if (!tab) setAdded(null); }, [tab]);
   return (
-    <dialog ref={ref} className="addchartdialog customdatamanager" onClose={() => setTab(null)}
-      onClick={(e) => { if (e.target === ref.current) ref.current?.close(); }}>
-      <h3>Custom data</h3>
-      <div className="tabs">
-        <button className={tab === "add" ? "active" : ""} onClick={() => setTab("add")}>Add data</button>
-        <button className={tab === "manage" ? "active" : ""} onClick={() => setTab("manage")}>
-          Manage{server.unlocked && server.datasets.length ? " (" + server.datasets.length + ")" : ""}</button>
-      </div>
+    <Dialog open={!!tab} onOpenChange={(open) => { if (!open) setTab(null); }}>
+    <DialogContent aria-describedby={undefined}
+      className="customdatamanager flex h-[90vh] w-[94vw] max-w-[94vw] flex-col gap-3 overflow-auto p-6 sm:max-w-[94vw]">
+      <DialogHeader><DialogTitle className="text-base">Custom data</DialogTitle></DialogHeader>
+      <Tabs value={tab || "add"} onValueChange={(v) => setTab(v as CustomDataTab)}>
+        <TabsList variant="line" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
+          <TabsTrigger value="add" className={TAB}>Add data</TabsTrigger>
+          <TabsTrigger value="manage" className={TAB}>
+            Manage{server.unlocked && server.datasets.length ? " (" + server.datasets.length + ")" : ""}</TabsTrigger>
+        </TabsList>
+      </Tabs>
       <div className="customdata">
         <p className="note flush">
           Your own annotations (a curated metastasis site, a field extracted from the record), used like any clinical
@@ -328,7 +336,7 @@ export default function CustomDataManager({ tab, setTab, studies, onChanged }: {
         {server.enabled && !server.unlocked && (
           <div className="cd-login">
             <span>Custom data is stored on the server. Log in to add, see and use it.</span>
-            <button className="primary" onClick={requestLogin}>Log in</button>
+            <Button size="sm" onClick={requestLogin}>Log in</Button>
           </div>
         )}
         {server.unlocked && tab === "add" && <AddCustomData studies={studies}
@@ -339,10 +347,10 @@ export default function CustomDataManager({ tab, setTab, studies, onChanged }: {
           <SavedCustomData onChanged={onChanged} onAdd={() => setTab("add")} />
         </>}
       </div>
-      <div className="row mt-3">
-        <span className="spacer" />
-        <button className="primary" onClick={() => ref.current?.close()}>Done</button>
-      </div>
-    </dialog>
+      <DialogFooter className="mt-auto">
+        <DialogClose asChild><Button>Done</Button></DialogClose>
+      </DialogFooter>
+    </DialogContent>
+    </Dialog>
   );
 }

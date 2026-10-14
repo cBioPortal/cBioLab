@@ -347,9 +347,9 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
       priority: Number(m.priority) || 0
     } : f;
   }).sort((x, y) => {
-    // portal ordering: declared priority first, then coverage
+    // portal ordering: declared priority first, then coverage, then name (so ties hold still)
     const pd = (y.priority ?? 0) - (x.priority ?? 0);
-    return pd !== 0 ? pd : y.patients - x.patients;
+    return pd || y.patients - x.patients || x.attribute.localeCompare(y.attribute);
   });
 
   // ---- numeric histograms (cBioPortal study-view bins) --------------------
@@ -1075,10 +1075,10 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     // attribute without its own clauses, the merged totals are on that basis
     const disjunctive = cats.some((i) => i.disjunctive) || undefined;
     return { ...base, kind: "cat" as const, ...(disjunctive ? { disjunctive } : {}),
-      values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n).slice(0, FACET_VALUE_LIMIT) };
+      values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n || x.v.localeCompare(y.v)).slice(0, FACET_VALUE_LIMIT) };
   }).sort((x, y) => {
     const pd = (y.priority ?? 0) - (x.priority ?? 0);
-    return pd !== 0 ? pd : y.patients - x.patients;
+    return pd || y.patients - x.patients || x.attribute.localeCompare(y.attribute);
   });
 
   const sumBy = (arrs: any[][], key: string): Map<string, number> => {

@@ -94,9 +94,9 @@ async function labRaces(browser, ok, BASE) {
       const onFail = (r) => { if (r.url().includes("/api/analysis")) failed++; };
       page.on("request", onReq); page.on("response", onRes); page.on("requestfailed", onFail);
       await page.locator(".viewcard .genesbtn").first().click();
-      const pills = await page.locator("dialog.genedialog .pill", { hasText: "TP53" }).count();
-      await page.locator("dialog.genedialog .pill", { hasText: "TP53" }).click(); // re-runs this view
-      await page.locator("dialog.genedialog button.primary").click();
+      const pills = await page.locator("[role=dialog].genedialog [data-slot=badge]", { hasText: "TP53" }).count();
+      await page.locator("[role=dialog].genedialog [data-slot=badge]", { hasText: "TP53" }).click(); // re-runs this view
+      await page.locator("[role=dialog].genedialog").getByRole("button", { name: "Done" }).click();
       await until(async () => !(await genesOf()).includes("TP53"), "the re-run without TP53", 60000).catch(() => {});
       const after = await genesOf();
       // on a failure, whether the edit reached the document says which half went wrong; a further
@@ -120,7 +120,7 @@ async function labRaces(browser, ok, BASE) {
     //    inside the page component would be a new component every render, and lose it.
     {
       await page.locator(".viewcard .genesbtn").first().click();
-      const input = page.locator("dialog.genedialog input[placeholder='add a gene…']");
+      const input = page.locator("[role=dialog].genedialog input[placeholder='add a gene…']");
       await input.click();
       await input.type("BRC");
       await tool(page, "analysis_set_details", { notes: "re-render while typing" });
@@ -152,8 +152,8 @@ async function labRaces(browser, ok, BASE) {
       await settled(page);
       await page.locator(".viewcard").evaluateAll((els) => els.forEach((el, i) => { el.__mark = "card" + i; }));
       const marks = () => page.locator(".viewcard").evaluateAll((els) => els.map((el) => el.__mark || "new"));
-      await page.locator(".viewcard").first().locator("summary[aria-label='reorder or remove this view']").click();
-      await page.locator(".viewcard").first().getByRole("button", { name: "move down" }).click();
+      await page.locator(".viewcard").first().getByRole("button", { name: "reorder or remove this view" }).click();
+      await page.locator("[data-slot=popover-content]").getByRole("button", { name: "move down" }).click();
       await page.waitForTimeout(500);
       const moved = await marks();
       const kinds = (await doc(page)).views.map((v) => v.kind);

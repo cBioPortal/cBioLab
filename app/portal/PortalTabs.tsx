@@ -13,6 +13,9 @@ import { dataPart } from "../_oncoprint/view-display.ts";
 import { OncoprintCard, type TrackCatalog } from "../_oncoprint/OncoprintCard.tsx";
 import type { PageTab } from "./page-doc";
 import { api } from "../lab/api.ts";
+import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
+import { LINE_TAB, LINE_TABS, SEG_TAB, SEG_TABS } from "../_ui/toolbar.ts";
+import { cn } from "../../lib/cn";
 
 type Patch = Record<string, unknown>;
 
@@ -79,31 +82,36 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
         ))}
         {left.length > 0 && <span className="meta">left out: {left.join("; ")}</span>}
       </div>
-      <div className="doctabs" role="tablist">
-        {tabs.map((t) => (
-          <button key={t.title} role="tab" aria-selected={t === tab} className={t === tab ? "on" : undefined} onClick={() => onOpen(t.title)}>
-            {t.title}{spinning(t.title) && <span className="spinner" />}
-          </button>
-        ))}
-      </div>
-      {tab?.sub && (
-        <div className="doctabs doctabs-sub" role="tablist">
-          {tab.sub.map((t) => (
-            <button key={t.title} role="tab" aria-selected={t === sub} className={t === sub ? "on" : undefined} onClick={() => onOpen(tab.title + " › " + t.title)}>
-              {t.title}{spinning(tab.title + " › " + t.title) && <span className="spinner" />}
-            </button>
+      <Tabs value={tab?.title ?? ""} onValueChange={onOpen} className="my-3">
+        <TabsList variant="line" aria-label="results tabs" className={LINE_TABS}>
+          {tabs.map((t) => (
+            <TabsTrigger key={t.title} value={t.title} className={LINE_TAB}>
+              {t.title}{spinning(t.title) && <span className="spinner" />}
+            </TabsTrigger>
           ))}
-        </div>
+        </TabsList>
+      </Tabs>
+      {tab?.sub && (
+        <Tabs value={sub?.title ?? ""} onValueChange={(v) => onOpen(tab.title + " › " + v)} className="-mt-1 mb-3">
+          <TabsList variant="line" aria-label={tab.title + " tabs"} className={LINE_TABS}>
+            {tab.sub.map((t) => (
+              <TabsTrigger key={t.title} value={t.title} className={cn(LINE_TAB, "px-2.5 pt-1 pb-1 text-sm")}>
+                {t.title}{spinning(tab.title + " › " + t.title) && <span className="spinner" />}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       )}
       {tab && !sub && tab.chooser && (() => {
         const ch = tab.chooser, mine = idx.map((i) => views[i]), on = ch.value(mine);
         return (
           <div className="portal-chooser">
             <span className="meta">{ch.label}</span>
-            <div className="pb-pills" role="tablist">
-              {ch.options.map((o) => <button key={o} type="button" role="tab" aria-selected={o === on} className={o === on ? "on" : undefined}
-                onClick={() => { if (o === on) return; const next = ch.apply(mine, o); onDoc({ ...doc, views: views.map((v, j) => { const k = idx.indexOf(j); return k >= 0 ? next[k] : v; }) }); }}>{o}</button>)}
-            </div>
+            <Tabs value={on} onValueChange={(o) => { const next = ch.apply(mine, o); onDoc({ ...doc, views: views.map((v, j) => { const k = idx.indexOf(j); return k >= 0 ? next[k] : v; }) }); }}>
+              <TabsList aria-label={ch.label} className={SEG_TABS}>
+                {ch.options.map((o) => <TabsTrigger key={o} value={o} className={SEG_TAB}>{o}</TabsTrigger>)}
+              </TabsList>
+            </Tabs>
           </div>
         );
       })()}

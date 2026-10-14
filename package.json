@@ -23,31 +23,45 @@
     "check:portal": "node --env-file=.env.local scripts/check-portal-parity.ts",
     "check:cohorts": "node --env-file=.env.local scripts/check-cohort-logic.ts",
     "check:mutants": "node --env-file=.env.local scripts/check-mutants.ts",
-    "verify": "npm test && npm run check:methods && RECORD=1 npm run check:portal && RECORD=1 npm run check:cohorts && RECORD=1 npm run check:mutants"
+    "verify": "npm test && npm run check:methods && RECORD=1 npm run check:portal && RECORD=1 npm run check:cohorts && RECORD=1 npm run check:mutants",
+    "visual": "node scripts/visual.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@tanstack/react-query": "^5.104.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "express": "^5.2.1",
+    "lucide-react": "^1.56.0",
     "marked": "^18.0.11",
     "mcp-handler": "^1.1.0",
     "mermaid": "^11.17.2",
     "next": "^16.3.6",
     "pg": "^8.23.0",
+    "radix-ui": "^1.8.1",
     "react": "^19",
     "react-dom": "^19",
     "sharp": "^0.35.3",
+    "tailwind-merge": "^3.7.0",
     "zod": "^4.4.3"
   },
   "type": "module",
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.0",
     "@types/pg": "^8.23.1",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "pixelmatch": "^7.2.0",
     "playwright": "1.62.1",
+    "pngjs": "^7.0.0",
+    "postcss": "^8.5.30",
+    "shadcn": "^4.21.4",
+    "tailwindcss": "^4.3.3",
+    "tw-animate-css": "^1.4.0",
     "typescript": "^6.0.3"
   }
 }

@@ -5,6 +5,9 @@
 // as images; everything else is stdout.
 import { useEffect, useRef, useState } from "react";
 import { isLocalSpec } from "../../../lib/lab-links.ts";
+import { LoaderCircle, Play } from "lucide-react";
+import { Button } from "../../_ui/button";
+import { Textarea } from "../../_ui/textarea";
 
 const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
 
@@ -86,10 +89,6 @@ buf = io.BytesIO(); fig.savefig(buf, format="png", dpi=100)
 print("__IMG__" + base64.b64encode(buf.getvalue()).decode())`
 ];
 
-const btn = (disabled: boolean): React.CSSProperties => ({
-  font: "500 0.78rem 'IBM Plex Sans', sans-serif", padding: "0.3rem 0.7rem", borderRadius: 6, cursor: disabled ? "default" : "pointer",
-  border: "1px solid var(--accent)", background: disabled ? "transparent" : "var(--accent)", color: disabled ? "var(--muted)" : "#fff", opacity: disabled ? 0.6 : 1
-});
 
 export default function PyNotebook({ files, fixtures, spec, cut }: { files: Record<string, string>; fixtures: { events: string; clinical: string; coverage: string }; spec?: Record<string, unknown> | null; cut?: string | null }) {
   const [status, setStatus] = useState("loading Pyodide (≈15 MB) …");
@@ -147,7 +146,7 @@ export default function PyNotebook({ files, fixtures, spec, cut }: { files: Reco
       <div className="row" style={{ alignItems: "center", marginBottom: "0.6rem" }}>
         <span className="meta" style={{ color: status.startsWith("failed") ? "var(--err)" : undefined }}>{progress || status}</span>
         <span className="spacer" />
-        <button disabled={!ready || !!progress} onClick={runAll} style={btn(!ready || !!progress)}>{progress ? "running…" : "run all cells"}</button>
+        <Button size="sm" disabled={!ready || !!progress} onClick={runAll}>{progress ? <LoaderCircle className="animate-spin" /> : <Play />}{progress ? "running…" : "run all cells"}</Button>
       </div>
       <p className="meta" style={{ maxWidth: "72ch", margin: "0 0 0.8rem" }}>
         This is CPython in your browser. The <code>cohortlab</code> package is loaded from this repo&apos;s <code>python/cohortlab/*.py</code> exactly
@@ -158,9 +157,9 @@ export default function PyNotebook({ files, fixtures, spec, cut }: { files: Reco
         <div className="card" key={i} style={{ padding: "0.7rem 0.9rem" }}>
           <div className="row" style={{ alignItems: "flex-start" }}>
             <span className="meta" style={{ fontFamily: "IBM Plex Mono, monospace", width: 44, paddingTop: 6 }}>[{i + 1}]</span>
-            <textarea value={c.code} spellCheck={false} onChange={(e) => setCells((cs) => cs.map((x, j) => j === i ? { ...x, code: e.target.value } : x))}
-              style={{ flex: 1, minHeight: Math.min(320, 20 + c.code.split("\n").length * 18), font: "12.5px/1.45 'IBM Plex Mono', monospace", background: "var(--code-bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 6, padding: "0.5rem 0.6rem", resize: "vertical" }} />
-            <button disabled={!ready || c.running} onClick={() => runCell(i)} style={{ ...btn(!ready || c.running), alignSelf: "flex-start" }}>{c.running ? "running…" : "run ▶"}</button>
+            <Textarea value={c.code} spellCheck={false} onChange={(e) => setCells((cs) => cs.map((x, j) => j === i ? { ...x, code: e.target.value } : x))}
+              className="flex-1 resize-y bg-muted font-mono text-[12.5px] leading-[1.45] md:text-[12.5px]" style={{ minHeight: Math.min(320, 20 + c.code.split("\n").length * 18) }} />
+            <Button size="sm" className="self-start" disabled={!ready || c.running} onClick={() => runCell(i)}>{c.running ? <LoaderCircle className="animate-spin" /> : <Play />}{c.running ? "running…" : "run"}</Button>
           </div>
           {(c.out.length > 0 || c.ms != null) && (
             <div style={{ marginLeft: 44, marginTop: "0.4rem" }}>

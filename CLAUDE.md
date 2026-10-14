@@ -352,6 +352,44 @@ still holds, against a running server.
   steps (`--s0` … `--s6`), four radii, one control height (`--ctl-h`). Nothing declares a font
   size or a border radius outside it — the app once had 36 distinct font sizes, five of them
   meaning "small text".
+- **New UI is Tailwind and shadcn; the app is moving onto them area by area.** The `@theme` in
+  `app/globals.css` IS the scale above under Tailwind's names: `text-xs` … `text-2xl` are the
+  seven type steps (Tailwind's own sizes are cleared, so an off-scale size does not exist);
+  spacing is Tailwind's 4px grid, on which the steps are `1`, `1.5`, `2.5`, `4`, `6`, `9` (prefer
+  those; `h-ctl` is the control height); colours use shadcn's semantic names mapped onto the
+  palette — `primary` is the teal, `accent` the soft tint, `muted-foreground` the grey text,
+  `destructive`, `border`, `ring`. shadcn components live in `app/_ui/` (`npx shadcn add …`,
+  configured by `components.json`; the CLI writes `cn` imports as `from "cn"` and tries to
+  install an unrelated `cn` package — point them at `@/lib/cn` and revert `package.json`) and are
+  this repo's code to edit; join classes with `cn()` from `lib/cn.ts`, never by string
+  concatenation (it knows the app's theme names, so a later class overrides an earlier one of
+  the same kind). Beside them in `app/_ui/` are the app's own primitives — use these rather than
+  rebuilding them: `Choice` (a dropdown from `[value, label]` pairs, where `""` may be a real
+  option such as "auto") and `OptionSelect` (the same from `<option>` children) in `choice.tsx`;
+  `GearMenu` / `MenuItem` / `closeGearMenu` in `gear-menu.tsx` (a button that opens a popover,
+  whose open state can live in the page's `menuOpenRef` store so it survives its card
+  remounting); `RemoveBadge` in `remove-badge.tsx` (a listed value a click removes, such as a
+  gene); and in `toolbar.ts` the toolbar class strings `TB`, `CHIP`, `FIELD` and the tab classes
+  `LINE_TABS` / `LINE_TAB` (page tabs over a rule) and `SEG_TABS` / `SEG_TAB` (a body's own selector). A
+  link-looking action is `<Button variant="link" size="inline">`; a toggle chip is an outline
+  `Button` with `aria-pressed`. The old stylesheet sits in the `legacy` layer, below Tailwind's
+  utilities, so a utility always wins over a legacy rule; its first block restores the browser
+  defaults it was written against for legacy markup, wherever it sits (a shadcn dialog
+  included), but not for shadcn's own parts (`[data-slot]`) or inside `[data-tw]` — **mark the
+  root of each area you convert with `data-tw`**, and delete that area's legacy rules in the
+  same commit. Converting must not change what the page shows except where meant: run
+  `npm run visual` (baseline first with `-- --update`, from the commit before) and account for
+  every diff it reports.
+- **e2e finds shadcn parts by role, not by legacy class.** A dialog is `[role=dialog].<its class>`
+  (Radix unmounts a closed one, so wait for it rather than for `[open]`); a menu's items are in
+  `[data-slot=popover-content]`; a select is `[role=combobox]` and its choices `[role=option]`
+  (it is not a native `<select>`, so no `selectOption`); a checkbox is `[role=checkbox]`; a tab is
+  `getByRole("tab")`; a removable value is `[data-slot=badge]`; a slider's handle is
+  `[data-slot=slider-thumb]`. A dialog's content is portalled to `<body>`, so it is not inside the
+  card that opened it. Keep a
+  stable class on a component the tests target (`genesbtn`, `cohortgear`, `viewgear`), and keep
+  native elements where something outside React reads them while closed — the document dialog
+  is a native `<dialog>` so `#docjson` stays in the page.
 - **One header per view: `ViewHead`.** Title, then this view's actions, then its status chips,
   then remove, on one baseline. Every view kind renders through it; a view that builds its own
   header is a bug, because the timing chip and the close control then move between cards.
@@ -359,14 +397,14 @@ still holds, against a running server.
   holds one kind of control and **never wraps inside itself**, so a pair like the zoom triple
   cannot be split by a line break; zones wrap as units and the divider is where the break
   happens. Where a view has both kinds, `data` (re-runs a query) sits left of `view` (instant).
-- **One idiom per job.** `.tbbtn` for a button or a disclosure, `.tbfield` for a labelled select,
-  `.chk` for a checkbox. Underlined link-buttons are not a fourth kind of control.
+- **One idiom per job.** In a toolbar: an outline `Button` with `TB` for a button, a `GearMenu`
+  for a disclosure, a `.tbfield` label around a `Choice`/`OptionSelect` for a labelled select,
+  a `.chk` label around a `Checkbox` for a checkbox — all at `h-ctl`.
 - **Controls side by side are a toolbar, wherever they sit** — a card's body, a line above a
   figure, a dialog: `.viewtb` > `.tbz`, never a hand-rolled `display: flex` row. The one-height
-  rule (`--ctl-h`, one font size) is `.viewtb`'s, so `.tbz` alone is not enough; outside it a
-  `.tbbtn`, `.chk` or `select` falls back to the global input/button padding and a checkbox
-  beside a button sits on another centre line at another height. (The timeline's controls once
-  shipped that way.)
+  rule (`--ctl-h`, one font size) is the controls' own (`TB`, `FIELD`, `Choice size="ctl"`); a
+  control built without it sits on another centre line at another height beside the rest. (The
+  timeline's controls once shipped that way; e2e's `misalignedControls` checks it.)
 - **Look at a UI change, then measure it — "renders without errors" is not done.** Screenshot the
   changed region itself at `deviceScaleFactor: 2` (a whole card at 1× hides a few pixels of
   misalignment) and compare it with the same kind of control in a neighbouring view: centre
@@ -377,7 +415,9 @@ still holds, against a running server.
   a step down in weight, so they read as apparatus rather than as findings.
 - **Server-rendered figures share the palette.** `lib/svg-kit.ts` owns `palette()`, `SERIES` and
   the frame/caption helpers, for `lib/view-svg.ts` and `lib/figures/` alike; a renderer
-  that invents a colour is drifting from every other view.
+  that invents a colour is drifting from every other view. Page CSS never reaches them — the
+  same drawing goes to MCP, exports, the CLI and the Python port — so they stay out of the
+  Tailwind migration.
 - **Geometry stays inline, styling does not.** A tooltip's position and a legend swatch's colour
   are data computed from the drawing; borders, padding and type are classes.
 

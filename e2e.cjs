@@ -11,7 +11,7 @@ async function pickExploreStudies(p) {
 
 /**
  * Controls that sit side by side must line up: in every toolbar zone (.tbz) under `scope`, each
- * control (.tbbtn, .chk, select) is one control height (--ctl-h) tall and every child shares one
+ * control (a button, checkbox label or select) is one control height (--ctl-h) tall and every child shares one
  * centre line. A control placed outside the toolbar idiom takes the global input/button padding
  * and fails this. Returns the misaligned rows, described; empty when all line up.
  */
@@ -22,7 +22,7 @@ async function misalignedControls(p, scope) {
     for (const z of document.querySelectorAll(scope + " .tbz")) {
       const kids = [...z.children].filter((c) => !c.classList.contains("tbl") && c.getBoundingClientRect().height > 0);
       const mids = kids.map((c) => { const r = c.getBoundingClientRect(); return r.top + r.height / 2; });
-      const off = kids.filter((c) => c.matches(".tbbtn, .chk, select") && Math.abs(c.getBoundingClientRect().height - ctl) > 0.5);
+      const off = kids.filter((c) => c.matches(".tbbtn, .chk, select, [data-slot=button], [data-slot=select-trigger]") && Math.abs(c.getBoundingClientRect().height - ctl) > 0.5);
       if (Math.max(...mids) - Math.min(...mids) > 1 || off.length)
         bad.push(kids.map((c, i) => (c.textContent || c.tagName).trim().slice(0, 14) + "@" + mids[i].toFixed(1) + "/h" + c.getBoundingClientRect().height.toFixed(1)).join(", "));
     }
@@ -80,8 +80,8 @@ async function main() {
     const rootResp = await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
     ok(scheme + ": / redirects into the app", /\/lab(\?|$)/.test(page.url()) && rootResp.ok(),
       page.url() + " status " + rootResp.status());
-    await page.waitForSelector(".tabs button", { timeout: 90000 });
-    ok(scheme + ": app shell loads", (await page.locator(".tabs button").count()) >= 4);
+    await page.waitForSelector("[aria-label='lab sections'] [role=tab]", { timeout: 90000 });
+    ok(scheme + ": app shell loads", (await page.getByRole("tab").count()) >= 4);
 
     if (scheme === "light") {
       // No credentials anywhere client-visible: check for env var names plus the
@@ -221,7 +221,7 @@ async function main() {
       // (the filters bar below it only renders once a filter exists), so this
       // is the main path from browsing to an analysis with zero filters set.
       await page.goto(BASE + "/lab");
-      await page.locator("button:has-text('Explore')").first().click();
+      await page.getByRole("tab", { name: "Explore", exact: true }).click();
       await page.waitForSelector('h2:has-text("Exploring")', { timeout: 120000 });
       await pickExploreStudies(page);
       let unfiltered = "";
@@ -334,32 +334,29 @@ async function main() {
       ok("Analyze carries the cohort into an analysis with no views yet", landed && views === 0,
         landed ? counted + " · " + views + " views" : "cohort did not reach the document");
 
-      // Saving asks for the name when you ask to save. The dialog is native
-      // <dialog>, so Esc and the backdrop come from the platform. Targeted by
-      // its own .savedialog class, not ":not(.wsdialog)" — the app now has
-      // several .namedialog-based dialogs, and "everything except this one"
-      // stopped meaning "the Save-as-a-Cohort dialog" the moment a second
-      // one showed up.
-      await page.locator(".tabs button:has-text('Explore')").click();
+      // Saving asks for the name when you ask to save; Esc and the backdrop come
+      // from the dialog primitive. Targeted by its own .savedialog class, since
+      // the app has several dialogs open from the same page.
+      await page.getByRole("tab", { name: "Explore", exact: true }).click();
       await page.waitForSelector(".exbar", { timeout: 120000 });
       await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
       let saveFlow = "dialog never opened";
       let savedOk = false;
       try {
         await page.locator(".exbar button:has-text('Save as a Cohort')").click();
-        await page.waitForSelector("dialog.savedialog[open]", { timeout: 30000 });
-        const prefilled = await page.locator("dialog.savedialog input").inputValue();
+        await page.waitForSelector("[role=dialog].savedialog", { timeout: 30000 });
+        const prefilled = await page.locator("[role=dialog].savedialog input").inputValue();
         // Esc must dismiss without saving
         await page.keyboard.press("Escape");
         await page.waitForTimeout(400);
-        const closedOnEsc = (await page.locator("dialog.savedialog[open]").count()) === 0;
+        const closedOnEsc = (await page.locator("[role=dialog].savedialog").count()) === 0;
         await page.locator(".exbar button:has-text('Save as a Cohort')").click();
-        await page.waitForSelector("dialog.savedialog[open]", { timeout: 30000 });
-        await page.locator("dialog.savedialog input").fill("e2e dialog cohort");
-        await page.locator("dialog.savedialog button:has-text('Save')").click();
+        await page.waitForSelector("[role=dialog].savedialog", { timeout: 30000 });
+        await page.locator("[role=dialog].savedialog input").fill("e2e dialog cohort");
+        await page.locator("[role=dialog].savedialog button[type=submit]").click();
         await page.waitForFunction(() => /saved/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 120000 });
-        await page.locator(".tabs button:text-is('Saved')").click();
+        await page.getByRole("tab", { name: "Saved", exact: true }).click();
         await page.waitForTimeout(1500);
         const inList = await page.locator("text=e2e dialog cohort").count();
         savedOk = !!prefilled && closedOnEsc && inList > 0;
@@ -371,16 +368,16 @@ async function main() {
       // DIFFERENTLY-named cohort first, so replacement is provable: the bar now
       // derives the name from the draft, so two Analyze runs share a name and
       // counting cohorts could not tell replace from overwrite.
-      await page.locator(".tabs button:text-is('Saved')").click();
-      await page.waitForSelector(".pick input", { timeout: 240000 });
+      await page.getByRole("tab", { name: "Saved", exact: true }).click();
+      await page.waitForSelector(".pick [role=checkbox]", { timeout: 240000 });
       let seeded = [];
       try {
-        await page.locator(".pick input").nth(0).check();
+        await page.locator(".pick [role=checkbox]").nth(0).check();
         await page.locator("button:has-text('Analyze selected')").click();
         await page.waitForSelector(".cohortbox", { timeout: 300000 });
         seeded = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {});
       } catch { /* left empty */ }
-      await page.locator(".tabs button:has-text('Explore')").click();
+      await page.getByRole("tab", { name: "Explore", exact: true }).click();
       await page.waitForSelector(".exbar", { timeout: 120000 });
       await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
       await page.locator(".valrow, .slice").nth(2).click();
@@ -421,9 +418,9 @@ async function main() {
         })).toString("base64")));
         await page.waitForSelector("button.genesbtn", { timeout: 300000 });
         await page.locator("button.genesbtn").first().click();
-        await page.waitForSelector("dialog.genedialog[open]", { timeout: 30000 });
-        const panel = page.locator("dialog.genedialog");
-        const before = await panel.locator(".pill").count();
+        await page.waitForSelector("[role=dialog].genedialog", { timeout: 30000 });
+        const panel = page.locator("[role=dialog].genedialog");
+        const before = await panel.locator("[data-slot=badge]").count();
         await panel.locator("input[list=view-genes]").fill("PIK3CA");
         await panel.locator('button:has-text("add")').click();
         const genesNow = async () => page.evaluate(() => {
@@ -441,7 +438,7 @@ async function main() {
         // appended, not replaced — reading the RESULT's `genes` field instead of
         // the document's once wiped the list down to the one just typed
         const appended = added.length === before + 1 && added.includes("TP53");
-        await panel.locator(".pill", { hasText: "KRAS" }).first().click();
+        await panel.locator("[data-slot=badge]", { hasText: "KRAS" }).first().click();
         await page.waitForFunction(() => {
           const ta = document.querySelector("#docjson"); if (!ta) return false;
           try { return !(JSON.parse(ta.value).views || [])
@@ -463,11 +460,11 @@ async function main() {
           cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
           views: [{ kind: "oncoprint", genes: ["TP53", "KRAS"] }]
         })).toString("base64")));
-        await page.waitForSelector('summary[title="download or open this figure elsewhere"]', { timeout: 300000 });
+        await page.waitForSelector('button[title="download or open this figure elsewhere"]', { timeout: 300000 });
         const namedButton = await page.locator("button.genesbtn").first().innerText();
-        await page.locator('summary[title="download or open this figure elsewhere"]').click();
-        const gear = page.locator('details:has(summary[title="download or open this figure elsewhere"]) .gearmenu-items');
-        const gearHasEditor = (await gear.locator(".pillwrap").count()) > 0;
+        await page.locator('button[title="download or open this figure elsewhere"]').click();
+        const gear = page.locator("[data-slot=popover-content]");
+        const gearHasEditor = (await gear.locator("[data-slot=badge]").count()) > 0;
         const gearHasCbioportal = (await gear.locator('a:has-text("cBioPortal")').count()) > 0;
         const gearHasDownloads = (await gear.locator("text=download figures").count()) > 0;
         // the button says how many rows it edits; the overflow menu is downloads/exports only —
@@ -579,18 +576,14 @@ async function main() {
 
       // Tabs are deep-linked: a refresh must land you where you were.
       await page.goto(BASE + "/lab");
-      await page.waitForSelector(".tabs button", { timeout: 120000 });
-      await page.locator(".tabs button:has-text('Explore')").click();
+      await page.waitForSelector("[aria-label='lab sections'] [role=tab]", { timeout: 120000 });
+      await page.getByRole("tab", { name: "Explore", exact: true }).click();
       await page.waitForTimeout(400);
       const urlHasTab = /tab=explore/.test(await page.evaluate(() => location.search));
       await page.reload();
-      // :visible matters here: the "+ Add chart" dialog carries its own nested
-      // .tabs (Clinical/Gene status/Derived timeline filters), present in the
-      // DOM with its own default-active button even while the <dialog> itself
-      // is closed — a bare ".tabs button.active" is ambiguous the moment that
-      // dialog has ever been part of the tree, not just while it's open.
-      await page.waitForSelector(".tabs button.active:visible", { timeout: 120000 });
-      const stayed = (await page.locator(".tabs button.active:visible").innerText()).trim();
+      // scoped to the lab's own tab list: the "+ Add chart" dialog carries tabs of its own
+      await page.waitForSelector("[aria-label='lab sections'] [role=tab][aria-selected=true]", { timeout: 120000 });
+      const stayed = (await page.locator("[aria-label='lab sections'] [role=tab][aria-selected=true]").innerText()).trim();
       ok("tabs survive a refresh", urlHasTab && stayed === "Explore", "?tab written: " + urlHasTab + ", after reload: " + stayed);
 
       // A ?doc= link still implies the analysis, but an explicit ?tab= wins.
@@ -599,19 +592,19 @@ async function main() {
       await page.goto(BASE + "/lab?tab=examples&doc=" + enc);
       await page.waitForTimeout(1800);
       ok("an explicit ?tab= beats the document's default tab",
-        (await page.locator(".tabs button.active:visible").innerText()).trim() === "Examples");
+        (await page.locator("[aria-label='lab sections'] [role=tab][aria-selected=true]").innerText()).trim() === "Examples");
 
       // Cohorts tab: tick cohorts, submit them together. No per-row "add" links.
       await page.goto(BASE + "/lab");
-      await page.locator(".tabs button:text-is('Saved')").click();
-      await page.waitForSelector(".pick input", { timeout: 240000 });
+      await page.getByRole("tab", { name: "Saved", exact: true }).click();
+      await page.waitForSelector(".pick [role=checkbox]", { timeout: 240000 });
       ok("cohort rows use checkboxes, not per-row add links",
         (await page.locator("button:has-text('add to analysis')").count()) === 0,
-        (await page.locator(".pick input").count()) + " selectable cohorts");
+        (await page.locator(".pick [role=checkbox]").count()) + " selectable cohorts");
       ok("submit is refused with nothing ticked",
         await page.locator("button:has-text('Analyze selected')").isDisabled());
-      await page.locator(".pick input").nth(0).check();
-      await page.locator(".pick input").nth(1).check();
+      await page.locator(".pick [role=checkbox]").nth(0).check();
+      await page.locator(".pick [role=checkbox]").nth(1).check();
       await page.locator("button:has-text('Analyze selected')").click();
       let together = [], startViews = -1;
       try {
@@ -626,8 +619,8 @@ async function main() {
       // Views come in from "Add a view", each then given a cohort from its "+ Add cohort".
       for (const label of ["Survival", "Oncoprint"]) {
         try {
-          await page.locator(".addview button.facet", { hasText: new RegExp("^\\+ " + label + "$") }).click();
-          await page.locator(".emptyview .emptyview-body button.primary").first().click();
+          await page.locator(".addview button", { hasText: new RegExp("^" + label + "$") }).click();
+          await page.locator(".emptyview .emptyview-body button").first().click();
           await page.locator(".addcohortdialog .acd-row button").first().click();
           await page.waitForFunction(() => !document.querySelector(".emptyview"), null, { timeout: 60000 });
         } catch { /* the checks below report what is missing */ }
@@ -639,10 +632,10 @@ async function main() {
       try {
         await page.waitForSelector(".addview", { timeout: 120000 });
         await page.locator(".addview button:has-text('Lollipop')").click();
-        await page.waitForSelector(".emptyview .emptyview-body button.primary", { timeout: 30000 });
+        await page.waitForSelector(".emptyview .emptyview-body button", { timeout: 30000 });
         added = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).map(v => v.kind);
         emptyFirst = (await page.locator(".lp-plot circle.lollipop-head").count()) === 0;
-        await page.locator(".emptyview .emptyview-body button.primary").first().click();
+        await page.locator(".emptyview .emptyview-body button").first().click();
         await page.locator(".addcohortdialog .acd-row button").first().click();
         await page.waitForSelector(".lp-plot circle.lollipop-head", { timeout: 300000 });
         dots = await page.locator(".lp-plot circle.lollipop-head").count();
@@ -664,12 +657,12 @@ async function main() {
       // A kind already in the document shows as a selected pill, and clicking it removes the view.
       let pillOn = false, pillOff = false, left = [];
       try {
-        const pill = page.locator(".addview button.facet:has-text('Lollipop')");
-        pillOn = /\bon\b/.test(await pill.getAttribute("class") || "");
+        const pill = page.locator(".addview button:has-text('Lollipop')");
+        pillOn = (await pill.getAttribute("aria-pressed")) === "true";
         await pill.click();
         await page.waitForFunction(() => !document.querySelector(".lp-plot circle.lollipop-head"), null, { timeout: 30000 });
         left = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).map(v => v.kind);
-        pillOff = !/\bon\b/.test(await pill.getAttribute("class") || "");
+        pillOff = (await pill.getAttribute("aria-pressed")) === "false";
       } catch { /* left as failed */ }
       ok("a selected view pill removes its view when clicked", pillOn && pillOff && !left.includes("hotspots") && left.length > 0,
         "selected " + pillOn + " · deselected " + pillOff + " · views now " + (left.join(", ") || "none"));
@@ -703,8 +696,8 @@ async function main() {
       try {
         beforeN = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).length;
         const firstCard = page.locator(".viewcard").first();
-        await firstCard.locator("summary[title='reorder or remove this view']").click();
-        await firstCard.locator(".gearmenu-items button:has-text('remove')").click();
+        await firstCard.getByRole("button", { name: "reorder or remove this view" }).click();
+        await page.locator("[data-slot=popover-content]").getByRole("button", { name: "remove" }).click();
         await page.waitForFunction((n) => {
           try { return (JSON.parse(document.querySelector("#docjson").value).views || []).length === n - 1; }
           catch { return false; }
@@ -728,10 +721,15 @@ async function main() {
       let basis = { types: 0, changed: false, truncated: false, anchor: null };
       try {
         await page.waitForSelector(".basis", { timeout: 300000 });
-        await page.waitForFunction(() => document.querySelectorAll(".basis select")[1]?.options.length > 2, null, { timeout: 180000 });
-        basis.types = await page.locator(".basis select").nth(1).locator("option").count();
         const before = await page.locator(".logrank").innerText();
-        await page.locator(".basis select").nth(1).selectOption("Treatment");
+        // the second control is what the clock starts from; its options arrive with the study's catalog
+        await page.locator(".basis [role=combobox]").nth(1).click();
+        await page.waitForFunction(() => {
+          const opts = [...document.querySelectorAll("[role=option]")];
+          return opts.length > 2 && !opts.some((o) => /loading/.test(o.textContent || ""));
+        }, null, { timeout: 180000 });
+        basis.types = await page.getByRole("option").count();
+        await page.getByRole("option", { name: "Treatment", exact: true }).click();
         await page.waitForFunction(() => document.querySelector(".trunc") !== null, null, { timeout: 300000 });
         await page.waitForFunction((b) => {
           const el = document.querySelector(".logrank");
@@ -749,7 +747,7 @@ async function main() {
       // The docs gate already proves each one RUNS; this proves the app can
       // launch them and that the federated views actually paint something.
       await page.goto(BASE + "/lab");
-      await page.locator("button:has-text('Examples')").first().click();
+      await page.getByRole("tab", { name: "Examples", exact: true }).click();
       await page.waitForSelector(".excard", { timeout: 120000 });
       const nCards = await page.locator(".excard").count();
       const { EXAMPLES } = await import("./lib/dsl-reference.ts");
@@ -766,7 +764,7 @@ async function main() {
       ];
       // a multi-view document must render EVERY one of its views, not just the first
       await page.goto(BASE + "/lab");
-      await page.locator("button:has-text('Examples')").first().click();
+      await page.getByRole("tab", { name: "Examples", exact: true }).click();
       await page.waitForSelector(".excard", { timeout: 120000 });
       await page.locator(".excard").filter({ hasText: "One cohort, five ways" }).first()
         .locator("button:has-text('Run')").click();
@@ -827,7 +825,8 @@ async function main() {
           if (!chip || !/^\d[\d,]*ms$/.test(chip.textContent.trim())) missing.push(name);
           else per.push(name + " " + chip.textContent.trim());
         }
-        const totalEl = [...document.querySelectorAll(".meta")].map(e => e.textContent).find(t => /ms · OncoKB/.test(t));
+        // the run's total sits in the document dialog, which stays in the page while closed
+        const totalEl = ((document.querySelector("dialog.docdialog")?.textContent || "").match(/[\d,]+ms · OncoKB/) || [])[0];
         return { per, missing, total: totalEl || null };
       });
       ok("every view reports its own latency, and the run reports a total",
@@ -843,7 +842,7 @@ async function main() {
 
       for (const [title, sel, label] of launches) {
         await page.goto(BASE + "/lab");
-        await page.locator("button:has-text('Examples')").first().click();
+        await page.getByRole("tab", { name: "Examples", exact: true }).click();
         await page.waitForSelector(".excard", { timeout: 120000 });
         const card = page.locator(".excard").filter({ hasText: title }).first();
         await card.locator("button:has-text('Run')").click();
@@ -911,7 +910,7 @@ async function main() {
         await page.route("**/api/view-page", async (route) => { if (!open && /"values"/.test(route.request().postData() || "")) await gate; try { await route.continue(); } catch {} });
         await page.getByRole("button", { name: "filter Mutation Type" }).click();
         await page.waitForTimeout(600);
-        const w = { loader: await page.locator(".dt-pop .dt-loading .waiting").isVisible().catch(() => false), condition: await page.locator(".dt-pop select").isEnabled().catch(() => false) };
+        const w = { loader: await page.locator(".dt-pop .dt-loading .waiting").isVisible().catch(() => false), condition: await page.locator(".dt-pop [role=combobox]").isEnabled().catch(() => false) };
         release(); await page.unroute("**/api/view-page");
         await page.locator(".dt-values label").first().waitFor({ timeout: 60000 });
         ok("table: a filter whose values are loading shows a loader, not an empty list", w.loader && w.condition, JSON.stringify(w));
@@ -922,7 +921,7 @@ async function main() {
       const top = await page.locator(".dt-values label").first().innerText();
       const [value, n] = top.trim().split(/\s+/);
       await page.locator(".dt-pop").getByRole("button", { name: "none" }).click();
-      await page.locator(".dt-values label").first().locator("input").check();
+      await page.locator(".dt-values label").first().locator("[role=checkbox]").check();
       await page.locator(".dt-pop").getByRole("button", { name: "apply" }).click();
       await settle();
       const picked = await count();
@@ -977,9 +976,9 @@ async function main() {
       await page.waitForTimeout(400);
       ok("timeline: folding a track hides its sub-tracks, in the browser", before === 1 && (await agents()) === 0 && requests === 0, before + " → " + (await agents()) + ", " + requests + " requests");
       await page.getByRole("button", { name: "List/Search" }).click();
-      await page.locator("dialog.tl-patients tr.dt-pick").first().waitFor({ timeout: 120000 });
-      ok("timeline: the patient list opens in a dialog from the navigator", (await page.evaluate(() => [...document.querySelectorAll(".tl-view tr.dt-pick")].every((r) => r.closest("dialog")))) && (await page.locator("dialog.tl-patients").evaluate((d) => d.open)));
-      await page.locator("dialog.tl-patients tr.dt-pick").nth(1).click();
+      await page.locator("[role=dialog].tl-patients tr.dt-pick").first().waitFor({ timeout: 120000 });
+      ok("timeline: the patient list opens in a dialog from the navigator", (await page.evaluate(() => [...document.querySelectorAll("tr.dt-pick")].every((r) => r.closest("[role=dialog].tl-patients")))) && (await page.locator("[role=dialog].tl-patients").isVisible()));
+      await page.locator("[role=dialog].tl-patients tr.dt-pick").nth(1).click();
       await page.waitForFunction(() => document.querySelector(".tl-who")?.textContent !== "P-0000012", null, { timeout: 120000 });
       const second = await who();
       await page.reload({ waitUntil: "domcontentloaded" });
@@ -988,11 +987,12 @@ async function main() {
       // the navigator steps through the list in its order: the second row is patient 2, prev is the first row
       const pos = async () => (await page.locator(".tl-pos").innerText()).trim();
       await page.getByRole("button", { name: "List/Search" }).click();
-      const firstRow = (await page.locator("dialog.tl-patients tr.dt-pick").first().locator("td").first().innerText()).trim();
+      const firstRow = (await page.locator("[role=dialog].tl-patients tr.dt-pick").first().locator("td").first().innerText()).trim();
       await page.keyboard.press("Escape");
-      ok("timeline: Esc closes the patient list", (await page.locator("dialog.tl-patients").count()) === 0);
+      await page.locator("[role=dialog].tl-patients").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+      ok("timeline: Esc closes the patient list", (await page.locator("[role=dialog].tl-patients").count()) === 0);
       const at2 = await pos();
-      await page.getByRole("button", { name: "‹ prev" }).click();
+      await page.getByRole("button", { name: "prev", exact: true }).click();
       await page.waitForFunction((s) => document.querySelector(".tl-who")?.textContent !== s && !document.querySelector(".tl-fig.stale"), second, { timeout: 120000 });
       const back = await who(), at1 = await pos();
       await page.locator(".tl-fig").click({ position: { x: 4, y: 4 } });
@@ -1053,7 +1053,7 @@ async function main() {
         (dl ? dl.suggestedFilename() : "no download") + " · " + lines.length + " lines");
       // the navigator steps to the next patient, and every table follows
       const pos = await page.locator(".tl-pos").innerText();
-      await page.getByRole("button", { name: "next ›" }).click();
+      await page.getByRole("button", { name: "next", exact: true }).click();
       await page.waitForFunction(() => document.querySelector(".tl-who")?.textContent !== "P-0024249", null, { timeout: 120000 });
       await settle();
       const titles2 = await page.locator(".alt-table .dt-title").allInnerTexts();
@@ -1153,7 +1153,7 @@ async function main() {
       const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
       await sp.goto(BASE + "/lab?tab=analysis", { waitUntil: "domcontentloaded" });
       await sp.locator(".addview button:has-text('Survival')").click();
-      await sp.locator(".emptyview .emptyview-body button.primary").first().click();
+      await sp.locator(".emptyview .emptyview-body button").first().click();
       await sp.getByRole("tab", { name: "Library" }).click();
       await sp.locator(".addcohortdialog .acd-row", { hasText: name }).getByRole("button").click();
       await sp.waitForSelector(".cohortbox", { timeout: 120000 });
@@ -1191,8 +1191,9 @@ async function main() {
       };
       const menuItems = async () => {
         const box = sp.locator(".cohortbox", { hasText: name });
-        await box.locator(".cohortgear").evaluate((d) => { d.open = true; });
-        const items = await box.locator(".cohortgear .gearmenu-items button").allInnerTexts();
+        const gear = box.locator(".cohortgear");
+        if ((await gear.getAttribute("data-state")) !== "open") await gear.click();
+        const items = await sp.locator("[data-slot=popover-content]").getByRole("button").allInnerTexts();
         return { box, items };
       };
       const savedDef = async () => {
@@ -1202,7 +1203,7 @@ async function main() {
       await open({ dsl: "2.5", study: "msk_chord_2024", cohorts: { [name]: { all: [{ kind: "oql", q: "KRAS: MUT" }] } }, views: [{ kind: "survival", cohorts: [name] }] });
       let m = await menuItems();
       steps.offered = m.items.some((t) => t.trim() === "save to library");
-      await m.box.locator(".cohortgear button", { hasText: "save to library" }).click();
+      await sp.locator("[data-slot=popover-content]").getByRole("button", { name: "save to library", exact: true }).click();
       await sp.waitForFunction((n) => { try { return !!JSON.parse(document.querySelector("#docjson").value).cohorts[n].from; } catch { return false; } }, name, { timeout: 60000 });
       const a1 = await savedDef();
       steps.saved = !!a1 && (await docOf()).cohorts[name].from.saved === a1.id;
@@ -1213,7 +1214,7 @@ async function main() {
       await open(d);
       m = await menuItems();
       steps.offeredAfterSplit = m.items.some((t) => t.trim() === "save changes to library");
-      await m.box.locator(".cohortgear button", { hasText: "save changes to library" }).click();
+      await sp.locator("[data-slot=popover-content]").getByRole("button", { name: "save changes to library", exact: true }).click();
       for (let i = 0; i < 60 && !(await savedDef())?.definition?.splits; i++) await sp.waitForTimeout(1000);
       const a2 = await savedDef();
       steps.splitSaved = !!a2 && a2.id === a1.id && !!a2.definition.splits?.sex && !a2.definition.from;
@@ -1238,18 +1239,18 @@ async function main() {
       await sp.waitForTimeout(2000);
       let apiCalls = 0;
       sp.on("request", (r) => { if (/\/api\/(explore|cohort)/.test(r.url())) apiCalls++; });
-      await sp.locator('button:has-text("add / change studies")').click();
+      await sp.getByRole("button", { name: "Add / change studies" }).click();
       await sp.waitForSelector(".applybar", { timeout: 60000 });
       // "add all" over every study is refused, naming the limit: each study adds dozens of
       // facet queries, and nothing here needs more than a handful
-      const addAll = sp.locator('button.facet:has-text("add all")').first();
+      const addAll = sp.getByRole("button", { name: /^add all/ });
       const refused = await addAll.isDisabled();
       const refusedWhy = (await addAll.getAttribute("title")) || "";
       ok("add all is refused past 30 studies, saying so", refused && /at most 30 studies/.test(refusedWhy), refusedWhy.slice(0, 90));
       // a narrow search: two ticks, then add all picks up the rest of it
       await sp.locator('input[placeholder^="search name"]').fill("thymoma");
       await sp.waitForTimeout(300);
-      const boxes = sp.locator('.study-row input[type=checkbox]');
+      const boxes = sp.locator('.study-row [role=checkbox]');
       for (let i = 0; i < 2; i++) { await boxes.nth(i).click(); await sp.waitForTimeout(250); }
       await addAll.click();
       await sp.waitForTimeout(2500);                  // well past the 350ms fetch debounce
@@ -1259,7 +1260,7 @@ async function main() {
       ok("the staged bar distinguishes staged from applied", /not queried yet/.test(bar), bar.slice(0, 80));
       // and submit must actually apply it
       const staged = Number((/^([\d,]+)/.exec(bar.trim()) || [])[1]?.replace(/,/g, "") || 0);
-      await sp.locator('.applybar button:has-text("submit")').click();
+      await sp.locator(".applybar").getByRole("button", { name: "Submit" }).click();
       await sp.waitForFunction(() => !document.querySelector(".applybar"), null, { timeout: 60000 });
       await sp.waitForTimeout(8000);
       const hdr = await sp.evaluate(() => {

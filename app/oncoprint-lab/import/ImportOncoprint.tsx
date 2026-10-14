@@ -3,6 +3,10 @@
 // interactive figure the analysis page draws, over data that never touches the database.
 import { useMemo, useState } from "react";
 import OncoprintFigure, { DEFAULT_FIGURE_DISPLAY, type FigureDisplay } from "../../_oncoprint/OncoprintFigure.tsx";
+import { Play } from "lucide-react";
+import { Button } from "../../_ui/button";
+import { OptionSelect } from "../../_ui/choice.tsx";
+import { Textarea } from "../../_ui/textarea";
 
 export default function ImportOncoprint({ sample }: { sample: { events: string; clinical: string; coverage: string } }) {
   const [events, setEvents] = useState(sample.events);
@@ -29,9 +33,8 @@ export default function ImportOncoprint({ sample }: { sample: { events: string; 
   const box = (label: string, hint: string, value: string, set: (v: string) => void, rows: number) => (
     <label style={{ display: "flex", flexDirection: "column", gap: "0.2rem", flex: 1, minWidth: 260 }}>
       <span className="meta"><strong>{label}</strong> — {hint}</span>
-      <textarea value={value} spellCheck={false} onChange={(e) => set(e.target.value)} rows={rows}
-        style={{ font: "12px/1.4 'IBM Plex Mono', monospace", background: "var(--code-bg)", color: "var(--ink)",
-          border: "1px solid var(--line)", borderRadius: 6, padding: "0.4rem", resize: "vertical" }} />
+      <Textarea value={value} spellCheck={false} onChange={(e) => set(e.target.value)} rows={rows}
+        className="resize-y bg-muted font-mono text-xs leading-[1.4] md:text-xs" />
     </label>
   );
 
@@ -44,13 +47,13 @@ export default function ImportOncoprint({ sample }: { sample: { events: string; 
           {box("coverage", "patient · genes the panel covers (optional)", coverage, setCoverage, 12)}
         </div>
         <div className="row" style={{ marginTop: "0.6rem", alignItems: "center", gap: "0.6rem" }}>
-          <label className="meta">group by <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} style={{ fontSize: "var(--t-md)" }}>
+          <label className="meta m-0 flex items-center gap-1.5">group by <OptionSelect value={groupBy} onValueChange={setGroupBy}>
             <option value="">nothing</option>
             {attrs.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select></label>
+          </OptionSelect></label>
           <span className="spacer" />
           <span className="meta">type is MISSENSE · TRUNC · INFRAME · SPLICE · PROMOTER · OTHER · FUSION · AMP · HOMDEL, with an optional _DRIVER suffix</span>
-          <button className="linklike" onClick={() => setDraw((n) => n + 1)}>Draw</button>
+          <Button size="sm" onClick={() => setDraw((n) => n + 1)}><Play />Draw</Button>
         </div>
       </div>
       <div className="card">

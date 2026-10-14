@@ -10,6 +10,18 @@ import type { ColumnFilter, ColumnValues, TableQuery, TableRows, TextFilterOp } 
 import { api } from "../lab/api.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { ViewPageBody, TableBody } from "../../lib/api-schemas.ts";
+import { ChevronLeft, ChevronRight, Columns3, Download, X } from "lucide-react";
+import { Button } from "../_ui/button";
+import { Checkbox } from "../_ui/checkbox";
+import { Input } from "../_ui/input";
+import { OptionSelect } from "../_ui/choice.tsx";
+import { FIELD, TB } from "../_ui/toolbar.ts";
+import { cn } from "../../lib/cn";
+
+/** a page number in the pager, filled while it is the page shown */
+const PAGE = "min-w-ctl justify-center aria-[current=page]:border-primary aria-[current=page]:bg-primary aria-[current=page]:text-primary-foreground";
+/** the × that removes a chip */
+const CHIP_X = "size-4 text-muted-foreground [&_svg:not([class*='size-'])]:size-3";
 
 const OP_LABELS: Record<TextFilterOp, string> = {
   contains: "contains", notContains: "does not contain", equals: "equals", notEquals: "does not equal",
@@ -87,14 +99,14 @@ export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
   const from = p.total ? p.page * p.size + 1 : 0, to = Math.min(p.total, (p.page + 1) * p.size);
   return (
     <div className="viewtb pb-pager"><div className="tbz">
-      <button type="button" className="tbbtn" disabled={p.page === 0} onClick={() => p.setPage(p.page - 1)} aria-label="previous page">‹</button>
+      <Button type="button" variant="outline" size="sm" className={TB} disabled={p.page === 0} onClick={() => p.setPage(p.page - 1)} aria-label="previous page"><ChevronLeft /></Button>
       {nums.map((n, i) => n == null ? <span key={"g" + i}>…</span>
-        : <button key={n} type="button" className={"tbbtn" + (n === p.page ? " on" : "")} aria-current={n === p.page ? "page" : undefined} onClick={() => p.setPage(n)}>{(n + 1).toLocaleString()}</button>)}
-      <button type="button" className="tbbtn" disabled={p.page >= p.pages - 1} onClick={() => p.setPage(p.page + 1)} aria-label="next page">›</button>
+        : <Button key={n} type="button" variant="outline" size="sm" className={cn(TB, PAGE)} aria-current={n === p.page ? "page" : undefined} onClick={() => p.setPage(n)}>{(n + 1).toLocaleString()}</Button>)}
+      <Button type="button" variant="outline" size="sm" className={TB} disabled={p.page >= p.pages - 1} onClick={() => p.setPage(p.page + 1)} aria-label="next page"><ChevronRight /></Button>
       <span>Showing {from.toLocaleString()}–{to.toLocaleString()} of {p.total.toLocaleString()} {unit}</span>
-      <label className="tbfield">per page <select value={String(p.size)} onChange={(e) => p.setSize(Number(e.target.value))}>
+      <label className="tbfield">per page <OptionSelect value={String(p.size)} onValueChange={(v) => p.setSize(Number(v))}>
         {[25, 50, 100, 250].map((n) => <option key={n} value={n}>{n}</option>)}
-      </select></label>
+      </OptionSelect></label>
       {p.error && <span className="mark">{p.error}</span>}
     </div></div>
   );
@@ -122,8 +134,13 @@ function Popover({ open, onClose, children, align = "left" }: { open: boolean; o
   }, [open, align]);
   useEffect(() => {
     if (!open) return;
-    const down = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    // a dropdown opened from inside renders in a portal of its own: a click there is still inside, and
+    // Escape closes that dropdown first
+    const PORTAL = "[data-radix-popper-content-wrapper], [data-slot=select-content]";
+    const inPortal = (t: EventTarget | null) => !!(t as Element | null)?.closest?.(PORTAL);
+    const portalOpen = () => !!document.querySelector(PORTAL);
+    const down = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node) && !inPortal(e.target)) onClose(); };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape" && !portalOpen()) onClose(); };
     // the click that opened it must not close it
     const t = setTimeout(() => document.addEventListener("mousedown", down), 0);
     document.addEventListener("keydown", key);
@@ -159,7 +176,7 @@ function useColumnValues(column: string, vi: number, docJson?: () => string, tab
 /** What a filter menu shows in place of its values while they load, or when they could not be read. */
 function ValuesState({ s, what }: { s: Values & { retry: () => void }; what: string }) {
   if (s.status === "loading") return <div className="dt-loading"><Waiting what={what} />{[0, 1, 2, 3, 4].map((i) => <span key={i} className="skeleton dt-skel" />)}</div>;
-  if (s.status === "failed") return <div className="dt-loading"><span className="mark">could not read the {what}: {s.error}</span> <button type="button" className="linklike" onClick={s.retry}>retry</button></div>;
+  if (s.status === "failed") return <div className="dt-loading"><span className="mark">could not read the {what}: {s.error}</span> <Button type="button" variant="link" size="inline" onClick={s.retry}>retry</Button></div>;
   return null;
 }
 
@@ -191,13 +208,13 @@ function FilterMenu({ col, current, vi, docJson, table, onApply }: {
           : <ValuesState s={vals} what="range" />}
         {/* typing a bound need not wait for the range; the range only fills the placeholders */}
         <div className="row">
-          <label className="tbfield">from <input type="number" step="any" value={lo} placeholder={range && range.min != null ? String(range.min) : "min"} onChange={(e) => setLo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && apply()} /></label>
-          <label className="tbfield">to <input type="number" step="any" value={hi} placeholder={range && range.max != null ? String(range.max) : "max"} onChange={(e) => setHi(e.target.value)} onKeyDown={(e) => e.key === "Enter" && apply()} /></label>
+          <label className="tbfield">from <Input type="number" step="any" className={cn(FIELD, "w-28")} value={lo} placeholder={range && range.min != null ? String(range.min) : "min"} onChange={(e) => setLo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && apply()} /></label>
+          <label className="tbfield">to <Input type="number" step="any" className={cn(FIELD, "w-28")} value={hi} placeholder={range && range.max != null ? String(range.max) : "max"} onChange={(e) => setHi(e.target.value)} onKeyDown={(e) => e.key === "Enter" && apply()} /></label>
         </div>
         <span className="meta">blank rows are left out once a range is set</span>
         <div className="row end">
-          <button type="button" className="tbbtn" disabled={!cur} onClick={() => onApply(undefined)}>remove filter</button>
-          <button type="button" className="tbbtn primary" onClick={apply}>apply</button>
+          <Button type="button" variant="outline" size="sm" className={TB} disabled={!cur} onClick={() => onApply(undefined)}>remove filter</Button>
+          <Button type="button" size="sm" className="h-ctl px-3 text-md" onClick={apply}>apply</Button>
         </div>
       </div>
     );
@@ -221,31 +238,31 @@ function FilterMenu({ col, current, vi, docJson, table, onApply }: {
     <div className="dt-filter">
       <b>{col.name}</b>
       <div className="row">
-        <select value={op} onChange={(e) => setOp(e.target.value as TextFilterOp)} aria-label="condition">
+        <OptionSelect value={op} onValueChange={(v) => setOp(v as TextFilterOp)} ariaLabel="condition">
           {(Object.keys(OP_LABELS) as TextFilterOp[]).map((o) => <option key={o} value={o}>{OP_LABELS[o]}</option>)}
-        </select>
-        <input type="text" value={text} placeholder="text" onChange={(e) => { setText(e.target.value); if (e.target.value) setPicked(null); }}
+        </OptionSelect>
+        <Input type="text" className={cn(FIELD, "w-40")} value={text} placeholder="text" onChange={(e) => { setText(e.target.value); if (e.target.value) setPicked(null); }}
           onKeyDown={(e) => e.key === "Enter" && apply()} aria-label="condition text" />
       </div>
       <span className="meta">or pick values{list ? " — " + list.values.length.toLocaleString() + (list.truncated ? "+ (the most frequent)" : "") + " in the rows kept" : ""}</span>
-      {list && list.values.length > 8 && <input type="search" value={find} placeholder="find a value" onChange={(e) => setFind(e.target.value)} aria-label="find a value" />}
+      {list && list.values.length > 8 && <Input type="search" className={FIELD} value={find} placeholder="find a value" onChange={(e) => setFind(e.target.value)} aria-label="find a value" />}
       <div className="row">
-        <button type="button" className="linklike" disabled={!list} title={list ? undefined : "waiting for the column's values"} onClick={() => { setPicked(null); setText(""); }}>all</button>
-        <button type="button" className="linklike" disabled={!list} title={list ? undefined : "waiting for the column's values"} onClick={() => { setPicked(new Set()); setText(""); }}>none</button>
+        <Button type="button" variant="link" size="inline" disabled={!list} title={list ? undefined : "waiting for the column's values"} onClick={() => { setPicked(null); setText(""); }}>all</Button>
+        <Button type="button" variant="link" size="inline" disabled={!list} title={list ? undefined : "waiting for the column's values"} onClick={() => { setPicked(new Set()); setText(""); }}>none</Button>
       </div>
       <div className="dt-values">
         {!list && <ValuesState s={vals} what="values" />}
         {list && !list.values.length && <span className="meta">no values in the rows kept</span>}
         {shown.map((x) => (
           <label key={x.value} className="meta">
-            <input type="checkbox" checked={isOn(x.value)} onChange={() => toggle(x.value)} />
-            <span className="grow">{x.value === "" ? <i>(blank)</i> : x.value}</span>
+            <Checkbox checked={isOn(x.value)} onCheckedChange={() => toggle(x.value)} />
+            <span className="dt-grow">{x.value === "" ? <i>(blank)</i> : x.value}</span>
             <span className="n">{x.n.toLocaleString()}</span>
           </label>))}
       </div>
       <div className="row end">
-        <button type="button" className="tbbtn" disabled={!cur} onClick={() => onApply(undefined)}>remove filter</button>
-        <button type="button" className="tbbtn primary" onClick={apply}>apply</button>
+        <Button type="button" variant="outline" size="sm" className={TB} disabled={!cur} onClick={() => onApply(undefined)}>remove filter</Button>
+        <Button type="button" size="sm" className="h-ctl px-3 text-md" onClick={apply}>apply</Button>
       </div>
     </div>
   );
@@ -263,16 +280,16 @@ function ColumnsMenu({ columns, shown, onShown }: { columns: { id: string; name:
   return (
     <div className="dt-filter">
       <b>Columns ({shown.length} of {columns.length})</b>
-      {columns.length > 10 && <input type="search" value={find} placeholder="find a column" onChange={(e) => setFind(e.target.value)} aria-label="find a column" />}
+      {columns.length > 10 && <Input type="search" className={FIELD} value={find} placeholder="find a column" onChange={(e) => setFind(e.target.value)} aria-label="find a column" />}
       <div className="row">
-        <button type="button" className="linklike" onClick={() => onShown(columns.map((c) => c.id))}>all</button>
-        <button type="button" className="linklike" onClick={() => onShown(undefined)}>default</button>
+        <Button type="button" variant="link" size="inline" onClick={() => onShown(columns.map((c) => c.id))}>all</Button>
+        <Button type="button" variant="link" size="inline" onClick={() => onShown(undefined)}>default</Button>
       </div>
       <div className="dt-values">
         {columns.filter(match).map((c) => (
           <label key={c.id} className="meta">
-            <input type="checkbox" checked={shown.includes(c.id)} disabled={shown.length === 1 && shown.includes(c.id)} onChange={() => toggle(c.id)} />
-            <span className="grow">{c.name}</span>
+            <Checkbox checked={shown.includes(c.id)} disabled={shown.length === 1 && shown.includes(c.id)} onCheckedChange={() => toggle(c.id)} />
+            <span className="dt-grow">{c.name}</span>
             {c.name !== c.id && <span className="n mono">{c.id}</span>}
           </label>))}
       </div>
@@ -387,33 +404,34 @@ export function DataTable<V extends string | number | null>({ t, query, updating
         {updating && <span className="waiting" role="status"><span className="spinner" /> updating…</span>}
         <span className="spacer" />
         <form className="dt-search" onSubmit={(e) => { e.preventDefault(); set({ search }); }}>
-          <input type="search" value={search} placeholder={"search " + unit} aria-label={"search " + unit}
+          <Input type="search" className={cn(FIELD, "w-52")} value={search} placeholder={"search " + unit} aria-label={"search " + unit}
             onChange={(e) => { setSearch(e.target.value); if (!e.target.value && q.search) set({ search: undefined }); }}
             onBlur={() => { if ((search || "") !== (q.search || "")) set({ search }); }} />
         </form>
         <span className="dt-anchor">
-          <button type="button" className={"tbbtn" + (menu === "\x01columns" ? " on" : "")} onClick={() => setMenu(menu === "\x01columns" ? null : "\x01columns")}
-            title="choose the columns shown">columns ({shownIdx.length}/{t.columns.length})</button>
+          <Button type="button" variant="outline" size="sm" className={cn(TB, "aria-expanded:border-primary aria-expanded:bg-accent aria-expanded:text-accent-foreground")}
+            aria-expanded={menu === "\x01columns"} onClick={() => setMenu(menu === "\x01columns" ? null : "\x01columns")}
+            title="choose the columns shown"><Columns3 />columns ({shownIdx.length}/{t.columns.length})</Button>
           <Popover open={menu === "\x01columns"} onClose={() => setMenu(null)} align="right">
             <ColumnsMenu columns={t.columns} shown={shownIds} onShown={(ids) => set({ columns: ids }, true)} />
           </Popover>
         </span>
         <form method="post" action="/api/table" target="_blank" onSubmit={download}>
           <input type="hidden" name="payload" />
-          <button className="tbbtn" type="submit" disabled={updating || !docJson || !t.total}
+          <Button variant="outline" size="sm" className={TB} type="submit" disabled={updating || !docJson || !t.total}
             title={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download"
-              : "every row kept, with all " + t.columns.length + " columns, as comma-separated text"}>download CSV ({t.total.toLocaleString()})</button>
+              : "every row kept, with all " + t.columns.length + " columns, as comma-separated text"}><Download />download CSV ({t.total.toLocaleString()})</Button>
         </form>
       </div>
       {(filters.length > 0 || (q.search || "").trim()) && (
         <div className="dt-chips">
-          {(q.search || "").trim() && <span className="dt-chip">search “{q.search}” <button type="button" aria-label="clear search" onClick={() => set({ search: undefined })}>×</button></span>}
+          {(q.search || "").trim() && <span className="dt-chip">search “{q.search}” <Button type="button" variant="ghost" size="icon-xs" className={CHIP_X} aria-label="clear search" onClick={() => set({ search: undefined })}><X /></Button></span>}
           {filters.map(([id, f]) => (
             <span key={id} className="dt-chip">
-              <button type="button" className="linklike" onClick={() => setMenu(id)}>{t.columns.find((c) => c.id === id)?.name || id} {filterText(f)}</button>
-              <button type="button" aria-label={"remove the filter on " + id} onClick={() => setFilter(id, undefined)}>×</button>
+              <Button type="button" variant="link" size="inline" onClick={() => setMenu(id)}>{t.columns.find((c) => c.id === id)?.name || id} {filterText(f)}</Button>
+              <Button type="button" variant="ghost" size="icon-xs" className={CHIP_X} aria-label={"remove the filter on " + id} onClick={() => setFilter(id, undefined)}><X /></Button>
             </span>))}
-          <button type="button" className="linklike" onClick={() => set({ search: undefined, filters: undefined })}>clear all</button>
+          <Button type="button" variant="link" size="inline" onClick={() => set({ search: undefined, filters: undefined })}>clear all</Button>
         </div>
       )}
       <div className={"dt-body" + (waiting ? " waiting-rows" : "")} aria-busy={!!waiting}>
