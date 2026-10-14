@@ -9,7 +9,7 @@
 // hiding unaltered columns or re-sorting on the client never touches the data.
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 
-import { STYLE, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatGutterPct, truncateLabel, trackLabelText, resolveStyle, type Style } from "../../lib/oncoprint-style.ts";
+import { STYLE, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatGutterPct, trackLabelText, resolveStyle, type Style } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 

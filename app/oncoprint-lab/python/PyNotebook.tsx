@@ -101,7 +101,7 @@ export default function PyNotebook({ files, fixtures, spec, cut }: { files: Reco
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         if (!(window as any).loadPyodide) {
           await new Promise<void>((res, rej) => { const s = document.createElement("script"); s.src = PYODIDE + "pyodide.js"; s.onload = () => res(); s.onerror = () => rej(new Error("could not load pyodide.js from " + PYODIDE)); document.head.appendChild(s); });

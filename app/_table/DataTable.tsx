@@ -147,6 +147,7 @@ function Popover({ open, onClose, children, align = "left" }: { open: boolean; o
     return () => { clearTimeout(t); document.removeEventListener("mousedown", down); document.removeEventListener("keydown", key); };
   }, [open, onClose]);
   if (!open) return null;
+  // eslint-disable-next-line jsx-a11y-x/click-events-have-key-events, jsx-a11y-x/no-noninteractive-element-interactions -- only stops a click inside the popover from reaching the handler that closes it
   return <div ref={ref} className="dt-pop" style={pos || { visibility: "hidden" }} role="dialog" onClick={(e) => e.stopPropagation()}>{children}</div>;
 }
 
@@ -361,6 +362,8 @@ export function DataTable<V extends string | number | null>({ t, query, updating
   useEffect(() => { setSearch(q.search || ""); }, [q.search]);
   const head = useRef<HTMLTableSectionElement>(null);
   const [headH, setHeadH] = useState(0);
+  // measures after every render; setState with an unchanged height is a no-op
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => { if (head.current) setHeadH(head.current.offsetHeight); });
   const set = (patch: Partial<TableQuery>, keepOpen = false) => {
     if (!keepOpen) setMenu(null);

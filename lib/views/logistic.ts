@@ -1,6 +1,5 @@
 // Logistic view: a multivariate logistic regression on the Cox view's covariate coding, fit
 // from per-patient rows inside each local study (patient-level participants only).
-import { DB } from "../ch.ts";
 import { logisticRegression, type LogisticRow } from "../stats.ts";
 import { viewToSvg } from "../view-svg.ts";
 import type { ViewResult, LogisticView, LogisticCoefficient } from "../types.ts";

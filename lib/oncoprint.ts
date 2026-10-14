@@ -6,8 +6,7 @@
 //   panel-aware track frequencies, group ranges. The renderer does zero data logic.
 import { chQuery, chQueryRows, DB, STUDY, PRIMARY, type ChConn } from "./ch.ts";
 import { compileCohort, sq } from "./compiler.ts";
-import { heatmapTrackLabel } from "./profile-names.ts";
-import type { CohortDef, Contract, Track, GroupRange, OncoprintSpec, HeatmapSpec, ChRow } from "./types.ts";
+import type { CohortDef, Contract, OncoprintSpec, HeatmapSpec, ChRow } from "./types.ts";
 
 // Internal-only: analysis.js passes an evaluated cohort's SQL as a subquery via this
 // Symbol key. JSON.parse cannot produce Symbol keys, so client specs can never inject
@@ -270,13 +269,6 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
     entry.ms = r._ms;
     return r;
   };
-  const lq = async <R = ChRow>(label: string, sql: string, study?: string) => {
-    const entry = { label, sql, ...(study ? { study } : {}) } as { label: string; sql: string; ms?: number; study?: string };
-    if (opts.log) opts.log.push(entry);
-    const r = await chQuery<R>(sql, study ? connOf(study) : PRIMARY);
-    entry.ms = r._ms;
-    return r;
-  };
   const study = specStudy(spec);
   // Federation: spec.studies = [..] makes this a multi-study contract. Columns are
   // then keyed by qualified ids ("<study>_<pid>") so id collisions across studies
@@ -349,7 +341,6 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   }
   const allPids = groups.flatMap(g => g.pids);
   if (!allPids.length) throw new Error("cohort is empty");
-const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i])); // provisional index
 
   // ---- genomic events + panel coverage, per study --------------------
   const events: EventRow[] = [];

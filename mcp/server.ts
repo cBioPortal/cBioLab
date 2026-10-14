@@ -25,7 +25,7 @@ app.post("/mcp", async (req: any, res: any) => {
     const server = new McpServer({ name: "cbio-lab", version: "1.0.0" });
     registerTools(server);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-    res.on("close", () => { transport.close(); server.close(); });
+    res.on("close", () => { void transport.close(); void server.close(); });
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
   } catch (e) {

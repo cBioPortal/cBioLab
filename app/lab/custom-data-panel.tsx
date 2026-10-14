@@ -35,7 +35,7 @@ const LOW_MATCH = 0.5;
  *  page by whichever component asks first — not left to the first engine request, which a page
  *  may never make (Explore with no study chosen, the Saved tab). */
 export function useCustomDataState(): ServerState {
-  useEffect(() => { loadCustomData(); }, []);
+  useEffect(() => { void loadCustomData(); }, []);
   return useSyncExternalStore(onCustomDataChange, serverState, serverState);
 }
 
@@ -67,7 +67,7 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
   const load = (t: string, defaultName: string) => {
     setText(t); setParsed(null); setResolved(null);
     if (!name) setName(defaultName);
-    preview(t);
+    void preview(t);
   };
   const loadFile = async (f: File | undefined) => {
     if (!f) return;
@@ -152,12 +152,12 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
               onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
               onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
               onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false); }}
-              onDrop={(e) => { e.preventDefault(); setDragging(false); loadFile(e.dataTransfer.files?.[0]); }}>
+              onDrop={(e) => { e.preventDefault(); setDragging(false); void loadFile(e.dataTransfer.files?.[0]); }}>
               <div className="cd-drophead">
                 <svg viewBox="0 0 16 16" aria-hidden><path d="M8 1.5 4.5 5h2.25v5h2.5V5h2.25ZM2 11v3h12v-3h-1.5v1.5h-9V11Z" /></svg>
                 <span><b>Drag a .tsv or .csv file here</b>, <label className="cd-pick">choose a file
                   <input type="file" accept=".tsv,.txt,.csv,.tab,text/plain,text/csv,text/tab-separated-values"
-                    onChange={(e) => { loadFile(e.target.files?.[0]); e.target.value = ""; }} /></label>, or paste below</span>
+                    onChange={(e) => { void loadFile(e.target.files?.[0]); e.target.value = ""; }} /></label>, or paste below</span>
                 <span className="spacer" />
                 <Button variant="outline" size="sm" className={TB} disabled={exampleBusy} onClick={loadExample}
                   title={"a few of " + studies[0] + "'s own patients with made-up values, so it can be added as it stands"}>
@@ -254,7 +254,7 @@ function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: (
   };
   const removeServer = (d: DatasetMeta) => {
     if (!confirm("Delete “" + d.name + "” from the server? Analyses pinned to it will be refused, with the date it was deleted.")) return;
-    serverAct("deleting…", () => deleteServerDataset(d.id));
+    void serverAct("deleting…", () => deleteServerDataset(d.id));
   };
   const exportServer = (d: DatasetMeta) => serverAct("exporting…", async () => download(await fetchServerVersion(d.id, d.latestVersion)));
 

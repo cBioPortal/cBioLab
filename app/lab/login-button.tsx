@@ -19,7 +19,7 @@ export default function LoginButton() {
   const [err, setErr] = useState<string | null>(null);
   const open = () => { setErr(null); setPassword(""); setShown(true); };
   // whether this deployment has a login, and whether this browser is in (once per page)
-  useEffect(() => { loadCustomData(); return onLoginRequest(open); }, []);
+  useEffect(() => { void loadCustomData(); return onLoginRequest(open); }, []);
   if (!server.enabled) return null;
 
   const submit = async () => {
@@ -37,7 +37,7 @@ export default function LoginButton() {
         : <Button variant="outline" size="sm" className={TB} onClick={open} title="log in to see, add and use custom data"><LogIn />Log in</Button>}
       <Dialog open={shown} onOpenChange={setShown}>
         <DialogContent className="logindialog sm:max-w-sm">
-          <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="flex flex-col gap-3">
+          <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="flex flex-col gap-3">
             <DialogHeader>
               <DialogTitle className="text-base">Log in</DialogTitle>
               <DialogDescription className="text-md">One shared login for now. It lets you save and open cohorts and analyses and use custom data; everyone who logs in sees the same things.</DialogDescription>

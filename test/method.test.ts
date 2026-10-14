@@ -80,7 +80,7 @@ describe("coxMethod", () => {
   test("the Python script codes every term exactly as the fit did", () => {
     const m = coxMethod([coxTrace()], coxOpts);
     assert.match(m.python!, /dtype=\{"c0": str, "c1": str\}/);
-    assert.match(m.python!, /"TP53 mutation status: Mutated": \(df\["c0"\] == "Mutated"\)\.astype\(float\),  # reference: Not mutated/);
+    assert.match(m.python!, /"TP53 mutation status: Mutated": \(df\["c0"\] == "Mutated"\)\.astype\(float\), {2}# reference: Not mutated/);
     assert.match(m.python!, /"GENDER: Male": \(df\["c1"\] == "Male"\)\.astype\(float\)/);
     assert.match(m.python!, /"AGE": df\["c2"\]\.astype\(float\)/);
     assert.doesNotMatch(m.python!, /strata=/);

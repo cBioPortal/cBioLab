@@ -17,7 +17,7 @@
 // ============================================================================
 
 import { DOC_VERSION } from "./doc-version.ts";
-import type { AnalysisDoc, TemplateDoc } from "./types.ts";
+import type { TemplateDoc } from "./types.ts";
 import type { CustomDataset } from "./custom-data-names.ts";
 import { LUAD_BIOPSY_SITE_DEMO } from "./custom-data-demo.ts";
 

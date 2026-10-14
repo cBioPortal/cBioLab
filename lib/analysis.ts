@@ -8,8 +8,7 @@
 // Deliberately deferred: cross-study patient dedup and attribute harmonization.
 import { chQuery, STUDY, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
-import { compileCohortDef, describeCohortDef } from "./cohort2.ts";
-import { PIDS_SQL } from "./oncoprint.ts";
+import { describeCohortDef } from "./cohort2.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, ViewParticipation, TemplateDoc, SplitBy } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
 import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, type Resolver } from "./federation.ts";

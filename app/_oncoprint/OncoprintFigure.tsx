@@ -9,7 +9,7 @@
 // changes cause a refetch; everything else is applied to the decoded arrays in place.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import { GEOM, PALETTE, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
+import { GEOM, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { geneLegendFor, resolveStyle, styleForDisplay, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
@@ -182,7 +182,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   useEffect(() => {
     let alive = true;
     setLoading(true); setError(null);
-    (async () => {
+    void (async () => {
       try {
         const t0 = performance.now();
         const res = await api.oncoprint(JSON.parse(specKey), { query: "?format=bin&provenance=1", endpoint: props.endpoint, pins: props.uploads });
@@ -193,10 +193,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         const d = unpackContract(buf);
         const decodeMs = performance.now() - t1;
         if (!alive) return;
-        const raw = Number(res.headers.get("X-Raw-Bytes")) || 0;
         bump({ fetchMs, bytes: buf.byteLength, decodeMs, engineMs: Number(res.headers.get("X-Engine-Ms")) || undefined,
-          packMs: Number(res.headers.get("X-Pack-Ms")) || undefined,
-          ...(raw && raw === buf.byteLength ? {} : {}) });
+          packMs: Number(res.headers.get("X-Pack-Ms")) || undefined });
         setData(d); setLoading(false);
         props.onContract?.(d);
       } catch (e) { if (alive) { setError(String((e as Error).message || e)); setLoading(false); } }
@@ -241,6 +239,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         ng.push({ ...g, start, count: keep.length - start });
       }
       order = new Uint32Array(keep); groups = ng;
+      // eslint-disable-next-line react-hooks/set-state-in-render -- a timing readout; perf is not an input of this memo, so the update does not recompute it
       bump({ hideMs: performance.now() - t0 });
     }
     // A clustering is computed in the engine from values the browser never receives, so a
@@ -250,11 +249,13 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       const t0 = performance.now();
       order = sortColumns(data, order, groups, sortKeys.map((k) => k.startsWith("-")
         ? { track: k.slice(1), dir: "desc" as const } : { track: k, dir: "asc" as const }));
+      // eslint-disable-next-line react-hooks/set-state-in-render -- a timing readout; perf is not an input of this memo, so the update does not recompute it
       bump({ sortMs: performance.now() - t0 });
     }
     if (gapMode !== "none" && gapTrack) {
       const t0 = performance.now();
       groups = segmentByTrack(data, order, groups, gapTrack.label, pctMode);
+      // eslint-disable-next-line react-hooks/set-state-in-render -- a timing readout; perf is not an input of this memo, so the update does not recompute it
       bump({ gapMs: performance.now() - t0 });
     }
     return { order, groups };
@@ -449,14 +450,14 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     if (detailTimer.current) clearTimeout(detailTimer.current);
     if (hit && hit.n === 1) {
       const col = data.columns()[hit.ci];
-      if (!props.endpoint && !(col in detail)) detailTimer.current = setTimeout(async () => {
+      if (!props.endpoint && !(col in detail)) detailTimer.current = setTimeout(() => void (async () => {
         setDetail((d) => ({ ...d, [col]: "loading" }));
         try {
           const res = await api.oncoprintDetail({ spec: spec as OncoprintSpec, column: col });
           const j = await res.json();
           setDetail((d) => ({ ...d, [col]: j.error ? { column: col, study: "", unit: data.unit, alterations: [], panels: [], notProfiled: [], annotation: j.error } : j }));
         } catch { setDetail((d) => { const n = { ...d }; delete n[col]; return n; }); }
-      }, 220);
+      })(), 220);
     }
   };
 
@@ -767,8 +768,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               {(close) => <>
                 <span className="meta px-2">download figures</span>
                 <MenuItem onClick={() => { close(); openExport(); }}><ImageDown />Export image (PNG or SVG)… — choose a page width</MenuItem>
-                <MenuItem onClick={() => { close(); download("tsv"); }}><Sheet />Tabular TSV — one row per track, one column per {data.unit}</MenuItem>
-                <MenuItem onClick={() => { close(); download("ids"); }}><ListOrdered />{data.unit} order — the ids as drawn</MenuItem>
+                <MenuItem onClick={() => { close(); void download("tsv"); }}><Sheet />Tabular TSV — one row per track, one column per {data.unit}</MenuItem>
+                <MenuItem onClick={() => { close(); void download("ids"); }}><ListOrdered />{data.unit} order — the ids as drawn</MenuItem>
                 {/* Not a download: the same spec, opened where it can be run rather than looked at.
                     Nothing is exported — the link carries the definition, and the lab page re-runs it. */}
                 <div className="menu-aside">

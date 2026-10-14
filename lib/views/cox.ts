@@ -2,7 +2,7 @@
 // study (patient-level participants only), and the covariate coding the logistic view shares.
 import { coxRegression, type CoxRow } from "../stats.ts";
 import { viewToSvg } from "../view-svg.ts";
-import type { ViewResult, SurvivalView, CoxView, CoxCoefficient, CoxCovariate } from "../types.ts";
+import type { ViewResult, CoxView, CoxCoefficient, CoxCovariate } from "../types.ts";
 import { isPatientLevel, type EndpointColumns } from "../federation.ts";
 import { axisLabel, validateAxis, OQL_UNALTERED, type AxisKind } from "../plot.ts";
 import { coxMethod, type CoxTrace } from "../method.ts";

@@ -37,7 +37,7 @@ const PINS_PATH = join(root, "test", "fixtures", "example-counts.json");
 const UPDATE = !!process.env.UPDATE_COUNTS;
 const pins: Pins = existsSync(PINS_PATH) ? JSON.parse(readFileSync(PINS_PATH, "utf8")) : { examples: {} };
 const fresh_pins: Record<string, Record<string, number>> = {};
-let pinnedFrom: string | null | undefined = pins.oncokbPin;
+const pinnedFrom: string | null | undefined = pins.oncokbPin;
 let runPin: string | null = null;
 
 // 2 + 3. every documented example runs, and gives the same answer as last time

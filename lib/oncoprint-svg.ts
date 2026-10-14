@@ -2,7 +2,7 @@
 // Zero data logic and zero style of its own: cells come from the contract, level of detail
 // from lib/oncoprint-lod.ts, every colour, band and label from lib/oncoprint-style.ts.
 import type { Contract, Track } from "./types.ts";
-import { STYLE, cellLayers, numericColor, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackTooltipLines, geneLegendFor, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
+import { cellLayers, numericColor, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackTooltipLines, geneLegendFor, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
 import { aggregate, bucketEdges } from "./oncoprint-lod.ts";
 
 const esc = (s: unknown): string => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");

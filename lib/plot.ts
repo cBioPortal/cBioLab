@@ -159,7 +159,7 @@ export function validateAxis(a: PlotAxis, which: string): void {
     if ("gene" in a || "genes" in a || "by" in a)
       throw new Error(which + " axis: an OQL axis is the query alone; drop gene, genes and by");
     try { parseOql(String(a.oql)); }
-    catch (e) { throw new Error(which + " axis: " + (e as Error).message); }
+    catch (e) { throw new Error(which + " axis: " + (e as Error).message, { cause: e }); }
     return;
   }
   if (a.source === "alteration") {
@@ -206,7 +206,7 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     const valCd = kind === "num" ? logOf(a, "toFloat64OrNull(cd.attribute_value)") : "cd.attribute_value";
     const defined = (e: string) => kind === "num" ? " AND " + e + " IS NOT NULL" : "";
     const own = "SELECT " + strip(sample ? "sample_unique_id" : "patient_unique_id", study) + " AS id, " + val + " AS v, " +
-      (sample ? "1" : "1") + " AS pref\n" +
+      "1 AS pref\n" +
       "  FROM " + clinicalTable(db, [a.attribute]) + "\n" +
       "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(a.attribute) +
       " AND attribute_value != ''" + defined(val) + "\n    AND type = " + (sample ? "'sample'" : "'patient'") + " AND " + inCohort("patient_unique_id");
@@ -529,11 +529,14 @@ function incBeta(x: number, a: number, b: number): number {
   return front * (f - 1);
 }
 function lgamma(z: number): number {
+  // eslint-disable-next-line no-loss-of-precision -- the published coefficients, digit for digit
   const g = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
-  let x = z, y = z, tmp = x + 5.5;
+  const x = z;
+  let y = z, tmp = x + 5.5;
   tmp -= (x + 0.5) * Math.log(tmp);
   let ser = 1.000000000190015;
   for (let j = 0; j < 6; j++) ser += g[j] / ++y;
+  // eslint-disable-next-line no-loss-of-precision -- the published coefficients, digit for digit
   return -tmp + Math.log(2.5066282746310005 * ser / x);
 }
 

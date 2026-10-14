@@ -137,7 +137,7 @@ export interface ProteinPositionLeaf {
 /** deprecated alias, translated to OQL internally */
 export interface AlterationLeaf {
   kind: "alteration"; gene: string;
-  driver?: "driverOnly" | string; types?: ("MUT" | "CNA" | "SV")[];
+  driver?: "driverOnly" | (string & {}); types?: ("MUT" | "CNA" | "SV")[];
 }
 
 // ---------- timeline sub-DSL (v1, embedded as an `event` leaf) --------------

@@ -60,7 +60,7 @@ function parseSpec(tok0: string, entry: string): OqlSpec {
   if (tok.startsWith("DRIVER_")) { driver = true; tok = tok.slice(7); }
   if (tok.endsWith("_DRIVER")) { driver = true; tok = tok.slice(0, -7); }
   if (tok === "DRIVER") return { type: "ANY", driver: true };
-  let em = tok.match(/^(EXP|PROT)([<>]=?)(-?\d+(?:\.\d+)?)$/);
+  const em = tok.match(/^(EXP|PROT)([<>]=?)(-?\d+(?:\.\d+)?)$/);
   if (em) return { type: em[1] as OqlSpecType, op: em[2], z: Number(em[3]) };
   if (tok === "EXP" || tok === "PROT") throw new Error("OQL " + tok + " needs a threshold, e.g. " + tok + ">2");
   for (const k of Object.keys(REJECT)) {

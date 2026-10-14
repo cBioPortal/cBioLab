@@ -167,7 +167,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
                 className="h-8 min-w-64 flex-1 text-md md:text-md" />
               {CAP_FILTERS.map(([k, label]) => (
                 <Button key={k} variant="outline" size="xs" className={CHIP} aria-pressed={sCaps.has(k)}
-                  onClick={() => setSCaps(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; })}>
+                  onClick={() => setSCaps(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; })}>
                   {label}
                 </Button>
               ))}
@@ -654,7 +654,7 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
                       title: "Analyze the current selection split by " + label + (c.kind === "num"
                         ? ": below / at or above its median within the selection" : ": one arm per value with at least 10 patients, the rest in Other") +
                         " — arms that never overlap and add up to the selection",
-                      onClick: () => splitDraftBy({ attribute: c.attribute }, label) },
+                      onClick: () => void splitDraftBy({ attribute: c.attribute }, label) },
                     ...(n > 0 ? [{ label: "Split by selected (" + (n > 8 ? "8+" : n) + ")",
                       title: "Analyze with each selected " + (c.kind === "num" ? "range" : "value") + " of " + label +
                         " as its own arm (tested in the order you clicked them), the rest of your selection as the cohort they split, and everyone else in Other",

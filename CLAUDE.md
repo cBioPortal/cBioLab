@@ -491,6 +491,26 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   proves nothing; in Playwright, `page.route()` the endpoint and hold it, check the loader is on
   screen and the controls are still usable, then release it and check the loader is gone.
 
+## Code standards — what `npm run lint` enforces
+
+`npm run lint` (ESLint, knip, ruff) is the gate's first stage; its messages say what to fix. What
+they can't tell you:
+- **API GET handlers call `await connection()` (`next/server`) first.** One that never reads the
+  request is prerendered at build time and serves that answer forever ("no login", an empty
+  warehouse); `scripts/gate.sh` fails on any prerendered API route outside its allowlist.
+- A promise you deliberately don't wait for is marked `void load();` — don't add an `await` just to
+  satisfy the rule. Delete code you stop using; don't park it as `void x;` or an `_` name.
+- Disable a rule only on the line where it is wrong, with the reason:
+  `// eslint-disable-next-line <rule> -- <why>` (Python: `# noqa: <code>` plus a comment). Never
+  change `eslint.config.mjs`, `knip.json` or the ruff rules as part of other work.
+- Off on purpose, so don't "fix" code for them: `any` / `no-unsafe-*`, complexity, nesting, formatting.
+- Accessibility (`jsx-a11y-x`, `app/**/*.tsx`): clickable things are `<button>`s, every input or
+  select has a name (label text, `title` or `aria-label`). A native `<dialog>`'s backdrop click is
+  the accepted exception: disable on that line, since Escape closes it.
+- The Semgrep and jscpd reports (`npm run report:security`, `report:dupes`): user values reach SQL
+  only through `sq()` / `PIDS_SQL` (invariant 5), never turn off TLS verification (`lib/db.ts`'s
+  `rejectUnauthorized: false` is the one open finding), factor out rather than copy a long block.
+
 ## Workflows
 
 - Build: `npm run build`. Dev serve: `npx next start -p <port>`.
@@ -511,6 +531,8 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   `node e2e.cjs` — 81 checks (Playwright + docs gate + the boundary suite + the
   denominator gate).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
+- Lint: `npm run lint` (~2 min, the gate's first stage) — see "Code standards" above for what it
+  holds code to. While iterating, `npx eslint <files you touched>` is enough.
 - Every feature: build → verify with real numbers (screenshots via Playwright; cross-check
   counts against known values) → run e2e → commit → push **your own branch**. **Stop there.**
   This is the checkpoint for a *finished* piece of work, not a loop to run after every edit —

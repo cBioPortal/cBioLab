@@ -55,14 +55,14 @@ export function useSavedArtifacts(loggedIn: boolean) {
 
   useEffect(() => {
     if (loggedIn) return;
-    qc.cancelQueries({ queryKey: KEY });
+    void qc.cancelQueries({ queryKey: KEY });
     qc.removeQueries({ queryKey: KEY });
   }, [loggedIn, qc]);
 
   /** Put one entry (or remove it, with null). A list that has not loaded yet is read instead, so
    *  a save made before it arrives does not stand in for everything else saved. */
   function put<T>(kind: ArtifactKind, name: string, value: T | null) {
-    if (qc.getQueryData(keyOf(kind)) === undefined) { qc.invalidateQueries({ queryKey: keyOf(kind) }); return; }
+    if (qc.getQueryData(keyOf(kind)) === undefined) { void qc.invalidateQueries({ queryKey: keyOf(kind) }); return; }
     qc.setQueryData<Record<string, T>>(keyOf(kind), (prev) => {
       const next = { ...prev };
       if (value) next[name] = value; else delete next[name];
@@ -86,7 +86,7 @@ export function useSavedArtifacts(loggedIn: boolean) {
   const state = (q: typeof cohortsQ | typeof workspacesQ): ListState => ({
     pending: loggedIn && q.isPending,
     error: q.error ? String(q.error.message || q.error) : null,
-    retry: () => { q.refetch(); },
+    retry: () => { void q.refetch(); },
   });
 
   return {

@@ -26,7 +26,7 @@ import { Textarea } from "../_ui/textarea";
 import { FIELD, TB } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
 
-type V = Record<string, any>;   // eslint-disable-line @typescript-eslint/no-explicit-any
+type V = Record<string, any>;
 
 // ---- the view as tracks: pure edits, each returning the next view --------------------------------
 

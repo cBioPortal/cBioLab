@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 
 import { logRank, logRankK, chiSquareP1df, fisherExact, kaplanMeier,
   benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
-  chiSquareP, studentTP, fTestP, chiSquareTest, welchT, welchAnovaTest, varianceFromMoments,
+  chiSquareP, studentTP, chiSquareTest, welchT, welchAnovaTest, varianceFromMoments,
   pearsonFromMoments, fisherZMeta, normalP, applyCutoff, toIncidence, survivalAxis,
   coxRegression, coxPartialLogLik, mannWhitneyU, kruskalWallis, quantilesFromHistogram,
   logisticRegression, logisticLogLik, type CoxRow, type Histogram, type LogisticRow } from "../lib/stats.ts";

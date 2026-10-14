@@ -12,7 +12,7 @@ export default function MermaidBlock({ source }: { source: string }) {
 
   useEffect(() => {
     let dead = false;
-    (async () => {
+    void (async () => {
       try {
         const mermaid = (await import("mermaid")).default;
         const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;

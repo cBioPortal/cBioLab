@@ -142,7 +142,7 @@ function categoricalEffect(a: ClinicalCell, b: ClinicalCell, test?: string): str
   const inB = new Set((b.top || []).map((x) => x.v));
   const values = (a.top || []).map((x) => x.v).filter((v) => v !== "" && inB.has(v));
   if (!values.length) return test || "";
-  const v = values.reduce((best, x) => Math.abs(share(a, x) - share(b, x)) > Math.abs(share(a, best) - share(b, best)) ? x : best);
+  const v = values.reduce((best, x) => Math.abs(share(a, x) - share(b, x)) > Math.abs(share(a, best) - share(b, best)) ? x : best, values[0]);
   return `${v}: ${share(a, v).toFixed(1)}% vs ${share(b, v).toFixed(1)}%` + (test ? ` (${test})` : "");
 }
 

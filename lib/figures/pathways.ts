@@ -6,7 +6,7 @@ import { CN_GAIN, CN_LOSS, qFmt } from "./common.ts";
 export function pathwaysSvg(v: ViewResult, o: SvgOpts): string {
   const p = palette(o.theme), res = v.pathways!;
   const rows = res.rows, k = rows[0]?.cells.length || 1;
-  const NAME_W = 150, BAR_X = 160, BAR_W = 190, TILE_X = BAR_X + BAR_W + 70, TILE_W = 86, TILE_GAP = 6;
+  const BAR_X = 160, BAR_W = 190, TILE_X = BAR_X + BAR_W + 70, TILE_W = 86, TILE_GAP = 6;
   const maxTiles = Math.max(1, ...rows.map((r) => r.top.length));
   const W0 = o.width || 960;
   const W = Math.max(W0, TILE_X + maxTiles * (TILE_W + TILE_GAP) + 130);

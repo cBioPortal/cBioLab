@@ -26,17 +26,28 @@ PORT="${GATE_PORT:-3100}"
 summary() { if [ -n "${CI:-}" ]; then cat; else "$@"; fi; }
 
 echo "== $(git branch --show-current 2>/dev/null || echo detached) @ $(git rev-parse --short HEAD)$([ -n "$(git status --porcelain)" ] && echo ' + uncommitted changes') =="
+# the venv first: lint runs ruff from it, and /oncoprint-lab/cli runs this interpreter and draws with
+# matplotlib, so a venv without the plot extra would turn that page's "not present" note into a traceback
+[ -d python/.venv ] || python3 -m venv python/.venv
+python/.venv/bin/pip install -q -e 'python[plot,dev]'
+# CI runs lint as a job of its own and sets GATE_SKIP_LINT
+if [ -z "${GATE_SKIP_LINT:-}" ]; then echo "== lint (eslint, knip, ruff) ==" && npm run lint 2>&1 | summary tail -15; fi
 echo "== build (-> $NEXT_DIST_DIR) ==" && npm run build 2>&1 | summary tail -3
+# A GET route that never reads the request is prerendered at build time under Cache Components, and
+# then answers every request with what the build saw (no LOGIN_PASSWORD, no warehouse). Only these
+# routes are static on purpose; any other prerendered API response is that bug.
+STATIC_API="api/version api/campaign/format"
+prerendered=$(cd "$NEXT_DIST_DIR/server/app" && find api -name '*.body' | sed 's/\.body$//' | sort)
+unexpected=$(comm -23 <(echo "$prerendered") <(tr ' ' '\n' <<<"$STATIC_API" | sort))
+if [ -n "$unexpected" ]; then
+  echo "FAIL API routes prerendered at build time (call connection() from next/server first):"; echo "$unexpected"; exit 1
+fi
 echo "== unit =="                      && npm test 2>&1 | summary grep -E "^# (tests|pass|fail)"
 echo "== postgres (stores, migrations, triggers) ==" && npm run test:db 2>&1 | summary grep -E "^# (tests|pass|fail)"
 echo "== counts against cBioPortal ==" && npm run check:portal 2>&1 | summary grep -E "^FAIL|comparisons"
 echo "== cohort logic =="              && npm run check:cohorts 2>&1 | summary grep -E "^FAIL|cohort-logic checks"
 echo "== method scripts =="            && npm run check:methods 2>&1 | summary grep -E "^FAIL|method records present|FAILED"
 echo "== python conformance (lib/oncoprint-*.ts vs python/cohortlab) =="
-# with the plot extra: /oncoprint-lab/cli runs this interpreter and draws with matplotlib, so a
-# venv without it would turn that page's "not present" note into a traceback
-[ -d python/.venv ] || python3 -m venv python/.venv
-python/.venv/bin/pip install -q -e 'python[plot]'
 python/.venv/bin/python -m unittest discover -s python/tests -v 2>&1 | summary tail -20
 echo "== e2e =="
 fuser -k $PORT/tcp 2>/dev/null || true

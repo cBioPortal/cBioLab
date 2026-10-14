@@ -161,7 +161,7 @@ export default function AnalysisPage() {
   const unresolvedCount = unresolvedUploads(doc).length;
   const wasUnresolved = useRef(0);
   useEffect(() => {
-    if (wasUnresolved.current > 0 && unresolvedCount === 0 && Object.keys(doc.cohorts || {}).length) { setError(null); rerunAnalysis(queryClient); }
+    if (wasUnresolved.current > 0 && unresolvedCount === 0 && Object.keys(doc.cohorts || {}).length) { setError(null); void rerunAnalysis(queryClient); }
     wasUnresolved.current = unresolvedCount;
   }, [unresolvedCount]); // eslint-disable-line
   const docText = docs.current.text;
@@ -476,7 +476,7 @@ export default function AnalysisPage() {
         onExplore={() => { if (!chooser) return; const t = chooser; setChooser(null); openAddCohort(t); }}
         onLogin={requestLogin}
         onClose={() => setChooser(null)} />
-      {toast && <div className="toast" role="status" onClick={() => setToast(null)}>{toast}</div>}
+      {toast && <div className="toast" role="status"><button type="button" title="dismiss" onClick={() => setToast(null)}>{toast}</button></div>}
       <CustomDataManager tab={exploreState.customTab} setTab={exploreState.setCustomTab} studies={exStudies} onChanged={() => fetchExplore()} />
       <CustomDataDialog focus={cdFocus} onClose={() => setCdFocus(null)}
         bindings={doc.uploads || []}

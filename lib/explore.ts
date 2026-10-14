@@ -1,7 +1,7 @@
 // Faceted study explorer: what exists, in what numbers — optionally conditioned on a
 // draft cohort so every count narrows as clauses are added (study-view-style feedback).
 // Everything returned is designed to be clickable into a DSL clause.
-import { chQuery, DB, PRIMARY, ensureChContext, registerChExternal, chExternalRegistered, type ChConn } from "./ch.ts";
+import { chQuery, PRIMARY, ensureChContext, registerChExternal, chExternalRegistered, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, type DerivedMetric } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";

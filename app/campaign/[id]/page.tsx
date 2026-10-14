@@ -77,14 +77,14 @@ export default function CampaignPage() {
     if (j.error) setErr(j.error); else { setV(j); setErr(null); }
     return j as View;
   }, [id]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   // the page's steps as WebMCP tools and window.cohortLab, once the study is known
   const study = v?.campaign.study;
   const [webmcp, setWebmcp] = useState<boolean | null>(null);
   useEffect(() => {
     if (!study) return;
-    const t = installAgentTools(id, study, () => { load(); });
+    const t = installAgentTools(id, study, () => { void load(); });
     setWebmcp(t.webmcp);
     return t.cleanup;
   }, [id, study, load]);
@@ -92,7 +92,7 @@ export default function CampaignPage() {
   // poll while the server works, so results appear row by row
   useEffect(() => {
     if (busy !== "run" && v?.campaign.status !== "running") return;
-    const t = setInterval(load, 2000);
+    const t = setInterval(() => void load(), 2000);
     return () => clearInterval(t);
   }, [busy, v?.campaign.status, load]);
 

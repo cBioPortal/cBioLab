@@ -391,6 +391,7 @@ export function logisticRegression(rows: LogisticRow[]): LogisticFit {
 function erfc(x: number): number {
   const z = Math.abs(x), t = 2 / (2 + z), ty = 4 * t - 2;
   const cof = [
+    // eslint-disable-next-line no-loss-of-precision -- the published coefficients, digit for digit
     -1.3026537197817094, 6.4196979235649026e-1, 1.9476473204185836e-2,
     -9.561514786808631e-3, -9.46595344482036e-4, 3.66839497852761e-4,
     4.2523324806907e-5, -2.0278578112534e-5, -1.624290004647e-6,
@@ -528,7 +529,7 @@ export function logRankK(strata: { groups: SurvPoint[][] }[]): LogRankK {
     const g = keep.map((i) => s.groups[i]);
     const { o, e, v, events } = stratumTermsK(g);
     if (!events) continue;
-    for (let i = 0; i < k; i++) E[i] += e[i], O[i] += o[i];
+    for (let i = 0; i < k; i++) { E[i] += e[i]; O[i] += o[i]; }
     for (let i = 0; i < k; i++) for (let l = 0; l < k; l++) V[i][l] += v[i][l];
     used++;
   }
@@ -628,6 +629,7 @@ export function log2OddsRatio(a: number, b: number, c: number, d: number): numbe
 // ---------------------------------------------------------------------------
 
 const GAMMA_COF = [
+  // eslint-disable-next-line no-loss-of-precision -- the published coefficients, digit for digit
   76.18009172947146, -86.50532032941677, 24.01409824083091,
   -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5
 ];
@@ -637,6 +639,7 @@ function gammaLn(x: number): number {
   const tmp = x + 5.5 - (x + 0.5) * Math.log(x + 5.5);
   let ser = 1.000000000190015;
   for (let j = 0; j < 6; j++) ser += GAMMA_COF[j] / ++y;
+  // eslint-disable-next-line no-loss-of-precision -- the published coefficients, digit for digit
   return -tmp + Math.log((2.5066282746310005 * ser) / x);
 }
 

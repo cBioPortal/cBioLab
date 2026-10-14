@@ -106,13 +106,12 @@ export function GenesDialog({ ctx }: { ctx: AnalysisCtx }) {
 }
 
 export function CustomDataWarning({ ctx }: { ctx: AnalysisCtx }) {
-  const { doc, openCustomManager, tab } = ctx;
+  const { doc, tab } = ctx;
   return <>
     {tab === "analysis" && (() => {
       // a shared document can name server custom data that is locked here, deleted, or absent
       const unresolved = unresolvedUploads(doc);
       const of = (why: string) => unresolved.filter((u) => u.why === why).map((u) => u.as);
-      const manage = <Button variant="link" size="inline" onClick={() => openCustomManager()}>Explore → Custom data</Button>;
       const names = (ids: string[]) => ids.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>);
       return unresolved.length > 0 && (
         <div className="card customwarn">
@@ -253,6 +252,7 @@ export function DocDialog({ ctx }: { ctx: AnalysisCtx }) {
         permanent column, so the leftbar can just be cohorts. A native <dialog>, so the editor
         stays in the page while it is closed — anything reading the document from outside
         React finds #docjson. */}
+    {/* eslint-disable-next-line jsx-a11y-x/click-events-have-key-events, jsx-a11y-x/no-noninteractive-element-interactions -- a click on the backdrop closes the modal; Escape closes it from the keyboard */}
     <dialog ref={docDialog} data-tw aria-labelledby="doctitle"
       className="docdialog m-auto max-h-[85vh] w-[min(90vw,48rem)] max-w-3xl overflow-auto rounded-lg border bg-card p-6 text-foreground shadow-lg backdrop:bg-black/50"
       onClick={e => { if (e.target === docDialog.current) docDialog.current?.close(); }}>

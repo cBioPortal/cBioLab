@@ -21,6 +21,7 @@ Source = "https://github.com/cBioPortal/cohort-lab"
 
 [project.optional-dependencies]
 plot = ["matplotlib>=3.7"]
+dev = ["ruff==0.17.0"]
 
 [project.scripts]
 cohortlab = "cohortlab.__main__:main"
@@ -35,3 +36,13 @@ cohortlab = ["style.json"]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["cohortlab*"]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+# bugs, not style: pyflakes, bugbear and the statement-level pycodestyle errors
+select = ["F", "B", "E4", "E7", "E9"]
+# one-line statements and short names match the TypeScript this package ports;
+# zip(strict=) would turn a length mismatch into an exception, a behaviour change
+ignore = ["E702", "E731", "E741", "E402", "B905"]

@@ -19,8 +19,7 @@ import { timelinePatientRowSource, TIMELINE_COLUMNS, PATIENT_ID } from "../lib/p
 import { checkQuery, cleanQuery, type TableQuery } from "../lib/table-query.ts";
 import { buildExplore } from "../lib/explore.ts";
 import { PRIMARY } from "../lib/ch.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, Contract, OncoprintSpec, ViewResult } from "../lib/types.ts";
-import type { PidsCarrier } from "../lib/oncoprint.ts";
+import type { AnalysisDoc, AnalysisResult, Contract, OncoprintSpec } from "../lib/types.ts";
 
 // ---------- shared zod fragments (mirrors docs/cohort-query.schema.json) ----------
 const zSelector = z.object({

@@ -200,11 +200,9 @@ export function CorrelatesBody({ v, docJson }: { v: ViewResult; docJson?: () => 
       <p className="meta">Genes on <code>{r.otherProfile}</code> correlated with <strong>{r.gene}</strong> on <code>{r.profileType}</code>, over {r.cohort} · {r.tested.toLocaleString()} genes tested · {r.significant.toLocaleString()} at q &lt; 0.05</p>
       <div className="pb-row">
         <div>
-          <label className="tbfield">
-            <OptionSelect value={which} onValueChange={(v) => setWhich(v as typeof which)}>
-              <option value="any">Show Any Correlation</option><option value="positive">Show Positive Correlations</option><option value="negative">Show Negative Correlations</option>
-            </OptionSelect>
-          </label>
+          <OptionSelect value={which} ariaLabel="which correlations to show" onValueChange={(v) => setWhich(v as typeof which)}>
+            <option value="any">Show Any Correlation</option><option value="positive">Show Positive Correlations</option><option value="negative">Show Negative Correlations</option>
+          </OptionSelect>
           <PortalTable rows={rows} cols={cols} initialSort={{ key: "q" }} search={(g) => g.gene + " " + (g.cytoband || "")} selected={picked} onSelect={setSel}
             note={"the " + r.positive.length + " most positive and " + r.negative.length + " most negative of " + r.tested.toLocaleString()} />
         </div>

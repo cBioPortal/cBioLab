@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 
 from .contract import Contract, Track
-from .style import STYLE, cell_layers, format_gutter_pct, gene_legend, numeric_rgb, resolve_style, style_for_display, track_category_color, track_label_text, truncate_label
+from .style import STYLE, cell_layers, format_gutter_pct, gene_legend, numeric_rgb, resolve_style, style_for_display, track_category_color, track_label_text
 
 _G = STYLE["geometry"]
 ROW_H, ROW_GAP, GROUP_GAP = _G["rowH"], _G["rowGap"], _G["groupGap"]

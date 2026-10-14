@@ -16,7 +16,7 @@
 // The store updates synchronously (a ref), so an edit's view id is known to the request it starts
 // in the same handler; React re-renders from it, and every change is announced once (URL sync).
 import { useRef, useState } from "react";
-import type { AnalysisDoc, View } from "../../lib/types.ts";
+import type { AnalysisDoc } from "../../lib/types.ts";
 import { DOC_VERSION } from "../../lib/doc-version.ts";
 
 /** `epoch` counts replace()s: a different document, whose numbers must never stand in for this one's */

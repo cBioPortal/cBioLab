@@ -47,7 +47,6 @@ export function legendFor(values: string[], ring = false): { label: string; colo
 }
 
 const num = (v: unknown): number | null => { const x = Number(v); return Number.isFinite(x) ? x : null; };
-import { genomicEventsSql, coverageSql } from "./oncoprint.ts";
 import type { CohortDef, CompileCtx, ChRow, ChResult, PatientTimeline } from "./types.ts";
 import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } from "./patient-timeline.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";

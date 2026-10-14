@@ -144,7 +144,7 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
     const before = b.doc;
     let r: AnalysisResult;
     try { r = await b.validate(next); }
-    catch (e) { throw new Error(`${label}: REJECTED by the engine, page unchanged — ${String((e as Error)?.message || e)}`); }
+    catch (e) { throw new Error(`${label}: REJECTED by the engine, page unchanged — ${String((e as Error)?.message || e)}`, { cause: e }); }
     const errs = r.views.map((v, i) => ({ i, v })).filter(({ i, v }) => v.error && (touched === "all" || touched.includes(i)));
     if (errs.length)
       throw new Error(`${label}: REJECTED, page unchanged — ` + errs.map(({ i, v }) => `view ${i} (${v.kind}): ${v.error}`).join("; "));
@@ -161,7 +161,7 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
   const views = () => [...(get().doc.views || [])];
   const needIndex = (i: unknown): number => {
     const n = Number(i);
-    if (!Number.isInteger(n) || n < 0 || n >= views().length) throw new Error(`no view ${i}: the document has ${views().length} (indices 0-${views().length - 1})`);
+    if (!Number.isInteger(n) || n < 0 || n >= views().length) throw new Error(`no view ${String(i)}: the document has ${views().length} (indices 0-${views().length - 1})`);
     return n;
   };
 
@@ -313,7 +313,7 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
         const b = get();
         let r: AnalysisResult;
         try { r = await b.validate(prev); }
-        catch (e) { undo.push(prev); throw new Error("undo: the previous document no longer runs — " + String((e as Error)?.message || e)); }
+        catch (e) { undo.push(prev); throw new Error("undo: the previous document no longer runs — " + String((e as Error)?.message || e), { cause: e }); }
         b.commit(prev, r);
         await settled(get, prev);
         return `Undone. The page is back to the previous document (${undo.length} more step${undo.length === 1 ? "" : "s"} available).\n\nCohorts:\n` + cohortLines(r);

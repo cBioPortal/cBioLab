@@ -1,5 +1,5 @@
 // DSL -> ClickHouse SQL compiler. Server-side only.
-import type { EventSelector, EventRel, Occurrence, ClinicalOp } from "./types.ts";
+import type { EventSelector, EventRel, Occurrence } from "./types.ts";
 import { foldedEqualsSql, canonicalEventName } from "./event-names.ts";
 import { linesCtes, compositionKeySql, DEFAULT_LINE_GAP, LINE_TYPE } from "./treatment-lines.ts";
 
