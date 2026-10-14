@@ -1,5 +1,8 @@
 // Marks several figures draw the same way.
 
+/** a coordinate to one decimal: enough for a screen, a tenth of the markup */
+export const r1 = (n: number) => Math.round(n * 10) / 10;
+
 /**
  * A step function's path (a KM curve, a cumulative incidence): hold the previous level to each
  * time, then move to the new one. Steps that land within the same half pixel are merged — a curve

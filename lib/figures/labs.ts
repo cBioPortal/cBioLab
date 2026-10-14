@@ -4,7 +4,9 @@ import {
   seriesStyle, fmtInt, fmtPct, fmtP, FS, SW, type SvgOpts
 } from "../svg-kit.ts";
 import type { ViewResult } from "../types.ts";
-import { timeScale, timeTitle, paragraph, r1 } from "./time-axis.ts";
+import { timeScale, timeTitle } from "../chart/time.ts";
+import { paragraph } from "../chart/text.ts";
+import { r1 } from "../chart/marks.ts";
 
 /** The labs course draws a bin only from this many patients; the engine's caption says so. */
 export const LAB_MIN_POINT_N = 5;

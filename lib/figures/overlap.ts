@@ -1,6 +1,6 @@
 // Overlap figure: how the cohorts' patients intersect — a Venn for 2–3 groups, else an UpSet.
 import {
-  palette, frame, caption, label, legend, textWidth, linear, axisLeft, leftAxisWidth, seriesStyle,
+  palette, frame, caption, label, legend, textWidth, packLines, linear, axisLeft, leftAxisWidth, seriesStyle,
   fmtInt, esc, num, FS, SW, OTHER, type SvgOpts
 } from "../svg-kit.ts";
 import type { ViewResult } from "../types.ts";
@@ -29,20 +29,6 @@ function distanceFor(r1: number, r2: number, area: number): number {
 /** a set's fill: its series colour, and past six the same hue lighter */
 const setFill = (i: number) => { const s = seriesStyle(i); return { color: s.color, opacity: 0.55 * s.tint }; };
 
-/**
- * Items packed into lines no wider than `w`, joined by " · "; an item wider than a line is cut
- * (its full text kept as a tooltip when drawn with `label`).
- */
-export function packLines(items: string[], w: number, size: number): string[] {
-  const lines: string[] = [];
-  let line = "";
-  for (const it of items) {
-    const next = line ? line + " · " + it : it;
-    if (line && textWidth(next, size) > w) { lines.push(line); line = it; } else line = next;
-  }
-  if (line) lines.push(line);
-  return lines;
-}
 
 const VENN_TOP = 24;
 

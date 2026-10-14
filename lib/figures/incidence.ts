@@ -8,7 +8,10 @@ import type { ViewResult } from "../types.ts";
 import { Z_975 } from "../stats.ts";
 import { stepPath } from "../chart/marks.ts";
 import { plotHeight } from "./survival.ts";
-import { timeScale, timeTitle, paragraph, lineSwatch, r1 } from "./time-axis.ts";
+import { timeScale, timeTitle } from "../chart/time.ts";
+import { paragraph } from "../chart/text.ts";
+import { lineSwatch } from "../chart/legend.ts";
+import { r1 } from "../chart/marks.ts";
 
 /** the competing event's line: thin and dotted, so it never reads as a seventh cohort's dashed one */
 const COMPETING_DASH = "2 2.5";

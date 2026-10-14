@@ -2,7 +2,8 @@
 // rule, and nothing drawn past the frame however long the names or many the cohorts.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { timeScale, paragraph } from "../lib/figures/time-axis.ts";
+import { timeScale } from "../lib/chart/time.ts";
+import { paragraph } from "../lib/chart/text.ts";
 import { incidenceSvg } from "../lib/figures/incidence.ts";
 import { riskmodelSvg } from "../lib/figures/riskmodel.ts";
 import { labsSvg } from "../lib/figures/labs.ts";

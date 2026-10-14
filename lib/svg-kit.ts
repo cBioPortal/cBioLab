@@ -10,11 +10,14 @@ import { FS } from "./chart/style.ts";
 import { fmtP } from "./chart/format.ts";
 export { esc };
 export { SERIES, seriesStyle, seriesColor, textOn, FS, MIN_FS, SW, OTHER } from "./chart/style.ts";
-export { textWidth, ellipsize, wrapWidth, label } from "./chart/text.ts";
+export { textWidth, ellipsize, wrapWidth, label, packLines, paragraph } from "./chart/text.ts";
 export { fmtInt, fmtNum, fmtPct, fmtShare, fmtP, fmtQ, pDigits, fmtRatio, fmtMonths, fmtCI, tickFormat } from "./chart/format.ts";
 export { linear, log, symlog, type Scale } from "./chart/scale.ts";
 export { axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, bandLabels } from "./chart/axis.ts";
-export { legend, type LegendItem } from "./chart/legend.ts";
+export { legend, lineSwatch, type LegendItem } from "./chart/legend.ts";
+export { timeScale, timeTitle } from "./chart/time.ts";
+export { placeLabels, type LabelWant, type Placed } from "./chart/place.ts";
+export { stepPath, r1 } from "./chart/marks.ts";
 
 export const INK = "var(--ink, #16232b)";
 export const MUTED = "var(--muted, #5b6b76)";

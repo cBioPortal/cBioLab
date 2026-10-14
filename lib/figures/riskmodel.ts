@@ -6,7 +6,10 @@ import {
 import type { ViewResult } from "../types.ts";
 import { stepPath } from "../chart/marks.ts";
 import { plotHeight } from "./survival.ts";
-import { timeScale, timeTitle, paragraph, lineSwatch, r1 } from "./time-axis.ts";
+import { timeScale, timeTitle } from "../chart/time.ts";
+import { paragraph } from "../chart/text.ts";
+import { lineSwatch } from "../chart/legend.ts";
+import { r1 } from "../chart/marks.ts";
 
 /** a hazard ratio below 1 and above it take the shared series' blue and vermillion */
 const FAVOURABLE = SERIES[0], ADVERSE = SERIES[4];

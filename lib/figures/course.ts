@@ -4,7 +4,9 @@ import {
   palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, legend, label, textWidth,
   seriesStyle, fmtInt, FS, SW, type SvgOpts
 } from "../svg-kit.ts";
-import { timeScale, lineSwatch, r1 } from "./time-axis.ts";
+import { timeScale } from "../chart/time.ts";
+import { lineSwatch } from "../chart/legend.ts";
+import { r1 } from "../chart/marks.ts";
 
 /**
  * The clinical course: small multiples, one panel per event type, one line per

@@ -1,6 +1,9 @@
-// What the time-course figures (incidence, risk model, labs, clinical course) share: one rule for
-// a time axis's ticks, and a wrapped paragraph of text. Candidates for lib/chart/.
-import { linear, textWidth, wrapWidth, label, fmtNum, FS, type Scale } from "../svg-kit.ts";
+// A time axis (months or weeks) with ticks at the steps a reader counts in; shared by every
+// time-course figure (incidence, risk model, labs, clinical course).
+import { linear, type Scale } from "./scale.ts";
+import { textWidth } from "./text.ts";
+import { fmtNum } from "./format.ts";
+import { FS } from "./style.ts";
 
 const STEPS = { months: [1, 3, 6, 12, 24, 36, 60, 120, 240], weeks: [1, 2, 4, 8, 12, 26, 52, 104, 208] } as const;
 
@@ -32,21 +35,3 @@ export function timeScale(from: number, to: number, r0: number, r1: number,
 
 /** the axis title for time measured from an anchor: "Months from Treatment (FIRST)" */
 export const timeTitle = (unit: "Months" | "Weeks", from?: string | null): string => unit + (from ? " from " + from : "");
-
-/**
- * A paragraph wrapped to `maxW`, its first baseline a line below `y`. Returns the drawing and the
- * height it takes.
- */
-export function paragraph(text: string, x: number, y: number, maxW: number, fill: string,
-  o: { size?: number; lineH?: number } = {}): { svg: string; height: number } {
-  const size = o.size ?? FS.body, lh = o.lineH ?? Math.round(size * 1.45);
-  const lines = wrapWidth(text, maxW, size);
-  return { svg: lines.map((l, i) => label(x, y + size + i * lh, l, { size, fill })).join(""), height: lines.length * lh + Math.round(size * 0.4) };
-}
-
-/** a series' line swatch (its colour and dash), 18 px wide, centred on y */
-export function lineSwatch(x: number, y: number, color: string, dash: string, width = 2): string {
-  return `<line x1="${x}" y1="${r1(y)}" x2="${x + 18}" y2="${r1(y)}" stroke="${color}" stroke-width="${width}"${dash ? ` stroke-dasharray="${dash}"` : ""}/>`;
-}
-
-export const r1 = (n: number) => Math.round(n * 10) / 10;

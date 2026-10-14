@@ -2,7 +2,8 @@
 // never on another label or a labelled point, and every label it cannot place reported.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { placeLabels, crosses, unplacedNote, volcano, type Box } from "../lib/figures/enrichment.ts";
+import { unplacedNote, volcano } from "../lib/figures/enrichment.ts";
+import { placeLabels, crosses, type Box } from "../lib/chart/place.ts";
 import { palette } from "../lib/svg-kit.ts";
 
 const bounds: Box = { x: 0, y: 0, w: 300, h: 200 };

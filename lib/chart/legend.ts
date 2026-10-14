@@ -66,3 +66,8 @@ export function legend(items: LegendItem[], x: number, y: number, maxW: number, 
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
+
+/** a series' line swatch (its colour and dash), 18 px wide, centred on y */
+export function lineSwatch(x: number, y: number, color: string, dash: string, width = 2): string {
+  return `<line x1="${x}" y1="${r1(y)}" x2="${x + 18}" y2="${r1(y)}" stroke="${color}" stroke-width="${width}"${dash ? ` stroke-dasharray="${dash}"` : ""}/>`;
+}

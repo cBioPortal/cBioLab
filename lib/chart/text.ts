@@ -4,6 +4,7 @@
 // out for MCP is laid out identically in the page.
 import { CHARS, REGULAR, BOLD } from "./metrics.ts";
 import { esc } from "./esc.ts";
+import { FS } from "./style.ts";
 
 const W_REG = new Map<string, number>(), W_BOLD = new Map<string, number>();
 for (let i = 0; i < CHARS.length; i++) { W_REG.set(CHARS[i], REGULAR[i]); W_BOLD.set(CHARS[i], BOLD[i]); }
@@ -71,3 +72,29 @@ export function label(x: number, y: number, s: unknown, o: LabelOpts): string {
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * Items packed into lines no wider than `w`, joined by " · "; an item wider than a line is cut
+ * (its full text kept as a tooltip when drawn with `label`).
+ */
+export function packLines(items: string[], w: number, size: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const it of items) {
+    const next = line ? line + " · " + it : it;
+    if (line && textWidth(next, size) > w) { lines.push(line); line = it; } else line = next;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+/**
+ * A paragraph wrapped to `maxW`, its first baseline a line below `y`. Returns the drawing and the
+ * height it takes.
+ */
+export function paragraph(text: string, x: number, y: number, maxW: number, fill: string,
+  o: { size?: number; lineH?: number } = {}): { svg: string; height: number } {
+  const size = o.size ?? FS.body, lh = o.lineH ?? Math.round(size * 1.45);
+  const lines = wrapWidth(text, maxW, size);
+  return { svg: lines.map((l, i) => label(x, y + size + i * lh, l, { size, fill })).join(""), height: lines.length * lh + Math.round(size * 0.4) };
+}
