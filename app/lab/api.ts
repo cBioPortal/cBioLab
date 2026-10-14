@@ -21,9 +21,13 @@ const send = (method: "PATCH" | "PUT", path: string, body: unknown): Promise<Res
   fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 export const api = {
-  /** The document's cohorts and views. `query`: "?oncoprint=spec" (the page draws its own oncoprints), "?figures=svg". */
+  /** The document's cohorts and views. `query`: "?oncoprint=spec" (the page draws its own figures, the oncoprint included), "?figures=svg". */
   analysis: async (doc: AnalysisBody, opts: Opts & { query?: string } = {}) =>
     post("/api/analysis" + (opts.query || ""), await withCustomData(doc), opts.signal),
+
+  /** One view's Python script, which the page's analysis requests leave out: the body is the one-view document the page sent for it. */
+  methodScript: async (doc: AnalysisBody, opts: Opts = {}) =>
+    post("/api/analysis/method", await withCustomData(doc), opts.signal),
 
   /** One view's method record as a Jupyter notebook (the .ipynb); the body is the document plus `notebookView`. */
   methodNotebook: async (body: NotebookBody, opts: Opts = {}) =>

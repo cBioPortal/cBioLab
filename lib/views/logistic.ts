@@ -1,7 +1,6 @@
 // Logistic view: a multivariate logistic regression on the Cox view's covariate coding, fit
 // from per-patient rows inside each local study (patient-level participants only).
 import { logisticRegression, type LogisticRow } from "../stats.ts";
-import { viewToSvg } from "../view-svg.ts";
 import type { ViewResult, LogisticView, LogisticCoefficient } from "../types.ts";
 import { isPatientLevel } from "../federation.ts";
 import { axisLabel, validateAxis, type AxisKind } from "../plot.ts";
@@ -143,6 +142,5 @@ export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult
     outcomeKind: outcomeKindFinal, ...(lv.outcomeEvent != null ? { outcomeEvent: String(lv.outcomeEvent) } : {}), outcomeOther,
     coefficients: lColumns.map((col, i) => ({ label: col.label, beta: lFit.beta[i], se: lFit.se[i], p: lFit.p[i] })),
   }, { outcomeLabel, queryLabel: "logisticRows" });
-  logisticResult.svg = viewToSvg(logisticResult) || undefined;
   return logisticResult;
 }

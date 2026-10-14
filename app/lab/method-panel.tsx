@@ -4,6 +4,7 @@
 import { useState } from "react";
 import type { MethodRecord } from "../../lib/method.ts";
 import type { AnalysisDoc } from "../../lib/types.ts";
+import type { AnalysisBody } from "../../lib/api-schemas.ts";
 import { api } from "./api.ts";
 import { Check, Copy, Download, LoaderCircle } from "lucide-react";
 import { Button } from "../_ui/button";
@@ -20,11 +21,22 @@ function Commit({ commit, file }: { commit: string | null; file: string }) {
     : <>at commit <a href={REPO + "/blob/" + sha + "/" + file} target="_blank" rel="noreferrer"><code>{sha.slice(0, 7)}</code></a></>;
 }
 
-/** Where a method record came from, so the server can rebuild its data for a notebook. */
-export interface MethodSource { doc: AnalysisDoc; index: number; kind: string }
+/** Where a method record came from, so the server can rebuild its data for a notebook, and the
+ *  one-view request that fetches its script when the response left it out. */
+export interface MethodSource { doc: AnalysisDoc; index: number; kind: string; request?: AnalysisDoc }
 
 export function MethodPanel({ method, source }: { method: MethodRecord; source?: MethodSource }) {
   const [copied, setCopied] = useState(false);
+  // the script, when the response left it out: fetched the first time its section is opened
+  const [fetched, setFetched] = useState<{ python?: string; error?: string; busy?: boolean } | null>(null);
+  const python = method.python ?? fetched?.python;
+  const loadScript = () => {
+    if (method.python || fetched || !source?.request) return;
+    setFetched({ busy: true });
+    api.methodScript(source.request as AnalysisBody).then((r) => r.json())
+      .then((j) => setFetched(j.python ? { python: j.python } : { error: j.error || "this view has no script" }))
+      .catch((e) => setFetched({ error: String((e as Error).message || e) }));
+  };
   const [nb, setNb] = useState<{ busy: boolean; error?: string }>({ busy: false });
   const download = async () => {
     if (!source) return;
@@ -49,8 +61,8 @@ export function MethodPanel({ method, source }: { method: MethodRecord; source?:
     }
   };
   const copy = () => {
-    if (!method.python) return;
-    navigator.clipboard?.writeText(method.python).then(() => {
+    if (!python) return;
+    navigator.clipboard?.writeText(python).then(() => {
       setCopied(true); setTimeout(() => setCopied(false), 1500);
     }, () => {});
   };
@@ -82,17 +94,19 @@ export function MethodPanel({ method, source }: { method: MethodRecord; source?:
         <Commit commit={method.implementation.commit} file={method.implementation.file} />.
         {method.verification && <> {method.verification}</>}
       </p>
-      {method.python && <details className="mpy">
+      {(method.python || method.pythonDeferred) && <details className="mpy" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) loadScript(); }}>
         <summary className="meta">Python equivalent — recompute these numbers with standard libraries</summary>
         <div className="provq">
           <div className="provhead">
-            <Button variant="outline" size="sm" className={TB} onClick={copy}>{copied ? <Check /> : <Copy />}{copied ? "copied" : "copy"}</Button>
+            <Button variant="outline" size="sm" className={TB} onClick={copy} disabled={!python}>{copied ? <Check /> : <Copy />}{copied ? "copied" : "copy"}</Button>
             {source && <Button variant="outline" size="sm" className={TB} onClick={download} disabled={nb.busy}
               title="A Jupyter notebook with this script, the data it reads and a check against these numbers. Opens in JupyterLab, VS Code or Colab.">
               {nb.busy ? <LoaderCircle className="animate-spin" /> : <Download />}{nb.busy ? "building notebook…" : "download as notebook (.ipynb)"}</Button>}
             {nb.error && <span className="meta" role="alert">{nb.error}</span>}
           </div>
-          <pre>{method.python}</pre>
+          {python ? <pre>{python}</pre>
+            : fetched?.error ? <p className="note" role="alert">{fetched.error}</p>
+            : <div className="loading-block"><span className="spinner" /> loading the script…</div>}
         </div>
       </details>}
     </div>

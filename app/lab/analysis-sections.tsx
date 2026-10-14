@@ -19,7 +19,7 @@ import { PartitionPanel, SplitForm, type SplitSpec } from "./partitions.tsx";
 import type { DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
 import { requestLogin, referencedDatasets, unresolvedUploads } from "./custom-data-client.ts";
-import { CohortStudies, CohortEditMenu, CAT_COLORS, ViewHead } from "./view-chrome.tsx";
+import { CohortStudies, CohortEditMenu, SeriesSwatch, ViewHead } from "./view-chrome.tsx";
 import { cohortHash, shortHash } from "../../lib/cohort-hash.ts";
 import { sameJson } from "../../lib/same-json.ts";
 import { viewIsEmpty } from "../../lib/partition-arms.ts";
@@ -192,7 +192,7 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
                           : "write this cohort's definition and splits over “" + toSave.as + "” in your library" }}
                       menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
                     <div className="cohortbox-head">
-                      <span className="cohortbox-name"><span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />{n}</span>
+                      <span className="cohortbox-name"><SeriesSwatch i={i} />{n}</span>
                       {c ? <><strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span></>
                         : busy ? <span className="skeleton cohortsum-skel" /> : null}
                     </div>

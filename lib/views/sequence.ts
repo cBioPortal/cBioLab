@@ -2,7 +2,6 @@
 // patient's successive lines.
 import { lineClassesParam } from "../cohort2.ts";
 import { lineGapOf, DEFAULT_LINE_GAP } from "../treatment-lines.ts";
-import { viewToSvg } from "../view-svg.ts";
 import type { ViewResult, SequenceView, SequenceResult, SequencePanel, SequenceNodeKind } from "../types.ts";
 import { SEQUENCE_ROW_LIMIT, type SequenceOpts } from "../federation.ts";
 import { canonicalEventName } from "../event-names.ts";
@@ -179,8 +178,5 @@ export async function runSequence(view: DocView, c: ViewRun): Promise<ViewResult
       (panels.length > 1
         ? " Both panels share one scale and one colour per regimen, so their heights are directly comparable." : "") +
       " " + panels.map((x) => x.cohort + ": " + x.started.toLocaleString() + " with a first line").join("; ") + "." };
-  const tSeq = Date.now();
-  seqResult.svg = viewToSvg(seqResult) || undefined;
-  seqResult.renderMs = Date.now() - tSeq;
   return seqResult;
 }

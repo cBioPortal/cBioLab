@@ -8,6 +8,10 @@ import type { ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
 import { isCustomAttr } from "../../lib/custom-data-names.ts";
 import { CAT_COLORS } from "./view-chrome.tsx";
+import { useWidth } from "./figure.tsx";
+import { textWidth } from "../../lib/chart/text.ts";
+import { fmtInt, fmtNum, fmtPct } from "../../lib/chart/format.ts";
+import { naturalOrder } from "../../lib/ordinal.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import type { ExploreState } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
@@ -613,6 +617,34 @@ export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
   </>;
 }
 
+/** rows a value list shows before it scrolls (`.vallist`'s max-height) */
+const VALLIST_ROWS = 9;
+
+/**
+ * A facet's histogram: one clickable bar per bin, its start labelled under it — every label that
+ * fits its bar's width, and every second (third, …) bin's when they do not, rather than letting
+ * neighbouring labels run into each other.
+ */
+function Histogram({ ticks, na, children }: { ticks: string[]; na: string | null; children: React.ReactNode }) {
+  const { ref, width } = useWidth(0);
+  // the tick font is --t-xs, 0.66rem; the bars share the row with the NA note and 2px gaps
+  const fs = 0.66 * 16;
+  const room = ((width ?? 280) - (na ? textWidth(na, fs) + 8 : 0)) / Math.max(1, ticks.length);
+  const widest = Math.max(...ticks.map((t) => textWidth(t, fs))) + 4;
+  const every = Math.max(1, Math.ceil(widest / Math.max(1, room)));
+  return (
+    <div ref={ref} className="mt-1">
+      <div className="histo">
+        {children}
+        {na && <span className="meta nacount">{na}</span>}
+      </div>
+      <div className="histo-ticks" aria-hidden="true" style={{ paddingRight: na ? textWidth(na, fs) + 8 : 0 }}>
+        {ticks.map((t, i) => <span key={i}>{i % every === 0 ? t : ""}</span>)}
+      </div>
+    </div>
+  );
+}
+
 export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
   const { addClause, addMode, parseDraft, selectionArmCount, splitDraftBy, splitDraftBySelection, splittingBy, visibleClinical } = ctx;
   const explore = ctx.explore!;
@@ -676,9 +708,11 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
             // its own comment for why cardinality (the study's, or worse,
             // the draft's) can't be trusted to decide this.
             const asList = !PIE_ATTRIBUTES.has(c.attribute);
+            // stage, grade and the like read in their own order (lib/ordinal.ts); the rest by count
+            const values: any[] = naturalOrder(c.values, (v: any) => String(v.v));
             let acc = 0;
             const R = 34, CX = 36, CY = 36;
-            const arcs = c.values.map((v: any, i: number) => {
+            const arcs = values.map((v: any, i: number) => {
               const frac = v.n / total, a0 = acc * 2 * Math.PI - Math.PI / 2;
               acc += frac;
               const a1 = acc * 2 * Math.PI - Math.PI / 2;
@@ -693,9 +727,9 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
             });
             if (asList) {
               const max = Math.max(...c.values.map((v: any) => v.n), 1);
-              return (
+              return (<>
                 <div className="vallist">
-                  {c.values.map((v: any, i: number) => (
+                  {values.map((v: any, i: number) => (
                     <button key={i} className={isSel(v) ? "valrow on" : "valrow"} onClick={() => addClause(clause(v))}
                       title={v.v + " — " + v.n.toLocaleString() + " (click to filter)"}>
                       <span className="vname">{v.v}</span>
@@ -712,16 +746,18 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
                           view's arcs already use, which is why only the
                           list view had every other value's share collapse
                           around whichever one you had just clicked. */}
-                      <span className="vpct">{(Math.round(1000 * v.n / total) / 10) + "%"}</span>
+                      <span className="vpct">{fmtPct(100 * v.n / total)}</span>
                     </button>
                   ))}
-                  {(c.distinct ?? 0) > c.values.length && (
-                    <span className="meta pad-tight">
-                      showing {c.values.length.toLocaleString()} of {c.distinct!.toLocaleString()} values
-                    </span>
-                  )}
                 </div>
-              );
+                  {(c.distinct ?? 0) > c.values.length ? (
+                    <span className="meta pad-tight vlistfoot">
+                      showing {c.values.length.toLocaleString()} of {c.distinct!.toLocaleString()} values{c.values.length > VALLIST_ROWS ? " · scroll for more" : ""}
+                    </span>
+                  ) : c.values.length > VALLIST_ROWS && (
+                    <span className="meta pad-tight vlistfoot">{c.values.length.toLocaleString()} values · scroll for more</span>
+                  )}
+              </>);
             }
             return (
               <div className="piewrap">
@@ -754,22 +790,21 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
               if (b.special === ">") return { kind: "clinical", attribute: c.attribute, range: { gt: b.start }, ...per };
               return { kind: "clinical", attribute: c.attribute, range: { gt: b.start, lte: b.end }, ...per };
             };
-            const label = (b: any) => b.special === "<=" ? "≤" + b.end : b.special === ">" ? ">" + b.start : b.start + "–" + b.end;
+            const label = (b: any) => b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start) + "–" + fmtNum(b.end);
+            const tick = (b: any) => b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start);
             return (
-              <div className="histo mt-1">
+              <Histogram ticks={c.bins.map(tick)} na={c.naCount ? "NA " + fmtInt(c.naCount) : null}>
                 {c.bins.map((b: any, i: number) => (
-                  <button key={i} className="hbar" title={label(b) + " · " + b.count.toLocaleString() + " " + (c.per === "sample" ? "samples" : "patients") + " — click to filter"}
+                  <button key={i} className="hbar" title={label(b) + " · " + fmtInt(b.count) + " " + (c.per === "sample" ? "samples" : "patients") + " — click to filter"}
                     onClick={() => addClause(clauseFor(b))}>
                     <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
-                    <span className="hlab">{b.special === "<=" ? "≤" + b.end : b.special === ">" ? ">" + b.start : b.start}</span>
                   </button>
                 ))}
-                {!!c.naCount && <span className="meta nacount">NA {c.naCount.toLocaleString()}</span>}
-              </div>
+              </Histogram>
             );
           })()}
           {c.kind === "num" && <div className="flex items-center gap-1 mt-1 flex-wrap">
-            <span className="meta">min {Math.round(c.min * 10) / 10} · median {Math.round(c.median * 10) / 10} · max {Math.round(c.max * 10) / 10}</span>
+            <span className="meta">min {fmtNum(c.min)} · median {fmtNum(c.median)} · max {fmtNum(c.max)}</span>
             <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>≥ median</Button>
             <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>&lt; median</Button>
           </div>}
@@ -800,7 +835,7 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
                 </span>
                 <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * st.n / max)) + "%" }} /></span>
                 <span className="vn">{st.n.toLocaleString()}</span>
-                <span className="vpct">{f.total ? (Math.round(1000 * st.n / f.total) / 10) + "%" : ""}</span>
+                <span className="vpct">{f.total ? fmtPct(100 * st.n / f.total) : ""}</span>
               </button>
             ))}
           </div>
@@ -839,7 +874,7 @@ export function StudyBreakdown({ ctx }: { ctx: ExploreCtx }) {
               <span className="mono">{r.study}</span>
               <span className="meta inst">{r.instance !== "a" ? "⧉ " + r.instanceLabel : ""}</span>
               <span className="bar"><i style={{ width: Math.max(1, Math.round(100 * r.n / total)) + "%" }} /></span>
-              <span className="meta pct">{Math.round(1000 * r.n / total) / 10}%</span>
+              <span className="meta pct">{fmtPct(100 * r.n / total)}</span>
               <span className="n">{r.n.toLocaleString()}</span>
               <span>{exStudies.length > 1 && (
                 <Button variant="link" size="inline" title="explore only this study"
@@ -978,7 +1013,7 @@ export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
                 {kind === "cna" && <span className="gcyto" title="cytoband">{g.cytoband || ""}</span>}
                 {kind !== "cna" && <span className="gevents" title={g.events.toLocaleString() + " events across " + g.altered.toLocaleString() + " samples"}>{g.events.toLocaleString()}</span>}
                 <span className={g.cna != null ? "cnatag " + (g.cna === 2 ? "amp" : "del") : "cnatag none"}>{g.cna != null ? (g.cna === 2 ? "AMP" : "HOMDEL") : ""}</span>
-                <span className="gfreq">{g.freqPct != null ? g.freqPct + "%" : "—"}</span>
+                <span className="gfreq">{g.freqPct != null ? fmtPct(g.freqPct) : "—"}</span>
                 <span className="gcount">{g.altered.toLocaleString()}<span className="meta">/{g.profiled.toLocaleString()}</span></span>
               </button>
             ))}

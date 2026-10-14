@@ -66,6 +66,8 @@ export const DEFAULT_BINS: [number, number] = [240, 160];
  */
 export const POINTS_CAP = 5000;
 export { HIGHLIGHT_CAP, HIGHLIGHT_COLORS, HIGHLIGHT_BASE } from "./plot-highlight.ts";
+export { isAbsent, jitterFor } from "./plot-draw.ts";
+import { isAbsent } from "./plot-draw.ts";
 /** bins per group in a violin */
 export const VIOLIN_BINS = 40;
 /** distinct colours a legend can carry before it stops being a legend */
@@ -99,10 +101,6 @@ const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
 const ATTR_RE = ATTR_NAME_RE;
 const PROFILE_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 
-/** categories that mean "this case has none of that", which draw as neutral and never as a ring */
-export function isAbsent(label: string): boolean {
-  return /^(not mutated|unaltered|neutral|no data|wild type|none|)$/i.test(String(label).trim());
-}
 
 /** the shape a pair of axes draws as — the portal's own rule, kept deliberately */
 export function plotShape(x: AxisKind, y: AxisKind): PlotShape {
@@ -464,17 +462,6 @@ export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: stri
     "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
 }
 
-/**
- * Where a point sits across its box. Deterministic from the case id, as the portal's jitter is,
- * so the same figure comes out of the server SVG, the browser and the Python package rather than
- * moving every time it is drawn.
- */
-export function jitterFor(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); }
-  const f = Math.abs(Math.sin(h >>> 0)) * 10000;
-  return (f - Math.floor(f)) * 2 - 1;
-}
 
 /** the contingency table, one row per occupied cell */
 export function plotTableSql(xSel: string, ySel: string, cohortSql: string): string {
@@ -576,8 +563,9 @@ export interface PlotGroup { g: string; n: number; lo: number; hi: number; q1: n
 export interface PlotData {
   shape: "scatter" | "box" | "table";
   n: number;
-  x: { label: string; kind: AxisKind };
-  y: { label: string; kind: AxisKind };
+  /** `log`: the axis carries log10(v + 1), so the figure labels its ticks in the original units */
+  x: { label: string; kind: AxisKind; log?: boolean };
+  y: { label: string; kind: AxisKind; log?: boolean };
   extent?: { x0: number; x1: number; y0: number; y1: number };
   grid?: [number, number];
   bins?: { bx: number; by: number; n: number }[];

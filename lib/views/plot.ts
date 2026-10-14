@@ -2,7 +2,6 @@
 // the axes decide; local, or federated where every participant can answer.
 import type { PlotView, ViewResult } from "../types.ts";
 import { pearsonFromMoments, regressionFromMoments, type Moments } from "../stats.ts";
-import { viewToSvg } from "../view-svg.ts";
 import { isPatientLevel, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable } from "../federation.ts";
 import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, HIGHLIGHT_CAP, HIGHLIGHT_COLORS, tukey, coverageNote,
   type PlotData, type PlotGroup, type PlotHighlight, type PlotRequest } from "../plot.ts";
@@ -162,10 +161,6 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
         participation: participationFor(sites, false),
         note: [coverageNote(data, unit), shapeNote, highlightNote(hs, unit)].filter(Boolean).join(" ") || undefined
       };
-      // drawn on the server, like every view but the oncoprint, so MCP gets the figure
-      const tPlot = Date.now();
-      pr.svg = viewToSvg(pr, { width: 960 }) || undefined;
-      pr.renderMs = Date.now() - tPlot;
       return pr;
     } else {
       // Federated: each site answers a smaller, self-contained question (its own extent, its
@@ -275,9 +270,6 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       const pr: ViewResult = { kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
         note: [coverageNote(data, unit), data.note, highlightNote(hs, unit)].filter(Boolean).join(" ") || undefined };
-      const tPlot = Date.now();
-      pr.svg = viewToSvg(pr, { width: 960 }) || undefined;
-      pr.renderMs = Date.now() - tPlot;
       return pr;
     }
   } catch (e) {

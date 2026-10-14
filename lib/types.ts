@@ -1427,6 +1427,8 @@ export interface KmPoint { t: number; s: number }
 export interface KmCurve {
   cohort: string; points: KmPoint[]; median: number | null;
   n: number; events: number; missing?: number;
+  /** the number at risk at each whole month from 0 (index = month), through the last follow-up */
+  atRisk?: number[];
   /** patients whose follow-up ended at or before their entry: never at risk, so left out of n */
   unobserved?: number;
 }

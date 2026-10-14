@@ -2,17 +2,33 @@
 // outer <svg> and the wrapped caption. lib/view-svg.ts and lib/figures/
 // both draw through these, so a new view kind cannot drift from the others'
 // colours or type.
-/** Cohort names and data values reach <text>; they must never reach it raw. */
-export const esc = (s: unknown): string =>
-  String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// The layout pieces (measured text, scales and ticks, axes, legends, number formats, type and
+// stroke steps) live in lib/chart/ and are re-exported here, so a figure imports one module.
+import { esc } from "./chart/esc.ts";
+import { wrapWidth } from "./chart/text.ts";
+import { FS } from "./chart/style.ts";
+import { fmtP } from "./chart/format.ts";
+export { esc };
+export { SERIES, seriesStyle, seriesColor, textOn, FS, MIN_FS, SW, OTHER } from "./chart/style.ts";
+export { textWidth, ellipsize, wrapWidth, label, packLines, paragraph } from "./chart/text.ts";
+export { fmtInt, fmtNum, fmtPct, fmtShare, fmtP, fmtQ, pDigits, fmtRatio, fmtMonths, fmtCI, tickFormat } from "./chart/format.ts";
+export { linear, log, symlog, type Scale } from "./chart/scale.ts";
+export { axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, bandLabels } from "./chart/axis.ts";
+export { legend, lineSwatch, type LegendItem } from "./chart/legend.ts";
+export { timeScale, timeTitle } from "./chart/time.ts";
+export { placeLabels, type LabelWant, type Placed } from "./chart/place.ts";
+export { stepPath, r1 } from "./chart/marks.ts";
 
-export const SERIES = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
 export const INK = "var(--ink, #16232b)";
 export const MUTED = "var(--muted, #5b6b76)";
 export const LINE = "var(--line, #dde4e8)";
 export const BG = "var(--bg, #ffffff)";
 
-export interface SvgOpts { width?: number; theme?: "auto" | "light" }
+export interface SvgOpts {
+  /** the width to lay the figure out at: the container's, measured, in the page */
+  width?: number;
+  theme?: "auto" | "light";
+}
 
 /** Palette resolution: "light" bakes literals in, for rasterising outside the app. */
 export function palette(theme: SvgOpts["theme"]) {
@@ -23,7 +39,7 @@ export function palette(theme: SvgOpts["theme"]) {
 
 export const num = (n: number): string => (Math.round(n * 100) / 100).toString();
 export const fmt = (n: number): string => n.toLocaleString("en-US");
-export const pFmt = (p: number): string => p === 0 ? "p < 1e-300" : p < 1e-4 ? "p=" + p.toExponential(1) : "p=" + p.toFixed(4);
+export const pFmt = (p: number): string => fmtP(p);
 
 /**
  * `grown`: the renderer widened the figure past the width it was asked for, to fit every group
@@ -31,25 +47,27 @@ export const pFmt = (p: number): string => p === 0 ? "p < 1e-300" : p < 1e-4 ? "
  * container (every label would shrink below legibility), so it keeps its width as a minimum and
  * the container scrolls. A figure at its requested width still scales to fit, as before.
  */
-export function frame(w: number, h: number, body: string, bg: string, grown = false): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" ` +
-    `style="max-width:${w}px;${grown ? `min-width:${w}px;` : ""}height:auto;display:block;font-family:'IBM Plex Sans',system-ui,sans-serif">` +
+export function frame(w: number, h: number, body: string, bg: string, grown = false, title?: string): string {
+  w = Math.ceil(w); h = Math.ceil(h);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" role="img"` +
+    (title ? ` aria-label="${esc(title)}"` : "") +
+    ` style="max-width:${w}px;${grown ? `min-width:${w}px;` : ""}height:auto;display:block;font-family:'IBM Plex Sans',system-ui,sans-serif">` +
+    (title ? `<title>${esc(title)}</title>` : "") +
     `<rect width="${w}" height="${h}" fill="${bg}"/>${body}</svg>`;
 }
 
-/** Wrapped caption lines — the caveat travels WITH the figure, never separately. */
-export function caption(text: string, w: number, y0: number, muted: string, perLine = 96): { svg: string; height: number } {
-  const words = String(text).split(/\s+/);
-  const lines: string[] = [];
-  let line = "";
-  for (const word of words) {
-    if ((line + " " + word).trim().length > perLine) { lines.push(line.trim()); line = word; }
-    else line += " " + word;
-  }
-  if (line.trim()) lines.push(line.trim());
+/** the widest a caption's lines run, however wide the figure: a line much longer is hard to read */
+const CAPTION_MEASURE = 760;
+
+/** Wrapped caption lines — the caveat travels WITH the figure, never separately. Wrapped to the
+ *  figure's width as measured, so a caption neither overruns the edge nor leaves half of it empty. */
+export function caption(text: string, w: number, y0: number, muted: string): { svg: string; height: number } {
+  if (!String(text).trim()) return { svg: "", height: 0 };
+  const lines = wrapWidth(text, Math.min(w - 16, CAPTION_MEASURE), FS.small);
+  const lh = Math.round(FS.small * 1.35);
   return {
-    svg: lines.map((l, i) => `<text x="8" y="${y0 + 12 + i * 13}" font-size="10" fill="${muted}">${esc(l)}</text>`).join(""),
-    height: lines.length * 13 + 8
+    svg: lines.map((l, i) => `<text x="8" y="${y0 + 12 + i * lh}" font-size="${FS.small}" fill="${muted}">${esc(l)}</text>`).join(""),
+    height: lines.length * lh + 8
   };
 }
 

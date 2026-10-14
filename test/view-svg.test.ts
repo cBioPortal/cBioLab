@@ -52,7 +52,7 @@ describe("cox: pooled vs stratified-by-cohort forest plots", () => {
   test("a pooled fit draws one panel, one HR=1 reference line", () => {
     const v: ViewResult = { kind: "cox", cohorts: ["all"], cox: { coefficients: [coef("TP53", 1.2)], n: 100, events: 40 }, caveat: "pooled" };
     const svg = viewToSvg(v)!;
-    assert.equal((svg.match(/HR=1/g) || []).length, 1);
+    assert.equal((svg.match(/HR = 1/g) || []).length, 1);
     assert.ok(svg.includes("TP53"));
   });
   test("stratifyByCohort draws one panel per cohort that fit, each headed by its own name and n", () => {
@@ -63,10 +63,10 @@ describe("cox: pooled vs stratified-by-cohort forest plots", () => {
       ] },
       caveat: "stratified" };
     const svg = viewToSvg(v)!;
-    assert.ok(svg.includes("NSCLC (n=100, 40 events)"));
-    assert.ok(svg.includes("CRC (n=50, 15 events)"));
+    assert.ok(svg.includes("NSCLC — n = 100, 40 events"));
+    assert.ok(svg.includes("CRC — n = 50, 15 events"));
     // one shared HR=1 axis label, not one per panel — the scale is shared across panels
-    assert.equal((svg.match(/HR=1/g) || []).length, 1);
+    assert.equal((svg.match(/HR = 1/g) || []).length, 1);
   });
   test("a cohort that failed to fit is simply not drawn, not a blank panel", () => {
     const v: ViewResult = { kind: "cox", cohorts: ["NSCLC", "Empty"],
@@ -77,7 +77,7 @@ describe("cox: pooled vs stratified-by-cohort forest plots", () => {
       caveat: "stratified, one failed" };
     const svg = viewToSvg(v)!;
     assert.ok(svg.includes("NSCLC"));
-    assert.equal(svg.includes("Empty ("), false);
+    assert.equal(svg.includes("Empty —"), false);
   });
   test("a view with every cohort's fit empty yields no figure, same as any other empty payload", () => {
     assert.equal(viewToSvg({ kind: "cox", cox: { coefficients: [], n: 0, events: 0, byCohort: [] } }), null);
@@ -89,8 +89,8 @@ describe("logistic: forest plot of odds ratios", () => {
   test("draws one panel, one OR=1 reference line — same shape as cox's forest plot, an odds ratio instead of a hazard ratio", () => {
     const v: ViewResult = { kind: "logistic", cohorts: ["all"], logistic: { coefficients: [coef("APC", 0.3)], n: 471, events: 27 }, caveat: "logistic" };
     const svg = viewToSvg(v)!;
-    assert.equal((svg.match(/OR=1/g) || []).length, 1);
-    assert.equal((svg.match(/HR=1/g) || []).length, 0);
+    assert.equal((svg.match(/OR = 1/g) || []).length, 1);
+    assert.equal((svg.match(/HR = 1/g) || []).length, 0);
     assert.ok(svg.includes("APC"));
     assert.ok(svg.includes("0.3"));
   });
@@ -114,11 +114,29 @@ describe("figures scale uniformly", () => {
 describe("survival: tick interval and cutoff controls reach the SVG", () => {
   test("tickMonths changes which month labels are drawn", () => {
     const svg = viewToSvg({ ...survival("A"), tickMonths: 6 })!;
-    assert.ok(svg.includes(">6mo<"), "a 6-month tick should be drawn, which the default 12mo spacing would skip");
+    assert.ok(svg.includes(">6</text>") && svg.includes(">Months</text>"), "a 6-month tick should be drawn, which the default 12mo spacing would skip");
   });
   test("cutoffMonths caps the x-axis", () => {
     const svg = viewToSvg({ ...survival("A"), cutoffMonths: 5 })!;
-    assert.equal(svg.includes(">10mo<"), false, "the axis must not run past a 5-month cutoff");
+    assert.ok(svg.includes(">0</text>") && !svg.includes(">10</text>") && !svg.includes(">12</text>"), "the axis must not run past a 5-month cutoff");
+  });
+});
+
+describe("survival: the number at risk under each tick", () => {
+  const withRisk = (): ViewResult => ({ kind: "survival", cohorts: ["A", "B"], curves: [
+    { cohort: "A", points: [{ t: 0, s: 1 }, { t: 6, s: 0.5 }, { t: 25, s: 0.3 }], median: 6, n: 1200, events: 600, atRisk: Array.from({ length: 30 }, (_, m) => 1200 - m * 40) },
+    { cohort: "B", points: [{ t: 0, s: 1 }, { t: 10, s: 0.7 }], median: null, n: 80, events: 20, atRisk: Array.from({ length: 13 }, (_, m) => 80 - m * 5) },
+  ] } as any);
+  test("each cohort's row gives its count at every tick, zero past its follow-up", () => {
+    const svg = viewToSvg(withRisk(), { width: 900 })!;
+    assert.match(svg, />Number at risk</);
+    assert.match(svg, /<title>A: 1,200 at risk at 0 months<\/title>1,200</);
+    assert.match(svg, /<title>A: 720 at risk at 12 months<\/title>720</);
+    assert.match(svg, /<title>B: 20 at risk at 12 months<\/title>20</);
+    assert.match(svg, /<title>B: 0 at risk at 24 months<\/title>0</);
+  });
+  test("a result without counts draws no table", () => {
+    assert.doesNotMatch(viewToSvg(survival("A"))!, />Number at risk</);
   });
 });
 
@@ -174,7 +192,8 @@ describe("the lollipop draws every codon, the way the portal's mutation tab does
       { proteinLength: 189, transcriptId: "T", domains: [] });
     const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [g], hide: ["missense.driver"] } as any)!;
     assert.equal((svg.match(/<circle [^>]*r="2\.8"/g) || []).length, 1, "only the truncating codon is drawn");
-    assert.ok(svg.includes("Hidden: Missense · Driver") && svg.includes("drawn: 2 of 8 mutations"));
+    const words = svg.replace(/<\/text>/g, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
+    assert.ok(words.includes("Hidden: Missense · Driver") && words.includes("drawn: 2 of 8 mutations"));
   });
   test("a codon's tooltip lists its changes with their counts", () => {
     const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [kras()] } as any)!;
@@ -379,7 +398,7 @@ describe("plot highlights: other cohorts drawn over the plotted one", () => {
     assert.match(svg, new RegExp('<rect [^>]*fill="' + HIGHLIGHT_COLORS[1] + '" fill-opacity="0.85"'), "S is a box of its own");
     assert.equal((svg.match(new RegExp('<circle [^>]*fill="' + HIGHLIGHT_COLORS[0] + '" fill-opacity', "g")) || []).length, 1, "the value inside the whiskers is a dot");
     assert.match(svg, new RegExp('<path d="M[^"]*Z" fill="' + HIGHLIGHT_COLORS[0] + '"'), "the value past them is a triangle at the edge");
-    assert.match(svg, /1 highlighted value lies beyond the whiskers/);
+    assert.match(svg, /1 highlighted value lies beyond the axis/);
   });
 });
 
@@ -395,7 +414,7 @@ describe("plot figures draw every group and category they are given", () => {
 
   test("a box plot with 108 groups draws all 108, widening past the requested width", () => {
     const svg = viewToSvg(box(108), { width: 960 })!;
-    for (const i of [0, 23, 24, 107]) assert.ok(svg.includes(">group" + i + "<"), "group" + i + " is drawn");
+    for (const i of [0, 23, 24, 107]) assert.ok(svg.includes(">group" + i + " (10)<"), "group" + i + " is drawn, with its count");
     const w = Number(/viewBox="0 0 (\d+)/.exec(svg)![1]);
     assert.ok(w > 960, "figure grew to " + w);
     assert.match(svg, /min-width:\d+px/, "a grown figure keeps its width so the container scrolls rather than shrinking it");

@@ -100,8 +100,9 @@ describe("timeline figure", () => {
     assert.match(text, /cut from the axis/);
     assert.match(text, /1 lab value is recorded as a bound/);
   });
-  test("a deceased status is the portal's black diamond", () => {
-    assert.match(timelineSvg(t).svg, /fill="black" transform="rotate\(45/);
+  test("a deceased status is the portal's black diamond, in the theme's ink so it shows in dark mode", () => {
+    assert.match(timelineSvg(t, { theme: "light" }).svg, /fill="#16232b" transform="rotate\(45/);
+    assert.match(timelineSvg(t).svg, /fill="var\(--ink[^"]*" transform="rotate\(45/);
   });
   test("a study's own colour must look like a colour to be used", () => {
     const bad: PatientTimeline = { ...t, events: [ev("Diagnosis", 0, { STYLE_COLOR: "red\" onload=\"x" })] };

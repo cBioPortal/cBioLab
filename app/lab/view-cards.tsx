@@ -2,16 +2,18 @@
 // The analysis page's view cards: one component per view kind, each drawing a view's result with
 // its header and controls. The page hands every card the same ViewCtx — the document, the result
 // and the edits a card can make — so a card holds no state of its own beyond what its body needs.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
 import { KIND_CARDS, hasKindCard, kindSub, KindCardControls, KindCardBody, drawsOwnWaiting } from "./kind-cards";
 import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
 import { OncoprintCard, Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import type { AnalysisDoc, AnalysisResult, OncoprintView, ExploreResult, KmCurve } from "../../lib/types.ts";
-import { survivalAxis } from "../../lib/stats.ts";
+import type { AnalysisDoc, AnalysisResult, OncoprintView, ExploreResult } from "../../lib/types.ts";
+import { pDigits } from "../../lib/chart/format.ts";
 import { MethodPanel } from "./method-panel.tsx";
-import { AxisPicker, HighlightPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, CAT_COLORS, Participation, ServerSvg, ViewFigure } from "./view-chrome.tsx";
+import { viewRequest } from "./use-analysis.ts";
+import { AxisPicker, HighlightPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, SeriesSwatch, Participation } from "./view-chrome.tsx";
+import { ViewFigure } from "./figure.tsx";
 import { ArrowLeftRight, Plus, Settings2, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
@@ -28,6 +30,8 @@ type EventOption = { canonical: string; label: string; n: number; perPatient?: n
 /** What every card reads from the page and the edits it can make — the page builds one per render. */
 export interface ViewCtx {
   doc: AnalysisDoc;
+  /** the study the page falls back to when the document names none (use-analysis.ts sends it) */
+  study: string;
   result: AnalysisResult;
   /** each view's id, in the document's order: what a card is keyed by */
   viewIds: (string | number)[];
@@ -75,17 +79,8 @@ export interface ViewCtx {
 }
 type CardProps = { ctx: ViewCtx; v: ResultView; vi: number };
 
-/** p-values: exponent notation once fixed notation would round to zero, and an
- *  honest floor when the true value underflows double precision. Returns the
- *  whole "p=..." / "p<..." label so the relation stays attached to the number. */
-const fmtP = (p: number): string =>
-  p === 0 ? "p < 1e-300" : p < 1e-4 ? "p=" + p.toExponential(1) : "p=" + p.toFixed(4);
-
-/** the same value for a table cell, where the column header already says "p" */
-const pCell = (p: number): string =>
-  p === 0 ? "< 1e-300" : p < 1e-4 ? p.toExponential(1) : p.toFixed(4);
-/** true when two p-values land on opposite sides of the conventional threshold */
-const crossesThreshold = (a: number, b: number): boolean => (a < 0.05) !== (b < 0.05);
+/** a p- or q-value for a table cell, where the column header already says "p" (lib/chart/format.ts) */
+const pCell = pDigits;
 
 export function Updating() {
   const ref = useRef<HTMLDivElement>(null);
@@ -111,36 +106,6 @@ export function Updating() {
       <div className="skeleton" />
     </div>
   );
-}
-
-export function KMChart({ curves, cutoffMonths, tickMonths, incidence }:
-  { curves: KmCurve[]; cutoffMonths?: number; tickMonths?: number; incidence?: boolean }) {
-  const ref = useRef<HTMLCanvasElement | null>(null);
-  useEffect(() => {
-    const c = ref.current; if (!c) return;
-    const dpr = window.devicePixelRatio || 1;
-    const W = c.clientWidth, H = 260;
-    c.width = W * dpr; c.height = H * dpr; c.style.height = H + "px";
-    const ctx = c.getContext("2d"); if (!ctx) return; ctx.scale(dpr, dpr);
-    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const grid = dark ? "#2a353c" : "#dde4e8", muted = dark ? "#93a3ad" : "#5b6b76";
-    const L = 44, R = 10, T = 10, B = 28;
-    const { tMax, step } = survivalAxis(curves, { cutoffMonths, tickMonths });
-    const x = (t: number) => L + (W - L - R) * t / tMax, y = (s: number) => T + (H - T - B) * (1 - s);
-    ctx.strokeStyle = grid; ctx.fillStyle = muted; ctx.font = "10px 'IBM Plex Sans',sans-serif";
-    for (const s of [0, 0.25, 0.5, 0.75, 1]) {
-      ctx.beginPath(); ctx.moveTo(L, y(s)); ctx.lineTo(W - R, y(s)); ctx.stroke();
-      ctx.fillText(Math.round(s * 100) + "%", 8, y(s) + 3);
-    }
-    for (let t = 0; t <= tMax; t += step) ctx.fillText(t + "mo", x(t) - 8, H - 10);
-    curves.forEach((cv, i: number) => {
-      ctx.strokeStyle = CAT_COLORS[i % CAT_COLORS.length]; ctx.lineWidth = 2; ctx.beginPath();
-      let py = y(incidence ? 0 : 1); ctx.moveTo(x(0), py);
-      for (const p of cv.points) { const nx = x(p.t), ny = y(p.s); ctx.lineTo(nx, py); ctx.lineTo(nx, ny); py = ny; }
-      ctx.lineTo(x(tMax), py); ctx.stroke();
-    });
-  }, [curves, cutoffMonths, tickMonths, incidence]);
-  return <canvas ref={ref} style={{ width: "100%", display: "block" }} />;
 }
 
 /** A card header's reorder and remove controls, and its note's when the analysis is saved. */
@@ -260,7 +225,7 @@ function CompareCard({ ctx, v, vi }: CardProps) {
         <table className="vtable">
           <thead><tr>
             <th className="l">gene</th>
-            {v.cohorts!.map((n, i: number) => <th key={n} className="r" style={{ color: CAT_COLORS[i] }}>{n}<br /><span className="thsub">driver / any</span></th>)}
+            {v.cohorts!.map((n, i: number) => <th key={n} className="r"><SeriesSwatch i={i} /> {n}<br /><span className="thsub">driver / any</span></th>)}
             {v.rows![0] && v.rows![0].pAny != null && <th className="r">p (any)</th>}
             {v.rows![0] && v.rows![0].qAny != null && <th className="r">q (any)</th>}
           </tr></thead>
@@ -369,7 +334,7 @@ function ClinicalCard({ ctx, v, vi }: CardProps) {
         <table className="vtable">
           <thead><tr>
             <th className="l">attribute</th>
-            {v.cohorts!.map((n, i: number) => <th key={n} className="l" style={{ color: CAT_COLORS[i] }}>{n}</th>)}
+            {v.cohorts!.map((n, i: number) => <th key={n} className="l"><SeriesSwatch i={i} /> {n}</th>)}
             <th className="r">test</th>
             <th className="r">p</th>
             <th className="r">q</th>
@@ -514,36 +479,7 @@ function SurvivalCard({ ctx, v, vi }: CardProps) {
           </div>
         );
       })()}
-      <KMChart curves={v.curves!} cutoffMonths={v.cutoffMonths} tickMonths={v.tickMonths} incidence={v.display === "incidence"} />
-      <div className="kmlegend">
-        {v.curves!.map((c, i: number) => <span key={c.cohort}><span style={{ display: "inline-block", width: 10, height: 10, background: CAT_COLORS[i], borderRadius: 2, marginRight: 5 }} />{c.cohort}: {v.display === "incidence" ? "50% incidence by " : "median "}{c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n={c.n}, {c.events} events)</span>)}
-      </div>
-      {v.logrank && (
-        <div className="logrank" title={"observed " + v.logrank.observed.join(" / ") + " events vs expected " + v.logrank.expected.join(" / ") + " under the null"}>
-          <strong>log-rank</strong> χ²={v.logrank.chi2.toFixed(2)} ({v.logrank.df} df) · <strong>{fmtP(v.logrank.p)}</strong>
-          {v.logrank.strata > 1 && <span className="meta"> · stratified by study, {v.logrank.strata} strata</span>}
-          {v.logrankPooled && (
-            <span className="meta" title="the unstratified test, which pools risk sets across studies and assumes a common baseline hazard">
-              {"  ·  pooled " + fmtP(v.logrankPooled.p)}
-              {crossesThreshold(v.logrank.p, v.logrankPooled.p) && <strong className="warnmark"> — the two disagree at p=0.05</strong>}
-            </span>
-          )}
-        </div>
-      )}
-      {v.logrankK && (
-        <div className="logrank" title={"observed " + v.logrankK.observed.join(" / ") + " events vs expected " + v.logrankK.expected.join(" / ") + " under the null, across " + v.logrankK.groups + " groups"}>
-          <strong>{v.logrankK.groups}-group log-rank</strong> χ²={v.logrankK.chi2.toFixed(2)} ({v.logrankK.df} df) · <strong>{fmtP(v.logrankK.p)}</strong>
-          <span className="meta"> — tests whether the groups differ at all, not which pair does</span>
-          {v.logrankK.strata > 1 && <span className="meta"> · stratified by study, {v.logrankK.strata} strata</span>}
-          {v.logrankKPooled && (
-            <span className="meta" title="the unstratified test, which pools risk sets across studies and assumes a common baseline hazard">
-              {"  ·  pooled " + fmtP(v.logrankKPooled.p)}
-              {crossesThreshold(v.logrankK.p, v.logrankKPooled.p) && <strong className="warnmark"> — the two disagree at p=0.05</strong>}
-            </span>
-          )}
-        </div>
-      )}
-      <p className="note">{v.caveat}</p>
+      <ViewFigure v={v} error={v.error} />
     </>}
   </>;
 }
@@ -606,7 +542,7 @@ function CoxCard({ ctx, v, vi }: CardProps) {
           </div>
         );
       })()}
-      <ViewFigure svg={v.svg} error={v.error} />
+      <ViewFigure v={v} error={v.error} />
     </>}
   </>;
 }
@@ -629,7 +565,7 @@ function KindCard({ ctx, v, vi }: CardProps) {
         return <>
           <KindCardControls c={mc} />
           {v.note && <p className="note">{v.note}</p>}
-          {body || <ViewFigure svg={v.svg} error={v.error} />}
+          {body || <ViewFigure v={v} error={v.error} />}
           {body && v.caveat && <p className="note vfoot">{v.caveat}</p>}
         </>;
       })()}
@@ -690,7 +626,7 @@ function LogisticCard({ ctx, v, vi }: CardProps) {
           </div>
         );
       })()}
-      <ViewFigure svg={v.svg} error={v.error} />
+      <ViewFigure v={v} error={v.error} />
     </>}
   </>;
 }
@@ -698,7 +634,7 @@ function LogisticCard({ ctx, v, vi }: CardProps) {
 function SequenceKeyHint({ ctx, v, vi }: CardProps) {
   const { busy, patchView } = ctx;
   return <>
-    {v.kind === "sequence" && !v.svg && v.error && v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
+    {v.kind === "sequence" && v.error && v.sequence && v.sequence.keyOptions && v.sequence.keyOptions.length > 0 && (
       <div className="basis">
         <span className="meta">label lines by</span>
         <Choice size="ctl" value={v.sequence.labelKey} disabled={busy} onChange={k => patchView(vi, { labelKey: k })}
@@ -706,6 +642,23 @@ function SequenceKeyHint({ ctx, v, vi }: CardProps) {
       </div>
     )}
   </>;
+}
+
+/** a numeric plot axis on a log scale: log10(v + 1), so a zero stays on the axis (lib/plot.ts) */
+function LogToggle({ ctx, vi, side, numeric }: { ctx: ViewCtx; vi: number; side: "x" | "y"; numeric: boolean }) {
+  const axis = ctx.docView(vi)[side];
+  if (!numeric || !axis || !("source" in axis) || (axis.source !== "clinical" && axis.source !== "molecular")) return null;
+  return (
+    <label className="chk" title={"draw " + side + " on a log scale — log10(value + 1), so zero stays on the axis and a negative value is left out"}>
+      <Checkbox checked={!!axis.log} disabled={ctx.busy}
+        onCheckedChange={(c) => ctx.updateView(vi, (vv: any) => {
+          const a = { ...vv[side] };
+          if (c === true) a.log = true; else delete a.log;
+          return { ...vv, [side]: a };
+        })} />
+      log
+    </label>
+  );
 }
 
 function PlotCard({ ctx, v, vi }: CardProps) {
@@ -721,10 +674,12 @@ function PlotCard({ ctx, v, vi }: CardProps) {
           <span className="tbl" title="these change what is drawn, and re-run the query">data</span>
           <AxisPicker side="x" axis={docView(vi).x} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
             onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, x: a }))} />
+          <LogToggle ctx={ctx} vi={vi} side="x" numeric={v.plot?.x.kind === "num"} />
         </div>
         <div className="tbz">
           <AxisPicker side="y" axis={docView(vi).y} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
             onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, y: a }))} />
+          <LogToggle ctx={ctx} vi={vi} side="y" numeric={v.plot?.y.kind === "num"} />
         </div>
         {/* colour/ring only affect a box plot's violin — a scatter's density and a
             contingency table have no per-case colour to split, so the controls would
@@ -767,7 +722,7 @@ function PlotCard({ ctx, v, vi }: CardProps) {
             onClick={() => updateView(vi, (vv: any) => ({ ...vv, x: vv.y, y: vv.x }))}><ArrowLeftRight />swap</Button>
         </div>
       </div>
-      <ViewFigure svg={v.svg} empty={v.plot?.note || "nothing to draw"} />
+      <ViewFigure v={v} empty={v.plot?.note || "nothing to draw"} />
     </>}
   </>;
 }
@@ -775,7 +730,7 @@ function PlotCard({ ctx, v, vi }: CardProps) {
 function SequenceCard({ ctx, v, vi }: CardProps) {
   const { busy, cohortChoice, docView, menuOpenRef, openCohortChooser, patchView, setViewCohorts, viewIds } = ctx;
   return <>
-    {v.kind === "sequence" && v.svg && <>
+    {v.kind === "sequence" && !v.error && <>
       <div className="vhead">
         <h2 className="vtitle">Treatment sequence <span className="plain">
           — lines of therapy by {v.sequence ? v.sequence.labelKey : ""}
@@ -818,7 +773,7 @@ function SequenceCard({ ctx, v, vi }: CardProps) {
       <DrawnCohorts drawn={cohortChoice(vi, docView(vi), 1).drawn} nodes={cohortChoice(vi, docView(vi), 1).nodes} />
       {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
       <SplitByNote v={v} />
-      <ServerSvg className="vscroll" html={v.svg} />
+      <ViewFigure v={v} />
     </>}
   </>;
 }
@@ -826,7 +781,7 @@ function SequenceCard({ ctx, v, vi }: CardProps) {
 function CourseCard({ ctx, v, vi }: CardProps) {
   const { busy, cohortChoice, doc, docView, menuOpenRef, openCohortChooser, patchView, setViewCohorts, viewIds } = ctx;
   return <>
-    {v.kind === "course" && v.svg && <>
+    {v.kind === "course" && !v.error && <>
       <div className="vhead">
         <h2 className="vtitle">Clinical course <span className="plain">
           — {[...new Set((v.course || []).map(c => c.eventType))].join(", ")}
@@ -904,9 +859,7 @@ function CourseCard({ ctx, v, vi }: CardProps) {
       <DrawnCohorts drawn={cohortChoice(vi, docView(vi)).drawn} nodes={cohortChoice(vi, docView(vi)).nodes} />
       {v.annotationNote && <p className="viewnote">{v.annotationNote}</p>}
       <SplitByNote v={v} />
-      {/* The same SVG MCP clients receive \u2014 one renderer,
-          so the figure cannot differ between surfaces. */}
-      <ServerSvg className="vscroll" html={v.svg} />
+      <ViewFigure v={v} />
     </>}
   </>;
 }
@@ -963,7 +916,7 @@ function QueriesPanel({ ctx, v, vi }: CardProps) {
             <pre>{q.sql}</pre>
           </div>
         ))}
-        {v.method && <MethodPanel method={v.method} source={{ doc: ctx.doc, index: vi, kind: v.kind }} />}
+        {v.method && <MethodPanel method={v.method} source={{ doc: ctx.doc, index: vi, kind: v.kind, request: viewRequest(ctx.doc, vi, ctx.study) }} />}
       </details>
     )}
   </>;

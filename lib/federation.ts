@@ -1629,7 +1629,8 @@ abstract class BaseResolver implements AggregateCapable {
     const shape = plotShape(xk, yk);
     if (shape === "waterfall") throw new Error("an ordered-cases axis (a waterfall) is not implemented yet; give both axes a source");
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
-    const label = { x: { label: axisLabel(spec.x), kind: xk }, y: { label: axisLabel(spec.y), kind: yk } };
+    const logOf = (ax: PlotAxis) => "log" in ax && ax.log ? { log: true } : {};
+    const label = { x: { label: axisLabel(spec.x), kind: xk, ...logOf(spec.x) }, y: { label: axisLabel(spec.y), kind: yk, ...logOf(spec.y) } };
     // alongside the plot's own queries, never failing it: a missing coverage just means no note
     const coverage = this.runLogged<ChRow>("plot:coverage", plotCoverageSql(xSel, ySel, ctx), conn)
       .then((r) => ({ total: Number(r.data[0]?.total || 0), nx: Number(r.data[0]?.nx || 0), ny: Number(r.data[0]?.ny || 0) }))

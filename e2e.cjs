@@ -796,7 +796,7 @@ async function main() {
       let basis = { types: 0, changed: false, truncated: false, anchor: null };
       try {
         await page.waitForSelector(".basis", { timeout: 300000 });
-        const before = await page.locator(".logrank").innerText();
+        const before = (await page.locator(".logrank").first().textContent()) || "";
         // the second control is what the clock starts from; its options arrive with the study's catalog
         await page.locator(".basis [role=combobox]").nth(1).click();
         await page.waitForFunction(() => {

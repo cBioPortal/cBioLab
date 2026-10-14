@@ -52,17 +52,17 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   `scripts/oncoprint-cli.ts` and `python -m cohortlab` wrap all of this for local tables, and
   `/oncoprint-lab/import` does the same in the browser (`POST /api/oncoprint/local`).
   `lib/oncoprint-cluster.ts` orders columns by a Ward dendrogram for the `cluster:<profile>`
-  sort key; `lib/oncoprint-detail.ts` answers one column at a time for tooltips. **`lib/view-svg.ts`** — the same contract for every other view kind (survival,
-  hotspots, compare, cooccurrence, coexpression, clinical); used by MCP `run_analysis`
+  sort key; `lib/oncoprint-detail.ts` answers one column at a time for tooltips. **`lib/view-svg.ts`** — the same contract for every other view kind: the dispatcher over
+  `lib/figures/<kind>.ts`; used by the page (drawn in the browser) and by MCP `run_analysis`
   for its figures (the oncoprint's image included).
 - **View aggregates** — most view kinds after the first few (`genome`, `pathways`, `enrichment`, …)
   query through the resolvers' `viewAggregate`/`viewAggregateMany`/`viewMeta`, whose SQL lives in
   **`lib/federation-views.ts`** (re-exported by `lib/federation.ts`, so the boundary suite sweeps
   it). Every local participant has those methods, a remote peer does not, and `answering()` in
   `lib/views/shared.ts` splits a view's studies accordingly so the view names what was left out.
-  Figures: **`lib/view-svg.ts`** draws the first kinds' figures itself and hands the rest to
-  **`lib/figures/<kind>.ts`**, one module per kind, registered with its title in `lib/figures/index.ts`
-  (browser-safe: `app/lab/portal-bodies.tsx` draws from them too); cards: `app/lab/kind-cards.tsx`.
+  Figures: **`lib/figures/<kind>.ts`**, one module per kind (the later kinds registered with their
+  title in `lib/figures/index.ts`), dispatched by **`lib/view-svg.ts`**; all browser-safe, laid out
+  with **`lib/chart/`** (see "Figures" under UI conventions); cards: `app/lab/kind-cards.tsx`.
 - **Table views** (`table`, `mutations`, `timeline`'s patient list, `alterations`' list and three tables, and any later view that lists rows) — **every one must
   support the same five things: pagination, search over its text, a filter per column (text
   conditions or a value list for text, a range for numbers), sorting, and a CSV download of every
@@ -381,10 +381,9 @@ still holds, against a running server.
   what a selection hides — so an image that travels alone is still complete. A selection that only
   changes what is drawn is kept in the view's spec (so a link reproduces it) but applied in the
   browser from the whole result, so a click re-runs nothing (`dataPart` leaves it out of the
-  re-run key). Code the browser draws with must not import server modules: `lib/view-svg.ts`
-  reaches the database layer through `lib/plot.ts`, so browser-drawn figures live in their own
-  module (`lib/lollipop-svg.ts`) that `lib/view-svg.ts` reuses — `node:async_hooks` in a client
-  bundle fails the whole page.
+  re-run key). Code the browser draws with must not import server modules — `node:async_hooks`
+  in a client bundle fails the whole page — which is why what the plot figure needs from
+  `lib/plot.ts` lives in `lib/plot-draw.ts`.
 - **One scale, in `app/globals.css`.** Seven type steps (`--t-xs` … `--t-2xl`), seven spacing
   steps (`--s0` … `--s6`), four radii, one control height (`--ctl-h`). Nothing declares a font
   size or a border radius outside it — the app once had 36 distinct font sizes, five of them
@@ -450,11 +449,34 @@ still holds, against a running server.
   one `--ctl-h` tall on one centre line. A view that adds a control row calls it.
 - **Apparatus goes in `.vfoot`.** Legend, methodology caveats and provenance stay on the page and
   a step down in weight, so they read as apparatus rather than as findings.
-- **Server-rendered figures share the palette.** `lib/svg-kit.ts` owns `palette()`, `SERIES` and
-  the frame/caption helpers, for `lib/view-svg.ts` and `lib/figures/` alike; a renderer
-  that invents a colour is drifting from every other view. Page CSS never reaches them — the
-  same drawing goes to MCP, exports, the CLI and the Python port — so they stay out of the
-  Tailwind migration.
+- **Figures are drawn in the browser at the card's width, by the renderer MCP uses.** The page
+  never inlines an SVG the server drew: `ViewFigure` / `DrawAtWidth` (`app/lab/figure.tsx`)
+  measure the card and call `viewToSvg(v, { width })`, and the figure is shown 1:1 — never
+  scaled down (unreadable text) or up. Narrower than `MIN_FIGURE_W` it keeps that width and
+  scrolls, with a fading edge and a "scroll →" cue. The analysis API therefore sends the page no
+  `svg` (`?oncoprint=spec`); MCP and `?figures=svg` draw on demand. A renderer must lay itself
+  out for whatever `o.width` it is given — wider means more room, not bigger type.
+- **Figures share one layout kit, `lib/chart/`** (re-exported by `lib/svg-kit.ts`), and never
+  guess: text is measured from IBM Plex Sans's advance widths (`textWidth`, `ellipsize`,
+  `wrapWidth`, `label` — a label cut to its room keeps its full text as a `<title>`); margins
+  come from the widest label (`leftAxisWidth`); ticks are round steps or powers of ten
+  (`linear` / `log` / `symlog`); axes (`axisLeft`, `axisBottom`, `bandLabels`) thin or turn
+  labels rather than overprint them; legends (`legend`, flowing or `grid`) wrap at the width.
+  Numbers go through `lib/chart/format.ts` — `fmtInt`, `fmtNum`, `fmtPct`, `fmtP`/`pDigits`,
+  `fmtRatio`, `fmtMonths` — in the figures and the HTML tables beside them alike, so a p-value
+  reads the same everywhere. Type is `FS.small` / `FS.body` / `FS.title` (10 / 11 / 12), never
+  below `MIN_FS`; strokes `SW`; the neutral grey `OTHER`. Series colours are `seriesStyle(i)`:
+  Okabe–Ito for six, then the same hues with a dash, so a seventh cohort is never a repeat; the
+  page's swatches (`SeriesSwatch`) match. Text on a fill takes `textOn(fill)`. A renderer that
+  invents a colour, a size or a tick rule is drifting from every other view. Page CSS never
+  reaches figures — the same drawing goes to MCP, exports, the CLI and the Python port — so they
+  stay out of the Tailwind migration.
+- **A figure's text is linted, at every width a card takes.** `lib/chart/lint.ts` reads a drawn
+  SVG back and reports type below `MIN_FS`, text running off the figure, and text printed over
+  text. `npm run check:figures` runs every documented example and every stress document
+  (`scripts/figure-stress.json`: the largest studies, many cohorts and categories, long names)
+  and lints each figure at 560, 936 and 1352px; it must report 0. A new view kind, or a change to
+  a renderer, adds a stress document when the existing ones do not reach its crowded case.
 - **Geometry stays inline, styling does not.** A tooltip's position and a legend swatch's colour
   are data computed from the drawing; borders, padding and type are classes.
 

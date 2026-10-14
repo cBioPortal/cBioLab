@@ -1,10 +1,9 @@
 // Provenance page: /provenance?spec=<base64url OncoprintSpec>
 // Server component — decodes the spec from the URL, re-renders the oncoprint (inline SVG),
 // and shows the DSL plus every SQL query the spec compiles to. Stateless: the link IS the spec.
-import { buildContract } from "../../lib/oncoprint.ts";
 import { specToQueries } from "../../lib/oncoprint.ts";
+import { cachedContract } from "../../lib/next-cache.ts";
 import { oncokbPin } from "../../lib/annotation.ts";
-import { contractToSvg } from "../../lib/oncoprint-svg.ts";
 import { PageTools } from "../_agent/PageTools.tsx";
 
 export const metadata = { title: "Oncoprint provenance — cbio-lab" };
@@ -13,13 +12,12 @@ export const instant = false;
 
 export default async function ProvenancePage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const sp = await searchParams;
-  let spec: any = null, queries: any = null, svg: string | null = null, contract: any = null, error: string | null = null;
+  let spec: any = null, queries: any = null, contract: any = null, error: string | null = null;
   try {
     if (typeof sp.spec !== "string") throw new Error("missing ?spec= parameter (base64url-encoded OncoprintSpec)");
     spec = JSON.parse(Buffer.from(String(sp.spec), "base64url").toString("utf8"));
     ({ queries } = specToQueries(spec, await oncokbPin()));
-    contract = await buildContract(spec);
-    svg = contractToSvg(contract, 1200);
+    contract = await cachedContract(spec);
   } catch (e) {
     error = String((e as Error)?.message || e);
   }
@@ -41,8 +39,9 @@ export default async function ProvenancePage({ searchParams }: { searchParams: P
         {contract && (
           <div className="card">
             <h2>Rendered oncoprint <span className="plain">— {contract.stats.nColumns.toLocaleString()} patients · {contract.tracks.length} tracks · re-rendered live from the spec below</span></h2>
-            <div style={{ overflowX: "auto", background: "#fff", borderRadius: 8, border: "1px solid var(--line)" }}
-              dangerouslySetInnerHTML={{ __html: svg ?? "" }} />
+            <div style={{ overflowX: "auto", background: "#fff", borderRadius: 8, border: "1px solid var(--line)" }}>
+              <img src={"/provenance/figure?spec=" + sp.spec} alt={"oncoprint of " + contract.stats.nColumns.toLocaleString() + " patients"} style={{ display: "block", maxWidth: "none" }} />
+            </div>
             <p className="note">Conventions: {JSON.stringify(contract.conventions)}</p>
           </div>
         )}
