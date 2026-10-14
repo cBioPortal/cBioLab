@@ -121,7 +121,8 @@ touched. The patient whose record is shown is the one identifier the coordinator
 is the entitlement. Every list row carries its Source ("GENIE site (shares patient timelines and
 patient alterations)"), a peer's patient is marked "from … over MCP", and the view's caveat names
 the studies that came over MCP. A failed or refused peer call keeps the answer out of the result
-cache, as a failed query does.
+cache, as a failed query does. A peer names the table it answered with, and an answer for any other table is refused:
+a peer on a build from before named tables answers every call with the timeline's list.
 
 **A simulated peer, for development and the gate.** `LOOPBACK_PEER=<connection>` (e.g. `b`, the
 `CLICKHOUSE2_*` database) has one app serve one of its own databases to itself over MCP

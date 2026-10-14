@@ -632,6 +632,21 @@ describe("patient-level federation is opt-in, on both sides, per study and kind"
     } finally { globalThis.fetch = original; }
   });
 
+  test("a peer that does not say which table it answered is believed only for the timeline's list", async () => {
+    const original = globalThis.fetch;
+    // a peer on an older build: whatever is asked, the timeline's list, naming no table
+    globalThis.fetch = (async () => new Response(JSON.stringify({ jsonrpc: "2.0", id: 2,
+      result: { structuredContent: { rows: [{ cohort: "c", study: "s", patient: "P-1" }] } } }), { headers: { "content-type": "application/json" } })) as typeof fetch;
+    try {
+      const r = new RemoteTimelineResolver("s", "http://peer.invalid/api/mcp", AGG, ["timeline", "alterations"]);
+      const ask = (table: "timeline" | "alterations" | "alterations:mutations") =>
+        r.patientRows({ table, parts: [{ cohort: "c", def: {} }], query: {}, defaults: [], mode: "page", subject: table === "alterations:mutations" ? { patient: "P-1" } : undefined });
+      assert.equal((await ask("timeline")).rows!.length, 1);
+      for (const t of ["alterations", "alterations:mutations"] as const)
+        await assert.rejects(() => ask(t), /answered with timeline rows when asked for alterations[\s\S]*update that instance/);
+    } finally { globalThis.fetch = original; }
+  });
+
   test("the patient views ask a peer only through the kind they belong to", () => {
     const read = (f: string) => readFileSync(new URL("../lib/views/" + f, import.meta.url), "utf8");
     assert.match(read("timeline.ts"), /rowHolders\(ctx, "timeline"\)/);

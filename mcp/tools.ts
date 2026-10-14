@@ -271,7 +271,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
           return {
             content: [{ type: "text" as const, text: `${table} rows for ${s} (${mode}) — patient-level, disclosed under MCP_DISCLOSE_PATIENTS (${PATIENT_KIND_NAMES[PEER_TABLES[table]]})` }],
-            structuredContent: { ...out, ...(annotated ? { oncokbPin: pin } : {}), queries: hideSql ? null : res.queries }
+            structuredContent: { table, ...out, ...(annotated ? { oncokbPin: pin } : {}), queries: hideSql ? null : res.queries }
           };
         } catch (e) { return rejected(e); }
       });

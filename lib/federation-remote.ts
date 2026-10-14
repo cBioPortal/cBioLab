@@ -344,6 +344,12 @@ export class RemotePatientResolver extends RemoteAggregateResolver implements Re
       ...(req.limit != null ? { limit: req.limit } : {}), ...(req.offset != null ? { offset: req.offset } : {}), ...(req.column ? { column: req.column } : {}),
       ...(req.patient ? { patient: req.patient } : {}), ...(req.subject ? { subject: req.subject } : {}), ...(req.oncokbPin ? { oncokbPin: req.oncokbPin } : {}),
     }), kind);
+    // the table the peer answered with: a peer on a build from before named tables answers every call with the
+    // timeline's list and names none, so anything else it sends without saying so is refused rather than shown
+    const served = (r as { table?: unknown }).table ?? "timeline";
+    if (served !== req.table)
+      throw new Error("the peer serving " + this.study + " answered with " + String(served).slice(0, 40) + " rows when asked for " + req.table +
+        "; it predates sharing " + PATIENT_KIND_NAMES[kind] + " over MCP — update that instance");
     if (Array.isArray(r.queries)) for (const q of r.queries) this.queries.push({ label: q.label, sql: q.sql, ms: q.ms, remote: true });
     // what the peer answered for is what it was asked about: its own study, the asked cohorts — and a table of one patient's, that patient
     const cohorts = new Set(req.parts.map((p) => p.cohort));
