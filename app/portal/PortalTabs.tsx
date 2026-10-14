@@ -4,6 +4,7 @@
 // {study, cohorts, views: the tab's} — as an ordinary analysis request, kept until one of its views
 // changes. A setting changed here is an edit to the document (onDoc), which the page writes to the
 // URL; the oncoprint's display and sort are applied in the browser and never re-run anything.
+import { ViewFigure } from "../lab/figure.tsx";
 import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc, AnalysisResult, View } from "../../lib/types";
 import { SERIES } from "../../lib/svg-kit";
@@ -53,7 +54,7 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
     gen.current[key] = g;
     setState((s) => ({ ...s, [key]: { ...s[key], sent, loading: true, error: undefined } }));
     // the oncoprint comes back as a spec the interactive figure draws; every other view as a figure
-    api.analysis(slice, { query: "?oncoprint=spec&figures=svg" })
+    api.analysis(slice, { query: "?oncoprint=spec" })
       .then((r) => r.json())
       .then((j) => {
         if (gen.current[key] !== g) return;
@@ -139,7 +140,7 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
             {v && v.error && <p className="note">{v.error}</p>}
             {v && !v.error && (body
               ? <>{body}{v.caveat && <p className="note vfoot">{v.caveat}</p>}</>
-              : v.svg ? <div className="viewfig" dangerouslySetInnerHTML={{ __html: v.svg }} /> : <p className="note">nothing to draw</p>)}
+              : <ViewFigure v={v} />)}
           </section>
         );
       })}

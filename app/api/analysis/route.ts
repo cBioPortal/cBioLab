@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     // the web app draws its own oncoprints; ?oncoprint=spec skips rendering them here
     const mode = url.searchParams.get("oncoprint") === "spec" ? "spec" as const : "svg" as const;
     const result = await withRequestCustomData(customData, () => cachedAnalysis(doc as unknown as AnalysisDoc, { oncoprint: mode }), { refs: customRefs, req });
-    // ?figures=svg: every view drawn by the shared server renderer (the portal pages show these)
+    // ?figures=svg: every view drawn by the shared server renderer, for a client that cannot draw
     if (url.searchParams.get("figures") === "svg")
       return Response.json({ ...result, views: result.views.map((v) => v.svg || v.error ? v : { ...v, svg: viewToSvg(v) || undefined }) });
     // the web app draws every other figure itself, at its card's width (app/lab/figure.tsx): a

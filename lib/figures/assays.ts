@@ -79,3 +79,42 @@ export function assaysSvg(v: ViewResult, o: SvgOpts): string {
   return frame(W, bottom + cap.height + 10, out.join("") + cap.svg, p.bg);
 }
 
+type AsRow = NonNullable<ViewResult["assays"]>["rows"][number];
+
+/** Each group's mean ± SD (numeric), or its mix of values (categorical), for the picked entity. */
+export function assayEntitySvg(r: NonNullable<ViewResult["assays"]>, e: AsRow, o: SvgOpts = {}): string {
+  const p = palette(o.theme), L = 150, W = 520, ROW = 30, T = 26;
+  const out: string[] = [`<text x="10" y="16" font-size="12" font-weight="700" fill="${p.ink}">${esc(e.name)}</text>`];
+  if (r.datatype === "numeric") {
+    const lo = Math.min(...e.cells.map((c) => (c.mean ?? 0) - (c.sd ?? 0))), hi = Math.max(...e.cells.map((c) => (c.mean ?? 0) + (c.sd ?? 0)));
+    const a = Math.min(0, lo), b = hi > a ? hi : a + 1, X = (x: number) => L + (W - L - 30) * (x - a) / (b - a);
+    e.cells.forEach((c, i) => {
+      const y = T + 14 + i * ROW, col = SERIES[i % SERIES.length];
+      out.push(`<text x="${L - 8}" y="${y + 4}" font-size="10.5" fill="${p.ink}" text-anchor="end">${esc(c.cohort)} (n=${c.n})</text>`);
+      if (c.mean != null) {
+        if (c.sd != null) out.push(`<line x1="${X(c.mean - c.sd)}" y1="${y}" x2="${X(c.mean + c.sd)}" y2="${y}" stroke="${col}" stroke-width="2"/>`);
+        out.push(`<circle cx="${X(c.mean)}" cy="${y}" r="5" fill="${col}"/><text x="${X(c.mean)}" y="${y - 8}" font-size="9.5" fill="${p.muted}" text-anchor="middle">${c.mean.toPrecision(3)}</text>`);
+      }
+    });
+    const yb = T + 14 + e.cells.length * ROW;
+    out.push(`<line x1="${L}" y1="${yb}" x2="${W - 30}" y2="${yb}" stroke="${p.muted}" stroke-width="0.6"/>` +
+      [a, (a + b) / 2, b].map((x) => `<text x="${X(x)}" y="${yb + 12}" font-size="9" fill="${p.muted}" text-anchor="middle">${Number(x.toPrecision(3))}</text>`).join("") +
+      `<text x="${(L + W - 30) / 2}" y="${yb + 26}" font-size="9.5" fill="${p.muted}" text-anchor="middle">mean ± SD per ${r.unit.replace(/s$/, "")}</text>`);
+    return frame(W, yb + 34, out.join(""), p.bg);
+  }
+  const vals = r.values || [];
+  e.cells.forEach((c, i) => {
+    const y = T + 6 + i * ROW;
+    out.push(`<text x="${L - 8}" y="${y + 12}" font-size="10.5" fill="${p.ink}" text-anchor="end">${esc(c.cohort)} (n=${c.n})</text>`);
+    let x = L;
+    vals.forEach((val, vi) => {
+      const n = c.values?.[val] || 0, w = c.n ? (W - L - 30) * n / c.n : 0;
+      if (w > 0) out.push(`<rect x="${x}" y="${y}" width="${w}" height="16" fill="${SERIES[vi % SERIES.length]}"><title>${esc(val + ": " + n + " of " + c.n)}</title></rect>`);
+      x += w;
+    });
+  });
+  const yb = T + 6 + e.cells.length * ROW + 6;
+  let kx = L;
+  vals.forEach((val, vi) => { out.push(`<rect x="${kx}" y="${yb}" width="10" height="10" fill="${SERIES[vi % SERIES.length]}"/><text x="${kx + 14}" y="${yb + 9}" font-size="10" fill="${p.ink}">${esc(val)}</text>`); kx += 24 + val.length * 6.2; });
+  return frame(Math.max(W, kx), yb + 20, out.join(""), p.bg);
+}

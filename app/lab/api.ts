@@ -21,7 +21,7 @@ const send = (method: "PATCH" | "PUT", path: string, body: unknown): Promise<Res
   fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 export const api = {
-  /** The document's cohorts and views. `query`: "?oncoprint=spec" (the page draws its own oncoprints), "?figures=svg". */
+  /** The document's cohorts and views. `query`: "?oncoprint=spec" (the page draws its own figures, the oncoprint included), "?figures=svg". */
   analysis: async (doc: AnalysisBody, opts: Opts & { query?: string } = {}) =>
     post("/api/analysis" + (opts.query || ""), await withCustomData(doc), opts.signal),
 

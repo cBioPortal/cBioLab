@@ -625,7 +625,4 @@ export function Latency({ v }: { v: any }) {
   );
 }
 
-/** A figure the server drew (lib/view-svg*.ts, which escapes every label it writes), inlined as markup. */
-export const ServerSvg = ({ html, className = "viewfig" }: { html: string; className?: string }) =>
-  <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 

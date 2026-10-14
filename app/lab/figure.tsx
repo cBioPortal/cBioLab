@@ -55,8 +55,8 @@ export function SvgAtWidth({ svg, className = "viewfig" }: { svg: string; classN
 }
 
 /** A view's figure drawn here at its card's width; with none, says so in words — unless the view's error says why already. */
-export function ViewFigure({ v, error, empty = "nothing to draw", className }: { v: ViewResult; error?: string | null; empty?: string; className?: string }) {
-  const { ref, width } = useWidth();
+export function ViewFigure({ v, error, empty = "nothing to draw", className, min }: { v: ViewResult; error?: string | null; empty?: string; className?: string; min?: number }) {
+  const { ref, width } = useWidth(min);
   const svg = useMemo(() => width == null ? null : viewToSvg(v, { width }), [v, width]);
   return (
     <div ref={ref} className="figwidth">

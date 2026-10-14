@@ -10,9 +10,10 @@ import { DataTable, specQuery } from "../_table/DataTable.tsx";
 export { usePages, Pager } from "../_table/DataTable.tsx";
 import { cancertypesPanelSvg } from "../../lib/figures/cancertypes";
 import { enrichmentVolcanoSvg, enrichmentScatterSvg, enrichmentTopSvg } from "../../lib/figures/enrichment";
+import { assayEntitySvg } from "../../lib/figures/assays";
 import { frame, palette, SERIES } from "../../lib/svg-kit";
 import { api } from "./api.ts";
-import { ServerSvg as Svg } from "./view-chrome.tsx";
+import { SvgAtWidth, DrawAtWidth, ViewFigure } from "./figure.tsx";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
@@ -50,7 +51,7 @@ export function CancertypesBody({ v }: { v: ViewResult }) {
   return (
     <div className="pb">
       {r.genes.length > 1 && <Pills items={[ALL, ...r.genes]} on={gene} set={setGene} />}
-      <div className="pb-scroll">{svgs.map((s, i) => <Svg key={i} html={s} />)}</div>
+      <div className="pb-scroll">{svgs.map((s, i) => <SvgAtWidth key={i} svg={s} />)}</div>
     </div>
   );
 }
@@ -143,7 +144,7 @@ export function EnrichmentBody({ v }: { v: ViewResult }) {
   ];
   return (
     <div className="pb">
-      <div className="pb-row pb-scroll">{charts.map((c, i) => <Svg key={i} html={c} />)}</div>
+      <div className="pb-row pb-scroll">{charts.map((c, i) => <SvgAtWidth key={i} svg={c} />)}</div>
       <PortalTable rows={r.rows} cols={cols} initialSort={{ key: "q" }} search={(g) => g.gene + " " + (g.cytoband || "")}
         filters={[{ label: "Significant only", test: (g) => g.q < 0.05 }]}
         note={r.tested > r.rows.length ? "the " + r.rows.length + " most significant of " + r.tested.toLocaleString() + " genes tested" : undefined} />
@@ -157,10 +158,10 @@ type CoRow = NonNullable<ViewResult["correlates"]>["positive"][number];
 
 /**
  * A plot of two values over one cohort, computed when asked: an ordinary plot view sent for the
- * pair, drawn by the shared server renderer. A newer pick supersedes one still in flight.
+ * pair, drawn here by the shared renderer. A newer pick supersedes one still in flight.
  */
 function usePairPlot(docJson: (() => string) | undefined, cohort: string, view: Record<string, unknown> | null) {
-  const [state, setState] = useState<{ key: string; svg?: string; error?: string } | null>(null);
+  const [state, setState] = useState<{ key: string; view?: ViewResult; error?: string } | null>(null);
   const want = useRef("");
   const key = JSON.stringify(view);
   useEffect(() => {
@@ -171,9 +172,9 @@ function usePairPlot(docJson: (() => string) | undefined, cohort: string, view: 
     try { doc = JSON.parse(docJson()); } catch { setState({ key, error: "no document to plot from" }); return; }
     const def = doc.cohorts && doc.cohorts[cohort];
     if (!def) { setState({ key, error: "cohort “" + cohort + "” is not in the document" }); return; }
-    api.analysis({ study: doc.study, cohorts: { [cohort]: def }, views: [{ ...view, cohorts: [cohort] } as View] }, { query: "?figures=svg" })
+    api.analysis({ study: doc.study, cohorts: { [cohort]: def }, views: [{ ...view, cohorts: [cohort] } as View] }, { query: "?oncoprint=spec" })
       .then((r) => r.json())
-      .then((j) => { if (want.current !== key) return; const pv = j.views && j.views[0]; setState({ key, ...(j.error || pv?.error ? { error: j.error || pv.error } : { svg: pv?.svg }) }); })
+      .then((j) => { if (want.current !== key) return; const pv = j.views && j.views[0]; setState({ key, ...(j.error || pv?.error ? { error: j.error || pv.error } : { view: pv }) }); })
       .catch((e) => { if (want.current === key) setState({ key, error: String(e) }); });
   }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
   return state && state.key === key ? state : null;
@@ -210,7 +211,7 @@ export function CorrelatesBody({ v, docJson }: { v: ViewResult; docJson?: () => 
           {picked && <p className="meta">{r.gene} vs {picked.gene} · Spearman {picked.rho?.toFixed(2)} (p = {pFmt(picked.rhoP)}) · Pearson {picked.r?.toFixed(2)} (p = {pFmt(picked.p)})</p>}
           {!plot && picked && <div className="loading-block"><span className="spinner" /> drawing {r.gene} vs {picked.gene}…</div>}
           {plot?.error && <p className="note">{plot.error}</p>}
-          {plot?.svg && <Svg html={plot.svg} />}
+          {plot?.view && <ViewFigure v={plot.view} min={320} />}
         </div>
       </div>
     </div>
@@ -220,45 +221,6 @@ export function CorrelatesBody({ v, docJson }: { v: ViewResult; docJson?: () => 
 // ---- Generic assays: one row per entity, and the picked entity per group --------------------
 
 type AsRow = NonNullable<ViewResult["assays"]>["rows"][number];
-
-/** Each group's mean ± SD (numeric), or its mix of values (categorical), for the picked entity. */
-function assayEntitySvg(r: NonNullable<ViewResult["assays"]>, e: AsRow): string {
-  const p = palette("auto"), L = 150, W = 520, ROW = 30, T = 26;
-  const out: string[] = [`<text x="10" y="16" font-size="12" font-weight="700" fill="${p.ink}">${escapeXml(e.name)}</text>`];
-  if (r.datatype === "numeric") {
-    const lo = Math.min(...e.cells.map((c) => (c.mean ?? 0) - (c.sd ?? 0))), hi = Math.max(...e.cells.map((c) => (c.mean ?? 0) + (c.sd ?? 0)));
-    const a = Math.min(0, lo), b = hi > a ? hi : a + 1, X = (x: number) => L + (W - L - 30) * (x - a) / (b - a);
-    e.cells.forEach((c, i) => {
-      const y = T + 14 + i * ROW, col = SERIES[i % SERIES.length];
-      out.push(`<text x="${L - 8}" y="${y + 4}" font-size="10.5" fill="${p.ink}" text-anchor="end">${escapeXml(c.cohort)} (n=${c.n})</text>`);
-      if (c.mean != null) {
-        if (c.sd != null) out.push(`<line x1="${X(c.mean - c.sd)}" y1="${y}" x2="${X(c.mean + c.sd)}" y2="${y}" stroke="${col}" stroke-width="2"/>`);
-        out.push(`<circle cx="${X(c.mean)}" cy="${y}" r="5" fill="${col}"/><text x="${X(c.mean)}" y="${y - 8}" font-size="9.5" fill="${p.muted}" text-anchor="middle">${c.mean.toPrecision(3)}</text>`);
-      }
-    });
-    const yb = T + 14 + e.cells.length * ROW;
-    out.push(`<line x1="${L}" y1="${yb}" x2="${W - 30}" y2="${yb}" stroke="${p.muted}" stroke-width="0.6"/>` +
-      [a, (a + b) / 2, b].map((x) => `<text x="${X(x)}" y="${yb + 12}" font-size="9" fill="${p.muted}" text-anchor="middle">${Number(x.toPrecision(3))}</text>`).join("") +
-      `<text x="${(L + W - 30) / 2}" y="${yb + 26}" font-size="9.5" fill="${p.muted}" text-anchor="middle">mean ± SD per ${r.unit.replace(/s$/, "")}</text>`);
-    return frame(W, yb + 34, out.join(""), p.bg);
-  }
-  const vals = r.values || [];
-  e.cells.forEach((c, i) => {
-    const y = T + 6 + i * ROW;
-    out.push(`<text x="${L - 8}" y="${y + 12}" font-size="10.5" fill="${p.ink}" text-anchor="end">${escapeXml(c.cohort)} (n=${c.n})</text>`);
-    let x = L;
-    vals.forEach((val, vi) => {
-      const n = c.values?.[val] || 0, w = c.n ? (W - L - 30) * n / c.n : 0;
-      if (w > 0) out.push(`<rect x="${x}" y="${y}" width="${w}" height="16" fill="${SERIES[vi % SERIES.length]}"><title>${escapeXml(val + ": " + n + " of " + c.n)}</title></rect>`);
-      x += w;
-    });
-  });
-  const yb = T + 6 + e.cells.length * ROW + 6;
-  let kx = L;
-  vals.forEach((val, vi) => { out.push(`<rect x="${kx}" y="${yb}" width="10" height="10" fill="${SERIES[vi % SERIES.length]}"/><text x="${kx + 14}" y="${yb + 9}" font-size="10" fill="${p.ink}">${escapeXml(val)}</text>`); kx += 24 + val.length * 6.2; });
-  return frame(Math.max(W, kx), yb + 20, out.join(""), p.bg);
-}
-const escapeXml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export function AssaysBody({ v }: { v: ViewResult }) {
   const r = v.assays!;
@@ -285,7 +247,7 @@ export function AssaysBody({ v }: { v: ViewResult }) {
             filters={[{ label: "Significant only", test: (e) => e.q < 0.05 }]}
             note={r.tested > r.rows.length ? "the " + r.rows.length + " most significant of " + r.tested.toLocaleString() : undefined} />
         </div>
-        {picked && <div className="pb-plot"><Svg html={assayEntitySvg(r, picked)} /></div>}
+        {picked && <div className="pb-plot"><DrawAtWidth min={320} draw={(width) => assayEntitySvg(r, picked, { width })} deps={[r, picked]} /></div>}
       </div>
     </div>
   );
