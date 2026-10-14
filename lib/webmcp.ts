@@ -2,8 +2,9 @@
 // registers them with document.modelContext (navigator.modelContext before Chromium 150)
 // when the browser offers it, and publishes the same functions as window.cohortLab for an
 // agent that can run page JavaScript but does not discover WebMCP tools itself — the Claude
-// sidebar in Chrome today. The site never calls a model; the researcher's own assistant is
-// the model, and these tools are how it reads and edits what the page shows.
+// sidebar in Chrome today. These tools are the only way any assistant reads and edits what the
+// page shows — including the site's own chat sidebar (app/_agent/ChatSidebar.tsx), which calls
+// them through window.cohortLab like any other.
 
 export type Json = Record<string, unknown>;
 export interface AgentTool {

@@ -29,6 +29,8 @@ msk_chord_2024 counts. A machine-readable contract is in
 | `CLICKHOUSE_DB` | `cbioportal_public_librechat_blue` |
 | `STUDY_ID` | `msk_chord_2024` |
 | `PORTAL_URL` | `https://www.cbioportal.org` |
+| `CHAT_PROVIDER` | optional: `anthropic` (with `ANTHROPIC_API_KEY`) or `bedrock` (with `AWS_REGION` and AWS credentials) turns on the Assistant sidebar — on a dev server (`next dev`) only; built deployments never have it |
+| `CHAT_MODEL` / `CHAT_EFFORT` | optional: the model id (default Claude Opus 5.5, `claude-opus-5-5` / `anthropic.claude-opus-5-5`) and effort (default `medium`) |
 
 Copy them into `.env.local` for local dev; set them in Vercel Project Settings → Environment Variables for deploys.
 

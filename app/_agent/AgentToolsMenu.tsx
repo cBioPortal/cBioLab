@@ -16,7 +16,7 @@ export function AgentToolsMenu({ page, tools, webmcp, intro }: {
       <div className="agent-pop">
         <p>{intro}</p>
         <p className="agent-how">
-          This site never calls a model itself. An assistant that supports <strong>WebMCP</strong> finds the tools through{" "}
+          These are the only way any assistant works this page, the site's own Assistant panel included. An assistant that supports <strong>WebMCP</strong> finds the tools through{" "}
           <code>document.modelContext</code>; one that can run JavaScript here calls <code>window.cohortLab.*</code>{" "}
           (<code>window.cohortLab.help()</code> lists them). {webmcp === null ? "" : webmcp ? "WebMCP: registered in this browser." : "WebMCP is not available in this browser."}
         </p>
