@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-10-11",
+  "generated": "2026-10-14",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -220,6 +220,9 @@
     "Custom data: a curated biopsy site on every sample": {
       "all patients": 93,
       "CNS met": 8
+    },
+    "Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)": {
+      "all patients": 42
     },
     "Cancer types summary: RAS genes across 50,000 tumours": {
       "all patients": 48179

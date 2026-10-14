@@ -20,6 +20,7 @@ import { DOC_VERSION } from "./doc-version.ts";
 import type { TemplateDoc } from "./types.ts";
 import type { CustomDataset } from "./custom-data-names.ts";
 import { LUAD_BIOPSY_SITE_DEMO } from "./custom-data-demo.ts";
+import { SPECTRUM_SC_DEMO } from "./spectrum-sc-demo.ts";
 
 export const DSL_VERSION = DOC_VERSION;
 
@@ -1040,6 +1041,37 @@ export const EXAMPLES: DslExample[] = [
           y: { source: "clinical", attribute: "FRACTION_GENOME_ALTERED" } },
         { kind: "compare", genes: ["EGFR", "KRAS", "TP53", "STK11", "KEAP1", "SMARCA4"],
           splitBy: { cohort: "all patients", attribute: "custom:luad-biopsy-site/BIOPSY_SITE" } }
+      ]
+    }
+  },
+  {
+    title: "Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)",
+    demonstrates: "Features summarised from a study's single-cell RNA-seq, uploaded as six custom datasets (five patient-level, one sample-level) and read beside its genomics: oncoprint tracks, box plots against the mutational signature, a scatter between two cell compartments, and a sample-level plot by tumour site. The rows are demo data bundled with the app, so this example runs without logging in.",
+    tags: ["custom data", "single-cell", "plot", "oncoprint"],
+    note: "msk_spectrum_tme_2022 is 42 untreated high-grade serous ovarian cancers; 41 had scRNA-seq at several anatomical sites. scripts/gen-spectrum-sc-demo.py reads the public CELLxGENE cell annotations (cell states, per-cell pathway scores, per-cell 6p allele fraction) and summarises them per patient (solid sites pooled; ADX_ adnexal, NADX_ non-adnexal) and per cBioPortal sample (the scRNA-seq site of the same patient, 61 of 82 samples). Dysfunctional T/NK cells (TNK_DYSFUNC) have a median of 10.8% of T/NK cells in the 16 HRD-Dup tumours against 6.0% in the 14 FBI tumours, and naive/central-memory cells the reverse (7.5% against 11.1%), as in the paper's Fig. 4b. In adnexal cancer cells, JAK-STAT pathway activity has a median of 0.03 in HRD-Dup against -0.57 in FBI (Fig. 3e), and cancer-cell and T/NK-cell JAK-STAT correlate across patients (Spearman 0.74, Fig. 4e). Clonal 6p loss of heterozygosity (over 80% of cancer cells) is called in 4 patients, 3 of them HRD-Dup — the paper reports 4 of 41. By site, T cells are a median 43% of immune cells in the 22 adnexal samples against 54% in the 18 omental ones. These are summaries of public cell metadata, not the paper's statistical models.",
+    customData: SPECTRUM_SC_DEMO,
+    doc: {
+      study: "msk_spectrum_tme_2022",
+      cohorts: { "all patients": { all: [] } },
+      views: [
+        { kind: "oncoprint", cohorts: ["all patients"], genes: ["TP53", "BRCA1", "BRCA2", "CCNE1", "MYC", "CDK12"],
+          clinical: ["CONSENSUS_SIGNATURE", "custom:spectrum-sc-cancer/CA_6P_STATUS", "custom:spectrum-sc-tnk/TNK_DYSFUNC", "custom:spectrum-sc-tnk/TNK_NAIVE_CM"],
+          sort: ["CONSENSUS_SIGNATURE"] },
+        { kind: "plot", cohorts: ["all patients"],
+          x: { source: "clinical", attribute: "CONSENSUS_SIGNATURE" },
+          y: { source: "clinical", attribute: "custom:spectrum-sc-tnk/TNK_DYSFUNC" } },
+        { kind: "plot", cohorts: ["all patients"],
+          x: { source: "clinical", attribute: "CONSENSUS_SIGNATURE" },
+          y: { source: "clinical", attribute: "custom:spectrum-sc-tnk/TNK_NAIVE_CM" } },
+        { kind: "plot", cohorts: ["all patients"],
+          x: { source: "clinical", attribute: "CONSENSUS_SIGNATURE" },
+          y: { source: "clinical", attribute: "custom:spectrum-sc-cancer/ADX_CA_JAKSTAT" } },
+        { kind: "plot", cohorts: ["all patients"],
+          x: { source: "clinical", attribute: "custom:spectrum-sc-cancer/CA_JAKSTAT" },
+          y: { source: "clinical", attribute: "custom:spectrum-sc-tnk/TNK_JAKSTAT" } },
+        { kind: "plot", unit: "sample", cohorts: ["all patients"],
+          x: { source: "clinical", attribute: "TUMOR_SUPERSITE" },
+          y: { source: "clinical", attribute: "custom:spectrum-sc-site/IMM_T" } }
       ]
     }
   },
