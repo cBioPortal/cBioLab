@@ -7,11 +7,13 @@
 // the result with the next request. This route never touches the database, the engine or the
 // document; it holds no tool of its own.
 //
-// GET says whether this deployment has chat: only a dev server does (lib/chat-model.ts).
+// GET says whether this deployment has chat (lib/chat-model.ts: a dev server, or a deployment that
+// opts in off Vercel) and whether this browser must sign in first, as a deployment requires.
 import { convertToModelMessages, jsonSchema, streamText, tool, type ToolSet, type UIMessage } from "ai";
 import { z } from "zod";
 import { connection } from "next/server";
-import { chatConfig, chatModel, chatProviderOptions } from "../../../lib/chat-model.ts";
+import { chatConfig, chatModel, chatProviderOptions, type ChatConfig } from "../../../lib/chat-model.ts";
+import { AccessError, loginEnabled, requirePrincipal, userFor } from "../../../lib/auth.ts";
 
 export const maxDuration = 300;
 
@@ -36,20 +38,28 @@ Be brief: the sidebar is narrow. Use short paragraphs and lists; use a table onl
 
 Current page: ${page}. Its tools: ${names.length ? names.join(", ") : "none"}.`;
 
-export async function GET() {
+/** This deployment's chat, or null: one that needs a sign-in but signs nobody in has none. */
+function config(): ChatConfig | null {
+  const c = chatConfig();
+  return c && (!c.signIn || loginEnabled()) ? c : null;
+}
+
+export async function GET(req: Request) {
   await connection();
   let c = null;
-  try { c = chatConfig(); } catch { /* reported by POST */ }
-  return Response.json({ enabled: !!c, provider: c?.provider ?? null, model: c?.model ?? null });
+  try { c = config(); } catch { /* reported by POST */ }
+  return Response.json({ enabled: !!c, provider: c?.provider ?? null, model: c?.model ?? null,
+    signInRequired: !!c?.signIn && !userFor(req) });
 }
 
 export async function POST(req: Request) {
   let c;
   try {
-    c = chatConfig();
-    if (!c) return Response.json({ error: "this deployment has no chat (a dev server with CHAT_PROVIDER set has one)" }, { status: 404 });
+    c = config();
+    if (!c) return Response.json({ error: "this deployment has no chat" }, { status: 404 });
+    if (c.signIn) requirePrincipal(req, "use the assistant");
   } catch (e) {
-    return Response.json({ error: String((e as Error)?.message || e) }, { status: 500 });
+    return Response.json({ error: String((e as Error)?.message || e) }, { status: e instanceof AccessError ? e.status : 500 });
   }
 
   let body;

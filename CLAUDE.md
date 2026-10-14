@@ -227,10 +227,14 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   document; edits are run by the engine and reach the page only if accepted.
 - **The chat sidebar is the app's only model call, and it is just another WebMCP client**
   (`app/_agent/ChatSidebar.tsx` in the root layout; `/api/chat`; the provider in
-  `lib/chat-model.ts`: `CHAT_PROVIDER=anthropic|bedrock`, `CHAT_MODEL`, `CHAT_EFFORT`). **It runs
-  only on a dev server (`next dev`)**: every built deployment, public or not, has no chat whatever
-  it sets, so no public URL spends the key; a dev server without `CHAT_PROVIDER` has none either. It must work the app exactly as an outside assistant (Claude in
-  Chrome, Claude Desktop) does: each request sends the tools the page exposes
+  `lib/chat-model.ts`: `CHAT_PROVIDER=anthropic|bedrock`, `CHAT_MODEL`, `CHAT_EFFORT`). **Where it
+  runs:** a dev server (`next dev`) with `CHAT_PROVIDER` set; a built deployment only with
+  `CHAT_ON_DEPLOYMENT=1`, never on Vercel (no public URL spends the key), and there only for a
+  signed-in user — a deployment that signs nobody in has none. The internal instance
+  (cbiolab.cbioportal.aws.mskcc.org) uses Bedrock with the credentials file the cluster's SAML job
+  refreshes every 3 h; Bedrock reads AWS credentials through the standard chain, re-read on every
+  request, so a refreshed file needs no restart. It must work the app exactly as an outside
+  assistant (Claude in Chrome, Claude Desktop) does: each request sends the tools the page exposes
   (`window.cohortLab.tools`), the route declares them **without implementations**, and every call
   runs in the browser through `window.cohortLab.call`. **Never give it a private way in** — no
   tools in the route, no reading page state or calling the engine or an API directly. A capability

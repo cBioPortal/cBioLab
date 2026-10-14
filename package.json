@@ -39,6 +39,7 @@
     "@ai-sdk/amazon-bedrock": "^5.0.115",
     "@ai-sdk/anthropic": "^4.0.79",
     "@ai-sdk/react": "^4.0.143",
+    "@aws-sdk/credential-provider-node": "^3.972.86",
     "@electric-sql/pglite": "^0.5.8",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@tanstack/react-query": "^5.104.1",

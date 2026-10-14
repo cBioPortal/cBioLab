@@ -24,7 +24,7 @@ import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput, type ToolPart } f
 const STORE = "cohortlab.chat";
 const OPEN = "cohortlab.chat.open";
 
-interface ChatInfo { enabled: boolean; model: string | null }
+interface ChatInfo { enabled: boolean; signInRequired: boolean; model: string | null }
 interface PageApi { page: string; tools: { name: string; description: string; input: object }[]; call: (name: string, args: object) => Promise<unknown> }
 
 const pageApi = (): PageApi | null => (window as unknown as { cohortLab?: PageApi }).cohortLab ?? null;
@@ -109,7 +109,7 @@ function ChatPanel({ info }: { info: ChatInfo }) {
   const busy = status === "submitted" || status === "streaming";
   const submit = () => {
     const text = input.trim();
-    if (!text || busy) return;
+    if (!text || busy || info.signInRequired) return;
     void sendMessage({ text });
     setInput("");
   };
@@ -184,14 +184,18 @@ function ChatPanel({ info }: { info: ChatInfo }) {
       </Conversation>
 
       <form className="shrink-0 border-t p-2.5" onSubmit={(e) => { e.preventDefault(); submit(); }}>
-        <div className="relative">
+        {info.signInRequired
+          ? <p className="text-sm text-muted-foreground">Sign in to use the assistant.</p>
+          : (
+            <div className="relative">
               <Textarea className="max-h-48 min-h-16 resize-none pr-11 text-sm" value={input} placeholder="Ask the assistant…"
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }} />
               {busy
                 ? <Button type="button" size="icon-sm" variant="outline" className="absolute right-1.5 bottom-1.5" onClick={() => void stop()} aria-label="Stop"><SquareIcon /></Button>
                 : <Button type="submit" size="icon-sm" className="absolute right-1.5 bottom-1.5" disabled={!input.trim()} aria-label="Send"><ArrowUpIcon /></Button>}
-        </div>
+            </div>
+          )}
       </form>
     </aside>
   );
