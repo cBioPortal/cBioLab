@@ -1,4 +1,4 @@
-// Changing a campaign (start, register, remove, lock, run) needs the login; reading it and
+// Changing a campaign (start, register, remove, lock, run) needs a sign-in; reading it and
 // checking a hypothesis's feasibility do not. Only the access decision is asserted here — what
 // happens after it needs Postgres, which the unit suite does not have.
 import { test, describe, before, after } from "node:test";
@@ -9,27 +9,28 @@ const post = (body: unknown, cookie?: string) => new Request("http://x/api/campa
   method: "POST", headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) }, body: JSON.stringify(body),
 });
 
-describe("campaign routes: changes need the login", () => {
-  let saved: string | undefined, cookie = "";
+describe("campaign routes: changes need a sign-in", () => {
+  const env = { ...process.env };
+  let cookie = "";
   before(async () => {
-    saved = process.env.LOGIN_PASSWORD;
-    process.env.LOGIN_PASSWORD = "test-password";
-    const { unlockCookie } = await import("../lib/auth.ts");
-    cookie = unlockCookie("test-password", false)!.split(";")[0];
+    process.env.AUTH_DEV_LOGIN = "1";
+    delete process.env.VERCEL_ENV;
+    const { sessionCookie } = await import("../lib/auth.ts");
+    cookie = sessionCookie(new Request("http://x/"), { id: "00000000-0000-0000-0000-00000000000a", email: "r@example.org", name: null }).split(";")[0];
   });
-  after(() => { if (saved === undefined) delete process.env.LOGIN_PASSWORD; else process.env.LOGIN_PASSWORD = saved; });
+  after(() => { process.env = env; });
 
   test("starting a campaign is refused logged out, with what it needs", async () => {
     const { POST } = await import("../app/api/campaign/route.ts");
     const r = await POST(new Request("http://x/api/campaign", { method: "POST", body: JSON.stringify({ question: "q" }) }));
     assert.equal(r.status, 403);
-    assert.match((await r.json()).error, /log in to start a campaign/);
+    assert.match((await r.json()).error, /sign in to start a campaign/);
   });
   for (const action of ["add", "remove", "lock", "run"]) {
     test(`${action}: refused logged out, let through logged in`, async () => {
       const { requireCampaignAccess } = await import("../lib/campaign.ts");
       const { AccessError } = await import("../lib/auth.ts");
-      assert.throws(() => requireCampaignAccess(post({ action }), action), (e: unknown) => e instanceof AccessError && e.status === 403 && /^log in to /.test(e.message));
+      assert.throws(() => requireCampaignAccess(post({ action }), action), (e: unknown) => e instanceof AccessError && e.status === 403 && /^sign in to /.test(e.message));
       assert.doesNotThrow(() => requireCampaignAccess(post({ action }, cookie), action));
     });
   }

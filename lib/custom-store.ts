@@ -1,9 +1,9 @@
 // Server-stored custom data: uploads saved so an analysis that uses one can be shared and re-run
 // (db/migrations/0003_custom_datasets.sql). The ONLY module that touches those tables.
 //
-// - Every read and write passes canRead / canWrite, which decide by owner and grant. Today the
-//   one principal is "shared" (lib/auth.ts), so both say yes for every live dataset;
-//   per-user and per-group access means filling in the grant table, not changing callers.
+// - Every read and write passes canRead / canWrite, which decide by owner and grant. A principal
+//   is a signed-in user's id (lib/auth.ts); a dataset saved before there were accounts has no
+//   owner and is readable by nobody until scripts/claim-legacy.ts gives it one.
 // - A version is immutable once written (enforced by a trigger too), so a document pinned to
 //   { dataset, version } always reads the same rows.
 // - Rows are stored as gzipped JSON and handed to the browser as stored: the browser sends them
@@ -27,7 +27,7 @@ export interface DatasetMeta {
   versions: DatasetVersionMeta[];
 }
 
-interface DatasetRow { id: string; slug: string; name: string; owner: string; level: CustomLevel; latest_version: number; created_at: string; updated_at: string; deleted_at: string | null }
+interface DatasetRow { id: string; slug: string; name: string; owner_id: string | null; level: CustomLevel; latest_version: number; created_at: string; updated_at: string; deleted_at: string | null }
 interface VersionRow { dataset_id: string; version: number; columns: CustomColumn[]; studies: string[]; row_count: number; rows_gz: Buffer; sha256: string; source: DatasetSource; created_by: string; created_at: string }
 interface GrantRow { dataset_id: string; principal: string; role: "viewer" | "editor" }
 
@@ -36,10 +36,10 @@ interface GrantRow { dataset_id: string; principal: string; role: "viewer" | "ed
 // ---------------------------------------------------------------------------
 
 function canRead(principal: string, d: DatasetRow, grants: GrantRow[]): boolean {
-  return d.owner === principal || grants.some((g) => g.principal === principal);
+  return d.owner_id === principal || grants.some((g) => g.principal === principal);
 }
 function canWrite(principal: string, d: DatasetRow, grants: GrantRow[]): boolean {
-  return d.owner === principal || grants.some((g) => g.principal === principal && g.role === "editor");
+  return d.owner_id === principal || grants.some((g) => g.principal === principal && g.role === "editor");
 }
 
 // ---------------------------------------------------------------------------
@@ -47,7 +47,8 @@ function canWrite(principal: string, d: DatasetRow, grants: GrantRow[]): boolean
 // ---------------------------------------------------------------------------
 
 interface Store {
-  datasets(): Promise<DatasetRow[]>;
+  /** the principal's own and those granted to them */
+  datasets(principal: string): Promise<DatasetRow[]>;
   dataset(id: string): Promise<DatasetRow | null>;
   bySlug(owner: string, slug: string): Promise<DatasetRow | null>;
   versions(ids: string[]): Promise<Omit<VersionRow, "rows_gz">[]>;
@@ -61,9 +62,12 @@ interface Store {
 
 const VERSION_COLS = "dataset_id, version, columns, studies, row_count, sha256, source, created_by, created_at";
 const store: Store = {
-  async datasets() { return dbQuery<DatasetRow>("select * from custom_dataset order by updated_at desc limit 500"); },
+  async datasets(principal) {
+    return dbQuery<DatasetRow>("select * from custom_dataset where owner_id = $1::uuid" +
+      " or id in (select dataset_id from custom_dataset_grant where principal = $1::text) order by updated_at desc limit 500", [principal]);
+  },
   async dataset(id) { return (await dbQuery<DatasetRow>("select * from custom_dataset where id = $1", [id]))[0] ?? null; },
-  async bySlug(owner, slug) { return (await dbQuery<DatasetRow>("select * from custom_dataset where owner = $1 and slug = $2", [owner, slug]))[0] ?? null; },
+  async bySlug(owner, slug) { return (await dbQuery<DatasetRow>("select * from custom_dataset where owner_id = $1 and slug = $2", [owner, slug]))[0] ?? null; },
   async versions(ids) {
     return ids.length ? dbQuery("select " + VERSION_COLS + " from custom_dataset_version where dataset_id = any($1::uuid[]) order by version", [ids]) : [];
   },
@@ -78,7 +82,7 @@ const store: Store = {
     await dbQuery(
       "with ds as (" +
       (d.create
-        ? "insert into custom_dataset (id, slug, name, owner, level, latest_version) values ($1::uuid, $2::text, $3::text, $4::text, $5::text, $6::int) returning id"
+        ? "insert into custom_dataset (id, slug, name, owner_id, level, latest_version) values ($1::uuid, $2::text, $3::text, $4::uuid, $5::text, $6::int) returning id"
         : "update custom_dataset set name = $3::text, latest_version = $6::int where id = $1::uuid and latest_version = $6::int - 1 and deleted_at is null" +
           " and $2::text is not null and $4::text is not null and $5::text is not null returning id") +
       ") insert into custom_dataset_version (dataset_id, version, columns, studies, row_count, rows_gz, sha256, source, created_by)" +
@@ -101,7 +105,7 @@ const store: Store = {
 const iso = (x: unknown): string => x instanceof Date ? x.toISOString() : String(x);
 
 const metaOf = (d: DatasetRow, vs: Omit<VersionRow, "rows_gz">[]): DatasetMeta => ({
-  id: d.id, slug: d.slug, name: d.name, owner: d.owner, level: d.level, latestVersion: d.latest_version,
+  id: d.id, slug: d.slug, name: d.name, owner: d.owner_id ?? "", level: d.level, latestVersion: d.latest_version,
   createdAt: iso(d.created_at), updatedAt: iso(d.updated_at), deletedAt: d.deleted_at ? iso(d.deleted_at) : null,
   versions: vs.filter((v) => v.dataset_id === d.id).map((v) => ({
     version: v.version, columns: v.columns, studies: v.studies, rowCount: v.row_count, sha256: v.sha256,
@@ -111,7 +115,7 @@ const metaOf = (d: DatasetRow, vs: Omit<VersionRow, "rows_gz">[]): DatasetMeta =
 
 /** Every live dataset this principal may read, newest first, without rows. */
 export async function listDatasets(principal: string): Promise<DatasetMeta[]> {
-  const all = (await store.datasets()).filter((d) => !d.deleted_at);
+  const all = (await store.datasets(principal)).filter((d) => !d.deleted_at);
   const grants = await store.grants(all.map((d) => d.id));
   const mine = all.filter((d) => canRead(principal, d, grants.filter((g) => g.dataset_id === d.id)));
   const vs = await store.versions(mine.map((d) => d.id));
@@ -166,7 +170,7 @@ export async function saveDataset(principal: string, input: unknown, source: unk
     if (clash) throw new Error("a server dataset is already named " + ds.id + ": save as a new version of it, or rename this upload");
   }
   const id = target?.id ?? randomUUID(), version = target ? target.latest_version + 1 : 1;
-  await store.write({ id, slug: target?.slug ?? ds.id, name: ds.name, owner: target?.owner ?? principal, level: ds.level, create: !target },
+  await store.write({ id, slug: target?.slug ?? ds.id, name: ds.name, owner: target?.owner_id ?? principal, level: ds.level, create: !target },
     { dataset_id: id, version, ...row });
   await store.log(principal, target ? "version" : "create", id, version);
   return metaOf((await store.dataset(id))!, await store.versions([id]));

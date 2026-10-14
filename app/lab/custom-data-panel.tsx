@@ -268,7 +268,7 @@ function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: (
     <section className="cd-saved">
       <h4>Saved datasets{server.datasets.length ? " (" + server.datasets.length + ")" : ""}</h4>
       <p className="meta flush">
-        Shared with everyone who logs in (one shared login, no per-user permissions yet). A saved version never
+        Yours: only you see them. A saved version never
         changes; an analysis that uses one is pinned to it.
       </p>
       {server.datasets.length ? (
@@ -331,12 +331,12 @@ export default function CustomDataManager({ tab, setTab, studies, onChanged }: {
           attribute: as a chart and filter in Explore, an oncoprint track or split, in comparisons and survival.
         </p>
         {!server.enabled && <p className="meta">
-          This deployment does not store custom data: it has no login (<code>LOGIN_PASSWORD</code> is not set).
+          This deployment does not store custom data: it has no sign-in.
           The gallery&apos;s custom-data example still runs, on demo data bundled with the app.</p>}
         {server.enabled && !server.unlocked && (
           <div className="cd-login">
-            <span>Custom data is stored on the server. Log in to add, see and use it.</span>
-            <Button size="sm" onClick={requestLogin}>Log in</Button>
+            <span>Custom data is stored on the server. Sign in to add, see and use it.</span>
+            <Button size="sm" onClick={requestLogin}>Sign in</Button>
           </div>
         )}
         {server.unlocked && tab === "add" && <AddCustomData studies={studies}

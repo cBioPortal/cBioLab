@@ -68,8 +68,8 @@ export default function CampaignPage() {
   // changing the record (register, remove, lock, run) needs the login; reading it does not
   const login = useCustomDataState();
   const why = !login.loaded ? "checking whether you are logged in…"
-    : !login.enabled ? "this deployment has no login, so campaigns cannot be changed on it"
-    : !login.unlocked ? "log in to change this campaign" : null;
+    : !login.enabled ? "this deployment has no sign-in, so campaigns cannot be changed on it"
+    : !login.unlocked ? "sign in to change this campaign" : null;
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/campaign/${id}`, { cache: "no-store" });

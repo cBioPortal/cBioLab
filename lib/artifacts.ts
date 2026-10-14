@@ -2,9 +2,9 @@
 // db/migrations/0001_saved_artifacts.sql). Definitions only — never a frozen
 // evaluation or a patient/sample id; see lib/db.ts and RATIONALE.md.
 //
-// Every call is made as a principal (lib/auth.ts): a row is visible to, and changed by, its
-// owner only. Rows saved before there was a login have no owner and belong to the shared
-// principal — today's only one — so nothing saved earlier disappears.
+// Every call is made as a principal — the signed-in user's id (lib/auth.ts): a row is visible to,
+// and changed by, its owner only. Rows saved before there were accounts have no owner and are
+// seen by nobody until scripts/claim-legacy.ts gives them one.
 //
 // Schema-versioned like the DSL documents themselves: CURRENT_SCHEMA_VERSION
 // is stamped on every write, and `migrate()` is the one place a stored
@@ -15,7 +15,6 @@
 // call site exist now, while adding them costs nothing, rather than being
 // retrofitted under pressure the day the DSL makes a breaking change.
 import { dbQuery } from "./db.ts";
-import { SHARED_PRINCIPAL } from "./auth.ts";
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
@@ -43,13 +42,10 @@ function migrate(kind: ArtifactKind, definition: unknown, fromVersion: number): 
   return definition;
 }
 
-interface Row { id: string; kind: ArtifactKind; name: string; schema_version: number; definition: unknown; owner?: string | null; created_at: string | Date; updated_at: string | Date }
+interface Row { id: string; kind: ArtifactKind; name: string; schema_version: number; definition: unknown; owner_id: string | null; created_at: string | Date; updated_at: string | Date }
 
 /** Postgres hands back timestamps as Date; the API speaks ISO text. */
 const iso = (t: string | Date): string => new Date(t).toISOString();
-
-/** An owner column of null predates the login and is read as the shared principal's. */
-const ownerOf = (r: Row) => r.owner ?? SHARED_PRINCIPAL;
 
 function fromRow(r: Row): SavedArtifact {
   return {
@@ -69,7 +65,7 @@ function validateName(name: unknown): string {
 
 // Storage: SQL against lib/db.ts, which supplies the in-process Postgres where none is configured.
 interface Store {
-  list(kind?: ArtifactKind): Promise<Row[]>;
+  list(owner: string, kind?: ArtifactKind): Promise<Row[]>;
   get(id: string): Promise<Row | null>;
   insert(kind: ArtifactKind, name: string, definition: unknown, owner: string): Promise<Row>;
   update(id: string, name: string, definition: unknown): Promise<Row | null>;
@@ -77,10 +73,10 @@ interface Store {
 }
 
 const store: Store = {
-  async list(kind) {
+  async list(owner, kind) {
     return kind
-      ? dbQuery<Row>("select * from saved_artifacts where kind = $1 order by updated_at desc limit 500", [kind])
-      : dbQuery<Row>("select * from saved_artifacts order by updated_at desc limit 500");
+      ? dbQuery<Row>("select * from saved_artifacts where owner_id = $1 and kind = $2 order by updated_at desc limit 500", [owner, kind])
+      : dbQuery<Row>("select * from saved_artifacts where owner_id = $1 order by updated_at desc limit 500", [owner]);
   },
   async get(id) {
     const rows = await dbQuery<Row>("select * from saved_artifacts where id = $1", [id]);
@@ -88,7 +84,7 @@ const store: Store = {
   },
   async insert(kind, name, definition, owner) {
     const rows = await dbQuery<Row>(
-      "insert into saved_artifacts (kind, name, schema_version, definition, owner) values ($1, $2, $3, $4, $5) returning *",
+      "insert into saved_artifacts (kind, name, schema_version, definition, owner_id) values ($1, $2, $3, $4, $5) returning *",
       [kind, name, CURRENT_SCHEMA_VERSION, JSON.stringify(definition), owner]
     );
     return rows[0];
@@ -107,14 +103,15 @@ const store: Store = {
 };
 
 export async function listArtifacts(principal: string, kind?: ArtifactKind): Promise<SavedArtifact[]> {
-  const rows = await store.list(kind);
-  return rows.filter((r) => ownerOf(r) === principal).map(fromRow);
+  return (await store.list(principal, kind)).map(fromRow);
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The row, if it exists and this principal owns it: someone else's reads as absent. */
 async function owned(principal: string, id: string): Promise<Row | null> {
-  const row = await store.get(id);
-  return row && ownerOf(row) === principal ? row : null;
+  const row = UUID.test(id) ? await store.get(id) : null;
+  return row && row.owner_id === principal ? row : null;
 }
 
 export async function getArtifact(principal: string, id: string): Promise<SavedArtifact | null> {

@@ -1464,7 +1464,7 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .agent-pop th { text-align: left; font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: var(--s1); border-bottom: 1px solid var(--line); }
 .agent-pop td { padding: var(--s0) var(--s1); border-bottom: 1px solid var(--line); }
 .agent-pop code { font-family: "IBM Plex Mono", monospace; font-size: var(--t-xs); }
-/* the header's shared login (app/lab/login-button.tsx) */
+/* the header's sign-in (app/lab/login-button.tsx) */
 .loginstate { display: inline-flex; align-items: center; gap: var(--s2); }
 
 /* /datasets — the data sets table */

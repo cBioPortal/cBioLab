@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 export type ExampleCohort = { name: string; desc: string; def: CohortDef };
 export type ExampleEval = { count?: number; error?: string; busy?: boolean } | null;
 
-const SHARED = "everyone who logs in sees these: one shared login, no per-user ownership yet";
+const OWN = "yours: only you see these";
 
 /** A list that is loading or failed says so; only a loaded one may be empty. */
 function ListStatus({ state, what, empty, isEmpty }: { state: ListState; what: string; empty: string; isEmpty: boolean }) {
@@ -47,12 +47,12 @@ export function SavedTab({
   wsError: string | null;
   onCustomData: (cohort: string) => OnCustomData;
 }) {
-  if (!login.loaded) return <div className="card"><Waiting what="your login" /></div>;
+  if (!login.loaded) return <div className="card"><Waiting what="your sign-in" /></div>;
   if (!login.unlocked) return <div className="card">
-    <p className="flush">Saved cohorts and analyses belong to your login.{" "}
+    <p className="flush">Saved cohorts and analyses are your own.{" "}
       {login.enabled
-        ? <><Button size="sm" onClick={onLogin}>Log in</Button> to see and save them.</>
-        : "This deployment has no login, so nothing can be saved on it."}</p>
+        ? <><Button size="sm" onClick={onLogin}>Sign in</Button> to see and save them.</>
+        : "This deployment has no sign-in, so nothing can be saved on it."}</p>
   </div>;
 
   const byNewest = <T extends { savedAt: string }>(m: Record<string, T>) =>
@@ -104,7 +104,7 @@ export function SavedTab({
       })}
 
       <h2 className="savedsec">
-        Saved cohorts <span className="plain">— {SHARED}. Tick any to include above; delete here.</span>
+        Saved cohorts <span className="plain">— {OWN}. Tick any to include above; delete here.</span>
       </h2>
       <ListStatus state={saved.cohortsState} what="saved cohorts" isEmpty={!Object.keys(saved.cohorts).length}
         empty="Nothing saved yet — save an example above, build one on the Explore page, or ask chat." />
@@ -127,7 +127,7 @@ export function SavedTab({
 
     {sub === "analyses" && <div className="grid2">
       <div className="card">
-        <h2>Saved analyses <span className="plain">— {SHARED}</span></h2>
+        <h2>Saved analyses <span className="plain">— {OWN}</span></h2>
         <ListStatus state={saved.workspacesState} what="saved analyses" isEmpty={!Object.keys(saved.workspaces).length}
           empty={'Nothing saved yet — build an analysis with at least one view, then "Save workspace" on the Analysis tab.'} />
         {byNewest(saved.workspaces).map(([n, w]) => {

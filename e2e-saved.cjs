@@ -2,8 +2,8 @@
 // said in words (CLAUDE.md, "waiting, and never hiding what isn't shown"), and saving under a name
 // that exists updates it. Each waiting state is checked by holding the request.
 //
-// Run by e2e.cjs when it has the login; on its own against a running server with LOGIN_PASSWORD set:
-//   E2E_PORT=3109 E2E_LOGIN_PASSWORD=… node e2e-saved.cjs
+// Run by e2e.cjs when it has a sign-in; on its own against a running server with AUTH_DEV_LOGIN=1:
+//   E2E_PORT=3109 E2E_LOGIN_EMAIL=someone@example.org node e2e-saved.cjs
 
 const LIST = /\/api\/artifacts\?kind=cohort/;
 
@@ -15,18 +15,26 @@ async function savedLists(browser, ok, BASE, LOGIN) {
   const savedCount = async (name) => ((await (await ctx.request.get(BASE + "/api/artifacts?kind=cohort")).json()).artifacts || [])
     .filter((a) => a.name === name).length;
   try {
-    // logged out, before the server has said whether there is a login: waiting, not "no login"
+    // signed out, before the server has said whether there is a sign-in: waiting, not "no sign-in"
     {
       let release; const gate = new Promise((r) => (release = r));
-      await page.route("**/api/login", async (route) => { await gate; await route.continue().catch(() => {}); });
+      await page.route("**/api/auth", async (route) => { await gate; await route.continue().catch(() => {}); });
       await page.goto(BASE + "/lab?tab=cohorts", { waitUntil: "domcontentloaded" });
-      await page.getByText("loading your login").waitFor({ timeout: 120000 });
-      ok("Saved tab waits for the login rather than claiming there is none",
-        (await page.getByText("This deployment has no login").count()) === 0);
-      release(); await page.unroute("**/api/login");
+      await page.getByText("loading your sign-in").waitFor({ timeout: 120000 });
+      ok("Saved tab waits for the sign-in rather than claiming there is none",
+        (await page.getByText("This deployment has no sign-in").count()) === 0);
+      release(); await page.unroute("**/api/auth");
     }
 
-    await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
+    // signing in through the header's dialog: the development sign-in form, then who is signed in
+    {
+      await page.locator("button.tbbtn", { hasText: "Sign in" }).first().click();
+      const dlg = page.locator("dialog.logindialog[open]");
+      await dlg.locator("input[type=email]").fill(LOGIN);
+      await dlg.locator("button[type=submit]").click();
+      const shown = await page.locator(".loginstate .meta").first().innerText({ timeout: 30000 }).catch(() => "");
+      ok("signing in from the header names who is signed in", shown === LOGIN, shown);
+    }
 
     // the list held: a loader, the rest of the tab usable, never "Nothing saved yet"
     {
@@ -171,7 +179,7 @@ if (require.main === module) {
     const browser = await launch();
     const results = [];
     await savedLists(browser, (n, c, x) => results.push((c ? "PASS " : "FAIL ") + n + (x ? "  [" + x + "]" : "")),
-      "http://localhost:" + (process.env.E2E_PORT || 3100), process.env.E2E_LOGIN_PASSWORD || "");
+      "http://localhost:" + (process.env.E2E_PORT || 3100), process.env.E2E_LOGIN_EMAIL || "");
     await browser.close();
     console.log(results.join("\n"));
     process.exit(results.some((r) => r.startsWith("FAIL")) ? 1 : 0);

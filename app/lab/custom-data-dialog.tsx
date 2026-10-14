@@ -237,7 +237,7 @@ export default function CustomDataDialog({ focus, onClose, onManage, bindings, o
       {missing.length > 0 && (
         <div className="card customwarn">
           {!server.enabled ? <>This deployment does not store custom data, so {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)} cannot be read here.</>
-            : !server.unlocked ? <><Button variant="link" size="inline" className="text-md" onClick={requestLogin}>Log in</Button> to read {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}.</>
+            : !server.unlocked ? <><Button variant="link" size="inline" className="text-md" onClick={requestLogin}>Sign in</Button> to read {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}.</>
             : <>Not on the server: {missing.map((id, i) => <span key={id}>{i ? ", " : ""}<code>custom:{id}</code></span>)}.</>}
         </div>
       )}

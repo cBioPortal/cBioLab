@@ -185,12 +185,14 @@ suite fail. A test that cannot fail is decoration.
   link: a document names `custom:<dataset>/<COLUMN>`, never a value. Covered by
   `test/boundary.test.ts` ("uploaded custom data") and `test/custom-data.test.ts`.
   **Server-stored custom data** (`lib/custom-store.ts`, `db/migrations/0003`)
-  is the one place this app keeps patient-level values at rest, in the Supabase
+  is the one place this app keeps patient-level values at rest, in the deployment's
   Postgres beside the artifact tables but in its own tables, reached only through
-  that module. It exists only where `LOGIN_PASSWORD` is set; today that
-  shared login is the whole of access control (one shared principal, `lib/auth.ts`),
-  so **anyone who can log in to a deployment can read every dataset stored there**.
-  Saved cohorts and analyses (`lib/artifacts.ts`) sit behind the same login.
+  that module. It exists only where the deployment signs people in (`lib/auth.ts`:
+  an OIDC provider, or the development sign-in, which is refused on Vercel
+  production). **A dataset is readable only by the user who saved it** (and anyone
+  given a grant, of which there are none yet); a row from before accounts has no
+  owner and is readable by nobody until claimed (`scripts/claim-legacy.ts`).
+  Saved cohorts and analyses (`lib/artifacts.ts`) are owned the same way.
   Every row read and write is logged (`custom_data_access_log`), versions are
   immutable (a trigger), and deletion is a soft delete that pinned analyses report.
   A request names stored datasets by reference (`customRefs`); the server reads

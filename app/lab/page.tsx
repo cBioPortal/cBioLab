@@ -222,7 +222,7 @@ export default function AnalysisPage() {
   const canSave = (): boolean => {
     if (loggedIn) return true;
     if (customState.enabled) requestLogin();
-    else setError("this deployment has no login, so cohorts and analyses cannot be saved on it");
+    else setError("this deployment has no sign-in, so cohorts and analyses cannot be saved on it");
     return false;
   };
 

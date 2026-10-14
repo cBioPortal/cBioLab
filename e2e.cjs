@@ -36,13 +36,14 @@ async function main() {
   const ok = (name, cond, extra) =>
     results.push((cond ? "PASS " : "FAIL ") + name + (extra ? "  [" + extra + "]" : ""));
 
-  // Saved cohorts and analyses need the login (lib/auth.ts). scripts/gate.sh gives its server a
-  // throwaway password and passes it here; logged out, the store must refuse.
-  const LOGIN = process.env.E2E_LOGIN_PASSWORD || "";
+  // Saved cohorts and analyses need a sign-in (lib/auth.ts). scripts/gate.sh turns on its server's
+  // development sign-in and passes the email to sign in as here; signed out, the store must refuse.
+  const LOGIN = process.env.E2E_LOGIN_EMAIL || "";
+  const signIn = (ctx, email = LOGIN) => ctx.request.post(BASE + "/api/auth/dev", { data: { email } });
   {
     const anon = await browser.newContext();
     const r = await anon.request.get(BASE + "/api/artifacts?kind=cohort");
-    ok("saved cohorts are refused without the login", r.status() === 403 || r.status() === 404, "HTTP " + r.status());
+    ok("saved cohorts are refused without a sign-in", r.status() === 403 || r.status() === 404, "HTTP " + r.status());
     // a built server knows its commit (lib/build-info.ts), says it at /api/version, and every page's footer agrees
     const v = await (await anon.request.get(BASE + "/api/version")).json();
     ok("/api/version names the commit this build was made from", /^[0-9a-f]{40}(\+dirty)?$/.test(v.commit || "") && /\/commit\/[0-9a-f]{40}$/.test(v.url || ""), JSON.stringify(v));
@@ -54,11 +55,30 @@ async function main() {
     await anon.close();
   }
 
+  // Two people: what one saves, the other can neither list, open, change nor delete.
+  if (LOGIN) {
+    const a = await browser.newContext(), b = await browser.newContext();
+    const steps = {};
+    try {
+      await signIn(a, "owner." + LOGIN); await signIn(b, "other." + LOGIN);
+      const made = (await (await a.request.post(BASE + "/api/artifacts", { data: { kind: "cohort", name: "e2e private", definition: { all: [] } } })).json()).artifact;
+      steps.listed = ((await (await b.request.get(BASE + "/api/artifacts?kind=cohort")).json()).artifacts || []).some((x) => x.id === made.id);
+      steps.open = (await b.request.get(BASE + "/api/artifacts/" + made.id)).status();
+      steps.patch = (await b.request.patch(BASE + "/api/artifacts/" + made.id, { data: { name: "taken" } })).status();
+      steps.del = (await b.request.delete(BASE + "/api/artifacts/" + made.id)).status();
+      steps.ownerStill = (await (await a.request.get(BASE + "/api/artifacts/" + made.id)).json()).artifact?.name;
+      await a.request.delete(BASE + "/api/artifacts/" + made.id);
+    } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
+    ok("one person's saved cohort is invisible and untouchable to another",
+      steps.listed === false && steps.open === 404 && steps.patch === 404 && steps.del === 404 && steps.ownerStill === "e2e private", JSON.stringify(steps));
+    await a.close(); await b.close();
+  }
+
   for (const scheme of ["light", "dark"]) {
     const ctx = await browser.newContext({ colorScheme: scheme, viewport: { width: 1360, height: 900 } });
     if (LOGIN) {
-      const r = await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
-      ok("logs in (" + scheme + ")", r.ok(), "HTTP " + r.status());
+      const r = await signIn(ctx);
+      ok("signs in (" + scheme + ")", r.ok(), "HTTP " + r.status());
     }
     const page = await ctx.newPage();
     const errors = [];
@@ -1144,7 +1164,7 @@ async function main() {
     const sp = await ctx.newPage();
     let steps = {};
     try {
-      await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
+      await signIn(ctx);
       const name = "e2e source " + Date.now();
       const v1 = { study: "msk_chord_2024", all: [{ kind: "oql", q: "KRAS: MUT" }] };
       const v2 = { study: "msk_chord_2024", all: [{ kind: "oql", q: "KRAS: MUT" }, { kind: "clinical", attribute: "SEX", values: ["Female"] }] };
@@ -1183,7 +1203,7 @@ async function main() {
     const sp = await ctx.newPage();
     let steps = {};
     try {
-      await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
+      await signIn(ctx);
       const name = "e2e save " + Date.now();
       const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
       // the store is jsonb, which does not keep key order: compare values, not text

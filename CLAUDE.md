@@ -144,7 +144,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   An envelope checks only the route's own parameters (which view, which page, which uploads) and
   passes the document, definition or spec it carries to the engine — don't grow it into a second
   schema of the DSL. A new endpoint the pages call gets an envelope and an `api` function. The one
-  exception is the login and custom-data endpoints (`/api/login`, `/api/custom-data/*`): they
+  exception is the sign-in and custom-data endpoints (`/api/auth*`, `/api/custom-data/*`): they
   belong to `app/lab/custom-data-client.ts`, which owns that state and which `api.ts` itself
   imports, so it calls them directly — through it, never from a component.
 - **Custom data** — a researcher's uploaded annotations, named `custom:<dataset>/<COLUMN>` and
@@ -158,14 +158,23 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   ships nothing. `lib/custom-data-server.ts` is the request boundary (patient-level studies only,
   id matching, "save as feature" membership). Results that use uploads bypass the shared cache;
   a document naming an upload the request lacks is refused (`assertCustomDataPresent`).
-  **Server-stored custom data** (`lib/custom-store.ts`, the only module touching its tables;
-  `lib/auth.ts`): enabled only where `LOGIN_PASSWORD` is set, one shared
-  principal unlocked by that code. A document pins what it uses as `uploads: [{as, dataset,
-  version}]` (added by the page on run); requests send `customRefs` and the server loads the
-  pinned, immutable version. **The login** (`lib/auth.ts`, the header's Log in): one shared
-  password, `LOGIN_PASSWORD`, guards custom data AND saved cohorts/analyses (`/api/artifacts`,
-  owner-scoped; ownerless rows from before the login read as the shared principal's).
-  `scripts/gate.sh` gives its e2e server a throwaway password. Per-user access is not built yet.
+  **Server-stored custom data** (`lib/custom-store.ts`, the only module touching its tables):
+  enabled only where the deployment signs people in, each dataset its saver's. A document pins
+  what it uses as `uploads: [{as, dataset, version}]` (added by the page on run); requests send
+  `customRefs` and the server loads the pinned, immutable version.
+- **Signing in** (`lib/auth.ts`, the header's Sign in) guards custom data, saved
+  cohorts/analyses (`/api/artifacts`) and campaign changes; exploring, analyses, `?doc=` links and
+  MCP need none. A deployment has ONE way in: an OpenID Connect provider (`lib/oidc.ts`;
+  `AUTH_OIDC_ISSUER`/`_CLIENT_ID`/`_CLIENT_SECRET`, optional `AUTH_OIDC_LABEL`, `AUTH_URL` behind a
+  proxy — Google on Vercel, MSK's Keycloak realm `msk` on the private cluster), and/or the
+  development sign-in (`AUTH_DEV_LOGIN=1`: any email, no password; refused on Vercel production;
+  what `scripts/gate.sh` and session dev servers use). A session is an httpOnly cookie signed with
+  `AUTH_SESSION_SECRET` naming the user; stores decide by that user's id. **People** are
+  `lib/users.ts` (`db/migrations/0004_users.sql`): a sign-in is found by provider + subject, and
+  joins an existing user (e.g. one added by email) only through a provider-VERIFIED email. Rows
+  from before accounts have no owner and are seen by nobody until `npm run db:claim-legacy --
+  <email>` gives them to someone. The OIDC flow is tested end to end against a stand-in provider
+  (`test/oidc.test.ts`).
 - **The writable store** (`lib/db.ts`, the only Postgres client): saved cohorts and analyses,
   campaigns and custom data. `DATABASE_URL` (or its older name `SUPABASE_DB_URL`) names the
   Postgres; without one, outside Vercel production, `lib/db.ts` runs an in-process Postgres
