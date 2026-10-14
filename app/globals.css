@@ -206,9 +206,10 @@ pre {
    columns each stacking every facet vertically. `auto-fill` + a fixed min width is what
    makes it collapse to one column on a phone without a media query: below ~280px+gap
    there is only room for one track. Each tile keeps its own `.card` look; `.vallist`
-   already caps its own height and scrolls (see its own comment), so a tile's height is
-   set by its shortest content, not by whichever facet happens to have the most values. */
-.facetgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.8rem; align-items: start; }
+   already caps its own height and scrolls (see its own comment), so no facet makes its row
+   tall. The tiles in a row share its height, so the grid reads as rows rather than a ragged
+   edge; the reading order stays left to right. */
+.facetgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.8rem; align-items: stretch; }
 .facetgrid > .card { margin-bottom: 0; min-width: 0; }
 /* Studies, data types and the three gene tables are dense multi-column rows (see
    .sbrow/.generow's own grid-template-columns) that read as cramped at one tile's

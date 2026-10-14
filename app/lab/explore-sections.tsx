@@ -11,6 +11,7 @@ import { CAT_COLORS } from "./view-chrome.tsx";
 import { useWidth } from "./figure.tsx";
 import { textWidth } from "../../lib/chart/text.ts";
 import { fmtInt, fmtNum, fmtPct } from "../../lib/chart/format.ts";
+import { naturalOrder } from "../../lib/ordinal.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import type { ExploreState } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
@@ -707,9 +708,11 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
             // its own comment for why cardinality (the study's, or worse,
             // the draft's) can't be trusted to decide this.
             const asList = !PIE_ATTRIBUTES.has(c.attribute);
+            // stage, grade and the like read in their own order (lib/ordinal.ts); the rest by count
+            const values: any[] = naturalOrder(c.values, (v: any) => String(v.v));
             let acc = 0;
             const R = 34, CX = 36, CY = 36;
-            const arcs = c.values.map((v: any, i: number) => {
+            const arcs = values.map((v: any, i: number) => {
               const frac = v.n / total, a0 = acc * 2 * Math.PI - Math.PI / 2;
               acc += frac;
               const a1 = acc * 2 * Math.PI - Math.PI / 2;
@@ -726,7 +729,7 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
               const max = Math.max(...c.values.map((v: any) => v.n), 1);
               return (<>
                 <div className="vallist">
-                  {c.values.map((v: any, i: number) => (
+                  {values.map((v: any, i: number) => (
                     <button key={i} className={isSel(v) ? "valrow on" : "valrow"} onClick={() => addClause(clause(v))}
                       title={v.v + " — " + v.n.toLocaleString() + " (click to filter)"}>
                       <span className="vname">{v.v}</span>
