@@ -123,13 +123,6 @@ header {
 header h1 { font-family: "IBM Plex Serif", Georgia, serif; font-size: var(--t-lg); font-weight: 600; margin: 0; }
 header .sub { color: var(--muted); font-size: var(--t-md); }
 .spacer { flex: 1; }
-.pill {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  font-size: var(--t-sm); padding: 0.2rem 0.65rem; border-radius: var(--r-pill);
-  border: 1px solid var(--line); color: var(--muted); background: var(--paper);
-}
-.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-.pill.on { color: var(--ok); border-color: var(--ok); } .pill.on .dot { background: var(--ok); }
 /* which commit this deployment runs — apparatus, a step below everything else */
 .build-stamp { padding: var(--s2) 1.4rem var(--s4); color: var(--muted); font-size: var(--t-xs); text-align: right; }
 .build-stamp a { color: inherit; }
@@ -396,7 +389,6 @@ main.analysis-main { max-width: min(132rem, 100%); }
 
 /* the zoom triple reads as one instrument: one border, no gaps to break at */
 .zoomctl { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; background: var(--paper); }
-.zoomctl > input[type=range] { width: 6.5rem; margin: 0 var(--s1); }
 /* tiebreakers only appear when there are any, on their own line */
 .viewtb-more { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2); flex-wrap: wrap; }
 
@@ -834,8 +826,6 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .gearmenu-items .setrow select { flex: 1; min-width: 0; }
 .gearmenu-items .setcol { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.15rem 0; }
 .gearmenu-items .setcol > .meta { color: var(--muted); font-size: var(--t-sm); }
-.gearmenu-items .pillwrap { display: flex; flex-wrap: wrap; gap: 0.25rem; }
-.gearmenu-items .pillwrap .pill { font-size: var(--t-sm); padding: 0.15rem 0.5rem; cursor: pointer; }
 .gearmenu-items hr { border: none; border-top: 1px solid var(--line); margin: 0.35rem 0 0.1rem; }
 
 
@@ -972,12 +962,6 @@ button.customtag:hover { text-decoration: underline; }
 .customlist td.meta { white-space: normal; }
 .genedialog { min-width: 24rem; max-width: 30rem; }
 .genedialog .setcol > .meta { color: var(--muted); font-size: var(--t-sm); }
-.genedialog .pillwrap { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.genedialog .pillwrap .pill { cursor: pointer; }
-/* a merged row reads as one thing: its pill and its split control share a border */
-.genedialog .pill-merged { display: inline-flex; align-items: center; gap: 0.1rem; border: 1px dashed var(--accent-ink);
-  border-radius: var(--r-pill); padding: 0 0.3rem 0 0; }
-.genedialog .pill-merged .pill { border: none; background: none; }
 .genedialog textarea { width: 100%; box-sizing: border-box; }
 .genedialog .setrow, .exportdialog .setrow { display: flex; gap: 0.4rem; margin-top: 0.5rem; align-items: center; }
 .genedialog .setrow input { flex: 1; min-width: 0; }
@@ -1528,14 +1512,8 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .portal-cohorts { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
 .portal-view { margin-top: var(--s3); }
 .portal-view .vtitle { font-size: var(--t-md); margin: 0 0 var(--s2); }
-.doctabs { display: flex; gap: var(--s1); flex-wrap: wrap; border-bottom: 1px solid var(--line); margin: var(--s3) 0; }
-.doctabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: var(--s2) var(--s3); font-size: var(--t-sm); color: var(--muted); cursor: pointer; display: inline-flex; gap: var(--s1); align-items: center; }
-.doctabs button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
 
 /* the portal-style card bodies (app/lab/portal-bodies.tsx) */
-.pb-pills { display: flex; flex-wrap: wrap; gap: var(--s1); margin: var(--s2) 0; }
-.pb-pills button { border: 1px solid var(--line); background: var(--card); color: var(--accent-ink); border-radius: var(--r-sm); padding: 2px var(--s2); font-size: var(--t-xs); cursor: pointer; }
-.pb-pills button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pb-scroll { overflow-x: auto; }
 .pb-row { display: flex; gap: var(--s4); align-items: flex-start; flex-wrap: wrap; }
 .pb-row > * { min-width: 0; }
@@ -1554,8 +1532,6 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .ds-table .ds-dl a { color: var(--accent-ink); }
 .ds-table .ds-study { min-width: 20rem; }
 .portal-group { color: #fff; border-radius: var(--r-sm); padding: 1px var(--s2); font-size: var(--t-xs); }
-.doctabs-sub { margin-top: calc(-1 * var(--s2)); }
-.doctabs-sub button { font-size: var(--t-xs); padding: var(--s1) var(--s3); }
 .portal-head .portal-summary { display: flex; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; font-size: var(--t-sm); }
 .portal-chooser { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s2); }
 .pb-loading { opacity: 0.45; transition: opacity 0.15s; }
@@ -1671,10 +1647,6 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 /* the timeline's two control rows are toolbars (.viewtb / .tbz), so they share the strip's one height */
 .tl-nav { margin: 0 0 var(--s2); padding-bottom: var(--s2); border-bottom: 1px solid var(--line); }
 .tl-settings { margin: 0 0 0 auto; }
-.tl-patients { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card); color: var(--ink);
-  width: min(94vw, 72rem); max-width: 94vw; max-height: 88vh; overflow: auto; padding: 1rem 1.1rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22); }
-.tl-patients::backdrop { background: rgba(0, 0, 0, 0.32); }
-.tl-patients-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s2); }
 .tl-pos { font-variant-numeric: tabular-nums; font-size: var(--t-md); min-width: 9rem; text-align: center; white-space: nowrap; }
 .tl-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s3); }
 .tl-who { font-weight: 600; }

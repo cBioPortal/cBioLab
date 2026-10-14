@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { GearMenu, MenuItem } from "../_ui/gear-menu.tsx";
 import { Input } from "../_ui/input";
 import { OptionSelect } from "../_ui/choice.tsx";
+import { Slider } from "../_ui/slider";
 import { FIELD, TB } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
 
@@ -754,8 +755,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             </OptionSelect></label>
             <span className="zoomctl">
               <Button type="button" variant="ghost" size="icon-xs" className={ZOOM} onClick={() => zoomAt(1 / 1.4)} title="zoom out" aria-label="zoom out"><Minus /></Button>
-              <input type="range" min={0} max={100} value={pct} title="zoom" aria-label="zoom"
-                onChange={(e) => { const p = Number(e.target.value) / 100; setView((v) => ({ ...v, zoom: minZoom * Math.pow(MAX_ZOOM / minZoom, p) })); }} />
+              <Slider min={0} max={100} value={[pct]} title="zoom" aria-label="zoom" className="mx-2 w-24"
+                onValueChange={([x]) => { const p = x / 100; setView((v) => ({ ...v, zoom: minZoom * Math.pow(MAX_ZOOM / minZoom, p) })); }} />
               <Button type="button" variant="ghost" size="icon-xs" className={ZOOM} onClick={() => zoomAt(1.4)} title="zoom in" aria-label="zoom in"><Plus /></Button>
               <Button type="button" variant="ghost" size="xs" className={cn(ZOOM, "w-auto border-l px-2 text-sm")} onClick={() => setView((v) => ({ ...v, zoom: minZoom, scrollX: 0 }))} title="fit every column in the width">fit</Button>
             </span>

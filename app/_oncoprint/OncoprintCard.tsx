@@ -15,6 +15,7 @@ import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
 import { Plus, Rows3 } from "lucide-react";
 import { Button } from "../_ui/button";
+import { RemoveBadge } from "../_ui/remove-badge";
 import { Checkbox } from "../_ui/checkbox";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { GearMenu } from "../_ui/gear-menu.tsx";
@@ -132,18 +133,16 @@ export function GeneListEditor({ view, busy, onGenes }: { view: V; busy: boolean
     <div className="setcol">
       <span className="meta">{rows.length} of 12 rows{merges && symbols.length !== rows.length ? " · " + symbols.length + " genes" : ""} — click one to remove it</span>
       {listErr && <span className="mark">{listErr}</span>}
-      <div className="pillwrap">
+      <div className="flex flex-wrap gap-1.5">
         {rows.map(r => (
-          <span key={r.label} className={r.members.length > 1 ? "pill-merged" : undefined}>
-            <button type="button" className="pill" disabled={busy || rows.length <= floor}
+          <span key={r.label} className={r.members.length > 1 ? "inline-flex items-center rounded-full border border-dashed border-primary pr-2" : "contents"}>
+            <RemoveBadge label={r.label} disabled={busy || rows.length <= floor} className={r.members.length > 1 ? "border-transparent bg-transparent" : undefined}
               title={rows.length <= floor
                 ? (floor === 2 ? "this view compares pairs, so it needs at least two genes" : "a view needs at least one gene")
                 : r.members.length > 1 ? "remove this merged row (" + r.members.join(", ") + ")" : "remove " + r.label}
-              onClick={() => drop(r.label)}>
-              {r.label} <span aria-hidden="true">×</span>
-            </button>
+              onClick={() => drop(r.label)} />
             {merges && r.members.length > 1 && (
-              <Button type="button" variant="link" size="inline" className="ml-1" disabled={busy}
+              <Button type="button" variant="link" size="inline" disabled={busy}
                 title="draw each of these genes as its own row" onClick={() => onGenes(splitGeneTrack(view, r.label).genes)}>split</Button>
             )}
           </span>

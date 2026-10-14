@@ -854,7 +854,7 @@ function CourseCard({ ctx, v, vi }: CardProps) {
         };
         return (
           <>
-            <div className="setcol"><span className="meta">measuring</span><div className="pillwrap">
+            <div className="setcol"><span className="meta">measuring</span><div className="flex flex-wrap gap-1">
             {v.eventOptions.map(e => (
               <Button key={e.canonical} type="button" variant="outline" size="xs" disabled={busy || (!chosen.includes(e.canonical) && chosen.length >= 6)}
                 className={CHIP} aria-pressed={chosen.includes(e.canonical)}

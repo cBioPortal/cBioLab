@@ -368,7 +368,9 @@ still holds, against a running server.
   option such as "auto") and `OptionSelect` (the same from `<option>` children) in `choice.tsx`;
   `GearMenu` / `MenuItem` / `closeGearMenu` in `gear-menu.tsx` (a button that opens a popover,
   whose open state can live in the page's `menuOpenRef` store so it survives its card
-  remounting); and the toolbar class strings `TB`, `CHIP`, `FIELD` in `toolbar.ts`. A
+  remounting); `RemoveBadge` in `remove-badge.tsx` (a listed value a click removes, such as a
+  gene); and in `toolbar.ts` the toolbar class strings `TB`, `CHIP`, `FIELD` and the tab classes
+  `LINE_TABS` / `LINE_TAB` (page tabs over a rule) and `SEG_TABS` / `SEG_TAB` (a body's own selector). A
   link-looking action is `<Button variant="link" size="inline">`; a toggle chip is an outline
   `Button` with `aria-pressed`. The old stylesheet sits in the `legacy` layer, below Tailwind's
   utilities, so a utility always wins over a legacy rule; its first block restores the browser
@@ -381,7 +383,10 @@ still holds, against a running server.
 - **e2e finds shadcn parts by role, not by legacy class.** A dialog is `[role=dialog].<its class>`
   (Radix unmounts a closed one, so wait for it rather than for `[open]`); a menu's items are in
   `[data-slot=popover-content]`; a select is `[role=combobox]` and its choices `[role=option]`
-  (it is not a native `<select>`, so no `selectOption`); a checkbox is `[role=checkbox]`. Keep a
+  (it is not a native `<select>`, so no `selectOption`); a checkbox is `[role=checkbox]`; a tab is
+  `getByRole("tab")`; a removable value is `[data-slot=badge]`; a slider's handle is
+  `[data-slot=slider-thumb]`. A dialog's content is portalled to `<body>`, so it is not inside the
+  card that opened it. Keep a
   stable class on a component the tests target (`genesbtn`, `cohortgear`, `viewgear`), and keep
   native elements where something outside React reads them while closed — the document dialog
   is a native `<dialog>` so `#docjson` stays in the page.

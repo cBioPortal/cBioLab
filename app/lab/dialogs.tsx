@@ -7,6 +7,7 @@ import { useState } from "react";
 import type { AnalysisDoc } from "../../lib/types.ts";
 import { cn } from "../../lib/cn";
 import { Button } from "../_ui/button";
+import { RemoveBadge } from "../_ui/remove-badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Input } from "../_ui/input";
 import { Label } from "../_ui/label";
@@ -227,10 +228,7 @@ function ParamRow({ name, value, busy, onChange }:
         <code className={PARAM_NAME}>${name}</code>
         <div className="flex flex-1 flex-wrap items-center gap-1">
           {items.map(x => (
-            <button key={x} type="button" className="pill cursor-pointer px-2 py-0.5 text-sm" disabled={busy}
-              title={"remove " + x} onClick={() => onChange(items.filter(y => y !== x))}>
-              {x} <span aria-hidden="true">×</span>
-            </button>
+            <RemoveBadge key={x} label={x} disabled={busy} title={"remove " + x} onClick={() => onChange(items.filter(y => y !== x))} />
           ))}
           <Input list="view-genes" placeholder="add…" value={add} disabled={busy} className="h-7 w-28 text-md md:text-md"
             onChange={e => setAdd(e.target.value.toUpperCase())}

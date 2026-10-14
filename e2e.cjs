@@ -420,7 +420,7 @@ async function main() {
         await page.locator("button.genesbtn").first().click();
         await page.waitForSelector("[role=dialog].genedialog", { timeout: 30000 });
         const panel = page.locator("[role=dialog].genedialog");
-        const before = await panel.locator(".pill").count();
+        const before = await panel.locator("[data-slot=badge]").count();
         await panel.locator("input[list=view-genes]").fill("PIK3CA");
         await panel.locator('button:has-text("add")').click();
         const genesNow = async () => page.evaluate(() => {
@@ -438,7 +438,7 @@ async function main() {
         // appended, not replaced — reading the RESULT's `genes` field instead of
         // the document's once wiped the list down to the one just typed
         const appended = added.length === before + 1 && added.includes("TP53");
-        await panel.locator(".pill", { hasText: "KRAS" }).first().click();
+        await panel.locator("[data-slot=badge]", { hasText: "KRAS" }).first().click();
         await page.waitForFunction(() => {
           const ta = document.querySelector("#docjson"); if (!ta) return false;
           try { return !(JSON.parse(ta.value).views || [])
@@ -464,7 +464,7 @@ async function main() {
         const namedButton = await page.locator("button.genesbtn").first().innerText();
         await page.locator('button[title="download or open this figure elsewhere"]').click();
         const gear = page.locator("[data-slot=popover-content]");
-        const gearHasEditor = (await gear.locator(".pillwrap").count()) > 0;
+        const gearHasEditor = (await gear.locator("[data-slot=badge]").count()) > 0;
         const gearHasCbioportal = (await gear.locator('a:has-text("cBioPortal")').count()) > 0;
         const gearHasDownloads = (await gear.locator("text=download figures").count()) > 0;
         // the button says how many rows it edits; the overflow menu is downloads/exports only —
@@ -976,9 +976,9 @@ async function main() {
       await page.waitForTimeout(400);
       ok("timeline: folding a track hides its sub-tracks, in the browser", before === 1 && (await agents()) === 0 && requests === 0, before + " → " + (await agents()) + ", " + requests + " requests");
       await page.getByRole("button", { name: "List/Search" }).click();
-      await page.locator("dialog.tl-patients tr.dt-pick").first().waitFor({ timeout: 120000 });
-      ok("timeline: the patient list opens in a dialog from the navigator", (await page.evaluate(() => [...document.querySelectorAll(".tl-view tr.dt-pick")].every((r) => r.closest("dialog")))) && (await page.locator("dialog.tl-patients").evaluate((d) => d.open)));
-      await page.locator("dialog.tl-patients tr.dt-pick").nth(1).click();
+      await page.locator("[role=dialog].tl-patients tr.dt-pick").first().waitFor({ timeout: 120000 });
+      ok("timeline: the patient list opens in a dialog from the navigator", (await page.evaluate(() => [...document.querySelectorAll("tr.dt-pick")].every((r) => r.closest("[role=dialog].tl-patients")))) && (await page.locator("[role=dialog].tl-patients").isVisible()));
+      await page.locator("[role=dialog].tl-patients tr.dt-pick").nth(1).click();
       await page.waitForFunction(() => document.querySelector(".tl-who")?.textContent !== "P-0000012", null, { timeout: 120000 });
       const second = await who();
       await page.reload({ waitUntil: "domcontentloaded" });
@@ -987,9 +987,10 @@ async function main() {
       // the navigator steps through the list in its order: the second row is patient 2, prev is the first row
       const pos = async () => (await page.locator(".tl-pos").innerText()).trim();
       await page.getByRole("button", { name: "List/Search" }).click();
-      const firstRow = (await page.locator("dialog.tl-patients tr.dt-pick").first().locator("td").first().innerText()).trim();
+      const firstRow = (await page.locator("[role=dialog].tl-patients tr.dt-pick").first().locator("td").first().innerText()).trim();
       await page.keyboard.press("Escape");
-      ok("timeline: Esc closes the patient list", (await page.locator("dialog.tl-patients").count()) === 0);
+      await page.locator("[role=dialog].tl-patients").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+      ok("timeline: Esc closes the patient list", (await page.locator("[role=dialog].tl-patients").count()) === 0);
       const at2 = await pos();
       await page.getByRole("button", { name: "prev", exact: true }).click();
       await page.waitForFunction((s) => document.querySelector(".tl-who")?.textContent !== s && !document.querySelector(".tl-fig.stale"), second, { timeout: 120000 });

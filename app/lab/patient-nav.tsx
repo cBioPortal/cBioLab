@@ -3,9 +3,10 @@
 // tables): ‹ prev / next › through the cohort's patients in the patient list's order — the order its
 // search, filters and sort give it, as the result's `position` places the shown patient — and the
 // list itself (the shared table, app/_table/DataTable.tsx) in a dialog, where a click picks one.
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { ChevronLeft, ChevronRight, List, X } from "lucide-react";
 import { Button } from "../_ui/button";
+import { Dialog, DialogContent, DialogTitle } from "../_ui/dialog";
 import { TB } from "../_ui/toolbar.ts";
 
 export type PatientKey = { study: string; id: string };
@@ -14,32 +15,30 @@ export type ListPosition = { index: number; prev: PatientKey | null; next: Patie
 /** ← and → step to the patient before or after — not while typing, nor inside the list's dialog. */
 export function patientKeys(position: ListPosition, go: (to: PatientKey | null | undefined) => void) {
   return (e: React.KeyboardEvent) => {
-    if ((e.target as Element).closest?.("input, select, textarea, dialog")) return;
+    if ((e.target as Element).closest?.("input, select, textarea, dialog, [role=dialog]")) return;
     if (e.key === "ArrowLeft") { e.preventDefault(); go(position?.prev); }
     if (e.key === "ArrowRight") { e.preventDefault(); go(position?.next); }
   };
 }
 
 /**
- * The patient list as a native modal (Esc, focus trapping and the backdrop are the platform's),
- * mounted while open. Esc inside one of the table's own popovers closes that popover, not the list.
+ * The patient list in a modal, mounted while open. Esc inside one of the table's own popovers closes
+ * that popover, not the list. The dialog is centred without a transform, so the table's popovers,
+ * which are fixed to the viewport, are placed against the viewport.
  */
 export function PatientsDialog({ title, onClose, children }: { title: string; onClose: () => void; children: (close: () => void) => React.ReactNode }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const popEsc = useRef(false);
-  useEffect(() => { const d = ref.current; if (d && !d.open) d.showModal(); }, []);
-  const close = () => ref.current?.close();
   return (
-    <dialog ref={ref} className="tl-patients" aria-label={title} onClose={onClose}
-      onKeyDownCapture={(e) => { popEsc.current = e.key === "Escape" && !!ref.current?.querySelector(".dt-pop"); }}
-      onCancel={(e) => { if (popEsc.current) e.preventDefault(); popEsc.current = false; }}
-      onClick={(e) => { if (e.target === ref.current) close(); }}>
-      <div className="tl-patients-head">
-        <h3 className="flush">{title}</h3>
-        <Button type="button" variant="ghost" size="sm" className={TB} onClick={close} aria-label="close the patient list"><X />close</Button>
-      </div>
-      {children(close)}
-    </dialog>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent aria-describedby={undefined} showCloseButton={false}
+        onEscapeKeyDown={(e) => { if (document.querySelector("[role=dialog].tl-patients .dt-pop")) e.preventDefault(); }}
+        className="tl-patients inset-0 m-auto block h-fit max-h-[88vh] w-[min(94vw,72rem)] max-w-[94vw] translate-none overflow-auto p-4 sm:max-w-[94vw]">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <DialogTitle className="text-base">{title}</DialogTitle>
+          <Button type="button" variant="ghost" size="sm" className={TB} onClick={onClose} aria-label="close the patient list"><X />close</Button>
+        </div>
+        {children(onClose)}
+      </DialogContent>
+    </Dialog>
   );
 }
 

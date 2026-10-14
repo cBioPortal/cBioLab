@@ -19,18 +19,21 @@ import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
 import { OptionSelect } from "../_ui/choice.tsx";
-import { FIELD, TB } from "../_ui/toolbar.ts";
+import { FIELD, SEG_TAB, SEG_TABS, TB } from "../_ui/toolbar.ts";
+import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 
 const framed = (c: { body: string; width: number; height: number } | null) => c ? frame(c.width, c.height, c.body, palette("auto").bg, true) : null;
 export const pFmt = (x: number) => x === 0 ? "< 1e-300" : x < 1e-3 ? x.toExponential(2) : x.toFixed(3);
 
 
-/** Pills over a body, the portal's gene / group selectors. */
+/** Tabs over a body, the portal's gene / group selectors. */
 function Pills({ items, on, set }: { items: string[]; on: string; set: (x: string) => void }) {
   return (
-    <div className="pb-pills" role="tablist">
-      {items.map((x) => <button key={x} type="button" role="tab" aria-selected={x === on} className={x === on ? "on" : undefined} onClick={() => set(x)}>{x}</button>)}
-    </div>
+    <Tabs value={on} onValueChange={set} className="my-2">
+      <TabsList className={SEG_TABS}>
+        {items.map((x) => <TabsTrigger key={x} value={x} className={SEG_TAB}>{x}</TabsTrigger>)}
+      </TabsList>
+    </Tabs>
   );
 }
 
