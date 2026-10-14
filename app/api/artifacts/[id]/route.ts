@@ -25,7 +25,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!UUID_RE.test(id)) return badId();
   try {
     const body = await req.json();
-    const artifact = await updateArtifact(requirePrincipal(req), id, { name: body.name, definition: body.definition });
+    // `version`: the one this change was made from; a stale one is refused (409), not merged
+    const artifact = await updateArtifact(requirePrincipal(req), id, { name: body.name, definition: body.definition, version: body.version });
     if (!artifact) return Response.json({ error: "not found" }, { status: 404 });
     return Response.json({ artifact });
   } catch (e) {

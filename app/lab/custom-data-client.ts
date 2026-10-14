@@ -15,6 +15,7 @@
 //                           none stays on the shared result cache. A name the document pins
 //                           (`uploads`, see bindUploads) resolves to that version; a body that
 //                           carries a spec rather than the document is given the pins with it.
+import type { Sharing } from "../../lib/access.ts";
 import { CUSTOM_PREFIX, LIMITS, type CustomColumn, type CustomDataset, type CustomLevel } from "../../lib/custom-data-names.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
 import { EXAMPLES } from "../../lib/dsl-reference.ts";
@@ -50,22 +51,33 @@ export function referencedDatasets(x: unknown): string[] {
 
 /** A document's pin: the name it uses -> a stored dataset at one version. */
 export interface UploadBinding { as: string; dataset: string; version: number }
-export interface ServerState { enabled: boolean; unlocked: boolean; datasets: DatasetMeta[]; error?: string; /** false until the server has answered once */ loaded?: boolean }
+export interface SignedInUser { id: string; email: string; name: string | null }
+/** How this deployment signs people in (lib/auth.ts): its provider's name, and the development sign-in. */
+export interface LoginOptions { oidc: string | null; dev: boolean }
+export interface ServerState {
+  /** the deployment signs people in at all */
+  enabled: boolean;
+  /** someone is signed in here */
+  unlocked: boolean;
+  user: SignedInUser | null;
+  options: LoginOptions;
+  datasets: DatasetMeta[]; error?: string; /** false until the server has answered once */ loaded?: boolean;
+}
 
-let server: ServerState = { enabled: false, unlocked: false, datasets: [] };
+let server: ServerState = { enabled: false, unlocked: false, user: null, options: { oidc: null, dev: false }, datasets: [] };
 export function serverState(): ServerState { return server; }
 
 /** Ask the server what it holds; quietly "not enabled" where it has no such store. */
 export async function loadServerData(): Promise<void> {
   try {
-    const st = await (await fetch("/api/login")).json() as { enabled: boolean; unlocked: boolean };
+    const st = await (await fetch("/api/auth")).json() as { enabled: boolean; user: SignedInUser | null; options: LoginOptions };
     let datasets: DatasetMeta[] = [];
-    if (st.unlocked) {
+    if (st.user) {
       const j = await (await fetch("/api/custom-data/datasets")).json();
       if (j.error) throw new Error(j.error);
       datasets = j.datasets;
     }
-    server = { enabled: !!st.enabled, unlocked: !!st.unlocked, datasets, loaded: true };
+    server = { enabled: !!st.enabled, unlocked: !!st.user, user: st.user, options: st.options, datasets, loaded: true };
   } catch (e) { server = { ...server, error: String((e as Error)?.message || e), loaded: true }; }
   emit();
 }
@@ -81,18 +93,20 @@ export function loadCustomData(): Promise<void> {
   return loaded;
 }
 
-/**
- * Log in with the deployment's shared password (LOGIN_PASSWORD): the server sets an
- * httpOnly cookie, and custom data becomes readable here. One shared login for now.
- */
-export async function logIn(password: string): Promise<void> {
-  const res = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: password }) });
+/** Sign in through the deployment's provider: leaves the page, and comes back to it signed in. */
+export function signInWithProvider(): void {
+  window.location.assign("/api/auth/login?next=" + encodeURIComponent(location.pathname + location.search));
+}
+/** The development sign-in (lib/auth.ts): any email, no password, where the deployment allows it. */
+export async function devSignIn(email: string): Promise<void> {
+  const res = await fetch("/api/auth/dev", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
   const j = await res.json();
   if (!res.ok) throw new Error(j.error || res.statusText);
+  versionCache.clear();
   await loadServerData();
 }
 export async function logOut(): Promise<void> {
-  await fetch("/api/login", { method: "DELETE" });
+  await fetch("/api/auth/logout", { method: "POST" });
   versionCache.clear();
   await loadServerData();
 }
@@ -107,8 +121,11 @@ export function customDataKey(): string {
   return server.datasets.map((d) => d.slug + "@" + d.latestVersion).join(",");
 }
 
+/** The dataset a document's `custom:<slug>/…` means when it pins none: the reader's own by that
+ *  name, else one shared with them (a pinned document names its dataset by id instead). */
 export function serverBySlug(slug: string): DatasetMeta | undefined {
-  return server.datasets.find((d) => d.slug === slug);
+  const named = server.datasets.filter((d) => d.slug === slug);
+  return named.find((d) => d.owner === server.user?.id) ?? named[0];
 }
 
 async function gzip(text: string): Promise<Blob> {
@@ -119,7 +136,7 @@ const strip = (d: CustomDataset): CustomDataset => ({ id: d.id, name: d.name, le
 
 /** Save a dataset to the server: a new one, or the next version of one (`versionOf`, its id). */
 export async function saveToServer(d: StoredDataset, versionOf?: string): Promise<DatasetMeta> {
-  if (!server.unlocked) throw new Error("log in (top right) to save custom data");
+  if (!server.unlocked) throw new Error("sign in (top right) to save custom data");
   const res = await fetch("/api/custom-data/datasets", { method: "POST", headers: { "Content-Type": "application/gzip" },
     body: await gzip(JSON.stringify({ dataset: strip(d), source: d.source, versionOf })) });
   const j = await res.json();
@@ -130,6 +147,15 @@ export async function saveToServer(d: StoredDataset, versionOf?: string): Promis
 
 export async function deleteServerDataset(id: string): Promise<void> {
   const res = await fetch("/api/custom-data/datasets/" + id, { method: "DELETE" });
+  const j = await res.json();
+  if (!res.ok || j.error) throw new Error(j.error || res.statusText);
+  await loadServerData();
+}
+
+/** Who a stored dataset is shared with (its owner only; lib/access.ts). */
+export async function shareServerDataset(id: string, sharing: Sharing): Promise<void> {
+  const res = await fetch("/api/custom-data/datasets/" + id + "/sharing",
+    { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sharing) });
   const j = await res.json();
   if (!res.ok || j.error) throw new Error(j.error || res.statusText);
   await loadServerData();

@@ -1,9 +1,10 @@
 // Server-stored custom data: uploads saved so an analysis that uses one can be shared and re-run
 // (db/migrations/0003_custom_datasets.sql). The ONLY module that touches those tables.
 //
-// - Every read and write passes canRead / canWrite, which decide by owner and grant. Today the
-//   one principal is "shared" (lib/auth.ts), so both say yes for every live dataset;
-//   per-user and per-group access means filling in the grant table, not changing callers.
+// - Every read and write passes lib/access.ts's canRead / canWrite / canShare: its owner, and its
+//   group or everyone signed in as its sharing says. A principal is a signed-in user's id
+//   (lib/auth.ts); a dataset saved before there were accounts has no owner and is readable by
+//   nobody until scripts/claim-legacy.ts gives it one.
 // - A version is immutable once written (enforced by a trigger too), so a document pinned to
 //   { dataset, version } always reads the same rows.
 // - Rows are stored as gzipped JSON and handed to the browser as stored: the browser sends them
@@ -14,6 +15,7 @@ import { gzipSync, gunzipSync } from "node:zlib";
 import { dbQuery } from "./db.ts";
 import { validateCustomData, type CustomDataset, type CustomColumn, type CustomLevel } from "./custom-data.ts";
 import { AccessError } from "./auth.ts";
+import { groupsOf, readableWhere, canRead, canWrite, canShare, rightsOf, sharingOf, validateSharing, type Rights, type Shareable, type Sharing } from "./access.ts";
 
 export interface DatasetSource { rowsIn: number; unmatched: number; duplicates: number; multiStudy: number; studies: string[] }
 
@@ -22,84 +24,58 @@ export interface DatasetVersionMeta {
   source: DatasetSource; createdBy: string; createdAt: string;
 }
 export interface DatasetMeta {
-  id: string; slug: string; name: string; owner: string; level: CustomLevel;
+  id: string; slug: string; name: string; owner: string; ownerEmail: string; level: CustomLevel;
   latestVersion: number; createdAt: string; updatedAt: string; deletedAt: string | null;
+  sharing: Sharing & { groupName: string | null };
+  /** what the asking user may do with it */
+  rights: Rights;
   versions: DatasetVersionMeta[];
 }
 
-interface DatasetRow { id: string; slug: string; name: string; owner: string; level: CustomLevel; latest_version: number; created_at: string; updated_at: string; deleted_at: string | null }
+interface DatasetRow extends Shareable {
+  id: string; slug: string; name: string; level: CustomLevel; latest_version: number; created_at: string; updated_at: string; deleted_at: string | null;
+  owner_email: string; group_name: string | null;
+}
 interface VersionRow { dataset_id: string; version: number; columns: CustomColumn[]; studies: string[]; row_count: number; rows_gz: Buffer; sha256: string; source: DatasetSource; created_by: string; created_at: string }
-interface GrantRow { dataset_id: string; principal: string; role: "viewer" | "editor" }
 
 // ---------------------------------------------------------------------------
-// Access
+// Storage: SQL against lib/db.ts, which supplies the in-process Postgres where none is configured.
 // ---------------------------------------------------------------------------
 
-function canRead(principal: string, d: DatasetRow, grants: GrantRow[]): boolean {
-  return d.owner === principal || grants.some((g) => g.principal === principal);
-}
-function canWrite(principal: string, d: DatasetRow, grants: GrantRow[]): boolean {
-  return d.owner === principal || grants.some((g) => g.principal === principal && g.role === "editor");
-}
-
-// ---------------------------------------------------------------------------
-// Backend: Postgres, or process memory where no database is configured (the e2e gate, a
-// session without SUPABASE_DB_URL) — never in Vercel production, where losing saved data on a
-// cold start would be worse than refusing.
-// ---------------------------------------------------------------------------
-
-interface Backend {
-  datasets(): Promise<DatasetRow[]>;
+interface Store {
+  /** the live datasets the principal may read (lib/access.ts) */
+  datasets(principal: string): Promise<DatasetRow[]>;
   dataset(id: string): Promise<DatasetRow | null>;
   bySlug(owner: string, slug: string): Promise<DatasetRow | null>;
   versions(ids: string[]): Promise<Omit<VersionRow, "rows_gz">[]>;
   version(id: string, version: number): Promise<VersionRow | null>;
-  grants(ids: string[]): Promise<GrantRow[]>;
   /** creates the dataset row (when `create`) and its next version, atomically */
   write(d: { id: string; slug: string; name: string; owner: string; level: CustomLevel; create: boolean }, v: Omit<VersionRow, "created_at">): Promise<void>;
   softDelete(id: string): Promise<void>;
   log(principal: string, action: "read" | "create" | "version" | "delete", id: string, version: number | null): Promise<void>;
 }
 
-const mem = { datasets: new Map<string, DatasetRow>(), versions: new Map<string, VersionRow>(), log: [] as unknown[] };
-const memoryBackend: Backend = {
-  async datasets() { return [...mem.datasets.values()]; },
-  async dataset(id) { return mem.datasets.get(id) ?? null; },
-  async bySlug(owner, slug) { return [...mem.datasets.values()].find((d) => d.owner === owner && d.slug === slug) ?? null; },
-  async versions(ids) { return [...mem.versions.values()].filter((v) => ids.includes(v.dataset_id)).map(({ rows_gz: _, ...v }) => v); },
-  async version(id, version) { return mem.versions.get(id + "@" + version) ?? null; },
-  async grants() { return []; },
-  async write(d, v) {
-    const now = new Date().toISOString();
-    const prev = mem.datasets.get(d.id);
-    mem.datasets.set(d.id, prev ? { ...prev, name: d.name, latest_version: v.version, updated_at: now }
-      : { id: d.id, slug: d.slug, name: d.name, owner: d.owner, level: d.level, latest_version: v.version, created_at: now, updated_at: now, deleted_at: null });
-    mem.versions.set(d.id + "@" + v.version, { ...v, created_at: now });
-  },
-  async softDelete(id) { const d = mem.datasets.get(id); if (d) d.deleted_at = new Date().toISOString(); },
-  async log(principal, action, id, version) { mem.log.push({ at: new Date().toISOString(), principal, action, id, version }); }
-};
-
+const DATASET = "select d.*, u.email as owner_email, g.name as group_name from custom_dataset d" +
+  " left join app_user u on u.id = d.owner_id left join user_group g on g.id = d.group_id";
 const VERSION_COLS = "dataset_id, version, columns, studies, row_count, sha256, source, created_by, created_at";
-const pgBackend: Backend = {
-  async datasets() { return dbQuery<DatasetRow>("select * from custom_dataset order by updated_at desc limit 500"); },
-  async dataset(id) { return (await dbQuery<DatasetRow>("select * from custom_dataset where id = $1", [id]))[0] ?? null; },
-  async bySlug(owner, slug) { return (await dbQuery<DatasetRow>("select * from custom_dataset where owner = $1 and slug = $2", [owner, slug]))[0] ?? null; },
+const store: Store = {
+  async datasets(principal) {
+    return dbQuery<DatasetRow>(DATASET + " where d.deleted_at is null and " + readableWhere("d", 1) + " order by d.updated_at desc limit 1000", [principal]);
+  },
+  async dataset(id) { return (await dbQuery<DatasetRow>(DATASET + " where d.id = $1", [id]))[0] ?? null; },
+  async bySlug(owner, slug) { return (await dbQuery<DatasetRow>("select * from custom_dataset where owner_id = $1 and slug = $2", [owner, slug]))[0] ?? null; },
   async versions(ids) {
     return ids.length ? dbQuery("select " + VERSION_COLS + " from custom_dataset_version where dataset_id = any($1::uuid[]) order by version", [ids]) : [];
   },
   async version(id, version) {
     return (await dbQuery<VersionRow>("select * from custom_dataset_version where dataset_id = $1 and version = $2", [id, version]))[0] ?? null;
   },
-  async grants(ids) {
-    return ids.length ? dbQuery<GrantRow>("select dataset_id, principal, role from custom_dataset_grant where dataset_id = any($1::uuid[])", [ids]) : [];
-  },
   async write(d, v) {
     // one statement, so a dataset never exists without its version or points past its last one
     await dbQuery(
       "with ds as (" +
       (d.create
-        ? "insert into custom_dataset (id, slug, name, owner, level, latest_version) values ($1::uuid, $2::text, $3::text, $4::text, $5::text, $6::int) returning id"
+        ? "insert into custom_dataset (id, slug, name, owner_id, level, latest_version) values ($1::uuid, $2::text, $3::text, $4::uuid, $5::text, $6::int) returning id"
         : "update custom_dataset set name = $3::text, latest_version = $6::int where id = $1::uuid and latest_version = $6::int - 1 and deleted_at is null" +
           " and $2::text is not null and $4::text is not null and $5::text is not null returning id") +
       ") insert into custom_dataset_version (dataset_id, version, columns, studies, row_count, rows_gz, sha256, source, created_by)" +
@@ -114,25 +90,17 @@ const pgBackend: Backend = {
   }
 };
 
-let warned = false;
-function backend(): Backend {
-  if (process.env.SUPABASE_DB_URL) return pgBackend;
-  if (process.env.VERCEL_ENV === "production")
-    throw new Error("SUPABASE_DB_URL is not set — server-stored custom data is not configured for production");
-  if (!warned) { warned = true; console.warn("[custom-store] SUPABASE_DB_URL is not set; server-stored custom data lives in process memory and is lost on restart"); }
-  return memoryBackend;
-}
-
 // ---------------------------------------------------------------------------
 // Operations
 // ---------------------------------------------------------------------------
 
-/** Postgres hands back timestamps as Date, the memory backend as ISO text: both become ISO text. */
+/** Postgres hands back timestamps as Date; the API speaks ISO text. */
 const iso = (x: unknown): string => x instanceof Date ? x.toISOString() : String(x);
 
-const metaOf = (d: DatasetRow, vs: Omit<VersionRow, "rows_gz">[]): DatasetMeta => ({
-  id: d.id, slug: d.slug, name: d.name, owner: d.owner, level: d.level, latestVersion: d.latest_version,
+const metaOf = (d: DatasetRow, vs: Omit<VersionRow, "rows_gz">[], principal: string, groups: Set<string>): DatasetMeta => ({
+  id: d.id, slug: d.slug, name: d.name, owner: d.owner_id ?? "", ownerEmail: d.owner_email ?? "", level: d.level, latestVersion: d.latest_version,
   createdAt: iso(d.created_at), updatedAt: iso(d.updated_at), deletedAt: d.deleted_at ? iso(d.deleted_at) : null,
+  sharing: { ...sharingOf(d), groupName: d.group_name }, rights: rightsOf(principal, d, groups),
   versions: vs.filter((v) => v.dataset_id === d.id).map((v) => ({
     version: v.version, columns: v.columns, studies: v.studies, rowCount: v.row_count, sha256: v.sha256,
     source: v.source, createdBy: v.created_by, createdAt: iso(v.created_at)
@@ -141,31 +109,27 @@ const metaOf = (d: DatasetRow, vs: Omit<VersionRow, "rows_gz">[]): DatasetMeta =
 
 /** Every live dataset this principal may read, newest first, without rows. */
 export async function listDatasets(principal: string): Promise<DatasetMeta[]> {
-  const b = backend();
-  const all = (await b.datasets()).filter((d) => !d.deleted_at);
-  const grants = await b.grants(all.map((d) => d.id));
-  const mine = all.filter((d) => canRead(principal, d, grants.filter((g) => g.dataset_id === d.id)));
-  const vs = await b.versions(mine.map((d) => d.id));
-  return mine.map((d) => metaOf(d, vs));
+  const [all, groups] = await Promise.all([store.datasets(principal), groupsOf(principal)]);
+  const vs = await store.versions(all.map((d) => d.id));
+  return all.map((d) => metaOf(d, vs, principal, groups));
 }
 
-async function readable(principal: string, id: string): Promise<DatasetRow> {
-  const b = backend();
-  const d = /^[0-9a-f-]{36}$/.test(id) ? await b.dataset(id) : null;
-  if (!d || !canRead(principal, d, await b.grants([d.id]))) throw new AccessError("no custom dataset " + id + " that you may read", 404);
-  return d;
+async function readable(principal: string, id: string): Promise<{ d: DatasetRow; groups: Set<string> }> {
+  const d = /^[0-9a-f-]{36}$/.test(id) ? await store.dataset(id) : null;
+  const groups = await groupsOf(principal);
+  if (!d || !canRead(principal, d, groups)) throw new AccessError("no custom dataset " + id + " that you may read", 404);
+  return { d, groups };
 }
 
 /** One version's rows (gzipped JSON, as stored) and its metadata. Logged. */
 export async function readVersion(principal: string, id: string, version?: number): Promise<{ meta: DatasetMeta; version: number; rowsGz: Buffer }> {
-  const b = backend();
-  const d = await readable(principal, id);
+  const { d, groups } = await readable(principal, id);
   if (d.deleted_at) throw new AccessError("custom dataset “" + d.name + "” (" + d.slug + ") was deleted on " + iso(d.deleted_at).slice(0, 10), 410);
   const n = version ?? d.latest_version;
-  const v = await b.version(d.id, n);
+  const v = await store.version(d.id, n);
   if (!v) throw new AccessError("custom dataset “" + d.name + "” has no version " + n + " (latest is " + d.latest_version + ")", 404);
-  await b.log(principal, "read", d.id, n);
-  return { meta: metaOf(d, await b.versions([d.id])), version: n, rowsGz: Buffer.from(v.rows_gz) };
+  await store.log(principal, "read", d.id, n);
+  return { meta: metaOf(d, await store.versions([d.id]), principal, groups), version: n, rowsGz: Buffer.from(v.rows_gz) };
 }
 
 /**
@@ -174,7 +138,6 @@ export async function readVersion(principal: string, id: string, version?: numbe
  * engine would refuse.
  */
 export async function saveDataset(principal: string, input: unknown, source: unknown, versionOf?: string): Promise<DatasetMeta> {
-  const b = backend();
   const [ds] = validateCustomData([input]) as [CustomDataset];
   if (!ds || !ds.rows.length) throw new Error("a dataset needs at least one row");
   const src = (source && typeof source === "object" ? source : {}) as Partial<DatasetSource>;
@@ -187,31 +150,41 @@ export async function saveDataset(principal: string, input: unknown, source: unk
       multiStudy: Number(src.multiStudy) || 0, studies: Array.isArray(src.studies) ? src.studies.map(String).slice(0, 50) : studies },
     created_by: principal
   };
-  let target: DatasetRow | null = null;
+  let target: DatasetRow | null = null, groups = new Set<string>();
   if (versionOf) {
-    target = await readable(principal, versionOf);
+    ({ d: target, groups } = await readable(principal, versionOf));
     if (target.deleted_at) throw new AccessError("custom dataset “" + target.name + "” was deleted; save it as a new dataset", 410);
-    if (!canWrite(principal, target, await b.grants([target.id]))) throw new AccessError("you may read “" + target.name + "” but not add versions to it", 403);
+    if (!canWrite(principal, target, groups)) throw new AccessError("you may read “" + target.name + "” but not add versions to it", 403);
     if (target.level !== ds.level) throw new Error("“" + target.name + "” is " + target.level + "-level; a new version must be too");
   } else {
-    const clash = await b.bySlug(principal, ds.id);
+    const clash = await store.bySlug(principal, ds.id);
     // a deleted dataset keeps its name, so an analysis pinned to it is still refused as deleted rather than reading another
     if (clash?.deleted_at) throw new Error("the name " + ds.id + " belonged to a dataset that was deleted, and is not reused: rename this upload");
     if (clash) throw new Error("a server dataset is already named " + ds.id + ": save as a new version of it, or rename this upload");
   }
   const id = target?.id ?? randomUUID(), version = target ? target.latest_version + 1 : 1;
-  await b.write({ id, slug: target?.slug ?? ds.id, name: ds.name, owner: target?.owner ?? principal, level: ds.level, create: !target },
+  await store.write({ id, slug: target?.slug ?? ds.id, name: ds.name, owner: target?.owner_id ?? principal, level: ds.level, create: !target },
     { dataset_id: id, version, ...row });
-  await b.log(principal, target ? "version" : "create", id, version);
-  return metaOf((await b.dataset(id))!, await b.versions([id]));
+  await store.log(principal, target ? "version" : "create", id, version);
+  return metaOf((await store.dataset(id))!, await store.versions([id]), principal, target ? groups : await groupsOf(principal));
 }
 
+/** Delete (its owner only). */
 export async function deleteDataset(principal: string, id: string): Promise<void> {
-  const b = backend();
-  const d = await readable(principal, id);
-  if (!canWrite(principal, d, await b.grants([d.id]))) throw new AccessError("you may read “" + d.name + "” but not delete it", 403);
-  await b.softDelete(d.id);
-  await b.log(principal, "delete", d.id, null);
+  const { d } = await readable(principal, id);
+  if (!canShare(principal, d)) throw new AccessError("only its owner can delete “" + d.name + "”", 403);
+  await store.softDelete(d.id);
+  await store.log(principal, "delete", d.id, null);
+}
+
+/** Change how a dataset is shared (its owner only). It holds patient-level values: never shared but by this. */
+export async function shareDataset(principal: string, id: string, sharing: unknown): Promise<DatasetMeta> {
+  const { d, groups } = await readable(principal, id);
+  if (!canShare(principal, d)) throw new AccessError("only its owner can change who “" + d.name + "” is shared with", 403);
+  if (d.deleted_at) throw new AccessError("custom dataset “" + d.name + "” was deleted", 410);
+  const s = validateSharing(sharing, groups);
+  await dbQuery("update custom_dataset set visibility = $2, group_id = $3, group_can_edit = $4 where id = $1", [id, s.visibility, s.groupId, s.groupCanEdit]);
+  return metaOf((await store.dataset(id))!, await store.versions([id]), principal, groups);
 }
 
 export function unpackRows(rowsGz: Buffer): CustomDataset["rows"] {

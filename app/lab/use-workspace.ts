@@ -8,7 +8,10 @@ import type { AnalysisDoc } from "../../lib/types.ts";
 import { EMPTY_DOC } from "./doc-store.ts";
 
 import type { DocStore } from "./doc-store.ts";
-import type { SavedWorkspace } from "./use-saved.ts";
+import type { SavedWorkspace, Shared } from "./use-saved.ts";
+
+/** An analysis someone else shared, opened as a working copy: where it came from, and the version opened. */
+export interface SharedOpen { id: string; name: string; owner: string; canEdit: boolean; version: number }
 
 /** What useWorkspace needs from the analysis page. */
 export interface WorkspacePage {
@@ -21,14 +24,22 @@ export interface WorkspacePage {
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   setStudy: React.Dispatch<React.SetStateAction<string>>;
   spaces: Record<string, SavedWorkspace>;
+  /** analyses others shared with the reader */
+  sharedSpaces: Shared<SavedWorkspace>[];
+  /** save over a shared analysis from the version opened; answers its new version */
+  saveShared: (id: string, name: string, doc: AnalysisDoc, version: number) => Promise<{ version: number }>;
   study: string;
 }
 
 export function useWorkspace(page: WorkspacePage) {
-  const { canSave, doc, docs, goTab, persistSpaces, removeSpace, setError, setStudy, spaces, study } = page;
+  const { canSave, doc, docs, goTab, persistSpaces, removeSpace, setError, setStudy, spaces, sharedSpaces, saveShared, study } = page;
 
   const [wsOpen, setWsOpen] = useState(false);
   const [wsError, setWsError] = useState<string | null>(null);
+  // the shared analysis this document was opened from; it stops applying once another document
+  // (another title) is on the page
+  const [sharedFrom, setSharedFrom] = useState<SharedOpen | null>(null);
+  const sharedOpen = sharedFrom && doc.title === sharedFrom.name && !spaces[doc.title] ? sharedFrom : null;
 
   // ---- editing a view's note (the gear menu's "add note…" / "edit note…") -
   const [viewNoteEditing, setViewNoteEditing] = useState<number | null>(null); // index into doc.views / result.views
@@ -49,10 +60,31 @@ export function useWorkspace(page: WorkspacePage) {
     const w = spaces[name];
     if (!w) return;
     const d = w.doc;
+    setSharedFrom(null);
     docs.replace(d);
     setError(null);
     if (d.study) setStudy(d.study);
     goTab("analysis");
+  };
+  /** Open an analysis someone shared: a working copy, titled as theirs, that remembers its source. */
+  const openShared = (id: string) => {
+    const x = sharedSpaces.find((s) => s.id === id);
+    if (!x) return;
+    const d = { ...x.item.doc, title: x.name };
+    setSharedFrom({ id, name: x.name, owner: x.owner.name || x.owner.email, canEdit: x.rights.edit, version: x.version });
+    docs.replace(d);
+    setError(null);
+    if (d.study) setStudy(d.study);
+    goTab("analysis");
+  };
+  /** Save the working copy back over the shared analysis — refused if someone saved it since it was opened. */
+  const confirmSharedSave = async () => {
+    if (!sharedOpen) return;
+    setWsError(null);
+    try {
+      const a = await saveShared(sharedOpen.id, sharedOpen.name, doc, sharedOpen.version);
+      setSharedFrom({ ...sharedOpen, version: a.version });
+    } catch (e) { setWsError("could not save: " + String((e as Error)?.message || e)); }
   };
   const deleteWorkspace = async (name: string) => {
     setWsError(null);
@@ -113,5 +145,5 @@ export function useWorkspace(page: WorkspacePage) {
     docs.set(d); setError(null);
   };
 
-  return { wsOpen, setWsOpen, wsError, setWsError, viewNoteEditing, setViewNoteEditing, openWorkspaceSave, confirmWorkspaceSave, openWorkspace, deleteWorkspace, makeTemplate, setParam, setNotes, analysisSaved, noteEdit, openViewNoteEdit, confirmViewNoteEdit, clearAnalysis };
+  return { sharedOpen, openShared, confirmSharedSave, wsOpen, setWsOpen, wsError, setWsError, viewNoteEditing, setViewNoteEditing, openWorkspaceSave, confirmWorkspaceSave, openWorkspace, deleteWorkspace, makeTemplate, setParam, setNotes, analysisSaved, noteEdit, openViewNoteEdit, confirmViewNoteEdit, clearAnalysis };
 }

@@ -36,13 +36,14 @@ async function main() {
   const ok = (name, cond, extra) =>
     results.push((cond ? "PASS " : "FAIL ") + name + (extra ? "  [" + extra + "]" : ""));
 
-  // Saved cohorts and analyses need the login (lib/auth.ts). scripts/gate.sh gives its server a
-  // throwaway password and passes it here; logged out, the store must refuse.
-  const LOGIN = process.env.E2E_LOGIN_PASSWORD || "";
+  // Saved cohorts and analyses need a sign-in (lib/auth.ts). scripts/gate.sh turns on its server's
+  // development sign-in and passes the email to sign in as here; signed out, the store must refuse.
+  const LOGIN = process.env.E2E_LOGIN_EMAIL || "";
+  const signIn = (ctx, email = LOGIN) => ctx.request.post(BASE + "/api/auth/dev", { data: { email } });
   {
     const anon = await browser.newContext();
     const r = await anon.request.get(BASE + "/api/artifacts?kind=cohort");
-    ok("saved cohorts are refused without the login", r.status() === 403 || r.status() === 404, "HTTP " + r.status());
+    ok("saved cohorts are refused without a sign-in", r.status() === 403 || r.status() === 404, "HTTP " + r.status());
     // a built server knows its commit (lib/build-info.ts), says it at /api/version, and every page's footer agrees
     const v = await (await anon.request.get(BASE + "/api/version")).json();
     ok("/api/version names the commit this build was made from", /^[0-9a-f]{40}(\+dirty)?$/.test(v.commit || "") && /\/commit\/[0-9a-f]{40}$/.test(v.url || ""), JSON.stringify(v));
@@ -54,11 +55,85 @@ async function main() {
     await anon.close();
   }
 
+  // Two people: what one saves, the other can neither list, open, change nor delete.
+  if (LOGIN) {
+    const a = await browser.newContext(), b = await browser.newContext();
+    const steps = {};
+    try {
+      await signIn(a, "owner." + LOGIN); await signIn(b, "other." + LOGIN);
+      const made = (await (await a.request.post(BASE + "/api/artifacts", { data: { kind: "cohort", name: "e2e private", definition: { all: [] } } })).json()).artifact;
+      steps.listed = ((await (await b.request.get(BASE + "/api/artifacts?kind=cohort")).json()).artifacts || []).some((x) => x.id === made.id);
+      steps.open = (await b.request.get(BASE + "/api/artifacts/" + made.id)).status();
+      steps.patch = (await b.request.patch(BASE + "/api/artifacts/" + made.id, { data: { name: "taken" } })).status();
+      steps.del = (await b.request.delete(BASE + "/api/artifacts/" + made.id)).status();
+      steps.ownerStill = (await (await a.request.get(BASE + "/api/artifacts/" + made.id)).json()).artifact?.name;
+      await a.request.delete(BASE + "/api/artifacts/" + made.id);
+    } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
+    ok("one person's saved cohort is invisible and untouchable to another",
+      steps.listed === false && steps.open === 404 && steps.patch === 404 && steps.del === 404 && steps.ownerStill === "e2e private", JSON.stringify(steps));
+    await a.close(); await b.close();
+  }
+
+  // Sharing through the page: an owner makes a group on the Groups page, adds someone by email,
+  // shares a cohort with it from the Saved tab's dialog and an analysis the group may edit; the
+  // member sees both under "Shared with you", opens the analysis and saves back to it, after which
+  // the owner's save from the version they had is refused rather than overwriting.
+  if (LOGIN) {
+    const T = Date.now().toString(36), A = "ada." + T + "." + LOGIN, B = "bob." + T + "." + LOGIN;
+    const ca = await browser.newContext({ viewport: { width: 1400, height: 900 } }), cb = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+    const steps = {}, errs = [];
+    try {
+      await signIn(ca, A); await signIn(cb, B);
+      const a = await ca.newPage();
+      a.on("pageerror", (e) => errs.push(e.message));
+      await a.goto(BASE + "/groups", { waitUntil: "domcontentloaded" });
+      await a.locator("input[aria-label='new group name']").fill("e2e lab " + T);
+      await a.locator("button", { hasText: "Make group" }).click();
+      await a.locator(".groupcard h2", { hasText: "e2e lab " + T }).waitFor({ timeout: 120000 });
+      await a.locator("input[aria-label='email to add']").fill(B);
+      await a.locator(".groupcard button", { hasText: "Add" }).click();
+      steps.member = await a.locator(".membertable td", { hasText: B }).waitFor({ timeout: 30000 }).then(() => true, () => false);
+      const mk = async (kind, name, definition) => (await (await ca.request.post(BASE + "/api/artifacts", { data: { kind, name, definition } })).json()).artifact;
+      await mk("cohort", "e2e shared cohort " + T, { all: [{ kind: "oql", q: "KRAS: MUT" }] });
+      const ws = await mk("workspace", "e2e shared analysis " + T, { study: "msk_chord_2024", title: "e2e shared analysis " + T,
+        cohorts: { "KRAS mutant": { all: [{ kind: "oql", q: "KRAS: MUT" }] } }, views: [] });
+      await a.goto(BASE + "/lab?tab=cohorts", { waitUntil: "domcontentloaded" });
+      const dlg = a.locator("[role=dialog].sharedialog");
+      const shareFrom = async (row, edit) => {
+        await row.locator("button.sharebadge").click({ timeout: 120000 });
+        await dlg.locator("label", { hasText: "A group" }).click();
+        await dlg.locator("[role=combobox][title=group]").click();
+        await a.locator("[role=option]").first().click();
+        if (edit) await dlg.locator("label", { hasText: "can edit it too" }).click();
+        await dlg.locator("button[type=submit]").click();
+        return row.locator("button.sharebadge", { hasText: "shared:" }).innerText({ timeout: 30000 }).catch(() => "");
+      };
+      steps.cohort = await shareFrom(a.locator(".listrow", { hasText: "e2e shared cohort " + T }), false);
+      await a.getByRole("tab", { name: "Analyses" }).click();
+      steps.analysis = await shareFrom(a.locator(".listrow", { hasText: "e2e shared analysis " + T }), true);
+      const b = await cb.newPage();
+      b.on("pageerror", (e) => errs.push(e.message));
+      await b.goto(BASE + "/lab?tab=cohorts", { waitUntil: "domcontentloaded" });
+      steps.bobSees = (await b.locator(".listrow", { hasText: "e2e shared cohort " + T }).innerText({ timeout: 120000 }).catch(() => "")).includes("from " + A);
+      await b.getByRole("tab", { name: "Analyses" }).click();
+      await b.locator(".listrow", { hasText: "e2e shared analysis " + T }).locator("button", { hasText: "open" }).click();
+      await b.locator("button[title*='” — ']").first().click({ timeout: 120000 });
+      await b.locator("[role=dialog].wsdialog button", { hasText: "Save to theirs" }).click();
+      for (let i = 0; i < 40 && (await (await ca.request.get(BASE + "/api/artifacts/" + ws.id)).json()).artifact.version < 2; i++) await b.waitForTimeout(250);
+      steps.savedBack = (await (await ca.request.get(BASE + "/api/artifacts/" + ws.id)).json()).artifact.version;
+      steps.stale = (await ca.request.patch(BASE + "/api/artifacts/" + ws.id, { data: { name: "x", definition: { views: [] }, version: 1 } })).status();
+    } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
+    ok("sharing from the page: a group, a shared cohort and an editable analysis, saved back by the member, a stale save refused",
+      steps.member && /^shared: “e2e lab/.test(steps.cohort) && /who can edit$/.test(steps.analysis) && steps.bobSees &&
+      steps.savedBack === 2 && steps.stale === 409 && !errs.length, JSON.stringify({ ...steps, errs }));
+    await ca.close(); await cb.close();
+  }
+
   for (const scheme of ["light", "dark"]) {
     const ctx = await browser.newContext({ colorScheme: scheme, viewport: { width: 1360, height: 900 } });
     if (LOGIN) {
-      const r = await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
-      ok("logs in (" + scheme + ")", r.ok(), "HTTP " + r.status());
+      const r = await signIn(ctx);
+      ok("signs in (" + scheme + ")", r.ok(), "HTTP " + r.status());
     }
     const page = await ctx.newPage();
     const errors = [];
@@ -1144,13 +1219,15 @@ async function main() {
     const sp = await ctx.newPage();
     let steps = {};
     try {
-      await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
+      await signIn(ctx);
       const name = "e2e source " + Date.now();
       const v1 = { study: "msk_chord_2024", all: [{ kind: "oql", q: "KRAS: MUT" }] };
       const v2 = { study: "msk_chord_2024", all: [{ kind: "oql", q: "KRAS: MUT" }, { kind: "clinical", attribute: "SEX", values: ["Female"] }] };
       const made = await (await ctx.request.post(BASE + "/api/artifacts", { data: { kind: "cohort", name, definition: v1 } })).json();
       const id = made.artifact.id;
       const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
+      // the store is jsonb, which does not keep key order: compare values, not text
+      const keyed = (x) => JSON.stringify(x, (_, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a < b ? -1 : 1)) : v);
       await sp.goto(BASE + "/lab?tab=analysis", { waitUntil: "domcontentloaded" });
       await sp.locator(".addview button:has-text('Survival')").click();
       await sp.locator(".emptyview .emptyview-body button").first().click();
@@ -1162,12 +1239,12 @@ async function main() {
       await ctx.request.patch(BASE + "/api/artifacts/" + id, { data: { name, definition: v2 } });
       await sp.reload({ waitUntil: "domcontentloaded" });
       await sp.waitForSelector(".srcbadge.changed", { timeout: 120000 });
-      steps.untouched = JSON.stringify((await docOf()).cohorts[name].all) === JSON.stringify(v1.all);
+      steps.untouched = keyed((await docOf()).cohorts[name].all) === keyed(v1.all);
       await sp.locator(".srcbadge.changed").click();
       await sp.getByRole("button", { name: "Update to the saved version" }).click();
       await sp.waitForFunction(() => !document.querySelector(".srcbadge.changed"), null, { timeout: 60000 });
       const after = (await docOf()).cohorts[name];
-      steps.updated = JSON.stringify(after.all) === JSON.stringify(v2.all) && after.from.hash !== copied.from.hash;
+      steps.updated = keyed(after.all) === keyed(v2.all) && after.from.hash !== copied.from.hash;
       await ctx.request.delete(BASE + "/api/artifacts/" + id);
     } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
     ok("a saved cohort is copied with its source, left alone when the saved one changes, and updated on request",
@@ -1181,7 +1258,7 @@ async function main() {
     const sp = await ctx.newPage();
     let steps = {};
     try {
-      await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
+      await signIn(ctx);
       const name = "e2e save " + Date.now();
       const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
       const open = async (doc) => {

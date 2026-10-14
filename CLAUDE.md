@@ -144,7 +144,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   An envelope checks only the route's own parameters (which view, which page, which uploads) and
   passes the document, definition or spec it carries to the engine — don't grow it into a second
   schema of the DSL. A new endpoint the pages call gets an envelope and an `api` function. The one
-  exception is the login and custom-data endpoints (`/api/login`, `/api/custom-data/*`): they
+  exception is the sign-in and custom-data endpoints (`/api/auth*`, `/api/custom-data/*`): they
   belong to `app/lab/custom-data-client.ts`, which owns that state and which `api.ts` itself
   imports, so it calls them directly — through it, never from a component.
 - **Custom data** — a researcher's uploaded annotations, named `custom:<dataset>/<COLUMN>` and
@@ -158,14 +158,51 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   ships nothing. `lib/custom-data-server.ts` is the request boundary (patient-level studies only,
   id matching, "save as feature" membership). Results that use uploads bypass the shared cache;
   a document naming an upload the request lacks is refused (`assertCustomDataPresent`).
-  **Server-stored custom data** (`lib/custom-store.ts`, the only module touching its tables;
-  `lib/auth.ts`): enabled only where `LOGIN_PASSWORD` is set, one shared
-  principal unlocked by that code. A document pins what it uses as `uploads: [{as, dataset,
-  version}]` (added by the page on run); requests send `customRefs` and the server loads the
-  pinned, immutable version. **The login** (`lib/auth.ts`, the header's Log in): one shared
-  password, `LOGIN_PASSWORD`, guards custom data AND saved cohorts/analyses (`/api/artifacts`,
-  owner-scoped; ownerless rows from before the login read as the shared principal's).
-  `scripts/gate.sh` gives its e2e server a throwaway password. Per-user access is not built yet.
+  **Server-stored custom data** (`lib/custom-store.ts`, the only module touching its tables):
+  enabled only where the deployment signs people in, each dataset its saver's. A document pins
+  what it uses as `uploads: [{as, dataset, version}]` (added by the page on run); requests send
+  `customRefs` and the server loads the pinned, immutable version.
+- **Signing in** (`lib/auth.ts`, the header's Sign in) guards custom data, saved
+  cohorts/analyses (`/api/artifacts`) and campaign changes; exploring, analyses, `?doc=` links and
+  MCP need none. A deployment has ONE way in: an OpenID Connect provider (`lib/oidc.ts`;
+  `AUTH_OIDC_ISSUER`/`_CLIENT_ID`/`_CLIENT_SECRET`, optional `AUTH_OIDC_LABEL`, `AUTH_URL` behind a
+  proxy — Google on Vercel, MSK's Keycloak realm `msk` on the private cluster), and/or the
+  development sign-in (`AUTH_DEV_LOGIN=1`: any email, no password; refused on Vercel production;
+  what `scripts/gate.sh` and session dev servers use). A session is an httpOnly cookie signed with
+  `AUTH_SESSION_SECRET` naming the user; stores decide by that user's id. **People** are
+  `lib/users.ts` (`db/migrations/0004_users.sql`): a sign-in is found by provider + subject, and
+  joins an existing user (e.g. one added by email) only through a provider-VERIFIED email. Rows
+  from before accounts have no owner and are seen by nobody until `npm run db:claim-legacy --
+  <email>` gives them to someone. The OIDC flow is tested end to end against a stand-in provider
+  (`test/oidc.test.ts`).
+- **Sharing** (`lib/access.ts` — THE place the rules live; `db/migrations/0005_sharing.sql`): a saved
+  cohort, analysis or custom dataset has an owner and a sharing — `visibility` private | group |
+  public (everyone signed in to the deployment), ONE `group_id`, and `group_can_edit`. The owner
+  alone deletes or reshares, and only with a group they belong to; a stale edit is refused (409,
+  `saved_artifacts.version`). Lists filter in SQL (`readableWhere`), single items in code
+  (`canRead`/`canWrite`/`canShare`); both stores call it, never a rule of their own. Sharing an
+  analysis wider than a custom dataset it pins returns `warnings` naming the dataset — patient-level
+  data is never shared but by its own owner, explicitly. **Groups** (`lib/groups.ts`) are run by
+  their admins (always at least one); people are added by email, signed in yet or not; deleting a
+  group makes what it shared private. The access matrix is in `test/support/store-contracts.ts`
+  (`sharingContract`), and `npm run check:access-mutants` (a gate stage) plants six sharing bugs
+  into a copy of `lib/access.ts` and requires each to fail it. A change to the rules updates both.
+  On the page, the reader's OWN items stay keyed by name (`use-saved.ts`); others' come separately,
+  keyed by id, since two people may use one name. UI: `app/lab/share-dialog.tsx` (owner only; from
+  the Saved tab's badges and the custom-data manager), the Saved tab's "Shared with you" sections,
+  `/groups` (`app/groups/page.tsx`, linked from the signed-in header). Opening someone else's analysis
+  gives a working copy that remembers its source (`use-workspace.ts` `sharedOpen`); where the group
+  may edit, the workspace dialog's "Save to theirs" saves back from the version opened.
+- **The writable store** (`lib/db.ts`, the only Postgres client): saved cohorts and analyses,
+  campaigns and custom data. `DATABASE_URL` (or its older name `SUPABASE_DB_URL`) names the
+  Postgres; without one, outside Vercel production, `lib/db.ts` runs an in-process Postgres
+  (PGlite) itself — in `.data/pglite` under `next dev`, in memory otherwise (so every gate run
+  starts empty) — so there is one SQL path and no second, hand-written store to keep in step.
+  **Migrations** are `db/migrations/*.sql`, applied in name order by **`lib/migrate.ts`**, which
+  records each in `schema_migrations`; every migration must stay re-runnable (`if not exists`,
+  `drop trigger if exists`). A configured database is migrated only by `npm run db:migrate`
+  (`npm run db:status` lists applied and pending), never by the app — run it before deploying
+  code that needs a new migration. The in-process database migrates itself on first use.
 - **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Saved /
   Analysis / Examples. Tabs move out into their own components as they are untangled
   (`saved-tab.tsx`, `examples-tab.tsx`), and each view kind's card is its own component in
@@ -524,10 +561,9 @@ they can't tell you:
   federated views, cohort-definition semantics, clinical-course semantics, and the SVG figure
   renderers, plots, gene tracks, template parameters and the panel-aware denominator;
   252 checks across 40 suites). `npm run test:db` (~15 s, in `scripts/gate.sh`) runs the stores'
-  Postgres SQL, `db/migrations` and their triggers on an in-process Postgres (PGlite,
-  `test/postgres.db-test.ts`) — the e2e gate uses the in-memory fallback, so that is the only place
-  the database path is exercised. A store promise belongs in `test/support/store-contracts.ts`,
-  which runs on both backends.
+  Postgres SQL, `db/migrations`, their runner and their triggers on an in-process Postgres (PGlite,
+  `test/postgres.db-test.ts`). A store promise belongs in `test/support/store-contracts.ts`, which
+  runs there and on `lib/db.ts`'s own fallback.
   `node e2e.cjs` — 81 checks (Playwright + docs gate + the boundary suite + the
   denominator gate).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.

@@ -56,7 +56,7 @@ export default function CampaignIndex() {
           <p className="camp-help">
             This site does not call an AI model. Your assistant in the browser starts the campaign and writes its hypotheses
             through the tools this page exposes (<a href="#for-ai-agents">For AI agents</a>, below); the site checks everything
-            it submits against the data and keeps the record. Starting a campaign, and changing one, needs the login (top
+            it submits against the data and keeps the record. Starting a campaign, and changing one, needs you to sign in (top
             right); reading them does not. Open the sidebar on this page and give it your question:
           </p>
           <Prompt label="Start a campaign over WebMCP" text={START_PROMPT} />

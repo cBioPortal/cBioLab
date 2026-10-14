@@ -25,7 +25,7 @@ export interface AddCohortTarget {
 }
 
 export interface LibraryState {
-  /** saved cohorts are the login's: "locked" when logged out, "off" where there is no login */
+  /** saved cohorts are the signed-in reader's: "locked" when signed out, "off" where there is no sign-in */
   saved: "off" | "locked" | "loading" | "ready" | "error";
   savedError?: string | null;
   /** the login's saved cohorts: `id` is the artifact's, which survives a rename */
@@ -133,8 +133,8 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
         {source === "library" && <>
           <Input className="h-8 text-md md:text-md" placeholder="search the library…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
           <h4 className="acd-h">Your saved cohorts</h4>
-          {library.saved === "off" ? <p className="note">This deployment has no login, so it keeps no saved cohorts.</p>
-            : library.saved === "locked" ? <p className="note"><Button variant="link" size="inline" className="text-md" onClick={onLogin}>Log in</Button> to see your saved cohorts.</p>
+          {library.saved === "off" ? <p className="note">This deployment has no sign-in, so it keeps no saved cohorts.</p>
+            : library.saved === "locked" ? <p className="note"><Button variant="link" size="inline" className="text-md" onClick={onLogin}>Sign in</Button> to see your saved cohorts.</p>
             : library.saved === "loading" ? <p className="note"><span className="spinner" /> loading your saved cohorts…</p>
             : library.saved === "error" ? <p className="error">Your saved cohorts could not be loaded: {library.savedError || "unknown error"}</p>
             : !library.cohorts.length ? <p className="note">You have no saved cohorts yet — save one from Explore (“Save as a cohort”).</p>

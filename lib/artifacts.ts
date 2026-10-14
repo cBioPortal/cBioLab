@@ -2,9 +2,12 @@
 // db/migrations/0001_saved_artifacts.sql). Definitions only — never a frozen
 // evaluation or a patient/sample id; see lib/db.ts and RATIONALE.md.
 //
-// Every call is made as a principal (lib/auth.ts): a row is visible to, and changed by, its
-// owner only. Rows saved before there was a login have no owner and belong to the shared
-// principal — today's only one — so nothing saved earlier disappears.
+// Every call is made as a principal — the signed-in user's id (lib/auth.ts). Who may see, change
+// and share a row is lib/access.ts's to decide: its owner always; its group or everyone signed in
+// as its sharing says. Something the principal may not see reads as absent; something they may
+// see but not change is refused (403); a change made from a stale copy is refused (409). Rows
+// saved before there were accounts have no owner and are seen by nobody until
+// scripts/claim-legacy.ts gives them one.
 //
 // Schema-versioned like the DSL documents themselves: CURRENT_SCHEMA_VERSION
 // is stamped on every write, and `migrate()` is the one place a stored
@@ -14,9 +17,10 @@
 // version, so migrate() is the identity function — but the column and the
 // call site exist now, while adding them costs nothing, rather than being
 // retrofitted under pressure the day the DSL makes a breaking change.
-import { randomUUID } from "node:crypto";
 import { dbQuery } from "./db.ts";
-import { SHARED_PRINCIPAL } from "./auth.ts";
+import { AccessError } from "./auth.ts";
+import { groupsOf, readableWhere, canRead, canWrite, canShare, rightsOf, sharingOf, validateSharing, covers,
+  type Rights, type Shareable, type Sharing, type Visibility } from "./access.ts";
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
@@ -30,7 +34,16 @@ export interface SavedArtifact {
   definition: unknown;
   createdAt: string;
   updatedAt: string;
+  /** counts writes: an update naming an older one is refused */
+  version: number;
+  owner: { id: string; email: string; name: string | null };
+  sharing: Sharing & { groupName: string | null };
+  /** what the asking user may do with it */
+  rights: Rights;
 }
+
+/** A custom dataset an analysis uses that some of the people it is shared with cannot read. */
+export interface DatasetWarning { id: string; slug: string; name: string; visibility: Visibility; groupName: string | null; yours: boolean }
 
 const KINDS: ArtifactKind[] = ["cohort", "workspace"];
 export function isArtifactKind(k: unknown): k is ArtifactKind {
@@ -44,20 +57,24 @@ function migrate(kind: ArtifactKind, definition: unknown, fromVersion: number): 
   return definition;
 }
 
-interface Row { id: string; kind: ArtifactKind; name: string; schema_version: number; definition: unknown; owner?: string | null; created_at: string | Date; updated_at: string | Date }
+interface Row extends Shareable {
+  id: string; kind: ArtifactKind; name: string; schema_version: number; definition: unknown; version: number;
+  created_at: string | Date; updated_at: string | Date;
+  owner_email: string; owner_name: string | null; group_name: string | null;
+}
 
-/** Postgres hands back timestamps as Date, the memory backend as ISO text: both become ISO text. */
+/** Postgres hands back timestamps as Date; the API speaks ISO text. */
 const iso = (t: string | Date): string => new Date(t).toISOString();
 
-/** An owner column of null predates the login and is read as the shared principal's. */
-const ownerOf = (r: Row) => r.owner ?? SHARED_PRINCIPAL;
-
-function fromRow(r: Row): SavedArtifact {
+function fromRow(r: Row, principal: string, groups: Set<string>): SavedArtifact {
   return {
     id: r.id, kind: r.kind, name: r.name,
     schemaVersion: CURRENT_SCHEMA_VERSION,
     definition: migrate(r.kind, r.definition, r.schema_version),
-    createdAt: iso(r.created_at), updatedAt: iso(r.updated_at)
+    createdAt: iso(r.created_at), updatedAt: iso(r.updated_at), version: r.version,
+    owner: { id: r.owner_id!, email: r.owner_email, name: r.owner_name },
+    sharing: { ...sharingOf(r), groupName: r.group_name },
+    rights: rightsOf(principal, r, groups),
   };
 }
 
@@ -67,132 +84,104 @@ function validateName(name: unknown): string {
   if (s.length > 200) throw new Error("name is too long (200 chars max)");
   return s;
 }
-
-// ---------------------------------------------------------------------------
-// Storage backend. Real Postgres normally — but a session/branch (or the e2e
-// gate) without SUPABASE_DB_URL configured falls back to an in-process store
-// instead of failing outright, so nothing here requires a live Supabase
-// project just to run. Two things this must never do quietly:
-//   - use the fallback in real Vercel production (VERCEL_ENV — set by Vercel
-//     itself on every deployment, unlike NODE_ENV, which `next start` also
-//     sets to "production" locally): losing "shared" state on every
-//     serverless cold start would be far worse than the loud error it
-//     replaces, so that case still throws.
-//   - fall back silently anywhere else: the first use logs a clear warning,
-//     once, so a forgotten .env.local entry is visible rather than a mystery.
-// ---------------------------------------------------------------------------
-interface Backend {
-  list(kind?: ArtifactKind): Promise<Row[]>;
-  get(id: string): Promise<Row | null>;
-  insert(kind: ArtifactKind, name: string, definition: unknown, owner: string): Promise<Row>;
-  update(id: string, name: string, definition: unknown): Promise<Row | null>;
-  remove(id: string): Promise<boolean>;
+function validateDefinition(d: unknown): unknown {
+  if (!d || typeof d !== "object") throw new Error("definition must be an object");
+  return d;
 }
 
-const memoryRows = new Map<string, Row>();
-const memoryBackend: Backend = {
-  async list(kind) {
-    return [...memoryRows.values()]
-      .filter(r => !kind || r.kind === kind)
-      .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
-      .slice(0, 500);
-  },
-  async get(id) { return memoryRows.get(id) ?? null; },
-  async insert(kind, name, definition, owner) {
-    const now = new Date().toISOString();
-    const row: Row = { id: randomUUID(), kind, name, schema_version: CURRENT_SCHEMA_VERSION, definition, owner, created_at: now, updated_at: now };
-    memoryRows.set(row.id, row);
-    return row;
-  },
-  async update(id, name, definition) {
-    const existing = memoryRows.get(id);
-    if (!existing) return null;
-    const row: Row = { ...existing, name, definition, schema_version: CURRENT_SCHEMA_VERSION, updated_at: new Date().toISOString() };
-    memoryRows.set(id, row);
-    return row;
-  },
-  async remove(id) { return memoryRows.delete(id); }
-};
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SELECT = "select a.*, u.email as owner_email, u.name as owner_name, g.name as group_name from saved_artifacts a" +
+  " join app_user u on u.id = a.owner_id left join user_group g on g.id = a.group_id";
 
-const pgBackend: Backend = {
-  async list(kind) {
-    return kind
-      ? dbQuery<Row>("select * from saved_artifacts where kind = $1 order by updated_at desc limit 500", [kind])
-      : dbQuery<Row>("select * from saved_artifacts order by updated_at desc limit 500");
-  },
-  async get(id) {
-    const rows = await dbQuery<Row>("select * from saved_artifacts where id = $1", [id]);
-    return rows[0] ?? null;
-  },
-  async insert(kind, name, definition, owner) {
-    const rows = await dbQuery<Row>(
-      "insert into saved_artifacts (kind, name, schema_version, definition, owner) values ($1, $2, $3, $4, $5) returning *",
-      [kind, name, CURRENT_SCHEMA_VERSION, JSON.stringify(definition), owner]
-    );
-    return rows[0];
-  },
-  async update(id, name, definition) {
-    const rows = await dbQuery<Row>(
-      "update saved_artifacts set name = $2, schema_version = $3, definition = $4 where id = $1 returning *",
-      [id, name, CURRENT_SCHEMA_VERSION, JSON.stringify(definition)]
-    );
-    return rows[0] ?? null;
-  },
-  async remove(id) {
-    const rows = await dbQuery<{ id: string }>("delete from saved_artifacts where id = $1 returning id", [id]);
-    return rows.length > 0;
-  }
-};
-
-let warned = false;
-function backend(): Backend {
-  if (process.env.SUPABASE_DB_URL) return pgBackend;
-  if (process.env.VERCEL_ENV === "production")
-    throw new Error("SUPABASE_DB_URL is not set — the artifact store is not configured for production");
-  if (!warned) {
-    warned = true;
-    console.warn("[artifacts] SUPABASE_DB_URL not set — saved cohorts/workspaces are using an in-process store; nothing will persist across a restart.");
-  }
-  return memoryBackend;
+async function row(id: string): Promise<Row | null> {
+  return UUID.test(id) ? (await dbQuery<Row>(SELECT + " where a.id = $1", [id]))[0] ?? null : null;
 }
 
+/** The row if this principal may read it (with their groups), else null: someone else's private row reads as absent. */
+async function readable(principal: string, id: string): Promise<{ r: Row; groups: Set<string> } | null> {
+  const r = await row(id);
+  if (!r) return null;
+  const groups = await groupsOf(principal);
+  return canRead(principal, r, groups) ? { r, groups } : null;
+}
+
+/** Everything this principal may read: their own, their groups', and everyone's. Newest first. */
 export async function listArtifacts(principal: string, kind?: ArtifactKind): Promise<SavedArtifact[]> {
-  const rows = await backend().list(kind);
-  return rows.filter((r) => ownerOf(r) === principal).map(fromRow);
-}
-
-/** The row, if it exists and this principal owns it: someone else's reads as absent. */
-async function owned(principal: string, id: string): Promise<Row | null> {
-  const row = await backend().get(id);
-  return row && ownerOf(row) === principal ? row : null;
+  const groups = await groupsOf(principal);
+  const rows = await dbQuery<Row>(SELECT + " where " + readableWhere("a", 1) + (kind ? " and a.kind = $2" : "") +
+    " order by a.updated_at desc limit 1000", kind ? [principal, kind] : [principal]);
+  return rows.map((r) => fromRow(r, principal, groups));
 }
 
 export async function getArtifact(principal: string, id: string): Promise<SavedArtifact | null> {
-  const row = await owned(principal, id);
-  return row ? fromRow(row) : null;
+  const x = await readable(principal, id);
+  return x ? fromRow(x.r, principal, x.groups) : null;
 }
 
+/** A new item, private to its creator. */
 export async function createArtifact(principal: string, kind: ArtifactKind, name: unknown, definition: unknown): Promise<SavedArtifact> {
   if (!isArtifactKind(kind)) throw new Error("kind must be 'cohort' or 'workspace'");
-  const n = validateName(name);
-  if (!definition || typeof definition !== "object") throw new Error("definition must be an object");
-  const row = await backend().insert(kind, n, definition, principal);
-  return fromRow(row);
+  const [r] = await dbQuery<{ id: string }>(
+    "insert into saved_artifacts (kind, name, schema_version, definition, owner_id) values ($1, $2, $3, $4, $5) returning id",
+    [kind, validateName(name), CURRENT_SCHEMA_VERSION, JSON.stringify(validateDefinition(definition)), principal]);
+  return (await getArtifact(principal, r.id))!;
 }
 
-/** Rename and/or replace the definition. Either field may be omitted to leave it as-is. */
-export async function updateArtifact(principal: string, id: string, patch: { name?: unknown; definition?: unknown }): Promise<SavedArtifact | null> {
-  const existing = await getArtifact(principal, id);
-  if (!existing) return null;
-  const name = patch.name === undefined ? existing.name : validateName(patch.name);
-  if (patch.definition !== undefined && (!patch.definition || typeof patch.definition !== "object"))
-    throw new Error("definition must be an object");
-  const definition = patch.definition === undefined ? existing.definition : patch.definition;
-  const row = await backend().update(id, name, definition);
-  return row ? fromRow(row) : null;
+/**
+ * Rename and/or replace the definition (either may be omitted). `version`, when given, is the one
+ * the change was made from: if someone has saved since, the change is refused, not merged.
+ */
+export async function updateArtifact(principal: string, id: string,
+  patch: { name?: unknown; definition?: unknown; version?: unknown }): Promise<SavedArtifact | null> {
+  const x = await readable(principal, id);
+  if (!x) return null;
+  const { r, groups } = x;
+  if (!canWrite(principal, r, groups)) throw new AccessError("“" + r.name + "” is shared with you to read, not to change", 403);
+  const name = patch.name === undefined ? r.name : validateName(patch.name);
+  const definition = patch.definition === undefined ? r.definition : validateDefinition(patch.definition);
+  const from = patch.version === undefined ? r.version : Number(patch.version);
+  const done = await dbQuery<{ id: string }>(
+    "update saved_artifacts set name = $2, schema_version = $3, definition = $4, version = version + 1" +
+    " where id = $1 and version = $5 returning id", [id, name, CURRENT_SCHEMA_VERSION, JSON.stringify(definition), from]);
+  if (!done.length) {
+    const now = await row(id);
+    throw new AccessError("“" + r.name + "” was changed" + (now ? " (now version " + now.version + ")" : "") +
+      " since you opened it (version " + from + "); reload it before saving", 409);
+  }
+  return getArtifact(principal, id);
 }
 
+/**
+ * Change how an item is shared (its owner only). For an analysis, also names the custom datasets
+ * it uses that some of its new audience could not read — those are never shared automatically.
+ */
+export async function shareArtifact(principal: string, id: string, sharing: unknown): Promise<{ artifact: SavedArtifact; warnings: DatasetWarning[] } | null> {
+  const x = await readable(principal, id);
+  if (!x) return null;
+  if (!canShare(principal, x.r)) throw new AccessError("only its owner can change who “" + x.r.name + "” is shared with", 403);
+  const s = validateSharing(sharing, x.groups);
+  await dbQuery("update saved_artifacts set visibility = $2, group_id = $3, group_can_edit = $4 where id = $1",
+    [id, s.visibility, s.groupId, s.groupCanEdit]);
+  const artifact = (await getArtifact(principal, id))!;
+  return { artifact, warnings: await datasetWarnings(artifact) };
+}
+
+/** The datasets an analysis pins (`uploads`) that its audience could not all read. */
+export async function datasetWarnings(a: SavedArtifact): Promise<DatasetWarning[]> {
+  const pins = (a.definition as { uploads?: { dataset?: unknown }[] })?.uploads;
+  const ids = [...new Set((Array.isArray(pins) ? pins : []).map((p) => p?.dataset).filter((d): d is string => typeof d === "string" && UUID.test(d)))];
+  if (!ids.length || a.sharing.visibility === "private") return [];
+  const ds = await dbQuery<Shareable & { id: string; slug: string; name: string; group_name: string | null }>(
+    "select d.*, g.name as group_name from custom_dataset d left join user_group g on g.id = d.group_id where d.id = any($1::uuid[])", [ids]);
+  return ds.filter((d) => !covers(sharingOf(d), a.sharing)).map((d) => ({
+    id: d.id, slug: d.slug, name: d.name, visibility: d.visibility, groupName: d.group_name, yours: d.owner_id === a.owner.id,
+  }));
+}
+
+/** Delete (its owner only). False when there is nothing this principal can see by that id. */
 export async function deleteArtifact(principal: string, id: string): Promise<boolean> {
-  if (!(await owned(principal, id))) return false;
-  return backend().remove(id);
+  const x = await readable(principal, id);
+  if (!x) return false;
+  if (!canShare(principal, x.r)) throw new AccessError("only its owner can delete “" + x.r.name + "”", 403);
+  return (await dbQuery<{ id: string }>("delete from saved_artifacts where id = $1 returning id", [id])).length > 0;
 }

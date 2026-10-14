@@ -5,13 +5,15 @@
 // re-renders the analysis page (see "Keystrokes stay in the field" in CLAUDE.md). Which custom
 // attributes are drawn as charts is chosen in Explore's Add chart dialog, like any other attribute.
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { ShareDialog, sharingLabel } from "./share-dialog.tsx";
+import { useGroups } from "./use-groups.ts";
 import {
   onCustomDataChange, loadCustomData, parseUpload, buildDataset, datasetToTsv, serverState, requestLogin, saveToServer,
-  deleteServerDataset, serverBySlug, fetchServerVersion, resolveIds, exampleUpload, type ParsedUpload, type ResolveResponse, type ServerState, type StoredDataset
+  deleteServerDataset, shareServerDataset, serverBySlug, fetchServerVersion, resolveIds, exampleUpload, type ParsedUpload, type ResolveResponse, type ServerState, type StoredDataset
 } from "./custom-data-client.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
 import { LIMITS } from "../../lib/custom-data-names.ts";
-import { Download, LoaderCircle, Trash2 } from "lucide-react";
+import { Download, LoaderCircle, Share2, Trash2 } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Input } from "../_ui/input";
@@ -257,6 +259,8 @@ function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: (
     void serverAct("deleting…", () => deleteServerDataset(d.id));
   };
   const exportServer = (d: DatasetMeta) => serverAct("exporting…", async () => download(await fetchServerVersion(d.id, d.latestVersion)));
+  const groups = useGroups(server.user?.id ?? null);
+  const [sharing, setSharing] = useState<DatasetMeta | null>(null);
 
   const download = (d: StoredDataset) => {
     const url = URL.createObjectURL(new Blob([datasetToTsv(d)], { type: "text/tab-separated-values" }));
@@ -268,8 +272,8 @@ function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: (
     <section className="cd-saved">
       <h4>Saved datasets{server.datasets.length ? " (" + server.datasets.length + ")" : ""}</h4>
       <p className="meta flush">
-        Shared with everyone who logs in (one shared login, no per-user permissions yet). A saved version never
-        changes; an analysis that uses one is pinned to it.
+        Yours, and others' shared with you. A saved version never changes; an analysis that uses one is
+        pinned to it. Each holds patient-level values: share one only with people entitled to them.
       </p>
       {server.datasets.length ? (
         <div className="attrtablewrap" style={{ maxHeight: "30vh" }}>
@@ -281,13 +285,15 @@ function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: (
                 return (
                   <tr key={d.id} style={{ cursor: "default" }}>
                     <td><b>{d.name}</b> <span className="meta">custom:{d.slug} · {d.level} level · v{d.latestVersion}
-                      {d.versions.length > 1 ? " of " + d.versions.length : ""} · {new Date(d.updatedAt).toLocaleDateString()}</span></td>
+                      {d.versions.length > 1 ? " of " + d.versions.length : ""} · {new Date(d.updatedAt).toLocaleDateString()}
+                      {" · "}{d.rights.share ? "shared with " + sharingLabel(d.sharing) : "from " + d.ownerEmail}</span></td>
                     <td className="meta">{v?.columns.map((c) => c.name).join(", ")}</td>
                     <td className="meta">{v?.rowCount.toLocaleString()} {d.level}s</td>
                     <td className="meta">{v?.studies.join(", ")}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       <Button variant="outline" size="sm" className={TB} disabled={!!serverBusy} onClick={() => exportServer(d)}><Download />Export</Button>{" "}
-                      <Button variant="outline" size="sm" className={cn(TB, "text-destructive hover:text-destructive")} disabled={!!serverBusy} onClick={() => removeServer(d)}><Trash2 />Delete</Button>
+                      {d.rights.share && <><Button variant="outline" size="sm" className={TB} disabled={!!serverBusy} onClick={() => setSharing(d)}><Share2 />Share…</Button>{" "}
+                        <Button variant="outline" size="sm" className={cn(TB, "text-destructive hover:text-destructive")} disabled={!!serverBusy} onClick={() => removeServer(d)}><Trash2 />Delete</Button></>}
                     </td>
                   </tr>
                 );
@@ -298,6 +304,10 @@ function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: (
       ) : <p className="meta">Nothing saved yet. <Button variant="link" size="inline" className="text-md" onClick={onAdd}>Add data</Button></p>}
       {serverBusy && <p className="meta"><span className="spinner" /> {serverBusy}</p>}
       {serverErr && <p className="error">{serverErr}</p>}
+      {sharing && <ShareDialog kind="custom dataset" name={sharing.name} sharing={sharing.sharing}
+        groups={groups.groups} groupsError={groups.error}
+        onSave={async (s) => { await shareServerDataset(sharing.id, s); onChanged(); }}
+        onClose={() => setSharing(null)} />}
     </section>
   );
 }
@@ -331,12 +341,12 @@ export default function CustomDataManager({ tab, setTab, studies, onChanged }: {
           attribute: as a chart and filter in Explore, an oncoprint track or split, in comparisons and survival.
         </p>
         {!server.enabled && <p className="meta">
-          This deployment does not store custom data: it has no login (<code>LOGIN_PASSWORD</code> is not set).
+          This deployment does not store custom data: it has no sign-in.
           The gallery&apos;s custom-data example still runs, on demo data bundled with the app.</p>}
         {server.enabled && !server.unlocked && (
           <div className="cd-login">
-            <span>Custom data is stored on the server. Log in to add, see and use it.</span>
-            <Button size="sm" onClick={requestLogin}>Log in</Button>
+            <span>Custom data is stored on the server. Sign in to add, see and use it.</span>
+            <Button size="sm" onClick={requestLogin}>Sign in</Button>
           </div>
         )}
         {server.unlocked && tab === "add" && <AddCustomData studies={studies}

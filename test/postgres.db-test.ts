@@ -1,36 +1,72 @@
-// The stores on Postgres, not on the in-memory fallback the e2e gate uses: an in-process
-// Postgres (test/support/postgres.ts) with db/migrations applied, reached through the same SQL
-// the deployment runs. Covers the migrations themselves, the store contracts both backends must
-// meet, and the database-level guarantees: a locked campaign and a stored dataset version cannot be
+// The stores on Postgres: an in-process Postgres (test/support/postgres.ts) migrated by the
+// deployment's runner, reached through the same SQL the deployment runs. Covers the migrations
+// and their runner, the store contracts, and the database-level guarantees: a locked campaign and a stored dataset version cannot be
 // changed, whatever the application does.
 import { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
 import type { PGlite } from "@electric-sql/pglite";
-import { startPostgres, reapplyMigrations, migrationFiles } from "./support/postgres.ts";
-import { customStoreContract, artifactContract } from "./support/store-contracts.ts";
+import { PGlite as PGliteDb } from "@electric-sql/pglite";
+import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
+import { startPostgres, reapplyMigrations, migrationFiles, target } from "./support/postgres.ts";
+import { migrate, migrationSql } from "../lib/migrate.ts";
+import { customStoreContract, artifactContract, userContract, sharingContract } from "./support/store-contracts.ts";
 import { saveDataset } from "../lib/custom-store.ts";
+import { userForEmail } from "../lib/users.ts";
 
 const db: PGlite = await startPostgres();
 
 describe("migrations", () => {
   test("apply in order to an empty database, and again without harm", async () => {
-    assert.deepEqual(migrationFiles(), ["0001_saved_artifacts.sql", "0002_campaigns.sql", "0003_custom_datasets.sql"]);
+    assert.deepEqual(migrationFiles(), ["0001_saved_artifacts.sql", "0002_campaigns.sql", "0003_custom_datasets.sql", "0004_users.sql", "0005_sharing.sql"]);
     const tables = async () => (await db.query<{ t: string }>(
       "select table_name as t from information_schema.tables where table_schema = 'public' order by 1")).rows.map((r) => r.t);
     const before = await tables();
     await reapplyMigrations(db);
     assert.deepEqual(await tables(), before);
-    for (const t of ["saved_artifacts", "campaigns", "campaign_hypotheses", "custom_dataset", "custom_dataset_version", "custom_dataset_grant", "custom_data_access_log"])
+    for (const t of ["app_user", "user_identity", "saved_artifacts", "campaigns", "campaign_hypotheses", "custom_dataset", "custom_dataset_version", "custom_data_access_log", "user_group", "group_member"])
       assert.ok(before.includes(t), t + " exists");
+  });
+
+  test("the runner records what it applied and applies nothing twice", async () => {
+    const recorded = (await db.query<{ name: string }>("select name from schema_migrations order by name")).rows.map((r) => r.name);
+    assert.deepEqual(recorded, migrationFiles());
+    assert.deepEqual(await migrate(target(db)), []);
+  });
+
+  test("a database migrated by hand before the runner existed is adopted without harm", async () => {
+    // as deployed before accounts: 0001-0003 run by hand, rows owned by the one shared principal
+    const old = await PGliteDb.create({ extensions: { pgcrypto } });
+    for (const f of ["0001_saved_artifacts.sql", "0002_campaigns.sql", "0003_custom_datasets.sql"]) await old.exec(migrationSql(f));
+    await old.query("insert into saved_artifacts (kind, name, definition, owner) values ('cohort', 'kept', '{}'::jsonb, 'shared')");
+    await old.query("insert into custom_dataset (slug, name, owner, level) values ('kept-data', 'kept', 'shared', 'patient')");
+    assert.deepEqual(await migrate(target(old)), migrationFiles());
+    assert.deepEqual((await old.query("select name, owner_id from saved_artifacts")).rows, [{ name: "kept", owner_id: null }],
+      "kept, and nobody's until claimed");
+    assert.deepEqual((await old.query("select slug, owner_id from custom_dataset")).rows, [{ slug: "kept-data", owner_id: null }]);
+    assert.deepEqual(await migrate(target(old)), []);
+    await old.close();
+  });
+
+  test("a migration that fails leaves nothing behind and is not recorded", async () => {
+    const fresh = await PGliteDb.create({ extensions: { pgcrypto } });
+    await fresh.exec("create table schema_migrations (name text primary key, applied_at timestamptz not null default now()); create table custom_dataset (id int)");
+    await assert.rejects(migrate(target(fresh)));
+    const tables = (await fresh.query<{ t: string }>("select table_name as t from information_schema.tables where table_schema = 'public' order by 1")).rows.map((r) => r.t);
+    assert.ok(!tables.includes("custom_dataset_version"), "the failed migration's tables were rolled back");
+    assert.deepEqual((await fresh.query<{ name: string }>("select name from schema_migrations order by name")).rows.map((r) => r.name),
+      ["0001_saved_artifacts.sql", "0002_campaigns.sql"]);
+    await fresh.close();
   });
 });
 
 customStoreContract("Postgres");
 artifactContract("Postgres");
+userContract("Postgres");
+sharingContract("Postgres");
 
 describe("a stored dataset version is immutable in the database", () => {
   test("an update or delete of a version row is refused by its trigger", async () => {
-    const d = await saveDataset("shared", {
+    const d = await saveDataset((await userForEmail("frozen@db.test")).id, {
       id: "frozen-rows", name: "frozen", level: "patient", columns: [{ name: "X", datatype: "STRING" }],
       rows: [{ study: "s1", patient: "P-1", values: ["a"] }]
     }, {});

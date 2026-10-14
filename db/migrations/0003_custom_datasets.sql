@@ -5,11 +5,9 @@
 -- uploaded against them. They are reached only through lib/custom-store.ts, which checks
 -- access on every read and write and logs every read; never query them from anywhere else.
 --
--- Access today: one shared principal ('shared'), unlocked by a deployment's access code
--- (LOGIN_PASSWORD, see lib/auth.ts). The owner and grant columns exist now
--- so that per-user and per-group access is added by filling them in, not by reshaping data.
+-- Who may read and change a dataset: its owner and how it is shared (0004, 0005, lib/access.ts).
 --
--- Run once, by hand, against the Supabase project, after 0001 and 0002.
+-- Applied by `npm run db:migrate` (lib/migrate.ts), after 0001 and 0002.
 
 create extension if not exists pgcrypto;
 
@@ -57,16 +55,6 @@ drop trigger if exists custom_dataset_version_no_update on custom_dataset_versio
 create trigger custom_dataset_version_no_update
   before update or delete on custom_dataset_version
   for each row execute function custom_dataset_version_immutable();
-
--- Who besides the owner may read or write a dataset. Empty until per-user access lands.
-create table if not exists custom_dataset_grant (
-  dataset_id uuid not null references custom_dataset (id),
-  principal text not null,
-  role text not null check (role in ('viewer', 'editor')),
-  granted_by text not null,
-  granted_at timestamptz not null default now(),
-  primary key (dataset_id, principal)
-);
 
 -- Every read of rows and every write, by whom.
 create table if not exists custom_data_access_log (

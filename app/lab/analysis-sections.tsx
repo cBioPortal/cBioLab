@@ -21,6 +21,7 @@ import type { OnCustomData } from "./pills";
 import { requestLogin, referencedDatasets, unresolvedUploads } from "./custom-data-client.ts";
 import { CohortStudies, CohortEditMenu, CAT_COLORS, ViewHead } from "./view-chrome.tsx";
 import { cohortHash, shortHash } from "../../lib/cohort-hash.ts";
+import { sameJson } from "../../lib/same-json.ts";
 import { viewIsEmpty } from "../../lib/partition-arms.ts";
 import type { CohortSaveState, CohortSourceState } from "./use-cohort-edits.ts";
 import { ViewCard, LoadingViewCard } from "./view-cards.tsx";
@@ -116,7 +117,7 @@ export function CustomDataWarning({ ctx }: { ctx: AnalysisCtx }) {
       return unresolved.length > 0 && (
         <div className="card customwarn">
           {of("locked").length > 0 && <p className="flush">This analysis uses custom data ({names(of("locked"))}).{" "}
-            <Button variant="link" size="inline" onClick={requestLogin}>Log in</Button> to run it.</p>}
+            <Button variant="link" size="inline" onClick={requestLogin}>Sign in</Button> to run it.</p>}
           {of("deleted").length > 0 && <p className="flush">This analysis is pinned to custom data that has since been deleted: {names(of("deleted"))}.</p>}
           {of("missing").length > 0 && <p className="flush">This analysis uses custom data that is not on the server: {names(of("missing"))}.</p>}
           {of("unavailable").length > 0 && <p className="flush">This analysis uses custom data ({names(of("unavailable"))}), which this deployment does not store.</p>}
@@ -213,7 +214,7 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
                       <div className="cohortsrc meta">
                         <span>Copied from saved cohort <strong>“{src.from.name}”</strong>{src.from.savedAt ? " (saved " + src.from.savedAt + ")" : ""}
                           {" "}· definition <code title={src.from.hash}>#{shortHash(src.from.hash)}</code>.</span>
-                        {src.state === "unknown" && <span> {loggedIn ? "Checking the saved cohort…" : "Log in to compare it with the saved cohort."}</span>}
+                        {src.state === "unknown" && <span> {loggedIn ? "Checking the saved cohort…" : "Sign in to compare it with the saved cohort."}</span>}
                         {src.state === "deleted" && <span> That saved cohort has since been deleted; this copy is unaffected.</span>}
                         {(src.state === "current" || src.state === "changed") && src.srcName !== src.from.name && <span> It is now named “{src.srcName}”.</span>}
                         {src.state === "current" && !src.edited && <span> The saved cohort is unchanged.</span>}
@@ -308,7 +309,7 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
             {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
               <Button variant="outline" size="sm" disabled={busy} onClick={openWorkspaceSave}
                 title={doc.title
-                  ? "“" + doc.title + "” — " + (spaces[doc.title] && JSON.stringify(spaces[doc.title].doc) === JSON.stringify(doc)
+                  ? "“" + doc.title + "” — " + (spaces[doc.title] && sameJson(spaces[doc.title].doc, doc)
                       ? "saved " + spaces[doc.title].savedAt : "unsaved changes")
                   : "save this analysis as a named, reopenable workspace"}>
                 <Save />

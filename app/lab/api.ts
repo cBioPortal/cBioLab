@@ -10,12 +10,15 @@ import type {
 } from "../../lib/api-schemas.ts";
 import { withCustomData, type UploadBinding } from "./custom-data-client.ts";
 import type { ArtifactKind } from "../../lib/artifacts.ts";
+import type { Sharing } from "../../lib/access.ts";
 
 interface Opts { signal?: AbortSignal }
 
 function post(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
   return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
 }
+const send = (method: "PATCH" | "PUT", path: string, body: unknown): Promise<Response> =>
+  fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 export const api = {
   /** The document's cohorts and views. `query`: "?oncoprint=spec" (the page draws its own oncoprints), "?figures=svg". */
@@ -63,12 +66,26 @@ export const api = {
   /** One study's timeline vocabulary and declared survival endpoints. */
   catalog: (study: string, opts: Opts = {}) => fetch("/api/catalog?study=" + encodeURIComponent(study), { signal: opts.signal }),
 
-  /** Saved cohorts and analyses (lib/artifacts.ts): the logged-in reader's, by kind. */
+  /** Saved cohorts and analyses (lib/artifacts.ts): everything the signed-in reader may see, by kind. */
   artifacts: {
     list: (kind: ArtifactKind, opts: Opts = {}) => fetch("/api/artifacts?kind=" + kind, { signal: opts.signal }),
     create: (body: { kind: ArtifactKind; name: string; definition: unknown }) => post("/api/artifacts", body),
-    update: (id: string, body: { name: string; definition: unknown }) =>
-      fetch("/api/artifacts/" + id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+    /** `version`: the one the change was made from — a stale one is refused (409) */
+    update: (id: string, body: { name: string; definition: unknown; version?: number }) => send("PATCH", "/api/artifacts/" + id, body),
     remove: (id: string) => fetch("/api/artifacts/" + id, { method: "DELETE" }),
+    /** who it is shared with (its owner only); answers { artifact, warnings } */
+    share: (id: string, sharing: Sharing) => send("PUT", "/api/artifacts/" + id + "/sharing", sharing),
+  },
+
+  /** Groups (lib/groups.ts): the reader's, and managing one. */
+  groups: {
+    list: (opts: Opts = {}) => fetch("/api/groups", { signal: opts.signal }),
+    get: (id: string, opts: Opts = {}) => fetch("/api/groups/" + id, { signal: opts.signal }),
+    create: (body: { name: string; description?: string }) => post("/api/groups", body),
+    update: (id: string, body: { name?: string; description?: string }) => send("PATCH", "/api/groups/" + id, body),
+    remove: (id: string) => fetch("/api/groups/" + id, { method: "DELETE" }),
+    addMember: (id: string, body: { email: string; role?: "admin" | "member" }) => post("/api/groups/" + id + "/members", body),
+    setRole: (id: string, userId: string, role: "admin" | "member") => send("PATCH", "/api/groups/" + id + "/members/" + userId, { role }),
+    removeMember: (id: string, userId: string) => fetch("/api/groups/" + id + "/members/" + userId, { method: "DELETE" }),
   },
 };
