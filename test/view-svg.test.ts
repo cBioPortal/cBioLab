@@ -114,11 +114,11 @@ describe("figures scale uniformly", () => {
 describe("survival: tick interval and cutoff controls reach the SVG", () => {
   test("tickMonths changes which month labels are drawn", () => {
     const svg = viewToSvg({ ...survival("A"), tickMonths: 6 })!;
-    assert.ok(svg.includes(">6mo<"), "a 6-month tick should be drawn, which the default 12mo spacing would skip");
+    assert.ok(svg.includes(">6</text>") && svg.includes(">Months</text>"), "a 6-month tick should be drawn, which the default 12mo spacing would skip");
   });
   test("cutoffMonths caps the x-axis", () => {
     const svg = viewToSvg({ ...survival("A"), cutoffMonths: 5 })!;
-    assert.equal(svg.includes(">10mo<"), false, "the axis must not run past a 5-month cutoff");
+    assert.ok(svg.includes(">0</text>") && !svg.includes(">10</text>") && !svg.includes(">12</text>"), "the axis must not run past a 5-month cutoff");
   });
 });
 

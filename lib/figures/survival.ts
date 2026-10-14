@@ -41,7 +41,7 @@ export function survivalSvg(v: ViewResult, o: SvgOpts): string {
   let y = T + PLOT + bottomAxisHeight(xTitle) + 10;
   const items = curves.map((c, i) => ({
     label: c.cohort, color: seriesStyle(i).color, dash: seriesStyle(i).dash, kind: "line" as const,
-    detail: (incidence ? "50% by " : "median ") + (c.median == null ? "not reached" : fmtMonths(c.median)) +
+    detail: (incidence ? "50% incidence by " : "median ") + (c.median == null ? "not reached" : fmtMonths(c.median)) +
       " · n = " + fmtInt(c.n) + " · " + fmtInt(c.events) + " events"
   }));
   const lg = legend(items, 8, y, W - 16, p, { grid: true });
