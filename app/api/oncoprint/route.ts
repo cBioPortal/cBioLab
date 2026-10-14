@@ -1,6 +1,5 @@
 import type { OncoprintSpec } from "../../../lib/types.ts";
 import { parseBody, OncoprintRequest } from "../../../lib/api-schemas.ts";
-import { buildContract } from "../../../lib/oncoprint";
 import { cachedContract } from "../../../lib/next-cache.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { packContract } from "../../../lib/oncoprint-binary";
@@ -18,11 +17,9 @@ export async function POST(req: Request) {
     const spec = envelope as unknown as OncoprintSpec;   // its contents are the engine's to check
     const t0 = Date.now();
     const sp = new URL(req.url).searchParams;
-    const log: { label: string; sql: string; ms?: number; study?: string }[] = [];
+    // a provenance request is answered with the queries that built the (cached) contract
     const provenance = sp.get("provenance") === "1";
-    // a provenance request wants the queries this run issues, so it is never answered from the cache
-    const contract = await withRequestCustomData(customData, () =>
-      provenance ? buildContract(spec, { log, provenance }) : cachedContract(spec), { refs: customRefs, req });
+    const contract = await withRequestCustomData(customData, () => cachedContract(spec, { provenance }), { refs: customRefs, req });
     const engineMs = Date.now() - t0;
     const fmt = sp.get("format");
     if (fmt === "svg" || fmt === "tsv") {

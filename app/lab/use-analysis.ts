@@ -48,6 +48,11 @@ function viewPart(v: V): V {
   void note;
   return rest;
 }
+/** The body the page sends for view `index` alone, so another request for it (its Python script)
+ *  is answered from the same cached result. */
+export function viewRequest(doc: AnalysisDoc, index: number, study = ""): AnalysisDoc {
+  return { ...cohortsPart(doc, study), views: [((doc.views || []) as unknown as V[])[index]] } as unknown as AnalysisDoc;
+}
 const cohortsKey = (base: AnalysisDoc) => ["analysis", "cohorts", JSON.stringify(base)] as const;
 const viewKey = (base: AnalysisDoc, v: V) => ["analysis", "view", JSON.stringify(base), JSON.stringify(viewPart(v))] as const;
 

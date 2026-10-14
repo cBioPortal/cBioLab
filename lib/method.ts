@@ -36,6 +36,9 @@ export interface MethodRecord {
   /** a script that recomputes the view's numbers from what its queries returned; absent when the
    *  queries' own counts are the numbers, with nothing computed from them */
   python?: string;
+  /** the script exists but was left out of this response (the page's requests): POST the view's
+   *  one-view document to /api/analysis/method for it */
+  pythonDeferred?: true;
   /** the view's own numbers that the script must reproduce, by the name the script reports them
    *  under — scripts/check-method-scripts.ts runs every gallery example's script and compares */
   check?: Record<string, CheckValue>;

@@ -25,6 +25,10 @@ export const api = {
   analysis: async (doc: AnalysisBody, opts: Opts & { query?: string } = {}) =>
     post("/api/analysis" + (opts.query || ""), await withCustomData(doc), opts.signal),
 
+  /** One view's Python script, which the page's analysis requests leave out: the body is the one-view document the page sent for it. */
+  methodScript: async (doc: AnalysisBody, opts: Opts = {}) =>
+    post("/api/analysis/method", await withCustomData(doc), opts.signal),
+
   /** One view's method record as a Jupyter notebook (the .ipynb); the body is the document plus `notebookView`. */
   methodNotebook: async (body: NotebookBody, opts: Opts = {}) =>
     post("/api/analysis/notebook", await withCustomData(body), opts.signal),

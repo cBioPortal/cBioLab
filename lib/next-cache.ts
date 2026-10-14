@@ -118,12 +118,18 @@ export async function cachedAnalysis(doc: AnalysisDoc, opts: { oncoprint?: "svg"
   return throughCache(async () => analysisEntry(doc, oncoprint, await dataVersion()), () => runAnalysis(doc, { oncoprint, count: cachedCount }));
 }
 
-async function contractEntry(spec: OncoprintSpec, _version: string): Promise<string> {
+async function contractEntry(spec: OncoprintSpec, provenance: boolean, _version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
-  return pack(await withoutFailedQueries(() => buildContract(spec)));
+  return pack(await withoutFailedQueries(() => buildContract(spec, provenance ? { log: [], provenance } : {})));
 }
-export async function cachedContract(spec: OncoprintSpec): Promise<Contract> {
-  if (hasCustomData()) return buildContract(spec);
-  return throughCache(async () => contractEntry(spec, await dataVersion()), () => buildContract(spec));
+/**
+ * An oncoprint's contract. With `provenance` it carries the queries that built it — those of the
+ * run whose answer is cached, which are the queries behind the cells it holds.
+ */
+export async function cachedContract(spec: OncoprintSpec, opts: { provenance?: boolean } = {}): Promise<Contract> {
+  const provenance = !!opts.provenance;
+  const direct = () => buildContract(spec, provenance ? { log: [], provenance } : {});
+  if (hasCustomData()) return direct();
+  return throughCache(async () => contractEntry(spec, provenance, await dataVersion()), direct);
 }
