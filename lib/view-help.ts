@@ -87,6 +87,10 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
     title: "What is this?",
     text: "Compares two or more groups on every measurement in one kind of extra lab data the study recorded — such as which mutational signatures (like sun damage or smoking) shaped each tumour, or which chromosome arms were gained or lost. The measurements at the top differ most clearly between the groups; each one shows its average, or its mix of results, in every group, so a difference that is clear but small reads as small."
   },
+  composition: {
+    title: "What is this?",
+    text: "Shows what each patient's (or sample's) tumour is made of — the share of each cell type, cell state or signature — as one stacked bar per case, sorted by the part you choose, with each group's average beside it. Under the bars, every group is set against the others part by part: the colour says whether a part is higher (red) or lower (blue) there, its size how sure that is. Parts of a whole move together, so one part rising means others fall."
+  },
   mutations: {
     title: "What is this?",
     text: "Lists every mutation found in one gene in your groups, one row per mutation: which sample it was in, the exact protein change, whether OncoKB considers it cancer-causing, what kind of change it is, and how much of the tumour carries it. Click a column to sort by it; the download saves every row. It sits under the lollipop chart, which shows the same mutations as positions along the protein."

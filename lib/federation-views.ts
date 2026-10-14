@@ -8,6 +8,7 @@ import { ALTERED_COND, driverJoin } from "./federation.ts";
 import { clinicalValueFoldSql, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { splitBucketSql } from "./cohort2.ts";
+import { casesCte, type CompositionSource } from "./composition.ts";
 
 /** bare patient id for a *_unique_id column of this study */
 const pidOf = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
@@ -857,6 +858,33 @@ export function assayEntityNamesSql(study: string, db: string, profileType: stri
     "  WHERE p.name = 'NAME' AND ge.stable_id IN (SELECT DISTINCT entity_stable_id FROM " + db + ".generic_assay_data_derived\n" +
     "    WHERE profile_type = " + sq(profileType) + " AND profile_stable_id = " + sq(study + "_" + profileType) + ")\n" +
     ")\nSELECT entity, name FROM named";
+}
+
+// ---------------------------------------------------------------------------
+// composition: parts of a whole per case (lib/composition.ts builds the vectors)
+
+/**
+ * Over the cohort's cases that have every part: n, and per part (arrays in part order) Σp and Σp²
+ * of the values compared; Σh and Σh² of each case's Shannon entropy; and how many cases were left
+ * out — with only some of the parts, or with a part below zero or none above. One row of sums: the
+ * vectors are built and summed inside the database.
+ */
+export function compositionMomentsSql(cohortSql: string, study: string, db: string, s: CompositionSource): string {
+  const k = s.parts.length;
+  return casesCte(s, study, db, cohortSql) +
+    "SELECT count() AS n, sumForEach(ps) AS sx, sumForEach(arrayMap(x -> x * x, ps)) AS sxx, sum(h) AS hx, sum(h * h) AS hxx,\n" +
+    "       (SELECT countIf(k < " + k + ") FROM raw) AS incomplete,\n" +
+    "       (SELECT countIf(k = " + k + " AND NOT (lo >= 0 AND tot > 0)) FROM raw) AS invalid\n" +
+    "FROM cases";
+}
+
+/** A generic-assay profile's entities, in id order. Metadata: an entity is a cell type or a
+ *  signature, never a case. */
+export function compositionEntitiesSql(study: string, db: string, profileType: string): string {
+  return "WITH entities AS (\n" +
+    "  SELECT DISTINCT entity_stable_id AS entity FROM " + db + ".generic_assay_data_derived\n" +
+    "  WHERE profile_type = " + sq(profileType) + " AND profile_stable_id = " + sq(study + "_" + profileType) + "\n" +
+    ")\nSELECT entity FROM entities ORDER BY entity";
 }
 
 // ---------------------------------------------------------------------------

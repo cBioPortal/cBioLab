@@ -60,6 +60,8 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   enrichment: { label: "Alteration enrichment (all genes)", title: "Alteration enrichment", maxCohorts: 6, minCohorts: 2 },
   assays: { label: "Generic assays (signatures, arm-level CNA, …)", title: "Generic assays", maxCohorts: 6, minCohorts: 2,
     why: (k) => !k.assays.length ? "this study has no generic-assay profiles (mutational signatures, arm-level copy number, …)" : null },
+  composition: { label: "Composition (cell types, states, signatures as parts of a whole)", title: "Composition", maxCohorts: 8, minCohorts: 1,
+    why: (k) => !k.assays.length && !k.attrs.some((a) => a.kind === "num") ? "this study has no generic-assay profile and no numeric attribute to draw as parts" : null },
   table: { label: "Clinical data table (download)", title: "Clinical data", maxCohorts: 6 },
   mutations: { label: "Mutation table (one gene)", title: "Mutations", maxCohorts: 6 },
   timeline: { label: "Patient timeline (one patient at a time)", title: "Patient timeline", maxCohorts: 1, cohortInHeader: true,
@@ -133,6 +135,12 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "table") return "one row per " + (spec.unit === "patient" ? "patient" : "sample") + (v.table ? " · " + v.table.total.toLocaleString() + " rows, " + v.table.columns.length + " attributes" : "");
   if (kind === "correlates") return (spec.gene || "no gene") + " on " + (spec.profileType || "no profile") + (spec.otherProfile && spec.otherProfile !== spec.profileType ? " against " + spec.otherProfile : "") + " · Spearman ρ, every gene";
   if (kind === "assays") return (v.assays ? v.assays.profileName + " · " + v.assays.test : spec.profileType || "no profile chosen") + ", per " + (v.assays ? v.assays.unit.replace(/s$/, "") : "sample");
+  if (kind === "composition") {
+    const c = v.composition;
+    const what = c ? c.sourceName : spec.profileType || (spec.attributes?.length ? spec.attributes.length + " attributes" : "no parts chosen");
+    return what + (c ? " · " + c.parts.length + " parts per " + c.unit.replace(/s$/, "") : "") + ((spec.normalize ?? true) ? ", as shares" : ", as recorded") +
+      (c ? " · sorted by " + (c.parts.find((x: { id: string }) => x.id === c.sort)?.name || c.sort) : "");
+  }
   if (kind === "cancertypes") return "by " + (spec.groupBy || "CANCER_TYPE") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled samples";
   if (kind === "riskmodel") return (spec.endpoint || "OS") + (spec.anchor?.eventType ? " from first " + spec.anchor.eventType + (spec.anchor.key ? " [" + spec.anchor.key + "=" + spec.anchor.value + "]" : "") : "") +
     " on " + (spec.measure === "driver" ? "driver mutations" : "mutated genes") +
@@ -278,6 +286,46 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
       </div>
     </div>
   );
+  if (spec.kind === "composition") {
+    const parts: string[] = c.v?.composition ? c.v.composition.parts.map((x: { id: string }) => x.id) : spec.attributes || spec.entities || [];
+    const names = new Map<string, string>(c.v?.composition ? c.v.composition.parts.map((x: { id: string; name: string }) => [x.id, x.name]) : []);
+    const fromProfile = !spec.attributes?.length;
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="where the parts come from: every entity of a generic-assay profile, or numeric clinical attributes you list">
+            parts <OptionSelect value={fromProfile ? "profile:" + (spec.profileType || "") : "attributes"} disabled={busy}
+              onValueChange={(v) => v === "attributes"
+                ? patch({ profileType: undefined, entities: undefined, attributes: spec.attributes?.length ? spec.attributes : [], sort: undefined })
+                : patch({ profileType: v.slice("profile:".length), attributes: undefined, entities: undefined, unit: undefined, sort: undefined })}>
+              {fromProfile && !c.assays.includes(spec.profileType) && <option value={"profile:" + (spec.profileType || "")}>{spec.profileType || "choose…"}</option>}
+              {c.assays.map((pr) => <option key={pr} value={"profile:" + pr}>{pr}</option>)}
+              <option value="attributes">clinical attributes…</option>
+            </OptionSelect>
+          </label>
+          {!fromProfile && <label className="tbfield" title="the numeric clinical attributes that are the parts, comma-separated (2–16; custom: names work)">
+            attributes <DraftInput value={(spec.attributes || []).join(", ")} disabled={busy} width="22rem" placeholder="custom:my-data/A, custom:my-data/B"
+              onCommit={(t) => patch({ attributes: t.split(",").map((x) => x.trim()).filter(Boolean), sort: undefined })} />
+          </label>}
+          {!fromProfile && <label className="tbfield" title="one bar per patient, or per sample">
+            per <OptionSelect value={spec.unit === "sample" ? "sample" : "patient"} disabled={busy} onValueChange={(v) => patch({ unit: v === "sample" ? "sample" : undefined })}>
+              <option value="patient">patient</option><option value="sample">sample</option>
+            </OptionSelect>
+          </label>}
+        </div>
+        <div className="tbz"><span className="tbl">view</span>
+          {parts.length > 0 && <label className="tbfield" title="the part the cases are ordered by, highest first">
+            sort by <OptionSelect value={spec.sort || parts[0]} disabled={busy} onValueChange={(v) => patch({ sort: v === parts[0] ? undefined : v })}>
+              {parts.map((x) => <option key={x} value={x}>{names.get(x) || x}</option>)}
+            </OptionSelect>
+          </label>}
+          <label className="chk" title="divide each case's parts by their sum, so every bar is a whole">
+            <Checkbox checked={spec.normalize !== false} disabled={busy} onCheckedChange={(on) => patch({ normalize: on === true ? undefined : false })} /> shares
+          </label>
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "enrichment") return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
@@ -585,6 +633,10 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   if (kind === "assays") {
     const profile = known.assays.find((p) => /signature/i.test(p) && /contribution/i.test(p)) || known.assays.find((p) => !/methylation/i.test(p)) || known.assays[0] || "";
     return { kind, profileType: profile };
+  }
+  if (kind === "composition") {
+    const profile = known.assays.find((p) => /cell_type.*relative|fraction|proportion/i.test(p)) || known.assays.find((p) => /signature/i.test(p) && /contribution/i.test(p)) || known.assays[0];
+    return profile ? { kind, profileType: profile } : { kind, attributes: [] };
   }
   if (kind === "diffexpr") {
     const profile = known.profiles.find((p) => /zscore/i.test(p) && /mrna|rna_seq/i.test(p))

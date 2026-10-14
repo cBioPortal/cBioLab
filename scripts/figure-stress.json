@@ -1964,5 +1964,202 @@
     "profileType": "mutational_signatures_contribution_v2"
    }
   ]
+ },
+ "composition-8x16": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "Melanoma": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Melanoma"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Non-Small Cell Lung Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Colorectal Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Breast Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Bladder Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Bladder Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Endometrial Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Endometrial Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Hepatobiliary Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Hepatobiliary Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Esophagogastric Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Esophagogastric Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "composition",
+    "cohorts": [
+     "Melanoma",
+     "Non-Small Cell Lung Cancer",
+     "Colorectal Cancer",
+     "Breast Cancer",
+     "Bladder Cancer",
+     "Endometrial Cancer",
+     "Hepatobiliary Cancer",
+     "Esophagogastric Cancer"
+    ],
+    "profileType": "mutational_signatures_contribution_v2",
+    "entities": [
+     "mutational_signatures_contribution_v2_Signature1",
+     "mutational_signatures_contribution_v2_Signature2",
+     "mutational_signatures_contribution_v2_Signature3",
+     "mutational_signatures_contribution_v2_Signature4",
+     "mutational_signatures_contribution_v2_Signature5",
+     "mutational_signatures_contribution_v2_Signature6",
+     "mutational_signatures_contribution_v2_Signature7",
+     "mutational_signatures_contribution_v2_Signature8",
+     "mutational_signatures_contribution_v2_Signature9",
+     "mutational_signatures_contribution_v2_Signature10",
+     "mutational_signatures_contribution_v2_Signature11",
+     "mutational_signatures_contribution_v2_Signature12",
+     "mutational_signatures_contribution_v2_Signature13",
+     "mutational_signatures_contribution_v2_Signature14",
+     "mutational_signatures_contribution_v2_Signature15",
+     "mutational_signatures_contribution_v2_Signature16"
+    ],
+    "sort": "mutational_signatures_contribution_v2_Signature7"
+   }
+  ]
+ },
+ "composition-bars": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "Small Cell Lung Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE_DETAILED",
+      "values": [
+       "Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Uveal Melanoma": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE_DETAILED",
+      "values": [
+       "Uveal Melanoma"
+      ],
+      "per": "sample"
+     }
+    ]
+   },
+   "Cutaneous Melanoma": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE_DETAILED",
+      "values": [
+       "Cutaneous Melanoma"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "composition",
+    "cohorts": [
+     "Small Cell Lung Cancer",
+     "Uveal Melanoma",
+     "Cutaneous Melanoma"
+    ],
+    "profileType": "mutational_signatures_contribution_v2",
+    "entities": [
+     "mutational_signatures_contribution_v2_Signature1",
+     "mutational_signatures_contribution_v2_Signature2",
+     "mutational_signatures_contribution_v2_Signature4",
+     "mutational_signatures_contribution_v2_Signature7",
+     "mutational_signatures_contribution_v2_Signature13",
+     "mutational_signatures_contribution_v2_Signature15"
+    ],
+    "sort": "mutational_signatures_contribution_v2_Signature7"
+   }
+  ]
  }
 }

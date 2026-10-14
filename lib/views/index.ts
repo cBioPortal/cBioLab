@@ -26,6 +26,7 @@ import { runCancertypes } from "./cancertypes.ts";
 import { runOverlap } from "./overlap.ts";
 import { runEnrichment } from "./enrichment.ts";
 import { runAssays } from "./assays.ts";
+import { runComposition } from "./composition.ts";
 import { runCorrelates } from "./correlates.ts";
 import { runTable } from "./table.ts";
 import { runMutations } from "./mutations.ts";
@@ -71,6 +72,7 @@ const RUNNERS: Record<string, ViewRunner> = {
   overlap: drawn(runOverlap),
   enrichment: drawn(runEnrichment),
   assays: drawn(runAssays),
+  composition: drawn(runComposition),
   correlates: drawn(runCorrelates),
   table: drawn(runTable),
   mutations: drawn(runMutations),

@@ -224,6 +224,11 @@
     "Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)": {
       "all patients": 42
     },
+    "Composition: T and NK cell states by mutational signature (MSK SPECTRUM)": {
+      "HRD-Dup": 16,
+      "HRD-Del": 6,
+      "FBI": 14
+    },
     "Cancer types summary: RAS genes across 50,000 tumours": {
       "all patients": 48179
     },
