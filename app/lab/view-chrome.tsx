@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { attributeLabel } from "../../lib/custom-data-names.ts";
 import type { ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
+import { SERIES, seriesStyle } from "../../lib/chart/style.ts";
 import { HIGHLIGHT_CAP, HIGHLIGHT_COLORS } from "../../lib/plot-highlight.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import { ArrowDown, ArrowUp, Ellipsis, Pencil, Plus, Save, Split, StickyNote, Trash2, X } from "lucide-react";
@@ -17,8 +18,19 @@ import { FIELD } from "../_ui/toolbar.ts";
 import { Checkbox } from "../_ui/checkbox";
 import { GearMenu, MenuItem, MenuSeparator } from "../_ui/gear-menu.tsx";
 
-/** the cohort colours, in order, for every chart on the page */
-export const CAT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];
+/** the cohort colours, in order, for every chart on the page: the figures' own (lib/chart/style.ts) */
+export const CAT_COLORS = SERIES;
+
+/** series `i`'s swatch, as the figures draw it: past the sixth, the colour repeats with the line's dash */
+export function SeriesSwatch({ i }: { i: number }) {
+  const st = seriesStyle(i);
+  if (!st.dash) return <span className="cohortswatch" aria-hidden="true" style={{ background: st.color }} />;
+  return (
+    <svg className="cohortswatch dashed" viewBox="0 0 16 10" aria-hidden="true">
+      <line x1="0" y1="5" x2="16" y2="5" stroke={st.color} strokeWidth="2.5" strokeDasharray={st.dash} />
+    </svg>
+  );
+}
 
 export function Participation({ p }: { p?: ViewParticipation }) {
   if (!p || !p.studies.length) return null;
@@ -443,8 +455,7 @@ export function DrawnCohorts({ drawn, nodes }: { drawn: string[]; nodes: CohortN
   const splits = nodes.filter((x) => x.kind === "split");
   const owner = drawn.map((n) => splits.filter((x) => n.startsWith(x.name + " / ")).sort((a, b) => b.name.length - a.name.length)[0])
     .find((x) => x) || null;
-  const swatch = (i: number) => drawn.length > 1 &&
-    <span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />;
+  const swatch = (i: number) => drawn.length > 1 && <SeriesSwatch i={i} />;
   const parent = owner && owner.name.slice(0, owner.name.length - owner.label.length - 3);
   return (
     <p className="viewcohorts">
@@ -618,8 +629,3 @@ export function Latency({ v }: { v: any }) {
 export const ServerSvg = ({ html, className = "viewfig" }: { html: string; className?: string }) =>
   <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 
-/** A view's server-drawn figure; with none, says so in words — unless the view's error says why already. */
-export function ViewFigure({ svg, error, empty = "nothing to draw" }: { svg?: string | null; error?: string | null; empty?: string }) {
-  if (svg) return <ServerSvg html={svg} />;
-  return error ? null : <p className="note">{empty}</p>;
-}

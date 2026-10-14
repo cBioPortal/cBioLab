@@ -102,7 +102,7 @@ export function diffexprSvg(v: ViewResult, o: SvgOpts): string {
     });
     bottom = Math.max(bottom, y + best.length * (CH + 44));
   }
-  const cap = caption(v.caveat || "", W, bottom + 4, p.muted, Math.floor(W / 7.2));
+  const cap = caption(v.caveat || "", W, bottom + 4, p.muted);
   return frame(W, bottom + 4 + cap.height + 10, out.join("") + cap.svg, p.bg);
 }
 

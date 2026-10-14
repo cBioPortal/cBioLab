@@ -137,7 +137,7 @@ export function enrichmentSvg(v: ViewResult, o: SvgOpts): string {
   y += 20 + shown.length * 17;
   if (r.tested > shown.length) out.push(`<text x="10" y="${y + 4}" font-size="9" fill="${p.muted}">+${fmt(r.tested - shown.length)} more genes tested (the full table is in the result and the MCP text)</text>`);
   y += 14;
-  const cap = caption(v.caveat || "", W, y, p.muted, Math.floor(W / 7.2));
+  const cap = caption(v.caveat || "", W, y, p.muted);
   return frame(W, y + cap.height + 10, out.join("") + cap.svg, p.bg, W > (o.width || 960));
 }
 

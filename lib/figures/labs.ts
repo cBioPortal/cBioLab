@@ -67,6 +67,6 @@ export function labsSvg(v: ViewResult, o: SvgOpts): string {
     yy += 15;
   });
   if (r.responseP != null) { out.push(`<text x="8" y="${yy}" font-size="10.5" fill="${p.ink}">response rates differ: Fisher ${esc(pFmt(r.responseP))}</text>`); yy += 14; }
-  const cap = caption(v.caveat || "", W, yy, p.muted, Math.floor(W / 7.2));
+  const cap = caption(v.caveat || "", W, yy, p.muted);
   return frame(W, yy + cap.height + 10, out.join("") + cap.svg, p.bg);
 }

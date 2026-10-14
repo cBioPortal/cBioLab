@@ -174,7 +174,8 @@ describe("the lollipop draws every codon, the way the portal's mutation tab does
       { proteinLength: 189, transcriptId: "T", domains: [] });
     const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [g], hide: ["missense.driver"] } as any)!;
     assert.equal((svg.match(/<circle [^>]*r="2\.8"/g) || []).length, 1, "only the truncating codon is drawn");
-    assert.ok(svg.includes("Hidden: Missense · Driver") && svg.includes("drawn: 2 of 8 mutations"));
+    const words = svg.replace(/<\/text>/g, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
+    assert.ok(words.includes("Hidden: Missense · Driver") && words.includes("drawn: 2 of 8 mutations"));
   });
   test("a codon's tooltip lists its changes with their counts", () => {
     const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [kras()] } as any)!;

@@ -188,7 +188,7 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
 
   let total = H;
   if (captionText) {
-    const cap = caption(captionText, W, H, pal.muted, Math.floor(W / 6.2));
+    const cap = caption(captionText, W, H, pal.muted);
     parts.push(cap.svg);
     total += cap.height;
   }

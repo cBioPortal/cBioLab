@@ -97,6 +97,6 @@ export function riskmodelSvg(v: ViewResult, o: SvgOpts): string {
     m.minMutated + "); elastic net, alpha " + m.alpha + ", seed " + m.seed + "." + (left.length ? " Left out: " + left.join("; ") + "." : "") +
     (m.features.length > shown.length ? " " + (m.features.length - shown.length) + " more genes were kept in at least one run; they are in the result, not drawn." : "") +
     " " + (v.caveat || "");
-  const cap = caption(text, W, yy + 8, p.muted, Math.floor(W / 7.2));
+  const cap = caption(text, W, yy + 8, p.muted);
   return frame(W, yy + cap.height + 18, out.join("") + cap.svg, p.bg);
 }

@@ -87,7 +87,7 @@ export function genomeSvg(v: ViewResult, o: SvgOpts): string {
   out.push(`<rect x="${L}" y="${lk - 9}" width="9" height="9" rx="2" fill="${CN_GAIN}"/><text x="${L + 13}" y="${lk}" font-size="10" fill="${p.ink}">gained</text>` +
     `<rect x="${L + 70}" y="${lk - 9}" width="9" height="9" rx="2" fill="${CN_LOSS}"/><text x="${L + 83}" y="${lk}" font-size="10" fill="${p.ink}">lost</text>` +
     `<rect x="${L + 120}" y="${lk - 9}" width="9" height="9" rx="2" fill="${p.muted}" opacity="0.3"/><text x="${L + 133}" y="${lk}" font-size="10" fill="${p.ink}">no segment covers this bin</text>`);
-  const cap = caption(v.caveat || "", W, lk + 6, p.muted, Math.floor(W / 7.2));
+  const cap = caption(v.caveat || "", W, lk + 6, p.muted);
   return frame(W, lk + 6 + cap.height + 10, out.join("") + cap.svg, p.bg);
 }
 

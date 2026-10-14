@@ -85,7 +85,7 @@ export function cancertypesSvg(v: ViewResult, o: SvgOpts): string {
     parts.push(`<g transform="translate(0 ${y})">${c.body}</g>`);
     y += c.height + 10; W = Math.max(W, c.width);
   });
-  const cap = caption(v.caveat || "", W, y, p.muted, Math.floor(W / 7.2));
+  const cap = caption(v.caveat || "", W, y, p.muted);
   return frame(W, y + cap.height + 10, parts.join("") + cap.svg, p.bg, W > (o.width || 860));
 }
 

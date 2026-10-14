@@ -44,7 +44,7 @@ export function pairedSvg(v: ViewResult, o: SvgOpts): string {
     });
     y += 10;
   });
-  const cap = caption(v.caveat || "", W, y, p.muted, Math.floor(W / 7.2));
+  const cap = caption(v.caveat || "", W, y, p.muted);
   return frame(W, y + cap.height + 10, out.join("") + cap.svg, p.bg);
 }
 

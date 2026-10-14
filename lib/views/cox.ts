@@ -1,7 +1,6 @@
 // Cox view: a multivariate proportional-hazards fit from per-patient rows inside each local
 // study (patient-level participants only), and the covariate coding the logistic view shares.
 import { coxRegression, type CoxRow } from "../stats.ts";
-import { viewToSvg } from "../view-svg.ts";
 import type { ViewResult, CoxView, CoxCoefficient, CoxCovariate } from "../types.ts";
 import { isPatientLevel, type EndpointColumns } from "../federation.ts";
 import { axisLabel, validateAxis, OQL_UNALTERED, type AxisKind } from "../plot.ts";
@@ -196,7 +195,6 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
         (cutoffMonths != null ? " Administratively censored at " + cutoffMonths + " months." : "") +
         " Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers, unlike KM/log-rank." };
     coxResult.method = coxMethod(perCohort.flatMap(({ fit }) => "error" in fit ? [] : [fit.trace]), coxMethodOptions);
-    coxResult.svg = viewToSvg(coxResult) || undefined;
     return coxResult;
   } else {
     const fit0 = await fitCoxFor(vNames);
@@ -223,7 +221,6 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
     // Rendered here, by the SAME renderer MCP uses — the app draws the
     // forest plot as this SVG rather than a second, hand-rolled chart (the pattern
     // the clinical course and treatment-sequence views already follow).
-    coxResult.svg = viewToSvg(coxResult) || undefined;
     return coxResult;
   }
 }

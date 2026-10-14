@@ -18,6 +18,9 @@ export async function POST(req: Request) {
     // ?figures=svg: every view drawn by the shared server renderer (the portal pages show these)
     if (url.searchParams.get("figures") === "svg")
       return Response.json({ ...result, views: result.views.map((v) => v.svg || v.error ? v : { ...v, svg: viewToSvg(v) || undefined }) });
+    // the web app draws every other figure itself, at its card's width (app/lab/figure.tsx): a
+    // figure drawn here as well would travel unused
+    if (mode === "spec") return Response.json({ ...result, views: result.views.map(({ svg: _svg, ...v }) => v) });
     return Response.json(result);
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });

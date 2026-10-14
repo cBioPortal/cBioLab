@@ -1,6 +1,5 @@
 // Every view kind's runner, by kind.
 import type { ViewResult } from "../types.ts";
-import { viewToSvg } from "../view-svg.ts";
 import type { DocView, ViewRun, ViewRunner } from "./run.ts";
 import { runCompare } from "./compare.ts";
 import { runSurvival } from "./survival.ts";
@@ -34,15 +33,14 @@ import { runAlterations } from "./alterations.ts";
 import { runTimeline } from "./timeline.ts";
 
 /**
- * A runner that draws no figure of its own and lets a throw stand for its error: the figure is drawn
- * from the result (lib/view-svg.ts), and an error is reported as the view's, with its cohorts.
+ * A runner that lets a throw stand for its error: an error is reported as the view's, with its
+ * cohorts. Its figure is drawn from the result where it is shown (lib/view-svg.ts).
  */
 function drawn<V>(run: (view: V, c: ViewRun) => Promise<ViewResult>): ViewRunner {
   return async (view: DocView, c: ViewRun) => {
     let r: ViewResult;
     try { r = await run(view as V, c); }
     catch (e) { r = { kind: view.kind, cohorts: c.vNames, error: (e as Error).message }; }
-    if (!r.error && !r.svg) r.svg = viewToSvg(r) || undefined;
     return r;
   };
 }

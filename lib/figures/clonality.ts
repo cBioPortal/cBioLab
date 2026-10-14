@@ -61,7 +61,7 @@ export function clonalitySvg(v: ViewResult, o: SvgOpts): string {
   });
   if (r.wgdP != null) { out.push(`<text x="${SIDE_X}" y="${sy + 4}" font-size="10" fill="${p.ink}">WGD differs: Fisher ${esc(pFmt(r.wgdP))}</text>`); sy += 14; }
   const bottom = Math.max(T + genes.length * rowH, sy) + 8;
-  const cap = caption(v.caveat || "", W, bottom, p.muted, Math.floor(W / 7.2));
+  const cap = caption(v.caveat || "", W, bottom, p.muted);
   return frame(W, bottom + cap.height + 10, out.join("") + cap.svg, p.bg);
 }
 

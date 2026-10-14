@@ -75,7 +75,7 @@ export function assaysSvg(v: ViewResult, o: SvgOpts): string {
   if (r.tested > shown.length)
     out.push(`<text x="${TX}" y="${bottom + 4}" font-size="9" fill="${p.muted}">+${fmt(r.tested - shown.length)} more entities tested (the full table is in the result and the MCP text)</text>`);
   bottom += 14;
-  const cap = caption(v.caveat || "", W, bottom, p.muted, Math.floor(W / 7.2));
+  const cap = caption(v.caveat || "", W, bottom, p.muted);
   return frame(W, bottom + cap.height + 10, out.join("") + cap.svg, p.bg);
 }
 

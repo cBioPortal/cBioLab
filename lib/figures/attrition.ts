@@ -40,7 +40,7 @@ export function attritionSvg(v: ViewResult, o: SvgOpts): string {
     });
     bottom = Math.max(bottom, y);
   });
-  const cap = caption(v.caveat || "", W, bottom + 12, p.muted, Math.floor(W / 7.4));
+  const cap = caption(v.caveat || "", W, bottom + 12, p.muted);
   const H = bottom + 12 + cap.height + 12;
   return frame(W, H, out.join("") + cap.svg, p.bg, W > W0);
 }

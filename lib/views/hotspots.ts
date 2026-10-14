@@ -1,7 +1,6 @@
 // Hotspots view: a lollipop of mutation counts per protein position for each gene.
 import { geneSymbols } from "../gene-tracks.ts";
 import { buildLollipopGene, fetchProteinInfo, checkHide } from "../lollipop.ts";
-import { viewToSvg } from "../view-svg.ts";
 import type { ViewResult, HotspotsView, HotspotGene } from "../types.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
 import { overLimit } from "./shared.ts";
@@ -47,6 +46,5 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
         : " NOTE: with no suppression floor set (minCount), a change carried by a single patient is reported —" +
           " the most disclosive aggregate this system produces. Set minCount to have each site withhold rare changes at source.") +
       (studies.length > 1 ? " Counts sum across studies; a patient enrolled in more than one is not deduplicated." : "") };
-  hr.svg = viewToSvg(hr, { width: 960 }) || undefined;
   return hr;
 }

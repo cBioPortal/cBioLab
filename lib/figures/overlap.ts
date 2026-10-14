@@ -118,7 +118,7 @@ function upsetSvg(v: ViewResult, o: SvgOpts): string {
   let y = matrixTop + sets.length * ROW + 6;
   out.push(`<text x="10" y="${y + 6}" font-size="10.5" fill="${p.ink}">${fmt(r.union)} patients in at least one cohort · ${inter.length} non-empty combination${inter.length === 1 ? "" : "s"} of ${Math.pow(2, sets.length) - 1}</text>`);
   y += 14;
-  const cap = caption(v.caveat || "", W, y, p.muted, Math.floor(Math.min(W, 960) / 7.2));
+  const cap = caption(v.caveat || "", W, y, p.muted);
   return frame(W, y + cap.height + 10, out.join("") + cap.svg, p.bg, W > W0);
 }
 
@@ -131,6 +131,6 @@ export function overlapSvg(v: ViewResult, o: SvgOpts): string {
   const keyW = 40 + Math.max(...r.sets.map((s) => (s.name.length + 36) * 6.4));
   const W = Math.max(o.width || 860, a.width + b.width + 60 + keyW), H = Math.max(a.height, b.height, 30 + r.sets.length * 20);
   const body = a.body + `<g transform="translate(${a.width + 30} 0)">${b.body}</g>` + overlapKey(r, p, a.width + b.width + 60, 40);
-  const cap = caption(v.caveat || "", W, H + 6, p.muted, Math.floor(W / 7.2));
+  const cap = caption(v.caveat || "", W, H + 6, p.muted);
   return frame(W, H + 6 + cap.height + 10, body + cap.svg, p.bg);
 }

@@ -17,59 +17,18 @@
 // Colours come from CSS custom properties with literal fallbacks, so an SVG
 // inlined in the app follows the page theme while the same string rasterised
 // for a chat gets a fixed light figure.
-import { isAbsent, jitterFor, HIGHLIGHT_BASE } from "./plot.ts";
+import { isAbsent, jitterFor } from "./plot-draw.ts";
+import { HIGHLIGHT_BASE } from "./plot-highlight.ts";
 import { filterHotspotGene } from "./lollipop.ts";
 import { lollipopPanelsSvg, lollipopSummaryText } from "./lollipop-svg.ts";
 export { lollipopSummaryText };
-import { survivalAxis } from "./stats.ts";
-import type { ViewResult, KmCurve, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind, PlotData } from "./types.ts";
+import type { ViewResult, CooccurRow, HotspotGene, CompareRow, ClinicalRow, CoexprRow, CourseSeries, SequencePanel, SequenceNodeKind, PlotData } from "./types.ts";
 import { kindFigure, kindTitle } from "./figures/index.ts";
+import { survivalSvg } from "./figures/survival.ts";
 import { esc, SERIES, palette, num, fmt, pFmt, frame, caption, type SvgOpts } from "./svg-kit.ts";
 export { esc, SERIES, type SvgOpts };
 
 // ---------------------------------------------------------------------------
-
-function survivalSvg(v: ViewResult, o: SvgOpts): string {
-  const p = palette(o.theme), W = o.width || 720;
-  const curves = (v.curves || []) as KmCurve[];
-  const incidence = v.display === "incidence";
-  const L = 46, R = 12, T = 12, PLOT = 250;
-  const legendH = 16 * curves.length + 6;
-  const stats = v.logrank ? 18 : 0;
-  const cap = caption(v.caveat || "", W, T + PLOT + legendH + stats + 8, p.muted);
-  const H = T + PLOT + legendH + stats + cap.height + 16;
-  const { tMax, step } = survivalAxis(curves, { cutoffMonths: v.cutoffMonths, tickMonths: v.tickMonths });
-  const x = (t: number) => L + (W - L - R) * t / tMax;
-  const y = (s: number) => T + PLOT * (1 - s);
-  const out: string[] = [];
-  for (const s of [0, 0.25, 0.5, 0.75, 1]) {
-    out.push(`<line x1="${L}" y1="${num(y(s))}" x2="${W - R}" y2="${num(y(s))}" stroke="${p.line}" stroke-width="1"/>`);
-    out.push(`<text x="8" y="${num(y(s) + 3)}" font-size="10" fill="${p.muted}">${Math.round(s * 100)}%</text>`);
-  }
-  for (let t = 0; t <= tMax; t += step)
-    out.push(`<text x="${num(x(t) - 8)}" y="${T + PLOT + 14}" font-size="10" fill="${p.muted}">${t}mo</text>`);
-  curves.forEach((c, i) => {
-    // a step function: hold the previous level to the event time, then drop (rise, for incidence)
-    let d = `M ${num(x(0))} ${num(y(incidence ? 0 : 1))}`, py = y(incidence ? 0 : 1);
-    for (const q of c.points) { d += ` L ${num(x(q.t))} ${num(py)} L ${num(x(q.t))} ${num(y(q.s))}`; py = y(q.s); }
-    d += ` L ${num(x(tMax))} ${num(py)}`;
-    out.push(`<path d="${d}" fill="none" stroke="${SERIES[i % SERIES.length]}" stroke-width="2"/>`);
-  });
-  curves.forEach((c, i) => {
-    const ly = T + PLOT + 24 + i * 16;
-    out.push(`<rect x="8" y="${ly}" width="9" height="9" rx="2" fill="${SERIES[i % SERIES.length]}"/>`);
-    out.push(`<text x="22" y="${ly + 8}" font-size="11" fill="${p.ink}">${esc(c.cohort)}: ` +
-      `${incidence ? "50% incidence by " : "median "}${c.median == null ? "not reached" : num(c.median) + "mo"} (n=${fmt(c.n)}, ${fmt(c.events)} events)</text>`);
-  });
-  if (v.logrank) {
-    const ly = T + PLOT + 24 + curves.length * 16;
-    out.push(`<text x="8" y="${ly + 8}" font-size="11" fill="${p.ink}">log-rank χ²=${num(v.logrank.chi2)} ` +
-      `(${v.logrank.df} df) · ${pFmt(v.logrank.p)}` +
-      (v.logrank.strata > 1 ? ` · stratified by study, ${v.logrank.strata} strata` : "") + `</text>`);
-  }
-  out.push(cap.svg);
-  return frame(W, H, out.join(""), p.bg);
-}
 
 /** The lollipop standing alone (an MCP client's image): the selection applied, the app's controls in words in the caption. */
 function hotspotsSvg(v: ViewResult, o: SvgOpts): string {

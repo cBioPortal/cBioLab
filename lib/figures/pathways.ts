@@ -56,7 +56,7 @@ export function pathwaysSvg(v: ViewResult, o: SvgOpts): string {
   out.push(`<rect x="${lx}" y="${y - 9}" width="4" height="9" fill="${CN_GAIN}"/><text x="${lx + 8}" y="${y}" font-size="10" fill="${p.muted}">oncogene</text>` +
     `<rect x="${lx + 70}" y="${y - 9}" width="4" height="9" fill="${CN_LOSS}"/><text x="${lx + 78}" y="${y}" font-size="10" fill="${p.muted}">tumour suppressor (paper's role)</text>`);
   y += 6;
-  const cap = caption(v.caveat || "", W, y, p.muted, Math.floor(W / 7.2));
+  const cap = caption(v.caveat || "", W, y, p.muted);
   return frame(W, y + cap.height + 10, out.join("") + cap.svg, p.bg, W > W0);
 }
 

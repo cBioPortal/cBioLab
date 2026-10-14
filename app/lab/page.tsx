@@ -23,7 +23,8 @@ import { api } from "./api.ts";
 import { useSavedArtifacts } from "./use-saved.ts";
 import { SavedTab } from "./saved-tab.tsx";
 import { ExamplesTab } from "./examples-tab.tsx";
-import { KMChart } from "./view-cards.tsx";
+import { DrawAtWidth } from "./figure.tsx";
+import { survivalSvg } from "../../lib/figures/survival.ts";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
 import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
 import { CohortEditDialog, ViewNoteDialog, WorkspaceDialog } from "./dialogs.tsx";
@@ -430,7 +431,7 @@ export default function AnalysisPage() {
                   const eps = [...names].filter((a) => /_MONTHS$/.test(a) && names.has(a.replace(/_MONTHS$/, "_STATUS"))).map((a) => a.replace(/_MONTHS$/, ""));
                   return eps.sort((a, b) => (a === "OS" ? -1 : b === "OS" ? 1 : a.localeCompare(b)));
                 })()}
-                addClauses={addClauses} km={(curves) => <KMChart curves={curves as any} />} />
+                addClauses={addClauses} km={(curves) => <DrawAtWidth min={320} draw={(width) => survivalSvg({ kind: "survival", curves: curves as any }, { width })} deps={[curves]} />} />
               <ClinicalFacets ctx={exploreCtx} />
               {/* Charted genes (added from "+ Add chart" > Gene status) — one tile per
                   gene per alteration type, the same tile shape a clinical attribute gets,
