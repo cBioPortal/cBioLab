@@ -33,3 +33,6 @@ verification-report/
 
 # npm run report:dupes / report:security
 quality-report/
+
+# next dev's local database (lib/db.ts) when no DATABASE_URL is set
+.data/

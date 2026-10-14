@@ -166,6 +166,16 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   password, `LOGIN_PASSWORD`, guards custom data AND saved cohorts/analyses (`/api/artifacts`,
   owner-scoped; ownerless rows from before the login read as the shared principal's).
   `scripts/gate.sh` gives its e2e server a throwaway password. Per-user access is not built yet.
+- **The writable store** (`lib/db.ts`, the only Postgres client): saved cohorts and analyses,
+  campaigns and custom data. `DATABASE_URL` (or its older name `SUPABASE_DB_URL`) names the
+  Postgres; without one, outside Vercel production, `lib/db.ts` runs an in-process Postgres
+  (PGlite) itself — in `.data/pglite` under `next dev`, in memory otherwise (so every gate run
+  starts empty) — so there is one SQL path and no second, hand-written store to keep in step.
+  **Migrations** are `db/migrations/*.sql`, applied in name order by **`lib/migrate.ts`**, which
+  records each in `schema_migrations`; every migration must stay re-runnable (`if not exists`,
+  `drop trigger if exists`). A configured database is migrated only by `npm run db:migrate`
+  (`npm run db:status` lists applied and pending), never by the app — run it before deploying
+  code that needs a new migration. The in-process database migrates itself on first use.
 - **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Saved /
   Analysis / Examples. Tabs move out into their own components as they are untangled
   (`saved-tab.tsx`, `examples-tab.tsx`), and each view kind's card is its own component in
@@ -524,10 +534,9 @@ they can't tell you:
   federated views, cohort-definition semantics, clinical-course semantics, and the SVG figure
   renderers, plots, gene tracks, template parameters and the panel-aware denominator;
   252 checks across 40 suites). `npm run test:db` (~15 s, in `scripts/gate.sh`) runs the stores'
-  Postgres SQL, `db/migrations` and their triggers on an in-process Postgres (PGlite,
-  `test/postgres.db-test.ts`) — the e2e gate uses the in-memory fallback, so that is the only place
-  the database path is exercised. A store promise belongs in `test/support/store-contracts.ts`,
-  which runs on both backends.
+  Postgres SQL, `db/migrations`, their runner and their triggers on an in-process Postgres (PGlite,
+  `test/postgres.db-test.ts`). A store promise belongs in `test/support/store-contracts.ts`, which
+  runs there and on `lib/db.ts`'s own fallback.
   `node e2e.cjs` — 81 checks (Playwright + docs gate + the boundary suite + the
   denominator gate).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.

@@ -5,6 +5,7 @@
 // from the dialog primitive), and reports when it closes so the page can unmount it.
 import { useState } from "react";
 import type { AnalysisDoc } from "../../lib/types.ts";
+import { sameJson } from "../../lib/same-json.ts";
 import { cn } from "../../lib/cn";
 import { Button } from "../_ui/button";
 import { RemoveBadge } from "../_ui/remove-badge";
@@ -171,7 +172,7 @@ export function WorkspaceDialog({ doc, saved, busy, unusedParams, error, onParam
         {nViews} view{nViews === 1 ? "" : "s"}
         {doc.params ? " · " + nParams + " parameter" + (nParams === 1 ? "" : "s") : ""}
         {!saved ? " · not saved yet"
-          : JSON.stringify(saved.doc) !== JSON.stringify(doc) ? " · unsaved changes"
+          : !sameJson(saved.doc, doc) ? " · unsaved changes"
           : " · saved " + saved.savedAt}
       </p>
       <Input className={FIELD} value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="workspace name…" />

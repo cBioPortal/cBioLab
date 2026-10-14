@@ -1151,6 +1151,8 @@ async function main() {
       const made = await (await ctx.request.post(BASE + "/api/artifacts", { data: { kind: "cohort", name, definition: v1 } })).json();
       const id = made.artifact.id;
       const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
+      // the store is jsonb, which does not keep key order: compare values, not text
+      const keyed = (x) => JSON.stringify(x, (_, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a < b ? -1 : 1)) : v);
       await sp.goto(BASE + "/lab?tab=analysis", { waitUntil: "domcontentloaded" });
       await sp.locator(".addview button:has-text('Survival')").click();
       await sp.locator(".emptyview .emptyview-body button").first().click();
@@ -1162,12 +1164,12 @@ async function main() {
       await ctx.request.patch(BASE + "/api/artifacts/" + id, { data: { name, definition: v2 } });
       await sp.reload({ waitUntil: "domcontentloaded" });
       await sp.waitForSelector(".srcbadge.changed", { timeout: 120000 });
-      steps.untouched = JSON.stringify((await docOf()).cohorts[name].all) === JSON.stringify(v1.all);
+      steps.untouched = keyed((await docOf()).cohorts[name].all) === keyed(v1.all);
       await sp.locator(".srcbadge.changed").click();
       await sp.getByRole("button", { name: "Update to the saved version" }).click();
       await sp.waitForFunction(() => !document.querySelector(".srcbadge.changed"), null, { timeout: 60000 });
       const after = (await docOf()).cohorts[name];
-      steps.updated = JSON.stringify(after.all) === JSON.stringify(v2.all) && after.from.hash !== copied.from.hash;
+      steps.updated = keyed(after.all) === keyed(v2.all) && after.from.hash !== copied.from.hash;
       await ctx.request.delete(BASE + "/api/artifacts/" + id);
     } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
     ok("a saved cohort is copied with its source, left alone when the saved one changes, and updated on request",
@@ -1184,6 +1186,8 @@ async function main() {
       await ctx.request.post(BASE + "/api/login", { data: { code: LOGIN } });
       const name = "e2e save " + Date.now();
       const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
+      // the store is jsonb, which does not keep key order: compare values, not text
+      const keyed = (x) => JSON.stringify(x, (_, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a < b ? -1 : 1)) : v);
       const open = async (doc) => {
         const b64 = Buffer.from(JSON.stringify(doc)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
         await sp.goto(BASE + "/lab?tab=analysis&doc=" + b64, { waitUntil: "domcontentloaded" });

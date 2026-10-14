@@ -8,7 +8,7 @@
 -- Like saved_artifacts, this holds definitions and aggregate results only — never a
 -- patient or sample identifier (see docs/DATA-BOUNDARY.md).
 --
--- Apply by hand, in order, after 0001 (there is no migration runner yet).
+-- Applied by `npm run db:migrate` (lib/migrate.ts), after 0001.
 
 create table if not exists campaigns (
   id uuid primary key default gen_random_uuid(),

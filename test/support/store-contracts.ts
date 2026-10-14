@@ -1,6 +1,5 @@
-// What a store promises, whichever backend holds it: run on the in-memory fallback
-// (test/custom-store.test.ts) and on Postgres with the migrations applied (test/postgres.db-test.ts).
-// The backend is the one SUPABASE_DB_URL selects when the contract runs.
+// What a store promises, whichever database holds it: run on lib/db.ts's in-process fallback
+// (test/custom-store.test.ts) and on a Postgres the test supplies (test/postgres.db-test.ts).
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { listDatasets, saveDataset, readVersion, deleteDataset, unpackRows } from "../../lib/custom-store.ts";

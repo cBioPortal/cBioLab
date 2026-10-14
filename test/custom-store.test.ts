@@ -1,15 +1,17 @@
-// Server-stored custom data and saved artifacts on the in-memory backend (the contracts in
-// test/support/store-contracts.ts; test/postgres.db-test.ts runs the same ones on Postgres), and the
-// access code, which is the only way in.
+// Server-stored custom data and saved artifacts on the fallback a deployment without DATABASE_URL
+// gets — lib/db.ts's own in-process Postgres, migrated on first use (the contracts in
+// test/support/store-contracts.ts; test/postgres.db-test.ts runs the same ones on a Postgres the
+// test hands the stores) — and the access code, which is the only way in.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
 delete process.env.SUPABASE_DB_URL;
+delete process.env.DATABASE_URL;
 const { customStoreContract, artifactContract } = await import("./support/store-contracts.ts");
 const access = await import("../lib/auth.ts");
 
-customStoreContract("in memory");
-artifactContract("in memory");
+customStoreContract("in-process fallback");
+artifactContract("in-process fallback");
 
 describe("custom data access code", () => {
   const req = (cookie?: string) => new Request("https://x.test/api", { headers: cookie ? { cookie } : {} });

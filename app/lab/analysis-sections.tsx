@@ -21,6 +21,7 @@ import type { OnCustomData } from "./pills";
 import { requestLogin, referencedDatasets, unresolvedUploads } from "./custom-data-client.ts";
 import { CohortStudies, CohortEditMenu, CAT_COLORS, ViewHead } from "./view-chrome.tsx";
 import { cohortHash, shortHash } from "../../lib/cohort-hash.ts";
+import { sameJson } from "../../lib/same-json.ts";
 import { viewIsEmpty } from "../../lib/partition-arms.ts";
 import type { CohortSaveState, CohortSourceState } from "./use-cohort-edits.ts";
 import { ViewCard, LoadingViewCard } from "./view-cards.tsx";
@@ -308,7 +309,7 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
             {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
               <Button variant="outline" size="sm" disabled={busy} onClick={openWorkspaceSave}
                 title={doc.title
-                  ? "“" + doc.title + "” — " + (spaces[doc.title] && JSON.stringify(spaces[doc.title].doc) === JSON.stringify(doc)
+                  ? "“" + doc.title + "” — " + (spaces[doc.title] && sameJson(spaces[doc.title].doc, doc)
                       ? "saved " + spaces[doc.title].savedAt : "unsaved changes")
                   : "save this analysis as a named, reopenable workspace"}>
                 <Save />

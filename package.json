@@ -18,6 +18,8 @@
     "report:security": "uvx semgrep@1.180.0 scan --metrics off --config p/typescript --config p/nodejs --config p/react --config p/nextjs --config p/sql-injection --config p/secrets --config p/python --text --sarif-output=quality-report/semgrep.sarif",
     "test:boundary": "node --test test/boundary.test.ts",
     "test:db": "node --test test/postgres.db-test.ts",
+    "db:migrate": "node --env-file-if-exists=.env.local scripts/db-migrate.ts",
+    "db:status": "node --env-file-if-exists=.env.local scripts/db-migrate.ts --status",
     "test:python": "python/.venv/bin/python -m unittest discover -s python/tests -v",
     "check:genefacets": "node --env-file=.env.local scripts/check-gene-facets.ts",
     "check:values": "node --env-file=.env.local scripts/check-value-folding.ts",
@@ -31,6 +33,7 @@
     "visual": "node scripts/visual.ts"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@tanstack/react-query": "^5.104.1",
     "class-variance-authority": "^0.7.1",
@@ -51,7 +54,6 @@
   },
   "type": "module",
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
     "@eslint/js": "^10.0.1",
     "@next/eslint-plugin-next": "^16.4.0",
     "@tailwindcss/postcss": "^4.3.3",

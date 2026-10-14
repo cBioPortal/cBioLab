@@ -30,6 +30,8 @@ const nextConfig = (phase) => ({
   // hosts besides localhost that may load `next dev`'s scripts and HMR socket (e.g. a tailnet
   // proxy in front of a dev server); comma-separated, dev only
   allowedDevOrigins: (process.env.ALLOWED_DEV_ORIGINS || "").split(",").map((h) => h.trim()).filter(Boolean),
+  // lib/db.ts's in-process Postgres loads its WebAssembly and extensions from its own package files
+  serverExternalPackages: ["@electric-sql/pglite"],
   // `next dev` otherwise appends its own section to CLAUDE.md on every start
   agentRules: false,
   // ship the bundled font (and its dir) inside the serverless function for the MCP route,

@@ -4,9 +4,8 @@
 -- docs/DATA-BOUNDARY.md and RATIONALE.md's "User state" section, which
 -- deliberately deferred frozen-evaluation storage for exactly this reason.
 --
--- Run this once, by hand, against the Supabase project (SQL editor or any
--- Postgres client) — there is no migration runner yet, so apply migrations
--- in this directory in order and keep this file as the record of what ran.
+-- Applied by `npm run db:migrate` (lib/migrate.ts), which runs this directory in name order and
+-- records each file in schema_migrations.
 
 create extension if not exists pgcrypto;
 

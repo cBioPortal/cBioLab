@@ -14,7 +14,6 @@
 // version, so migrate() is the identity function — but the column and the
 // call site exist now, while adding them costs nothing, rather than being
 // retrofitted under pressure the day the DSL makes a breaking change.
-import { randomUUID } from "node:crypto";
 import { dbQuery } from "./db.ts";
 import { SHARED_PRINCIPAL } from "./auth.ts";
 
@@ -46,7 +45,7 @@ function migrate(kind: ArtifactKind, definition: unknown, fromVersion: number): 
 
 interface Row { id: string; kind: ArtifactKind; name: string; schema_version: number; definition: unknown; owner?: string | null; created_at: string | Date; updated_at: string | Date }
 
-/** Postgres hands back timestamps as Date, the memory backend as ISO text: both become ISO text. */
+/** Postgres hands back timestamps as Date; the API speaks ISO text. */
 const iso = (t: string | Date): string => new Date(t).toISOString();
 
 /** An owner column of null predates the login and is read as the shared principal's. */
@@ -68,20 +67,8 @@ function validateName(name: unknown): string {
   return s;
 }
 
-// ---------------------------------------------------------------------------
-// Storage backend. Real Postgres normally — but a session/branch (or the e2e
-// gate) without SUPABASE_DB_URL configured falls back to an in-process store
-// instead of failing outright, so nothing here requires a live Supabase
-// project just to run. Two things this must never do quietly:
-//   - use the fallback in real Vercel production (VERCEL_ENV — set by Vercel
-//     itself on every deployment, unlike NODE_ENV, which `next start` also
-//     sets to "production" locally): losing "shared" state on every
-//     serverless cold start would be far worse than the loud error it
-//     replaces, so that case still throws.
-//   - fall back silently anywhere else: the first use logs a clear warning,
-//     once, so a forgotten .env.local entry is visible rather than a mystery.
-// ---------------------------------------------------------------------------
-interface Backend {
+// Storage: SQL against lib/db.ts, which supplies the in-process Postgres where none is configured.
+interface Store {
   list(kind?: ArtifactKind): Promise<Row[]>;
   get(id: string): Promise<Row | null>;
   insert(kind: ArtifactKind, name: string, definition: unknown, owner: string): Promise<Row>;
@@ -89,32 +76,7 @@ interface Backend {
   remove(id: string): Promise<boolean>;
 }
 
-const memoryRows = new Map<string, Row>();
-const memoryBackend: Backend = {
-  async list(kind) {
-    return [...memoryRows.values()]
-      .filter(r => !kind || r.kind === kind)
-      .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
-      .slice(0, 500);
-  },
-  async get(id) { return memoryRows.get(id) ?? null; },
-  async insert(kind, name, definition, owner) {
-    const now = new Date().toISOString();
-    const row: Row = { id: randomUUID(), kind, name, schema_version: CURRENT_SCHEMA_VERSION, definition, owner, created_at: now, updated_at: now };
-    memoryRows.set(row.id, row);
-    return row;
-  },
-  async update(id, name, definition) {
-    const existing = memoryRows.get(id);
-    if (!existing) return null;
-    const row: Row = { ...existing, name, definition, schema_version: CURRENT_SCHEMA_VERSION, updated_at: new Date().toISOString() };
-    memoryRows.set(id, row);
-    return row;
-  },
-  async remove(id) { return memoryRows.delete(id); }
-};
-
-const pgBackend: Backend = {
+const store: Store = {
   async list(kind) {
     return kind
       ? dbQuery<Row>("select * from saved_artifacts where kind = $1 order by updated_at desc limit 500", [kind])
@@ -144,26 +106,14 @@ const pgBackend: Backend = {
   }
 };
 
-let warned = false;
-function backend(): Backend {
-  if (process.env.SUPABASE_DB_URL) return pgBackend;
-  if (process.env.VERCEL_ENV === "production")
-    throw new Error("SUPABASE_DB_URL is not set — the artifact store is not configured for production");
-  if (!warned) {
-    warned = true;
-    console.warn("[artifacts] SUPABASE_DB_URL not set — saved cohorts/workspaces are using an in-process store; nothing will persist across a restart.");
-  }
-  return memoryBackend;
-}
-
 export async function listArtifacts(principal: string, kind?: ArtifactKind): Promise<SavedArtifact[]> {
-  const rows = await backend().list(kind);
+  const rows = await store.list(kind);
   return rows.filter((r) => ownerOf(r) === principal).map(fromRow);
 }
 
 /** The row, if it exists and this principal owns it: someone else's reads as absent. */
 async function owned(principal: string, id: string): Promise<Row | null> {
-  const row = await backend().get(id);
+  const row = await store.get(id);
   return row && ownerOf(row) === principal ? row : null;
 }
 
@@ -176,7 +126,7 @@ export async function createArtifact(principal: string, kind: ArtifactKind, name
   if (!isArtifactKind(kind)) throw new Error("kind must be 'cohort' or 'workspace'");
   const n = validateName(name);
   if (!definition || typeof definition !== "object") throw new Error("definition must be an object");
-  const row = await backend().insert(kind, n, definition, principal);
+  const row = await store.insert(kind, n, definition, principal);
   return fromRow(row);
 }
 
@@ -188,11 +138,11 @@ export async function updateArtifact(principal: string, id: string, patch: { nam
   if (patch.definition !== undefined && (!patch.definition || typeof patch.definition !== "object"))
     throw new Error("definition must be an object");
   const definition = patch.definition === undefined ? existing.definition : patch.definition;
-  const row = await backend().update(id, name, definition);
+  const row = await store.update(id, name, definition);
   return row ? fromRow(row) : null;
 }
 
 export async function deleteArtifact(principal: string, id: string): Promise<boolean> {
   if (!(await owned(principal, id))) return false;
-  return backend().remove(id);
+  return store.remove(id);
 }
