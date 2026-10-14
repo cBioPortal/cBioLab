@@ -28,8 +28,8 @@ async function savedLists(browser, ok, BASE, LOGIN) {
 
     // signing in through the header's dialog: the development sign-in form, then who is signed in
     {
-      await page.locator("button.tbbtn", { hasText: "Sign in" }).first().click();
-      const dlg = page.locator("dialog.logindialog[open]");
+      await page.locator("header").getByRole("button", { name: "Sign in" }).click();
+      const dlg = page.locator("[role=dialog].logindialog");
       await dlg.locator("input[type=email]").fill(LOGIN);
       await dlg.locator("button[type=submit]").click();
       const shown = await page.locator(".loginstate .meta").first().innerText({ timeout: 30000 }).catch(() => "");

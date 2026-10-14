@@ -11,11 +11,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
-import type { ArtifactKind } from "../../lib/artifacts.ts";
+import type { ArtifactKind, DatasetWarning } from "../../lib/artifacts.ts";
+import type { Sharing } from "../../lib/access.ts";
 import { api } from "./api.ts";
 
-export type SavedCohort = { id: string; def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null };
-export type SavedWorkspace = { id: string; doc: AnalysisDoc; savedAt: string };
+export type SavedCohort = { id: string; def: CohortDef; savedAt: string; lastEval?: { count: number; text?: string } | null; sharing?: Artifact["sharing"] };
+export type SavedWorkspace = { id: string; doc: AnalysisDoc; savedAt: string; sharing?: Artifact["sharing"]; version?: number };
 /** Loading, failed and loaded are different states: a list that has not arrived is not empty. */
 export type ListState = { pending: boolean; error: string | null; retry: () => void };
 
@@ -44,9 +45,9 @@ async function answer(res: Response) {
 }
 
 const asCohort = (a: Artifact, lastEval: SavedCohort["lastEval"] = null): SavedCohort =>
-  ({ id: a.id, def: a.definition as CohortDef, savedAt: fmtDate(a.updatedAt), lastEval });
+  ({ id: a.id, def: a.definition as CohortDef, savedAt: fmtDate(a.updatedAt), lastEval, sharing: a.sharing });
 const asWorkspace = (a: Artifact): SavedWorkspace =>
-  ({ id: a.id, doc: a.definition as AnalysisDoc, savedAt: fmtDate(a.updatedAt) });
+  ({ id: a.id, doc: a.definition as AnalysisDoc, savedAt: fmtDate(a.updatedAt), sharing: a.sharing, version: a.version });
 
 function listQuery<T>(kind: ArtifactKind, user: string | null, as: (a: Artifact) => T) {
   return {
@@ -126,6 +127,20 @@ export function useSavedArtifacts(user: string | null) {
     saveWorkspace: async (name: string, doc: AnalysisDoc) =>
       put("workspace", name, asWorkspace(await save("workspace", name, doc))),
     removeWorkspace: (name: string) => remove("workspace", name),
+    /** who one of the reader's own items is shared with; answers the custom datasets its audience cannot read */
+    share: async (kind: ArtifactKind, id: string, sharing: Sharing): Promise<DatasetWarning[]> => {
+      const j = await answer(await api.artifacts.share(id, sharing));
+      await qc.invalidateQueries({ queryKey: keyOf(kind, user) });
+      return j.warnings as DatasetWarning[];
+    },
+    /** save over an item someone shared with the reader to edit, from the version they opened (a stale one is refused) */
+    saveShared: async (kind: ArtifactKind, id: string, name: string, definition: unknown, version: number): Promise<Artifact> => {
+      const a = (await answer(await api.artifacts.update(id, { name, definition, version }))).artifact as Artifact;
+      await qc.invalidateQueries({ queryKey: keyOf(kind, user) });
+      return a;
+    },
+    /** re-read both lists (another person may have changed what is shared) */
+    refresh: () => qc.invalidateQueries({ queryKey: KEY }),
   };
 }
 

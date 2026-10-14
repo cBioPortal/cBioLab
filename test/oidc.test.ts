@@ -20,6 +20,7 @@ const codes = new Map<string, { challenge: string; nonce: string; redirect: stri
 before(async () => {
   const { privateKey, publicKey } = await generateKeyPair("RS256");
   const jwk = { ...(await exportJWK(publicKey)), kid: "k1", alg: "RS256", use: "sig" };
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- a stand-in server: a handler that throws fails the test's own request
   server = createServer(async (req, res) => {
     const url = new URL(req.url!, issuer);
     const json = (status: number, body: unknown) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(body)); };

@@ -3,8 +3,8 @@
 // reader save and open their own cohorts and analyses and use custom data (lib/auth.ts). A
 // deployment offers its provider (Google, MSK…), the development sign-in, or both; with only a
 // provider the button goes straight there. Shown only where the deployment signs people in.
-import { useEffect, useState } from "react";
-import { LogIn, LogOut } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { LogIn, LogOut, Users } from "lucide-react";
 import { loadCustomData, devSignIn, signInWithProvider, logOut, onLoginRequest, serverState } from "./custom-data-client.ts";
 import { useCustomDataState } from "./custom-data-panel.tsx";
 import { Button } from "../_ui/button";
@@ -18,12 +18,12 @@ export default function LoginButton() {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const showDialog = (why: string | null = null) => { setErr(why); setEmail(""); setShown(true); };
-  const open = () => {
+  const showDialog = useCallback((why: string | null = null) => { setErr(why); setEmail(""); setShown(true); }, []);
+  const open = useCallback(() => {
     const { options } = serverState();
     if (options.oidc && !options.dev) signInWithProvider();
     else showDialog();
-  };
+  }, [showDialog]);
   // whether this deployment signs people in, and who is signed in here (once per page); a sign-in
   // the provider sent back refused arrives as ?signin_error=, shown in the dialog once it renders
   useEffect(() => {
@@ -35,7 +35,7 @@ export default function LoginButton() {
       showDialog(why);
     }
     return onLoginRequest(open);
-  }, []);
+  }, [open, showDialog]);
   if (!server.enabled) return null;
 
   const submit = async () => {
@@ -50,6 +50,7 @@ export default function LoginButton() {
     <>
       {server.unlocked
         ? <span className="loginstate"><span className="meta" title={server.user?.email}>{who}</span>
+            <Button variant="outline" size="sm" className={TB} asChild><a href="/groups" title="the groups you share saved work with"><Users />Groups</a></Button>
             <Button variant="outline" size="sm" className={TB} onClick={() => void logOut()} title="sign this browser out"><LogOut />Sign out</Button></span>
         : <Button variant="outline" size="sm" className={TB} onClick={open} title="sign in to save cohorts and analyses and use custom data"><LogIn />Sign in</Button>}
       <Dialog open={shown} onOpenChange={setShown}>

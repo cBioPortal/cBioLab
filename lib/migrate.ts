@@ -33,7 +33,7 @@ export async function migrate(db: MigrationTarget): Promise<string[]> {
     } catch (e) {
       // the failed statement leaves the connection inside the aborted transaction
       await db.exec("rollback").catch(() => {});
-      throw new Error("migration " + f + " failed and was rolled back: " + ((e as Error)?.message || e));
+      throw new Error("migration " + f + " failed and was rolled back: " + ((e as Error)?.message || e), { cause: e });
     }
     applied.push(f);
   }

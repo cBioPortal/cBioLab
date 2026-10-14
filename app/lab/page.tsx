@@ -301,10 +301,12 @@ export default function AnalysisPage() {
   // ---- the page's actions, each group in its own hook; later groups use earlier ones ----------
   const toolActions = useToolActions({ doc, docs, goTab, persistSpaces, queryClient, setError, setStudy, setValidating, study });
   const { commitDoc, proposePartition, saveAs, validateDoc } = toolActions;
-  const library = useLibrary({ docs, evalDef, goTab, persist, saved, setError, setStudy, study });
+  const library = useLibrary({ docs, evalDef, goTab, persist, saved, sharedSaved: savedArtifacts.sharedCohorts, setError, setStudy, study });
   const { analyzePicked, cohortsSubTab, docLink, exEvals, exTag, picked, previewExample, runDocExample, saveExample, setCohortsSubTab, setExTag, setPicked, togglePick } = library;
-  const workspace = useWorkspace({ canSave, doc, docs, goTab, persistSpaces, removeSpace, setError, setStudy, spaces, study });
-  const { analysisSaved, clearAnalysis, confirmViewNoteEdit, confirmWorkspaceSave, deleteWorkspace, noteEdit, openWorkspace, openWorkspaceSave, setNotes, setParam, setViewNoteEditing, setWsOpen, viewNoteEditing, wsError, wsOpen } = workspace;
+  const workspace = useWorkspace({ canSave, doc, docs, goTab, persistSpaces, removeSpace, setError, setStudy, spaces, study,
+    sharedSpaces: savedArtifacts.sharedWorkspaces,
+    saveShared: (id, name, d, version) => savedArtifacts.saveShared("workspace", id, name, d, version) });
+  const { sharedOpen, openShared, confirmSharedSave, analysisSaved, clearAnalysis, confirmViewNoteEdit, confirmWorkspaceSave, deleteWorkspace, noteEdit, openWorkspace, openWorkspaceSave, setNotes, setParam, setViewNoteEditing, setWsOpen, viewNoteEditing, wsError, wsOpen } = workspace;
   const savedReady = loggedIn && !savedArtifacts.cohortsState.pending && !savedArtifacts.cohortsState.error;
   const cohortEdits = useCohortEdits({ doc, docs, evalOf: (n) => { const c = result?.cohorts[n]; return c ? { count: c.count, text: c.text } : null; }, persist, proposePartition, saved, savedReady, setError, setToast, study });
   const { analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary } = cohortEdits;
@@ -365,6 +367,7 @@ export default function AnalysisPage() {
             dropdown, because picking several genes is a task you settle into,
             and a menu that closes on an outside click fights that. */}
         {wsOpen && <WorkspaceDialog doc={doc} saved={doc.title ? spaces[doc.title] : undefined} busy={busy}
+          shared={sharedOpen} onSaveShared={confirmSharedSave}
           unusedParams={result?.unusedParams} error={wsError} onParam={setParam} onNotes={setNotes}
           onDelete={() => deleteWorkspace(doc.title!)} onSave={confirmWorkspaceSave} onClose={() => setWsOpen(false)} />}
         {cohortEditing != null && <CohortEditDialog name={cohortEditing} notes={doc.cohorts?.[cohortEditing]?.notes || ""}
@@ -448,7 +451,7 @@ export default function AnalysisPage() {
           sub={cohortsSubTab} onSub={setCohortsSubTab} examples={EXAMPLES}
           picked={picked} onTogglePick={togglePick} onClearPicked={() => setPicked([])} onAnalyze={analyzePicked}
           evals={exEvals} onPreview={previewExample} onSaveExample={saveExample}
-          saved={savedArtifacts} onOpenWorkspace={openWorkspace} onDeleteWorkspace={deleteWorkspace}
+          saved={savedArtifacts} onOpenWorkspace={openWorkspace} onOpenShared={openShared} onDeleteWorkspace={deleteWorkspace}
           wsError={wsError} onCustomData={showClauseData} />}
 
         {/* ================= Examples tab ================= */}

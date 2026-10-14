@@ -188,7 +188,11 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   (`sharingContract`), and `npm run check:access-mutants` (a gate stage) plants six sharing bugs
   into a copy of `lib/access.ts` and requires each to fail it. A change to the rules updates both.
   On the page, the reader's OWN items stay keyed by name (`use-saved.ts`); others' come separately,
-  keyed by id, since two people may use one name.
+  keyed by id, since two people may use one name. UI: `app/lab/share-dialog.tsx` (owner only; from
+  the Saved tab's badges and the custom-data manager), the Saved tab's "Shared with you" sections,
+  `/groups` (`app/groups/page.tsx`, linked from the signed-in header). Opening someone else's analysis
+  gives a working copy that remembers its source (`use-workspace.ts` `sharedOpen`); where the group
+  may edit, the workspace dialog's "Save to theirs" saves back from the version opened.
 - **The writable store** (`lib/db.ts`, the only Postgres client): saved cohorts and analyses,
   campaigns and custom data. `DATABASE_URL` (or its older name `SUPABASE_DB_URL`) names the
   Postgres; without one, outside Vercel production, `lib/db.ts` runs an in-process Postgres

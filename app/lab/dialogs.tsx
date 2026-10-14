@@ -140,8 +140,11 @@ export function ViewNoteDialog({ note: initial, onSave, onClose }: {
  * workspace" button on the Analysis tab. Parameters and notes are the document's own and change
  * as they are edited (a parameter re-runs the views that use it); the name is saved with Save.
  */
-export function WorkspaceDialog({ doc, saved, busy, unusedParams, error, onParam, onNotes, onDelete, onSave, onClose }: {
+export function WorkspaceDialog({ doc, saved, shared, busy, unusedParams, error, onParam, onNotes, onDelete, onSave, onSaveShared, onClose }: {
   doc: AnalysisDoc;
+  /** the shared analysis this is a working copy of, when it is one */
+  shared?: { owner: string; canEdit: boolean } | null;
+  onSaveShared?: () => void;
   /** the workspace as saved under this document's title, if it is */
   saved: { doc: AnalysisDoc; savedAt: string } | undefined;
   busy: boolean;
@@ -166,7 +169,12 @@ export function WorkspaceDialog({ doc, saved, busy, unusedParams, error, onParam
           <Button type="button" variant="ghost" className="mr-auto text-destructive hover:text-destructive" disabled={busy}
             title={"delete the saved workspace “" + doc.title + "”"} onClick={onDelete}>Delete</Button>
         )}
-        <CancelSave onClose={onClose} disabled={!name.trim()} label={saved ? "Save changes" : "Save"} />
+        <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+        {shared?.canEdit && onSaveShared && <Button type="button"
+          title={"save over " + shared.owner + "'s “" + doc.title + "” — refused if someone has saved it since you opened it"}
+          onClick={() => { onClose(); onSaveShared(); }}>Save to theirs</Button>}
+        <Button type="submit" variant={shared?.canEdit ? "outline" : "default"} disabled={!name.trim()}>
+          {saved ? "Save changes" : shared ? "Save as my copy" : "Save"}</Button>
       </>}>
       <p className={cn(META, "meta")}>
         {nViews} view{nViews === 1 ? "" : "s"}
@@ -175,6 +183,11 @@ export function WorkspaceDialog({ doc, saved, busy, unusedParams, error, onParam
           : !sameJson(saved.doc, doc) ? " · unsaved changes"
           : " · saved " + saved.savedAt}
       </p>
+      {shared && <p className="note m-0">
+        A working copy of “{doc.title}”, shared by {shared.owner}. {shared.canEdit
+          ? "Save it back to theirs, or save it as your own copy below."
+          : "You can read theirs, not change it: Save keeps a copy of your own."}
+      </p>}
       <Input className={FIELD} value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="workspace name…" />
 
       {doc.params && nParams > 0 ? (

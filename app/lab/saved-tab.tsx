@@ -2,7 +2,13 @@
 // The Saved tab: the example cohorts and the reader's saved cohorts, ticked to analyse together,
 // and their saved analyses. What it holds across a tab switch (the ticks, the previews, the
 // sub-tab) belongs to the page, which keeps it while this unmounts.
+import { useState } from "react";
 import CohortPills, { type OnCustomData } from "./pills";
+import { ShareDialog, sharingLabel } from "./share-dialog.tsx";
+import { useGroups } from "./use-groups.ts";
+import { shareServerDataset } from "./custom-data-client.ts";
+import type { ArtifactKind } from "../../lib/artifacts.ts";
+import type { Sharing } from "../../lib/access.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { ServerState } from "./custom-data-client.ts";
 import type { CohortDef } from "../../lib/types.ts";
@@ -14,7 +20,19 @@ import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 export type ExampleCohort = { name: string; desc: string; def: CohortDef };
 export type ExampleEval = { count?: number; error?: string; busy?: boolean } | null;
 
-const OWN = "yours: only you see these";
+const OWN = "yours, shared as each says";
+
+/** Whose an item shared with the reader is, and how it reaches them. */
+const sharedBy = (x: { owner: { email: string; name: string | null }; sharing: Sharing & { groupName: string | null }; rights: { edit: boolean } }) =>
+  "from " + (x.owner.name || x.owner.email) + " · " + (x.sharing.visibility === "public" ? "shared with everyone" : "shared with “" + x.sharing.groupName + "”") +
+  (x.rights.edit ? " · you can edit" : "");
+
+/** An own item's sharing, as a small badge that opens the share dialog. */
+function ShareBadge({ sharing, onClick }: { sharing?: Sharing & { groupName: string | null }; onClick: () => void }) {
+  const label = sharing ? sharingLabel(sharing) : "only you";
+  return <Button variant="link" size="inline" className="sharebadge text-sm" onClick={onClick} title={"shared with " + label + " — change who"}>
+    {sharing && sharing.visibility !== "private" ? "shared: " + label : "share…"}</Button>;
+}
 
 /** A list that is loading or failed says so; only a loaded one may be empty. */
 function ListStatus({ state, what, empty, isEmpty }: { state: ListState; what: string; empty: string; isEmpty: boolean }) {
@@ -26,7 +44,7 @@ function ListStatus({ state, what, empty, isEmpty }: { state: ListState; what: s
 
 export function SavedTab({
   login, onLogin, sub, onSub, examples, picked, onTogglePick, onClearPicked, onAnalyze,
-  evals, onPreview, onSaveExample, saved, onOpenWorkspace, onDeleteWorkspace, wsError, onCustomData,
+  evals, onPreview, onSaveExample, saved, onOpenWorkspace, onOpenShared, onDeleteWorkspace, wsError, onCustomData,
 }: {
   login: ServerState;
   onLogin: () => void;
@@ -41,12 +59,16 @@ export function SavedTab({
   evals: Record<string, ExampleEval>;
   onPreview: (ex: ExampleCohort) => void;
   onSaveExample: (ex: ExampleCohort) => void;
+  /** open an analysis someone shared with the reader, by id */
+  onOpenShared: (id: string) => void;
   saved: SavedArtifacts;
   onOpenWorkspace: (name: string) => void;
   onDeleteWorkspace: (name: string) => void;
   wsError: string | null;
   onCustomData: (cohort: string) => OnCustomData;
 }) {
+  const groups = useGroups(login.user?.id ?? null);
+  const [sharing, setSharing] = useState<{ kind: ArtifactKind; id: string; name: string; sharing: Sharing } | null>(null);
   if (!login.loaded) return <div className="card"><Waiting what="your sign-in" /></div>;
   if (!login.unlocked) return <div className="card">
     <p className="flush">Saved cohorts and analyses are your own.{" "}
@@ -118,11 +140,29 @@ export function SavedTab({
             {c.lastEval && <span className="meta">{c.lastEval.count.toLocaleString()} pts</span>}
             <span className="meta">saved {c.savedAt}</span>
             <span className="spacer" />
+            <ShareBadge sharing={c.sharing} onClick={() => setSharing({ kind: "cohort", id: c.id, name: n, sharing: c.sharing ?? PRIVATE })} />
             <Button variant="link" size="inline" onClick={() => saved.removeCohort(n)}>delete</Button>
           </div>
           <div className="listrow-body"><CohortPills def={c.def} onCustomData={onCustomData(n)} /></div>
         </div>
       ))}
+
+      {saved.sharedCohorts.length > 0 && <>
+        <h2 className="savedsec">Shared with you <span className="plain">— others' cohorts you may use. Tick any to include above.</span></h2>
+        {saved.sharedCohorts.map((x) => (
+          <div key={x.id} className="listrow">
+            <div className="listrow-head">
+              <label className="pick">
+                <Checkbox checked={picked.includes("shared:" + x.id)} onCheckedChange={() => onTogglePick("shared:" + x.id)} />
+                <strong>{x.name}</strong>
+              </label>
+              <span className="meta">{sharedBy(x)}</span>
+              <span className="meta">saved {x.item.savedAt}</span>
+            </div>
+            <div className="listrow-body"><CohortPills def={x.item.def} onCustomData={onCustomData(x.name)} /></div>
+          </div>
+        ))}
+      </>}
     </div>}
 
     {sub === "analyses" && <div className="grid2">
@@ -139,6 +179,7 @@ export function SavedTab({
                 <span className="meta">{views} view{views === 1 ? "" : "s"}</span>
                 <span className="meta">saved {w.savedAt}</span>
                 <span className="spacer" />
+                <ShareBadge sharing={w.sharing} onClick={() => setSharing({ kind: "workspace", id: w.id, name: n, sharing: w.sharing ?? PRIVATE })} />
                 <Button variant="link" size="inline" onClick={() => onOpenWorkspace(n)}>open</Button>
                 <Button variant="link" size="inline" onClick={() => onDeleteWorkspace(n)}>delete</Button>
               </div>
@@ -147,6 +188,31 @@ export function SavedTab({
         })}
         {wsError && <p className="error">{wsError}</p>}
       </div>
+      {saved.sharedWorkspaces.length > 0 && <div className="card">
+        <h2>Shared with you <span className="plain">— others' analyses. Opening one gives you a working copy{saved.sharedWorkspaces.some((x) => x.rights.edit) ? "; where you can edit, you can also save back to it" : ""}.</span></h2>
+        {saved.sharedWorkspaces.map((x) => {
+          const views = (x.item.doc.views || []).length;
+          return (
+            <div key={x.id} className="listrow">
+              <div className="listrow-head">
+                <strong>{x.name}</strong>
+                <span className="meta">{views} view{views === 1 ? "" : "s"}</span>
+                <span className="meta">{sharedBy(x)}</span>
+                <span className="spacer" />
+                <Button variant="link" size="inline" onClick={() => onOpenShared(x.id)}>open</Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>}
     </div>}
+
+    {sharing && <ShareDialog kind={sharing.kind === "workspace" ? "analysis" : "cohort"} name={sharing.name} sharing={sharing.sharing}
+      groups={groups.groups} groupsError={groups.error}
+      onSave={(s) => saved.share(sharing.kind, sharing.id, s)}
+      onShareDatasets={async (ids, s) => { for (const id of ids) await shareServerDataset(id, s); }}
+      onClose={() => setSharing(null)} />}
   </div>;
 }
+
+const PRIVATE: Sharing = { visibility: "private", groupId: null, groupCanEdit: false };

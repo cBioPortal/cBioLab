@@ -15,6 +15,7 @@
 //                           none stays on the shared result cache. A name the document pins
 //                           (`uploads`, see bindUploads) resolves to that version; a body that
 //                           carries a spec rather than the document is given the pins with it.
+import type { Sharing } from "../../lib/access.ts";
 import { CUSTOM_PREFIX, LIMITS, type CustomColumn, type CustomDataset, type CustomLevel } from "../../lib/custom-data-names.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
 import { EXAMPLES } from "../../lib/dsl-reference.ts";
@@ -146,6 +147,15 @@ export async function saveToServer(d: StoredDataset, versionOf?: string): Promis
 
 export async function deleteServerDataset(id: string): Promise<void> {
   const res = await fetch("/api/custom-data/datasets/" + id, { method: "DELETE" });
+  const j = await res.json();
+  if (!res.ok || j.error) throw new Error(j.error || res.statusText);
+  await loadServerData();
+}
+
+/** Who a stored dataset is shared with (its owner only; lib/access.ts). */
+export async function shareServerDataset(id: string, sharing: Sharing): Promise<void> {
+  const res = await fetch("/api/custom-data/datasets/" + id + "/sharing",
+    { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sharing) });
   const j = await res.json();
   if (!res.ok || j.error) throw new Error(j.error || res.statusText);
   await loadServerData();
