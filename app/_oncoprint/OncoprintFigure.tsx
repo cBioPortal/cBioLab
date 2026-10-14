@@ -768,8 +768,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               {(close) => <>
                 <span className="meta px-2">download figures</span>
                 <MenuItem onClick={() => { close(); openExport(); }}><ImageDown />Export image (PNG or SVG)… — choose a page width</MenuItem>
-                <MenuItem onClick={() => { close(); download("tsv"); }}><Sheet />Tabular TSV — one row per track, one column per {data.unit}</MenuItem>
-                <MenuItem onClick={() => { close(); download("ids"); }}><ListOrdered />{data.unit} order — the ids as drawn</MenuItem>
+                <MenuItem onClick={() => { close(); void download("tsv"); }}><Sheet />Tabular TSV — one row per track, one column per {data.unit}</MenuItem>
+                <MenuItem onClick={() => { close(); void download("ids"); }}><ListOrdered />{data.unit} order — the ids as drawn</MenuItem>
                 {/* Not a download: the same spec, opened where it can be run rather than looked at.
                     Nothing is exported — the link carries the definition, and the lab page re-runs it. */}
                 <div className="menu-aside">

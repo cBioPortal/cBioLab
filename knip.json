@@ -3,5 +3,6 @@
   "entry": ["e2e.cjs", "e2e-saved.cjs", "bench.mjs", "scripts/**/*.{ts,cjs,mjs}", "test/**/*.ts"],
   "project": ["**/*.{ts,tsx,cjs,mjs}"],
   "ignoreBinaries": ["uv", "uvx"],
+  "ignoreDependencies": ["tailwindcss", "tw-animate-css", "shadcn"],
   "rules": { "exports": "off", "types": "off" }
 }
