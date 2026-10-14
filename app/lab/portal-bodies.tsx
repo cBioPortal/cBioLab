@@ -9,11 +9,13 @@ import type { ViewResult, TableQuery, CohortDef, View } from "../../lib/types";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 export { usePages, Pager } from "../_table/DataTable.tsx";
 import { cancertypesPanelSvg } from "../../lib/figures/cancertypes";
-import { enrichmentVolcanoSvg, enrichmentScatterSvg, enrichmentTopSvg } from "../../lib/figures/enrichment";
+import { enrichmentChartsSvg } from "../../lib/figures/enrichment";
 import { assayEntitySvg } from "../../lib/figures/assays";
+import { pDigits, fmtP, fmtPct, fmtNum } from "../../lib/chart/format";
+import { textOn, seriesStyle } from "../../lib/chart/style";
 import { frame, palette, SERIES } from "../../lib/svg-kit";
 import { api } from "./api.ts";
-import { SvgAtWidth, DrawAtWidth, ViewFigure } from "./figure.tsx";
+import { DrawAtWidth, ViewFigure } from "./figure.tsx";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
@@ -23,8 +25,6 @@ import { OptionSelect } from "../_ui/choice.tsx";
 import { FIELD, SEG_TAB, SEG_TABS, TB } from "../_ui/toolbar.ts";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 
-const framed = (c: { body: string; width: number; height: number } | null) => c ? frame(c.width, c.height, c.body, palette("auto").bg, true) : null;
-export const pFmt = (x: number) => x === 0 ? "< 1e-300" : x < 1e-3 ? x.toExponential(2) : x.toFixed(3);
 
 
 /** Tabs over a body, the portal's gene / group selectors. */
@@ -44,14 +44,15 @@ export function CancertypesBody({ v }: { v: ViewResult }) {
   const r = v.cancertypes!;
   const ALL = "All Queried Genes";
   const [gene, setGene] = useState(ALL);
-  const svgs = useMemo(() => r.panels.map((_, i) => {
-    const c = cancertypesPanelSvg(r, i, { gene: gene === ALL ? null : gene, title: r.panels.length > 1 || gene !== ALL });
-    return frame(c.width, c.height, c.body, palette("auto").bg, true);
-  }), [r, gene]);
+  // each cohort's chart laid out for the card's width; one with more groups than fit grows and scrolls
+  const draw = (i: number) => (width: number) => {
+    const c = cancertypesPanelSvg(r, i, { width, gene: gene === ALL ? null : gene, title: r.panels.length > 1 || gene !== ALL });
+    return frame(c.width, c.height, c.body, palette("auto").bg, c.grown, "Cancer types summary — " + r.panels[i].cohort);
+  };
   return (
     <div className="pb">
       {r.genes.length > 1 && <Pills items={[ALL, ...r.genes]} on={gene} set={setGene} />}
-      <div className="pb-scroll">{svgs.map((s, i) => <SvgAtWidth key={i} svg={s} />)}</div>
+      {r.panels.map((_, i) => <DrawAtWidth key={i} draw={draw(i)} deps={[r, gene]} />)}
     </div>
   );
 }
@@ -116,7 +117,7 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
 }
 
 const Badge = ({ text, color }: { text: string; color: string | null }) =>
-  <span className="pb-badge" style={color ? { background: color } : { background: "var(--line)", color: "var(--ink)" }}>{text}</span>;
+  <span className="pb-badge" style={color ? { background: color, color: textOn(color) } : { background: "var(--line)", color: "var(--ink)" }}>{text}</span>;
 
 /** An OncoKB annotation cell: oncogenic calls coloured, the rest grey; nothing when there is no call. */
 export const AnnotationBadge = ({ text }: { text: string }) => text
@@ -129,22 +130,21 @@ type EnRow = NonNullable<ViewResult["enrichment"]>["rows"][number];
 export function EnrichmentBody({ v }: { v: ViewResult }) {
   const r = v.enrichment!;
   const two = r.groups.length === 2;
-  const charts = useMemo(() => [enrichmentVolcanoSvg(r), enrichmentScatterSvg(r), enrichmentTopSvg(r)].map(framed).filter((x): x is string => !!x), [r]);
-  const color = (g: string) => SERIES[r.groups.indexOf(g) % SERIES.length];
+  const color = (g: string) => seriesStyle(Math.max(0, r.groups.indexOf(g))).color;
   const cols: Col<EnRow>[] = [
     { key: "gene", label: "Gene", value: (g) => g.gene, render: (g) => <strong>{g.gene}</strong> },
     { key: "cytoband", label: "Cytoband", value: (g) => g.cytoband || null },
     ...r.groups.map((name, i): Col<EnRow> => ({ key: "g" + i, label: name, num: true, title: "altered / profiled in " + name,
-      value: (g) => g.cells[i].pct, render: (g) => <>{g.cells[i].altered.toLocaleString()} ({g.cells[i].pct == null ? "—" : g.cells[i].pct!.toFixed(2) + "%"})</> })),
+      value: (g) => g.cells[i].pct, render: (g) => <>{g.cells[i].altered.toLocaleString()} ({g.cells[i].pct == null ? "—" : fmtPct(g.cells[i].pct!)})</> })),
     ...(two ? [{ key: "lr", label: "Log2 Ratio", num: true, value: (g: EnRow) => g.log2Ratio ?? (g.cells[0].altered ? 99 : -99),
       render: (g: EnRow) => g.log2Ratio == null ? (g.cells[0].altered ? ">10" : "<-10") : g.log2Ratio.toFixed(2) }] : []),
-    { key: "p", label: "p-Value", num: true, value: (g) => g.p, render: (g) => pFmt(g.p) },
-    { key: "q", label: "q-Value", num: true, value: (g) => g.q, render: (g) => <span style={{ fontWeight: g.q < 0.05 ? 700 : 400 }}>{pFmt(g.q)}</span> },
+    { key: "p", label: "p-Value", num: true, value: (g) => g.p, render: (g) => pDigits(g.p) },
+    { key: "q", label: "q-Value", num: true, value: (g) => g.q, render: (g) => <span style={{ fontWeight: g.q < 0.05 ? 700 : 400 }}>{pDigits(g.q)}</span> },
     { key: "in", label: two ? "Enriched in" : "Most enriched in", value: (g) => g.enrichedIn, render: (g) => <Badge text={g.enrichedIn} color={g.q < 0.05 ? color(g.enrichedIn) : null} /> },
   ];
   return (
     <div className="pb">
-      <div className="pb-row pb-scroll">{charts.map((c, i) => <SvgAtWidth key={i} svg={c} />)}</div>
+      <DrawAtWidth draw={(width) => enrichmentChartsSvg(r, { width })} deps={[r]} />
       <PortalTable rows={r.rows} cols={cols} initialSort={{ key: "q" }} search={(g) => g.gene + " " + (g.cytoband || "")}
         filters={[{ label: "Significant only", test: (g) => g.q < 0.05 }]}
         note={r.tested > r.rows.length ? "the " + r.rows.length + " most significant of " + r.tested.toLocaleString() + " genes tested" : undefined} />
@@ -193,8 +193,8 @@ export function CorrelatesBody({ v, docJson }: { v: ViewResult; docJson?: () => 
     { key: "cytoband", label: "Cytoband", value: (g) => g.cytoband || null },
     { key: "rho", label: "Spearman's Correlation", num: true, value: (g) => g.rho,
       render: (g) => <span style={{ color: (g.rho ?? 0) > 0 ? SERIES[2] : SERIES[4] }}>{g.rho?.toFixed(3)}</span> },
-    { key: "p", label: "p-Value", num: true, value: (g) => g.rhoP, render: (g) => pFmt(g.rhoP) },
-    { key: "q", label: "q-Value", num: true, value: (g) => g.q, render: (g) => <strong>{pFmt(g.q)}</strong> },
+    { key: "p", label: "p-Value", num: true, value: (g) => g.rhoP, render: (g) => pDigits(g.rhoP) },
+    { key: "q", label: "q-Value", num: true, value: (g) => g.q, render: (g) => <strong>{pDigits(g.q)}</strong> },
   ];
   return (
     <div className="pb">
@@ -208,7 +208,7 @@ export function CorrelatesBody({ v, docJson }: { v: ViewResult; docJson?: () => 
             note={"the " + r.positive.length + " most positive and " + r.negative.length + " most negative of " + r.tested.toLocaleString()} />
         </div>
         <div className="pb-plot">
-          {picked && <p className="meta">{r.gene} vs {picked.gene} · Spearman {picked.rho?.toFixed(2)} (p = {pFmt(picked.rhoP)}) · Pearson {picked.r?.toFixed(2)} (p = {pFmt(picked.p)})</p>}
+          {picked && <p className="meta">{r.gene} vs {picked.gene} · Spearman {picked.rho?.toFixed(2)} ({fmtP(picked.rhoP)}) · Pearson {picked.r?.toFixed(2)} ({fmtP(picked.p)})</p>}
           {!plot && picked && <div className="loading-block"><span className="spinner" /> drawing {r.gene} vs {picked.gene}…</div>}
           {plot?.error && <p className="note">{plot.error}</p>}
           {plot?.view && <ViewFigure v={plot.view} min={320} />}
@@ -226,16 +226,16 @@ export function AssaysBody({ v }: { v: ViewResult }) {
   const r = v.assays!;
   const [sel, setSel] = useState<AsRow | null>(null);
   const picked = sel && r.rows.includes(sel) ? sel : r.rows[0] || null;
-  const color = (g: string) => SERIES[r.groups.indexOf(g) % SERIES.length];
+  const color = (g: string) => seriesStyle(Math.max(0, r.groups.indexOf(g))).color;
   const numeric = r.datatype === "numeric";
   const cols: Col<AsRow>[] = [
     { key: "name", label: "Entity", value: (e) => e.name, render: (e) => <strong title={e.entity}>{e.name}</strong> },
     ...r.groups.flatMap((name, i): Col<AsRow>[] => numeric
-      ? [{ key: "m" + i, label: name + " mean", num: true, value: (e) => e.cells[i].mean ?? null, render: (e) => e.cells[i].mean == null ? "—" : e.cells[i].mean!.toPrecision(3) },
-         { key: "s" + i, label: name + " SD", num: true, value: (e) => e.cells[i].sd ?? null, render: (e) => e.cells[i].sd == null ? "—" : e.cells[i].sd!.toPrecision(3) }]
+      ? [{ key: "m" + i, label: name + " mean", num: true, value: (e) => e.cells[i].mean ?? null, render: (e) => e.cells[i].mean == null ? "—" : fmtNum(e.cells[i].mean!) },
+         { key: "s" + i, label: name + " SD", num: true, value: (e) => e.cells[i].sd ?? null, render: (e) => e.cells[i].sd == null ? "—" : fmtNum(e.cells[i].sd!) }]
       : [{ key: "n" + i, label: name + " n", num: true, value: (e) => e.cells[i].n }]),
-    { key: "p", label: "p-Value", num: true, value: (e) => e.p, render: (e) => pFmt(e.p) },
-    { key: "q", label: "q-Value", num: true, value: (e) => e.q, render: (e) => <strong>{pFmt(e.q)}</strong> },
+    { key: "p", label: "p-Value", num: true, value: (e) => e.p, render: (e) => pDigits(e.p) },
+    { key: "q", label: "q-Value", num: true, value: (e) => e.q, render: (e) => <strong>{pDigits(e.q)}</strong> },
     { key: "in", label: "Higher in", value: (e) => e.higherIn, render: (e) => <Badge text={e.higherIn + (e.value ? " · " + e.value : "")} color={e.q < 0.05 ? color(e.higherIn) : null} /> },
   ];
   return (

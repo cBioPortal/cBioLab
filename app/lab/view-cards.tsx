@@ -11,6 +11,7 @@ import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { AnalysisDoc, AnalysisResult, OncoprintView, ExploreResult } from "../../lib/types.ts";
 import { pDigits } from "../../lib/chart/format.ts";
 import { MethodPanel } from "./method-panel.tsx";
+import { viewRequest } from "./use-analysis.ts";
 import { AxisPicker, HighlightPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, SeriesSwatch, Participation } from "./view-chrome.tsx";
 import { ViewFigure } from "./figure.tsx";
 import { ArrowLeftRight, Plus, Settings2, X } from "lucide-react";
@@ -29,6 +30,8 @@ type EventOption = { canonical: string; label: string; n: number; perPatient?: n
 /** What every card reads from the page and the edits it can make — the page builds one per render. */
 export interface ViewCtx {
   doc: AnalysisDoc;
+  /** the study the page falls back to when the document names none (use-analysis.ts sends it) */
+  study: string;
   result: AnalysisResult;
   /** each view's id, in the document's order: what a card is keyed by */
   viewIds: (string | number)[];
@@ -641,6 +644,23 @@ function SequenceKeyHint({ ctx, v, vi }: CardProps) {
   </>;
 }
 
+/** a numeric plot axis on a log scale: log10(v + 1), so a zero stays on the axis (lib/plot.ts) */
+function LogToggle({ ctx, vi, side, numeric }: { ctx: ViewCtx; vi: number; side: "x" | "y"; numeric: boolean }) {
+  const axis = ctx.docView(vi)[side];
+  if (!numeric || !axis || !("source" in axis) || (axis.source !== "clinical" && axis.source !== "molecular")) return null;
+  return (
+    <label className="chk" title={"draw " + side + " on a log scale — log10(value + 1), so zero stays on the axis and a negative value is left out"}>
+      <Checkbox checked={!!axis.log} disabled={ctx.busy}
+        onCheckedChange={(c) => ctx.updateView(vi, (vv: any) => {
+          const a = { ...vv[side] };
+          if (c === true) a.log = true; else delete a.log;
+          return { ...vv, [side]: a };
+        })} />
+      log
+    </label>
+  );
+}
+
 function PlotCard({ ctx, v, vi }: CardProps) {
   const { attrsLoading, busy, catalogAttrs, cohortChoice, docView, menuOpenRef, profileOptions, updateView } = ctx;
   return <>
@@ -654,10 +674,12 @@ function PlotCard({ ctx, v, vi }: CardProps) {
           <span className="tbl" title="these change what is drawn, and re-run the query">data</span>
           <AxisPicker side="x" axis={docView(vi).x} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
             onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, x: a }))} />
+          <LogToggle ctx={ctx} vi={vi} side="x" numeric={v.plot?.x.kind === "num"} />
         </div>
         <div className="tbz">
           <AxisPicker side="y" axis={docView(vi).y} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
             onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, y: a }))} />
+          <LogToggle ctx={ctx} vi={vi} side="y" numeric={v.plot?.y.kind === "num"} />
         </div>
         {/* colour/ring only affect a box plot's violin — a scatter's density and a
             contingency table have no per-case colour to split, so the controls would
@@ -894,7 +916,7 @@ function QueriesPanel({ ctx, v, vi }: CardProps) {
             <pre>{q.sql}</pre>
           </div>
         ))}
-        {v.method && <MethodPanel method={v.method} source={{ doc: ctx.doc, index: vi, kind: v.kind }} />}
+        {v.method && <MethodPanel method={v.method} source={{ doc: ctx.doc, index: vi, kind: v.kind, request: viewRequest(ctx.doc, vi, ctx.study) }} />}
       </details>
     )}
   </>;

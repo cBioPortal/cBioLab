@@ -327,7 +327,7 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
           </label>
           <label className="tbfield" title="groups with fewer profiled patients (or samples) than this are pooled into one bar, never dropped">
             min group <OptionSelect value={String(spec.minSamples ?? 10)} disabled={busy} onValueChange={(v) => patch({ minSamples: Number(v) })}>
-              {[1, 10, 50, 100, 200, 500].map((n) => <option key={n} value={n}>{n}</option>)}
+              {[...new Set([1, 10, 50, 100, 200, 500, spec.minSamples ?? 10])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
             </OptionSelect>
           </label>
         </div>

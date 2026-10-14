@@ -380,7 +380,7 @@ describe("plot highlights: other cohorts drawn over the plotted one", () => {
     assert.match(svg, new RegExp('<rect [^>]*fill="' + HIGHLIGHT_COLORS[1] + '" fill-opacity="0.85"'), "S is a box of its own");
     assert.equal((svg.match(new RegExp('<circle [^>]*fill="' + HIGHLIGHT_COLORS[0] + '" fill-opacity', "g")) || []).length, 1, "the value inside the whiskers is a dot");
     assert.match(svg, new RegExp('<path d="M[^"]*Z" fill="' + HIGHLIGHT_COLORS[0] + '"'), "the value past them is a triangle at the edge");
-    assert.match(svg, /1 highlighted value lies beyond the whiskers/);
+    assert.match(svg, /1 highlighted value lies beyond the axis/);
   });
 });
 
@@ -396,7 +396,7 @@ describe("plot figures draw every group and category they are given", () => {
 
   test("a box plot with 108 groups draws all 108, widening past the requested width", () => {
     const svg = viewToSvg(box(108), { width: 960 })!;
-    for (const i of [0, 23, 24, 107]) assert.ok(svg.includes(">group" + i + "<"), "group" + i + " is drawn");
+    for (const i of [0, 23, 24, 107]) assert.ok(svg.includes(">group" + i + " (10)<"), "group" + i + " is drawn, with its count");
     const w = Number(/viewBox="0 0 (\d+)/.exec(svg)![1]);
     assert.ok(w > 960, "figure grew to " + w);
     assert.match(svg, /min-width:\d+px/, "a grown figure keeps its width so the container scrolls rather than shrinking it");

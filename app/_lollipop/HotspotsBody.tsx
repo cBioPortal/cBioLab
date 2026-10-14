@@ -9,6 +9,8 @@ import React, { useMemo } from "react";
 import type { HotspotGene, ViewResult } from "../../lib/types.ts";
 import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellOf, type AlterationCell, type ImpactType } from "../../lib/lollipop.ts";
 import { lollipopPanelsSvg } from "../../lib/lollipop-svg.ts";
+import { DrawAtWidth } from "../lab/figure.tsx";
+import { fmtShare } from "../../lib/chart/format.ts";
 import { X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { TB } from "../_ui/toolbar.ts";
@@ -95,7 +97,7 @@ function AlterationGrid({ g, classes, hide, onHide }: { g: HotspotGene; classes:
 function GeneSummary({ g }: { g: HotspotGene }) {
   const ids = g.ids || {};
   const link = (text: string | undefined, href: string) => text ? <a href={href} target="_blank" rel="noreferrer">{text}</a> : <span>-</span>;
-  const freq = g.cohortSamples ? (Math.round(1000 * g.somaticSamples / g.cohortSamples) / 10).toFixed(1) + "%" : "—";
+  const freq = g.cohortSamples ? fmtShare(g.somaticSamples / g.cohortSamples) : "–";
   return (
     <div className="lp-summary">
       <div>{link(ids.refseq, "https://www.ncbi.nlm.nih.gov/nuccore/" + (ids.refseq || ""))} | {link(ids.ensembl, "https://grch37.ensembl.org/homo_sapiens/Transcript/Summary?t=" + (ids.ensembl || "").replace(/\.\d+$/, ""))}</div>
@@ -127,7 +129,9 @@ export function HotspotsBody({ v, hide: hideList, onHide }: { v: ViewResult; hid
       )}
       {drawn.map((d, i) => (
         <div key={d.gene.gene} className="lp-gene">
-          <div className="lp-plot" dangerouslySetInnerHTML={{ __html: lollipopPanelsSvg([d.gene], { width: 760 }, "") }} />
+          <div className="lp-plot flex-[1_1_560px]">
+            <DrawAtWidth draw={(width) => lollipopPanelsSvg([d.gene], { width }, "")} deps={[d.gene]} />
+          </div>
           <div className="lp-side">
             <GeneSummary g={genes[i]} />
             <AlterationGrid g={genes[i]} classes={classes} hide={hide} onHide={set} />

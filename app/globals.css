@@ -444,13 +444,16 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .hbar {
   position: relative; flex: 1 1 0; min-width: 10px; height: 100%;
   display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch;
-  background: none; border: none; padding: 0 0 12px; cursor: pointer;
+  background: none; border: none; padding: 0; cursor: pointer;
 }
 .hbar:hover .hfill { opacity: 1; }
 .hbar .hfill { display: block; width: 100%; background: var(--accent-ink); opacity: 0.72; border-radius: 2px 2px 0 0; }
-.hbar .hlab {
-  position: absolute; bottom: 0; left: 0; right: 0; text-align: center;
-  font-size: var(--t-xs); color: var(--muted); overflow: hidden; white-space: nowrap;
+/* the bins' labels, a row of their own under the bars (app/lab/explore-sections.tsx Histogram
+   thins them to what fits, so none is cut or runs into the next) */
+.histo-ticks { display: flex; gap: 2px; }
+.histo-ticks > span {
+  flex: 1 1 0; min-width: 10px; text-align: left; white-space: nowrap; overflow: visible;
+  font-size: var(--t-xs); color: var(--muted); font-variant-numeric: tabular-nums;
 }
 
 /* Explore: categorical clinical facets as pie charts (portal study-view style) */
@@ -490,12 +493,13 @@ main.analysis-main { max-width: min(132rem, 100%); }
   /* every value is present; the list scrolls rather than being trimmed */
   max-height: 13.5rem; overflow-y: auto; overscroll-behavior: contain;
 }
+.vlistfoot { display: block; margin-top: var(--s1); }
 .valrow {
   /* name · a thin proportion rule · count · share — the bar is a hint at
      relative size, deliberately small so the label and the number stay the
      content. Declare a column for EVERY child: adding the share without one
      wrapped it to a second line under each value. */
-  display: grid; grid-template-columns: 1fr 3rem minmax(3.5rem, auto) 3rem;
+  display: grid; grid-template-columns: 1fr 2.25rem minmax(3.5rem, auto) 3.25rem;
   gap: 0 0.6rem; align-items: center; width: 100%;
   background: none; border: none; padding: 0.12rem 0.3rem; border-radius: var(--r-sm);
   font: inherit; font-size: var(--t-md); color: var(--ink); text-align: left; cursor: pointer;
@@ -1516,13 +1520,10 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .xc-title { font-size: var(--t-md); font-weight: 600; }
 .xc-body { position: relative; min-height: 12rem; }
 .xc-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: var(--s2); background: color-mix(in srgb, var(--card) 70%, transparent); color: var(--muted); font-size: var(--t-sm); }
-.xc-density { width: 100%; max-width: 26rem; display: block; touch-action: none; cursor: crosshair; user-select: none; }
+.xc-density { display: block; touch-action: none; cursor: crosshair; user-select: none; }
 .xc-frame { fill: none; stroke: var(--line); }
 .xc-cell { fill: var(--accent); }
 .xc-brush { fill: color-mix(in srgb, var(--accent) 15%, transparent); stroke: var(--accent); stroke-dasharray: 3 2; }
-.xc-tick { font-size: 9px; fill: var(--muted); }
-.xc-tickline { stroke: var(--muted); }
-.xc-axis { font-size: 10px; fill: var(--muted); }
 
 /* the portal pages (app/portal): cBioPortal's Results and Comparison layouts */
 .portal-main { max-width: 1400px; margin: 0 auto; padding: var(--s4); }

@@ -3,15 +3,18 @@
 // 4px points and 5px bars, same-day events stacked with their count, samples as numbered markers,
 // numeric lab results as line charts. Browser-safe (the lab card draws with it) and used by
 // lib/view-svg.ts for the MCP figure, so both are the same drawing.
-import { esc, frame, caption, palette, type SvgOpts } from "./svg-kit.ts";
+import { esc, frame, caption, palette, label, textWidth, textOn, fmtNum, FS, SW, type SvgOpts } from "./svg-kit.ts";
 import {
   buildTracks, flattenTracks, axisTicks, dayScale, sampleMarks, numericResult, attr, yearLabel, formatDays,
   COLOR_KEY, SHAPE_KEY, POINT_COLOR, YEAR, type TlItem, type TlTrack, type SampleMark,
 } from "./timeline-tracks.ts";
 import type { PatientEvent, PatientTimeline } from "./types.ts";
 
-export const TL_HEADER_W = 200;
 const AXIS_H = 26, TRACK_H = 20, LINE_H = 50, PAD_R = 14, INDENT = 14, R = 4;
+/** the header column's bounds: wide enough for most labels, never more than this share of the figure */
+const HEADER_MIN = 120, HEADER_SHARE = 0.3;
+
+type Pal = ReturnType<typeof palette>;
 
 export interface TimelineSvgOpts extends SvgOpts {
   collapsed?: readonly string[];
@@ -25,9 +28,9 @@ function colorOf(e: PatientEvent): string {
   return c && /^(#[0-9a-f]{3,8}|[a-z]{3,20}|rgba?\([0-9., ]+\))$/i.test(c.trim()) ? c.trim() : POINT_COLOR;
 }
 
-function shape(e: PatientEvent, y: number, fill: string): string {
+function shape(e: PatientEvent, y: number, fill: string, pal: Pal): string {
   if (/^status$/i.test(e.type.trim()) && e.attrs.some(([k, v]) => /^status$/i.test(k) && /^deceased$/i.test(v)))
-    return `<rect x="-3.5" y="${y - 3.5}" width="7" height="7" fill="black" transform="rotate(45 0 ${y})"/>`;
+    return `<rect x="-3.5" y="${y - 3.5}" width="7" height="7" fill="${pal.ink}" transform="rotate(45 0 ${y})"/>`;
   const s = (attr(e, SHAPE_KEY) || "circle").toLowerCase().trim();
   const k = 0.8 * R, t = 1.3 * R;
   if (s === "square") return `<rect x="${-k}" y="${y - k}" width="${2 * k}" height="${2 * k}" fill="${fill}"/>`;
@@ -40,24 +43,25 @@ function shape(e: PatientEvent, y: number, fill: string): string {
   return `<circle cx="0" cy="${y}" r="${R}" fill="${fill}"/>`;
 }
 
-/** Same-day events as the portal stacks them: two or three offset sheets, and the count above. */
-function stack(fills: string[], y: number, n: number): string {
+/** Same-day events as the portal stacks them: two or three offset sheets, and the count beside them when it has room. */
+function stack(fills: string[], y: number, n: number, pal: Pal, count: boolean): string {
   const w = 9, ry = 0.52 * w / 2;
   const sheet = (dy: number, f: string, mask: boolean) =>
-    `<ellipse cx="0" cy="${y + dy}" rx="${w / 2}" ry="${ry}" fill="${f}" stroke="black" stroke-width="0.2"/>` +
-    (mask ? `<ellipse cx="0" cy="${y + dy - 1}" rx="${w / 2}" ry="${ry}" fill="#fff"/>` : "");
+    `<ellipse cx="0" cy="${y + dy}" rx="${w / 2}" ry="${ry}" fill="${f}" stroke="${pal.ink}" stroke-width="0.2"/>` +
+    (mask ? `<ellipse cx="0" cy="${y + dy - 1}" rx="${w / 2}" ry="${ry}" fill="${pal.bg}"/>` : "");
   const f = fills.length === 2 ? fills : [0, 1, 2].map((i) => fills[i % fills.length]);
   const body = f.length === 2
     ? sheet(w / 8, f[1], true) + sheet(-w / 8, f[0], false)
     : sheet(w / 4, f[2], true) + sheet(0, f[1], true) + sheet(-w / 4, f[0], false);
-  return body + `<text x="4" y="${y - 6}" font-size="7" fill="#666">${n}</text>`;
+  return body + (count ? label(w / 2 + 2, y + FS.small * 0.35, n, { size: FS.small, fill: pal.muted }) : "");
 }
 
-function sampleMarker(marks: SampleMark[], y: number): string {
+function sampleMarker(marks: SampleMark[], y: number, pal: Pal): string {
   if (marks.length === 1) {
     const m = marks[0];
-    return `<circle cx="0" cy="${y}" r="7" fill="${esc(m.color)}"/>` +
-      `<text x="0" y="${y}" dy=".33em" text-anchor="middle" font-size="10" fill="white" font-family="Arial">${esc(m.label)}</text>`;
+    // a thin ring in the theme's grey, so a black (primary) marker still shows on a dark page
+    return `<circle cx="0" cy="${y}" r="7" fill="${esc(m.color)}" stroke="${pal.muted}" stroke-width="${SW.hair}"/>` +
+      label(0, y + FS.small * 0.35, m.label, { size: FS.small, fill: textOn(m.color), anchor: "middle" });
   }
   const nums = marks.map((m) => Number(m.label)).sort((a, b) => a - b);
   const ranges: string[] = [];
@@ -65,13 +69,13 @@ function sampleMarker(marks: SampleMark[], y: number): string {
     let j = i; while (j + 1 < nums.length && nums[j + 1] === nums[j] + 1) j++;
     ranges.push(i === j ? String(nums[i]) : nums[i] + "-" + nums[j]); i = j + 1;
   }
-  const label = ranges.join(", "), w = label.length * 6 + 8, h = 14;
+  const text = ranges.join(", "), w = textWidth(text, FS.small) + 10, h = 14;
   const colors = [...new Set(marks.sort((a, b) => Number(a.label) - Number(b.label)).map((m) => m.color))];
   const seg = w / colors.length;
-  const id = "tlclip" + Math.round(y) + "_" + label.replace(/[^0-9]/g, "_");
+  const id = "tlclip" + Math.round(y) + "_" + text.replace(/[^0-9]/g, "_");
   return `<clipPath id="${id}"><rect x="${-w / 2}" y="${y - h / 2}" rx="${h / 2}" width="${w}" height="${h}"/></clipPath>` +
     `<g clip-path="url(#${id})">` + colors.map((c, i) => `<rect x="${-w / 2 + i * seg}" y="${y - h / 2}" width="${seg + 0.5}" height="${h}" fill="${esc(c)}"/>`).join("") + `</g>` +
-    `<text x="0" y="${y}" dy=".33em" text-anchor="middle" font-size="10" fill="white" font-family="Arial">${esc(label)}</text>`;
+    label(0, y + FS.small * 0.35, text, { size: FS.small, fill: textOn(colors[0]), anchor: "middle" });
 }
 
 const groupBy = <T,>(xs: T[], key: (x: T) => string): T[][] => {
@@ -100,10 +104,25 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
   const flat = flattenTracks(tracks, new Set(o.collapsed || []));
   const all = flat.flatMap((r) => r.items);
   const { ticks, cutYears } = axisTicks(all, !o.expandGaps);
-  const PW = W - TL_HEADER_W - PAD_R;
-  const { x: dx } = dayScale(ticks, PW);
-  const X = (d: number) => TL_HEADER_W + dx(d);
   const marks = sampleMarks(t.samples, ev);
+
+  // the header column: as wide as its labels (and a line chart's value ticks) need, within bounds
+  const headText = (r: (typeof flat)[number]) => (r.track.children.length ? (r.collapsed ? "▸ " : "▾ ") : "") + r.track.label;
+  const lineRange = (items: TlItem[]) => {
+    const vals = items.map((it) => numericResult(ev[it.i])!.v);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (lo === hi) { lo -= 1; hi += 1; }
+    return { lo, hi };
+  };
+  const tickRoom = Math.max(0, ...flat.filter((r) => r.track.draw === "line" && !r.collapsed).map((r) => {
+    const { lo, hi } = lineRange(r.items);
+    return Math.max(textWidth(fmtNum(lo), FS.small), textWidth(fmtNum(hi), FS.small)) + 12;
+  }));
+  const labelsW = Math.max(0, ...flat.map((r) => 5 + r.track.depth * INDENT + textWidth(headText(r), FS.body, r.track.depth === 0 ? 600 : 400)));
+  const HW = Math.round(Math.min(W * HEADER_SHARE, Math.max(HEADER_MIN, labelsW + tickRoom + 8)));
+  const PW = W - HW - PAD_R;
+  const { x: dx } = dayScale(ticks, PW);
+  const X = (d: number) => HW + dx(d);
   let y = AXIS_H, censored = 0;
   const rows = flat.map((r) => {
     const h = r.track.draw === "line" && !r.collapsed ? LINE_H : TRACK_H;
@@ -114,21 +133,28 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
   const H = y + 6;
   const parts: string[] = [];
 
-  // the axis: a year line and label at each year start; a cut as a squiggle
-  parts.push(`<rect x="${TL_HEADER_W}" y="${AXIS_H - 1}" width="${PW}" height="1" fill="#ccc"/>`);
+  // the axis: a year line and label at each year start; a cut as a squiggle. Labels that would
+  // touch a cut or the label before them are left out (the year lines stay), and the end labels
+  // are kept inside the figure.
+  parts.push(`<line x1="${HW}" y1="${AXIS_H - 0.5}" x2="${HW + PW}" y2="${AXIS_H - 0.5}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
   const cuts = ticks.filter((tk) => tk.trim).map((tk) => X(tk.start));
+  let lastRight = -Infinity;
   for (const tk of ticks) {
     if (tk.trim) {
       const cx = X(tk.start);
       parts.push(`<g transform="translate(${cx.toFixed(1)} 0)"><title>${tk.trim.years} years with no events, cut</title>` +
-        `<path d="M-6 ${AXIS_H - 9} q3 -6 6 0 t6 0" fill="none" stroke="#999" stroke-width="1.2"/>` +
-        `<line x1="0" x2="0" y1="${AXIS_H}" y2="${H - 4}" stroke="#bbb" stroke-dasharray="2 3"/></g>`);
+        `<path d="M-6 ${AXIS_H - 9} q3 -6 6 0 t6 0" fill="none" stroke="${pal.muted}" stroke-width="1.2"/>` +
+        `<line x1="0" x2="0" y1="${AXIS_H}" y2="${H - 4}" stroke="${pal.muted}" stroke-width="${SW.hair}" stroke-dasharray="2 3"/></g>`);
+      lastRight = Math.max(lastRight, cx + 8);
       continue;
     }
     for (let d = Math.ceil(tk.start / YEAR) * YEAR; d <= tk.end; d += YEAR) {
-      const xx = X(d).toFixed(1), clear = cuts.every((c) => Math.abs(c - X(d)) > 18);
-      parts.push(`<line x1="${xx}" x2="${xx}" y1="${AXIS_H - 6}" y2="${H - 4}" stroke="${d === 0 ? "#bbb" : "#eee"}"/>` +
-        (clear ? `<text x="${xx}" y="${AXIS_H - 10}" text-anchor="middle" font-size="10" fill="#333">${yearLabel(d)}</text>` : ""));
+      const x = X(d), xx = x.toFixed(1);
+      const text = yearLabel(d), w = textWidth(text, FS.small);
+      const cx = Math.min(Math.max(x, HW + w / 2), W - 2 - w / 2);
+      const clear = cx - w / 2 > lastRight + 6 && cuts.every((c) => Math.abs(c - cx) > w / 2 + 8);
+      parts.push(`<line x1="${xx}" x2="${xx}" y1="${AXIS_H - 4}" y2="${H - 4}" stroke="${d === 0 ? pal.muted : pal.line}" stroke-width="${SW.hair}"/>`);
+      if (clear) { parts.push(label(cx, AXIS_H - 8, text, { size: FS.small, fill: pal.muted, anchor: "middle" })); lastRight = cx + w / 2; }
     }
   }
 
@@ -136,29 +162,29 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
     const tr = r.track, cy = r.y + TRACK_H / 2;
     // header
     const hasKids = tr.children.length > 0;
-    const lab = (hasKids ? (r.collapsed ? "▸ " : "▾ ") : "") + tr.label;
-    const fit = lab.length > 30 - tr.depth * 2 ? lab.slice(0, 29 - tr.depth * 2) + "…" : lab;
+    const x0 = 5 + tr.depth * INDENT;
+    const room = HW - x0 - (tr.draw === "line" && !r.collapsed ? tickRoom : 0) - 6;
     parts.push(`<g${o.interactive && hasKids ? ` class="tl-h" data-uid="${esc(tr.uid)}" style="cursor:pointer"` : ""}>` +
-      `<title>${esc(tr.label)}</title><text x="${5 + tr.depth * INDENT}" y="${cy}" dy=".33em" font-size="11" fill="${pal.ink}"` +
-      `${tr.depth === 0 ? ` font-weight="600"` : ""}>${esc(fit)}</text></g>`);
-    parts.push(`<line x1="0" x2="${W}" y1="${r.y + r.h - 0.5}" y2="${r.y + r.h - 0.5}" stroke="#f1f1f1"/>`);
+      `<title>${esc(tr.label)}</title>` +
+      label(x0, cy + FS.body * 0.35, headText(r), { size: FS.body, fill: pal.ink, weight: tr.depth === 0 ? 600 : 400, maxW: room })
+        .replace(/<title>.*?<\/title>/, "") + `</g>`);
+    parts.push(`<line x1="0" x2="${W}" y1="${r.y + r.h - 0.5}" y2="${r.y + r.h - 0.5}" stroke="${pal.line}" stroke-width="${SW.hair}" opacity="0.6"/>`);
     const tag = (ix: number[]) => (o.interactive ? ` class="tl-m" data-ev="${ix.join(",")}"` : "");
 
     if (tr.draw === "line" && !r.collapsed) {
       const pts = r.items.map((it) => ({ it, v: numericResult(ev[it.i])! })).sort((a, b) => a.it.start - b.it.start);
-      let lo = Math.min(...pts.map((p) => p.v.v)), hi = Math.max(...pts.map((p) => p.v.v));
-      if (lo === hi) { lo -= 1; hi += 1; }
+      const { lo, hi } = lineRange(r.items);
       const yy = (v: number) => r.y + r.h - 7 - (v - lo) / (hi - lo) * (r.h - 14);
-      const tickLab = (v: number) => (Math.abs(v) >= 100 ? Math.round(v) : Math.round(v * 100) / 100).toString();
-      parts.push(`<text x="${TL_HEADER_W - 8}" y="${yy(hi)}" dy=".33em" text-anchor="end" font-size="9" fill="#aaa">${tickLab(hi)}</text>` +
-        `<text x="${TL_HEADER_W - 8}" y="${yy(lo)}" dy=".33em" text-anchor="end" font-size="9" fill="#aaa">${tickLab(lo)}</text>` +
-        `<line x1="${TL_HEADER_W - 5}" x2="${TL_HEADER_W}" y1="${yy(hi)}" y2="${yy(hi)}" stroke="#aaa"/><line x1="${TL_HEADER_W - 5}" x2="${TL_HEADER_W}" y1="${yy(lo)}" y2="${yy(lo)}" stroke="#aaa"/>`);
-      parts.push(`<polyline fill="none" stroke="#555" stroke-width="1" points="${pts.map((p) => X(p.it.start).toFixed(1) + "," + yy(p.v.v).toFixed(1)).join(" ")}"/>`);
+      for (const v of [hi, lo]) {
+        parts.push(label(HW - 8, yy(v) + FS.small * 0.35, fmtNum(v), { size: FS.small, fill: pal.muted, anchor: "end" }) +
+          `<line x1="${HW - 5}" x2="${HW}" y1="${yy(v)}" y2="${yy(v)}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
+      }
+      parts.push(`<polyline fill="none" stroke="${pal.muted}" stroke-width="${SW.line}" points="${pts.map((p) => X(p.it.start).toFixed(1) + "," + yy(p.v.v).toFixed(1)).join(" ")}"/>`);
       for (const p of pts) {
         const c = colorOf(ev[p.it.i]);
         if (p.v.censored) censored++;
         parts.push(`<g${tag([p.it.i])} transform="translate(${X(p.it.start).toFixed(1)} 0)">` +
-          (p.v.censored ? `<circle cx="0" cy="${yy(p.v.v)}" r="3" fill="#fff" stroke="${c}" stroke-width="1.5"/>` : `<circle cx="0" cy="${yy(p.v.v)}" r="3" fill="${c}"/>`) + `</g>`);
+          (p.v.censored ? `<circle cx="0" cy="${yy(p.v.v)}" r="3" fill="${pal.bg}" stroke="${c}" stroke-width="1.5"/>` : `<circle cx="0" cy="${yy(p.v.v)}" r="3" fill="${c}"/>`) + `</g>`);
       }
       continue;
     }
@@ -167,23 +193,28 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
       for (const g of groupBy(r.items, (it) => String(it.start))) {
         const ms = [...new Set(g.map((it) => attr(ev[it.i], "SAMPLE_ID")).filter(Boolean) as string[])].map((id) => marks.get(id)).filter(Boolean) as SampleMark[];
         parts.push(`<g${tag(g.map((it) => it.i))} transform="translate(${X(g[0].start).toFixed(1)} 0)">` +
-          (ms.length ? sampleMarker(ms, cy) : `<circle cx="0" cy="${cy}" r="${R}" fill="${POINT_COLOR}"/>`) + `</g>`);
+          (ms.length ? sampleMarker(ms, cy, pal) : `<circle cx="0" cy="${cy}" r="${R}" fill="${POINT_COLOR}"/>`) + `</g>`);
       }
       continue;
     }
 
-    for (const g of groupBy(r.items, (it) => it.start + "-" + it.end)) {
+    // a group's count is written to its right only where the next mark leaves room; the stack still
+    // shows there are several, and the card's tooltip lists them
+    const groups = groupBy(r.items, (it) => it.start + "-" + it.end).sort((a, b) => a[0].start - b[0].start);
+    const starts = groups.map((g) => X(g[0].start));
+    groups.forEach((g, gi) => {
       const e0 = ev[g[0].i];
-      const x0 = X(g[0].start);
+      const x0 = starts[gi], next = gi + 1 < starts.length ? starts[gi + 1] - R : W;
+      const fits = (from: number) => x0 + from + 2 + textWidth(String(g.length), FS.small) + 2 <= next;
       if (g[0].end > g[0].start) {
         const w = Math.max(X(g[0].end) - x0, 2 * R);
         parts.push(`<g${tag(g.map((it) => it.i))} transform="translate(${x0.toFixed(1)} 0)"><rect x="0" y="${cy - 2.5}" width="${w.toFixed(1)}" height="5" rx="2" ry="2" fill="${colorOf(e0)}"/>` +
-          (g.length > 1 ? `<text x="${(w + 2).toFixed(1)}" y="${cy - 3}" font-size="7" fill="#666">${g.length}</text>` : "") + `</g>`);
+          (g.length > 1 && fits(w) ? label(w + 2, cy + FS.small * 0.35, g.length, { size: FS.small, fill: pal.muted }) : "") + `</g>`);
       } else {
         parts.push(`<g${tag(g.map((it) => it.i))} transform="translate(${x0.toFixed(1)} 0)">` +
-          (g.length > 1 ? stack(g.map((it) => colorOf(ev[it.i])), cy, g.length) : shape(e0, cy, colorOf(e0))) + `</g>`);
+          (g.length > 1 ? stack(g.map((it) => colorOf(ev[it.i])), cy, g.length, pal, fits(4.5)) : shape(e0, cy, colorOf(e0), pal)) + `</g>`);
       }
-    }
+    });
   }
 
   let total = H;
@@ -193,7 +224,7 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
     total += cap.height;
   }
   return {
-    svg: frame(W, total, parts.join(""), pal.bg),
+    svg: frame(W, total, parts.join(""), pal.bg, false, o.interactive ? undefined : "Timeline of " + t.patient),
     layout: { tracks, rows, cutYears, censored, width: W, height: total },
   };
 }

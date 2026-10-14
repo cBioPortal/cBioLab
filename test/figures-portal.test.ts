@@ -21,14 +21,15 @@ describe("cancertypes", () => {
     assert.ok(svg.includes("30 / 150 samples, 160 in the group"), "a group with unprofiled samples says so");
     assert.ok(svg.includes("Alteration Frequency"));
   });
-  test("a '+' per data type a group was profiled for, and one gene's bars on request", () => {
+  test("a '+' per group for a data type only some groups were profiled for, and one gene's bars on request", () => {
     const g = (k: string, label: string, n: number, m: number, sv: number) => ({ ...grp(k, label, n, m), profiledFor: { mutation: n, cna: 0, sv } });
     const two: ViewResult = { ...v, cancertypes: { ...v.cancertypes!, genes: ["KRAS", "NRAS"], panels: [{ ...v.cancertypes!.panels[0],
       groups: [g("a", "A", 100, 50, 100), g("b", "B", 100, 10, 0)], pooled: undefined,
       perGene: [{ gene: "KRAS", groups: [g("a", "A", 100, 40, 100)] }, { gene: "NRAS", groups: [g("b", "B", 100, 7, 0)] }] }] } };
     const all = cancertypesPanelSvg(two.cancertypes!, 0);
-    assert.ok(all.body.includes("Mutation data") && all.body.includes("Structural variant data") && !all.body.includes("CNA data"));
-    assert.equal((all.body.match(/>\+</g) || []).length, 3, "two groups profiled for mutations, one for SVs");
+    assert.ok(all.body.includes("Structural variant data") && !all.body.includes("CNA data"));
+    assert.equal((all.body.match(/>\+</g) || []).length, 1, "only the SV row differs between groups: one '+', for A");
+    assert.ok(all.body.includes("Every group was profiled for mutation data."), "a type every group has is said once, not marked per group");
     const nras = cancertypesPanelSvg(two.cancertypes!, 0, { gene: "NRAS" });
     assert.ok(nras.body.includes("B: 7.0% (7 / 100 samples)") && !nras.body.includes("A: "));
   });
@@ -78,7 +79,7 @@ describe("enrichment", () => {
       grid: { xMax: 5, yMax: 25, nx: 80, ny: 50, cells: [[40, 1, 25]] }, labels: ["<APC>", "KRAS"] } };
   test("draws the volcano and the table, escapes gene names and keeps the caveat", () => {
     const svg = viewToSvg(v)!;
-    assert.ok(svg.includes("Log2 Ratio") && svg.includes("70 (70.00%)") && svg.includes("80 (80.00%)"));
+    assert.ok(svg.includes("Log2 Ratio") && svg.includes("70 (70.0%)") && svg.includes("80 (80.0%)"));
     assert.ok(svg.includes("A →") && svg.includes("← B"), "the volcano says which side is which group");
     assert.ok(svg.includes("Genes with highest frequency in any group") && svg.includes("Altered frequency in A (%)"));
     assert.ok(!svg.includes("<APC>") && svg.includes("&lt;APC&gt;"));
@@ -104,7 +105,7 @@ describe("assays", () => {
       grid: { xMax: 0.5, yMax: 50, nx: 80, ny: 50, cells: [] }, labels: ["<UV>"] } };
   test("numeric, two cohorts: a volcano of the difference in means, names escaped, the caveat kept", () => {
     const svg = viewToSvg(numeric)!;
-    assert.ok(svg.includes("difference in mean (A − B)") && svg.includes("0.500") && svg.includes("0.170"));
+    assert.ok(svg.includes("difference in mean (A − B)") && svg.includes(">0.5<") && svg.includes(">0.17<"), "each cohort's mean is drawn");
     assert.ok(!svg.includes("<UV>") && svg.includes("&lt;UV&gt; (named)"));
     assert.ok(svg.includes("read the means too") && svg.includes("+23 more entities tested"));
   });

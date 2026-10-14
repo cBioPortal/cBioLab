@@ -563,8 +563,9 @@ export interface PlotGroup { g: string; n: number; lo: number; hi: number; q1: n
 export interface PlotData {
   shape: "scatter" | "box" | "table";
   n: number;
-  x: { label: string; kind: AxisKind };
-  y: { label: string; kind: AxisKind };
+  /** `log`: the axis carries log10(v + 1), so the figure labels its ticks in the original units */
+  x: { label: string; kind: AxisKind; log?: boolean };
+  y: { label: string; kind: AxisKind; log?: boolean };
   extent?: { x0: number; x1: number; y0: number; y1: number };
   grid?: [number, number];
   bins?: { bx: number; by: number; n: number }[];

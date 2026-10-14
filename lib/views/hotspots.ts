@@ -32,7 +32,9 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   // `hotspots` stays whole, so the app re-filters it without a re-run
   const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(hide.length ? { hide } : {}),
     participation: participationFor(studies, false),
-    note: "Mutations in “" + cn + "” by protein position, as cBioPortal's mutation tab draws them: one stem per codon" +
+    note: (vNames.length > 1 ? "A lollipop draws one cohort: this shows “" + cn + "” only; " +
+        vNames.slice(1).map((n) => "“" + n + "”").join(", ") + (vNames.length === 2 ? " is" : " are") + " not drawn. " : "") +
+      "Mutations in “" + cn + "” by protein position, as cBioPortal's mutation tab draws them: one stem per codon" +
       " (the stored protein start position), its height the number of distinct patient + protein change pairs there." +
       " Colour is the codon's dominant mutation type, putative drivers before VUS" +
       (annotated ? " (driver = OncoKB oncogenic, pinned; the portal also counts hotspots and custom annotations)." : " (no OncoKB pin, so every mutation is coloured as a driver, as the portal does with annotation off).") +

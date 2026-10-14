@@ -6,6 +6,9 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api.ts";
 import { Choice } from "../_ui/choice.tsx";
+import { useWidth } from "./figure.tsx";
+import { linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight } from "../../lib/svg-kit.ts";
+import { fmtInt } from "../../lib/chart/format.ts";
 import type { CohortDef, View } from "../../lib/types.ts";
 
 type Clause = Record<string, unknown>;
@@ -44,7 +47,7 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
     const cohort: CohortDef = { ...(studies.length > 1 ? { studies } : {}), all: (draft ? draft.all : []) as CohortDef["all"] };
     const views: View[] = [];
     if (ep) views.push({ kind: "survival", endpoint: ep });
-    if (hasScatter) views.push({ kind: "plot", x: { source: "clinical", attribute: X_ATTR, log: true }, y: { source: "clinical", attribute: Y_ATTR }, bins: [48, 32] });
+    if (hasScatter) views.push({ kind: "plot", unit: "sample", x: { source: "clinical", attribute: X_ATTR, log: true }, y: { source: "clinical", attribute: Y_ATTR }, bins: [48, 32] });
     api.analysis({ study: studies[0], cohorts: { Selected: cohort }, views })
       .then((r) => r.json())
       .then((j) => {
@@ -84,7 +87,7 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
         <div className="xc-head">
           <span className="xc-title">Mutation count vs fraction genome altered</span>
           <span className="meta">{res && res.plot && res.plot.data && res.plot.data.coverage && res.plot.data.coverage.total > res.plot.data.n
-            ? res.plot.data.n.toLocaleString() + " of " + res.plot.data.coverage.total.toLocaleString() + " samples have both · " : ""}drag a box to filter</span>
+            ? fmtInt(res.plot.data.n) + " of " + fmtInt(res.plot.data.coverage.total) + " samples have both · " : ""}drag a box to filter</span>
         </div>
         <div className="xc-body">
           {res && res.plot && res.plot.data && res.plot.data.shape === "scatter" && !res.plot.data.grid &&
@@ -104,8 +107,19 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
 
 /** A density of the binned scatter with a drag-to-select box; the box's corners become value ranges. */
 function Density({ data, onSelect }: { data: PlotData; onSelect: (x0: number, x1: number, y0: number, y1: number) => void }) {
-  const W = 340, H = 230, L = 44, B = 30, T = 8, R = 8, PW = W - L - R, PH = H - T - B;
+  const { ref, width } = useWidth(260);
+  const W = width ?? 340, H = Math.round(Math.max(200, Math.min(300, W * 0.62)));
   const e = data.extent!, [gx, gy] = data.grid!;
+  const yTitle = "fraction genome altered", xTitle = "mutation count (log scale)";
+  // ticks: round fractions up the side; whole counts along the bottom, the axis being log10(count + 1)
+  const ys0 = linear(e.y0, e.y1, 0, 1, { nice: false });
+  const L = 6 + leftAxisWidth(ys0, yTitle), R = 10, T = 8, B = bottomAxisHeight(xTitle) + 2, PW = W - L - R, PH = H - T - B;
+  const ys = linear(e.y0, e.y1, T + PH, T, { nice: false });
+  const xs = linear(e.x0, e.x1, L, L + PW, { nice: false });
+  xs.ticks = [0, 1, 3, 10, 30, 100, 300, 1000, 3000, 10000].map((c) => Math.log10(c + 1)).filter((t) => t >= e.x0 - 1e-9 && t <= e.x1 + 1e-9);
+  xs.fmt = (t) => fmtInt(10 ** t - 1);
+  const pal = { ink: "var(--ink)", muted: "var(--muted)", line: "var(--line)" };
+  const axes = axisLeft(ys, L, pal, { title: yTitle }) + axisBottom(xs, T + PH, pal, { title: xTitle, minX: 0, maxX: W });
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const maxN = Math.max(1, ...(data.bins || []).map((b) => b.n));
@@ -116,34 +130,31 @@ function Density({ data, onSelect }: { data: PlotData; onSelect: (x0: number, x1
     return { x: (ev.clientX - r.left) * W / r.width, y: (ev.clientY - r.top) * H / r.height };
   };
   const round = (v: number, span: number) => { const d = Math.max(0, 2 - Math.floor(Math.log10(Math.max(1e-9, span)))); return Number(v.toFixed(d)); };
-  // the selection is passed in axis units; x is log10(count + 1), so it is not rounded here
-  const ticks = (a: number, b: number) => [0, 0.5, 1].map((f) => a + (b - a) * f);
   return (
-    <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="xc-density" role="img"
-      aria-label={"density of " + data.n.toLocaleString() + " samples; drag to select a range"}
-      onPointerDown={(ev) => { const p = local(ev); (ev.target as Element).setPointerCapture?.(ev.pointerId); setDrag({ x0: p.x, y0: p.y, x1: p.x, y1: p.y }); }}
-      onPointerMove={(ev) => { if (drag) { const p = local(ev); setDrag({ ...drag, x1: p.x, y1: p.y }); } }}
-      onPointerUp={() => {
-        if (drag && Math.abs(drag.x1 - drag.x0) > 4 && Math.abs(drag.y1 - drag.y0) > 4) {
-          const ax = [vx(Math.min(drag.x0, drag.x1)), vx(Math.max(drag.x0, drag.x1))];
-          const ay = [vy(Math.max(drag.y0, drag.y1)), vy(Math.min(drag.y0, drag.y1))];
-          onSelect(ax[0], ax[1], round(ay[0], e.y1 - e.y0), round(ay[1], e.y1 - e.y0));
-        }
-        setDrag(null);
-      }}>
-      <rect x={L} y={T} width={PW} height={PH} className="xc-frame" />
-      {(data.bins || []).map((b, i) => (
-        <rect key={i} x={L + PW * b.bx / gx} y={T + PH - PH * (b.by + 1) / gy} width={PW / gx + 0.3} height={PH / gy + 0.3}
-          className="xc-cell" opacity={0.15 + 0.85 * Math.log1p(b.n) / Math.log1p(maxN)}><title>{b.n.toLocaleString() + " samples"}</title></rect>
-      ))}
-      {[0, 1, 3, 10, 30, 100, 300, 1000, 3000].filter((c) => Math.log10(c + 1) >= e.x0 - 1e-9 && Math.log10(c + 1) <= e.x1 + 1e-9).map((c) => {
-        const x = L + PW * (Math.log10(c + 1) - e.x0) / ((e.x1 - e.x0) || 1);
-        return <g key={"x" + c}><line x1={x} x2={x} y1={T + PH} y2={T + PH + 3} className="xc-tickline" /><text x={x} y={H - B + 13} textAnchor="middle" className="xc-tick">{c}</text></g>;
-      })}
-      {ticks(e.y0, e.y1).map((v, i) => <text key={"y" + i} x={L - 4} y={T + PH - PH * i / 2 + 3} textAnchor="end" className="xc-tick">{round(v, e.y1 - e.y0)}</text>)}
-      <text x={L + PW / 2} y={H - 3} textAnchor="middle" className="xc-axis">mutation count (log scale)</text>
-      <text x={11} y={T + PH / 2} textAnchor="middle" className="xc-axis" transform={`rotate(-90 11 ${T + PH / 2})`}>fraction genome altered</text>
-      {drag && <rect x={Math.min(drag.x0, drag.x1)} y={Math.min(drag.y0, drag.y1)} width={Math.abs(drag.x1 - drag.x0)} height={Math.abs(drag.y1 - drag.y0)} className="xc-brush" />}
-    </svg>
+    <div ref={ref}>
+      {width != null && (
+        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="xc-density" role="img"
+          aria-label={"density of " + fmtInt(data.n) + " samples; drag to select a range"}
+          onPointerDown={(ev) => { const p = local(ev); (ev.target as Element).setPointerCapture?.(ev.pointerId); setDrag({ x0: p.x, y0: p.y, x1: p.x, y1: p.y }); }}
+          onPointerMove={(ev) => { if (drag) { const p = local(ev); setDrag({ ...drag, x1: p.x, y1: p.y }); } }}
+          onPointerUp={() => {
+            if (drag && Math.abs(drag.x1 - drag.x0) > 4 && Math.abs(drag.y1 - drag.y0) > 4) {
+              const ax = [vx(Math.min(drag.x0, drag.x1)), vx(Math.max(drag.x0, drag.x1))];
+              const ay = [vy(Math.max(drag.y0, drag.y1)), vy(Math.min(drag.y0, drag.y1))];
+              onSelect(ax[0], ax[1], round(ay[0], e.y1 - e.y0), round(ay[1], e.y1 - e.y0));
+            }
+            setDrag(null);
+          }}>
+          <rect x={L} y={T} width={PW} height={PH} className="xc-frame" />
+          {(data.bins || []).map((b, i) => (
+            <rect key={i} x={L + PW * b.bx / gx} y={T + PH - PH * (b.by + 1) / gy} width={PW / gx + 0.3} height={PH / gy + 0.3}
+              className="xc-cell" opacity={0.15 + 0.85 * Math.log1p(b.n) / Math.log1p(maxN)}><title>{fmtInt(b.n) + " samples"}</title></rect>
+          ))}
+          {/* the axes are drawn by the figures' own kit (lib/chart/axis.ts), which escapes what it writes */}
+          <g dangerouslySetInnerHTML={{ __html: axes }} />
+          {drag && <rect x={Math.min(drag.x0, drag.x1)} y={Math.min(drag.y0, drag.y1)} width={Math.abs(drag.x1 - drag.x0)} height={Math.abs(drag.y1 - drag.y0)} className="xc-brush" />}
+        </svg>
+      )}
+    </div>
   );
 }

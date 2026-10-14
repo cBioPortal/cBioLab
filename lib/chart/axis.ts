@@ -84,8 +84,8 @@ export function axisBottom(s: Scale, y: number, pal: AxisPal, o: { title?: strin
  * `maxH`. Returns the drawing and the height it takes below `y`.
  */
 export function bandLabels(labels: string[], centers: number[], band: number, y: number, pal: AxisPal,
-  o: { maxH?: number; size?: number } = {}): { svg: string; height: number } {
-  const size = o.size ?? FS.small, maxH = o.maxH ?? 110;
+  o: { maxH?: number; size?: number; minX?: number } = {}): { svg: string; height: number } {
+  const size = o.size ?? FS.small, maxH = o.maxH ?? 110, minX = o.minX ?? 0;
   const widths = labels.map((l) => textWidth(l, size));
   const widest = Math.max(0, ...widths);
   if (widest <= band - 4) {
@@ -96,9 +96,14 @@ export function bandLabels(labels: string[], centers: number[], band: number, y:
   const sin = steep ? 1 : Math.SQRT1_2;
   const maxW = maxH / sin;
   const used = Math.min(widest, maxW) * sin + size;
+  // a turned label runs down and to the left of its band; one near the left edge is cut short
+  // rather than run off the figure
+  const cos = steep ? 0 : Math.SQRT1_2;
   const svg = labels.map((l, i) => {
     const x = centers[i] + (steep ? size * 0.35 : size * 0.3), yy = y + 6;
-    return label(x, yy, l, { size, fill: pal.ink, anchor: "end", rotate: angle, maxW });
+    // the turned line's own height reaches a further size·sin past its end
+    const room = cos ? Math.min(maxW, (x - minX - size * Math.SQRT1_2) / cos) : maxW;
+    return label(x, yy, l, { size, fill: pal.ink, anchor: "end", rotate: angle, maxW: room });
   }).join("");
   return { svg, height: Math.ceil(used + 8) };
 }

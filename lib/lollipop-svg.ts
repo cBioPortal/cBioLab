@@ -3,7 +3,10 @@
 // it in the browser (app/_lollipop/HotspotsBody.tsx) from the same code the server uses for MCP.
 import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellLabel, type AlterationCell } from "./lollipop.ts";
 import type { HotspotGene } from "./types.ts";
-import { esc, palette, num, fmt, frame, caption, type SvgOpts } from "./svg-kit.ts";
+import {
+  esc, palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, legend, label, textWidth, textOn,
+  fmtInt, fmtShare, FS, SW, type SvgOpts, type LegendItem
+} from "./svg-kit.ts";
 
 /**
  * What the grid beside a lollipop shows in the app — somatic mutation frequency and the Driver/VUS
@@ -12,13 +15,13 @@ import { esc, palette, num, fmt, frame, caption, type SvgOpts } from "./svg-kit.
  */
 export function lollipopSummaryText(genes: HotspotGene[], hide: readonly string[]): string {
   const parts = genes.map((g) => {
-    const freq = g.cohortSamples ? (Math.round(1000 * g.somaticSamples / g.cohortSamples) / 10).toFixed(1) + "%" : "—";
+    const freq = g.cohortSamples ? fmtShare(g.somaticSamples / g.cohortSamples) : "–";
     const cells = IMPACT_TYPES.filter((k) => g.tally[k].driver || g.tally[k].vus)
-      .map((k) => IMPACT_COLORS[k].label.toLowerCase() + " " + fmt(g.tally[k].driver) + " driver / " + fmt(g.tally[k].vus) + " VUS");
+      .map((k) => IMPACT_COLORS[k].label.toLowerCase() + " " + fmtInt(g.tally[k].driver) + " driver / " + fmtInt(g.tally[k].vus) + " VUS");
     const f = filterHotspotGene(g, hide);
     return g.gene + ": somatic mutation frequency " + freq + "; mutation rows " + (cells.join(", ") || "none") +
-      (hide.length ? "; drawn: " + fmt(f.shown) + " of " + fmt(f.total) + " mutations" +
-        (f.unclassed ? " (" + fmt(f.unclassed) + " from a site that reports no alteration class, drawn regardless)" : "") : "") + ".";
+      (hide.length ? "; drawn: " + fmtInt(f.shown) + " of " + fmtInt(f.total) + " mutations" +
+        (f.unclassed ? " (" + fmtInt(f.unclassed) + " from a site that reports no alteration class, drawn regardless)" : "") : "") + ".";
   });
   return (hide.length ? "Hidden: " + hide.map((c) => cellLabel(c as AlterationCell)).join(", ") + ". " : "") + parts.join(" ");
 }
@@ -28,90 +31,83 @@ export function lollipopSummaryText(genes: HotspotGene[], hide: readonly string[
  * LollipopPlotNoTooltip / LollipopMutationPlot): a protein backbone with its Pfam domains, one
  * grey stem per codon topped by a 2.8px head in the codon's colour, a linear y axis of
  * "# GENE Mutations" whose max is at least 5, and one label on the tallest stem. What the rules
- * decide lives in lib/lollipop.ts; this only places it. The plots alone, one panel per gene, with a
- * caption: the app draws its own controls beside them, and lib/view-svg.ts's hotspotsSvg wraps them
- * for a figure that stands alone.
+ * decide lives in lib/lollipop.ts; this only places it, at the width it is given. The plots alone,
+ * one panel per gene, with a caption: the app draws its own controls beside them, and
+ * lib/view-svg.ts's hotspotsSvg wraps them for a figure that stands alone.
  */
 export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText: string): string {
-  const p = palette(o.theme), W = o.width || 720;
-  const L = 56, R = 16, plotW = W - L - R;
-  const STEM = 160, LABEL_ROOM = 20, BACKBONE = 14, DOMAIN = 24, STICK = "#BABDB6";
-  const PANEL = 22 + LABEL_ROOM + STEM + DOMAIN + 40 + 18;
+  const p = palette(o.theme), W = Math.max(400, o.width || 720);
+  const R = 16, STEM = 150, LABEL_ROOM = 18, BACKBONE = 14, DOMAIN = 24, STICK = "#BABDB6";
   const out: string[] = [];
-  genes.forEach((g, gi) => {
-    const top = 8 + gi * PANEL;
+  let top = 6;
+  for (const g of genes) {
     const len = Math.max(1, g.proteinLength);
-    const x = (pos: number) => L + plotW * Math.min(pos, len) / len;
-    const yTop = top + 22 + LABEL_ROOM, yBase = yTop + STEM;
     const maxN = Math.max(0, ...g.positions.map((q) => q.n));
-    const yMax = Math.max(5, maxN);
-    out.push(`<text x="8" y="${top + 12}" font-size="12" font-weight="600" fill="${p.ink}">${esc(g.gene)}</text>` +
-      `<text x="${8 + g.gene.length * 8 + 10}" y="${top + 12}" font-size="10" fill="${p.muted}">` +
-      esc(fmt(g.mutations) + " mutations · " + fmt(g.mutated) + " mutated patients" +
-        (g.lengthSource === "genome-nexus" ? "" : " · length unknown — axis runs to codon " + len)) + `</text>`);
+    const yTitle = "# " + g.gene + " Mutations";
+    const head = 18, yTop = top + head + LABEL_ROOM, yBase = yTop + STEM;
+    const ys = linear(0, Math.max(5, maxN), yBase, yTop, { count: 4 });
+    const yFmt = (t: number) => fmtInt(t);
+    const L = 8 + leftAxisWidth(ys, yTitle, yFmt);
+    const plotW = W - L - R;
+    const x = (pos: number) => L + plotW * Math.min(pos, len) / len;
 
-    // y axis: ticks at 0 and max labelled; unlabelled ones between at the first step giving < 9 intervals
-    const stepY = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000].find((st) => yMax / st < 9) ?? Math.ceil(yMax / 8);
-    const yAt = (n: number) => yBase - STEM * Math.min(1, n / yMax);
-    out.push(`<line x1="${L - 6}" y1="${yTop}" x2="${L - 6}" y2="${yBase}" stroke="${p.muted}" stroke-width="1"/>`);
-    for (let t = 0; t <= yMax; t += stepY) out.push(`<line x1="${L - 10}" y1="${num(yAt(t))}" x2="${L - 6}" y2="${num(yAt(t))}" stroke="${p.muted}"/>`);
-    out.push(`<text x="${L - 12}" y="${num(yAt(0) + 3)}" font-size="10" fill="${p.muted}" text-anchor="end">0</text>`,
-      `<text x="${L - 12}" y="${num(yAt(yMax) + 3)}" font-size="10" fill="${p.muted}" text-anchor="end">${fmt(yMax)}</text>`,
-      `<text x="14" y="${num((yTop + yBase) / 2)}" font-size="10" fill="${p.muted}" text-anchor="middle" ` +
-      `transform="rotate(-90 14 ${num((yTop + yBase) / 2)})"># ${esc(g.gene)} Mutations</text>`);
+    const gw = textWidth(g.gene, FS.title, 600);
+    out.push(label(8, top + 13, g.gene, { size: FS.title, weight: 600, fill: p.ink }));
+    out.push(label(8 + gw + 10, top + 13, fmtInt(g.mutations) + " mutations · " + fmtInt(g.mutated) + " mutated patients" +
+      (g.lengthSource === "genome-nexus" ? "" : " · length unknown — axis runs to codon " + fmtInt(len)), { size: FS.small, fill: p.muted, maxW: W - 8 - gw - 10 - 8 }));
+    out.push(axisLeft(ys, L - 6, p, { title: yTitle, gridTo: W - R, fmt: yFmt, line: true }));
 
-    // backbone and domains
+    // backbone and domains, each named where its name fits (cut with its full name kept), always in its tooltip
     const bbY = yBase + (DOMAIN - BACKBONE) / 2;
-    out.push(`<rect x="${L}" y="${num(bbY)}" width="${num(plotW)}" height="${BACKBONE}" fill="${STICK}"/>`);
+    out.push(`<rect x="${r1(L)}" y="${r1(bbY)}" width="${r1(plotW)}" height="${BACKBONE}" fill="${STICK}"/>`);
     for (const d of g.domains) {
       const dx = x(d.start), dw = Math.max(2, x(d.end) - x(d.start));
-      const fit = Math.floor(dw / 6);
-      const name = d.name.length <= fit ? d.name : fit > 2 ? d.name.slice(0, fit - 2) + ".." : "";
+      const room = dw - 6, fits = room >= textWidth(d.name.slice(0, 2) + "…", FS.small);
       out.push(`<g><title>${esc(d.name + " (" + d.accession + "): " + d.start + "–" + d.end)}</title>` +
-        `<rect x="${num(dx)}" y="${yBase}" width="${num(dw)}" height="${DOMAIN}" fill="${d.color}"/>` +
-        (name ? `<text x="${num(dx + dw / 2)}" y="${yBase + DOMAIN / 2 + 3.5}" font-size="10" fill="#ffffff" text-anchor="middle">${esc(name)}</text>` : "") + `</g>`);
+        `<rect x="${r1(dx)}" y="${yBase}" width="${r1(dw)}" height="${DOMAIN}" fill="${d.color}"/>` +
+        (fits ? label(dx + dw / 2, yBase + DOMAIN / 2 + FS.small * 0.35, d.name, { size: FS.small, fill: textOn(d.color), anchor: "middle", maxW: room }) : "") + `</g>`);
     }
 
-    // x axis: ticks at the first interval giving < 15, labels at even multiples, 0 and "<len>aa" always
-    const stepX = [50, 100, 200, 250, 500, 1000, 2500, 5000, 10000, 25000].find((st) => len / st < 15) ?? 50000;
-    const axY = yBase + DOMAIN + 6;
-    const tick = (pos: number, label: string | null) => out.push(`<line x1="${num(x(pos))}" y1="${axY}" x2="${num(x(pos))}" y2="${axY + 4}" stroke="${p.muted}"/>` +
-      (label != null ? `<text x="${num(x(pos))}" y="${axY + 15}" font-size="10" fill="${p.muted}" text-anchor="middle">${label}</text>` : ""));
-    tick(0, "0");
-    for (let t = stepX, k = 1; t < len; t += stepX, k++) tick(t, k % 2 === 0 && len - t > (2 / 3) * stepX ? String(t) : null);
-    tick(len, len + "aa");
+    // x axis: round codon steps, and the protein's length at its end in place of any tick it would touch
+    const axY = yBase + DOMAIN + 4;
+    const xs = linear(0, len, L, L + plotW, { nice: false, count: Math.max(2, Math.floor(plotW / 90)) });
+    const endText = fmtInt(len) + "aa", endW = textWidth(endText, FS.small);
+    xs.ticks = [...xs.ticks.filter((t) => t < len && xs(t) + textWidth(fmtInt(t), FS.small) / 2 + 8 < x(len) - endW), len];
+    out.push(axisBottom(xs, axY, p, { minX: L - 20, maxX: W - 2, fmt: (t) => t === len ? endText : fmtInt(t) }));
 
     // stems, heads, tooltips
     for (const q of g.positions) {
-      const cx = x(q.pos), cy = yAt(q.n);
-      const tip = "codon " + q.pos + ": " + fmt(q.n) + " mutation" + (q.n === 1 ? "" : "s") + "\n" +
-        q.changes.slice(0, 12).map((c) => c.change + " " + fmt(c.n)).join("\n") +
+      const cx = x(q.pos), cy = ys(Math.min(ys.domain[1], q.n));
+      const tip = "codon " + q.pos + ": " + fmtInt(q.n) + " mutation" + (q.n === 1 ? "" : "s") + "\n" +
+        q.changes.slice(0, 12).map((c) => c.change + " " + fmtInt(c.n)).join("\n") +
         (q.changes.length > 12 ? "\n…and " + (q.changes.length - 12) + " more" : "");
       out.push(`<g><title>${esc(tip)}</title>` +
-        `<line x1="${num(cx)}" y1="${yBase}" x2="${num(cx)}" y2="${num(cy)}" stroke="${STICK}" stroke-width="1"/>` +
-        `<circle class="lollipop-head" cx="${num(cx)}" cy="${num(cy)}" r="2.8" fill="${q.color}"/></g>`);
+        `<line x1="${r1(cx)}" y1="${yBase}" x2="${r1(cx)}" y2="${r1(cy)}" stroke="${STICK}" stroke-width="${SW.line}"/>` +
+        `<circle class="lollipop-head" cx="${r1(cx)}" cy="${r1(cy)}" r="2.8" fill="${q.color}"/></g>`);
     }
     if (g.label) {
       const lq = g.positions.find((q) => q.pos === g.label!.pos);
       if (lq) {
-        const lx = x(lq.pos), half = g.label.text.length * 2.9;
-        const anchor = lx - half < L ? "start" : lx + half > W - R ? "end" : "middle";
-        out.push(`<text x="${num(lx)}" y="${num(yAt(lq.n) - 7)}" font-size="10" font-family="Arial,sans-serif" fill="${p.ink}" text-anchor="${anchor}">${esc(g.label.text)}</text>`);
+        const w = Math.min(textWidth(g.label.text, FS.small), plotW);
+        const lx = Math.max(L + w / 2, Math.min(W - R - w / 2, x(lq.pos)));
+        out.push(label(lx, ys(Math.min(ys.domain[1], lq.n)) - 7, g.label.text, { size: FS.small, fill: p.ink, anchor: "middle", maxW: plotW }));
       }
     }
 
-    // legend: the colours this gene actually uses
-    const used = new Map<string, string>();
-    for (const q of g.positions) used.set(q.color, (IMPACT_COLORS as any)[q.impact].label + (q.driver ? "" : " (VUS)"));
-    let lx = L;
-    const ly = axY + 32;
-    for (const [color, label] of used) {
-      out.push(`<circle cx="${lx + 4}" cy="${ly - 3}" r="3.5" fill="${color}"/><text x="${lx + 11}" y="${ly}" font-size="9" fill="${p.muted}">${esc(label)}</text>`);
-      lx += 22 + label.length * 5.4;
+    // legend: the classes this gene uses, always in the same order (drivers before VUS within a class)
+    const used = new Set(g.positions.map((q) => q.impact + (q.driver ? ".driver" : ".vus")));
+    const items: LegendItem[] = [];
+    for (const k of IMPACT_TYPES) for (const drv of [true, false]) {
+      if (!used.has(k + (drv ? ".driver" : ".vus"))) continue;
+      items.push({ label: IMPACT_COLORS[k].label + (drv ? "" : " (VUS)"), color: drv ? IMPACT_COLORS[k].driver : IMPACT_COLORS[k].vus, kind: "dot" });
     }
-  });
-  const H = 8 + genes.length * PANEL;
-  const cap = caption(captionText, W, H, p.muted);
-  return frame(W, H + cap.height + 10, out.join("") + cap.svg, p.bg);
+    const ly = axY + 6 + FS.small + 8;
+    const lg = legend(items, L, ly, W - L - R, p, { size: FS.small });
+    out.push(lg.svg);
+    top = ly + lg.height + 14;
+  }
+  const cap = caption(captionText, W, top - 8, p.muted);
+  return frame(W, top - 8 + cap.height + 10, out.join("") + cap.svg, p.bg, false, "Mutations by protein position — " + genes.map((g) => g.gene).join(", "));
 }
 
+const r1 = (n: number) => Math.round(n * 10) / 10;

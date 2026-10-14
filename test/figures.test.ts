@@ -30,9 +30,14 @@ describe("attrition", () => {
     const svg = viewToSvg(v)!;
     assert.ok(!svg.includes("<b>A</b>") && svg.includes("&lt;b&gt;A&lt;/b&gt;"));
   });
-  test("six cohorts widen the figure rather than crush it, and say so with a min-width", () => {
+  test("six cohorts wrap onto a second row of columns rather than crush them or run past the edge", () => {
     const six: ViewResult = { ...v, attrition: Array.from({ length: 6 }, (_, i) => ({ ...v.attrition![0], cohort: "c" + i })) };
-    assert.match(viewToSvg(six)!, /min-width:\d+px/);
+    const svg = viewToSvg(six, { width: 760 })!;
+    for (let i = 0; i < 6; i++) assert.ok(svg.includes(">c" + i + "<"), "c" + i + " is drawn");
+    assert.match(svg, /viewBox="0 0 760 /);
+    assert.doesNotMatch(svg, /min-width/);
+    const boxes = [...svg.matchAll(/<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="[\d.]+" rx="4"/g)].map((m) => ({ x: +m[1], w: +m[2] }));
+    assert.ok(boxes.every((b) => b.w >= 200 && b.x + b.w <= 760), "every box keeps a readable width inside the figure");
   });
   test("titled for chat captions", () => assert.match(viewTitle(v), /^Cohort attrition/));
 });
@@ -76,7 +81,7 @@ describe("pathways", () => {
   });
   test("an underflowed q never prints as zero", () => {
     const svg = viewToSvg(v)!;
-    assert.ok(svg.includes("q&lt;1e-300") && !/q=0(e\+0)?</.test(svg));
+    assert.ok(svg.includes("q &lt; 1e-300") && !/q = 0(e\+0)?</.test(svg));
   });
   test("a significant member is starred, and the caveat travels with the figure", () => {
     const svg = viewToSvg(v)!;
@@ -150,7 +155,7 @@ describe("clonality", () => {
   test("shows % clonal, LOH and WGD, and says when a gene has no call rather than drawing nothing", () => {
     const svg = viewToSvg(v)!;
     // clonal share is of the calls that were called either way: 40 / (40 + 5)
-    assert.ok(svg.includes("89% clonal") && svg.includes("LOH 70%"));
+    assert.ok(svg.includes("88.9% clonal") && svg.includes("LOH 70.0%"));
     assert.ok(svg.includes("33.3%"), "30 of 90 doubled");
     assert.ok(svg.includes("no driver mutation call with a FACETS estimate"));
   });
@@ -175,7 +180,7 @@ describe("incidence", () => {
     assert.ok(svg.includes("brain &lt;met&gt;") && !svg.includes("<met>"));
   });
   test("a permutation p at its floor says so instead of reading as exact", () => {
-    assert.ok(viewToSvg(v)!.includes("no shuffle of 2000 as extreme"));
+    assert.ok(viewToSvg(v)!.includes("no shuffle of 2,000 as extreme"));
   });
 });
 
