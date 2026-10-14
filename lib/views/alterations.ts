@@ -2,7 +2,7 @@
 // Structural Variants tables (cBioPortal's patient view) — four table views in one, each on
 // lib/table-query.ts with its own query, the row sources in lib/patient-alterations.ts.
 import type { ViewResult, AlterationsView, AlterationsResult, TableRows } from "../types.ts";
-import type { PatientLevelCapable } from "../federation.ts";
+import { peerRowsFor, type PatientLevelCapable, type PeerTable, type Resolver } from "../federation.ts";
 import type { TablePart } from "../mutation-table.ts";
 import { checkQuery, describeQuery, shownColumns, type TableQuery } from "../table-query.ts";
 import { alterationsMethod } from "../method.ts";
@@ -10,10 +10,10 @@ import { PATIENT_ID } from "../patient-timeline.ts";
 import { sampleMarks } from "../timeline-tracks.ts";
 import {
   ALTERATION_TABLES, ALTERATION_TABLE_NAMES, ALTERATION_COLUMNS, ALTERATION_DEFAULT_COLUMNS, ALTERATION_PATIENT_COLUMNS, ALTERATION_PATIENT_DEFAULT_COLUMNS,
-  alterationSource, alterationPatientRowSource, patientSamplesSource, type AlterationTable,
+  alterationSource, alterationPatientRowSource, patientSamplesSource, type AlterationPart, type AlterationTable,
 } from "../patient-alterations.ts";
 import type { ViewRun } from "./run.ts";
-import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "./rows.ts";
+import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type RemoteRows, type Rows } from "./rows.ts";
 import { plural, refuse } from "./shared.ts";
 
 type Cell = string | number | null;
@@ -64,7 +64,19 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
   const only = ctx.table == null ? null : (ALTERATION_TABLES as readonly string[]).includes(ctx.table) ? ctx.table as AlterationTable : undefined;
   if (only === undefined) return no("table is one of " + ALTERATION_TABLES.join(", ") + ", or none for the patient list");
 
-  const { holders, excluded } = rowHolders(ctx);
+  // who may answer: a local patient-level participant, or a peer whose rules allow patient alterations
+  const { holders, excluded, viaPeer } = rowHolders(ctx, "alterations");
+  const peerOf = (r: Resolver) => peerRowsFor(r, "alterations");
+  /** a peer pages `table` itself; what it annotated with is recorded for the result */
+  let peerPin: string | null | undefined;
+  const remote = (table: PeerTable, subject?: RemoteRows["subject"]): RemoteRows =>
+    ({ of: peerOf, table, subject, oncokbPin: pin, onAnswer: (a) => { if (a.oncokbPin !== undefined) peerPin = a.oncokbPin; } });
+  // the Source column: this portal's own database, or the peer's label (set where the peer pages its rows)
+  /** where a patient's tables came from: a peer's are marked, as the timeline marks its record */
+  const sourceOf = (study: string) => peerOf(ctx.resolvers[study]) ? { source: { label: ctx.resolvers[study].instance.label, remote: true } } : {};
+  /** the OncoKB version a patient's tables were annotated with: the peer's, for a patient it served */
+  const pinOf = (study: string) => peerOf(ctx.resolvers[study]) ? peerPin ?? null : pin;
+  const sourced = (parts: TablePart[]): AlterationPart[] => parts.map((p) => ({ ...p, source: "this portal (" + ctx.resolvers[p.study].instance.label + ")" }));
   if (!holders.length) return no("no study here may disclose a patient's alterations (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
   if (view.patient && !ctx.vStudies.includes(view.patient.study))
     return no("patient " + view.patient.id + " is named in " + view.patient.study + ", which this view's cohort does not span (" + ctx.vStudies.join(", ") + ")");
@@ -74,12 +86,12 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
   const defaults = ALTERATION_PATIENT_DEFAULT_COLUMNS;
   const shown = shownColumns(q, ALTERATION_PATIENT_COLUMNS, defaults);
   const listRows = (size: number, opts: { values?: boolean; locate?: { study: string; patient: string } } = {}) =>
-    runRows(ctx, "alterations", holders, q, defaults, shown, size, (parts) => (db) => alterationPatientRowSource(parts, db),
-      opts.values && ctx.values ? { column: ctx.values, numeric: !!ALTERATION_PATIENT_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined, undefined, opts.locate);
+    runRows(ctx, "alterations", holders, q, defaults, shown, size, (parts) => (db) => alterationPatientRowSource(sourced(parts), db),
+      opts.values && ctx.values ? { column: ctx.values, numeric: !!ALTERATION_PATIENT_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined, remote("alterations"), opts.locate);
   /** the patient's samples in their order — the numbered markers, which order a gene's rows — read whole whatever page is asked */
   const samplesOf = async (pt: { study: string; id: string }) => {
     const r = await runRows({ ...ctx, page: undefined, values: undefined }, "alterations:samples", [pt.study], {}, ["sid"], ["sid", "type"], TABLE_ROWS_MAX,
-      (parts: TablePart[]) => (db) => patientSamplesSource(parts[0], pt.id, db));
+      (parts: TablePart[]) => (db) => patientSamplesSource(parts[0], pt.id, db), undefined, remote("alterations:samples", { patient: pt.id }));
     const samples = r.rows.map((x) => ({ id: String(x.sid), type: String(x.type ?? "") }));
     return { samples, order: [...sampleMarks(samples, []).keys()] };
   };
@@ -88,7 +100,8 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     const cols = ALTERATION_COLUMNS[t], { q: tqq, size } = tq[t], defs = ALTERATION_DEFAULT_COLUMNS[t];
     const r = await runRows(ctx, "alterations:" + t, [pt.study], tqq, defs, shownColumns(tqq, cols, defs), size,
       (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin, order),
-      ctx.values && only === t ? { column: ctx.values, numeric: !!cols.find((c) => c.id === ctx.values)?.numeric } : undefined);
+      ctx.values && only === t ? { column: ctx.values, numeric: !!cols.find((c) => c.id === ctx.values)?.numeric } : undefined,
+      remote(("alterations:" + t) as PeerTable, { patient: pt.id, order }));
     const columns = cols.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric }));
     return { r, rows: { columns, shown: shownColumns(tqq, columns, defs), defaults: defs, query: tqq, rows: rowsOf(r, cols), offset: r.offset, pageSize: size,
       lists: r.lists, total: r.total, all: r.all, ...(r.values ? { values: r.values } : {}) } };
@@ -106,7 +119,8 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
       const want = pt || (first?.rows[0] ? { study: String(first.rows[0].study), id: String(first.rows[0].patient) } : null);
       if (!want) return no("the cohort's patient list is empty, so there is no patient's " + only + " table to page");
       const { rows } = await tableRows(only, want, (await samplesOf(want)).order);
-      return partial({ ...listOf({ rows: [], lists: [], total: 0, all: 0, offset: 0, groups: 1 }), patient: { ...want, samples: [] }, tables: { [only]: rows }, oncokbPin: pin });
+      return partial({ ...listOf({ rows: [], lists: [], total: 0, all: 0, offset: 0, groups: 1 }), patient: { ...want, samples: [], ...sourceOf(want.study) }, tables: { [only]: rows },
+        oncokbPin: pinOf(want.study) });
     }
     const r = await listRows(show, { values: true, locate: view.patient && !ctx.page && !ctx.values ? { study: view.patient.study, patient: view.patient.id } : undefined });
     if (ctx.page || ctx.values) return partial({ ...listOf(r), patient: null, tables: {}, oncokbPin: pin });
@@ -114,10 +128,14 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     // the patient listed: the one the view names (checked to be one of its cohort's patients), else the list's first
     const want = view.patient ? { study: view.patient.study, id: view.patient.id } : r.rows[0] ? { study: String(r.rows[0].study), id: String(r.rows[0].patient) } : null;
     if (want && view.patient && !r.position) {
-      const res = ctx.resolvers[want.study] as unknown as PatientLevelCapable;
+      // the named patient must be one of the view's cohort's patients — asked of whoever holds them
+      const res = ctx.resolvers[want.study], rem = peerOf(res);
       const member: TableQuery = { filters: { patient: { op: "equals", value: want.id } } };
-      const counts = await res.rowsCounts("alterations:member", (db) => alterationPatientRowSource(vNames.filter((cn) => ctx.cohorts[cn].studies.includes(want.study))
-        .map((cn) => ({ cohort: cn, study: want.study, cohortSql: ctx.resolvers[want.study].cohortSql(ctx.doc.cohorts[cn]) })), db), member, defaults);
+      const inCohorts = vNames.filter((cn) => ctx.cohorts[cn].studies.includes(want.study));
+      const counts = rem
+        ? (await rem.patientRows({ table: "alterations", parts: inCohorts.map((cn) => ({ cohort: cn, def: ctx.doc.cohorts[cn] })), query: member, defaults, mode: "counts" })).counts || []
+        : await (res as unknown as PatientLevelCapable).rowsCounts("alterations:member", (db) => alterationPatientRowSource(
+          sourced(inCohorts.map((cn) => ({ cohort: cn, study: want.study, cohortSql: res.cohortSql(ctx.doc.cohorts[cn]) }))), db), member, defaults);
       if (!counts.some((c) => c.n > 0)) return no(want.id + " is not a patient of this cohort in " + want.study);
     }
     const smp = want ? await samplesOf(want) : null;
@@ -128,6 +146,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     const tables: AlterationsResult["tables"] = {};
     ALTERATION_TABLES.forEach((t, i) => { const x = tabs[i]; if (x) tables[t] = x.rows; });
     const samples = smp?.samples || [];
+    const shownPin = want ? pinOf(want.study) : pin;
     const list = listOf(r);
     const sortName = q.sort ? listColumns.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null;
     const tableLine = (t: AlterationTable) => {
@@ -136,8 +155,8 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     };
     return {
       kind: "alterations", cohorts: vNames,
-      alterations: { ...list, patient: want ? { ...want, samples } : null, position, tables, oncokbPin: pin },
-      method: alterationsMethod({ cohorts: vNames, oncokbPin: pin, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length,
+      alterations: { ...list, patient: want ? { ...want, samples, ...sourceOf(want.study) } : null, position, tables, oncokbPin: shownPin },
+      method: alterationsMethod({ cohorts: vNames, oncokbPin: shownPin, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length,
         lists: r.lists, excluded, instances: r.groups, patient: want,
         tables: want ? ALTERATION_TABLES.map((t) => ({ name: ALTERATION_TABLE_NAMES[t], total: tables[t]!.total, all: tables[t]!.all, queryText: describeQuery(tables[t]!.query, tables[t]!.columns) })) : [] }),
       participation: ctx.participationFor(ctx.vStudies, true),
@@ -146,7 +165,10 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
         "Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. " +
         "Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. " +
         "Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. " +
-        (pin ? "Annotation is OncoKB " + pin + " (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. " : "No OncoKB version is pinned here, so the annotation columns are empty. ") +
+        (want && peerOf(ctx.resolvers[want.study]) ? want.id + "'s tables come from " + ctx.resolvers[want.study].instance.label + " over MCP, computed in its database. " : "") +
+        (shownPin ? "Annotation is OncoKB " + shownPin + " (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. " : "No OncoKB version is pinned here, so the annotation columns are empty. ") +
+        (viaPeer.length ? "Patients of " + viaPeer.join(", ") + " come from " + [...new Set(viaPeer.map((st) => ctx.resolvers[st].instance.label))].join(", ") +
+          " over MCP: a peer whose rules and this instance's both allow patient alterations (its Source column says so); every view their rules do not name treats it as aggregate-only. " : "") +
         "The patient list: " + tableTail(r, q, listColumns, "patient", "with patients who have any alteration first, then by patient id", excluded, false),
     };
   } catch (e) { return no((e as Error).message); }

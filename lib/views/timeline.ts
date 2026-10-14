@@ -1,7 +1,7 @@
 // Timeline view: the cohort's patients, and one patient's clinical timeline (cBioPortal's patient-view
 // Timeline) — drawn by lib/timeline-svg.ts, on the track model of lib/timeline-tracks.ts.
 import type { ViewResult, TimelineView, TimelineResult, PatientTimeline } from "../types.ts";
-import { isPatientLevel, hasPatientTimeline, hasRemoteTimelineRows, type PatientLevelCapable, type PatientTimelineCapable, type Resolver } from "../federation.ts";
+import { hasPatientTimeline, peerRowsFor, type PatientLevelCapable, type PatientTimelineCapable, type Resolver } from "../federation.ts";
 import type { TablePart } from "../mutation-table.ts";
 import { checkQuery, describeQuery, shownColumns, type TableQuery } from "../table-query.ts";
 import { timelineMethod } from "../method.ts";
@@ -24,11 +24,9 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
   const bad = checkQuery(q, TIMELINE_COLUMNS);
   if (bad) return refuse("timeline", ctx, bad);
 
-  // who may answer: a local patient-level participant, or a peer in the opt-in patient-level mode
-  const remoteOf = (r: Resolver) => hasRemoteTimelineRows(r) ? r : null;
-  const holders = ctx.vStudies.filter((st) => isPatientLevel(ctx.resolvers[st]) || remoteOf(ctx.resolvers[st]));
-  const excluded = rowHolders(ctx).excluded.filter((e) => !holders.includes(e.study));
-  const viaPeer = holders.filter((st) => remoteOf(ctx.resolvers[st]));
+  // who may answer: a local patient-level participant, or a peer whose rules allow timelines
+  const { holders, excluded, viaPeer } = rowHolders(ctx, "timeline");
+  const remote = { of: (r: Resolver) => peerRowsFor(r, "timeline"), table: "timeline" as const };
   if (!holders.length) return refuse("timeline", ctx, "no study here may disclose a patient's timeline (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
   if (view.patient && !ctx.vStudies.includes(view.patient.study))
     return refuse("timeline", ctx, "patient " + view.patient.id + " is named in " + view.patient.study + ", which none of this view's cohorts span (" + ctx.vStudies.join(", ") + ")");
@@ -42,7 +40,7 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
   try {
     r = await runRows(ctx, "timeline", holders, q, defaults, shownColumns(q, TIMELINE_COLUMNS, defaults), show,
       (parts) => (db) => timelinePatientRowSource(sourced(parts), db),
-      ctx.values ? { column: ctx.values, numeric: !!TIMELINE_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined, remoteOf,
+      ctx.values ? { column: ctx.values, numeric: !!TIMELINE_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined, remote,
       view.patient && !ctx.page && !ctx.values ? { study: view.patient.study, patient: view.patient.id } : undefined);
   } catch (e) { return refuse("timeline", ctx, (e as Error).message); }
   const columns = TIMELINE_COLUMNS.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric }));
@@ -70,9 +68,9 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
         // the named patient must be one of the view's cohorts' patients — asked of whoever holds them
         const inCohorts = vNames.filter((cn) => ctx.cohorts[cn].studies.includes(want.study));
         const member: TableQuery = { filters: { patient: { op: "equals", value: want.id } } };
-        const rem = remoteOf(res);
+        const rem = peerRowsFor(res, "timeline");
         const counts = rem
-          ? (await rem.timelineRows({ parts: inCohorts.map((cn) => ({ cohort: cn, def: ctx.doc.cohorts[cn] })), query: member, defaults, mode: "counts" })).counts || []
+          ? (await rem.patientRows({ table: "timeline", parts: inCohorts.map((cn) => ({ cohort: cn, def: ctx.doc.cohorts[cn] })), query: member, defaults, mode: "counts" })).counts || []
           : await (res as unknown as PatientLevelCapable).rowsCounts("timeline:member", (db) => timelinePatientRowSource(
             sourced(inCohorts.map((cn) => ({ cohort: cn, study: want.study, cohortSql: res.cohortSql(ctx.doc.cohorts[cn]) }))), db), member, defaults);
         if (!counts.some((c) => c.n > 0)) return refuse("timeline", ctx, want.id + " is not a patient of " + (vNames.length > 1 ? "these cohorts" : "this cohort") + " in " + want.study);
@@ -84,7 +82,7 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
 
   const position: TimelineResult["position"] = patient ? await listPosition(r, !!view.patient, (first) =>
     runRows(ctx, "timeline", holders, q, defaults, shownColumns(q, TIMELINE_COLUMNS, defaults), 1,
-      (parts) => (db) => timelinePatientRowSource(sourced(parts), db), undefined, remoteOf, first)) : null;
+      (parts) => (db) => timelinePatientRowSource(sourced(parts), db), undefined, remote, first)) : null;
 
   const sortName = q.sort ? columns.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null;
   // the figure that travels alone (MCP, exports): the patient's timeline with the view's own track and gap settings
@@ -103,7 +101,7 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
     caveat: (patient ? "" : "No patient to draw: the list is empty. ") +
       "The list is one row per patient of each cohort; event counts and days come from the study's timeline, in days from diagnosis as the study records them. " +
       (viaPeer.length ? "Patients of " + viaPeer.join(", ") + " come from " + [...new Set(viaPeer.map((st) => ctx.resolvers[st].instance.label))].join(", ") +
-        " over MCP: a peer both this instance and the peer configured to share patient timelines (its Source column says so); for every other view it stays aggregate-only. " : "") +
+        " over MCP: a peer whose rules and this instance's both allow patient timelines (its Source column says so); every view their rules do not name treats it as aggregate-only. " : "") +
       tableTail(r, q, columns, "patient", "with patients who have a timeline first, then by patient id", excluded, vNames.length > 1),
   };
 }

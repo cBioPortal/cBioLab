@@ -28,7 +28,7 @@ export async function customContext(raw: unknown, server?: ServerRefs): Promise<
   const studies = new Set(datasets.flatMap((d) => d.rows.map((r) => r.study)));
   const routing = await studyRouting();
   for (const study of studies) {
-    if (peerForStudy(study))
+    if (await peerForStudy(study))
       throw new Error("custom data for " + study + " cannot be used: that study is held by a remote peer, which may not receive patient-level data");
     if (!routing.has(study)) throw new Error("custom data names study '" + study + "', which is not available here");
     const inst = await instanceForStudy(study);
@@ -96,7 +96,7 @@ export async function resolveCaseIds(studies: string[], level: "patient" | "samp
   const byConn = new Map<string, { conn: ChConn; studies: string[] }>();
   const refused: { study: string; reason: string }[] = [];
   for (const s of studies) {
-    if (peerForStudy(s) || !routing.has(s)) { refused.push({ study: s, reason: "not available here" }); continue; }
+    if (await peerForStudy(s) || !routing.has(s)) { refused.push({ study: s, reason: "not available here" }); continue; }
     const inst = await instanceForStudy(s);
     if (inst.mode !== "patient-level") { refused.push({ study: s, reason: inst.label + " is not entitled to patient-level data" }); continue; }
     const e = byConn.get(inst.conn.id) ?? { conn: inst.conn, studies: [] };
@@ -151,7 +151,7 @@ export const EXAMPLE_PATIENTS = 8;
  * them matches the study, so it can be added as it stands. Patient-level studies only.
  */
 export async function exampleCaseIds(study: string): Promise<string[]> {
-  if (peerForStudy(study)) throw new Error("example data cannot name patients of " + study + ": it is held by a remote peer");
+  if (await peerForStudy(study)) throw new Error("example data cannot name patients of " + study + ": it is held by a remote peer");
   const conn = await patientLevelConn(study, "example data names patients");
   const r = await chQueryRows(
     "SELECT DISTINCT patient_stable_id FROM " + conn.db + ".sample_derived\n" +

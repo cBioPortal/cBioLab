@@ -81,7 +81,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   patient's Mutations, Copy Number Alterations and Structural Variants as three table views in one card, each
   with its own query under its own spec key (`mutations`, `cna`, `sv`); the top-level query is the patient list's.
   Row sources in **`lib/patient-alterations.ts`** (one row per variant / call / event however many of the
-  patient's samples carry it). Local patient-level participants only — the opt-in peer mode stays timeline-only.
+  patient's samples carry it). Local patient-level participants, and a peer whose rules allow `alterations`
+  (opt-in patient-level federation, below): the peer pages each table in its own database.
   Its navigator is the timeline's: **`app/lab/patient-nav.tsx`** (‹ prev / next ›, the List/Search dialog,
   ← / →) serves every view that shows one patient of a cohort at a time, stepping by the result's `position`
   (`listPosition()` in `lib/views/rows.ts`).
@@ -97,10 +98,17 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   navigator (cohort, the patient list — a `<dialog>` holding the `DataTable` — and ‹ prev / next ›) steps by the result's `position` — the drawn patient's place
   in the list's order (`rankSql`) and its neighbours — setting `patient`. The chosen `patient`, folded `collapsed`
   tracks and `expandGaps` are in the spec; the last two are drawn in the browser (`dataPart`).
-  **Opt-in patient-level federation** serves this view alone: a peer that sets
-  `MCP_DISCLOSE_PATIENTS` exposes `federated_patient_rows`/`federated_patient_timeline`, and a
-  coordinator that names the study in `PEER_MCP_PATIENT_LEVEL` reaches it through
-  `RemoteTimelineResolver` (aggregate-only for every other view). See `docs/DATA-BOUNDARY.md`.
+  **Opt-in patient-level federation** serves this view and `alterations`, per study and kind of data:
+  rules (`lib/disclosure.ts`; `study:timeline+alterations`, `*` for every study) in the peer's
+  `MCP_DISCLOSE_PATIENTS` register and gate `federated_patient_rows`/`federated_patient_timeline`, and
+  the same rules in the coordinator's `PEER_MCP_PATIENT_LEVEL` decide what it accepts — data crosses
+  only where both allow it. The coordinator reaches the peer through `RemotePatientResolver` /
+  `RemoteTimelineResolver` (`patientRows()` names a table in `PEER_TABLES`, never SQL; aggregate-only
+  for every other view); `runRows`' `remote` option pages a peer's rows beside local databases. A new
+  patient view joins by adding a kind, its tables to `PEER_TABLES` and the peer tool, and
+  `rowHolders(ctx, kind)`. `LOOPBACK_PEER=b` (`lib/loopback-peer.ts`) serves the second database
+  to the app itself as a simulated peer — one app, both databases, federation over real MCP calls;
+  the gate runs `scripts/e2e-federation.cjs` that way. See `docs/DATA-BOUNDARY.md`.
 - **`lib/event-names.ts`** — **THE only place timeline event names are normalized.** Case-fold and
   trim, nothing else; measured to be complete for event types and attribute keys (zero residual
   collisions). Folds are disclosed in the caveat, never silent. Do not fork it. Every timeline

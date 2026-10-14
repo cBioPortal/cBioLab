@@ -14,9 +14,12 @@ import {
 } from "../lib/campaign.ts";
 import { HYPOTHESIS_GRAMMAR } from "../lib/hypothesis.ts";
 import { runAnalysis, resolveStudy, studyProfiles } from "../lib/analysis.ts";
-import { resolverFor, carriesPatientIds, studyRouting, PatientLevelResolver } from "../lib/federation.ts";
+import { resolverFor, carriesPatientIds, studyRouting, PatientLevelResolver, PEER_TABLES, type PeerTable } from "../lib/federation.ts";
 import { timelinePatientRowSource, TIMELINE_COLUMNS, PATIENT_ID } from "../lib/patient-timeline.ts";
-import { checkQuery, cleanQuery, type TableQuery } from "../lib/table-query.ts";
+import { ALTERATION_COLUMNS, ALTERATION_PATIENT_COLUMNS, PATIENT_SAMPLE_COLUMNS, alterationPatientRowSource, alterationSource, patientSamplesSource } from "../lib/patient-alterations.ts";
+import { loopbackConnId } from "../lib/loopback-peer.ts";
+import { allowedKinds, disclosedByThisInstance, PATIENT_KIND_NAMES, type PatientKind } from "../lib/disclosure.ts";
+import { checkQuery, cleanQuery, type QueryColumn, type RowSource, type TableQuery } from "../lib/table-query.ts";
 import { buildExplore } from "../lib/explore.ts";
 import { PRIMARY } from "../lib/ch.ts";
 import type { AnalysisDoc, AnalysisResult, Contract, OncoprintSpec } from "../lib/types.ts";
@@ -172,17 +175,22 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
     });
 
   // ---- opt-in patient-level federation ---------------------------------------
-  // Registered ONLY where this instance's operator lists studies in MCP_DISCLOSE_PATIENTS: a peer
-  // that has not opted in does not have these tools at all. They serve exactly one view — the
-  // timeline: a page of a cohort's patient list, and one patient's clinical record — for a study
-  // this instance holds at patient level itself. The coordinator must opt in as well
-  // (PEER_MCP_PATIENT_LEVEL); see docs/DATA-BOUNDARY.md. There is no caller authentication yet:
-  // anyone who can reach this endpoint can read what it discloses.
-  const disclose = (process.env.MCP_DISCLOSE_PATIENTS || "").split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
-  if (disclose.length) {
-    const held = async (study: string): Promise<{ s: string; res: PatientLevelResolver }> => {
+  // Registered ONLY where this instance's operator writes rules in MCP_DISCLOSE_PATIENTS
+  // (lib/disclosure.ts): a peer that has not opted in does not have these tools at all. Each call is
+  // checked against those rules — the study, and the kind of patient-level data the table belongs to
+  // (PEER_TABLES) — for a study this instance holds at patient level itself. The coordinator must
+  // accept the same kind (PEER_MCP_PATIENT_LEVEL); see docs/DATA-BOUNDARY.md. There is no caller
+  // authentication yet: anyone who can reach this endpoint can read what it discloses.
+  if ((process.env.MCP_DISCLOSE_PATIENTS || "").trim()) {
+    const held = async (study: string, kind: PatientKind): Promise<{ s: string; res: PatientLevelResolver }> => {
+      // the rules are checked on the study as asked, before anything is read, and again as resolved
+      const refuse = (x: string) => new Error(x.slice(0, 120) + " is not a study this instance discloses " + PATIENT_KIND_NAMES[kind] + " of");
+      if (!allowedKinds(disclosedByThisInstance(), study).has(kind)) throw refuse(study);
       const s = await resolveStudy(study);
-      if (!disclose.includes("*") && !disclose.includes(s)) throw new Error(s + " is not a study this instance discloses patients of");
+      if (!allowedKinds(disclosedByThisInstance(), s).has(kind)) throw refuse(s);
+      // with a simulated peer (lib/loopback-peer.ts) the rules are that peer's: only its connection's studies are disclosed
+      const loop = loopbackConnId();
+      if (loop && (await studyRouting()).get(s)?.id !== loop) throw refuse(s);
       const { profiles, gaProfiles } = await studyProfiles(s);
       const res = await resolverFor(s, { oncokbPin: process.env.ONCOKB_PIN || null, profiles, gaProfiles });
       // only what this instance holds itself at patient level: never a peer's data relayed, never an aggregate-only study
@@ -190,16 +198,30 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       return { s, res };
     };
     const rejected = (e: unknown) => ({ content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true });
+    /** each table's columns, and whether it is one patient's (named in `subject`) rather than a cohort's patient list */
+    const TABLES: Record<PeerTable, { columns: QueryColumn[]; perPatient: boolean }> = {
+      "timeline": { columns: TIMELINE_COLUMNS, perPatient: false },
+      "alterations": { columns: ALTERATION_PATIENT_COLUMNS, perPatient: false },
+      "alterations:samples": { columns: PATIENT_SAMPLE_COLUMNS, perPatient: true },
+      "alterations:mutations": { columns: ALTERATION_COLUMNS.mutations, perPatient: true },
+      "alterations:cna": { columns: ALTERATION_COLUMNS.cna, perPatient: true },
+      "alterations:sv": { columns: ALTERATION_COLUMNS.sv, perPatient: true },
+    };
+    const PIN = /^[A-Za-z0-9._-]{1,40}$/;
 
     server.registerTool(
       "federated_patient_rows",
       {
         description:
-          "Patient-level federation endpoint (opt-in: MCP_DISCLOSE_PATIENTS) for another cbio-lab instance's timeline view: the patients of the given cohorts in a study THIS instance holds, one row each with sample and timeline-event counts and first/last event day — a page of them, the per-cohort counts, one column's values, or one patient's place in the order — searched, filtered and sorted here. Returns patient identifiers.",
+          "Patient-level federation endpoint (opt-in: MCP_DISCLOSE_PATIENTS rules) for another cbio-lab instance's patient views, computed in THIS instance's database for a study it holds: " +
+          "the timeline's patient list (table 'timeline'); the alterations view's patient list ('alterations'), and one patient's samples, mutations, copy-number alterations and structural variants " +
+          "('alterations:samples' / ':mutations' / ':cna' / ':sv', naming the patient in subject) — a page of rows, the per-cohort counts, one column's values, or one patient's place in the order, " +
+          "searched, filtered and sorted here. Each table is answered only where this instance's rules disclose its kind for the study. Returns patient identifiers.",
         inputSchema: {
           study: z.string().max(120),
+          table: z.enum(Object.keys(PEER_TABLES) as [PeerTable, ...PeerTable[]]).default("timeline"),
           parts: z.array(z.object({ cohort: z.string().max(200), cohortDef: z.record(z.string(), z.any()) })).min(1).max(6),
-          source: z.string().max(200).describe("What the caller calls this instance: the list's Source column"),
+          source: z.string().max(200).describe("What the caller calls this instance: a patient list's Source column"),
           query: z.record(z.string(), z.any()).nullish(),
           defaults: z.array(z.string().max(40)).max(20),
           mode: z.enum(["page", "counts", "values", "rank"]),
@@ -207,33 +229,49 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           offset: z.number().int().min(0).nullish(),
           column: z.string().max(40).nullish(),
           patient: z.string().max(80).nullish(),
+          subject: z.object({ patient: z.string().max(80), order: z.array(z.string().max(120)).max(500).nullish() }).nullish()
+            .describe("For a table of one patient's: whose, and their samples' order (the Samples column's)"),
+          oncokbPin: z.string().max(40).nullish().describe("The OncoKB version the caller annotates with, used unless this instance pins its own (ONCOKB_PIN)"),
         }
       },
-      async ({ study, parts, source, query, defaults, mode, limit, offset, column, patient }: { study: string; parts: { cohort: string; cohortDef: any }[]; source: string; query?: any; defaults: string[]; mode: "page" | "counts" | "values" | "rank"; limit?: number | null; offset?: number | null; column?: string | null; patient?: string | null }) => {
+      async ({ study, table, parts, source, query, defaults, mode, limit, offset, column, patient, subject, oncokbPin }: { study: string; table: PeerTable; parts: { cohort: string; cohortDef: any }[]; source: string; query?: any; defaults: string[]; mode: "page" | "counts" | "values" | "rank"; limit?: number | null; offset?: number | null; column?: string | null; patient?: string | null; subject?: { patient: string; order?: string[] | null } | null; oncokbPin?: string | null }) => {
         try {
           if (parts.some((p) => carriesPatientIds(p.cohortDef)))
             throw new Error("a cohort contains an explicit sample or patient list; identifier lists are not accepted across instances");
-          const { s, res } = await held(study);
+          const t = TABLES[table];
+          if (!t) throw new Error("not a table this instance serves");
+          const { s, res } = await held(study, PEER_TABLES[table]);
           const q = cleanQuery((query || {}) as TableQuery);
-          const bad = checkQuery(q, TIMELINE_COLUMNS);
+          const bad = checkQuery(q, t.columns);
           if (bad) throw new Error(bad);
-          const known = new Set(TIMELINE_COLUMNS.map((c) => c.id));
+          const known = new Set(t.columns.map((c) => c.id));
           if (defaults.some((d) => !known.has(d))) throw new Error("defaults name unknown columns");
+          if (t.perPatient && (!subject || !PATIENT_ID.test(subject.patient))) throw new Error(table + " is one patient's table; subject names the patient");
+          if (oncokbPin && !PIN.test(oncokbPin)) throw new Error("not an OncoKB version");
           const label = source.replace(/[^\w .,()/:-]/g, "").slice(0, 120);
-          const src = (db: string) => timelinePatientRowSource(parts.map((p) => ({ cohort: p.cohort, study: s, cohortSql: res.cohortSql(p.cohortDef), source: label })), db);
+          const sourced = parts.map((p) => ({ cohort: p.cohort, study: s, cohortSql: res.cohortSql(p.cohortDef), source: label }));
+          // OncoKB's call is on the mutation and copy-number tables alone; the answer says which version it is
+          const annotated = table === "alterations:mutations" || table === "alterations:cna";
+          const pin = annotated ? process.env.ONCOKB_PIN || oncokbPin || null : null;
+          const src: (db: string) => RowSource =
+            table === "timeline" ? (db) => timelinePatientRowSource(sourced, db)
+            : table === "alterations" ? (db) => alterationPatientRowSource(sourced, db)
+            : table === "alterations:samples" ? (db) => patientSamplesSource(sourced[0], subject!.patient, db)
+            : (db) => alterationSource(table.slice("alterations:".length) as "mutations" | "cna" | "sv", sourced[0], subject!.patient, db, pin, subject!.order || []);
+          const tag = table + ":" + mode;
           let out: Record<string, unknown>;
-          if (mode === "counts") out = { counts: await res.rowsCounts("timeline:counts", src, q, defaults) };
+          if (mode === "counts") out = { counts: await res.rowsCounts(tag, src, q, defaults) };
           else if (mode === "values") {
-            if (!column || !known.has(column)) throw new Error("values needs one of the list's columns");
-            out = { values: await res.rowsValues("timeline:values", src, q, defaults, column) };
+            if (!column || !known.has(column)) throw new Error("values needs one of the table's columns");
+            out = { values: await res.rowsValues(tag, src, q, defaults, column) };
           } else if (mode === "rank") {
             if (!patient || !PATIENT_ID.test(patient)) throw new Error("rank needs a patient id");
-            out = { rank: await res.rowsRank("timeline:rank", src, q, defaults, s, patient) };
-          } else out = { rows: (await res.rowsPage("timeline:rows", src, q, defaults, limit || 25, offset || 0)).rows };
+            out = { rank: await res.rowsRank(tag, src, q, defaults, s, patient) };
+          } else out = { rows: (await res.rowsPage(tag, src, q, defaults, limit || 25, offset || 0)).rows };
           const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
           return {
-            content: [{ type: "text" as const, text: `timeline patient list for ${s} (${mode}) — patient-level, disclosed under MCP_DISCLOSE_PATIENTS` }],
-            structuredContent: { ...out, queries: hideSql ? null : res.queries }
+            content: [{ type: "text" as const, text: `${table} rows for ${s} (${mode}) — patient-level, disclosed under MCP_DISCLOSE_PATIENTS (${PATIENT_KIND_NAMES[PEER_TABLES[table]]})` }],
+            structuredContent: { ...out, ...(annotated ? { oncokbPin: pin } : {}), queries: hideSql ? null : res.queries }
           };
         } catch (e) { return rejected(e); }
       });
@@ -248,7 +286,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       async ({ study, patient }: { study: string; patient: string }) => {
         try {
           if (!PATIENT_ID.test(patient)) throw new Error("not a patient id");
-          const { s, res } = await held(study);
+          const { s, res } = await held(study, "timeline");
           const t = await res.patientTimeline(patient);
           if (!t.events.length && !t.samples.length) throw new Error(patient + " has no record in " + s);
           const hideSql = process.env.FEDERATION_HIDE_SQL === "1";

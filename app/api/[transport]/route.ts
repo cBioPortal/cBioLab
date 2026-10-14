@@ -2,6 +2,7 @@
 import { createMcpHandler } from "mcp-handler";
 import { registerTools } from "../../../mcp/tools.ts";
 import { cachedAnalysis, cachedContract } from "../../../lib/next-cache.ts";
+import { asLoopbackPeer, isLoopbackRequest } from "../../../lib/loopback-peer.ts";
 
 const handler = createMcpHandler(
   (server) => registerTools(server, { runAnalysis: (doc) => cachedAnalysis(doc), buildContract: cachedContract }),
@@ -9,5 +10,8 @@ const handler = createMcpHandler(
   { basePath: "/api", disableSse: true, maxDuration: 60 }
 );
 
-export { handler as GET, handler as POST, handler as DELETE };
+// a call this app made to itself is answered as its simulated peer (lib/loopback-peer.ts)
+const serve = (req: Request) => isLoopbackRequest(req) ? asLoopbackPeer(() => handler(req)) : handler(req);
+
+export { serve as GET, serve as POST, serve as DELETE };
 export const maxDuration = 60;

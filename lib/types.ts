@@ -1347,7 +1347,7 @@ export interface AlterationsView extends TableQuery {
 }
 export interface AlterationsResult extends TableRows<string | number | null> {
   /** the patient listed, with their samples (none on a page request), or null when the list is empty */
-  patient: { study: string; id: string; samples: PatientSample[] } | null;
+  patient: { study: string; id: string; samples: PatientSample[]; source?: { label: string; remote: boolean } } | null;
   /** where that patient falls in the list's order, and the patients either side (as the timeline's) */
   position?: TimelineResult["position"];
   /** the patient's three tables; on a page or values request, only the one asked for */

@@ -1,6 +1,7 @@
 // What the table views share: their rows run in the database through lib/table-query.ts, paged
 // across the participants that hold them.
-import { isPatientLevel, type PatientLevelCapable, type RemoteTimelineRows, type Resolver } from "../federation.ts";
+import { PATIENT_KIND_NAMES, type PatientKind } from "../disclosure.ts";
+import { isPatientLevel, peerRowsFor, type PatientLevelCapable, type PeerRowsRequest, type RemotePatientRows, type Resolver } from "../federation.ts";
 import type { TablePart } from "../mutation-table.ts";
 import { cleanQuery, describeQuery, mergeValues, type ColumnValues, type RowSource, type TableQuery } from "../table-query.ts";
 import type { TableRows, ViewResult } from "../types.ts";
@@ -11,13 +12,21 @@ export const TABLE_ROWS_MAX = 1000;
 /** rows one page request may take (the download's chunk) */
 export const TABLE_CHUNK = 10000;
 
-/** Who may hand over rows: patient-level participants; the rest are named with their patients. */
-export function rowHolders(ctx: ViewRun) {
-  const holders = ctx.vStudies.filter((st) => isPatientLevel(ctx.resolvers[st]));
+/**
+ * Who may hand over rows: patient-level participants, and — for a view whose kind of patient-level
+ * data a peer may serve (lib/disclosure.ts) — the peers whose rules allow it; the rest are named
+ * with their patients.
+ */
+export function rowHolders(ctx: ViewRun, kind?: PatientKind) {
+  const viaPeer = (st: string) => !!kind && !!peerRowsFor(ctx.resolvers[st], kind);
+  const holders = ctx.vStudies.filter((st) => isPatientLevel(ctx.resolvers[st]) || viaPeer(st));
   const excluded = ctx.vStudies.filter((st) => !holders.includes(st)).map((st) => ({
-    study: st, reason: ctx.resolvers[st].instance.id === "peer" ? "a remote peer, which does not disclose patients" : "aggregate-only: it does not disclose patients",
+    study: st, reason: ctx.resolvers[st].instance.id !== "peer" ? "aggregate-only: it does not disclose patients"
+      : kind && (ctx.resolvers[st] as Partial<RemotePatientRows>).patientKinds?.size
+        ? "a remote peer this instance does not accept " + PATIENT_KIND_NAMES[kind] + " from"
+        : "a remote peer, which does not disclose patients",
     patients: ctx.vNames.reduce((n, c) => n + (ctx.cohorts[c].perStudy[st]?.count || 0), 0) }));
-  return { holders, excluded };
+  return { holders, excluded, viaPeer: holders.filter(viaPeer) };
 }
 
 /** The column ids a query reads besides what is shown: its filters, its sort, and — for search — the shown ones. */
@@ -35,11 +44,14 @@ export type Rows = { rows: Record<string, unknown>[]; lists: { cohort: string; s
  * order — one group, one query. With RunOpts.values, a column's values instead of rows.
  * `source(parts, reads)` builds the table's row source; `reads` names the columns a query needs
  * ("all" for a page), so a count need not carry every column. With `locate`, also where that
- * patient falls in the order and its neighbours (the timeline's prev / next).
+ * patient falls in the order and its neighbours (the timeline's prev / next). With `remote`, a
+ * study whose peer may serve this table (`of`) has its rows paged by that peer, as `table`.
  */
+export type RemoteRows = { of: (r: Resolver) => RemotePatientRows | null; table: PeerRowsRequest["table"]; subject?: PeerRowsRequest["subject"];
+  oncokbPin?: string | null; onAnswer?: (a: { oncokbPin?: string | null }) => void };
 export async function runRows(ctx: ViewRun, label: string, holders: string[], q: TableQuery, defaults: string[], shown: string[], size: number,
   source: (parts: TablePart[], reads: string[] | "all") => (db: string) => RowSource, values?: { column: string; numeric: boolean },
-  remote?: (r: Resolver) => RemoteTimelineRows | null, locate?: { study: string; patient: string }): Promise<Rows> {
+  remote?: RemoteRows, locate?: { study: string; patient: string }): Promise<Rows> {
   type PL = Pick<PatientLevelCapable, "rowsPage" | "rowsCounts" | "rowsValues" | "rowsRank">;
   // one backend per database — or per peer, for a view whose rows a peer may page itself (`remote`)
   type Backend = {
@@ -54,21 +66,26 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
     values: (parts, reads, column) => r.rowsValues(label + ":values", source(parts, reads), q, defaults, column),
     rank: (parts, study, patient) => r.rowsRank(label + ":rank", source(parts, queryReads(q, shown)), q, defaults, study, patient),
   });
-  const peer = (r: RemoteTimelineRows): Backend => {
-    const defs = (parts: TablePart[]) => parts.map((p) => ({ cohort: p.cohort, def: ctx.doc.cohorts[p.cohort] }));
+  const peer = (r: RemotePatientRows, rr: RemoteRows): Backend => {
+    const ask = async (parts: TablePart[], req: Pick<PeerRowsRequest, "mode" | "limit" | "offset" | "column" | "patient">) => {
+      const a = await r.patientRows({ table: rr.table, parts: parts.map((p) => ({ cohort: p.cohort, def: ctx.doc.cohorts[p.cohort] })), query: q, defaults,
+        ...req, ...(rr.subject ? { subject: rr.subject } : {}), ...(rr.oncokbPin ? { oncokbPin: rr.oncokbPin } : {}) });
+      rr.onAnswer?.(a);
+      return a;
+    };
     return {
-      page: async (parts, limit, offset) => (await r.timelineRows({ parts: defs(parts), query: q, defaults, mode: "page", limit, offset })).rows || [],
-      counts: async (parts) => (await r.timelineRows({ parts: defs(parts), query: q, defaults, mode: "counts" })).counts || [],
-      values: async (parts, _reads, column) => (await r.timelineRows({ parts: defs(parts), query: q, defaults, mode: "values", column })).values || [],
-      rank: async (parts, _study, patient) => (await r.timelineRows({ parts: defs(parts), query: q, defaults, mode: "rank", patient })).rank ?? null,
+      page: async (parts, limit, offset) => (await ask(parts, { mode: "page", limit, offset })).rows || [],
+      counts: async (parts) => (await ask(parts, { mode: "counts" })).counts || [],
+      values: async (parts, _reads, column) => (await ask(parts, { mode: "values", column })).values || [],
+      rank: async (parts, _study, patient) => (await ask(parts, { mode: "rank", patient })).rank ?? null,
     };
   };
   const groups: { backend: Backend; parts: TablePart[]; total: number }[] = [];
   const byKey = new Map<string, number>();
   for (const cn of ctx.vNames) for (const st of ctx.cohorts[cn].studies.filter((x) => holders.includes(x))) {
-    const r = ctx.resolvers[st], rem = remote ? remote(r) : null;
+    const r = ctx.resolvers[st], rem = remote ? remote.of(r) : null;
     const k = rem ? "peer:" + rem.peerUrl : "db:" + r.instance.conn.id;
-    if (!byKey.has(k)) { byKey.set(k, groups.length); groups.push({ backend: rem ? peer(rem) : local(r as unknown as PL), parts: [], total: 0 }); }
+    if (!byKey.has(k)) { byKey.set(k, groups.length); groups.push({ backend: rem ? peer(rem, remote!) : local(r as unknown as PL), parts: [], total: 0 }); }
     groups[byKey.get(k)!].parts.push({ cohort: cn, study: st, cohortSql: rem ? "" : r.cohortSql(ctx.doc.cohorts[cn]) });
   }
   const reads = queryReads(q, shown);
