@@ -153,6 +153,21 @@ export interface PartitionProposalRequest {
 }
 
 /**
+ * A document's cohorts as runAnalysis evaluates them — parameters, splits, `extends` and
+ * percentiles resolved — for a request about one of its cohorts outside a run (a split's arms, a
+ * link to its cells). `paramsDoc` is the document with only its parameters resolved.
+ */
+export async function resolveDocCohorts(input: unknown): Promise<{ paramsDoc: AnalysisDoc; doc: AnalysisDoc; docStudy: string }> {
+  const { doc: paramsDoc } = resolveParams(upgradeDocument(input as AnalysisDoc).doc);
+  const { doc: partitionedDoc } = expandSplitTree(paramsDoc as AnalysisDoc);
+  const extendsDoc = resolveExtends(partitionedDoc);
+  const docStudy = await resolveStudy(extendsDoc.study);
+  const doc = await resolveCohortPercentiles(extendsDoc, docStudy, async (study, refDef, attribute, per, p) =>
+    (await resolverFor(study, {})).attributeQuantile(refDef, attribute, per, p));
+  return { paramsDoc: paramsDoc as AnalysisDoc, doc, docStudy };
+}
+
+/**
  * Write a partition's arms from the data, for an author to review and edit: one arm per frequent
  * value of a categorical attribute (the same rule as a view's splitBy), a median split of a
  * numeric one, a gene's mutated / wild-type, or one arm per OQL query. The returned definition
@@ -160,12 +175,7 @@ export interface PartitionProposalRequest {
  * what a reader sees, and re-running it later cannot quietly regroup patients.
  */
 export async function proposePartition(req: PartitionProposalRequest): Promise<{ name: string; def: PartitionDef; note?: string }> {
-  const { doc: paramsDoc } = resolveParams(upgradeDocument(req.doc).doc);
-  const { doc: partitionedDoc } = expandSplitTree(paramsDoc as AnalysisDoc);
-  const extendsDoc = resolveExtends(partitionedDoc);
-  const docStudy = await resolveStudy(extendsDoc.study);
-  const doc = await resolveCohortPercentiles(extendsDoc, docStudy, async (study, refDef, attribute, per, p) =>
-    (await resolverFor(study, {})).attributeQuantile(refDef, attribute, per, p));
+  const { paramsDoc, doc, docStudy } = await resolveDocCohorts(req.doc);
   const cohort = String(req.cohort || "");
   const def = doc.cohorts?.[cohort];
   if (!def) throw new Error("no cohort “" + cohort + "” to split; have " + Object.keys(doc.cohorts || {}).join(", "));

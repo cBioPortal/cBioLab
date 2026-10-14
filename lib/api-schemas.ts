@@ -77,6 +77,13 @@ export const PatientsOfRequest = z.object({
     .max(50000, "selection is larger than the 50,000-id ceiling on an explicit patient list"),
 });
 
+/** POST /api/cell-explorer — a link opening one of a document's cohorts' cells in Cell Explorer, or a
+ *  cohort from a Cell Explorer link (or donor ids) pasted for a study. */
+export const CellExplorerRequest = z.union([
+  z.object({ mode: z.literal("link"), doc: DocEnvelope, cohort: z.string(), ...customData }),
+  z.object({ mode: z.literal("import"), study: z.string(), text: z.string().max(200000, "that is more text than a list of donors") }),
+]);
+
 /** POST /api/partition — proposed arms for splitting a cohort by an attribute, a gene or OQL queries. */
 export const PartitionRequest = z.object({
   doc: DocEnvelope,
@@ -122,6 +129,7 @@ export type OncoprintBody = Open<z.input<typeof OncoprintRequest>>;
 export type OncoprintDetailBody = z.input<typeof OncoprintDetailRequest>;
 export type PatientsOfBody = z.input<typeof PatientsOfRequest>;
 export type PartitionBody = z.input<typeof PartitionRequest>;
+export type CellExplorerBody = z.input<typeof CellExplorerRequest>;
 export type MembersBody = z.input<typeof MembersRequest>;
 export type ViewPageBody = z.input<typeof ViewPageRequest>;
 export type TableBody = z.input<typeof TableRequest>;

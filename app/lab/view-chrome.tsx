@@ -9,7 +9,7 @@ import { VIEW_HELP } from "../../lib/view-help.ts";
 import { SERIES, seriesStyle } from "../../lib/chart/style.ts";
 import { HIGHLIGHT_CAP, HIGHLIGHT_COLORS } from "../../lib/plot-highlight.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
-import { ArrowDown, ArrowUp, Ellipsis, Pencil, Plus, Save, Split, StickyNote, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, Pencil, Plus, Save, Split, StickyNote, Trash2, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
@@ -574,8 +574,11 @@ export function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove, on
  * "Cohorts" heading for why that is deliberately a separate, unscoped piece
  * of work.
  */
-export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCount = 0, save, menuId, menuStore }: {
+export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCount = 0, save, cells, onCells, menuId, menuStore }: {
   busy?: boolean; canEdit: boolean; onEdit: () => void; onRemove: () => void;
+  /** the single-cell dataset this cohort's patients can be opened in, when its study has one */
+  cells?: { label: string } | null;
+  onCells?: () => Promise<void>;
   /** saving the cohort to the library, offered only while it has something to save */
   save?: { onSave: () => Promise<void>; label: string; title: string } | null;
   /** the split form; `done` closes this menu. A cohort may have several splits — each view draws one */
@@ -601,6 +604,11 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
             onClick={() => setSplitting(true)}><Split />{splitCount ? "split another way…" : "split into arms…"}</MenuItem>
           <MenuSeparator />
         </>)}
+        {cells && onCells && !splitting && <>
+          <MenuItem disabled={busy} title={"open this cohort's patients' cells in Cell Explorer: " + cells.label}
+            onClick={() => { close(); void onCells(); }}><ExternalLink />open cells in Cell Explorer</MenuItem>
+          <MenuSeparator />
+        </>}
         {canEdit && <>
           <MenuItem disabled={busy} onClick={() => { close(); onEdit(); }}><Pencil />edit…</MenuItem>
           <MenuSeparator />
