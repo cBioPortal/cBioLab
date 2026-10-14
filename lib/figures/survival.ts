@@ -49,7 +49,8 @@ export function survivalSvg(v: ViewResult, o: SvgOpts): string {
   y += lg.height + 4;
 
   for (const line of statLines(v)) {
-    out.push(label(8, y + FS.body, line, { size: FS.body, fill: p.ink, maxW: W - 16 }));
+    // the class is how the page (and its e2e) finds the test in the figure
+    out.push(label(8, y + FS.body, line, { size: FS.body, fill: p.ink, maxW: W - 16, extra: 'class="logrank"' }));
     y += Math.round(FS.body * 1.6);
   }
   const cap = caption(v.caveat || "", W, y, p.muted);
