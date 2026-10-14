@@ -246,7 +246,8 @@ export function useCohortEdits(page: CohortEditsPage) {
       const j = await (await api.cellExplorer({ mode: "link", doc, cohort: name })).json();
       if (j.error) throw new Error(j.error);
       if (w) { w.opener = null; w.location.href = j.url; } else window.open(j.url, "_blank", "noopener");
-      setToast("“" + name + "”: " + j.donors.toLocaleString() + " of its " + j.patients.toLocaleString() + " patients' cells opened in Cell Explorer");
+      setToast("“" + name + "”: " + j.donors.toLocaleString() + " of its " + j.patients.toLocaleString() + " patients " +
+        (j.donorsChecked ? "have cells in " + j.label + " — opened in Cell Explorer" : "opened in Cell Explorer (its donor list could not be checked)"));
       setTimeout(() => setToast(null), 6000);
     } catch (e) {
       w?.close();

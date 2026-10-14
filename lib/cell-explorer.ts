@@ -28,6 +28,12 @@ export const CELL_EXPLORER_DATASETS: CellExplorerDataset[] = [
   { study: "msk_spectrum_tme_2022", dataset: "spectrum", label: "MSK SPECTRUM scRNA-seq (927,205 cells, 41 patients)",
     obsColumn: "donor_id", patientAttribute: "PATIENT_DISPLAY_NAME",
     view: { colorBy: "category", category: "author_cell_type", showCategoryLabels: true } },
+  { study: "crc_hta8_htan_2024", dataset: "crc-metastasis-epithelial", label: "HTAN MSK colorectal metastasis, epithelial cells (47,107 cells, 29 patients)",
+    obsColumn: "donor_id", patientAttribute: null,
+    view: { colorBy: "category", category: "Author Cell Type", showCategoryLabels: true } },
+  { study: "crc_hta11_htan_2021", dataset: "htan-vumc-crc-val-and-dis-datasets-non-epithelial", label: "HTAN Vanderbilt colorectal polyps, immune and stromal cells (10,696 cells, 59 donors)",
+    obsColumn: "donor_id", patientAttribute: null,
+    view: { colorBy: "category", category: "Cell_Type", showCategoryLabels: true } },
 ];
 
 export function cellExplorerFor(study: string | null | undefined): CellExplorerDataset | null {

@@ -10,7 +10,7 @@ import { clinicalTable, tsvField } from "./custom-data.ts";
 import { patientLevelConn } from "./federation.ts";
 import { cohortMembership } from "./custom-data-server.ts";
 import { resolveDocCohorts } from "./analysis.ts";
-import { CELL_EXPLORER_DATASETS, CELL_EXPLORER_MAX_DONORS, cellExplorerFor, cellExplorerUrl, donorsFromInput, type CellExplorerDataset } from "./cell-explorer.ts";
+import { CELL_EXPLORER_BASE, CELL_EXPLORER_DATASETS, CELL_EXPLORER_MAX_DONORS, cellExplorerFor, cellExplorerUrl, donorsFromInput, type CellExplorerDataset } from "./cell-explorer.ts";
 import type { CohortDef } from "./types.ts";
 
 function datasetFor(study: string): CellExplorerDataset {
@@ -44,10 +44,28 @@ async function donorPairs(d: CellExplorerDataset, by: "patient" | "donor", ids: 
   return (r.rows as string[][]).map(([patient, donor]) => ({ patient, donor }));
 }
 
+/** the donor ids Cell Explorer's catalog lists for a dataset, or null when it lists none (a very large one) or cannot be reached */
+const donorCache = new Map<string, { at: number; donors: Set<string> | null }>();
+async function datasetDonors(d: CellExplorerDataset): Promise<Set<string> | null> {
+  const hit = donorCache.get(d.dataset);
+  if (hit && Date.now() - hit.at < 3_600_000) return hit.donors;
+  let donors: Set<string> | null = null;
+  try {
+    const r = await fetch(CELL_EXPLORER_BASE + "/api/datasets/" + encodeURIComponent(d.dataset), { signal: AbortSignal.timeout(10_000) });
+    const j = r.ok ? await r.json() as { metadata?: { obs_columns?: { name: string; cardinality?: number; values?: string[] | null }[] } } : null;
+    const c = j?.metadata?.obs_columns?.find((x) => x.name === d.obsColumn);
+    if (c?.values && c.values.length && c.values.length === c.cardinality) donors = new Set(c.values.map(String));
+  } catch { donors = null; }
+  donorCache.set(d.dataset, { at: Date.now(), donors });
+  return donors;
+}
+
 export interface CellsLink {
   url: string; dataset: string; label: string; study: string;
   /** the cohort's patients in the study, and how many of them are donors in the dataset */
   patients: number; donors: number;
+  /** false when the dataset's donor list could not be read, so `donors` counts patients with a donor id, not ones with cells */
+  donorsChecked: boolean;
 }
 
 /** A link opening the cells of one of a document's cohorts in Cell Explorer. */
@@ -59,12 +77,12 @@ export async function cohortCellsLink(input: { doc: unknown; cohort: string }): 
   const d = datasetFor(study);
   const [m] = await cohortMembership(def, [study]);
   if (!m.members.length) throw new Error("“" + input.cohort + "” has no patients in " + study);
-  const pairs = await donorPairs(d, "patient", m.members);
-  if (!pairs.length) throw new Error("none of the " + m.members.length + " patients of “" + input.cohort + "” is a donor in " + d.label);
-  const donors = [...new Set(pairs.map((x) => x.donor))].sort();
+  const [pairs, inDataset] = await Promise.all([donorPairs(d, "patient", m.members), datasetDonors(d)]);
+  const donors = [...new Set(pairs.map((x) => x.donor))].filter((x) => !inDataset || inDataset.has(x)).sort();
+  if (!donors.length) throw new Error("none of the " + m.members.length + " patients of “" + input.cohort + "” has cells in " + d.label);
   if (donors.length > CELL_EXPLORER_MAX_DONORS)
     throw new Error("“" + input.cohort + "” has " + donors.length + " donors in " + d.label + "; a Cell Explorer link names at most " + CELL_EXPLORER_MAX_DONORS);
-  return { url: cellExplorerUrl(d, donors), dataset: d.dataset, label: d.label, study, patients: m.members.length, donors: donors.length };
+  return { url: cellExplorerUrl(d, donors), dataset: d.dataset, label: d.label, study, patients: m.members.length, donors: donors.length, donorsChecked: !!inDataset };
 }
 
 export interface CellsCohort {

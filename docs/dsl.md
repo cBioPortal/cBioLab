@@ -4204,7 +4204,76 @@ Runs on custom data: `spectrum-sc-composition` (SPECTRUM scRNA: cell-type compos
 }
 ```
 
-### Example 61: Cancer types summary: RAS genes across 50,000 tumours
+### Example 61: Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)
+
+crc_hta11_htan_2021 is 52 patients with colorectal polyps (Chen et al., Cell 2021). The summary covers 55 of its 61 samples; its counts equal the study's own absolute_counts profile for all 670 sample and cell-type pairs it reports. Per sample, adenoma-specific cells (ASC) are 32.1% of the epithelium in the 30 conventional adenomas against 4.1% in the 20 serrated polyps (q = 2e-5), and serrated-specific cells (SSC) 1.5% against 19.7% (q = 0.003): the two paths to malignancy the paper describes. Stem cells (STM) differ little here (3.1% against 2.5%). The study's own fractions, over every cell type, give the same picture (ASC 29.9% against 3.7%). Cohorts are patients, so a patient with polyps of both types counts in both; 5 of the 52 have both.
+
+Runs on custom data: `hta11-sc-p` (HTAN Vanderbilt colorectal polyp scRNA-seq (Chen et al., Cell 2021) — per patient, 51 patients, columns EPI_N_CELLS, EPI_Cell_Type_ABS, EPI_Cell_Type_ASC, EPI_Cell_Type_CT, EPI_Cell_Type_EE, EPI_Cell_Type_GOB, EPI_Cell_Type_SSC, EPI_Cell_Type_STM, EPI_Cell_Type_TAC, EPI_Cell_Type_TUF, NONEPI_N_CELLS, NONEPI_Cell_Type_B, NONEPI_Cell_Type_END, NONEPI_Cell_Type_FIB, NONEPI_Cell_Type_MAS, NONEPI_Cell_Type_MYE, NONEPI_Cell_Type_PLA, NONEPI_Cell_Type_T); `hta11-sc-s` (HTAN Vanderbilt colorectal polyp scRNA-seq (Chen et al., Cell 2021) — per sample, 55 samples, columns EPI_N_CELLS, EPI_Cell_Type_ABS, EPI_Cell_Type_ASC, EPI_Cell_Type_CT, EPI_Cell_Type_EE, EPI_Cell_Type_GOB, EPI_Cell_Type_SSC, EPI_Cell_Type_STM, EPI_Cell_Type_TAC, EPI_Cell_Type_TUF, NONEPI_N_CELLS, NONEPI_Cell_Type_B, NONEPI_Cell_Type_END, NONEPI_Cell_Type_FIB, NONEPI_Cell_Type_MAS, NONEPI_Cell_Type_MYE, NONEPI_Cell_Type_PLA, NONEPI_Cell_Type_T), sent with the request as `customData`; without it the document is refused.
+
+```json
+{
+  "study": "crc_hta11_htan_2021",
+  "cohorts": {
+    "Conventional adenoma": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "POLYP_TYPE",
+          "values": [
+            "AD"
+          ],
+          "per": "sample"
+        }
+      ]
+    },
+    "Serrated polyp": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "POLYP_TYPE",
+          "values": [
+            "SER"
+          ],
+          "per": "sample"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "composition",
+      "cohorts": [
+        "Conventional adenoma",
+        "Serrated polyp"
+      ],
+      "unit": "sample",
+      "attributes": [
+        "custom:hta11-sc-s/EPI_Cell_Type_ABS",
+        "custom:hta11-sc-s/EPI_Cell_Type_ASC",
+        "custom:hta11-sc-s/EPI_Cell_Type_CT",
+        "custom:hta11-sc-s/EPI_Cell_Type_EE",
+        "custom:hta11-sc-s/EPI_Cell_Type_GOB",
+        "custom:hta11-sc-s/EPI_Cell_Type_SSC",
+        "custom:hta11-sc-s/EPI_Cell_Type_STM",
+        "custom:hta11-sc-s/EPI_Cell_Type_TAC",
+        "custom:hta11-sc-s/EPI_Cell_Type_TUF"
+      ],
+      "sort": "custom:hta11-sc-s/EPI_Cell_Type_ASC"
+    },
+    {
+      "kind": "composition",
+      "cohorts": [
+        "Conventional adenoma",
+        "Serrated polyp"
+      ],
+      "profileType": "relative_counts",
+      "sort": "ASC"
+    }
+  ]
+}
+```
+
+### Example 62: Cancer types summary: RAS genes across 50,000 tumours
 
 KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appendiceal and colorectal follow, and the bars show where RAS is amplified rather than mutated — germ cell tumours and esophagogastric cancer.
 
@@ -4233,7 +4302,7 @@ KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appen
 }
 ```
 
-### Example 62: Cohort overlap: how four groups share their patients
+### Example 63: Cohort overlap: how four groups share their patients
 
 TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD. 5,314 TP53-mutant patients belong to none of the other three groups; 435 are in all four.
 
@@ -4303,7 +4372,7 @@ TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD.
 }
 ```
 
-### Example 63: Alteration enrichment: what separates colorectal from pancreatic tumours
+### Example 64: Alteration enrichment: what separates colorectal from pancreatic tumours
 
 Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TCF7L2, PIK3CA, FBXW7 and SOX9 mark colorectal cancer; KRAS and CDKN2A mark pancreatic cancer.
 
@@ -4368,7 +4437,7 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
 }
 ```
 
-### Example 64: Mutational signatures: what UV light and tobacco leave behind
+### Example 65: Mutational signatures: what UV light and tobacco leave behind
 
 Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature (7) makes up about half of a melanoma's mutations and almost none of a lung cancer's; the smoking signature (4) is the reverse.
 
@@ -4414,7 +4483,7 @@ Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature 
 }
 ```
 
-### Example 65: Co-expression: the genes that rise and fall with ESR1
+### Example 66: Co-expression: the genes that rise and fall with ESR1
 
 TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up behind ESR1 — CCDC170 (its neighbour on 6q25, often co-amplified), THSD4, FOXA1, TBC1D9 — and the genes of basal-like tumours fall away from it.
 
@@ -4439,7 +4508,7 @@ TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up be
 }
 ```
 
-### Example 66: Clinical data: every pancreatic cancer sample, oldest patients first
+### Example 67: Clinical data: every pancreatic cancer sample, oldest patients first
 
 Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 
@@ -4476,7 +4545,7 @@ Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 }
 ```
 
-### Example 67: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
+### Example 68: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
 
 MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row, and P-0000012's alterations beside it.
 
@@ -4529,7 +4598,7 @@ MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 
 }
 ```
 
-### Example 68: A patient's mutations, copy-number alterations and structural variants
+### Example 69: A patient's mutations, copy-number alterations and structural variants
 
 MSK-CHORD prostate cancer patients, those with the most structural variants first; P-0024249's tables, mutations kept to OncoKB-oncogenic calls.
 
@@ -4577,7 +4646,7 @@ MSK-CHORD prostate cancer patients, those with the most structural variants firs
 }
 ```
 
-### Example 69: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
+### Example 70: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
 
 MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at an allele frequency of 0.2 or more, highest first.
 

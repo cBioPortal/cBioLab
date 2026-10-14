@@ -1,0 +1,60 @@
+{
+ "study": "crc_hta8_htan_2024",
+ "id": "hta8-sc",
+ "name": "HTAN MSK colorectal metastasis scRNA-seq (Moorman et al., Nature 2025)",
+ "cellExplorer": "crc-metastasis-tumor",
+ "patient": {
+  "obs": "donor_id",
+  "attribute": null
+ },
+ "sample": {
+  "obs": "Sample ID",
+  "attribute": "H5AD_SAMPLE_ID"
+ },
+ "sources": [
+  {
+   "zarr": "https://cbioportal-public-imaging.assets.cbioportal.org/htan/progressive-plasticity-during-colorectal-cancer-metastasis/progressive-plasticity-during-crc-metastasis-epithelial.zarr",
+   "prefix": "EPI",
+   "labels": [
+    "Author Cell Type"
+   ],
+   "scores": [],
+   "where": {
+    "Tumor Status": [
+     "Non-Tumor"
+    ]
+   },
+   "_note": "normal epithelium: the share of each cell type among a sample's non-tumour epithelial cells"
+  },
+  {
+   "zarr": "https://cbioportal-public-imaging.assets.cbioportal.org/htan/progressive-plasticity-during-colorectal-cancer-metastasis/progressive-plasticity-during-crc-metastasis-epithelial.zarr",
+   "prefix": "ALL",
+   "labels": [
+    "Tumor Status"
+   ],
+   "scores": [],
+   "where": {},
+   "_note": "of all epithelial cells: tumour (primary or metastasis) against normal"
+  },
+  {
+   "zarr": "https://cbioportal-public-imaging.assets.cbioportal.org/htan/progressive-plasticity-during-colorectal-cancer-metastasis/progressive-plasticity-during-crc-metastasis-tumor.zarr",
+   "prefix": "TUM",
+   "labels": [],
+   "scores": [
+    "Module Secretory Intestine Score",
+    "Module Tumor ISC-like Score",
+    "Module Squamous Score",
+    "Module Intestine Score",
+    "Module Endoderm Development Score",
+    "Module Injury Repair Score",
+    "Module Neuroendocrine Score",
+    "Module Absorptive Intestine Score",
+    "Module Osteoblast Score"
+   ],
+   "where": {},
+   "_note": "tumour cells: the paper's gene-module scores, averaged"
+  }
+ ],
+ "minCells": 50,
+ "minScoreCells": 20
+}

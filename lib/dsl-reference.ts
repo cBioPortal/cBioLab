@@ -21,6 +21,7 @@ import type { TemplateDoc } from "./types.ts";
 import type { CustomDataset } from "./custom-data-names.ts";
 import { LUAD_BIOPSY_SITE_DEMO } from "./custom-data-demo.ts";
 import { SPECTRUM_SC_DEMO } from "./spectrum-sc-demo.ts";
+import { HTA11_SC_DEMO } from "./hta11-sc-demo.ts";
 
 export const DSL_VERSION = DOC_VERSION;
 
@@ -1104,6 +1105,26 @@ export const EXAMPLES: DslExample[] = [
           ],
           sort: "custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13" },
         { kind: "composition", cohorts: ["HRD-Dup", "HRD-Del", "FBI"], profileType: "cell_type_relative_counts", sort: "T_cell" }
+      ]
+    }
+  },
+  {
+    title: "Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)",
+    demonstrates: "Single-cell data brought in without a study-specific script: scripts/gen-singlecell-summary.py proposed the mapping from a Cell Explorer dataset to this study (donor_id is the patient, the HTAN Specimen ID the sample) and summarised the cell labels per sample. The first view draws those custom data; the second the study's own generic-assay cell-type fractions, for comparison.",
+    tags: ["composition", "custom data", "single-cell"],
+    note: "crc_hta11_htan_2021 is 52 patients with colorectal polyps (Chen et al., Cell 2021). The summary covers 55 of its 61 samples; its counts equal the study's own absolute_counts profile for all 670 sample and cell-type pairs it reports. Per sample, adenoma-specific cells (ASC) are 32.1% of the epithelium in the 30 conventional adenomas against 4.1% in the 20 serrated polyps (q = 2e-5), and serrated-specific cells (SSC) 1.5% against 19.7% (q = 0.003): the two paths to malignancy the paper describes. Stem cells (STM) differ little here (3.1% against 2.5%). The study's own fractions, over every cell type, give the same picture (ASC 29.9% against 3.7%). Cohorts are patients, so a patient with polyps of both types counts in both; 5 of the 52 have both.",
+    customData: HTA11_SC_DEMO,
+    doc: {
+      study: "crc_hta11_htan_2021",
+      cohorts: {
+        "Conventional adenoma": { all: [{ kind: "clinical", attribute: "POLYP_TYPE", values: ["AD"], per: "sample" }] },
+        "Serrated polyp": { all: [{ kind: "clinical", attribute: "POLYP_TYPE", values: ["SER"], per: "sample" }] }
+      },
+      views: [
+        { kind: "composition", cohorts: ["Conventional adenoma", "Serrated polyp"], unit: "sample",
+          attributes: ["custom:hta11-sc-s/EPI_Cell_Type_ABS", "custom:hta11-sc-s/EPI_Cell_Type_ASC", "custom:hta11-sc-s/EPI_Cell_Type_CT", "custom:hta11-sc-s/EPI_Cell_Type_EE", "custom:hta11-sc-s/EPI_Cell_Type_GOB", "custom:hta11-sc-s/EPI_Cell_Type_SSC", "custom:hta11-sc-s/EPI_Cell_Type_STM", "custom:hta11-sc-s/EPI_Cell_Type_TAC", "custom:hta11-sc-s/EPI_Cell_Type_TUF"],
+          sort: "custom:hta11-sc-s/EPI_Cell_Type_ASC" },
+        { kind: "composition", cohorts: ["Conventional adenoma", "Serrated polyp"], profileType: "relative_counts", sort: "ASC" }
       ]
     }
   },

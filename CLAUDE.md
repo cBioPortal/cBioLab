@@ -158,7 +158,13 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   cell-explorer.cbioportal.org dataset (the cohort menu), and a Cell Explorer link or donor ids
   back into a `patientList` cohort ("+ Add cohort" → From Cell Explorer). The study→dataset
   registry is `CELL_EXPLORER_DATASETS`. Both directions name patients, so both answer only from a
-  patient-level instance.
+  patient-level instance. A link names only the donors Cell Explorer's catalog lists for the dataset.
+- **Single-cell summaries for any Cell Explorer dataset** — `scripts/gen-singlecell-summary.py`:
+  `propose <slug> <study>` drafts a config (patient and sample columns, the crosswalk to the study's
+  ids — direct or through a sample attribute — and candidate label and score columns, dropping columns
+  that never vary within a sample); `build <config>` writes per-patient and per-sample custom datasets
+  (label shares, mean scores). Reviewed configs live in `scripts/singlecell/`. Paper-specific design
+  (a sorting correction, site pooling, cut-offs) stays a dataset's own script, as SPECTRUM's does.
 - **Requests from the pages** go through **`app/lab/api.ts`** (`api.analysis`, `api.explore`,
   `api.oncoprint`, …), never a bare `fetch`: each takes its endpoint's envelope type from
   **`lib/api-schemas.ts`** and attaches the uploads its body uses (`withCustomData`). The routes
