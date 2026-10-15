@@ -6,7 +6,7 @@
 // panel-aware frequencies — separated from where the rows come from. `buildContract`
 // fetches from ClickHouse and calls this; a CLI or a notebook can call it on local
 // tables, and a port in another language has this function as its conformance target.
-import { heatmapTrackLabel } from "./profile-names.ts";
+import { heatmapTrackLabel, STUDY_TRACK } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { STYLE } from "./oncoprint-style.ts";
 import type { Contract, Track, GroupRange, ZReference, ResolvedDisplay, DisplaySpec, SortKeySpec } from "./types.ts";
@@ -98,7 +98,7 @@ export interface AssembleInput {
   genes: GeneTrackSpec[];
   /** column groups: name + column ids in fetch order; a column id appears in at most one group */
   groups: { name: string; pids: string[] }[];
-  /** study label(s) for the contract header; more than one adds a categorical Study track */
+  /** study label(s) for the contract header; more than one adds the categorical "Study of origin" track */
   studies: string[];
   /** column id -> study, required when studies.length > 1 */
   studyOf?: Map<string, string>;
@@ -249,7 +249,7 @@ export function assembleContract(input: AssembleInput): Contract {
     const catIdx = new Map<string, number>(studies.map((s, i) => [s, i]));
     const cells = new Int32Array(allPids.length).fill(-1);
     allPids.forEach((p, i) => { const s = studyOf.get(p); if (s != null) cells[i] = catIdx.get(s)!; });
-    clinTracks.push({ kind: "clinical", label: "Study", categories: studies.slice(), cells });
+    clinTracks.push({ kind: "clinical", label: STUDY_TRACK, categories: studies.slice(), cells });
   }
   for (const { attr, values: valByPid } of clinical) {
     // One string-keyed lookup per column, then three passes over a positional array. The map

@@ -84,7 +84,7 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
   };
   const note = (multi
     ? "cross-study oncoprint" + (okStudies.length <= 2 ? " (" + okStudies.join(", ") + ")" : " across " + okStudies.length + " studies") +
-      ": duplicate patients across studies appear as separate columns; clinical tracks merge attribute values by name without harmonization; the Study track shows each column's origin"
+      ": duplicate patients across studies appear as separate columns; clinical tracks merge attribute values by name without harmonization; the \u201cStudy of origin\u201d track shows each column's origin"
     : "") +
     (withheld.length
       ? (multi ? " — " : "") + "columns cover " + shownPts.toLocaleString() + " of " +

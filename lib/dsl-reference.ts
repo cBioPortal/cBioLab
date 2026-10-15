@@ -338,7 +338,7 @@ export const EXAMPLES: DslExample[] = [
     title: "Cross-study federation with an oncoprint",
     demonstrates: "One cohort spanning two studies. Overlap is NOT deduplicated and vocabularies are NOT harmonized \u2014 the view says so rather than hiding it.",
     tags: ["oncoprint", "federation"],
-    note: "One cohort unioned across two studies (members are study-qualified; overlap is NOT deduplicated), rendered as a federated oncoprint with a categorical and a numeric clinical track, columns sorted by cancer type then descending age. The Study track is added automatically.",
+    note: "One cohort unioned across two studies (members are study-qualified; overlap is NOT deduplicated), rendered as a federated oncoprint with a categorical and a numeric clinical track, columns sorted by cancer type then descending age. The \u201cStudy of origin\u201d track is added automatically.",
     doc: {
       study: "msk_chord_2024",
       cohorts: {
@@ -1837,7 +1837,7 @@ cohortDef: { "all": [clause, ...(max 8)], "extends"?: "<cohort name>", "study"?:
 "extends" splices that cohort's own "all" in ahead of this one's (only "all" is inherited; a cycle is rejected by name) — e.g. define "apcMutated" once, then "apcMutatedLiverMets": {"extends":"apcMutated","all":[...]} instead of repeating the APC clause.
 a cohort may target another study or union across several (members are study-qualified; overlap
 across studies is NOT deduplicated — say so when comparing). Oncoprint views federate too: cross-study
-columns are qualified per study (duplicates appear twice) and a Study track shows each column's origin.
+columns are qualified per study (duplicates appear twice) and a \u201cStudy of origin\u201d track shows each column's origin.
 clause = leaf | {"any":[leaf,...]} | {"not":leaf} | {"not":{"any":[leaf,...]}} (De Morgan's — "none of these" in one clause).
 Leaf kinds:
 - {"kind":"oql","q":"STK11: DRIVER"} — genomic status in cBioPortal OQL (preferred; full notes below).

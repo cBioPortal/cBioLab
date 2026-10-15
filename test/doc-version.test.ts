@@ -92,16 +92,16 @@ describe("upgradeDocument", () => {
       views: [{ kind: "survival" }, { kind: "compare", cohorts: [] }, { kind: "clinical", cohorts: ["B"] },
         { kind: "survival", splitBy: { cohort: "A", attribute: "SEX" } }] };
     const { doc, upgrade } = upgradeDocument(d24) as any;
-    assert.equal(doc.dsl, "2.5");
+    assert.equal(doc.dsl, DOC_VERSION);
     assert.deepEqual(doc.views.map((v: any) => v.cohorts), [["A", "B"], ["A", "B"], ["B"], undefined]);
     assert.deepEqual(upgrade.changes, ["2 views that showed every cohort by default now list them by name, since a view now draws only the cohorts it names"]);
   });
 
   test("a 2.5 view with no cohorts stays empty", () => {
     const d = { dsl: "2.5", cohorts: { A: { all: [] } }, views: [{ kind: "survival" }] };
-    const r = upgradeDocument(d);
-    assert.equal(r.doc, d);
-    assert.equal(r.upgrade, null);
+    const r = upgradeDocument(d) as any;
+    assert.equal(r.doc.views[0].cohorts, undefined);
+    assert.deepEqual(r.upgrade?.changes ?? [], []);
   });
 
   test("a document for a newer version is refused, naming both versions", () => {
@@ -160,5 +160,17 @@ describe("splits stored on cohorts", () => {
 
   test("a split of something that is neither a cohort nor an arm is refused by name", () => {
     assert.throws(() => unflattenSplits({ A: { all: [] } }, { "B / s": { of: "B", split: "s", arms: [] } }), /not a cohort or an arm/);
+  });
+});
+
+describe("2.5 → 2.6", () => {
+  test("an oncoprint sorting by the study track sorts by its new name", () => {
+    const { doc, upgrade } = upgradeDocument({ dsl: "2.5", cohorts: {}, views: [
+      { kind: "oncoprint", sort: ["-Study", "CANCER_TYPE"] }, { kind: "oncoprint", sort: [{ track: "Study", dir: "desc" }] },
+      { kind: "survival", sort: ["Study"] }] }) as any;
+    assert.deepEqual(doc.views[0].sort, ["-Study of origin", "CANCER_TYPE"]);
+    assert.deepEqual(doc.views[1].sort, [{ track: "Study of origin", dir: "desc" }]);
+    assert.deepEqual(doc.views[2].sort, ["Study"], "only oncoprints have a study track");
+    assert.match(upgrade.changes.join(" "), /2 oncoprint views .*Study of origin/);
   });
 });

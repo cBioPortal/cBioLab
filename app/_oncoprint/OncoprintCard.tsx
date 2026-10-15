@@ -9,7 +9,7 @@ import React, { useState } from "react";
 import OncoprintFigure, { type ColumnSelection } from "./OncoprintFigure.tsx";
 import { figureDisplayOf, withFigureDisplay, sortKeysOf, withSortKeys, sortKeyText } from "./view-display.ts";
 import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
-import { heatmapTrackLabel } from "../../lib/profile-names.ts";
+import { heatmapTrackLabel, STUDY_TRACK } from "../../lib/profile-names.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
@@ -35,7 +35,7 @@ export const heatmapLabels = (v: V): string[] => (v.heatmap || []).flatMap((h: V
 
 /** drop sort keys whose track no longer exists */
 export const pruneSort = (v: V): V => {
-  const keep = new Set(["genomic", "id", "Study", ...(v.clinical || []), ...heatmapLabels(v)]);
+  const keep = new Set(["genomic", "id", STUDY_TRACK, ...(v.clinical || []), ...heatmapLabels(v)]);
   const sort = (v.sort || []).filter((s: unknown) => keep.has(sortKeyText(s).replace(/^-/, "")));
   const next = { ...v };
   if (sort.length) next.sort = sort; else delete next.sort;

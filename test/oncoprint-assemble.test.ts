@@ -150,9 +150,9 @@ test("the unit labels the contract and names what a column is", () => {
   assert.deepEqual(sm.tracks.map((t) => t.cells), pt.tracks.map((t) => t.cells));
 });
 
-test("more than one study adds a Study track from studyOf", () => {
+test("more than one study adds the \"Study of origin\" track from studyOf", () => {
   const c = assembleContract({ ...input(), studies: ["s1", "s2"], studyOf: new Map([["P1", "s1"], ["P2", "s1"], ["P3", "s2"], ["P4", "s2"], ["P5", "s2"]]) });
-  const st = c.tracks.find((t) => t.label === "Study")!;
+  const st = c.tracks.find((t) => t.label === "Study of origin")!;
   assert.deepEqual(st.categories, ["s1", "s2"]);
   assert.equal(st.cells[c.columns.indexOf("P3")], 1);
   assert.equal(c.study, "s1 + s2");

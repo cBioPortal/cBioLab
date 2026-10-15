@@ -1,6 +1,6 @@
 <!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.ts; regenerate with `npm run docs:gen`. -->
 
-# cbio-lab DSL (v2.5)
+# cbio-lab DSL (v2.6)
 
 One declarative JSON object — the **Analysis document** — describes everything cbio-lab does:
 which patients form each cohort, and which views compare them. The server compiles it to
@@ -11,7 +11,7 @@ SQL each cohort compiled to.
 ## Analysis document
 
 ```
-{ "dsl":     "2.5",                         // the document's version; see "Versions" below
+{ "dsl":     "2.6",                         // the document's version; see "Versions" below
   "study":   "<default study id>",            // validated against cancer_study
   "cohorts": { "<name>": cohortDef, ... },    // max 16 — the store every view's "cohorts" names from
   "views":   [ view, ... ],                   // max 6; each lists its own "cohorts": ["<name>", ...]
@@ -87,7 +87,7 @@ Up to 16 authored cohorts and 48 cohorts in all, children included. Expanded bef
 each child `extends` its parent and runs in the parent's studies. (Not to be confused with the
 `{"kind":"split"}` leaf below, which selects the engine's fixed discovery or validation half.)
 
-**Versions.** A document carries `"dsl": "2.5"`. One written for an older version is
+**Versions.** A document carries `"dsl": "2.6"`. One written for an older version is
 upgraded when it is read — the result's `upgraded` says from which version and what changed
 (2.2 → 2.3 moved top-level `partitions` onto the cohorts they split as `splits`, and renamed
 their children from `"<partition> / <arm>"` to `"<cohort> / <partition> / <arm>"`, views
@@ -1738,7 +1738,7 @@ Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep 
 
 ### Example 14: Cross-study federation with an oncoprint
 
-One cohort unioned across two studies (members are study-qualified; overlap is NOT deduplicated), rendered as a federated oncoprint with a categorical and a numeric clinical track, columns sorted by cancer type then descending age. The Study track is added automatically.
+One cohort unioned across two studies (members are study-qualified; overlap is NOT deduplicated), rendered as a federated oncoprint with a categorical and a numeric clinical track, columns sorted by cancer type then descending age. The “Study of origin” track is added automatically.
 
 ```json
 {

@@ -154,7 +154,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             s = study_of.get(p)
             if s is not None:
                 cells[i] = cat_idx[s]
-        clin.append(Track("clinical", "Study", cells, {"categories": list(studies)}))
+        clin.append(Track("clinical", "Study of origin", cells, {"categories": list(studies)}))
     for c in clinical:
         attr, val_by_pid = c["attr"], c["values"]
         present = [val_by_pid[p] for p in all_pids if p in val_by_pid]
