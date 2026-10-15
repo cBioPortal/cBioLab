@@ -274,7 +274,7 @@ export function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derive
 
 export interface TrackCatalog { attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[]; loading: boolean }
 
-export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, onGenes, onCreateCohort, onSaveFeature, onContract, contract, note, studies, uploads }: {
+export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, onGenes, onCreateCohort, onSaveFeature, onContract, contract, note, studies, uploads, onUndo }: {
   /** the view as the document holds it */
   view: V;
   /** the render request the engine returned for it */
@@ -298,6 +298,8 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
   note?: string; studies?: string[];
   /** the document's pinned uploads, for the figure's own requests */
   uploads?: UploadBinding[];
+  /** step the document back one change, offered beside the figure's own error */
+  onUndo?: () => void;
 }) {
   const [own, setOwn] = useState<UnpackedContract | null>(null);
   const c = contract !== undefined ? contract : own;
@@ -308,6 +310,7 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
     <>
       <OncoprintFigure
         spec={spec}
+        onUndo={onUndo}
         uploads={uploads}
         display={figureDisplayOf(view)}
         sortKeys={sortKeysOf(view)}

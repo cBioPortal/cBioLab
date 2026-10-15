@@ -62,3 +62,22 @@ describe("view ids", () => {
     assert.deepEqual(t.ids.slice(0, 2), s.ids);
   });
 });
+
+describe("history", () => {
+  test("a document back from history keeps the ids of the views it shares with this one", () => {
+    // restore() is commitDoc: Back to a document whose views are unchanged keeps their cards
+    const s = start();
+    const edited = setDoc(s, doc([a, { ...b, endpoint: "PFS" }, c]));
+    const back = commitDoc(edited, doc([a, b, c]));
+    assert.equal(back.ids[0], s.ids[0]); assert.equal(back.ids[2], s.ids[2]);
+    assert.equal(back.epoch, edited.epoch, "not a different document: its numbers may stand");
+  });
+  test("?doc= decodes to the document, and anything else to nothing", async () => {
+    const { decodeDocParam } = await import("../app/lab/use-doc-history.ts");
+    const d = doc([a]);
+    const b64 = Buffer.from(JSON.stringify(d)).toString("base64url");
+    assert.deepEqual(decodeDocParam("?tab=analysis&doc=" + b64), d);
+    assert.equal(decodeDocParam("?tab=analysis"), null);
+    assert.equal(decodeDocParam("?doc=%%%"), null);
+  });
+});

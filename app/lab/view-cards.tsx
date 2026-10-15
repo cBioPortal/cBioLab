@@ -14,7 +14,7 @@ import { MethodPanel } from "./method-panel.tsx";
 import { viewRequest } from "./use-analysis.ts";
 import { AxisPicker, HighlightPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, SeriesSwatch, Participation } from "./view-chrome.tsx";
 import { ViewFigure } from "./figure.tsx";
-import { ArrowLeftRight, Plus, Settings2, X } from "lucide-react";
+import { ArrowLeftRight, Plus, Settings2, Undo2, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
@@ -35,6 +35,8 @@ export interface ViewCtx {
   result: AnalysisResult;
   /** each view's id, in the document's order: what a card is keyed by */
   viewIds: (string | number)[];
+  /** step the document back one change: what an errored view offers */
+  docHistory: { undo: () => void; canUndo: boolean };
   /** the ids of views whose own re-run is in flight */
   pendingKeys: Set<string | number>;
   /** a full document run is in flight */
@@ -889,6 +891,7 @@ function OncoprintViewCard({ ctx, v, vi }: CardProps) {
           onContract={(ct) => { const k = JSON.stringify(v.spec); setContracts((m) => m[k] === ct ? m : { ...m, [k]: ct }); }}
           contract={c || null}
           note={v.note} studies={v.studies}
+          onUndo={ctx.docHistory.canUndo ? ctx.docHistory.undo : undefined}
         />
       </>;
     })()}
@@ -932,8 +935,15 @@ function ErrorHead({ ctx, v, vi }: CardProps) {
   </>;
 }
 
-function ErrorNote({ v }: CardProps) {
+function ErrorNote({ ctx, v }: CardProps) {
+  const { docHistory } = ctx;
   return <>
+    {v.error && docHistory.canUndo && (
+      <div className="viewtb"><div className="tbz">
+        <Button variant="outline" className={TB + " undo-error"} onClick={docHistory.undo}
+          title="put the analysis back as it was before the last change (Ctrl/⌘-Z)"><Undo2 />Undo last change</Button>
+      </div></div>
+    )}
     {v.error && <div className="error">{v.kind}: {v.error}{v.participation ? <> <>{v.ms != null && (
           <span className="lat" title={
             "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +

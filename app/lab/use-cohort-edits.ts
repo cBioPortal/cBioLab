@@ -158,7 +158,8 @@ export function useCohortEdits(page: CohortEditsPage) {
       const c = await persist(st.as, def, evalOf(name), st.id);
       const now = docs.current.doc;
       if (now.cohorts?.[name]) {
-        docs.set({ ...now, cohorts: { ...now.cohorts, [name]: { ...now.cohorts[name], from: { saved: c.id, name: st.as, hash: cohortHash(def), savedAt: c.savedAt } } } });
+        // bookkeeping after a save, not an edit the reader would undo
+        docs.set({ ...now, cohorts: { ...now.cohorts, [name]: { ...now.cohorts[name], from: { saved: c.id, name: st.as, hash: cohortHash(def), savedAt: c.savedAt } } } }, { undoable: false });
       }
     } catch (e: any) {
       setError("could not save \u201c" + name + "\u201d: " + (e?.message || e));

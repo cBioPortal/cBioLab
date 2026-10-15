@@ -15,6 +15,12 @@
 //
 // The store updates synchronously (a ref), so an edit's view id is known to the request it starts
 // in the same handler; React re-renders from it, and every change is announced once (URL sync).
+//
+// Every change is a step the reader can go back from (the page pushes a browser history entry),
+// except where the caller passes `{ undoable: false }`: a change the reader did not make, such as
+// upgrading an older document on open or recording which saved cohort a definition came from.
+// restore(d) puts back a document from history (Back, Forward, Undo, Redo): ids as commit's, and
+// it is not announced, since the URL already holds it.
 import { useRef, useState } from "react";
 import type { AnalysisDoc } from "../../lib/types.ts";
 import { DOC_VERSION } from "../../lib/doc-version.ts";
@@ -70,20 +76,24 @@ export function replaceDoc(s: DocState, d: AnalysisDoc): DocState {
 }
 export function commitDoc(s: DocState, d: AnalysisDoc): DocState { return { ...s, doc: d, ...matchIds(s, d), text: textOf(d) }; }
 
+export interface ChangeOpts { undoable?: boolean }
+
 export interface DocStore {
   /** the latest state — current even before React has re-rendered */
   readonly current: DocState;
-  set(d: AnalysisDoc): void;
-  replace(d: AnalysisDoc): void;
-  commit(d: AnalysisDoc): void;
+  set(d: AnalysisDoc, o?: ChangeOpts): void;
+  replace(d: AnalysisDoc, o?: ChangeOpts): void;
+  commit(d: AnalysisDoc, o?: ChangeOpts): void;
+  /** a document back from history: unchanged views keep their ids (and cards), nothing is announced */
+  restore(d: AnalysisDoc): void;
   /** the JSON editor's draft; changes nothing else */
   setText(text: string): void;
   /** the ids `d`'s views have, or would have if it were set now */
   idsFor(d: AnalysisDoc): number[];
 }
 
-/** The page's document store. `onChange` is told about every new document (not about text drafts). */
-export function useDocStore(initial: AnalysisDoc, onChange: (d: AnalysisDoc) => void): DocStore {
+/** The page's document store. `onChange` is told about every new document (not about text drafts or restores). */
+export function useDocStore(initial: AnalysisDoc, onChange: (d: AnalysisDoc, undoable: boolean) => void): DocStore {
   const ref = useRef<DocState | null>(null);
   if (!ref.current) ref.current = initialDocState(initial);
   const [, render] = useState(0);
@@ -91,16 +101,17 @@ export function useDocStore(initial: AnalysisDoc, onChange: (d: AnalysisDoc) => 
   changed.current = onChange;
   const store = useRef<DocStore | null>(null);
   if (!store.current) {
-    const apply = (next: DocState, announce: boolean) => {
+    const apply = (next: DocState, announce: boolean, o?: ChangeOpts) => {
       ref.current = next;
       render((n) => n + 1);
-      if (announce) changed.current(next.doc);
+      if (announce) changed.current(next.doc, o?.undoable !== false);
     };
     store.current = {
       get current() { return ref.current!; },
-      set: (d) => apply(setDoc(ref.current!, d), true),
-      replace: (d) => apply(replaceDoc(ref.current!, d), true),
-      commit: (d) => apply(commitDoc(ref.current!, d), true),
+      set: (d, o) => apply(setDoc(ref.current!, d), true, o),
+      replace: (d, o) => apply(replaceDoc(ref.current!, d), true, o),
+      commit: (d, o) => apply(commitDoc(ref.current!, d), true, o),
+      restore: (d) => apply(commitDoc(ref.current!, d), false),
       setText: (text) => apply({ ...ref.current!, text }, false),
       idsFor: (d) => d === ref.current!.doc ? ref.current!.ids : alignIds(ref.current!, d).ids,
     };

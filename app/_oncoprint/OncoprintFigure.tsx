@@ -19,7 +19,7 @@ import { api } from "../lab/api.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
 import type { OncoprintBody } from "../../lib/api-schemas.ts";
 import type { OncoprintSpec } from "../../lib/types.ts";
-import { Check, Download, Ellipsis, ImageDown, ListOrdered, LoaderCircle, Minus, Plus, Sheet, SlidersHorizontal, Tag, X } from "lucide-react";
+import { Check, Download, Ellipsis, ImageDown, ListOrdered, LoaderCircle, Minus, Plus, Sheet, SlidersHorizontal, Tag, Undo2, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
@@ -72,6 +72,8 @@ export interface Perf { fetchMs?: number; bytes?: number; engineMs?: number; pac
 export interface OncoprintFigureProps {
   /** POSTed to the endpoint below; a change of value (by JSON) refetches */
   spec: unknown;
+  /** when the spec is refused, a way back: the page's undo of the change that caused it */
+  onUndo?: () => void;
   /** where the contract comes from; the local-tables route takes the same shapes back */
   endpoint?: string;
   /** ordered sort keys: "genomic" | "id" | "[-]<track label>"; empty = the engine's own order */
@@ -689,6 +691,12 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   };
   return (
     <>
+      {error && props.onUndo && (
+        <div className="viewtb"><div className="tbz">
+          <Button variant="outline" className={TB + " undo-error"} onClick={props.onUndo}
+            title="put the analysis back as it was before the last change (Ctrl/⌘-Z)"><Undo2 />Undo last change</Button>
+        </div></div>
+      )}
       {error && <div className="error">oncoprint: {error}</div>}
       {/* the figure's own fetch (its spec changed): a skeleton the size of a figure when there is
           none yet, and over the plot when there is one, so the old picture isn't read as the new */}
