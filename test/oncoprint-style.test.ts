@@ -104,6 +104,9 @@ test("level of detail: edges partition the columns, buckets OR genes and average
   assert.deepEqual(bucketCodes(gene, [B.TRUNCATING, B.MISSENSE | D, B.TRUNCATING | B.AMP, B.SV], 0, 4, 2), [B.MISSENSE | D, B.TRUNCATING | B.AMP | B.SV]);
   assert.deepEqual(bucketCodes({ kind: "clinical", numeric: true }, [10, 20, -1, -1], 0, 4, 2), [15, -1]);
   assert.deepEqual(bucketCodes({ kind: "clinical", categories: ["a", "b"] }, [0, 1, 1, 2, -1, -1], 0, 6, 3), [0, 1, -1], "ties go to the lower index");
+  // rows that point at exceptions keep them at low zoom
+  assert.deepEqual(bucketCodes({ kind: "clinical", categories: ["Yes"], profiledFor: "MUTATION_EXTENDED" }, [0, 0, 0, -1, 0, 0], 0, 6, 2), [0, -1], "one unprofiled column shows");
+  assert.deepEqual(bucketCodes({ kind: "clinical", numeric: true, bar: true }, [128, 128, 255, 128, -1, -1], 0, 6, 3), [128, 255, -1], "the largest count shows, not the mean");
 });
 
 

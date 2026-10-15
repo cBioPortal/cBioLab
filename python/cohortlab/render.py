@@ -35,6 +35,11 @@ def bucket_edges(n: int, buckets: int) -> np.ndarray:
 def aggregate(track: Track, cells: np.ndarray, edges: np.ndarray) -> np.ndarray:
     """One display code per bucket, per track kind (mirrors lod.aggregate)."""
     starts = np.asarray(edges[:-1], dtype=np.intp)  # reduceat wants platform-width indices (32-bit under WebAssembly)
+    if track.meta.get("profiledFor"):
+        # the exception wins: "No" (-1) when any column is unprofiled
+        return np.where(np.minimum.reduceat(cells.astype(np.int64), starts) == -1, -1, 0)
+    if track.meta.get("bar"):
+        return np.maximum.reduceat(cells.astype(np.int64), starts)
     if track.meta.get("numeric"):
         valid = cells != -1
         s = np.add.reduceat(np.where(valid, cells, 0).astype(np.int64), starts)

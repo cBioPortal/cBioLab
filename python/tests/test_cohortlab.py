@@ -139,6 +139,18 @@ class LevelOfDetailConformance(unittest.TestCase):
                     self.assertEqual(json.loads(r.stdout), bucket_codes(op.contract, buckets))
 
 
+class ExceptionRows(unittest.TestCase):
+    """The rows that point at exceptions keep them at low zoom (mirrors test/oncoprint-style.test.ts)."""
+
+    def test_profiled_and_bar_buckets(self):
+        from cohortlab.contract import Track
+        from cohortlab.render import aggregate, bucket_edges
+        prof = Track("clinical", "Profiled for mutations", np.array([0, 0, 0, -1, 0, 0], dtype=np.int32), {"categories": ["Yes"], "profiledFor": "MUTATION_EXTENDED"})
+        self.assertEqual(aggregate(prof, prof.cells, bucket_edges(6, 2)).tolist(), [0, -1])
+        bar = Track("clinical", "# Samples per Patient", np.array([128, 128, 255, 128, -1, -1], dtype=np.int32), {"numeric": True, "bar": True})
+        self.assertEqual(aggregate(bar, bar.cells, bucket_edges(6, 3)).tolist(), [128, 255, -1])
+
+
 class StyleOverrides(unittest.TestCase):
     """resolve_style mirrors lib/oncoprint-style.ts, and an override reaches the drawn pixels."""
 

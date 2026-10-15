@@ -6,14 +6,20 @@
 //                    The mutation classes follow the portal's precedence: those of columns with
 //                    a driver mutation when there are any, else every column's
 //   numeric          mean of the present values (rounded), -1 when none present
+//   bar (a count)    the largest present value, -1 when none present
 //   categorical      the most frequent category; ties go to the lower index; -1 when none
+//   profiled-for     -1 ("No") when any column is unprofiled, else 0 ("Yes")
+//
+// The bar and profiled-for rows exist to point at the exceptions (a patient with several
+// samples, a column missing a kind of data), so like a gene row they let the exception win a
+// bucket rather than be averaged or outvoted away at low zoom.
 import type { Track } from "./types.ts";
 import { STYLE } from "./oncoprint-style.ts";
 
 const B = STYLE.bits;
 const MUT = B.MISSENSE | B.TRUNCATING | B.INFRAME | B.SPLICE | B.OTHER_MUT | B.PROMOTER;
 
-export type TrackShape = Pick<Track, "kind" | "numeric" | "categories">;
+export type TrackShape = Pick<Track, "kind" | "numeric" | "categories" | "bar" | "profiledFor">;
 
 /** Column index boundaries for `buckets` buckets over `n` columns; edges[b]..edges[b+1] is bucket b. */
 export function bucketEdges(n: number, buckets: number): number[] {
@@ -30,6 +36,15 @@ export function bucketEdges(n: number, buckets: number): number[] {
  * cells[order[k]]; without it, cells[k]. `scratch` must hold at least categories+1 ints.
  */
 export function aggregate(t: TrackShape, cells: ArrayLike<number>, order: ArrayLike<number> | null, k0: number, k1: number, scratch: Int32Array): number {
+  if (t.profiledFor) {
+    for (let k = k0; k < k1; k++) if (cells[order ? order[k] : k] === -1) return -1;
+    return k1 > k0 ? 0 : -1;
+  }
+  if (t.bar) {
+    let max = -1;
+    for (let k = k0; k < k1; k++) { const c = cells[order ? order[k] : k]; if (c > max) max = c; }
+    return max;
+  }
   if (t.numeric) {
     let sum = 0, n = 0;
     for (let k = k0; k < k1; k++) { const c = cells[order ? order[k] : k]; if (c !== -1) { sum += c; n++; } }
