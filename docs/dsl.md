@@ -131,13 +131,13 @@ describes for every other identifier-bearing path.
 `q` is 1–30 entries separated by `;`, each `GENE` (any alteration) or `GENE: spec spec ...`.
 A patient matches if **any** entry matches (portal "altered in query" semantics).
 
-- Mutations: `MUT`, `MUT=<protein change>` (e.g. `MUT=G12C`), classes `MISSENSE NONSENSE TRUNC INFRAME SPLICE`; bare `G12C` is protein-change shorthand.
+- Mutations: `MUT`, `MUT=<protein change>` (e.g. `MUT=G12C`), classes `MISSENSE NONSENSE FRAMESHIFT NONSTART NONSTOP INFRAME SPLICE PROMOTER TRUNC`; bare `G12C` is protein-change shorthand. Classes are cBioPortal's, case for case: each stored mutation type maps to one class exactly as the portal's OQL maps it (e.g. `Splice_Region` is SPLICE, `Translation_Start_Site` NONSTART; a protein change of `Promoter` is PROMOTER whatever its type; an unlisted type such as `5'Flank` or `Silent` is in no class). **`TRUNC` is the portal's: every mutation that is not missense or in-frame** — nonsense, frameshift, nonstop, splice, start-loss, promoter and unclassified types alike — not just nonsense and frameshift.
 - Copy number: `AMP`, `HOMDEL`, `CNA` (either, high-level ±2 only).
 - Structural variants: `FUSION`.
 - Drivers: `DRIVER` alone (any driver alteration) or as modifier (`MUT_DRIVER`, `DRIVER_G12D`, `TRUNC_DRIVER`). Requires the version-pinned OncoKB annotation store; the pin is reported in every result.
 - Protein position range, on a mutation (cBioPortal's `(a-b)` modifier): `TRUNC_(1400-)`, `MUT_(-500)`, `MUT_(12-13)`, `MUT=(712-979)_DRIVER`, or a range alone (`(1400-)`, any mutation there). By default a mutation matches when its protein range (start-end) **overlaps** the range; with `*` (`(1-100*)`) it must lie entirely inside it. A mutation with no usable position (missing, -1, or start after end) never matches, as in the portal. The range and the class are tested on the **same** mutation, so `APC: TRUNC_(1400-)` is a truncation at or after codon 1400 — unlike ANDing an `APC: TRUNC` leaf with a `proteinPosition` leaf, which can be satisfied by two different mutations. On anything but a mutation (`AMP_(1-100)`) it is refused.
 - Expression: `EXP>z EXP<z PROT>z` — only in studies with mRNA/protein profiles (errors otherwise, listing available profiles).
-- **Rejected loudly** (never silently approximated): `GAIN HETLOSS GERMLINE SOMATIC PROMOTER`.
+- **Rejected loudly** (never silently approximated): `GAIN HETLOSS GERMLINE SOMATIC`.
 
 ### Event sub-DSL (timeline)
 

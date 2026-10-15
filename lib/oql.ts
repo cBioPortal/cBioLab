@@ -2,14 +2,15 @@
 // Parses the cBioPortal OQL subset our data can honestly answer and compiles it to SQL
 // over genomic_event_derived (+ the pinned OncoKB store for DRIVER semantics).
 //
-// Supported per gene: MUT | MUT=<pchange> | MISSENSE NONSENSE TRUNC INFRAME SPLICE |
+// Supported per gene: MUT | MUT=<pchange> | MISSENSE NONSENSE NONSTART NONSTOP FRAMESHIFT INFRAME
+//   SPLICE PROMOTER TRUNC (the portal's classes, mutClassSql) |
 //   AMP HOMDEL | FUSION | DRIVER (standalone = any driver alteration) | _DRIVER /
 //   DRIVER_ modifiers on any of the above | bare gene = any alteration |
 //   protein position range modifier on a mutation: (a-b) (a-) (-b), with * for fully contained,
 //   e.g. TRUNC_(1400-), MUT_(-500), (1-100*)_DRIVER, MUT=(712-979)_DRIVER.
 // Rejected with an explanation (not silently approximated): GAIN/HETLOSS (only high-level
 // CNA (+-2) is stored), EXP/PROT (no expression thresholds here), GERMLINE/SOMATIC
-// (public studies are germline-stripped), PROMOTER.
+// (public studies are germline-stripped).
 import { DB, STUDY } from "./ch.ts";
 import { sq } from "./compiler.ts";
 
@@ -26,15 +27,39 @@ export interface OqlEntry { gene: string; specs: OqlSpec[] }
 
 const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
 const CLASS_MAP: Record<string, string> = {
-  MISSENSE: "missense", NONSENSE: "nonsense", TRUNC: "trunc", INFRAME: "in_frame", SPLICE: "splice"
+  MISSENSE: "missense", NONSENSE: "nonsense", NONSTART: "nonstart", NONSTOP: "nonstop", FRAMESHIFT: "frameshift",
+  INFRAME: "inframe", SPLICE: "splice", PROMOTER: "promoter", TRUNC: "trunc"
 };
+
+/**
+ * A mutation's class as cBioPortal's OQL sees it — cbioportal-frontend's getMutationSubType and
+ * getSimplifiedMutationType (src/shared/lib/oql/AccessorsForOqlFilter.ts), case for case: a
+ * protein change of "Promoter" is a promoter mutation whatever its type, a listed type maps to
+ * its class, and anything unlisted (5'Flank, Silent, Targeted_Region, ...) is "other". The
+ * portal's Fusion has no class; "none" stands for it.
+ */
+const PORTAL_TYPE_CLASS: [string, string[]][] = [
+  ["missense", ["missense_mutation", "missense", "missense_variant"]],
+  ["frameshift", ["frame_shift_ins", "frame_shift_del", "frameshift", "frameshift_deletion", "frameshift_insertion",
+    "de_novo_start_outofframe", "frameshift_variant"]],
+  ["nonsense", ["nonsense_mutation", "nonsense", "stopgain_snv"]],
+  ["splice", ["splice_site", "splice", "splice site", "splicing", "splice_site_snp", "splice_site_del", "splice_site_indel",
+    "splice_region"]],
+  ["nonstart", ["translation_start_site", "start_codon_snp", "start_codon_del"]],
+  ["nonstop", ["nonstop_mutation"]],
+  ["inframe", ["in_frame_del", "in_frame_ins", "in_frame_deletion", "in_frame_insertion", "indel", "nonframeshift_deletion",
+    "nonframeshift", "nonframeshift insertion", "nonframeshift_insertion"]],
+];
+const mutClassSql = (type: string, change: string): string =>
+  "multiIf(lower(" + type + ") = 'fusion', 'none', lower(" + change + ") = 'promoter', 'promoter', " +
+  PORTAL_TYPE_CLASS.map(([cls, types]) => "lower(" + type + ") IN (" + types.map(sq).join(", ") + "), " + sq(cls)).join(", ") +
+  ", 'other')";
 const REJECT: Record<string, string> = {
   GAIN: "GAIN is not supported: only high-level CNA (amp/deep-deletion, ±2) is stored",
   HETLOSS: "HETLOSS is not supported: only high-level CNA (±2) is stored",
 
   GERMLINE: "GERMLINE is not supported: public studies are germline-stripped",
-  SOMATIC: "SOMATIC modifier is not supported (all stored mutations are somatic/unknown)",
-  PROMOTER: "PROMOTER is not supported in this dataset"
+  SOMATIC: "SOMATIC modifier is not supported (all stored mutations are somatic/unknown)"
 };
 
 // -> [{gene, specs: [{type:'MUT'|'CNA'|'SV'|'ANY', pchange?, cls?, cna?, driver}]}]
@@ -123,8 +148,9 @@ function specCond(spec: OqlSpec): string {
   const conds: string[] = [];
   if (spec.type === "MUT") {
     conds.push("g.variant_type = 'mutation'");
-    if (spec.cls === "trunc") conds.push("(lower(g.mutation_type) LIKE 'nonsense%' OR lower(g.mutation_type) LIKE 'frame_shift%' OR lower(g.mutation_type) LIKE 'nonstop%')");
-    else if (spec.cls) conds.push("lower(g.mutation_type) LIKE " + sq(spec.cls + "%"));
+    // The portal's TRUNC is every class but missense and in-frame (oqlfilter.ts), not a list of types.
+    if (spec.cls === "trunc") conds.push(mutClassSql("g.mutation_type", "g.mutation_variant") + " NOT IN ('missense', 'inframe')");
+    else if (spec.cls) conds.push(mutClassSql("g.mutation_type", "g.mutation_variant") + " = " + sq(spec.cls));
     if (spec.pchange) conds.push("g.mutation_variant = " + sq(spec.pchange));
     if (spec.range) conds.push(rangeCond(spec.range));
   } else if (spec.type === "CNA") {
