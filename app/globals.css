@@ -267,6 +267,14 @@ pre {
   
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* A chip whose action waits on a fetch: its background pulses like a skeleton, behind the label,
+   instead of a spinner beside it — so the chip keeps its width when the wait ends, and stays at full
+   strength so it does not read as disabled for good. */
+.chip-wave { position: relative; isolation: isolate; overflow: hidden; }
+.chip-wave::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--line); animation: skeleton-pulse 1.3s ease-in-out infinite;
+}
 .busy { opacity: 0.45; pointer-events: none; transition: opacity 0.15s; }
 .loading-block {
   display: flex; align-items: center; gap: 0.6rem; color: var(--muted);
