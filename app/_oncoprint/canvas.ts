@@ -167,6 +167,8 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   const pad = view.whitespace && zoom >= STYLE.geometry.padMinZoom ? Math.min(STYLE.geometry.cellPadMax, Math.floor(zoom * STYLE.geometry.padFraction)) : 0;
   let cellsDrawn = 0, bucketsDrawn = 0;
   const scratch = new Int32Array(64);
+  const dpr = ctx.getTransform().a || 1;
+  const snap = (v: number): number => Math.round(v * dpr) / dpr;
 
   // clip the plot area so partially visible edge columns never bleed into the gutter
   ctx.save();
@@ -191,8 +193,11 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
       }
       if (zoom >= 1) {
         for (let k = k0; k < k1; k++) {
-          const x = gx + k * zoom - sx + gutter;
-          drawCell(ctx, t, t.cells[order[g.start + k]], x, y, Math.max(0.5, zoom - pad), rowH, P, S, colors);
+          // Column edges snapped to device pixels: at a fractional zoom, two cells sharing a
+          // pixel each antialias their edge against the paper, and the paper shows through
+          // as a seam every few columns. Snapped, neighbours meet exactly.
+          const xa = snap(gx + k * zoom - sx + gutter), xb = snap(gx + k * zoom - sx + gutter + Math.max(0.5, zoom - pad));
+          drawCell(ctx, t, t.cells[order[g.start + k]], xa, y, Math.max(1 / dpr, xb - xa), rowH, P, S, colors);
           cellsDrawn++;
         }
       } else {

@@ -80,6 +80,9 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   const scratch = new Int32Array(64);
   const fmtNum = (x: number): string | number => Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : Math.round(x * 10) / 10;
 
+  // Cells at a fractional width would each antialias their edges against the paper, and the
+  // paper shows through as a seam every few columns; crisp edges make neighbours meet.
+  parts.push(`<g shape-rendering="crispEdges">`);
   contract.tracks.forEach((t, ti: number) => {
     const y = HEADER_H + ti * (ROW_H + ROW_GAP);
     parts.push(`<text x="4" y="${y + 14}" fill="${P.text}"><title>${esc(trackTooltipLines(t, contract.columns.length, contract.unit).join("\n"))}</title>${esc(trackLabelText(t, S))}</text>`);
@@ -102,6 +105,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
       }
     });
   });
+  parts.push("</g>");
 
   // legend
   let ly = HEADER_H + nTracks * (ROW_H + ROW_GAP) + 14;
