@@ -91,7 +91,9 @@ export const STYLE = {
     sequential: { from: [222, 235, 247], to: [8, 72, 135] },            // #deebf7 -> #084887
     diverging: { low: [33, 102, 172], mid: [255, 255, 255], high: [178, 24, 43] }  // #2166ac -> white -> #b2182b
   },
-  geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17, cellPadMax: 3, padMinZoom: 3, padFraction: 0.3,
+  geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17,
+    // whitespace between columns: a hairline of this many px, once a column is padMinZoom px wide
+    cellPad: 1, padMinZoom: 6,
     // a row pooling several genes wears the brackets that made it, the way the query spells it
     mergedBrackets: ["[", "]"] },
   percent: { gutterDecimals: 1, runRule: "portal" }   // runRule: integer at 3 % and above, one decimal below, N/P

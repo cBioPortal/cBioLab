@@ -164,7 +164,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   ctx.textBaseline = "alphabetic";
   const zoom = view.zoom, sx = view.scrollX;
   const offs = groupOffsets(groups, zoom, gap);
-  const pad = view.whitespace && zoom >= STYLE.geometry.padMinZoom ? Math.min(STYLE.geometry.cellPadMax, Math.floor(zoom * STYLE.geometry.padFraction)) : 0;
+  const pad = view.whitespace && zoom >= STYLE.geometry.padMinZoom ? STYLE.geometry.cellPad : 0;
   let cellsDrawn = 0, bucketsDrawn = 0;
   const scratch = new Int32Array(64);
   const dpr = ctx.getTransform().a || 1;
@@ -195,9 +195,11 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
         for (let k = k0; k < k1; k++) {
           // Column edges snapped to device pixels: at a fractional zoom, two cells sharing a
           // pixel each antialias their edge against the paper, and the paper shows through
-          // as a seam every few columns. Snapped, neighbours meet exactly.
-          const xa = snap(gx + k * zoom - sx + gutter), xb = snap(gx + k * zoom - sx + gutter + Math.max(0.5, zoom - pad));
-          drawCell(ctx, t, t.cells[order[g.start + k]], xa, y, Math.max(1 / dpr, xb - xa), rowH, P, S, colors);
+          // as a seam every few columns. Snapped, neighbours meet exactly, and the gap (when
+          // there is one) is cut from the next column's snapped edge, so every gap is the
+          // same width and only cell widths absorb the rounding — no beat between the two.
+          const xa = snap(gx + k * zoom - sx + gutter), xNext = snap(gx + (k + 1) * zoom - sx + gutter);
+          drawCell(ctx, t, t.cells[order[g.start + k]], xa, y, Math.max(1 / dpr, xNext - xa - pad), rowH, P, S, colors);
           cellsDrawn++;
         }
       } else {
