@@ -102,8 +102,10 @@ export function genomicEventsSql(genes: string[], study: string = STUDY, db: str
 }
 
 /**
- * One row per patient: a bitmask over the queried gene list, bit i set when some panel of
- * that patient covers genes[i]. An integer per patient instead of an array of gene names —
+ * One row per patient: a bitmask over the queried gene list, bit i set when some mutation, copy
+ * number or structural variant panel of that patient covers genes[i] — the three kinds of event
+ * a gene cell draws, so a cell is profiled when any of them was assayed (the portal's rule, and
+ * the one the other views' denominators use). An integer per patient instead of an array of gene names —
  * at 400k patients that is the difference between a few megabytes and a few hundred kilobytes.
  */
 export function coverageSql(genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient"): string {
@@ -115,7 +117,7 @@ export function coverageSql(genes: string[], study: string = STUDY, db: string =
     "FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + genes.map(sq).join(",") + ")\n" +
     (unit === "sample" ? "" : "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n") +
-    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
+    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')\n" +
     "GROUP BY pid";
 }
 
@@ -259,7 +261,7 @@ export function specToQueries(spec: OncoprintSpec, pin?: string | null) {
       sql: cohortColumnsSql(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, DB, unit, pin) });
   }
   queries.push({ label: "genomic events (mutations, CNA, SV) for the gene tracks", sql: genomicEventsSql(genes, study, DB, unit) });
-  queries.push({ label: "panel coverage \u2014 the NOT_PROFILED cell source and frequency denominators", sql: coverageSql(genes, study, DB, unit) });
+  queries.push({ label: "panel coverage (mutation, copy number and structural variant panels) \u2014 the NOT_PROFILED cell source and frequency denominators", sql: coverageSql(genes, study, DB, unit) });
   queries.push({ label: "samples per column and the alteration types it was profiled for \u2014 the \u201c# Samples per Patient\u201d and \u201cProfiled for\u201d rows", sql: columnFactsSql(study, DB, unit) });
   if (clinical.length) queries.push({ label: "clinical attribute tracks", sql: clinicalSql(clinical, study, DB, unit) });
   for (const de of derivedEvents)

@@ -59,7 +59,7 @@ export async function columnDetail(spec: OncoprintSpec, column: string): Promise
     "FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "LEFT JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + genes.map(sq).join(",") + ")\n" +
     (unit === "sample" ? "" : "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n") +
-    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
+    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')\n" +
     "  AND " + (unit === "sample" ? "sp.sample_unique_id" : "sd.patient_unique_id") + " = " + uid + "\n" +
     "GROUP BY panel", conn);
   const panels = panelRows.rows.map((r) => ({ panel: String(r[0]), covers: ((r[1] as string[]) || []).filter(Boolean) }));
