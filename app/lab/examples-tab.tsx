@@ -8,6 +8,8 @@ import { Check, ExternalLink, Link2, Play } from "lucide-react";
 import { EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
 import { Button } from "../_ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
+import { usePublicEnv } from "../_env/public-env-context.tsx";
+import { parseExamplesUrl } from "../../lib/site.ts";
 
 /** a tag filter: an outline chip, filled while it is the one shown */
 const TAG = "group rounded-pill px-2.5 text-sm font-normal aria-pressed:border-link aria-pressed:bg-link aria-pressed:text-card aria-pressed:hover:bg-link/90 aria-pressed:hover:text-card";
@@ -20,6 +22,14 @@ const studiesOf = (ex: DslExample): string[] => [...new Set(Object.values(ex.doc
 
 const hostOf = (url: string) => { try { return new URL(url).host; } catch { return url; } };
 
+/** Where this deployment's gallery examples run (EXAMPLES_URL, lib/site.ts): null for here, else the
+ *  deployment that holds their studies; with an error when the setting is not a URL. */
+export function useExamplesUrl(): { examplesUrl: string | null; examplesUrlError: string | null } {
+  const raw = usePublicEnv().EXAMPLES_URL;
+  try { return { examplesUrl: parseExamplesUrl(raw), examplesUrlError: null }; }
+  catch (e) { return { examplesUrl: null, examplesUrlError: String((e as Error)?.message || e) }; }
+}
+
 export function ExamplesTab({ tag, onTag, busy, onRun, link, elsewhere, elsewhereError, onError }: {
   tag: string;
   onTag: (t: string) => void;
@@ -27,9 +37,9 @@ export function ExamplesTab({ tag, onTag, busy, onRun, link, elsewhere, elsewher
   onRun: (ex: DslExample) => void;
   /** the example's shareable ?doc= link — on the deployment that runs it */
   link: (ex: DslExample) => string;
-  /** the deployment the examples run on: null for this one; undefined until known */
-  elsewhere: string | null | undefined;
-  /** why `elsewhere` could not be found out, if it could not */
+  /** the deployment the examples run on: null for this one */
+  elsewhere: string | null;
+  /** why `elsewhere` could not be read, if it could not */
   elsewhereError: string | null;
   onError: (msg: string) => void;
 }) {
@@ -37,8 +47,7 @@ export function ExamplesTab({ tag, onTag, busy, onRun, link, elsewhere, elsewher
   // the example whose Run is waiting on the reader's go-ahead to leave this site
   const [leaving, setLeaving] = useState<DslExample | null>(null);
   const run = (ex: DslExample) => { if (elsewhere) setLeaving(ex); else onRun(ex); };
-  const runWhy = elsewhereError ? "can't tell where examples run on this site: " + elsewhereError
-    : elsewhere === undefined ? "checking where this site runs examples…" : null;
+  const runWhy = elsewhereError ? "can't tell where examples run on this site: " + elsewhereError : null;
   const copy = async (ex: DslExample) => {
     try { await navigator.clipboard.writeText(link(ex)); setCopied(ex.title); setTimeout(() => setCopied(null), 1800); }
     catch { onError("could not copy to clipboard"); }

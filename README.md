@@ -30,6 +30,7 @@ msk_chord_2024 counts. A machine-readable contract is in
 | `STUDY_ID` | `msk_chord_2024` |
 | `PORTAL_URL` | `https://www.cbioportal.org` |
 | `EXAMPLES_URL` | optional: set on an instance whose database is not the public warehouse, e.g. `https://cbiolab.vercel.app`. The gallery examples are written for the public studies, so the Examples tab then opens each one there (after saying the reader is leaving), instead of running it here. Unset, they run on this instance |
+| `PUBLIC_ENV` | optional: the environment variables written into the page for the browser to read, comma-separated (default `EXAMPLES_URL`). Read per request, so one image serves every deployment; a name that looks like a secret (`PASSWORD`, `SECRET`, `KEY`, `TOKEN`, `CREDENTIAL`) is refused |
 | `CHAT_PROVIDER` | optional: `anthropic` (with `ANTHROPIC_API_KEY`) or `bedrock` (with `AWS_REGION` and AWS credentials) turns on the Assistant sidebar on a dev server (`next dev`) |
 | `CHAT_ON_DEPLOYMENT` | `1` also turns it on in a built deployment (never on Vercel), for signed-in users only |
 | `CHAT_MODEL` / `CHAT_EFFORT` | optional: the model id (default Claude Sonnet 5.5, `claude-sonnet-5-5` / `anthropic.claude-sonnet-5-5`) and effort (default `medium`) |

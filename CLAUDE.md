@@ -167,10 +167,14 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   (a sorting correction, site pooling, cut-offs) stays a dataset's own script, as SPECTRUM's does.
 - **Where the examples run** — the gallery examples are written for the public warehouse's studies
   (and their counts are pinned to it), so an instance on another database sets `EXAMPLES_URL`
-  (`lib/site.ts`, served to the page by `GET /api/site` at run time, not baked in at build) to a
-  deployment that holds them. The Examples tab then says so, and Run opens a "you are leaving this
+  (`lib/site.ts`, a public environment variable — below) to a deployment that holds them. The Examples tab then says so, and Run opens a "you are leaving this
   site" dialog and the example on that deployment, in a new tab; the assistant's
   `analysis_load_example` returns that link instead of loading it. Unset, examples run in place.
+- **Public environment variables** (`lib/public-env.ts`) — the ONE way a setting reaches the
+  browser at run time: `PUBLIC_ENV` names them (default `EXAMPLES_URL`), `app/_env/public-env.tsx`
+  writes them into the page per request (`connection()`, inside the lab layout's Suspense), and a
+  client reads them with `usePublicEnv()`. Not `NEXT_PUBLIC_*`, which a build bakes in for good;
+  not a fetch. A secret-shaped name is refused (`test/public-env.test.ts`).
 - **Requests from the pages** go through **`app/lab/api.ts`** (`api.analysis`, `api.explore`,
   `api.oncoprint`, …), never a bare `fetch`: each takes its endpoint's envelope type from
   **`lib/api-schemas.ts`** and attaches the uploads its body uses (`withCustomData`). The routes

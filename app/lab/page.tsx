@@ -16,7 +16,8 @@ import { requestLogin, referencedDatasets, bindUploads, unresolvedUploads } from
 import { useDocStore, EMPTY_DOC } from "./doc-store.ts";
 import { useDocHistory } from "./use-doc-history.ts";
 import { useExploreState } from "./use-explore-state.ts";
-import { useExamplesUrl, useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
+import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
+import { useExamplesUrl } from "./examples-tab.tsx";
 import { useAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload } from "lucide-react";
@@ -341,7 +342,7 @@ export default function AnalysisPage() {
   const webmcp = useLabTools({
     doc, result, busy, error, tab, study, savedAs: analysisSaved ? doc.title || null : null,
     validate: validateDoc, proposePartition, commit: commitDoc, goTab: (t) => goTab(t as typeof TABS[number]),
-    runExample: runDocExample, examplesElsewhere: examplesUrl ?? null, exampleLink, save: saveAs, link: docLink,
+    runExample: runDocExample, examplesElsewhere: examplesUrl, exampleLink, save: saveAs, link: docLink,
     exploreStudies: exSel.current, draft: parseDraft(), explore, exploreBusy,
     setExploreStudies, addClause, removeDraftClause, clearDraft, analyzeDraft,
     saveDraft: async (name: string) => {
