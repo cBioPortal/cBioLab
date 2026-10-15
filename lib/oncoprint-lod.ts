@@ -2,12 +2,24 @@
 // columns than pixels. One implementation for the server SVG and the browser canvas; the
 // Python package mirrors it and a conformance test compares bucket codes.
 //
-//   gene / derived   OR of the altered bitmasks; -1 only when every column is not profiled
+//   gene / derived   OR of the altered bitmasks; -1 only when every column is not profiled.
+//                    The mutation classes follow the portal's precedence: those of columns with
+//                    a driver mutation when there are any, else every column's
 //   numeric          mean of the present values (rounded), -1 when none present
+//   peak (a count)   the largest present value, -1 when none present
 //   categorical      the most frequent category; ties go to the lower index; -1 when none
+//   profiled-for     -1 ("No") when any column is unprofiled, else 0 ("Yes")
+//
+// The peak and profiled-for rows exist to point at the exceptions (a patient with several
+// samples, a column missing a kind of data), so like a gene row they let the exception win a
+// bucket rather than be averaged or outvoted away at low zoom.
 import type { Track } from "./types.ts";
+import { STYLE } from "./oncoprint-style.ts";
 
-export type TrackShape = Pick<Track, "kind" | "numeric" | "categories">;
+const B = STYLE.bits;
+const MUT = B.MISSENSE | B.TRUNCATING | B.INFRAME | B.SPLICE | B.OTHER_MUT | B.PROMOTER;
+
+export type TrackShape = Pick<Track, "kind" | "numeric" | "categories" | "peak" | "profiledFor">;
 
 /** Column index boundaries for `buckets` buckets over `n` columns; edges[b]..edges[b+1] is bucket b. */
 export function bucketEdges(n: number, buckets: number): number[] {
@@ -24,6 +36,15 @@ export function bucketEdges(n: number, buckets: number): number[] {
  * cells[order[k]]; without it, cells[k]. `scratch` must hold at least categories+1 ints.
  */
 export function aggregate(t: TrackShape, cells: ArrayLike<number>, order: ArrayLike<number> | null, k0: number, k1: number, scratch: Int32Array): number {
+  if (t.profiledFor) {
+    for (let k = k0; k < k1; k++) if (cells[order ? order[k] : k] === -1) return -1;
+    return k1 > k0 ? 0 : -1;
+  }
+  if (t.peak) {
+    let max = -1;
+    for (let k = k0; k < k1; k++) { const c = cells[order ? order[k] : k]; if (c > max) max = c; }
+    return max;
+  }
   if (t.numeric) {
     let sum = 0, n = 0;
     for (let k = k0; k < k1; k++) { const c = cells[order ? order[k] : k]; if (c !== -1) { sum += c; n++; } }
@@ -38,9 +59,16 @@ export function aggregate(t: TrackShape, cells: ArrayLike<number>, order: ArrayL
     let best = 0; for (let i = 1; i < m; i++) if (scratch[i] > scratch[best]) best = i;
     return best;
   }
-  let code = -1;
-  for (let k = k0; k < k1; k++) { const c = cells[order ? order[k] : k]; if (c === -1) continue; code = (code === -1 ? 0 : code) | (c > 0 ? c : 0); }
-  return code;
+  let code = -1, drvMut = 0, vusMut = 0;
+  for (let k = k0; k < k1; k++) {
+    const c = cells[order ? order[k] : k];
+    if (c === -1) continue;
+    if (code === -1) code = 0;
+    if (c <= 0) continue;
+    code |= c & ~MUT;
+    if (c & B.MUT_DRIVER) drvMut |= c & MUT; else vusMut |= c & MUT;
+  }
+  return code === -1 ? -1 : code | (drvMut || vusMut);
 }
 
 /** Every bucket's code for one track over one group, the shape the conformance test compares. */

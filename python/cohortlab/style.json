@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "bits": {
     "MISSENSE": 1,
     "TRUNCATING": 2,
@@ -14,11 +14,13 @@
     "MRNA_HIGH": 1024,
     "MRNA_LOW": 2048,
     "PROT_HIGH": 4096,
-    "PROT_LOW": 8192
+    "PROT_LOW": 8192,
+    "MUT_DRIVER": 16384,
+    "SV_DRIVER": 32768
   },
   "palette": {
     "paper": "#ffffff",
-    "unaltered": "#e8ecee",
+    "unaltered": "#bebebe",
     "derived": "#0f86a1",
     "text": "#1f2933",
     "muted": "#5b6b76",
@@ -32,7 +34,76 @@
       "#56B4E9",
       "#F0E442",
       "#999999"
-    ]
+    ],
+    "reserved": {
+      "true": "#1b9e77",
+      "yes": "#1b9e77",
+      "positive": "#1b9e77",
+      "diseasefree": "#1b9e77",
+      "tumorfree": "#1b9e77",
+      "living": "#1b9e77",
+      "alive": "#1b9e77",
+      "notprogressed": "#1b9e77",
+      "false": "#d95f02",
+      "no": "#d95f02",
+      "negative": "#d95f02",
+      "recurred": "#d95f02",
+      "progressed": "#d95f02",
+      "recurred/progressed": "#d95f02",
+      "withtumor": "#d95f02",
+      "deceased": "#d95f02",
+      "female": "#e0699e",
+      "f": "#e0699e",
+      "male": "#2986e2",
+      "m": "#2986e2",
+      "other": "#a9a9a9",
+      "unknown": "#d3d3d3",
+      "na": "#d3d3d3",
+      "missense": "#008000",
+      "inframe": "#993404",
+      "truncating": "#000000",
+      "fusion": "#8b00c9",
+      "splice": "#e5802b",
+      "promoter": "#00b7ce",
+      "driver": "#008000",
+      "vus": "#53d400",
+      "1:deceased": "#d95f02",
+      "1:recurred/progressed": "#d95f02",
+      "1:recurred": "#d95f02",
+      "1:progressed": "#d95f02",
+      "1:yes": "#d95f02",
+      "1:1": "#d95f02",
+      "1:progression": "#d95f02",
+      "1:event": "#d95f02",
+      "1:deadofmelanoma": "#d95f02",
+      "1:deadwithtumor": "#d95f02",
+      "1:metastaticrelapse": "#d95f02",
+      "1:localizedrelapse": "#d95f02",
+      "0:living": "#1b9e77",
+      "0:alive": "#1b9e77",
+      "0:diseasefree": "#1b9e77",
+      "0:no": "#1b9e77",
+      "0:0": "#1b9e77",
+      "0:progressionfree": "#1b9e77",
+      "0:noprogression": "#1b9e77",
+      "0:notprogressed": "#1b9e77",
+      "0:censored": "#1b9e77",
+      "0:censor": "#1b9e77",
+      "0:aliveorcensored": "#1b9e77",
+      "0:aliveordeadtumorfree": "#1b9e77",
+      "0:norelapse": "#1b9e77",
+      "0:censure": "#1b9e77",
+      "0:ned": "#1b9e77",
+      "wildtype": "#bebebe",
+      "nomutation": "#bebebe",
+      "amplification": "#ff0000",
+      "gain": "#ffb6c1",
+      "diploid": "#bebebe",
+      "unchanged": "#bebebe",
+      "loss": "#8fd8d8",
+      "shallowdeletion": "#8fd8d8",
+      "deepdeletion": "#0000ff"
+    }
   },
   "glyph": {
     "cna": {
@@ -43,15 +114,13 @@
       "options": [
         {
           "bit": "AMP",
-          "color": "#e41a1c",
-          "vus": "#f6a6a5",
+          "color": "#ff0000",
           "label": "Amplification",
           "order": 10
         },
         {
           "bit": "HOMDEL",
-          "color": "#2166ac",
-          "vus": "#a6c4de",
+          "color": "#0000ff",
           "label": "Deep Deletion",
           "order": 12
         }
@@ -66,15 +135,13 @@
       "options": [
         {
           "bit": "MRNA_HIGH",
-          "color": "#c0392b",
-          "vus": "#c0392b",
+          "color": "#ff9999",
           "label": "mRNA High",
           "order": 20
         },
         {
           "bit": "MRNA_LOW",
-          "color": "#2c6fbb",
-          "vus": "#2c6fbb",
+          "color": "#6699cc",
           "label": "mRNA Low",
           "order": 21
         }
@@ -86,21 +153,19 @@
           "bit": "PROT_HIGH",
           "band": [
             0,
-            0.18
+            0.2
           ],
           "color": "#ff3df8",
-          "vus": "#ff3df8",
           "label": "Protein High",
           "order": 30
         },
         {
           "bit": "PROT_LOW",
           "band": [
-            0.82,
+            0.8,
             1
           ],
-          "color": "#00b8d4",
-          "vus": "#00b8d4",
+          "color": "#00e1ff",
           "label": "Protein Low",
           "order": 31
         }
@@ -108,38 +173,38 @@
     },
     "sv": {
       "band": [
-        0.15,
-        0.85
+        0.2,
+        0.8
       ],
       "bit": "SV",
-      "color": "#8e24aa",
+      "color": "#8b00c9",
       "vus": "#ce92e8",
       "label": "Structural Variant",
       "order": 1
     },
     "mutation": {
       "band": [
-        0.3,
-        0.7
+        0.3333333333333333,
+        0.6666666666666666
       ],
       "order": 0,
       "priority": [
         {
           "bit": "TRUNCATING",
-          "color": "#111111",
-          "vus": "#7c8794",
+          "color": "#000000",
+          "vus": "#708090",
           "label": "Truncating Mutation"
         },
         {
           "bit": "SPLICE",
-          "color": "#ff8c00",
-          "vus": "#f5c88f",
+          "color": "#e5802b",
+          "vus": "#f0b87b",
           "label": "Splice Mutation"
         },
         {
           "bit": "INFRAME",
-          "color": "#b8860b",
-          "vus": "#dcc37e",
+          "color": "#993404",
+          "vus": "#a68028",
           "label": "Inframe Mutation"
         },
         {
@@ -150,14 +215,14 @@
         },
         {
           "bit": "MISSENSE",
-          "color": "#2e7d32",
-          "vus": "#8bc98e",
+          "color": "#008000",
+          "vus": "#53d400",
           "label": "Missense Mutation"
         },
         {
           "bit": "OTHER_MUT",
-          "color": "#9467bd",
-          "vus": "#c9b3de",
+          "color": "#cf58bc",
+          "vus": "#f96ae3",
           "label": "Other Mutation"
         }
       ],
@@ -167,21 +232,31 @@
         "label": "Mutation"
       }
     },
-    "vusStyle": "pair",
-    "vusAlpha": 0.35,
+    "driverLabels": {
+      "driver": " (putative driver)",
+      "vus": " (unknown significance)"
+    },
+    "bar": {
+      "color": "#008000",
+      "negative": "#ff0000"
+    },
+    "profiled": {
+      "color": "#1b9e77",
+      "yes": "Yes",
+      "no": "No"
+    },
     "notProfiled": {
-      "fill": "#f4f6f7",
+      "fill": "#ffffff",
       "stripe": {
-        "color": "#dfe4e7",
+        "color": "#bebebe",
         "band": [
-          0.45,
-          0.55
+          0.475,
+          0.525
         ]
       },
       "label": "Not profiled"
     },
-    "unalteredLabel": "No alterations",
-    "driverNote": "paler = unknown significance"
+    "unalteredLabel": "No alterations"
   },
   "ramps": {
     "sequential": {
@@ -221,9 +296,8 @@
     "groupGap": 10,
     "header": 22,
     "labelMaxChars": 17,
-    "cellPadMax": 3,
-    "padMinZoom": 3,
-    "padFraction": 0.3,
+    "cellPad": 1,
+    "padMinZoom": 6,
     "mergedBrackets": [
       "[",
       "]"

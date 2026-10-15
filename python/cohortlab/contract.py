@@ -13,9 +13,10 @@ from typing import Any, Iterable
 
 import numpy as np
 
+from .style import BITS, numeric_value  # the one bit definition, generated from lib/oncoprint-style.ts
+
 DEFAULT_DISPLAY: dict[str, Any] = {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all",
                                    "colorByType": True, "hideVUS": False, "annotate": "oncokb", "whiteBackground": False}
-BITS = {"MISSENSE": 1, "TRUNCATING": 2, "INFRAME": 4, "SPLICE": 8, "OTHER_MUT": 16, "SV": 32, "AMP": 64, "HOMDEL": 128, "DRIVER": 256}
 NOT_PROFILED = -1
 _MAGIC = 0x4F504231  # "OPB1"
 
@@ -102,8 +103,7 @@ class Contract:
                 vals = ["yes" if c > 0 else "no" for c in t.cells]
                 kind = "DERIVED"
             elif t.meta.get("numeric"):
-                lo, hi = t.meta.get("min", 0), t.meta.get("max", 1)
-                vals = ["" if c == -1 else str(round(lo + (int(c) / 255.0) * (hi - lo), 2)) for c in t.cells]
+                vals = ["" if c == -1 else str(round(numeric_value(t.meta, int(c)), 2)) for c in t.cells]
                 kind = "HEATMAP " + t.meta.get("profileType", "") if t.kind == "heatmap" else "CLINICAL"
             else:
                 cats = t.meta.get("categories") or []
@@ -135,12 +135,14 @@ def gene_cell_label(code: int) -> str:
         return "not profiled"
     if code <= 0:
         return ""
-    drv = " (putative driver)" if code & BITS["DRIVER"] else " (unknown significance)"
+    sig = {True: " (putative driver)", False: " (unknown significance)"}
     parts = []
     for bit, name in (("MISSENSE", "Missense Mutation"), ("TRUNCATING", "Truncating Mutation"), ("INFRAME", "Inframe Mutation"),
-                      ("SPLICE", "Splice Mutation"), ("OTHER_MUT", "Other Mutation"), ("SV", "Structural Variant")):
+                      ("SPLICE", "Splice Mutation"), ("PROMOTER", "Promoter Mutation"), ("OTHER_MUT", "Other Mutation")):
         if code & BITS[bit]:
-            parts.append(name + drv)
+            parts.append(name + sig[bool(code & BITS["MUT_DRIVER"])])
+    if code & BITS["SV"]:
+        parts.append("Structural Variant" + sig[bool(code & BITS["SV_DRIVER"])])
     if code & BITS["AMP"]:
         parts.append("Amplification")
     if code & BITS["HOMDEL"]:

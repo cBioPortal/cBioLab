@@ -23,6 +23,7 @@ import { buildAnnotationIndex, oncokbPin } from "./annotation.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { wardOrder, CLUSTER_LIMIT } from "./oncoprint-cluster.ts";
 
+import { PROFILED_TYPES, type ProfiledType } from "./profile-names.ts";
 import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
 import { clinicalTable, assertCustomDataPresent } from "./custom-data.ts";
@@ -101,8 +102,10 @@ export function genomicEventsSql(genes: string[], study: string = STUDY, db: str
 }
 
 /**
- * One row per patient: a bitmask over the queried gene list, bit i set when some panel of
- * that patient covers genes[i]. An integer per patient instead of an array of gene names —
+ * One row per patient: a bitmask over the queried gene list, bit i set when some mutation, copy
+ * number or structural variant panel of that patient covers genes[i] — the three kinds of event
+ * a gene cell draws, so a cell is profiled when any of them was assayed (the portal's rule, and
+ * the one the other views' denominators use). An integer per patient instead of an array of gene names —
  * at 400k patients that is the difference between a few megabytes and a few hundred kilobytes.
  */
 export function coverageSql(genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient"): string {
@@ -114,7 +117,25 @@ export function coverageSql(genes: string[], study: string = STUDY, db: string =
     "FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + genes.map(sq).join(",") + ")\n" +
     (unit === "sample" ? "" : "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n") +
-    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
+    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')\n" +
+    "GROUP BY pid";
+}
+
+/**
+ * One row per column: how many samples it has, and a bitmask over PROFILED_TYPES, bit i set when
+ * some sample of the column is in a profile of that type whatever its genes — the portal's
+ * "# Samples per Patient" and "Profiled for <type>" rows, from one scan.
+ */
+export function columnFactsSql(study: string = STUDY, db: string = DB, unit: Unit = "patient"): string {
+  const puidPrefix = study + "_";
+  const types = PROFILED_TYPES.map(([t]) => sq(t)).join(",");
+  return "SELECT " + idCol(unit, puidPrefix, "sd.") + " AS pid,\n" +
+    "       uniqExact(sd.sample_unique_id) AS samples,\n" +
+    "       toUInt8(groupBitOr(if(sp.alteration_type = '', 0, bitShiftLeft(toUInt8(1), toUInt8(indexOf([" + types + "], sp.alteration_type) - 1))))) AS mask\n" +
+    "FROM " + db + ".sample_derived sd\n" +
+    "LEFT JOIN (SELECT sample_unique_id, alteration_type FROM " + db + ".sample_to_gene_panel_derived\n" +
+    "           WHERE cancer_study_identifier = " + sq(study) + " AND alteration_type IN (" + types + ")) sp ON sp.sample_unique_id = sd.sample_unique_id\n" +
+    "WHERE sd.cancer_study_identifier = " + sq(study) + "\n" +
     "GROUP BY pid";
 }
 
@@ -240,7 +261,8 @@ export function specToQueries(spec: OncoprintSpec, pin?: string | null) {
       sql: cohortColumnsSql(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, DB, unit, pin) });
   }
   queries.push({ label: "genomic events (mutations, CNA, SV) for the gene tracks", sql: genomicEventsSql(genes, study, DB, unit) });
-  queries.push({ label: "panel coverage \u2014 the NOT_PROFILED cell source and frequency denominators", sql: coverageSql(genes, study, DB, unit) });
+  queries.push({ label: "panel coverage (mutation, copy number and structural variant panels) \u2014 the NOT_PROFILED cell source and frequency denominators", sql: coverageSql(genes, study, DB, unit) });
+  queries.push({ label: "samples per column and the alteration types it was profiled for \u2014 the \u201c# Samples per Patient\u201d and \u201cProfiled for\u201d rows", sql: columnFactsSql(study, DB, unit) });
   if (clinical.length) queries.push({ label: "clinical attribute tracks", sql: clinicalSql(clinical, study, DB, unit) });
   for (const de of derivedEvents)
     queries.push({ label: "derived-event track \u201c" + (de.label || "derived event") + "\u201d \u2014 cohort-DSL patients", sql: cohortColumnsSql({ ...de.expression, lineGap }, study, DB, unit, pin) });
@@ -345,15 +367,26 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   // ---- genomic events + panel coverage, per study --------------------
   const events: EventRow[] = [];
   const coverage: AssembleInput["coverage"] = [];
+  const profiledMasks: { pid: string; mask: number }[] = [];
+  const samplesPer: { pid: string; n: number }[] = [];
   const evFetched = await Promise.all(studies.map(s =>
     Promise.all([lqRows("oncoprint:alterations", genomicEventsSql(genes, s, dbOf(s), unit), s),
-                 lqRows("oncoprint:coverage", coverageSql(genes, s, dbOf(s), unit), s)]).then(([e, c]) => ({ s, e, c }))));
-  for (const { s, e, c } of evFetched) {
+                 lqRows("oncoprint:coverage", coverageSql(genes, s, dbOf(s), unit), s),
+                 lqRows("oncoprint:profiledTypes", columnFactsSql(s, dbOf(s), unit), s)]).then(([e, c, p]) => ({ s, e, c, p }))));
+  for (const { s, e, c, p } of evFetched) {
     const pref = multi ? s + "_" : "";
     // column order is the SELECT's: pid, gene, vt, mt, mv, cna
     for (const r of e.rows) events.push({ pid: pref + (r[0] as string), gene: r[1] as string, vt: r[2] as string, mt: r[3] as string, mv: r[4] as string, cna: r[5] as string });
     for (const r of c.rows) coverage.push({ pid: pref + (r[0] as string), mask: Number(r[1]) });
+    // column order is the SELECT's: pid, samples, mask
+    for (const r of p.rows) {
+      profiledMasks.push({ pid: pref + (r[0] as string), mask: Number(r[2]) });
+      samplesPer.push({ pid: pref + (r[0] as string), n: Number(r[1]) });
+    }
   }
+  // the alteration types this figure draws: the gene cells' three, and an overlay's
+  const profiledTypes: ProfiledType[] = ["MUTATION_EXTENDED", "COPY_NUMBER_ALTERATION", "STRUCTURAL_VARIANT",
+    ...overlays.map((o) => (o.kind === "mrna" ? "MRNA_EXPRESSION" : "PROTEIN_LEVEL") as ProfiledType)];
   // "annotate: none" is a deliberate choice to draw without driver calls; say so rather than
   // letting the figure look as though nothing was annotated
   const annotation = display.annotate === "none"
@@ -447,7 +480,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   const queryMs = Date.now() - t0;
   const tAsm = Date.now();
   const contract = assembleContract({
-    genes: geneList, groups, studies, studyOf, events, coverage,
+    genes: geneList, groups, studies, studyOf, events, coverage, profiled: { types: profiledTypes, masks: profiledMasks }, samples: samplesPer,
     isDriver: (r) => annotation.isDriver(r as Parameters<typeof annotation.isDriver>[0]), annotationSource: annotation.source,
     clinical: clinicalIn, heatmap: heatmapIn, overlays: overlaysIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit, clusterRank
   });

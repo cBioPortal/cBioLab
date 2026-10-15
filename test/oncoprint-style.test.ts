@@ -3,8 +3,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { STYLE, cellLayers, formatPct, formatGutterPct, geneLegend, geneLegendFor, numericColor, resolveStyle, trackCategoryColor, trackLabelText, trackTooltipLines } from "../lib/oncoprint-style.ts";
-import { mutClassBit } from "../lib/oncoprint-assemble.ts";
+import { STYLE, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines } from "../lib/oncoprint-style.ts";
+import { assembleContract, mutClassBit, type AssembleInput } from "../lib/oncoprint-assemble.ts";
 import { STYLE_JSON } from "../scripts/gen-style.ts";
 import { bucketCodes, bucketEdges } from "../lib/oncoprint-lod.ts";
 
@@ -14,33 +14,57 @@ test("python/cohortlab/style.json is the generated copy of lib/oncoprint-style.t
   assert.equal(readFileSync("python/cohortlab/style.json", "utf8"), STYLE_JSON, "run: npm run style:gen");
 });
 
-test("cell layers: base, CNA, mRNA outline, protein bars, SV band, one mutation by priority", () => {
+test("cell layers: base, CNA, mRNA outline, protein bars, SV band, one mutation by priority — the portal's", () => {
   assert.deepEqual(cellLayers(0, STYLE).map((l) => l.color), [STYLE.palette.unaltered]);
-  assert.equal(cellLayers(-1, STYLE).length, 2, "not profiled = fill + stripe");
-  const both = cellLayers(B.MISSENSE | B.TRUNCATING | B.DRIVER, STYLE);
+  assert.equal(STYLE.palette.unaltered, "#bebebe", "the portal's grey");
+  assert.equal(cellLayers(-1, STYLE).length, 2, "not profiled = white + a thin grey line");
+  const both = cellLayers(B.MISSENSE | B.TRUNCATING | B.MUT_DRIVER | B.DRIVER, STYLE);
   assert.equal(both.length, 2);
-  assert.equal(both[1].color, "#111111", "truncating outranks missense when both are present");
-  const stack = cellLayers(B.AMP | B.MRNA_HIGH | B.PROT_LOW | B.SV | B.SPLICE | B.DRIVER, STYLE);
-  assert.deepEqual(stack.map((l) => l.color), [STYLE.palette.unaltered, "#e41a1c", "#c0392b", "#00b8d4", "#8e24aa", "#ff8c00"]);
+  assert.equal(both[1].color, "#000000", "truncating outranks missense when both are present");
+  const stack = cellLayers(B.AMP | B.MRNA_HIGH | B.PROT_LOW | B.SV | B.SV_DRIVER | B.SPLICE | B.MUT_DRIVER | B.DRIVER, STYLE);
+  assert.deepEqual(stack.map((l) => l.color), [STYLE.palette.unaltered, "#ff0000", "#ff9999", "#00e1ff", "#8b00c9", "#e5802b"]);
   assert.equal(stack[2].stroke, 2, "mRNA is an outline so what is under it still shows");
-  assert.deepEqual(stack[4].band, [0.15, 0.85]);
-  assert.deepEqual(stack[3].band, [0.82, 1], "protein low is a bar at the bottom");
+  assert.deepEqual(stack[4].band, [0.2, 0.8]);
+  assert.deepEqual(stack[3].band, [0.8, 1], "protein low is a bar at the bottom");
+  assert.deepEqual(stack[5].band, [1 / 3, 2 / 3]);
 });
 
-test("unknown significance uses the paler colour of each pair, not opacity", () => {
+test("driver and VUS are each glyph's own: a different colour per pair, CNA one colour, no fading", () => {
   const vus = cellLayers(B.AMP | B.SPLICE, STYLE);
-  const drv = cellLayers(B.AMP | B.SPLICE | B.DRIVER, STYLE);
-  assert.deepEqual(vus.map((l) => l.alpha), [1, 1, 1], "no fading: the colour carries it");
-  assert.deepEqual(vus.map((l) => l.color), [STYLE.palette.unaltered, "#f6a6a5", "#f5c88f"]);
-  assert.deepEqual(drv.map((l) => l.color), [STYLE.palette.unaltered, "#e41a1c", "#ff8c00"]);
-  // the fade remains available as an override for anyone who prefers it
-  const faded = cellLayers(B.AMP, resolveStyle({ glyph: { vusStyle: "fade" } }));
-  assert.equal(faded[1].color, "#e41a1c");
-  assert.equal(faded[1].alpha, STYLE.glyph.vusAlpha);
+  assert.deepEqual(vus.map((l) => l.color), [STYLE.palette.unaltered, "#ff0000", "#f0b87b"], "a copy number change has one colour whatever its annotation");
+  assert.ok(vus.every((l) => !("alpha" in l)), "nothing is drawn faded");
+  // the cell-wide DRIVER bit (a driver amplification) does not make the mutation a driver
+  assert.equal(cellLayers(B.AMP | B.SPLICE | B.DRIVER, STYLE)[2].color, "#f0b87b");
+  assert.equal(cellLayers(B.AMP | B.SPLICE | B.DRIVER | B.MUT_DRIVER, STYLE)[2].color, "#e5802b");
+  // an SV and a mutation in one cell are annotated independently
+  const mixed = cellLayers(B.SV | B.SV_DRIVER | B.MISSENSE | B.DRIVER, STYLE);
+  assert.deepEqual(mixed.slice(1).map((l) => l.color), ["#8b00c9", "#53d400"]);
+  assert.throws(() => resolveStyle({ glyph: { vusStyle: "fade" } }), /not a style key/, "the fade is gone, loudly");
+});
+
+test("the assembler: a driver mutation of any class outranks every VUS one, SV and mutation annotated apart", () => {
+  const input = (events: AssembleInput["events"], drivers: string[]): AssembleInput => ({
+    genes: ["G"], groups: [{ name: "all", pids: ["p"] }], studies: ["s"], events, coverage: [{ pid: "p", genes: ["G"] }],
+    isDriver: (r) => drivers.includes(r.vt + ":" + (r.mt ?? r.cna ?? "")), annotationSource: "test",
+    clinical: [], heatmap: [], derived: [], sort: [], lineGap: 0
+  });
+  const cell = (inp: AssembleInput): number => assembleContract(inp).tracks.find((t) => t.kind === "gene")!.cells[0] as number;
+  const ev = [{ pid: "p", gene: "G", vt: "mutation", mt: "Nonsense_Mutation" }, { pid: "p", gene: "G", vt: "mutation", mt: "Missense_Mutation" }];
+  const c = cell(input(ev, ["mutation:Missense_Mutation"]));
+  assert.equal(c & (B.TRUNCATING | B.MISSENSE), B.MISSENSE, "the VUS truncation is not drawn over the driver missense");
+  assert.ok(c & B.MUT_DRIVER && c & B.DRIVER);
+  assert.equal(cellLayers(c, STYLE)[1].color, "#008000");
+  const v = cell(input(ev, []));
+  assert.equal(v & (B.TRUNCATING | B.MISSENSE), B.TRUNCATING | B.MISSENSE, "with no driver mutation every class is kept");
+  assert.equal(cellLayers(v, STYLE)[1].color, "#708090");
+  const sv = cell(input([{ pid: "p", gene: "G", vt: "structural_variant" }, { pid: "p", gene: "G", vt: "cna", cna: 2 },
+    { pid: "p", gene: "G", vt: "mutation", mt: "Missense_Mutation" }], ["cna:2"]));
+  assert.ok(sv & B.DRIVER, "a driver amplification still counts toward the driver %");
+  assert.equal(sv & (B.SV_DRIVER | B.MUT_DRIVER), 0, "but neither the SV nor the missense is drawn as a driver");
 });
 
 test("promoter mutations are their own class, between in-frame and missense", () => {
-  const p = cellLayers(B.PROMOTER | B.MISSENSE | B.DRIVER, STYLE);
+  const p = cellLayers(B.PROMOTER | B.MISSENSE | B.MUT_DRIVER, STYLE);
   assert.equal(p[1].color, "#00b7ce", "promoter outranks missense");
   assert.equal(mutClassBit("5'Flank"), B.PROMOTER);
   assert.equal(mutClassBit("Missense_Mutation"), B.MISSENSE);
@@ -49,15 +73,24 @@ test("promoter mutations are their own class, between in-frame and missense", ()
 
 test("percent format follows the portal, legend order is mutations, SV, CNA, not profiled", () => {
   assert.equal(formatPct(null), "N/P"); assert.equal(formatPct(2.94), "2.9%"); assert.equal(formatPct(3.4), "3%"); assert.equal(formatPct(52.6), "53%");
-  assert.deepEqual(geneLegend(STYLE).map((i) => i.label).slice(0, 2), ["Truncating Mutation", "Splice Mutation"]);
+  assert.deepEqual(geneLegend(STYLE).map((i) => i.label).slice(0, 3),
+    ["Truncating Mutation (putative driver)", "Truncating Mutation (unknown significance)", "Splice Mutation (putative driver)"]);
   assert.equal(geneLegend(STYLE).at(-1)!.kind, "notProfiled");
   assert.equal(formatGutterPct(10, 20), "10% / 20%");
   assert.equal(formatGutterPct(10, 20, 50, 100), "10% / 20%*", "the asterisk says the denominator was not every column");
   assert.equal(formatGutterPct(10, 20, 100, 100), "10% / 20%");
   assert.equal(formatGutterPct(null, null), "N/P");
-  // a legend lists only what the cells carry
-  const only = geneLegendFor(B.MISSENSE | B.AMP, STYLE).map((i) => i.label);
-  assert.deepEqual(only, ["Missense Mutation", "Amplification", "Not profiled"]);
+  // a legend lists only what the cells draw: the displayed mutation class, as driver or VUS
+  const tracks = [{ kind: "gene", cells: [0, -1, B.MISSENSE | B.TRUNCATING, B.MISSENSE | B.MUT_DRIVER | B.DRIVER, B.AMP | B.DRIVER] }];
+  assert.deepEqual(geneLegend(STYLE, glyphPresence(tracks)).map((i) => i.label),
+    ["Truncating Mutation (unknown significance)", "Missense Mutation (putative driver)", "Amplification", "Not profiled"]);
+  // annotation off: one entry per glyph in its driver colour (the portal's rule set without recurrence)
+  const off = geneLegend(styleForDisplay(STYLE, { annotate: "none" }), glyphPresence([{ kind: "gene", cells: [B.MISSENSE] }]));
+  assert.deepEqual(off.map((i) => [i.label, i.color]), [["Missense Mutation", "#008000"], ["Not profiled", "#bebebe"]]);
+  assert.equal(cellLayers(B.MISSENSE, styleForDisplay(STYLE, { annotate: "none" }))[1].color, "#008000");
+  // colour by type off: one pair for every class, listed once
+  const one = geneLegend(styleForDisplay(STYLE, { colorByType: false }), glyphPresence([{ kind: "gene", cells: [B.MISSENSE, B.TRUNCATING | B.MUT_DRIVER] }]));
+  assert.deepEqual(one.map((i) => i.label), ["Mutation (putative driver)", "Mutation (unknown significance)", "Not profiled"]);
   assert.equal(numericColor(0, null), "rgb(222,235,247)"); assert.equal(numericColor(255, 128), "rgb(178,24,43)"); assert.equal(numericColor(128, 128), "rgb(255,255,255)");
 });
 
@@ -66,22 +99,26 @@ test("level of detail: edges partition the columns, buckets OR genes and average
   assert.deepEqual(bucketEdges(3, 10), [0, 1, 2, 3]);
   const gene = { kind: "gene" as const };
   assert.deepEqual(bucketCodes(gene, [1, 0, -1, -1, 64 | 256, 0], 0, 6, 3), [1, -1, 64 | 256]);
+  // a bucket's mutation classes come from its driver-mutation columns when it has any
+  const D = B.MUT_DRIVER | B.DRIVER;
+  assert.deepEqual(bucketCodes(gene, [B.TRUNCATING, B.MISSENSE | D, B.TRUNCATING | B.AMP, B.SV], 0, 4, 2), [B.MISSENSE | D, B.TRUNCATING | B.AMP | B.SV]);
   assert.deepEqual(bucketCodes({ kind: "clinical", numeric: true }, [10, 20, -1, -1], 0, 4, 2), [15, -1]);
   assert.deepEqual(bucketCodes({ kind: "clinical", categories: ["a", "b"] }, [0, 1, 1, 2, -1, -1], 0, 6, 3), [0, 1, -1], "ties go to the lower index");
+  // rows that point at exceptions keep them at low zoom
+  assert.deepEqual(bucketCodes({ kind: "clinical", categories: ["Yes"], profiledFor: "MUTATION_EXTENDED" }, [0, 0, 0, -1, 0, 0], 0, 6, 2), [0, -1], "one unprofiled column shows");
+  assert.deepEqual(bucketCodes({ kind: "clinical", numeric: true, peak: true }, [128, 128, 255, 128, -1, -1], 0, 6, 3), [128, 255, -1], "the largest count shows, not the mean");
 });
 
 
 test("an override merges onto the defaults and leaves the rest alone", () => {
   assert.equal(resolveStyle(undefined), STYLE, "nothing to merge returns the defaults themselves");
   assert.equal(resolveStyle({}), STYLE);
-  const S = resolveStyle({ palette: { unaltered: "#f0f0f0" }, glyph: { vusAlpha: 0.6 } });
+  const S = resolveStyle({ palette: { unaltered: "#f0f0f0" }, glyph: { sv: { vus: "#123456" } } });
   assert.equal(S.palette.unaltered, "#f0f0f0");
-  assert.equal(S.glyph.vusAlpha, 0.6);
+  assert.equal(S.glyph.sv.vus, "#123456");
   assert.equal(S.palette.paper, STYLE.palette.paper, "untouched keys keep their default");
-  assert.equal(STYLE.palette.unaltered, "#e8ecee", "the defaults are not mutated");
+  assert.equal(STYLE.palette.unaltered, "#bebebe", "the defaults are not mutated");
   assert.equal(cellLayers(B.MISSENSE, S)[0].color, "#f0f0f0");
-  // vusAlpha only bites when the style is set to fade rather than use colour pairs
-  assert.equal(cellLayers(B.MISSENSE, resolveStyle({ glyph: { vusStyle: "fade", vusAlpha: 0.6 } }))[1].alpha, 0.6);
 });
 
 test("overrides reach colours, ramps, geometry and legend labels", () => {
@@ -93,7 +130,7 @@ test("overrides reach colours, ramps, geometry and legend labels", () => {
   assert.equal(S.palette.categorical.length, 2);
   assert.equal(S.glyph.mutation.priority[0].color, "#abcdef");
   assert.equal(S.glyph.mutation.priority[0].bit, "TRUNCATING", "entries keep their meaning");
-  assert.equal(S.glyph.mutation.priority[4].color, "#2e7d32", "unlisted entries keep their default");
+  assert.equal(S.glyph.mutation.priority[4].color, "#008000", "unlisted entries keep their default");
   assert.equal(S.geometry.rowH, 30);
   assert.equal(geneLegend(S).at(-1)!.label, "No panel");
 });
@@ -102,12 +139,12 @@ test("overrides are rejected loudly: typos, wrong types, meaning changes, illegi
   assert.throws(() => resolveStyle({ palete: {} }), /style.palete is not a style key.*palette/s);
   assert.throws(() => resolveStyle({ palette: { unalterd: "#000000" } }), /style.palette.unalterd is not a style key/);
   assert.throws(() => resolveStyle({ palette: { unaltered: "red" } }), /not a #rrggbb colour/);
-  assert.throws(() => resolveStyle({ glyph: { vusAlpha: "half" } }), /must be a number/);
+  assert.throws(() => resolveStyle({ geometry: { rowH: "tall" } }), /must be a number/);
   assert.throws(() => resolveStyle({ bits: { AMP: 1 } }), /read-only/);
   assert.throws(() => resolveStyle({ glyph: { mutation: { priority: [{ bit: "MISSENSE" }, {}, {}, {}, {}, {}] } } }),
     /priority\[0\].bit is read-only/);
   assert.throws(() => resolveStyle({ glyph: { mutation: { priority: [{}] } } }), /keep all 6 entries/);
-  assert.throws(() => resolveStyle({ glyph: { notProfiled: { fill: "#e8ecee", stripe: { color: "#e8ecee" } } } }),
+  assert.throws(() => resolveStyle({ glyph: { notProfiled: { fill: "#bebebe", stripe: { color: "#bebebe" } } } }),
     /indistinguishable from unaltered/);
 });
 
@@ -144,4 +181,28 @@ test("a track label explains itself in words, the same words for every renderer"
   assert.deepEqual(trackTooltipLines({ label: "STAGE", categories: ["III", "IV"] }, 12), ["STAGE", "2 values: III, IV"]);
   assert.deepEqual(trackTooltipLines({ label: "AGE", numeric: true, min: 44, max: 80 }, 12), ["AGE", "44 → 80"]);
   assert.deepEqual(trackTooltipLines({ label: "EMPTY", categories: [] }, 12), ["EMPTY", "no values in these columns"]);
+});
+
+test("numeric clinical rows are the portal's bars: from the bottom, both ways across zero, log for counts", () => {
+  assert.deepEqual(barBand({ min: 40, max: 80 }, 255), { band: [0, 1], negative: false });
+  assert.deepEqual(barBand({ min: 40, max: 80 }, 0), { band: [1, 1], negative: false }, "the smallest value is an empty cell, as in the portal");
+  const mixed = { min: -2, max: 4 };
+  assert.deepEqual(barBand(mixed, encodeNumeric(4, -2, 4)), { band: [0, 0.5], negative: false }, "the larger side fills its half");
+  const neg = barBand(mixed, encodeNumeric(-2, -2, 4));
+  assert.equal(neg.negative, true); assert.deepEqual(neg.band, [0.5, 0.75], "scaled by the larger side");
+  assert.deepEqual(barBand({ min: -5, max: -1 }, 0), { band: [0, 1], negative: true }, "all negative hangs from the top");
+  const log = { min: 0, max: 999, logScale: true };
+  const c = encodeNumeric(9, 0, 999, true);
+  assert.equal(c, Math.round(255 * Math.log(10) / Math.log(1000)), "log(value + 1) over log(max + 1)");
+  assert.ok(Math.abs(numericValue(log, c) - 9) < 0.2, "and the code decodes back to the value");
+  assert.equal(numericValue({ min: 40, max: 80 }, 255), 80);
+});
+
+test("clinical values the portal reserves a colour for keep it, whatever the attribute; Edit colours still wins", () => {
+  const sex = { label: "SEX", categories: ["Male", "Female", "Unknown", "Intersex"] };
+  assert.deepEqual([0, 1, 2].map((i) => trackCategoryColor(sex, i, STYLE)), ["#2986e2", "#e0699e", "#d3d3d3"]);
+  assert.equal(trackCategoryColor(sex, 3, STYLE), STYLE.palette.categorical[3], "an unreserved value takes the cycle");
+  const os = { label: "OS_STATUS", categories: ["1:DECEASED", "0:LIVING", "Disease Free", "DISEASEFREE"] };
+  assert.deepEqual([0, 1, 2, 3].map((i) => trackCategoryColor(os, i, STYLE)), ["#d95f02", "#1b9e77", "#1b9e77", "#1b9e77"], "case and spaces do not matter");
+  assert.equal(trackCategoryColor(sex, 1, STYLE, { SEX: { Female: "#123456" } }), "#123456");
 });

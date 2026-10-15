@@ -6,18 +6,13 @@
 // panel-aware frequencies — separated from where the rows come from. `buildContract`
 // fetches from ClickHouse and calls this; a CLI or a notebook can call it on local
 // tables, and a port in another language has this function as its conformance target.
-import { heatmapTrackLabel } from "./profile-names.ts";
+import { heatmapTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
+import { STYLE, encodeNumeric } from "./oncoprint-style.ts";
 import type { Contract, Track, GroupRange, ZReference, ResolvedDisplay, DisplaySpec, SortKeySpec } from "./types.ts";
 
-// gene-track cell bitmask
-export const BITS = {
-  MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16,
-  SV: 32, AMP: 64, HOMDEL: 128,
-  DRIVER: 256,      // any alteration in the cell is annotated (putative) driver
-  PROMOTER: 512,    // 5'Flank / promoter mutations
-  MRNA_HIGH: 1024, MRNA_LOW: 2048, PROT_HIGH: 4096, PROT_LOW: 8192
-};
+// gene-track cell bitmask: one definition, the style's
+export const BITS = STYLE.bits;
 export const NOT_PROFILED = -1;
 
 export function mutClassBit(mt: string | undefined): number {
@@ -103,7 +98,7 @@ export interface AssembleInput {
   genes: GeneTrackSpec[];
   /** column groups: name + column ids in fetch order; a column id appears in at most one group */
   groups: { name: string; pids: string[] }[];
-  /** study label(s) for the contract header; more than one adds a categorical Study track */
+  /** study label(s) for the contract header; more than one adds the categorical "Study of origin" track */
   studies: string[];
   /** column id -> study, required when studies.length > 1 */
   studyOf?: Map<string, string>;
@@ -115,6 +110,17 @@ export interface AssembleInput {
    * where one integer per patient is far cheaper to send than an array of names).
    */
   coverage: ({ pid: string; genes: string[] } | { pid: string; mask: number })[];
+  /**
+   * The portal's "Profiled for <type>" rows: which alteration types the figure draws (`types`),
+   * and per column a bitmask over PROFILED_TYPES of those its samples were profiled for. A row
+   * appears only for a type some columns were and some were not profiled for, as in the portal.
+   */
+  profiled?: { types: ProfiledType[]; masks: { pid: string; mask: number }[] };
+  /**
+   * Samples per column, patient columns only. Adds the portal's "# Samples per Patient" row when
+   * some patient has more than one.
+   */
+  samples?: { pid: string; n: number }[];
   /** driver call per event, and the source to echo in conventions */
   isDriver: (r: EventRow) => boolean;
   annotationSource: string;
@@ -188,15 +194,23 @@ export function assembleContract(input: AssembleInput): Contract {
   // driver amplification and a passenger missense keeps only the amplification, and a merged
   // row's driver in one gene does not smuggle another gene's passenger through. What was
   // dropped is counted so a caption can say so.
+  //
+  // Driver status is per glyph, as in the portal: SV_DRIVER for the structural variant,
+  // MUT_DRIVER for the mutation band, and DRIVER for "some alteration here is a driver" (the
+  // driver %, the sort). The portal ranks every driver mutation above every VUS one whatever
+  // the class, so a VUS mutation's class is held aside and joins the cell only where no driver
+  // mutation does — a VUS truncation beside a driver missense shows as the driver missense.
   const hideVus = !!input.display?.hideVUS;
   let hiddenVus = 0;
+  const vusMut = new Map<Int32Array, Uint16Array>();   // mutation class bits all sit below 1024
   for (const r of events) {
     const i = pidIndex.get(r.pid);
     if (i === undefined) continue;
     const rows = rowsOfGene.get(r.gene);
     if (!rows) continue;
     let bit = 0;
-    if (r.vt === "mutation") bit = mutClassBit(r.mt);
+    const mut = r.vt === "mutation";
+    if (mut) bit = mutClassBit(r.mt);
     else if (r.vt === "structural_variant") bit = BITS.SV;
     else if (r.vt === "cna") bit = Number(r.cna) >= 2 ? BITS.AMP : (Number(r.cna) <= -2 ? BITS.HOMDEL : 0);
     if (!bit) continue;
@@ -206,9 +220,20 @@ export function assembleContract(input: AssembleInput): Contract {
       for (const cells of rows) if (cells[i] === NOT_PROFILED) cells[i] = 0;   // it was still assayed
       continue;
     }
-    if (driver) bit |= BITS.DRIVER;
+    if (mut && !driver) {
+      for (const cells of rows) {
+        let held = vusMut.get(cells);
+        if (!held) { held = new Uint16Array(cells.length); vusMut.set(cells, held); }
+        held[i] |= bit;
+        if (cells[i] === NOT_PROFILED) cells[i] = 0;
+      }
+      continue;
+    }
+    if (driver) bit |= BITS.DRIVER | (mut ? BITS.MUT_DRIVER : bit === BITS.SV ? BITS.SV_DRIVER : 0);
     for (const cells of rows) cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | bit; // an observed event implies profiled
   }
+  for (const [cells, held] of vusMut)
+    for (let i = 0; i < cells.length; i++) if (held[i] && !(cells[i] & BITS.MUT_DRIVER)) cells[i] |= held[i];
 
   phase("gene cells");
 
@@ -235,7 +260,32 @@ export function assembleContract(input: AssembleInput): Contract {
     const catIdx = new Map<string, number>(studies.map((s, i) => [s, i]));
     const cells = new Int32Array(allPids.length).fill(-1);
     allPids.forEach((p, i) => { const s = studyOf.get(p); if (s != null) cells[i] = catIdx.get(s)!; });
-    clinTracks.push({ kind: "clinical", label: "Study", categories: studies.slice(), cells });
+    clinTracks.push({ kind: "clinical", label: STUDY_TRACK, categories: studies.slice(), cells });
+  }
+  if (input.samples && unit === "patient") {
+    const n = new Int32Array(allPids.length);
+    for (const r of input.samples) { const i = pidIndex.get(r.pid); if (i !== undefined) n[i] = r.n; }
+    let max = 0;
+    for (let i = 0; i < n.length; i++) if (n[i] > max) max = n[i];
+    if (max > 1) {
+      const cells = new Int32Array(allPids.length);
+      for (let i = 0; i < n.length; i++) cells[i] = n[i] ? Math.round(255 * n[i] / max) : -1;
+      clinTracks.push({ kind: "clinical", label: SAMPLES_TRACK, numeric: true, bar: true, peak: true, min: 0, max, cells });
+    }
+  }
+  if (input.profiled) {
+    const mask = new Int32Array(allPids.length);
+    for (const r of input.profiled.masks) { const i = pidIndex.get(r.pid); if (i !== undefined) mask[i] |= r.mask; }
+    const rows: Track[] = [];
+    for (const type of input.profiled.types) {
+      const bit = 1 << PROFILED_TYPES.findIndex(([t]) => t === type);
+      const cells = new Int32Array(allPids.length);
+      let yes = 0;
+      for (let i = 0; i < allPids.length; i++) if (mask[i] & bit) yes++; else cells[i] = -1;
+      if (yes === 0 || yes === allPids.length) continue;
+      rows.push({ kind: "clinical", label: profiledTrackLabel(type), categories: [STYLE.glyph.profiled.yes], profiledFor: type, cells });
+    }
+    clinTracks.push(...rows.sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true })));
   }
   for (const { attr, values: valByPid } of clinical) {
     // One string-keyed lookup per column, then three passes over a positional array. The map
@@ -265,15 +315,19 @@ export function assembleContract(input: AssembleInput): Contract {
       continue;
     }
     if (nNumeric >= 0.9 * nPresent && distinct.size > 10) {
-      const span = max - min || 1;
+      // drawn as bars over the data's range, as the portal does; its fixed range for a fraction
+      // of the genome, and its log scale for mutation counts
+      const fraction = attr === "FRACTION_GENOME_ALTERED";
+      if (fraction) { min = Math.min(min, 0); max = Math.max(max, 1); }
+      const logScale = attr === "MUTATION_COUNT" && min >= 0;
       const cells = new Int32Array(allPids.length).fill(-1);
       for (let i = 0; i < val.length; i++) {
         const v = val[i];
         if (v == null) continue;
         const x = Number(v);
-        if (Number.isFinite(x)) cells[i] = Math.round(255 * (x - min) / span);
+        if (Number.isFinite(x)) cells[i] = encodeNumeric(x, min, max, logScale);
       }
-      clinTracks.push({ kind: "clinical", numeric: true, label: attr, min, max, cells });
+      clinTracks.push({ kind: "clinical", numeric: true, bar: true, ...(logScale ? { logScale } : {}), label: attr, min, max, cells });
       continue;
     }
     const counts = new Map<string, number>();
@@ -432,7 +486,9 @@ export function assembleContract(input: AssembleInput): Contract {
 
   phase("sort");
   // ---- track meta (panel-aware frequencies) -----------------------------
-  const tracks: Track[] = [];
+  // Rows top to bottom in the portal's order: clinical (the study, sample-count and profiled-for
+  // rows first), then the derived-cohort rows beside them, then genes, then heatmaps.
+  const tracks: Track[] = clinTracks.map((t) => ({ ...t, cells: remap(t.cells) }));
   // an overlay is evidence about the gene, not an alteration of it: expression does not
   // enter the altered fraction, which is what the portal reports too
   const ALT = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
@@ -446,6 +502,11 @@ export function assembleContract(input: AssembleInput): Contract {
       freqPct: profiled ? Math.round(1000 * altered / profiled) / 10 : null,
       driverPct: profiled ? Math.round(1000 * driverAltered / profiled) / 10 : null };
   };
+  for (const t of devTracks) {
+    const cells = remap(t.cells);
+    tracks.push({ ...t, cells, altered: cells.filter((c) => c === 1).length, profiled: cells.length,
+      freqPct: Math.round(1000 * cells.filter((c) => c === 1).length / cells.length) / 10 });
+  }
   for (const gt of geneTracks) {
     const cells = remap(geneCells.get(gt.label)!);
     const { profiled, altered, driverAltered, freqPct, driverPct } = geneCounts(cells);
@@ -462,13 +523,7 @@ export function assembleContract(input: AssembleInput): Contract {
       }) } : {})
     });
   }
-  for (const t of devTracks) {
-    const cells = remap(t.cells);
-    tracks.push({ ...t, cells, altered: cells.filter((c) => c === 1).length, profiled: cells.length,
-      freqPct: Math.round(1000 * cells.filter((c) => c === 1).length / cells.length) / 10 });
-  }
   for (const t of heatTracks) tracks.push({ ...t, cells: remap(t.cells) });
-  for (const t of clinTracks) tracks.push({ ...t, cells: remap(t.cells) });
 
   phase("track meta");
   return {

@@ -6,6 +6,7 @@ Python side of the same pure functions; the TypeScript module is the reference.
 from __future__ import annotations
 
 import json
+import math
 import os
 from typing import Any
 
@@ -15,38 +16,31 @@ with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.json")
 BITS: dict[str, int] = STYLE["bits"]
 
 
-def cell_layers(code: int, S: dict[str, Any] = STYLE) -> list[tuple[str, tuple[float, float], float, float]]:
-    """Fills for one gene cell, bottom to top: (colour, (band from, band to), alpha, stroke px)."""
+def cell_layers(code: int, S: dict[str, Any] = STYLE) -> list[tuple[str, tuple[float, float], float]]:
+    """Fills for one gene cell, bottom to top: (colour, (band from, band to), stroke px)."""
     G, B = S["glyph"], S["bits"]
     if code == -1:
         npf = G["notProfiled"]
-        return [(npf["fill"], (0.0, 1.0), 1.0, 0.0), (npf["stripe"]["color"], tuple(npf["stripe"]["band"]), 1.0, 0.0)]
-    out = [(S["palette"]["unaltered"], (0.0, 1.0), 1.0, 0.0)]
+        return [(npf["fill"], (0.0, 1.0), 0.0), (npf["stripe"]["color"], tuple(npf["stripe"]["band"]), 0.0)]
+    out = [(S["palette"]["unaltered"], (0.0, 1.0), 0.0)]
     if code <= 0:
         return out
-    driver = bool(code & B["DRIVER"])
-    pair = G.get("vusStyle") == "pair"
-    alpha = 1.0 if driver or pair else G["vusAlpha"]
-
-    def paint(e: dict[str, Any]) -> str:
-        return e["color"] if driver or not pair else e.get("vus", e["color"])
-
     for o in G["cna"]["options"]:
         if code & B[o["bit"]]:
-            out.append((paint(o), tuple(G["cna"]["band"]), alpha, 0.0))
+            out.append((o["color"], tuple(G["cna"]["band"]), 0.0))
             break
     for o in G["mrna"]["options"]:
         if code & B[o["bit"]]:
-            out.append((paint(o), tuple(G["mrna"]["band"]), 1.0, float(G["mrna"]["stroke"])))
+            out.append((o["color"], tuple(G["mrna"]["band"]), float(G["mrna"]["stroke"])))
             break
     for o in G["protein"]["options"]:
         if code & B[o["bit"]]:
-            out.append((paint(o), tuple(o["band"]), 1.0, 0.0))
+            out.append((o["color"], tuple(o["band"]), 0.0))
     if code & B[G["sv"]["bit"]]:
-        out.append((paint(G["sv"]), tuple(G["sv"]["band"]), alpha, 0.0))
+        out.append((G["sv"]["color"] if code & B["SV_DRIVER"] else G["sv"]["vus"], tuple(G["sv"]["band"]), 0.0))
     for m in G["mutation"]["priority"]:
         if code & B[m["bit"]]:
-            out.append((paint(m), tuple(G["mutation"]["band"]), alpha, 0.0))
+            out.append((m["color"] if code & B["MUT_DRIVER"] else m["vus"], tuple(G["mutation"]["band"]), 0.0))
             break
     return out
 
@@ -72,6 +66,43 @@ def numeric_rgb(v: float, center: float | None, S: dict[str, Any] = STYLE) -> tu
 def numeric_color(v: float, center: float | None, S: dict[str, Any] = STYLE) -> str:
     r, g, b = numeric_rgb(v, center, S)
     return f"rgb({r},{g},{b})"
+
+
+# ---- numeric cells (port of encodeNumeric / numericValue / barBand) ------------------------------
+
+def _js_round(x: float) -> int:
+    return int(math.floor(x + 0.5))
+
+
+def encode_numeric(x: float, lo: float, hi: float, log_scale: bool = False) -> int:
+    """The 0..255 code for value x on a track scaled over lo..hi (log(value + |lo| + 1) when log_scale)."""
+    if log_scale:
+        s = abs(lo) + 1
+        base = math.log(lo + s)
+        return _js_round(255 * (math.log(x + s) - base) / ((math.log(hi + s) - base) or 1))
+    return _js_round(255 * (x - lo) / ((hi - lo) or 1))
+
+
+def numeric_value(meta: dict[str, Any], code: int) -> float:
+    """The value a numeric cell's code stands for."""
+    lo, hi, f = meta.get("min", 0), meta.get("max", 1), code / 255
+    if meta.get("logScale"):
+        s = abs(lo) + 1
+        base = math.log(lo + s)
+        return math.exp(base + f * (math.log(hi + s) - base)) - s
+    return lo + f * (hi - lo)
+
+
+def bar_band(meta: dict[str, Any], code: int) -> tuple[tuple[float, float], bool]:
+    """Where a bar sits in its cell (fractions of the row) and whether it is negative: the portal's bar rule."""
+    lo, hi, f = meta.get("min", 0), meta.get("max", 1), code / 255
+    if lo >= 0 or meta.get("logScale"):
+        return (1 - f, 1.0), False
+    if hi <= 0:
+        return (0.0, 1 - f), True
+    v = numeric_value(meta, code)
+    r = v / max(-lo, hi)
+    return ((0.5 - 0.5 * r, 0.5), False) if v >= 0 else ((0.5, 0.5 - 0.5 * r), True)
 
 
 def category_color(i: int, S: dict[str, Any] = STYLE) -> str:
@@ -111,16 +142,57 @@ def track_label_text(track: Any, S: dict[str, Any] = STYLE) -> str:
     return open_b + (label[: n - 1] + "…" if len(label) > n else label) + close_b
 
 
-def gene_legend(S: dict[str, Any] = STYLE) -> list[tuple[str, str, str]]:
-    """(label, colour, kind) in display order: mutations by priority, SV, CNA, mRNA, protein, not profiled."""
-    G = S["glyph"]
-    items = [(m["label"], m["color"], "swatch") for m in G["mutation"]["priority"]]
-    items.append((G["sv"]["label"], G["sv"]["color"], "swatch"))
-    items += [(o["label"], o["color"], "swatch") for o in G["cna"]["options"]]
-    items += [(o["label"], o["color"], "outline") for o in G["mrna"]["options"]]
-    items += [(o["label"], o["color"], "swatch") for o in G["protein"]["options"]]
+def glyph_presence(codes: Any, S: dict[str, Any] = STYLE) -> dict[str, Any]:
+    """What gene cells draw, for a legend (port of glyphPresence): bits, and driver / VUS per band.
+
+    `codes` may repeat; pass distinct ones (np.unique) for a large contract."""
+    B, G = S["bits"], S["glyph"]
+    out = {"bits": 0, "mutDriver": 0, "mutVus": 0, "svDriver": False, "svVus": False}
+    for c in {int(x) for x in codes if int(x) > 0}:
+        out["bits"] |= c
+        if c & B[G["sv"]["bit"]]:
+            out["svDriver" if c & B["SV_DRIVER"] else "svVus"] = True
+        for m in G["mutation"]["priority"]:
+            if c & B[m["bit"]]:
+                out["mutDriver" if c & B["MUT_DRIVER"] else "mutVus"] |= B[m["bit"]]
+                break
+    return out
+
+
+def gene_legend(S: dict[str, Any] = STYLE, present: dict[str, Any] | None = None) -> list[tuple[str, str, str]]:
+    """(label, colour, kind) in display order: mutations by priority, SV, CNA, mRNA, protein, not profiled.
+
+    A glyph whose driver and VUS colours differ gets an entry for each; with `present`, only what the cells draw."""
+    G, B, L = S["glyph"], S["bits"], S["glyph"]["driverLabels"]
+    items: list[tuple[str, str, str]] = []
+
+    def pair(e: dict[str, Any], drv: bool, vus: bool) -> None:
+        if e["color"] == e["vus"]:
+            if drv or vus:
+                items.append((e["label"], e["color"], "swatch"))
+            return
+        if drv:
+            items.append((e["label"] + L["driver"], e["color"], "swatch"))
+        if vus:
+            items.append((e["label"] + L["vus"], e["vus"], "swatch"))
+
+    def has(bit: str) -> bool:
+        return present is None or bool(present["bits"] & B[bit])
+
+    for m in G["mutation"]["priority"]:
+        pair(m, present is None or bool(present["mutDriver"] & B[m["bit"]]), present is None or bool(present["mutVus"] & B[m["bit"]]))
+    pair(G["sv"], present is None or present["svDriver"], present is None or present["svVus"])
+    items += [(o["label"], o["color"], "swatch") for o in G["cna"]["options"] if has(o["bit"])]
+    items += [(o["label"], o["color"], "outline") for o in G["mrna"]["options"] if has(o["bit"])]
+    items += [(o["label"], o["color"], "swatch") for o in G["protein"]["options"] if has(o["bit"])]
     items.append((G["notProfiled"]["label"], G["notProfiled"]["stripe"]["color"], "notProfiled"))
-    return items
+    seen: set[tuple[str, str]] = set()
+    out = []
+    for it in items:
+        if (it[0], it[1]) not in seen:
+            seen.add((it[0], it[1]))
+            out.append(it)
+    return out
 
 
 # ---- user overrides ----------------------------------------------------------
@@ -190,26 +262,38 @@ def resolve_style(overrides: dict[str, Any] | None = None, S: dict[str, Any] = S
     return merged
 
 
+def reserved_color(value: str, S: dict[str, Any] = STYLE) -> str | None:
+    """The portal's fixed colour for a clinical value, if it has one (port of reservedColor)."""
+    return S["palette"]["reserved"].get(_re.sub(r"\s", "", value).lower())
+
+
 def track_category_color(track: Any, code: int, S: dict[str, Any] = STYLE, colors: dict[str, dict[str, str]] | None = None) -> str:
-    """Colour for a categorical cell, honouring display.colors[trackLabel][value]."""
+    """Colour for a categorical cell: display.colors[trackLabel][value], then a reserved colour, then the cycle."""
     cats = (track.meta.get("categories") if hasattr(track, "meta") else None) or []
     value = cats[code] if 0 <= code < len(cats) else None
     if value is not None and colors and track.label in colors:
         override = colors[track.label].get(value)
         if override:
             return override
-    return category_color(code, S)
+    if hasattr(track, "meta") and track.meta.get("profiledFor"):
+        return S["glyph"]["profiled"]["color"]
+    return (reserved_color(value, S) if value is not None else None) or category_color(code, S)
 
 
 def style_for_display(S: dict[str, Any], display: dict[str, Any] | None) -> dict[str, Any]:
     """The style a figure draws with, given its viewing options (port of styleForDisplay)."""
-    if not display or display.get("colorByType") is not False:
-        return S
-    one = S["glyph"]["mutation"]["single"]
-    out = dict(S)
-    glyph = dict(S["glyph"])
-    mut = dict(glyph["mutation"])
-    mut["priority"] = [{**m, "color": one["color"], "vus": one["vus"], "label": one["label"]} for m in mut["priority"]]
-    glyph["mutation"] = mut
-    out["glyph"] = glyph
+    d = display or {}
+    out = S
+    if d.get("colorByType") is False:
+        one = out["glyph"]["mutation"]["single"]
+        mut = {**out["glyph"]["mutation"], "priority": [{**m, "color": one["color"], "vus": one["vus"], "label": one["label"]}
+                                                      for m in out["glyph"]["mutation"]["priority"]]}
+        out = {**out, "glyph": {**out["glyph"], "mutation": mut}}
+    if d.get("annotate") == "none":
+        G = out["glyph"]
+        out = {**out, "glyph": {**G, "sv": {**G["sv"], "vus": G["sv"]["color"]},
+                                "mutation": {**G["mutation"], "priority": [{**m, "vus": m["color"]} for m in G["mutation"]["priority"]]}}}
+    if d.get("whiteBackground"):
+        out = {**out, "palette": {**out["palette"], "unaltered": "#ffffff"},
+               "glyph": {**out["glyph"], "notProfiled": {**out["glyph"]["notProfiled"], "fill": "#ffffff"}}}
     return out

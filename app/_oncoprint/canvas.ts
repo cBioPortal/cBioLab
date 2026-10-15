@@ -9,12 +9,11 @@
 // hiding unaltered columns or re-sorting on the client never touches the data.
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 
-import { STYLE, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatGutterPct, trackLabelText, resolveStyle, type Style } from "../../lib/oncoprint-style.ts";
+import { STYLE, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatGutterPct, trackLabelText, resolveStyle, type Style } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
 export const BITS = STYLE.bits;
-export const CAT_COLORS = STYLE.palette.categorical;
 export const PALETTE = {
   paper: STYLE.palette.paper, unaltered: STYLE.palette.unaltered, np: STYLE.glyph.notProfiled.fill, npStripe: STYLE.glyph.notProfiled.stripe.color,
   derived: STYLE.palette.derived, text: STYLE.palette.text, muted: STYLE.palette.muted, groupLine: STYLE.palette.groupLine
@@ -77,7 +76,7 @@ export function segmentByTrack(data: UnpackedContract, order: Uint32Array, group
   const t = data.tracks.find((x) => x.label === trackLabel);
   if (!t || !t.categories) return groups;
   const cats = t.categories;
-  const nameOf = (c: number): string => c === -1 ? "no data" : cats[c] ?? "Other";
+  const nameOf = (c: number): string => c === -1 ? (t.profiledFor ? STYLE.glyph.profiled.no : "no data") : cats[c] ?? "Other";
   const out: VisibleGroup[] = [];
   const multi = groups.length > 1;
   for (const g of groups) {
@@ -114,19 +113,29 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
   S: Style, colors?: Record<string, Record<string, string>>): void {
   if (t.kind === "gene") {
     for (const l of cellLayers(code, S)) {
-      if (l.alpha < 1) ctx.globalAlpha = l.alpha;
       if (l.stroke) {
         const sw = Math.min(l.stroke, w / 2 || l.stroke);
         ctx.strokeStyle = l.color; ctx.lineWidth = sw;
         ctx.strokeRect(x + sw / 2, y + sw / 2, Math.max(0, w - sw), h - sw);
       } else { ctx.fillStyle = l.color; ctx.fillRect(x, y + h * l.band[0], w, h * (l.band[1] - l.band[0])); }
-      if (l.alpha < 1) ctx.globalAlpha = 1;
     }
     return;
   }
   if (t.kind === "derivedEvent") { ctx.fillStyle = code > 0 ? P.derived : P.unaltered; ctx.fillRect(x, y, w, h); return; }
-  if (t.numeric) { ctx.fillStyle = code === -1 ? P.np : styleNumericColor(code, t.center, S); ctx.fillRect(x, y, w, h); return; }
-  ctx.fillStyle = code === -1 ? P.np : trackCategoryColor(t, code, S, colors); ctx.fillRect(x, y, w, h);
+  if (code === -1) {
+    // the portal's no-data glyph: the not-profiled cell's white and midline
+    const [s0, s1] = S.glyph.notProfiled.stripe.band;
+    ctx.fillStyle = P.np; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = P.npStripe; ctx.fillRect(x, y + h * s0, w, h * (s1 - s0));
+    return;
+  }
+  if (t.bar) {
+    const { band, negative } = barBand(t, code);
+    ctx.fillStyle = negative ? S.glyph.bar.negative : S.glyph.bar.color; ctx.fillRect(x, y + h * band[0], w, h * (band[1] - band[0]));
+    return;
+  }
+  if (t.numeric) { ctx.fillStyle = styleNumericColor(code, t.center, S); ctx.fillRect(x, y, w, h); return; }
+  ctx.fillStyle = trackCategoryColor(t, code, S, colors); ctx.fillRect(x, y, w, h);
 }
 
 /** The palette a contract draws with: defaults, or its own `display.style` override. */
@@ -155,9 +164,11 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   ctx.textBaseline = "alphabetic";
   const zoom = view.zoom, sx = view.scrollX;
   const offs = groupOffsets(groups, zoom, gap);
-  const pad = view.whitespace && zoom >= STYLE.geometry.padMinZoom ? Math.min(STYLE.geometry.cellPadMax, Math.floor(zoom * STYLE.geometry.padFraction)) : 0;
+  const pad = view.whitespace && zoom >= STYLE.geometry.padMinZoom ? STYLE.geometry.cellPad : 0;
   let cellsDrawn = 0, bucketsDrawn = 0;
   const scratch = new Int32Array(64);
+  const dpr = ctx.getTransform().a || 1;
+  const snap = (v: number): number => Math.round(v * dpr) / dpr;
 
   // clip the plot area so partially visible edge columns never bleed into the gutter
   ctx.save();
@@ -173,7 +184,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
     ctx.fillStyle = P.muted;
     if (gw >= 24) ctx.fillText(g.name + (gw >= 90 ? " (" + g.patients.toLocaleString("en-US") + ")" : ""), Math.max(gutter, gx - sx + gutter), 13, Math.max(20, gw + gapPx - 4));
     data.tracks.forEach((t, ti) => {
-      const y = header + ti * (rowH + rowGap);
+      const y = snap(header + ti * (rowH + rowGap));
       if (opts.pctLabels && g.pct && g.pct[ti] != null) {
         ctx.fillStyle = P.muted; ctx.font = "10px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
         if (pctLeft) { ctx.textAlign = "right"; ctx.fillText(formatPct(g.pct[ti]), gx - sx + gutter - 3, y + 14, gapPx - 4); ctx.textAlign = "left"; }
@@ -182,8 +193,13 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
       }
       if (zoom >= 1) {
         for (let k = k0; k < k1; k++) {
-          const x = gx + k * zoom - sx + gutter;
-          drawCell(ctx, t, t.cells[order[g.start + k]], x, y, Math.max(0.5, zoom - pad), rowH, P, S, colors);
+          // Column edges snapped to device pixels: at a fractional zoom, two cells sharing a
+          // pixel each antialias their edge against the paper, and the paper shows through
+          // as a seam every few columns. Snapped, neighbours meet exactly, and the gap (when
+          // there is one) is cut from the next column's snapped edge, so every gap is the
+          // same width and only cell widths absorb the rounding — no beat between the two.
+          const xa = snap(gx + k * zoom - sx + gutter), xNext = snap(gx + (k + 1) * zoom - sx + gutter);
+          drawCell(ctx, t, t.cells[order[g.start + k]], xa, y, Math.max(1 / dpr, snap(xNext - pad) - xa), rowH, P, S, colors);
           cellsDrawn++;
         }
       } else {
@@ -194,7 +210,10 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
           const kk1 = Math.min(k1, Math.max(kk0 + 1, Math.floor((px + 1 + sx - gx) / zoom)));
           if (kk0 >= kk1) continue;
           const code = aggregate(t, order, g.start + kk0, g.start + kk1, scratch);
-          drawCell(ctx, t, code, px + gutter, y, 1, rowH, P, S, colors);
+          // snapped like the columns above: at a fractional pixel ratio (1.25, 1.5, browser
+          // zoom) a CSS pixel is not a whole device pixel, and unsnapped buckets seam
+          const xa = snap(px + gutter);
+          drawCell(ctx, t, code, xa, y, snap(px + 1 + gutter) - xa, rowH, P, S, colors);
           bucketsDrawn++;
         }
       }
@@ -246,13 +265,14 @@ export function decodeGene(code: number): string {
   if (code === 0) return "no alteration";
   const B = BITS as Record<string, number>;
   const parts: string[] = [];
-  for (const m of STYLE.glyph.mutation.priority) if (code & B[m.bit]) parts.push(m.label.toLowerCase());
-  if (code & BITS.SV) parts.push(STYLE.glyph.sv.label.toLowerCase());
-  for (const o of STYLE.glyph.cna.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase());
+  // driver status is per glyph: the mutation band's, the SV's; a copy number change has none drawn
+  const sig = (bit: number): string => (code & bit ? " (putative driver)" : " (unknown significance)");
+  const muts = STYLE.glyph.mutation.priority.filter((m) => code & B[m.bit]).map((m) => m.label.toLowerCase());
+  if (muts.length) parts.push(muts.join(", ") + sig(BITS.MUT_DRIVER));
+  if (code & BITS.SV) parts.push(STYLE.glyph.sv.label.toLowerCase() + sig(BITS.SV_DRIVER));
+  for (const o of STYLE.glyph.cna.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase() + (code & BITS.DRIVER && !(code & (BITS.MUT_DRIVER | BITS.SV_DRIVER)) ? " (putative driver)" : ""));
   for (const o of STYLE.glyph.mrna.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase());
   for (const o of STYLE.glyph.protein.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase());
-  const ALT = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
-  if (code & ALT) parts.push(code & BITS.DRIVER ? "putative driver" : "unknown significance");
   return parts.join(" · ");
 }
 

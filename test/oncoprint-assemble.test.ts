@@ -34,12 +34,12 @@ test("cells: bitmask, driver bit, NOT_PROFILED from coverage, event implies prof
   const c = assembleContract(input());
   const byLabel = Object.fromEntries(c.tracks.map((t) => [t.label, t]));
   const col = (p: string) => c.columns.indexOf(p);
-  assert.equal(byLabel.TP53.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER);
+  assert.equal(byLabel.TP53.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER | BITS.MUT_DRIVER);
   assert.equal(byLabel.TP53.cells[col("P2")], BITS.TRUNCATING);
   assert.equal(byLabel.KRAS.cells[col("P2")], BITS.AMP | BITS.DRIVER);
   assert.equal(byLabel.KRAS.cells[col("P3")], 0, "gain is below the high-level threshold");
   assert.equal(byLabel.KRAS.cells[col("P4")], NOT_PROFILED, "P4's panel does not cover KRAS");
-  assert.equal(byLabel.TP53.cells[col("P5")], BITS.SV | BITS.DRIVER, "an event on an uncovered patient still draws");
+  assert.equal(byLabel.TP53.cells[col("P5")], BITS.SV | BITS.DRIVER | BITS.SV_DRIVER, "an event on an uncovered patient still draws");
   assert.equal(byLabel.KRAS.cells[col("P5")], NOT_PROFILED);
 });
 
@@ -91,13 +91,20 @@ test("clinical typing: categorical with Other, numeric only past 10 distinct val
   const age = c.tracks.find((t) => t.label === "AGE")!;
   assert.equal(age.numeric, undefined, "five distinct values among the columns is categorical, whatever else the map holds");
   assert.ok(c.tracks.some((t) => t.label === "MISSING (no data)"));
-  assert.deepEqual(c.tracks.map((t) => t.kind), ["gene", "gene", "derivedEvent", "clinical", "clinical", "clinical"]);
+  assert.deepEqual(c.tracks.map((t) => t.kind), ["clinical", "clinical", "clinical", "derivedEvent", "gene", "gene"], "the portal's order: clinical above the genes");
 
   const pids = Array.from({ length: 12 }, (_, i) => "P" + (i + 1));
   const wide = assembleContract({ ...input(), groups: [{ name: "A", pids }],
     clinical: [{ attr: "AGE", values: new Map(pids.map((p, i) => [p, String(40 + i * 3)])) }, { attr: "ST", values: new Map(pids.map((p, i) => [p, "s" + (i % 9)])) }] });
   const num = wide.tracks.find((t) => t.label === "AGE")!;
   assert.equal(num.numeric, true); assert.equal(num.min, 40); assert.equal(num.max, 73);
+  assert.equal(num.bar, true, "a numeric clinical row is drawn as bars, as in the portal");
+  const fga = assembleContract({ ...input(), groups: [{ name: "A", pids }],
+    clinical: [{ attr: "FRACTION_GENOME_ALTERED", values: new Map(pids.map((p, i) => [p, String(0.1 + i * 0.02)])) },
+      { attr: "MUTATION_COUNT", values: new Map(pids.map((p, i) => [p, String(i * i)])) }] });
+  const f = fga.tracks.find((t) => t.label === "FRACTION_GENOME_ALTERED")!;
+  assert.deepEqual([f.min, f.max], [0, 1], "a fraction of the genome is drawn over 0..1");
+  assert.equal(fga.tracks.find((t) => t.label === "MUTATION_COUNT")!.logScale, true, "mutation counts on a log scale");
   assert.equal(num.cells[wide.columns.indexOf("P12")], 255);
   assert.equal(num.cells[wide.columns.indexOf("P1")], 0);
   const st = wide.tracks.find((t) => t.label === "ST")!;
@@ -150,12 +157,47 @@ test("the unit labels the contract and names what a column is", () => {
   assert.deepEqual(sm.tracks.map((t) => t.cells), pt.tracks.map((t) => t.cells));
 });
 
-test("more than one study adds a Study track from studyOf", () => {
+test("more than one study adds the \"Study of origin\" track from studyOf", () => {
   const c = assembleContract({ ...input(), studies: ["s1", "s2"], studyOf: new Map([["P1", "s1"], ["P2", "s1"], ["P3", "s2"], ["P4", "s2"], ["P5", "s2"]]) });
-  const st = c.tracks.find((t) => t.label === "Study")!;
+  const st = c.tracks.find((t) => t.label === "Study of origin")!;
   assert.deepEqual(st.categories, ["s1", "s2"]);
   assert.equal(st.cells[c.columns.indexOf("P3")], 1);
   assert.equal(c.study, "s1 + s2");
+});
+
+test("profiled-for rows: one per drawn type some columns lack, after the study track, 'No' as no data", () => {
+  // bits over PROFILED_TYPES: 1 mutations, 2 CNA, 4 SV, 8 mRNA
+  const masks = [{ pid: "P1", mask: 7 }, { pid: "P2", mask: 7 }, { pid: "P3", mask: 1 | 4 }, { pid: "P4", mask: 7 }, { pid: "P5", mask: 7 | 8 }];
+  const c = assembleContract({ ...input(), studies: ["s1", "s2"], studyOf: new Map([["P1", "s1"], ["P2", "s1"], ["P3", "s2"], ["P4", "s2"], ["P5", "s2"]]),
+    profiled: { types: ["MUTATION_EXTENDED", "COPY_NUMBER_ALTERATION", "STRUCTURAL_VARIANT", "MRNA_EXPRESSION"], masks } });
+  const clin = c.tracks.filter((t) => t.kind === "clinical");
+  assert.deepEqual(clin.map((t) => t.label).slice(0, 3), ["Study of origin", "Profiled for copy number alterations", "Profiled for mRNA expression"],
+    "every column has mutations and SV, so those rows say nothing and are left out, as in the portal");
+  const cna = clin[1];
+  assert.equal(cna.profiledFor, "COPY_NUMBER_ALTERATION");
+  assert.deepEqual(cna.categories, ["Yes"]);
+  assert.equal(cna.cells[c.columns.indexOf("P3")], -1);
+  assert.equal(cna.cells[c.columns.indexOf("P1")], 0);
+  // nobody profiled is as silent as everybody profiled
+  const none = assembleContract({ ...input(), profiled: { types: ["PROTEIN_LEVEL"], masks } });
+  assert.ok(!none.tracks.some((t) => t.profiledFor));
+});
+
+test("# Samples per Patient: a bar row from zero, only when some patient has more than one sample", () => {
+  const samples = [{ pid: "P1", n: 1 }, { pid: "P2", n: 3 }, { pid: "P3", n: 1 }, { pid: "P4", n: 2 }, { pid: "P5", n: 1 }];
+  const masks = ["P1", "P2", "P3", "P4"].map((pid) => ({ pid, mask: 1 }));
+  const c = assembleContract({ ...input(), samples, profiled: { types: ["MUTATION_EXTENDED"], masks } });
+  const clin = c.tracks.filter((t) => t.kind === "clinical");
+  assert.deepEqual(clin.slice(0, 2).map((t) => t.label), ["# Samples per Patient", "Profiled for mutations"], "the portal's order");
+  const t = clin[0];
+  assert.ok(t.numeric && t.bar);
+  assert.equal(t.min, 0); assert.equal(t.max, 3);
+  assert.equal(t.cells[c.columns.indexOf("P2")], 255);
+  assert.equal(t.cells[c.columns.indexOf("P1")], 85, "one sample of a most of three is a third of the cell");
+  const one = assembleContract({ ...input(), samples: samples.map((r) => ({ ...r, n: 1 })) });
+  assert.ok(!one.tracks.some((x) => x.label === "# Samples per Patient"), "nobody with more than one: no row");
+  const bySample = assembleContract({ ...input(), unit: "sample", samples });
+  assert.ok(!bySample.tracks.some((x) => x.label === "# Samples per Patient"), "a sample column is one sample");
 });
 
 // ---- merged gene rows (cBioPortal's `[TP53 MDM2]`) -------------------------
@@ -167,10 +209,10 @@ test("a merged row is the OR of its members, and profiled where any member was",
   const t = c.tracks.find((x) => x.label === "pathway")!;
   const col = (p: string) => c.columns.indexOf(p);
   assert.deepEqual(t.members, ["TP53", "KRAS"]);
-  assert.equal(t.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER);
+  assert.equal(t.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER | BITS.MUT_DRIVER);
   assert.equal(t.cells[col("P2")], BITS.TRUNCATING | BITS.AMP | BITS.DRIVER, "both members' bits land in one cell");
   assert.equal(t.cells[col("P4")], 0, "profiled for TP53 only, and unaltered in both");
-  assert.equal(t.cells[col("P5")], BITS.SV | BITS.DRIVER);
+  assert.equal(t.cells[col("P5")], BITS.SV | BITS.DRIVER | BITS.SV_DRIVER);
 });
 
 test("a merged row's denominator is the union of its members' panels", () => {
@@ -178,7 +220,7 @@ test("a merged row's denominator is the union of its members' panels", () => {
   // P4's panel covers TP53 but not KRAS; on its own KRAS is profiled in 3 columns, TP53 in 5
   i.genes = [{ genes: ["TP53", "KRAS"] }];
   const c = assembleContract(i);
-  const t = c.tracks[0];
+  const t = c.tracks.find((x) => x.kind === "gene")!;
   assert.equal(t.label, "TP53 / KRAS", "the default label names the members");
   assert.equal(t.profiled, 5, "union: every column profiled for either gene");
   assert.equal(t.altered, 3, "P1, P2 and P5; P3's low-level gain is not an alteration and P4 has none");
@@ -203,7 +245,7 @@ test("the staircase ranks a merged row as one row", () => {
   const i = input();
   i.genes = [{ label: "either", genes: ["TP53", "KRAS"] }];
   const c = assembleContract(i);
-  const t = c.tracks[0];
+  const t = c.tracks.find((x) => x.kind === "gene")!;
   // within group A: P2 (amp, driver) outranks P1 (missense driver) outranks P3 (unaltered)
   assert.deepEqual(c.columns.slice(0, 3), ["P2", "P1", "P3"]);
   assert.ok(t.cells[0] & BITS.AMP);
@@ -214,7 +256,7 @@ test("a merged row draws its members' overlays too", () => {
   i.genes = [{ label: "either", genes: ["TP53", "KRAS"] }];
   i.overlays = [{ kind: "mrna", profileType: "rna", threshold: 2, values: new Map([["P3|KRAS", 3.1], ["P1|TP53", -2.5]]) }];
   const c = assembleContract(i);
-  const t = c.tracks[0];
+  const t = c.tracks.find((x) => x.kind === "gene")!;
   const col = (p: string) => c.columns.indexOf(p);
   assert.ok(t.cells[col("P3")] & BITS.MRNA_HIGH, "KRAS expression lands on the merged row");
   assert.ok(t.cells[col("P1")] & BITS.MRNA_LOW);
@@ -229,8 +271,9 @@ test("hiding unknown significance drops the alteration, not the whole cell", () 
   const col = (p: string) => c.columns.indexOf(p);
   // P2 has a non-driver TP53 truncation and a driver KRAS amp: the truncation goes, the amp stays.
   // A merged row must not let one gene's driver smuggle another gene's passenger through.
-  assert.equal(c.tracks[0].cells[col("P2")], BITS.AMP | BITS.DRIVER);
-  assert.equal(c.tracks[0].cells[col("P1")], BITS.MISSENSE | BITS.DRIVER, "a driver is kept");
+  const row = c.tracks.find((x) => x.kind === "gene")!;
+  assert.equal(row.cells[col("P2")], BITS.AMP | BITS.DRIVER);
+  assert.equal(row.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER | BITS.MUT_DRIVER, "a driver is kept");
   assert.equal(c.stats.hiddenVus, 1);
 });
 

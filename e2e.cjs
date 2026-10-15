@@ -605,12 +605,17 @@ async function main() {
         await page.waitForSelector("canvas", { timeout: 300000 });
         await page.waitForTimeout(2500);
         const box = await page.locator("canvas").first().boundingBox();
-        await page.mouse.move(box.x + 40, box.y + 32);          // the merged row's gutter label
-        await page.waitForTimeout(600);
-        const tip = await page.evaluate(() => {
-          const d = document.querySelector(".onco-tip");
-          return d ? d.innerText.replace(/\n/g, " | ") : null;
-        });
+        // clinical rows (# Samples per Patient, Profiled for ...) sit above the genes, as in the
+        // portal, so walk the gutter labels down (header 22px, rows 20 + 3px) to the merged row's
+        let tip = null;
+        for (let row = 0; row < 8 && !(tip && /TP53 pathway/.test(tip)); row++) {
+          await page.mouse.move(box.x + 40, box.y + 22 + row * 23 + 10);
+          await page.waitForTimeout(400);
+          tip = await page.evaluate(() => {
+            const d = document.querySelector(".onco-tip");
+            return d ? d.innerText.replace(/\n/g, " | ") : null;
+          });
+        }
         mergedOk = !!tip && /TP53 pathway/.test(tip) && /MDM2/.test(tip) && /MDM4/.test(tip) && /profiled/.test(tip);
         mergedWhat = tip || "no tooltip on the track label";
       } catch (e) { mergedWhat = String(e.message).split("\n")[0]; }

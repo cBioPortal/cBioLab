@@ -1762,8 +1762,19 @@ export interface Track {
   byGroup?: { group: string; altered: number; profiled: number; freqPct: number | null; driverPct: number | null }[];
   /** categorical clinical tracks */
   categories?: string[];
+  /**
+   * A "Profiled for <type>" row: category 0 is "Yes" and a cell without a value means "No".
+   * Renderers draw it in the style's `glyph.profiled` colour.
+   */
+  profiledFor?: string;
   /** numeric clinical + heatmap tracks (cells scaled 0..255; -1 = no data) */
   numeric?: boolean; min?: number; max?: number; center?: number | null;
+  /** draw a numeric track as bars (barBand in the style), as the portal draws numeric clinical attributes */
+  bar?: boolean;
+  /** the cells scale log(value + |min| + 1) rather than the value (the portal's rule for mutation counts) */
+  logScale?: boolean;
+  /** zoomed out, a bucket shows its largest value rather than the mean: the row points at exceptions */
+  peak?: boolean;
   gene?: string; profileType?: string; note?: string;
 }
 export interface GroupRange { name: string; start: number; count: number; patients?: number }

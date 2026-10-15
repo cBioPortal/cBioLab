@@ -1,19 +1,22 @@
 // Contract -> tab-separated table, the portal's "Tabular" download shape:
 // one row per track (track_name, track_type, then one column per case in oncoprint order).
 import { BITS, NOT_PROFILED } from "./oncoprint-assemble.ts";
+import { STYLE, numericValue } from "./oncoprint-style.ts";
 import type { Contract } from "./types.ts";
 
 export function geneCellLabel(code: number): string {
   if (code === NOT_PROFILED) return "not profiled";
   if (code <= 0) return "";
-  const drv = code & BITS.DRIVER ? " (putative driver)" : " (unknown significance)";
+  // driver status is per glyph, as drawn: the mutation band's and the SV's own bits
+  const mut = code & BITS.MUT_DRIVER ? " (putative driver)" : " (unknown significance)";
   const parts: string[] = [];
-  if (code & BITS.MISSENSE) parts.push("Missense Mutation" + drv);
-  if (code & BITS.TRUNCATING) parts.push("Truncating Mutation" + drv);
-  if (code & BITS.INFRAME) parts.push("Inframe Mutation" + drv);
-  if (code & BITS.SPLICE) parts.push("Splice Mutation" + drv);
-  if (code & BITS.OTHER_MUT) parts.push("Other Mutation" + drv);
-  if (code & BITS.SV) parts.push("Structural Variant" + drv);
+  if (code & BITS.MISSENSE) parts.push("Missense Mutation" + mut);
+  if (code & BITS.TRUNCATING) parts.push("Truncating Mutation" + mut);
+  if (code & BITS.INFRAME) parts.push("Inframe Mutation" + mut);
+  if (code & BITS.SPLICE) parts.push("Splice Mutation" + mut);
+  if (code & BITS.PROMOTER) parts.push("Promoter Mutation" + mut);
+  if (code & BITS.OTHER_MUT) parts.push("Other Mutation" + mut);
+  if (code & BITS.SV) parts.push("Structural Variant" + (code & BITS.SV_DRIVER ? " (putative driver)" : " (unknown significance)"));
   if (code & BITS.AMP) parts.push("Amplification");
   if (code & BITS.HOMDEL) parts.push("Deep Deletion");
   return parts.join(", ");
@@ -28,8 +31,8 @@ export function contractToTsv(contract: Contract): string {
       const c = cells[i];
       if (t.kind === "gene") vals[i] = geneCellLabel(c);
       else if (t.kind === "derivedEvent") vals[i] = c > 0 ? "yes" : "no";
-      else if (t.numeric) vals[i] = c === -1 ? "" : String(Math.round(((t.min ?? 0) + (c / 255) * ((t.max ?? 1) - (t.min ?? 0))) * 100) / 100);
-      else vals[i] = c === -1 ? "" : (t.categories && t.categories[c]) ?? "Other";
+      else if (t.numeric) vals[i] = c === -1 ? "" : String(Math.round(numericValue(t, c) * 100) / 100);
+      else vals[i] = c === -1 ? (t.profiledFor ? STYLE.glyph.profiled.no : "") : (t.categories && t.categories[c]) ?? "Other";
     }
     const type = t.kind === "gene" ? "GENE" : t.kind === "heatmap" ? "HEATMAP " + (t.profileType || "") : t.kind === "derivedEvent" ? "DERIVED" : "CLINICAL";
     lines.push(t.label + "\t" + type + "\t" + vals.join("\t"));

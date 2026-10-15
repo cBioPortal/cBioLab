@@ -9,9 +9,9 @@
 // changes cause a refetch; everything else is applied to the decoded arrays in place.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import { GEOM, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
+import { GEOM, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
-import { geneLegendFor, resolveStyle, styleForDisplay, trackTooltipLines } from "../../lib/oncoprint-style.ts";
+import { STYLE, geneLegend, glyphPresence, numericValue, resolveStyle, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { setPngDpi } from "../../lib/png-dpi.ts";
@@ -42,11 +42,9 @@ const EXPORT_PRESETS: { label: string; in: number }[] = [
  * so a figure at a given inch width has the same proportions whether exported as SVG or PNG */
 const EXPORT_LAYOUT_DPI = 96;
 
-/** unaltered cells drawn white; not-profiled keeps its stripe, which is what still tells them apart */
-function withBackground(S: ReturnType<typeof resolveStyle>, white?: boolean) {
-  if (!white) return S;
-  return { ...S, palette: { ...S.palette, unaltered: "#ffffff" },
-    glyph: { ...S.glyph, notProfiled: { ...S.glyph.notProfiled, fill: "#ffffff" } } };
+/** the style this figure draws with: its own override, then the browser's viewing options and the spec's annotation */
+function figureStyle(data: UnpackedContract, display: FigureDisplay) {
+  return styleForDisplay(resolveStyle(data.display?.style), { ...display, annotate: data.display?.annotate });
 }
 
 /**
@@ -298,7 +296,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     cv.style.width = cssW + "px"; cv.style.height = H + "px";
     const ctx = cv.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const S = withBackground(styleForDisplay(resolveStyle(data.display?.style), display), display.whiteBackground);
+    const S = figureStyle(data, display);
     const r = draw(ctx, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, Math.max(0, view.scrollX)) },
       cssW, paletteOf(S), { gap: gapPx, pctLabels: pctMode, style: S, colors: display.colors ?? data.display?.colors });
     const mem = (performance as any).memory;
@@ -344,7 +342,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     cv.style.width = w + "px"; cv.style.height = H + "px";
     const ctx = cv.getContext("2d")!;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const S2 = withBackground(styleForDisplay(resolveStyle(data.display?.style), display), display.whiteBackground);
+    const S2 = figureStyle(data, display);
     draw(ctx, data, visible.order, visible.groups, { zoom: fitZoom(visible.groups, w - GEOM.gutter, gapPx), scrollX: 0, whitespace: display.whitespace },
       w, paletteOf(S2), { gap: gapPx, pctLabels: pctMode, style: S2, colors: display.colors ?? data.display?.colors });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -594,8 +592,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         if (t.members && t.members.length > 1) lines.push({ text: "merged: " + t.members.join(" · "), dim: true });
       }
       else if (t.kind === "derivedEvent") lines.push({ text: t.label + ": " + (c > 0 ? "yes" : "no") });
-      else if (t.numeric) lines.push({ text: t.label + ": " + (c === -1 ? "no data" : "≈" + (Math.round(((t.min ?? 0) + (c / 255) * ((t.max ?? 1) - (t.min ?? 0))) * 10) / 10)) });
-      else lines.push({ text: t.label + ": " + (c === -1 ? "no data" : (t.categories && t.categories[c]) || "Other") });
+      else if (t.numeric) lines.push({ text: t.label + ": " + (c === -1 ? "no data" : "≈" + (Math.round(numericValue(t, c) * 10) / 10)) });
+      else lines.push({ text: t.label + ": " + (c === -1 ? (t.profiledFor ? STYLE.glyph.profiled.no : "no data") : (t.categories && t.categories[c]) || "Other") });
     } else if (t.kind === "gene" || t.kind === "derivedEvent") {
       let alt = 0, prof = 0;
       for (let k = hit.k; k < hit.k1; k++) { const c = t.cells[visible.order[k]]; if (c !== -1) prof++; if (c > 0) alt++; }
@@ -661,7 +659,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         // so 8.5in looks like a page at any resolution, and the pixel count is exactly widthIn*dpi
         const w = Math.max(200, Math.round(exportWidthIn * EXPORT_LAYOUT_DPI));
         const scale = exportDpi / EXPORT_LAYOUT_DPI;
-        const S2 = withBackground(styleForDisplay(resolveStyle(data.display?.style), display), display.whiteBackground);
+        const S2 = figureStyle(data, display);
         const cv = document.createElement("canvas");
         const H = canvasHeight(data.tracks.length);
         cv.width = Math.round(w * scale); cv.height = Math.round(H * scale);
@@ -849,7 +847,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem", padding: "0.2rem 0.3rem", maxHeight: 200, overflowY: "auto" }}>
                       {t.categories.map((v, ci) => (
                         <label key={v} className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                          <input type="color" value={(display.colors?.[t.label]?.[v]) || CAT_COLORS[ci % CAT_COLORS.length]}
+                          <input type="color" value={trackCategoryColor(t, ci, figureStyle(data, display), display.colors)}
                             onChange={(e) => set({ colors: { ...(display.colors || {}), [t.label]: { ...(display.colors?.[t.label] || {}), [v]: e.target.value } } })}
                             style={{ width: 26, height: 18, padding: 0, border: "none", background: "none" }} />
                           <span style={{ flex: 1 }}>{v}</span>
@@ -952,7 +950,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             onMouseMove={(e) => { if (e.buttons === 1) miniScroll(e); }} />
         )}
         <div className="vfoot">
-          <Legend data={data} colorByType={display.colorByType} colors={display.colors ?? data.display?.colors} white={display.whiteBackground} />
+          <Legend data={data} display={display} colors={display.colors ?? data.display?.colors} />
           {props.footer}
         </div>
         {props.timings && (
@@ -1015,28 +1013,37 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   );
 }
 
-function Legend({ data, colorByType, colors, white }: { data: UnpackedContract; colorByType: boolean; colors?: Record<string, Record<string, string>>; white?: boolean }) {
-  const S = styleForDisplay(resolveStyle(data.display?.style), { colorByType });
+const fmtRange = (x: number): string => (Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : String(Math.round(x * 10) / 10));
+
+function Legend({ data, display, colors }: { data: UnpackedContract; display: FigureDisplay; colors?: Record<string, Record<string, string>> }) {
+  const S = figureStyle(data, display);
+  const white = display.whiteBackground;
   const P = paletteOf(S);
-  let bitsPresent = 0;
-  for (const t of data.tracks) if (t.kind === "gene") for (let i = 0; i < t.cells.length; i++) if (t.cells[i] > 0) bitsPresent |= t.cells[i];
+  // bits and priority are read-only in a style override, so what the cells draw is the data's alone
+  const present = useMemo(() => glyphPresence(data.tracks), [data]);
   const sw = (c: string, w = 10) => <span style={{ display: "inline-block", width: w, height: 10, background: c, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />;
-  const np = <span style={{ display: "inline-block", width: 10, height: 10, background: `linear-gradient(${P.np} 45%, ${P.npStripe} 45%, ${P.npStripe} 55%, ${P.np} 55%)`, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />;
+  const [s0, s1] = S.glyph.notProfiled.stripe.band;
+  const np = <span style={{ display: "inline-block", width: 10, height: 10, background: `linear-gradient(${P.np} calc(${s0 * 100}% - 0.5px), ${P.npStripe} calc(${s0 * 100}% - 0.5px), ${P.npStripe} calc(${s1 * 100}% + 0.5px), ${P.np} calc(${s1 * 100}% + 0.5px))`, boxShadow: "inset 0 0 0 1px " + P.npStripe, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />;
   if (data.display?.clinicalLegends === "none") return null;
   return (
     <div className="onco-legend">
-      {geneLegendFor(bitsPresent, S).map((it) => <span key={it.label}>{it.kind === "notProfiled" ? np
+      {geneLegend(S, present).map((it) => <span key={it.label + it.color}>{it.kind === "notProfiled" ? np
         : it.kind === "outline" ? <span style={{ display: "inline-block", width: 10, height: 10, border: "2px solid " + it.color, background: P.unaltered, marginRight: 4, verticalAlign: -1, borderRadius: 2, boxSizing: "border-box" }} />
         : sw(it.color)}{it.label}</span>)}
       {data.tracks.some((t) => t.kind === "derivedEvent") && <span>{sw(P.derived)}Derived event</span>}
-      <span>{S.glyph.driverNote} · % = driver / any</span>
+      <span>% = driver / any</span>
       {white && <span className="mark">white background: unaltered and not-profiled differ only by the stripe</span>}
       {data.stats.hiddenVus != null && <span className="mark">{data.stats.hiddenVus.toLocaleString()} alterations of unknown significance hidden — the percentages are over drivers alone</span>}
       {data.display?.annotate === "none" && <span className="mark">driver annotation off: nothing is called a driver</span>}
       {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (
-        <span key={t.label}>{t.label}: {t.numeric
+        <span key={t.label}>{t.label}: {t.bar
+          ? <><span style={{ display: "inline-flex", alignItems: "flex-end", gap: 1, height: 10, marginRight: 4, verticalAlign: -1 }}>
+              {[3, 5, 7, 10].map((hh) => <span key={hh} style={{ width: 3, height: hh, background: S.glyph.bar.color }} />)}</span>
+              {fmtRange(t.min!)} → {fmtRange(t.max!)}{t.logScale ? " (log scale)" : ""}</>
+          : t.numeric
           ? <>{sw(t.center != null ? "linear-gradient(90deg,#2166ac,#fff,#b2182b)" : "linear-gradient(90deg,#deebf7,#084887)", 44)}{t.min} → {t.max}</>
-          : <>{(t.categories || []).slice(0, 8).map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw((colors && colors[t.label] && colors[t.label][c]) || CAT_COLORS[i % CAT_COLORS.length])}{c}</span>)}
+          : <>{(t.categories || []).slice(0, 8).map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw(trackCategoryColor(t, i, S, colors))}{c}</span>)}
+            {t.profiledFor && <span style={{ marginRight: 6 }}>{np}{S.glyph.profiled.no}</span>}
             {(t.categories || []).length > 8 && <span className="meta">+{(t.categories || []).length - 8} more</span>}</>}</span>
       ))}
     </div>

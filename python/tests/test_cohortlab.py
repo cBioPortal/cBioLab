@@ -33,12 +33,12 @@ class LocalTables(unittest.TestCase):
         c = self.op.contract
         col = c.columns.index
         tp53, kras, egfr = c.track("TP53"), c.track("KRAS"), c.track("EGFR")
-        self.assertEqual(int(tp53.cells[col("P01")]), BITS["MISSENSE"] | BITS["DRIVER"])
-        self.assertEqual(int(tp53.cells[col("P02")]), BITS["TRUNCATING"] | BITS["DRIVER"])
+        self.assertEqual(int(tp53.cells[col("P01")]), BITS["MISSENSE"] | BITS["DRIVER"] | BITS["MUT_DRIVER"])
+        self.assertEqual(int(tp53.cells[col("P02")]), BITS["TRUNCATING"] | BITS["DRIVER"] | BITS["MUT_DRIVER"])
         self.assertEqual(int(kras.cells[col("P03")]), BITS["AMP"] | BITS["DRIVER"])
         self.assertEqual(int(kras.cells[col("P08")]), 0, "GAIN is below the high-level threshold")
         self.assertEqual(int(egfr.cells[col("P05")]), NOT_PROFILED, "P05's panel does not cover EGFR")
-        self.assertEqual(int(egfr.cells[col("P04")]), BITS["MISSENSE"] | BITS["SV"] | BITS["DRIVER"])
+        self.assertEqual(int(egfr.cells[col("P04")]), BITS["MISSENSE"] | BITS["SV"] | BITS["DRIVER"] | BITS["MUT_DRIVER"], "the fusion is a VUS beside a driver missense")
         self.assertEqual(int(kras.cells[col("P12")]), NOT_PROFILED, "P12 has no coverage row and no event")
 
     def test_groups_and_frequencies(self):
@@ -139,21 +139,43 @@ class LevelOfDetailConformance(unittest.TestCase):
                     self.assertEqual(json.loads(r.stdout), bucket_codes(op.contract, buckets))
 
 
+class ExceptionRows(unittest.TestCase):
+    """The rows that point at exceptions keep them at low zoom (mirrors test/oncoprint-style.test.ts)."""
+
+    def test_profiled_and_bar_buckets(self):
+        from cohortlab.contract import Track
+        from cohortlab.render import aggregate, bucket_edges
+        prof = Track("clinical", "Profiled for mutations", np.array([0, 0, 0, -1, 0, 0], dtype=np.int32), {"categories": ["Yes"], "profiledFor": "MUTATION_EXTENDED"})
+        self.assertEqual(aggregate(prof, prof.cells, bucket_edges(6, 2)).tolist(), [0, -1])
+        bar = Track("clinical", "# Samples per Patient", np.array([128, 128, 255, 128, -1, -1], dtype=np.int32), {"numeric": True, "peak": True})
+        self.assertEqual(aggregate(bar, bar.cells, bucket_edges(6, 3)).tolist(), [128, 255, -1])
+
+
+class ReservedColors(unittest.TestCase):
+    def test_reserved_values_match_typescript(self):
+        from cohortlab.contract import Track
+        from cohortlab.style import STYLE, track_category_color
+        t = Track("clinical", "OS_STATUS", np.zeros(1, dtype=np.int32), {"categories": ["1:DECEASED", "Disease Free", "Female", "Intersex"]})
+        self.assertEqual([track_category_color(t, i) for i in range(3)], ["#d95f02", "#1b9e77", "#e0699e"])
+        self.assertEqual(track_category_color(t, 3), STYLE["palette"]["categorical"][3])
+
+
 class StyleOverrides(unittest.TestCase):
     """resolve_style mirrors lib/oncoprint-style.ts, and an override reaches the drawn pixels."""
 
     def test_merge_and_rejections(self):
         from cohortlab import STYLE, resolve_style
         self.assertIs(resolve_style(None), STYLE)
-        S = resolve_style({"palette": {"unaltered": "#f0f0f0"}, "glyph": {"vusAlpha": 0.6}})
+        S = resolve_style({"palette": {"unaltered": "#f0f0f0"}, "glyph": {"sv": {"vus": "#123456"}}})
         self.assertEqual(S["palette"]["unaltered"], "#f0f0f0")
-        self.assertEqual(S["glyph"]["vusAlpha"], 0.6)
+        self.assertEqual(S["glyph"]["sv"]["vus"], "#123456")
         self.assertEqual(S["palette"]["paper"], STYLE["palette"]["paper"])
-        self.assertEqual(STYLE["palette"]["unaltered"], "#e8ecee", "the defaults are not mutated")
+        self.assertEqual(STYLE["palette"]["unaltered"], "#bebebe", "the defaults are not mutated")
         for bad, msg in [({"palete": {}}, "not a style key"), ({"palette": {"unaltered": "red"}}, "#rrggbb"),
-                         ({"bits": {"AMP": 1}}, "read-only"), ({"glyph": {"vusAlpha": "half"}}, "must be a number"),
+                         ({"bits": {"AMP": 1}}, "read-only"), ({"geometry": {"rowH": "tall"}}, "must be a number"),
                          ({"glyph": {"mutation": {"priority": [{"bit": "MISSENSE"}, {}, {}, {}, {}, {}]}}}, "read-only"),
-                         ({"glyph": {"notProfiled": {"fill": "#e8ecee", "stripe": {"color": "#e8ecee"}}}}, "indistinguishable")]:
+                         ({"glyph": {"vusStyle": "fade"}}, "not a style key"),
+                         ({"glyph": {"notProfiled": {"fill": "#bebebe", "stripe": {"color": "#bebebe"}}}}, "indistinguishable")]:
             with self.subTest(bad=bad):
                 with self.assertRaisesRegex(ValueError, msg):
                     resolve_style(bad)
@@ -176,8 +198,11 @@ class StyleOverrides(unittest.TestCase):
                                        display={"style": {"palette": {"unaltered": "#f0f0f0"}}, "colors": {"CANCER_TYPE": {"Lung": "#123456"}}}, **opts)
         a, _ = raster(plain.contract, width=600)
         b, _ = raster(themed.contract, width=600)
-        self.assertTrue((a == np.array([232, 236, 238])).all(axis=2).any(), "the default unaltered grey is drawn")
-        self.assertFalse((b == np.array([232, 236, 238])).all(axis=2).any(), "and is gone once overridden")
+        self.assertTrue((a == np.array([190, 190, 190])).all(axis=2).any(), "the default unaltered grey is drawn")
+        grey = lambda img: int((img == np.array([190, 190, 190])).all(axis=2).sum())  # noqa: E731
+        # the not-profiled line is the same grey, so the override shows as the grey shrinking to that line
+        self.assertLess(grey(b), grey(a) // 4, "and is gone from unaltered cells once overridden")
+        self.assertTrue((b == np.array([240, 240, 240])).all(axis=2).any(), "which draw the override instead")
         self.assertTrue((b == np.array([240, 240, 240])).all(axis=2).any())
         self.assertTrue((b == np.array([0x12, 0x34, 0x56])).all(axis=2).any(), "the per-track colour is drawn")
 

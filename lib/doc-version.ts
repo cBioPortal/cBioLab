@@ -14,7 +14,7 @@
 
 import { flattenSplits, viewDrawProblem } from "./partition-arms.ts";
 
-export const DOC_VERSION = "2.5";
+export const DOC_VERSION = "2.6";
 
 /** what upgrading a document did, reported in the result so a reader is told, not left to notice */
 export interface DocUpgrade {
@@ -167,11 +167,38 @@ function viewsNameTheirCohorts(doc: AnyDoc, changes: string[]): AnyDoc {
   return { ...doc, views };
 }
 
+/**
+ * 2.5 → 2.6: an oncoprint's study track is named "Study of origin", as the portal names it, where
+ * it was "Study". A track's label is its sort key, so an oncoprint view sorting by "Study" is
+ * given the new name and sorts as before.
+ */
+function studyTrackRenamed(doc: AnyDoc, changes: string[]): AnyDoc {
+  if (!Array.isArray(doc.views)) return doc;
+  let fixed = 0;
+  const views = doc.views.map((v: AnyDoc) => {
+    if (!v || v.kind !== "oncoprint" || !Array.isArray(v.sort)) return v;
+    let hit = false;
+    const sort = v.sort.map((k: unknown) => {
+      if (k === "Study" || k === "-Study") { hit = true; return (k as string).replace("Study", "Study of origin"); }
+      if (k && typeof k === "object" && (k as AnyDoc).track === "Study") { hit = true; return { ...k, track: "Study of origin" }; }
+      return k;
+    });
+    if (!hit) return v;
+    fixed++;
+    return { ...v, sort };
+  });
+  if (!fixed) return doc;
+  changes.push(fixed + " oncoprint view" + (fixed === 1 ? "" : "s") + " sorting by the study track now name" +
+    (fixed === 1 ? "s" : "") + " it “Study of origin”, its new name");
+  return { ...doc, views };
+}
+
 /** each step upgrades from the version before `to`; unversioned documents start at the first */
 const STEPS: { to: string; run: (doc: AnyDoc, changes: string[]) => AnyDoc }[] = [
   { to: "2.3", run: partitionsToSplits },
   { to: "2.4", run: splitsNoLongerReplace },
-  { to: "2.5", run: viewsNameTheirCohorts }
+  { to: "2.5", run: viewsNameTheirCohorts },
+  { to: "2.6", run: studyTrackRenamed }
 ];
 
 /**

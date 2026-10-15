@@ -14,6 +14,7 @@ import numpy as np
 
 from .contract import BITS, DEFAULT_DISPLAY, NOT_PROFILED, Contract, Track
 from .gene_tracks import normalize_gene_tracks
+from .style import encode_numeric
 
 
 def _round(x: float) -> int:
@@ -103,6 +104,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
     # gene cannot smuggle another gene's passenger onto a merged row. The column stays profiled.
     hide_vus = bool((display or {}).get("hideVUS"))
     hidden_vus = 0
+    vus_mut: dict[int, tuple[np.ndarray, np.ndarray]] = {}
     for r in events:
         i = pid_index.get(r["pid"])
         if i is None:
@@ -127,10 +129,22 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 if cells[i] == NOT_PROFILED:
                     cells[i] = 0
             continue
+        mut = r["vt"] == "mutation"
+        if mut and not driver:
+            # a VUS mutation's class joins the cell only where no driver mutation does (the portal's precedence)
+            for cells in rows:
+                held = vus_mut.setdefault(id(cells), (cells, np.zeros(len(cells), dtype=np.uint16)))[1]
+                held[i] |= bit
+                if cells[i] == NOT_PROFILED:
+                    cells[i] = 0
+            continue
         if driver:
-            bit |= BITS["DRIVER"]
+            bit |= BITS["DRIVER"] | (BITS["MUT_DRIVER"] if mut else BITS["SV_DRIVER"] if bit == BITS["SV"] else 0)
         for cells in rows:
             cells[i] = (0 if cells[i] == NOT_PROFILED else int(cells[i])) | bit
+    for cells, held in vus_mut.values():
+        free = (held > 0) & ((cells & BITS["MUT_DRIVER"]) == 0)
+        cells[free] |= held[free].astype(cells.dtype)
 
     # ---- clinical tracks -------------------------------------------------
     clin: list[Track] = []
@@ -141,7 +155,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             s = study_of.get(p)
             if s is not None:
                 cells[i] = cat_idx[s]
-        clin.append(Track("clinical", "Study", cells, {"categories": list(studies)}))
+        clin.append(Track("clinical", "Study of origin", cells, {"categories": list(studies)}))
     for c in clinical:
         attr, val_by_pid = c["attr"], c["values"]
         present = [val_by_pid[p] for p in all_pids if p in val_by_pid]
@@ -150,15 +164,19 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             continue
         nums = [x for x in (_js_number(v) for v in present) if math.isfinite(x)]
         if present and len(nums) >= 0.9 * len(present) and len(set(nums)) > 10:
+            # bars over the data's range, as the portal draws them: its fixed range for a fraction of
+            # the genome, its log scale for mutation counts
             lo, hi = min(nums), max(nums)
-            span = (hi - lo) or 1
+            if attr == "FRACTION_GENOME_ALTERED":
+                lo, hi = min(lo, 0), max(hi, 1)
+            log_scale = attr == "MUTATION_COUNT" and lo >= 0
             cells = np.full(n, -1, dtype=np.int32)
             for i, p in enumerate(all_pids):
                 if p in val_by_pid:
                     x = _js_number(val_by_pid[p])
                     if math.isfinite(x):
-                        cells[i] = _round(255 * (x - lo) / span)
-            clin.append(Track("clinical", attr, cells, {"numeric": True, "min": _num(lo), "max": _num(hi)}))
+                        cells[i] = encode_numeric(x, lo, hi, log_scale)
+            clin.append(Track("clinical", attr, cells, {"numeric": True, "bar": True, **({"logScale": True} if log_scale else {}), "min": _num(lo), "max": _num(hi)}))
             continue
         counts: dict[str, int] = {}
         for p in all_pids:
@@ -296,7 +314,8 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
     columns = [all_pids[i] for i in order]
 
     # ---- track meta (panel-aware frequencies) -------------------------------
-    tracks: list[Track] = []
+    # rows top to bottom in the portal's order: clinical, derived-cohort rows, genes, heatmaps
+    tracks: list[Track] = [Track(t.kind, t.label, t.cells[order_arr], t.meta) for t in clin]
 
     def gene_counts(cells: np.ndarray) -> dict[str, Any]:
         """The pooled numbers and each group's: the same formula over a slice of the columns."""
@@ -307,6 +326,10 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 "freqPct": _round(1000 * altered / profiled) / 10 if profiled else None,
                 "driverPct": _round(1000 * driver_altered / profiled) / 10 if profiled else None}
 
+    for t in dev:
+        cells = t.cells[order_arr]
+        alt = int((cells == 1).sum())
+        tracks.append(Track(t.kind, t.label, cells, {**t.meta, "altered": alt, "profiled": int(cells.size), "freqPct": _round(1000 * alt / cells.size) / 10}))
     for gt in gene_tracks:
         cells = gene_cells[gt.label][order_arr]
         by_group = [{"group": g["name"], **{k: v for k, v in gene_counts(cells[g["start"]:g["start"] + g["count"]]).items() if k != "driverAltered"}}
@@ -315,13 +338,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             **({"members": list(gt.members)} if len(gt.members) > 1 else {}),
             **gene_counts(cells),
             **({"byGroup": by_group} if by_group is not None else {})}))
-    for t in dev:
-        cells = t.cells[order_arr]
-        alt = int((cells == 1).sum())
-        tracks.append(Track(t.kind, t.label, cells, {**t.meta, "altered": alt, "profiled": int(cells.size), "freqPct": _round(1000 * alt / cells.size) / 10}))
     for t in heat:
-        tracks.append(Track(t.kind, t.label, t.cells[order_arr], t.meta))
-    for t in clin:
         tracks.append(Track(t.kind, t.label, t.cells[order_arr], t.meta))
 
     return Contract(
