@@ -12,6 +12,7 @@ import type { SplitSpec } from "./partitions.tsx";
 import { withoutPartition, renamePartitionChild, flattenSplits, editSplits, splitKey, renameInViews } from "../../lib/partition-arms.ts";
 import { saveToServer, featureFromColumns, type StoredDataset } from "./custom-data-client.ts";
 import { api } from "./api.ts";
+import { cellExplorerFor, type CellExplorerDataset } from "../../lib/cell-explorer.ts";
 
 import type { DocStore } from "./doc-store.ts";
 
@@ -234,5 +235,25 @@ export function useCohortEdits(page: CohortEditsPage) {
     docs.set(d);
   };
 
-  return { cohortEditing, setCohortEditing, featureSaved, featureFromSelection, cohortFromSelection, removeCohort, runEdited, splitsFlat, setPartitionDef, removePartitionNamed, renamePartitionRow, splitCohortBy, analysisStudies, openCohortEdit, confirmCohortEdit, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary };
+  // ---- a cohort's cells in Cell Explorer ----------------------------------
+  /** the single-cell dataset a cohort's patients can be opened in, or null */
+  const cohortCells = (name: string): CellExplorerDataset | null =>
+    cellExplorerFor((doc.cohorts?.[name] as (CohortDef & { study?: string }) | undefined)?.study || doc.study || study);
+  /** open the cohort's donors' cells in a new tab: the tab opens on the click (a later one is a blocked pop-up), the link follows */
+  const openCohortCells = async (name: string) => {
+    const w = window.open("about:blank", "_blank");
+    try {
+      const j = await (await api.cellExplorer({ mode: "link", doc, cohort: name })).json();
+      if (j.error) throw new Error(j.error);
+      if (w) { w.opener = null; w.location.href = j.url; } else window.open(j.url, "_blank", "noopener");
+      setToast("“" + name + "”: " + j.donors.toLocaleString() + " of its " + j.patients.toLocaleString() + " patients " +
+        (j.donorsChecked ? "have cells in " + j.label + " — opened in Cell Explorer" : "opened in Cell Explorer (its donor list could not be checked)"));
+      setTimeout(() => setToast(null), 6000);
+    } catch (e) {
+      w?.close();
+      setError("Cell Explorer: " + String((e as Error)?.message || e));
+    }
+  };
+
+  return { cohortEditing, setCohortEditing, featureSaved, featureFromSelection, cohortFromSelection, removeCohort, runEdited, splitsFlat, setPartitionDef, removePartitionNamed, renamePartitionRow, splitCohortBy, analysisStudies, openCohortEdit, confirmCohortEdit, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary, cohortCells, openCohortCells };
 }

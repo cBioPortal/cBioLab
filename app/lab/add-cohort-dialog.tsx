@@ -13,6 +13,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../_ui/dialog"
 import { Input } from "../_ui/input";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { TB } from "../_ui/toolbar.ts";
+import { Textarea } from "../_ui/textarea";
+import { api } from "./api.ts";
+import type { CellExplorerDataset } from "../../lib/cell-explorer.ts";
 
 export interface AddCohortTarget {
   /** the view's id in the doc store: an edit made while the dialog is open cannot retarget it */
@@ -33,9 +36,9 @@ export interface LibraryState {
   examples: { name: string; desc: string; def: CohortDef }[];
 }
 
-type Source = "analysis" | "library" | "explore";
+type Source = "analysis" | "library" | "explore" | "cells";
 
-export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, onLogin, onClose }: {
+export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, onLogin, onClose, cells }: {
   target: AddCohortTarget | null;
   /** the analysis's cohorts in its order (the colour each has in its summary), with their sizes once known */
   analysis: { name: string; def: CohortDef; count: number | null; views: string[] }[];
@@ -45,6 +48,8 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
   onExplore: () => void;
   onLogin: () => void;
   onClose: () => void;
+  /** the study's single-cell dataset in Cell Explorer, when it has one: a cohort can come from its donors */
+  cells?: CellExplorerDataset | null;
 }) {
   const [source, setSource] = useState<Source>("analysis");
   const [q, setQ] = useState("");
@@ -105,6 +110,7 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
             <TabsTrigger value="analysis" className="px-3 text-md">In this analysis <span className="text-muted-foreground">{available.length}</span></TabsTrigger>
             <TabsTrigger value="library" className="px-3 text-md">Library</TabsTrigger>
             <TabsTrigger value="explore" className="px-3 text-md">Build in Explore</TabsTrigger>
+            {cells && <TabsTrigger value="cells" className="px-3 text-md">From Cell Explorer</TabsTrigger>}
           </TabsList>
         </Tabs>
 
@@ -154,7 +160,68 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
             <Button disabled={full} title={full ? addTitle("") : undefined} onClick={onExplore}>Open Explore</Button>
           </div>
         )}
+        {source === "cells" && cells && <CellsSource cells={cells} full={full} replaces={replaces} addTitle={addTitle}
+          nameFor={libraryName} onAdd={onAdd} />}
       </DialogContent>}
     </Dialog>
+  );
+}
+
+/**
+ * A cohort from Cell Explorer: a link to the dataset filtered to some donors, or donor ids pasted,
+ * matched to the study's patients on the server (lib/cell-explorer-server.ts). The text stays in
+ * this component while it is typed.
+ */
+function CellsSource({ cells, full, replaces, addTitle, nameFor, onAdd }: {
+  cells: CellExplorerDataset; full: boolean; replaces: boolean; addTitle: (what: string) => string;
+  nameFor: (name: string, def: CohortDef) => string; onAdd: (name: string, def?: CohortDef) => void;
+}) {
+  const [text, setText] = useState("");
+  const [name, setName] = useState("from Cell Explorer");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [found, setFound] = useState<{ def: CohortDef; donors: number; patients: number; unmatched: string[]; from: string } | null>(null);
+  const match = async () => {
+    setBusy(true); setErr(null); setFound(null);
+    try {
+      const j = await (await api.cellExplorer({ mode: "import", study: cells.study, text })).json();
+      if (j.error) throw new Error(j.error);
+      setFound(j);
+    } catch (e) { setErr(String((e as Error)?.message || e)); }
+    finally { setBusy(false); }
+  };
+  const as = found ? nameFor(name.trim() || "from Cell Explorer", found.def) : name.trim();
+  return (
+    <div className="acd-cells flex flex-col gap-2.5">
+      <p className="note mt-0">
+        Paste a Cell Explorer link to <strong>{cells.label}</strong> filtered by {cells.obsColumn} (its “share” link), or the donor
+        ids themselves, separated by commas, spaces or lines. They are matched to {cells.study}'s patients
+        {cells.patientAttribute ? " through " + cells.patientAttribute : ""}; the cohort is that list of patients.
+      </p>
+      <Textarea aria-label="Cell Explorer link or donor ids" rows={4} className="text-md md:text-md" value={text}
+        placeholder={"https://cell-explorer.cbioportal.org/view?config=…\nor SPECTRUM-OV-002, SPECTRUM-OV-007, …"}
+        onChange={(e) => { setText(e.target.value); setFound(null); }} />
+      <div className="viewtb">
+        <div className="tbz">
+          <Button variant="outline" size="sm" className={TB} disabled={busy || !text.trim()} onClick={() => void match()}>
+            {busy && <span className="spinner" />}Find patients</Button>
+        </div>
+      </div>
+      {err && <p className="error m-0">{err}</p>}
+      {found && <>
+        <p className="note m-0">
+          {found.donors.toLocaleString()} donor{found.donors === 1 ? "" : "s"} from the {found.from === "link" ? "link" : "list"} → <strong>{found.patients.toLocaleString()}</strong> patient{found.patients === 1 ? "" : "s"}
+          {found.unmatched.length > 0 && <> · <span className="text-destructive">{found.unmatched.length} not a donor of {cells.study}</span>: {found.unmatched.slice(0, 5).join(", ")}{found.unmatched.length > 5 ? ", …" : ""}</>}
+        </p>
+        <div className="viewtb">
+          <div className="tbz">
+            <label className="tbfield">name <Input aria-label="cohort name" className="h-ctl w-56 text-md md:text-md" value={name} onChange={(e) => setName(e.target.value)} /></label>
+            <Button variant="outline" size="sm" className={TB} disabled={full} title={addTitle("“" + as + "”")}
+              onClick={() => onAdd(as, found.def)}>{replaces ? "Use" : <><Plus />Add</>}</Button>
+          </div>
+        </div>
+        {as !== (name.trim() || "from Cell Explorer") && <p className="meta m-0">added as “{as}”, since this analysis already has a different “{name.trim()}”</p>}
+      </>}
+    </div>
   );
 }

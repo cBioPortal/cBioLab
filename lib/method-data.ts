@@ -147,6 +147,27 @@ export async function methodFiles(v: ViewResult, run: Run = runRecorded): Promis
     }
     if (wanted.includes("assays_moments.csv")) put("assays_moments.csv", toCsv([...numeric.values()], ["cohort", "entity", "n", "sx", "sxx"]));
     if (wanted.includes("assays_counts.csv")) put("assays_counts.csv", toCsv([...counts.values()], ["cohort", "entity", "value", "n"]));
+  } else if (v.kind === "composition" && v.composition) {
+    // per (cohort, part) n, Σp and Σp², summed over the cohort's studies
+    const parts = v.composition.parts.map((x) => x.id);
+    const acc = new Map<string, { n: number; sx: number[]; sxx: number[] }>();
+    for (const q of qs) {
+      const [, cohort] = /^composition:moments:(.*)$/.exec(q.label) || [];
+      if (cohort == null) continue;
+      const a = acc.get(cohort) || { n: 0, sx: parts.map(() => 0), sxx: parts.map(() => 0) };
+      for (const r of await run(q.study, q.sql)) {
+        a.n += Number(r.n);
+        if (!Number(r.n)) continue;
+        (r.sx as unknown as number[]).forEach((x, j) => { a.sx[j] += Number(x); });
+        (r.sxx as unknown as number[]).forEach((x, j) => { a.sxx[j] += Number(x); });
+      }
+      acc.set(cohort, a);
+    }
+    const rows: Row[] = v.composition.groups.flatMap((g) => {
+      const a = acc.get(g.cohort) || { n: 0, sx: parts.map(() => 0), sxx: parts.map(() => 0) };
+      return parts.map((part, j) => ({ cohort: g.cohort, part, n: a.n, sx: a.sx[j], sxx: a.sxx[j] }));
+    });
+    put("composition_moments.csv", toCsv(rows, ["cohort", "part", "n", "sx", "sxx"]));
   } else if (v.kind === "correlates") {
     const rows: Row[] = [];
     for (const q of qs.filter((q) => q.label === "correlates:moments")) rows.push(...(await run(q.study, q.sql)).map((r) => ({ study: q.study, ...r })));

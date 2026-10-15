@@ -16,6 +16,7 @@ import { cancertypesSvg } from "./cancertypes.ts";
 import { overlapSvg } from "./overlap.ts";
 import { enrichmentSvg } from "./enrichment.ts";
 import { assaysSvg } from "./assays.ts";
+import { compositionSvg } from "./composition.ts";
 import { correlatesSvg } from "./correlates.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
@@ -73,6 +74,10 @@ const FIGURES: Record<string, Figure> = {
   assays: {
     draw: (v, o) => v.assays && v.assays.tested > 0 ? assaysSvg(v, o) : null,
     title: (v) => "Generic assays" + (v.assays ? " — " + v.assays.profileName : "")
+  },
+  composition: {
+    draw: (v, o) => v.composition && v.composition.groups.some((g) => g.n > 0) ? compositionSvg(v, o) : null,
+    title: (v) => "Composition" + (v.composition ? " — " + v.composition.sourceName : "")
   },
   correlates: {
     draw: (v, o) => v.correlates && v.correlates.tested > 0 ? correlatesSvg(v, o) : null,

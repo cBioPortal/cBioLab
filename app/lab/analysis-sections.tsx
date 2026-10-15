@@ -55,6 +55,9 @@ export interface AnalysisCtx {
   /** whether a cohort has anything to save to the library, and the action that saves it */
   cohortSaveState: (name: string) => CohortSaveState | null;
   saveCohortToLibrary: (name: string) => Promise<void>;
+  /** the single-cell dataset a cohort's patients can be opened in (lib/cell-explorer.ts), and opening it */
+  cohortCells: (name: string) => import("../../lib/cell-explorer.ts").CellExplorerDataset | null;
+  openCohortCells: (name: string) => Promise<void>;
   loggedIn: boolean;
   viewTitle: (kind: string) => string;
   emptyViewHint: (kind: string) => string;
@@ -147,7 +150,7 @@ function EmptyViewCard({ ctx, vi }: { ctx: AnalysisCtx; vi: number }) {
 }
 
 export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
-  const { busy, catalogAttrs, cohortSaveState, cohortSource, doc, loggedIn, menuOpenRef, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, result, saveCohortToLibrary, setPartitionDef, setUpgradeNote, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, updateFromSaved, upgradeNote, viewTitle } = ctx;
+  const { busy, catalogAttrs, cohortCells, cohortSaveState, cohortSource, doc, openCohortCells, loggedIn, menuOpenRef, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, result, saveCohortToLibrary, setPartitionDef, setUpgradeNote, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, updateFromSaved, upgradeNote, viewTitle } = ctx;
   const [cohortOpen, setCohortOpen] = useState<Set<string>>(() => new Set());
   const names = Object.keys(doc.cohorts || {});
   const flat = splitsFlat();
@@ -190,6 +193,7 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
                       save={toSave && { onSave: () => saveCohortToLibrary(n), label: toSave.action === "create" ? "save to library" : "save changes to library",
                         title: toSave.action === "create" ? "save “" + toSave.as + "” to your library, to add it to other analyses"
                           : "write this cohort's definition and splits over “" + toSave.as + "” in your library" }}
+                      cells={cohortCells(n)} onCells={() => openCohortCells(n)}
                       menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
                     <div className="cohortbox-head">
                       <span className="cohortbox-name"><SeriesSwatch i={i} />{n}</span>

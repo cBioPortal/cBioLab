@@ -249,6 +249,7 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | `overlap` | `cohorts:[names] (2–6)` | **how cohorts' patients intersect**, cBioPortal's group-comparison Overlap tab: for every combination of the cohorts, the patients — and their samples — in exactly those cohorts and none of the others, with each cohort's own size. Two or three cohorts are drawn as the portal draws them, area-proportional diagrams of samples and of patients side by side; more as an UpSet plot. A cohort is a set of patients, so a patient's samples go wherever the patient does. Each study's database answers with one count per combination (a bitmask of membership) — counts only — and a cohort's size here must equal its own count, or the view says the definition gave two answers. Ids are study-qualified, so patients only ever overlap within a study |
 | `enrichment` | `alteration?:"mutation"|"cna"|"amp"|"homdel"|"sv", measure?:"any"|"driver", minAltered?:5, label?:12, cohorts:[2–6 names]` | **genomic-alteration enrichment across every gene**, cBioPortal's group-comparison Genomic Alterations tab: each gene's frequency of one alteration type per cohort, counted in SAMPLES over the samples profiled for that gene — samples on a panel listing it (counted per panel, then joined to its genes, Explore's own construction) plus whole-exome samples, and a sample altered off-panel counts as measured. Uncalled mutations are excluded as the portal excludes them; copy number is high-level only. Two cohorts: a two-sided Fisher test and the log2 ratio of the altered shares, drawn as a volcano beside the table; three or more: a chi-squared test. q is Benjamini–Hochberg across every gene tested; genes altered in fewer than `minAltered` samples, or unprofiled in a cohort, are counted as not tested. The caption warns that hypermutated tumours enrich almost every gene. Counts only |
 | `assays` | `profileType:"<generic-assay profile>", minN?:3, label?:12, cohorts:[2–6 names]` | **every entity of one generic-assay profile compared between cohorts**, cBioPortal's group-comparison tabs for generic assays (mutational signatures, arm-level copy number, treatment response, …): one value per sample (every sample of each cohort's patients) or per patient for a patient-level profile. A numeric profile: each entity's n, Σv and Σv² per cohort — values that are not numbers, such as a limit `">8"` or NA, are counted and left out — then Welch's t for two cohorts (drawn as a volcano of the difference in means) or Welch's ANOVA for more. A categorical one: each entity's count per value per cohort — NA and blank are not called and are counted apart — then a chi-squared test on cohort × value. q is Benjamini–Hochberg across every entity tested; an entity with fewer than `minN` values in a cohort, or with no spread, is counted as not tested. Per-probe methylation is refused (hundreds of thousands of probes), as is any profile past 20,000 entities. Counts and moments only |
+| `composition` | `profileType:"<generic-assay profile>", entities?:[ids] | attributes:["<numeric attribute>", …2–16], unit?:"patient"|"sample", normalize?:true, sort?:"<part>", cohorts:[1–8 names]` | **what each case is made of, as parts of a whole, compared between cohorts** — the stacked-bar panels of single-cell studies (cell types, cell states) and of signature studies. The parts are a generic-assay profile's entities (per sample, or per patient for a patient-level profile; at most 16 — choose them with `entities`) or 2–16 numeric clinical attributes, `custom:` uploads included (per patient unless `unit:"sample"`). A case with every part, none below zero and a sum above zero is kept, its parts divided by their sum unless `normalize:false`; the rest are counted as left out. Inside the database, per cohort: n, Σp and Σp² per part and Σ, Σ² of each case's Shannon entropy. Each cohort against the view's other cohorts pooled, part by part: log2 of the ratio of means (each + 0.001) and Welch's t, Benjamini–Hochberg across the comparisons (with two cohorts, once per part). The figure draws each cohort's cases as stacked bars ordered by `sort` (default the first part), beside the cohort's mean, and a cohort × part matrix; the bars come only from participants that may show cases, and past 2,000 cases a cohort is drawn as its mean alone, saying so. Sums only, apart from those bars, which carry no ids |
 | `mutations` | `gene:"<symbol>", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[≤6 names]` | **one gene's mutation table**, the table under cBioPortal's Mutations-tab lollipop: every called mutation of `gene` in each cohort's samples (uncalled calls left out), one row per call — sample, detailed cancer type, protein change, the OncoKB annotation at the pinned version, mutation and variant type, allele frequency (variant / variant + reference reads) with both read counts, the study's MUTATION_COUNT, chromosome, positions, alleles, mutation status. Column ids: `sample`, `cancerType`, `proteinChange`, `annotation`, `mutationType`, `variantType`, `vaf`, `altCount`, `refCount`, `mutCount`, `chr`, `start`, `end`, `ref`, `var`, `status`; shown by default: sample, cancerType, proteinChange, annotation, mutationType, mutCount (the portal's own). Searched, filtered and sorted as every table view is (see *Table views* below; default order drivers first, then by codon; `proteinChange` sorts by codon, `annotation` drivers first). Its rows name samples, so only a patient-level participant contributes them; any other study is named |
 | `table` | `unit?:"sample"|"patient", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[≤6 names]` | **the clinical data table**, cBioPortal's Clinical Data tab: one row per sample of each cohort's patients — carrying its patient's attributes too — or per patient (patient attributes only), with every clinical attribute the study records (highest priority first; at most 200 — past that, name the ones you want in `columns`), values as recorded. Column ids: `patient`, `sample` (or `samples`, the count, per patient), and the attribute ids; every one is shown by default. Searched, filtered and sorted as every table view is (see *Table views* below; an attribute the study declares NUMBER is numeric; default order patient and sample id). `attributes` and `sort.attribute` are older spellings of `columns` and `sort.column`. Its rows are patients, so only a patient-level participant contributes them; an aggregate-only or remote study is named with how many of each cohort's patients it holds. A patient in two cohorts is listed under each. A listing: no statistic |
 | `timeline` | `patient?:{study, id}, collapsed?:[track ids], expandGaps?:false, columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[1 name]` | **one patient's clinical timeline**, cBioPortal's patient-view Timeline: every clinical event the study records for `patient` (default: the first patient of the list), in days from diagnosis, as tracks — one per event type (case-folded), in the portal's order (sample acquisition, sequencing, surgery, … treatment, diagnosis, lab tests), nested by attribute as the portal nests them (Treatment by TREATMENT_TYPE → SUBTYPE → AGENT, Lab_Test by TEST, Diagnosis and Pathology by SUBTYPE; a lone "Other" level is folded into its parent). Points are events, bars are events with a stop date, same-day events stack with their count; samples are numbered markers (collection order) coloured by SAMPLE_TYPE; a lab test whose every RESULT is a number is a line chart (a result recorded as `<x`/`>x` is drawn hollow at x); STYLE_COLOR / STYLE_SHAPE attributes are honoured. Runs of four or more years with no event are cut to one dashed mark unless `expandGaps`. `collapsed` names tracks drawn folded, by id: the event type in lower case, then each nesting value, dot-joined (`treatment`, `treatment.Chemo`, `lab_test`). The cohort's patients to choose from — in the lab card, a dialog its navigator opens — are a table view (see *Table views* below) with column ids `patient`, `samples`, `events`, `first`, `last` (event days), `span` (days), `types` (event types recorded); default order patients with a timeline first, then by id. A named patient must be one of the cohort's patients. The view reads ONE cohort (name it in `cohorts` when the document has several). The result gives the drawn patient's `position` in the list's order (its search, filters and sort) — `index` from 0, and the `prev` and `next` patients as `{study, id}`, what the card's ‹ prev / next › step to by setting `patient`; null when the query leaves the patient out. Both the list and the timeline name a patient, so only a patient-level participant contributes; any other study is named. A listing: no statistic |
@@ -4010,7 +4011,269 @@ Runs on custom data: `luad-biopsy-site` (LUAD biopsy site (demo), 186 samples, c
 }
 ```
 
-### Example 59: Cancer types summary: RAS genes across 50,000 tumours
+### Example 59: Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)
+
+msk_spectrum_tme_2022 is 42 untreated high-grade serous ovarian cancers; 41 had scRNA-seq at several anatomical sites. scripts/gen-spectrum-sc-demo.py reads the public CELLxGENE cell annotations (cell states, per-cell pathway scores, per-cell 6p allele fraction) and summarises them per patient (solid sites pooled; ADX_ adnexal, NADX_ non-adnexal) and per cBioPortal sample (the scRNA-seq site of the same patient, 61 of 82 samples). Dysfunctional T/NK cells (TNK_DYSFUNC) have a median of 10.8% of T/NK cells in the 16 HRD-Dup tumours against 6.0% in the 14 FBI tumours, and naive/central-memory cells the reverse (7.5% against 11.1%), as in the paper's Fig. 4b. In adnexal cancer cells, JAK-STAT pathway activity has a median of 0.03 in HRD-Dup against -0.57 in FBI (Fig. 3e), and cancer-cell and T/NK-cell JAK-STAT correlate across patients (Spearman 0.74, Fig. 4e). Clonal 6p loss of heterozygosity (over 80% of cancer cells) is called in 4 patients, 3 of them HRD-Dup — the paper reports 4 of 41. By site, T cells are a median 43% of immune cells in the 22 adnexal samples against 54% in the 18 omental ones. These are summaries of public cell metadata, not the paper's statistical models.
+
+Runs on custom data: `spectrum-sc-composition` (SPECTRUM scRNA: cell-type composition (demo), 41 patients, columns IMM_T, IMM_B, IMM_PLASMA, IMM_MYELOID, IMM_DC, IMM_MAST, STR_CANCER, STR_FIBRO, STR_ENDO, ADX_IMM_T, ADX_IMM_B, ADX_IMM_PLASMA, ADX_IMM_MYELOID, ADX_IMM_DC, ADX_IMM_MAST, ADX_STR_CANCER, ADX_STR_FIBRO, ADX_STR_ENDO, NADX_IMM_T, NADX_IMM_B, NADX_IMM_PLASMA, NADX_IMM_MYELOID, NADX_IMM_DC, NADX_IMM_MAST, NADX_STR_CANCER, NADX_STR_FIBRO, NADX_STR_ENDO, N_IMMUNE, N_NONIMMUNE, N_CELLS, N_SITES, HAS_ASCITES_SCRNA); `spectrum-sc-tnk` (SPECTRUM scRNA: T/NK cell states (demo), 41 patients, columns TNK_CD4_T_CXCL13, TNK_CD4_T_naive, TNK_CD4_T_reg, TNK_CD8_T_CXCL13, TNK_CD8_T_ISG, TNK_CD8_T_cytotoxic, TNK_Cycling_T_NK, TNK_ILC, TNK_NK_CD56, TNK_NK_cytotoxic, TNK_NAIVE_CM, TNK_DYSFUNC, TNK_TREG, CD8_DYSFUNC_OF_CD8, ADX_TNK_CD4_T_CXCL13, ADX_TNK_CD4_T_naive, ADX_TNK_CD4_T_reg, ADX_TNK_CD8_T_CXCL13, ADX_TNK_CD8_T_ISG, ADX_TNK_CD8_T_cytotoxic, ADX_TNK_Cycling_T_NK, ADX_TNK_ILC, ADX_TNK_NK_CD56, ADX_TNK_NK_cytotoxic, ADX_TNK_NAIVE_CM, ADX_TNK_DYSFUNC, ADX_TNK_TREG, ADX_CD8_DYSFUNC_OF_CD8, NADX_TNK_CD4_T_CXCL13, NADX_TNK_CD4_T_naive, NADX_TNK_CD4_T_reg, NADX_TNK_CD8_T_CXCL13, NADX_TNK_CD8_T_ISG, NADX_TNK_CD8_T_cytotoxic, NADX_TNK_Cycling_T_NK, NADX_TNK_ILC, NADX_TNK_NK_CD56, NADX_TNK_NK_cytotoxic, NADX_TNK_NAIVE_CM, NADX_TNK_DYSFUNC, NADX_TNK_TREG, NADX_CD8_DYSFUNC_OF_CD8, CD8_SCORE_NAIVE, CD8_SCORE_CYTOTOXIC, CD8_SCORE_PREDYSFUNC, CD8_SCORE_DYSFUNC, TNK_JAKSTAT, TNK_TGFB, TNK_ISG, SHANNON_TNK, BC_TNK_BETWEEN_SITES, N_TNK); `spectrum-sc-tnk-fine` (SPECTRUM scRNA: T/NK fine states (41) (demo), 41 patients, columns TF_CD4_T_ISG, TF_CD4_T_dysfunc_early, TF_CD4_T_dysfunc_late_1, TF_CD4_T_dysfunc_late_2, TF_CD4_T_effector_memory, TF_CD4_T_naive_centr_mem, TF_CD4_T_reg_1, TF_CD4_T_reg_2, TF_CD4_T_reg_3, TF_CD4_T_reg_ISG, TF_CD8_T_ISG_early, TF_CD8_T_ISG_late, TF_CD8_T_cytotoxic, TF_CD8_T_dysfunc_ISG, TF_CD8_T_dysfunc_early, TF_CD8_T_dysfunc_late, TF_CD8_T_effector_memory, TF_CD8_T_naive_centr_mem_1, TF_CD8_T_naive_centr_mem_2, TF_Cycling_CD4_T, TF_Cycling_CD8_T_1, TF_Cycling_CD8_T_2, TF_Cycling_CD8_T_3, TF_Cycling_CD8_T_4, TF_Cycling_CD8_T_5, TF_Cycling_CD8_T_6, TF_Cycling_NK, TF_ILC_a, TF_ILC_b, TF_ILC_c, TF_NK_cytotoxic_GZMH, TF_NK_cytotoxic_SPON2_1, TF_NK_cytotoxic_SPON2_2, TF_NK_reg_CCL3, TF_NK_reg_CD56, TF_NK_reg_CRTAM, TF_NK_reg_IGFBP2, TF_NK_reg_ISG, TF_NK_reg_KRT81_KRT86_1, TF_NK_reg_KRT81_KRT86_2, TF_gd_T_cell); `spectrum-sc-myeloid` (SPECTRUM scRNA: macrophage & DC states (demo), 41 patients, columns MAC_Clearing_M, MAC_Cycling_M, MAC_M1_S100A8, MAC_M2_COL1A1, MAC_M2_CXCL10, MAC_M2_MARCO, MAC_M2_MMP9, MAC_M2_SELENOP, DC_cDC1, DC_cDC2, DC_mDC, DC_pDC, ADX_MAC_Clearing_M, ADX_MAC_Cycling_M, ADX_MAC_M1_S100A8, ADX_MAC_M2_COL1A1, ADX_MAC_M2_CXCL10, ADX_MAC_M2_MARCO, ADX_MAC_M2_MMP9, ADX_MAC_M2_SELENOP, ADX_DC_cDC1, ADX_DC_cDC2, ADX_DC_mDC, ADX_DC_pDC, NADX_MAC_Clearing_M, NADX_MAC_Cycling_M, NADX_MAC_M1_S100A8, NADX_MAC_M2_COL1A1, NADX_MAC_M2_CXCL10, NADX_MAC_M2_MARCO, NADX_MAC_M2_MMP9, NADX_MAC_M2_SELENOP, NADX_DC_cDC1, NADX_DC_cDC2, NADX_DC_mDC, NADX_DC_pDC, MAC_SCORE_JAKSTAT, DC_SCORE_IFN_REGULATORS, SHANNON_MAC, BC_MAC_BETWEEN_SITES); `spectrum-sc-cancer` (SPECTRUM scRNA: cancer cell states, signalling & 6p LOH (demo), 41 patients, columns CC_Cancer_cell_1, CC_Cancer_cell_2, CC_Cancer_cell_3, CC_Cancer_cell_4, CC_Cancer_cell_5, CC_Cancer_cell_6, CC_Cycling_cancer_cell_1, CC_Cycling_cancer_cell_2, EPI_CILIATED, CA_JAKSTAT, CA_TGFB, CA_TNFA, CA_NFKB, CA_HYPOXIA, CA_EGFR, CA_MAPK, CA_PI3K, CA_VEGF, CA_P53, CA_WNT, CA_ISG, CA_IFNG, CA_6P_LOH_PCT, CA_6P_IMBALANCED_PCT, CA_6P_STATUS, ADX_CA_JAKSTAT, ADX_CA_TGFB, NADX_CA_JAKSTAT, NADX_CA_TGFB, ADX_CA_6P_LOH_PCT, ADX_CA_6P_STATUS, NADX_CA_6P_LOH_PCT, NADX_CA_6P_STATUS, SHANNON_CANCER, BC_CANCER_BETWEEN_SITES, N_CANCER); `spectrum-sc-site` (SPECTRUM scRNA: site-matched sample features (demo), 61 samples, columns SCRNA_SITE, SCRNA_MATCH, IMM_T, IMM_B, IMM_PLASMA, IMM_MYELOID, IMM_DC, IMM_MAST, STR_CANCER, STR_FIBRO, STR_ENDO, N_IMMUNE, N_NONIMMUNE, TNK_CD4_T_CXCL13, TNK_CD4_T_naive, TNK_CD4_T_reg, TNK_CD8_T_CXCL13, TNK_CD8_T_ISG, TNK_CD8_T_cytotoxic, TNK_Cycling_T_NK, TNK_ILC, TNK_NK_CD56, TNK_NK_cytotoxic, TNK_NAIVE_CM, TNK_DYSFUNC, TNK_TREG, CD8_DYSFUNC_OF_CD8, CD8_SCORE_DYSFUNC, TNK_JAKSTAT, MAC_Clearing_M, MAC_Cycling_M, MAC_M1_S100A8, MAC_M2_COL1A1, MAC_M2_CXCL10, MAC_M2_MARCO, MAC_M2_MMP9, MAC_M2_SELENOP, DC_cDC1, DC_cDC2, DC_mDC, DC_pDC, CC_Cancer_cell_1, CC_Cancer_cell_2, CC_Cancer_cell_3, CC_Cancer_cell_4, CC_Cancer_cell_5, CC_Cancer_cell_6, CC_Cycling_cancer_cell_1, CC_Cycling_cancer_cell_2, CA_JAKSTAT, CA_TGFB, CA_TNFA, CA_NFKB, CA_HYPOXIA, CA_ISG, CA_6P_LOH_PCT, CA_6P_STATUS), sent with the request as `customData`; without it the document is refused.
+
+```json
+{
+  "study": "msk_spectrum_tme_2022",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "oncoprint",
+      "cohorts": [
+        "all patients"
+      ],
+      "genes": [
+        "TP53",
+        "BRCA1",
+        "BRCA2",
+        "CCNE1",
+        "MYC",
+        "CDK12"
+      ],
+      "clinical": [
+        "CONSENSUS_SIGNATURE",
+        "custom:spectrum-sc-cancer/CA_6P_STATUS",
+        "custom:spectrum-sc-tnk/TNK_DYSFUNC",
+        "custom:spectrum-sc-tnk/TNK_NAIVE_CM"
+      ],
+      "sort": [
+        "CONSENSUS_SIGNATURE"
+      ]
+    },
+    {
+      "kind": "plot",
+      "cohorts": [
+        "all patients"
+      ],
+      "x": {
+        "source": "clinical",
+        "attribute": "CONSENSUS_SIGNATURE"
+      },
+      "y": {
+        "source": "clinical",
+        "attribute": "custom:spectrum-sc-tnk/TNK_DYSFUNC"
+      }
+    },
+    {
+      "kind": "plot",
+      "cohorts": [
+        "all patients"
+      ],
+      "x": {
+        "source": "clinical",
+        "attribute": "CONSENSUS_SIGNATURE"
+      },
+      "y": {
+        "source": "clinical",
+        "attribute": "custom:spectrum-sc-tnk/TNK_NAIVE_CM"
+      }
+    },
+    {
+      "kind": "plot",
+      "cohorts": [
+        "all patients"
+      ],
+      "x": {
+        "source": "clinical",
+        "attribute": "CONSENSUS_SIGNATURE"
+      },
+      "y": {
+        "source": "clinical",
+        "attribute": "custom:spectrum-sc-cancer/ADX_CA_JAKSTAT"
+      }
+    },
+    {
+      "kind": "plot",
+      "cohorts": [
+        "all patients"
+      ],
+      "x": {
+        "source": "clinical",
+        "attribute": "custom:spectrum-sc-cancer/CA_JAKSTAT"
+      },
+      "y": {
+        "source": "clinical",
+        "attribute": "custom:spectrum-sc-tnk/TNK_JAKSTAT"
+      }
+    },
+    {
+      "kind": "plot",
+      "unit": "sample",
+      "cohorts": [
+        "all patients"
+      ],
+      "x": {
+        "source": "clinical",
+        "attribute": "TUMOR_SUPERSITE"
+      },
+      "y": {
+        "source": "clinical",
+        "attribute": "custom:spectrum-sc-site/IMM_T"
+      }
+    }
+  ]
+}
+```
+
+### Example 60: Composition: T and NK cell states by mutational signature (MSK SPECTRUM)
+
+The 36 SPECTRUM patients with a consensus signature other than Undetermined, split as the paper splits them. Dysfunctional CXCL13+ CD8 T cells are a mean 7.0% of T/NK cells in the 16 HRD-Dup patients against 4.9% in HRD-Del and 4.4% in FBI, and naive CD4 cells the reverse (15.2% against 19.6% and 20.1%) — the direction of the paper's Fig. 4b. The clearest single difference is cycling T/NK cells, higher in HRD-Dup (8.6% against 5.7%; Welch p = 0.003, q = 0.08 across the 30 comparisons); none reaches q < 0.05 at this size, which the matrix shows as no outlined dot. Per sample, from the study's cell-type fractions, T cells are 24% of HRD-Dup samples' cells against 32% of FBI's. The paper fits a binomial model on cell counts with site and sort as covariates; this view compares shares between groups and says so.
+
+Runs on custom data: `spectrum-sc-composition` (SPECTRUM scRNA: cell-type composition (demo), 41 patients, columns IMM_T, IMM_B, IMM_PLASMA, IMM_MYELOID, IMM_DC, IMM_MAST, STR_CANCER, STR_FIBRO, STR_ENDO, ADX_IMM_T, ADX_IMM_B, ADX_IMM_PLASMA, ADX_IMM_MYELOID, ADX_IMM_DC, ADX_IMM_MAST, ADX_STR_CANCER, ADX_STR_FIBRO, ADX_STR_ENDO, NADX_IMM_T, NADX_IMM_B, NADX_IMM_PLASMA, NADX_IMM_MYELOID, NADX_IMM_DC, NADX_IMM_MAST, NADX_STR_CANCER, NADX_STR_FIBRO, NADX_STR_ENDO, N_IMMUNE, N_NONIMMUNE, N_CELLS, N_SITES, HAS_ASCITES_SCRNA); `spectrum-sc-tnk` (SPECTRUM scRNA: T/NK cell states (demo), 41 patients, columns TNK_CD4_T_CXCL13, TNK_CD4_T_naive, TNK_CD4_T_reg, TNK_CD8_T_CXCL13, TNK_CD8_T_ISG, TNK_CD8_T_cytotoxic, TNK_Cycling_T_NK, TNK_ILC, TNK_NK_CD56, TNK_NK_cytotoxic, TNK_NAIVE_CM, TNK_DYSFUNC, TNK_TREG, CD8_DYSFUNC_OF_CD8, ADX_TNK_CD4_T_CXCL13, ADX_TNK_CD4_T_naive, ADX_TNK_CD4_T_reg, ADX_TNK_CD8_T_CXCL13, ADX_TNK_CD8_T_ISG, ADX_TNK_CD8_T_cytotoxic, ADX_TNK_Cycling_T_NK, ADX_TNK_ILC, ADX_TNK_NK_CD56, ADX_TNK_NK_cytotoxic, ADX_TNK_NAIVE_CM, ADX_TNK_DYSFUNC, ADX_TNK_TREG, ADX_CD8_DYSFUNC_OF_CD8, NADX_TNK_CD4_T_CXCL13, NADX_TNK_CD4_T_naive, NADX_TNK_CD4_T_reg, NADX_TNK_CD8_T_CXCL13, NADX_TNK_CD8_T_ISG, NADX_TNK_CD8_T_cytotoxic, NADX_TNK_Cycling_T_NK, NADX_TNK_ILC, NADX_TNK_NK_CD56, NADX_TNK_NK_cytotoxic, NADX_TNK_NAIVE_CM, NADX_TNK_DYSFUNC, NADX_TNK_TREG, NADX_CD8_DYSFUNC_OF_CD8, CD8_SCORE_NAIVE, CD8_SCORE_CYTOTOXIC, CD8_SCORE_PREDYSFUNC, CD8_SCORE_DYSFUNC, TNK_JAKSTAT, TNK_TGFB, TNK_ISG, SHANNON_TNK, BC_TNK_BETWEEN_SITES, N_TNK); `spectrum-sc-tnk-fine` (SPECTRUM scRNA: T/NK fine states (41) (demo), 41 patients, columns TF_CD4_T_ISG, TF_CD4_T_dysfunc_early, TF_CD4_T_dysfunc_late_1, TF_CD4_T_dysfunc_late_2, TF_CD4_T_effector_memory, TF_CD4_T_naive_centr_mem, TF_CD4_T_reg_1, TF_CD4_T_reg_2, TF_CD4_T_reg_3, TF_CD4_T_reg_ISG, TF_CD8_T_ISG_early, TF_CD8_T_ISG_late, TF_CD8_T_cytotoxic, TF_CD8_T_dysfunc_ISG, TF_CD8_T_dysfunc_early, TF_CD8_T_dysfunc_late, TF_CD8_T_effector_memory, TF_CD8_T_naive_centr_mem_1, TF_CD8_T_naive_centr_mem_2, TF_Cycling_CD4_T, TF_Cycling_CD8_T_1, TF_Cycling_CD8_T_2, TF_Cycling_CD8_T_3, TF_Cycling_CD8_T_4, TF_Cycling_CD8_T_5, TF_Cycling_CD8_T_6, TF_Cycling_NK, TF_ILC_a, TF_ILC_b, TF_ILC_c, TF_NK_cytotoxic_GZMH, TF_NK_cytotoxic_SPON2_1, TF_NK_cytotoxic_SPON2_2, TF_NK_reg_CCL3, TF_NK_reg_CD56, TF_NK_reg_CRTAM, TF_NK_reg_IGFBP2, TF_NK_reg_ISG, TF_NK_reg_KRT81_KRT86_1, TF_NK_reg_KRT81_KRT86_2, TF_gd_T_cell); `spectrum-sc-myeloid` (SPECTRUM scRNA: macrophage & DC states (demo), 41 patients, columns MAC_Clearing_M, MAC_Cycling_M, MAC_M1_S100A8, MAC_M2_COL1A1, MAC_M2_CXCL10, MAC_M2_MARCO, MAC_M2_MMP9, MAC_M2_SELENOP, DC_cDC1, DC_cDC2, DC_mDC, DC_pDC, ADX_MAC_Clearing_M, ADX_MAC_Cycling_M, ADX_MAC_M1_S100A8, ADX_MAC_M2_COL1A1, ADX_MAC_M2_CXCL10, ADX_MAC_M2_MARCO, ADX_MAC_M2_MMP9, ADX_MAC_M2_SELENOP, ADX_DC_cDC1, ADX_DC_cDC2, ADX_DC_mDC, ADX_DC_pDC, NADX_MAC_Clearing_M, NADX_MAC_Cycling_M, NADX_MAC_M1_S100A8, NADX_MAC_M2_COL1A1, NADX_MAC_M2_CXCL10, NADX_MAC_M2_MARCO, NADX_MAC_M2_MMP9, NADX_MAC_M2_SELENOP, NADX_DC_cDC1, NADX_DC_cDC2, NADX_DC_mDC, NADX_DC_pDC, MAC_SCORE_JAKSTAT, DC_SCORE_IFN_REGULATORS, SHANNON_MAC, BC_MAC_BETWEEN_SITES); `spectrum-sc-cancer` (SPECTRUM scRNA: cancer cell states, signalling & 6p LOH (demo), 41 patients, columns CC_Cancer_cell_1, CC_Cancer_cell_2, CC_Cancer_cell_3, CC_Cancer_cell_4, CC_Cancer_cell_5, CC_Cancer_cell_6, CC_Cycling_cancer_cell_1, CC_Cycling_cancer_cell_2, EPI_CILIATED, CA_JAKSTAT, CA_TGFB, CA_TNFA, CA_NFKB, CA_HYPOXIA, CA_EGFR, CA_MAPK, CA_PI3K, CA_VEGF, CA_P53, CA_WNT, CA_ISG, CA_IFNG, CA_6P_LOH_PCT, CA_6P_IMBALANCED_PCT, CA_6P_STATUS, ADX_CA_JAKSTAT, ADX_CA_TGFB, NADX_CA_JAKSTAT, NADX_CA_TGFB, ADX_CA_6P_LOH_PCT, ADX_CA_6P_STATUS, NADX_CA_6P_LOH_PCT, NADX_CA_6P_STATUS, SHANNON_CANCER, BC_CANCER_BETWEEN_SITES, N_CANCER); `spectrum-sc-site` (SPECTRUM scRNA: site-matched sample features (demo), 61 samples, columns SCRNA_SITE, SCRNA_MATCH, IMM_T, IMM_B, IMM_PLASMA, IMM_MYELOID, IMM_DC, IMM_MAST, STR_CANCER, STR_FIBRO, STR_ENDO, N_IMMUNE, N_NONIMMUNE, TNK_CD4_T_CXCL13, TNK_CD4_T_naive, TNK_CD4_T_reg, TNK_CD8_T_CXCL13, TNK_CD8_T_ISG, TNK_CD8_T_cytotoxic, TNK_Cycling_T_NK, TNK_ILC, TNK_NK_CD56, TNK_NK_cytotoxic, TNK_NAIVE_CM, TNK_DYSFUNC, TNK_TREG, CD8_DYSFUNC_OF_CD8, CD8_SCORE_DYSFUNC, TNK_JAKSTAT, MAC_Clearing_M, MAC_Cycling_M, MAC_M1_S100A8, MAC_M2_COL1A1, MAC_M2_CXCL10, MAC_M2_MARCO, MAC_M2_MMP9, MAC_M2_SELENOP, DC_cDC1, DC_cDC2, DC_mDC, DC_pDC, CC_Cancer_cell_1, CC_Cancer_cell_2, CC_Cancer_cell_3, CC_Cancer_cell_4, CC_Cancer_cell_5, CC_Cancer_cell_6, CC_Cycling_cancer_cell_1, CC_Cycling_cancer_cell_2, CA_JAKSTAT, CA_TGFB, CA_TNFA, CA_NFKB, CA_HYPOXIA, CA_ISG, CA_6P_LOH_PCT, CA_6P_STATUS), sent with the request as `customData`; without it the document is refused.
+
+```json
+{
+  "study": "msk_spectrum_tme_2022",
+  "cohorts": {
+    "HRD-Dup": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CONSENSUS_SIGNATURE",
+          "values": [
+            "HRD-Dup"
+          ]
+        }
+      ]
+    },
+    "HRD-Del": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CONSENSUS_SIGNATURE",
+          "values": [
+            "HRD-Del"
+          ]
+        }
+      ]
+    },
+    "FBI": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CONSENSUS_SIGNATURE",
+          "values": [
+            "FBI"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "composition",
+      "cohorts": [
+        "HRD-Dup",
+        "HRD-Del",
+        "FBI"
+      ],
+      "attributes": [
+        "custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13",
+        "custom:spectrum-sc-tnk/TNK_CD4_T_naive",
+        "custom:spectrum-sc-tnk/TNK_CD4_T_reg",
+        "custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13",
+        "custom:spectrum-sc-tnk/TNK_CD8_T_ISG",
+        "custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic",
+        "custom:spectrum-sc-tnk/TNK_Cycling_T_NK",
+        "custom:spectrum-sc-tnk/TNK_ILC",
+        "custom:spectrum-sc-tnk/TNK_NK_CD56",
+        "custom:spectrum-sc-tnk/TNK_NK_cytotoxic"
+      ],
+      "sort": "custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13"
+    },
+    {
+      "kind": "composition",
+      "cohorts": [
+        "HRD-Dup",
+        "HRD-Del",
+        "FBI"
+      ],
+      "profileType": "cell_type_relative_counts",
+      "sort": "T_cell"
+    }
+  ]
+}
+```
+
+### Example 61: Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)
+
+crc_hta11_htan_2021 is 52 patients with colorectal polyps (Chen et al., Cell 2021). The summary covers 55 of its 61 samples; its counts equal the study's own absolute_counts profile for all 670 sample and cell-type pairs it reports. Per sample, adenoma-specific cells (ASC) are 32.1% of the epithelium in the 30 conventional adenomas against 4.1% in the 20 serrated polyps (q = 2e-5), and serrated-specific cells (SSC) 1.5% against 19.7% (q = 0.003): the two paths to malignancy the paper describes. Stem cells (STM) differ little here (3.1% against 2.5%). The study's own fractions, over every cell type, give the same picture (ASC 29.9% against 3.7%). Cohorts are patients, so a patient with polyps of both types counts in both; 5 of the 52 have both.
+
+Runs on custom data: `hta11-sc-p` (HTAN Vanderbilt colorectal polyp scRNA-seq (Chen et al., Cell 2021) — per patient, 51 patients, columns EPI_N_CELLS, EPI_Cell_Type_ABS, EPI_Cell_Type_ASC, EPI_Cell_Type_CT, EPI_Cell_Type_EE, EPI_Cell_Type_GOB, EPI_Cell_Type_SSC, EPI_Cell_Type_STM, EPI_Cell_Type_TAC, EPI_Cell_Type_TUF, NONEPI_N_CELLS, NONEPI_Cell_Type_B, NONEPI_Cell_Type_END, NONEPI_Cell_Type_FIB, NONEPI_Cell_Type_MAS, NONEPI_Cell_Type_MYE, NONEPI_Cell_Type_PLA, NONEPI_Cell_Type_T); `hta11-sc-s` (HTAN Vanderbilt colorectal polyp scRNA-seq (Chen et al., Cell 2021) — per sample, 55 samples, columns EPI_N_CELLS, EPI_Cell_Type_ABS, EPI_Cell_Type_ASC, EPI_Cell_Type_CT, EPI_Cell_Type_EE, EPI_Cell_Type_GOB, EPI_Cell_Type_SSC, EPI_Cell_Type_STM, EPI_Cell_Type_TAC, EPI_Cell_Type_TUF, NONEPI_N_CELLS, NONEPI_Cell_Type_B, NONEPI_Cell_Type_END, NONEPI_Cell_Type_FIB, NONEPI_Cell_Type_MAS, NONEPI_Cell_Type_MYE, NONEPI_Cell_Type_PLA, NONEPI_Cell_Type_T), sent with the request as `customData`; without it the document is refused.
+
+```json
+{
+  "study": "crc_hta11_htan_2021",
+  "cohorts": {
+    "Conventional adenoma": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "POLYP_TYPE",
+          "values": [
+            "AD"
+          ],
+          "per": "sample"
+        }
+      ]
+    },
+    "Serrated polyp": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "POLYP_TYPE",
+          "values": [
+            "SER"
+          ],
+          "per": "sample"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "composition",
+      "cohorts": [
+        "Conventional adenoma",
+        "Serrated polyp"
+      ],
+      "unit": "sample",
+      "attributes": [
+        "custom:hta11-sc-s/EPI_Cell_Type_ABS",
+        "custom:hta11-sc-s/EPI_Cell_Type_ASC",
+        "custom:hta11-sc-s/EPI_Cell_Type_CT",
+        "custom:hta11-sc-s/EPI_Cell_Type_EE",
+        "custom:hta11-sc-s/EPI_Cell_Type_GOB",
+        "custom:hta11-sc-s/EPI_Cell_Type_SSC",
+        "custom:hta11-sc-s/EPI_Cell_Type_STM",
+        "custom:hta11-sc-s/EPI_Cell_Type_TAC",
+        "custom:hta11-sc-s/EPI_Cell_Type_TUF"
+      ],
+      "sort": "custom:hta11-sc-s/EPI_Cell_Type_ASC"
+    },
+    {
+      "kind": "composition",
+      "cohorts": [
+        "Conventional adenoma",
+        "Serrated polyp"
+      ],
+      "profileType": "relative_counts",
+      "sort": "ASC"
+    }
+  ]
+}
+```
+
+### Example 62: Cancer types summary: RAS genes across 50,000 tumours
 
 KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appendiceal and colorectal follow, and the bars show where RAS is amplified rather than mutated — germ cell tumours and esophagogastric cancer.
 
@@ -4039,7 +4302,7 @@ KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appen
 }
 ```
 
-### Example 60: Cohort overlap: how four groups share their patients
+### Example 63: Cohort overlap: how four groups share their patients
 
 TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD. 5,314 TP53-mutant patients belong to none of the other three groups; 435 are in all four.
 
@@ -4109,7 +4372,7 @@ TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD.
 }
 ```
 
-### Example 61: Alteration enrichment: what separates colorectal from pancreatic tumours
+### Example 64: Alteration enrichment: what separates colorectal from pancreatic tumours
 
 Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TCF7L2, PIK3CA, FBXW7 and SOX9 mark colorectal cancer; KRAS and CDKN2A mark pancreatic cancer.
 
@@ -4174,7 +4437,7 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
 }
 ```
 
-### Example 62: Mutational signatures: what UV light and tobacco leave behind
+### Example 65: Mutational signatures: what UV light and tobacco leave behind
 
 Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature (7) makes up about half of a melanoma's mutations and almost none of a lung cancer's; the smoking signature (4) is the reverse.
 
@@ -4220,7 +4483,7 @@ Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature 
 }
 ```
 
-### Example 63: Co-expression: the genes that rise and fall with ESR1
+### Example 66: Co-expression: the genes that rise and fall with ESR1
 
 TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up behind ESR1 — CCDC170 (its neighbour on 6q25, often co-amplified), THSD4, FOXA1, TBC1D9 — and the genes of basal-like tumours fall away from it.
 
@@ -4245,7 +4508,7 @@ TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up be
 }
 ```
 
-### Example 64: Clinical data: every pancreatic cancer sample, oldest patients first
+### Example 67: Clinical data: every pancreatic cancer sample, oldest patients first
 
 Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 
@@ -4282,7 +4545,7 @@ Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 }
 ```
 
-### Example 65: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
+### Example 68: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
 
 MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row, and P-0000012's alterations beside it.
 
@@ -4335,7 +4598,7 @@ MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 
 }
 ```
 
-### Example 66: A patient's mutations, copy-number alterations and structural variants
+### Example 69: A patient's mutations, copy-number alterations and structural variants
 
 MSK-CHORD prostate cancer patients, those with the most structural variants first; P-0024249's tables, mutations kept to OncoKB-oncogenic calls.
 
@@ -4383,7 +4646,7 @@ MSK-CHORD prostate cancer patients, those with the most structural variants firs
 }
 ```
 
-### Example 67: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
+### Example 70: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
 
 MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at an allele frequency of 0.2 or more, highest first.
 

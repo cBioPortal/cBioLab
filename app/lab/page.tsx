@@ -35,6 +35,7 @@ import { useWorkspace } from "./use-workspace.ts";
 import { useLibrary, EXAMPLES } from "./use-library.ts";
 import { useToolActions } from "./use-tool-actions.ts";
 import { AddCohortDialog, type AddCohortTarget } from "./add-cohort-dialog.tsx";
+import { cellExplorerFor } from "../../lib/cell-explorer.ts";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
@@ -311,7 +312,7 @@ export default function AnalysisPage() {
   const { sharedOpen, openShared, confirmSharedSave, analysisSaved, clearAnalysis, confirmViewNoteEdit, confirmWorkspaceSave, deleteWorkspace, noteEdit, openWorkspace, openWorkspaceSave, setNotes, setParam, setViewNoteEditing, setWsOpen, viewNoteEditing, wsError, wsOpen } = workspace;
   const savedReady = loggedIn && !savedArtifacts.cohortsState.pending && !savedArtifacts.cohortsState.error;
   const cohortEdits = useCohortEdits({ doc, docs, evalOf: (n) => { const c = result?.cohorts[n]; return c ? { count: c.count, text: c.text } : null; }, persist, proposePartition, saved, savedReady, setError, setToast, study });
-  const { analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary } = cohortEdits;
+  const { analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary, cohortCells, openCohortCells } = cohortEdits;
   const exploreState = useExploreState({ addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
   const { setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies } = exploreState;
   const openTab = (t: typeof TABS[number]) => { goTab(t); if (t === "explore" && !explore) fetchExplore(); };
@@ -326,7 +327,7 @@ export default function AnalysisPage() {
   /** what every view card reads and the edits it can make (app/lab/view-cards.tsx) */
   const viewCtx = { VIEW_KINDS, study, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, maxCohortsOf, menuOpenRef, moveView, noteEdit, ocView, openCohortChooser, openGenes, patchView, pendingKeys, profileOptions, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
   /** what the Analysis tab's sections read and the actions they take (app/lab/analysis-sections.tsx) */
-  const analysisCtx: AnalysisCtx = { VIEW_KINDS, addView, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortSaveState, cohortSource, emptyViewHint, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, removeViews, renamePartitionRow, result, saveCohortToLibrary, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
+  const analysisCtx: AnalysisCtx = { VIEW_KINDS, addView, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortCells, cohortSaveState, cohortSource, openCohortCells, emptyViewHint, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, removeViews, renamePartitionRow, result, saveCohortToLibrary, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
   // what the page offers the researcher's AI assistant (app/lab/agent-tools.ts), current every render
   const webmcp = useLabTools({
     doc, result, busy, error, tab, study, savedAs: analysisSaved ? doc.title || null : null,
@@ -480,6 +481,7 @@ export default function AnalysisPage() {
         onAdd={(name, def) => { if (chooser) addCohortToView(chooser, name, def); }}
         onExplore={() => { if (!chooser) return; const t = chooser; setChooser(null); openAddCohort(t); }}
         onLogin={requestLogin}
+        cells={cellExplorerFor(doc.study || study)}
         onClose={() => setChooser(null)} />
       {toast && <div className="toast" role="status"><button type="button" title="dismiss" onClick={() => setToast(null)}>{toast}</button></div>}
       <CustomDataManager tab={exploreState.customTab} setTab={exploreState.setCustomTab} studies={exStudies} onChanged={() => fetchExplore()} />

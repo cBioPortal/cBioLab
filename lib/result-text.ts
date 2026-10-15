@@ -305,6 +305,15 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         as.rows.slice(0, 40).map((g) => `  ${g.name}: ` + g.cells.map(cell).join(" | ") +
           (g.diff != null ? `, difference ${g.diff.toPrecision(3)}` : "") + `, q=${pFmt(g.q)}, higher in ${g.higherIn}${g.value ? " (" + g.value + ")" : ""}`).join("\n") +
         (as.rows.length > 40 ? `\n  … ${as.tested - 40} more entities tested` : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "composition" && v.composition) {
+      const cm = v.composition;
+      const fmt = (x: number) => cm.normalize ? (100 * x).toFixed(1) + "%" : x.toPrecision(3);
+      out.push(`Composition of ${cm.sourceName} (${cm.parts.length} parts${cm.normalize ? ", shares of each " + cm.unit.replace(/s$/, "") + "'s total" : ""}; ` +
+        `each cohort against the others by Welch's t, BH q over ${cm.tested} comparisons; ${cm.significant} at q<0.05):\n` +
+        cm.groups.map((g) => `  ${g.cohort} (n=${g.n}${g.entropy ? ", entropy " + g.entropy.mean.toFixed(2) : ""}): ` +
+          cm.parts.map((pt) => { const c = cm.cells.find((x) => x.cohort === g.cohort && x.part === pt.id)!;
+            return `${pt.name} ${fmt(c.mean)}` + (c.q != null ? ` (log2 ${c.log2!.toFixed(2)}, q=${pFmt(c.q)})` : ""); }).join(", ")).join("\n") +
+        caveatOf(v) + noteOf(v));
     } else if (v.kind === "correlates") {
       const co = v.correlates!;
       const line = (g: CorrelatesGene) => `  ${g.gene}: ρ ${g.rho} (q=${pFmt(g.q)}), r ${g.r}, n=${g.n}`;

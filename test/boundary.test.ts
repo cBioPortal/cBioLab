@@ -401,6 +401,12 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "assayValueCountsSql": () => federation.assayValueCountsSql(cohortSql, "x", "db", "armlevel_cna"),
     "assayProfileSql": () => federation.assayProfileSql("x", "db", "armlevel_cna"),
     "assayEntityNamesSql": () => federation.assayEntityNamesSql("x", "db", "armlevel_cna"),
+    // composition: each case's vector is built and summed in CTEs; one row of sums (and two counts) leaves
+    "compositionMomentsSql": () => federation.compositionMomentsSql(cohortSql, "x", "db",
+      { kind: "genericAssay", profileType: "cell_type_relative_counts", parts: ["T_cell", "B_cell", "Fibroblast"], unit: "sample", normalize: true }),
+    "compositionMomentsSql:clinical": () => federation.compositionMomentsSql(cohortSql, "x", "db",
+      { kind: "clinical", parts: ["custom:sc-states/CD8_EX", "custom:sc-states/CD8_NAIVE"], unit: "patient", normalize: false }),
+    "compositionEntitiesSql": () => federation.compositionEntitiesSql("x", "db", "cell_type_relative_counts"),
     // correlates: per-patient values and their ranks stay in CTEs; twelve sums per gene leave
     "geneCytobandsSql": () => federation.geneCytobandsSql(["KRAS", "APC"], "x", "db"),
     "correlatesMomentsSql": () => federation.correlatesMomentsSql(cohortSql, "x", "db", "ESR1", "rna_seq_v2_mrna", "rppa")

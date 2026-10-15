@@ -8,6 +8,8 @@
 import { readFileSync } from "fs";
 import { EXAMPLES } from "../lib/dsl-reference.ts";
 import { runAnalysis } from "../lib/analysis.ts";
+import { withRequestCustomData } from "../lib/custom-data-server.ts";
+import type { CustomDataset } from "../lib/custom-data-names.ts";
 import { viewToSvg } from "../lib/view-svg.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
 import type { AnalysisDoc } from "../lib/types.ts";
@@ -16,15 +18,16 @@ const WIDTHS = [560, 936, 1352];
 const only = process.env.FIGURE_CHECK_ONLY || "";
 const verbose = !!process.env.FIGURE_CHECK_VERBOSE;
 const stress = JSON.parse(readFileSync(new URL("./figure-stress.json", import.meta.url), "utf8")) as Record<string, AnalysisDoc>;
-const docs: [string, AnalysisDoc][] = [
-  ...EXAMPLES.map((e, i) => ["example " + (i + 1) + ": " + e.title, e.doc as unknown as AnalysisDoc] as [string, AnalysisDoc]),
-  ...Object.entries(stress).map(([k, d]) => ["stress: " + k, d] as [string, AnalysisDoc]),
+// an example's bundled uploads go with it, as the Examples tab and docs:check send them
+const docs: [string, AnalysisDoc, CustomDataset[] | undefined][] = [
+  ...EXAMPLES.map((e, i) => ["example " + (i + 1) + ": " + e.title, e.doc as unknown as AnalysisDoc, e.customData] as [string, AnalysisDoc, CustomDataset[] | undefined]),
+  ...Object.entries(stress).map(([k, d]) => ["stress: " + k, d, undefined] as [string, AnalysisDoc, CustomDataset[] | undefined]),
 ].filter(([name]) => name.includes(only));
 
 let failed = 0, drawn = 0;
-for (const [name, doc] of docs) {
+for (const [name, doc, customData] of docs) {
   let result;
-  try { result = await runAnalysis(doc, { oncoprint: "spec" }); }
+  try { result = await withRequestCustomData(customData, () => runAnalysis(doc, { oncoprint: "spec" })); }
   catch (e) { console.log("SKIP " + name + "  [" + (e as Error).message.slice(0, 120) + "]"); continue; }
   result.views.forEach((v, vi) => {
     if (v.error || v.kind === "oncoprint") return;

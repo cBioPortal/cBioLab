@@ -20,6 +20,8 @@ import { DOC_VERSION } from "./doc-version.ts";
 import type { TemplateDoc } from "./types.ts";
 import type { CustomDataset } from "./custom-data-names.ts";
 import { LUAD_BIOPSY_SITE_DEMO } from "./custom-data-demo.ts";
+import { SPECTRUM_SC_DEMO } from "./spectrum-sc-demo.ts";
+import { HTA11_SC_DEMO } from "./hta11-sc-demo.ts";
 
 export const DSL_VERSION = DOC_VERSION;
 
@@ -1044,6 +1046,89 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)",
+    demonstrates: "Features summarised from a study's single-cell RNA-seq, uploaded as six custom datasets (five patient-level, one sample-level) and read beside its genomics: oncoprint tracks, box plots against the mutational signature, a scatter between two cell compartments, and a sample-level plot by tumour site. The rows are demo data bundled with the app, so this example runs without logging in.",
+    tags: ["custom data", "single-cell", "plot", "oncoprint"],
+    note: "msk_spectrum_tme_2022 is 42 untreated high-grade serous ovarian cancers; 41 had scRNA-seq at several anatomical sites. scripts/gen-spectrum-sc-demo.py reads the public CELLxGENE cell annotations (cell states, per-cell pathway scores, per-cell 6p allele fraction) and summarises them per patient (solid sites pooled; ADX_ adnexal, NADX_ non-adnexal) and per cBioPortal sample (the scRNA-seq site of the same patient, 61 of 82 samples). Dysfunctional T/NK cells (TNK_DYSFUNC) have a median of 10.8% of T/NK cells in the 16 HRD-Dup tumours against 6.0% in the 14 FBI tumours, and naive/central-memory cells the reverse (7.5% against 11.1%), as in the paper's Fig. 4b. In adnexal cancer cells, JAK-STAT pathway activity has a median of 0.03 in HRD-Dup against -0.57 in FBI (Fig. 3e), and cancer-cell and T/NK-cell JAK-STAT correlate across patients (Spearman 0.74, Fig. 4e). Clonal 6p loss of heterozygosity (over 80% of cancer cells) is called in 4 patients, 3 of them HRD-Dup — the paper reports 4 of 41. By site, T cells are a median 43% of immune cells in the 22 adnexal samples against 54% in the 18 omental ones. These are summaries of public cell metadata, not the paper's statistical models.",
+    customData: SPECTRUM_SC_DEMO,
+    doc: {
+      study: "msk_spectrum_tme_2022",
+      cohorts: { "all patients": { all: [] } },
+      views: [
+        { kind: "oncoprint", cohorts: ["all patients"], genes: ["TP53", "BRCA1", "BRCA2", "CCNE1", "MYC", "CDK12"],
+          clinical: ["CONSENSUS_SIGNATURE", "custom:spectrum-sc-cancer/CA_6P_STATUS", "custom:spectrum-sc-tnk/TNK_DYSFUNC", "custom:spectrum-sc-tnk/TNK_NAIVE_CM"],
+          sort: ["CONSENSUS_SIGNATURE"] },
+        { kind: "plot", cohorts: ["all patients"],
+          x: { source: "clinical", attribute: "CONSENSUS_SIGNATURE" },
+          y: { source: "clinical", attribute: "custom:spectrum-sc-tnk/TNK_DYSFUNC" } },
+        { kind: "plot", cohorts: ["all patients"],
+          x: { source: "clinical", attribute: "CONSENSUS_SIGNATURE" },
+          y: { source: "clinical", attribute: "custom:spectrum-sc-tnk/TNK_NAIVE_CM" } },
+        { kind: "plot", cohorts: ["all patients"],
+          x: { source: "clinical", attribute: "CONSENSUS_SIGNATURE" },
+          y: { source: "clinical", attribute: "custom:spectrum-sc-cancer/ADX_CA_JAKSTAT" } },
+        { kind: "plot", cohorts: ["all patients"],
+          x: { source: "clinical", attribute: "custom:spectrum-sc-cancer/CA_JAKSTAT" },
+          y: { source: "clinical", attribute: "custom:spectrum-sc-tnk/TNK_JAKSTAT" } },
+        { kind: "plot", unit: "sample", cohorts: ["all patients"],
+          x: { source: "clinical", attribute: "TUMOR_SUPERSITE" },
+          y: { source: "clinical", attribute: "custom:spectrum-sc-site/IMM_T" } }
+      ]
+    }
+  },
+  {
+    title: "Composition: T and NK cell states by mutational signature (MSK SPECTRUM)",
+    demonstrates: "A `composition` view, the stacked-bar panels of single-cell papers: each patient's T/NK cells split into ten states (custom data, one attribute per state), ordered by the dysfunctional CXCL13+ CD8 share, each signature's mean beside its patients, and a matrix of every state in each signature against the other two. A second view does the same per sample from the study's own generic-assay cell-type fractions.",
+    tags: ["composition", "custom data", "single-cell"],
+    note: "The 36 SPECTRUM patients with a consensus signature other than Undetermined, split as the paper splits them. Dysfunctional CXCL13+ CD8 T cells are a mean 7.0% of T/NK cells in the 16 HRD-Dup patients against 4.9% in HRD-Del and 4.4% in FBI, and naive CD4 cells the reverse (15.2% against 19.6% and 20.1%) — the direction of the paper's Fig. 4b. The clearest single difference is cycling T/NK cells, higher in HRD-Dup (8.6% against 5.7%; Welch p = 0.003, q = 0.08 across the 30 comparisons); none reaches q < 0.05 at this size, which the matrix shows as no outlined dot. Per sample, from the study's cell-type fractions, T cells are 24% of HRD-Dup samples' cells against 32% of FBI's. The paper fits a binomial model on cell counts with site and sort as covariates; this view compares shares between groups and says so.",
+    customData: SPECTRUM_SC_DEMO,
+    doc: {
+      study: "msk_spectrum_tme_2022",
+      cohorts: {
+        "HRD-Dup": { all: [{ kind: "clinical", attribute: "CONSENSUS_SIGNATURE", values: ["HRD-Dup"] }] },
+        "HRD-Del": { all: [{ kind: "clinical", attribute: "CONSENSUS_SIGNATURE", values: ["HRD-Del"] }] },
+        "FBI": { all: [{ kind: "clinical", attribute: "CONSENSUS_SIGNATURE", values: ["FBI"] }] }
+      },
+      views: [
+        { kind: "composition", cohorts: ["HRD-Dup", "HRD-Del", "FBI"],
+          attributes: [
+            "custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13",
+            "custom:spectrum-sc-tnk/TNK_CD4_T_naive",
+            "custom:spectrum-sc-tnk/TNK_CD4_T_reg",
+            "custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13",
+            "custom:spectrum-sc-tnk/TNK_CD8_T_ISG",
+            "custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic",
+            "custom:spectrum-sc-tnk/TNK_Cycling_T_NK",
+            "custom:spectrum-sc-tnk/TNK_ILC",
+            "custom:spectrum-sc-tnk/TNK_NK_CD56",
+            "custom:spectrum-sc-tnk/TNK_NK_cytotoxic"
+          ],
+          sort: "custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13" },
+        { kind: "composition", cohorts: ["HRD-Dup", "HRD-Del", "FBI"], profileType: "cell_type_relative_counts", sort: "T_cell" }
+      ]
+    }
+  },
+  {
+    title: "Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)",
+    demonstrates: "Single-cell data brought in without a study-specific script: scripts/gen-singlecell-summary.py proposed the mapping from a Cell Explorer dataset to this study (donor_id is the patient, the HTAN Specimen ID the sample) and summarised the cell labels per sample. The first view draws those custom data; the second the study's own generic-assay cell-type fractions, for comparison.",
+    tags: ["composition", "custom data", "single-cell"],
+    note: "crc_hta11_htan_2021 is 52 patients with colorectal polyps (Chen et al., Cell 2021). The summary covers 55 of its 61 samples; its counts equal the study's own absolute_counts profile for all 670 sample and cell-type pairs it reports. Per sample, adenoma-specific cells (ASC) are 32.1% of the epithelium in the 30 conventional adenomas against 4.1% in the 20 serrated polyps (q = 2e-5), and serrated-specific cells (SSC) 1.5% against 19.7% (q = 0.003): the two paths to malignancy the paper describes. Stem cells (STM) differ little here (3.1% against 2.5%). The study's own fractions, over every cell type, give the same picture (ASC 29.9% against 3.7%). Cohorts are patients, so a patient with polyps of both types counts in both; 5 of the 52 have both.",
+    customData: HTA11_SC_DEMO,
+    doc: {
+      study: "crc_hta11_htan_2021",
+      cohorts: {
+        "Conventional adenoma": { all: [{ kind: "clinical", attribute: "POLYP_TYPE", values: ["AD"], per: "sample" }] },
+        "Serrated polyp": { all: [{ kind: "clinical", attribute: "POLYP_TYPE", values: ["SER"], per: "sample" }] }
+      },
+      views: [
+        { kind: "composition", cohorts: ["Conventional adenoma", "Serrated polyp"], unit: "sample",
+          attributes: ["custom:hta11-sc-s/EPI_Cell_Type_ABS", "custom:hta11-sc-s/EPI_Cell_Type_ASC", "custom:hta11-sc-s/EPI_Cell_Type_CT", "custom:hta11-sc-s/EPI_Cell_Type_EE", "custom:hta11-sc-s/EPI_Cell_Type_GOB", "custom:hta11-sc-s/EPI_Cell_Type_SSC", "custom:hta11-sc-s/EPI_Cell_Type_STM", "custom:hta11-sc-s/EPI_Cell_Type_TAC", "custom:hta11-sc-s/EPI_Cell_Type_TUF"],
+          sort: "custom:hta11-sc-s/EPI_Cell_Type_ASC" },
+        { kind: "composition", cohorts: ["Conventional adenoma", "Serrated polyp"], profileType: "relative_counts", sort: "ASC" }
+      ]
+    }
+  },
+  {
     title: "Cancer types summary: RAS genes across 50,000 tumours",
     demonstrates: "A `cancertypes` view, cBioPortal's Cancer Types Summary: the share of samples altered in at least one of a gene list per cancer type, each bar split by mutation, amplification, deep deletion, structural variant or several at once, over the samples profiled for at least one of the genes. Small cancer types are pooled into one named bar, not dropped.",
     tags: ["cancertypes", "frequency", "pan-cancer"],
@@ -1422,6 +1507,7 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | \`overlap\` | \`cohorts:[names] (2–6)\` | **how cohorts' patients intersect**, cBioPortal's group-comparison Overlap tab: for every combination of the cohorts, the patients — and their samples — in exactly those cohorts and none of the others, with each cohort's own size. Two or three cohorts are drawn as the portal draws them, area-proportional diagrams of samples and of patients side by side; more as an UpSet plot. A cohort is a set of patients, so a patient's samples go wherever the patient does. Each study's database answers with one count per combination (a bitmask of membership) — counts only — and a cohort's size here must equal its own count, or the view says the definition gave two answers. Ids are study-qualified, so patients only ever overlap within a study |
 | \`enrichment\` | \`alteration?:"mutation"\|"cna"\|"amp"\|"homdel"\|"sv", measure?:"any"\|"driver", minAltered?:5, label?:12, cohorts:[2–6 names]\` | **genomic-alteration enrichment across every gene**, cBioPortal's group-comparison Genomic Alterations tab: each gene's frequency of one alteration type per cohort, counted in SAMPLES over the samples profiled for that gene — samples on a panel listing it (counted per panel, then joined to its genes, Explore's own construction) plus whole-exome samples, and a sample altered off-panel counts as measured. Uncalled mutations are excluded as the portal excludes them; copy number is high-level only. Two cohorts: a two-sided Fisher test and the log2 ratio of the altered shares, drawn as a volcano beside the table; three or more: a chi-squared test. q is Benjamini–Hochberg across every gene tested; genes altered in fewer than \`minAltered\` samples, or unprofiled in a cohort, are counted as not tested. The caption warns that hypermutated tumours enrich almost every gene. Counts only |
 | \`assays\` | \`profileType:"<generic-assay profile>", minN?:3, label?:12, cohorts:[2–6 names]\` | **every entity of one generic-assay profile compared between cohorts**, cBioPortal's group-comparison tabs for generic assays (mutational signatures, arm-level copy number, treatment response, …): one value per sample (every sample of each cohort's patients) or per patient for a patient-level profile. A numeric profile: each entity's n, Σv and Σv² per cohort — values that are not numbers, such as a limit \`">8"\` or NA, are counted and left out — then Welch's t for two cohorts (drawn as a volcano of the difference in means) or Welch's ANOVA for more. A categorical one: each entity's count per value per cohort — NA and blank are not called and are counted apart — then a chi-squared test on cohort × value. q is Benjamini–Hochberg across every entity tested; an entity with fewer than \`minN\` values in a cohort, or with no spread, is counted as not tested. Per-probe methylation is refused (hundreds of thousands of probes), as is any profile past 20,000 entities. Counts and moments only |
+| \`composition\` | \`profileType:"<generic-assay profile>", entities?:[ids] | attributes:["<numeric attribute>", …2–16], unit?:"patient"|"sample", normalize?:true, sort?:"<part>", cohorts:[1–8 names]\` | **what each case is made of, as parts of a whole, compared between cohorts** — the stacked-bar panels of single-cell studies (cell types, cell states) and of signature studies. The parts are a generic-assay profile's entities (per sample, or per patient for a patient-level profile; at most 16 — choose them with \`entities\`) or 2–16 numeric clinical attributes, \`custom:\` uploads included (per patient unless \`unit:\"sample\"\`). A case with every part, none below zero and a sum above zero is kept, its parts divided by their sum unless \`normalize:false\`; the rest are counted as left out. Inside the database, per cohort: n, Σp and Σp² per part and Σ, Σ² of each case's Shannon entropy. Each cohort against the view's other cohorts pooled, part by part: log2 of the ratio of means (each + 0.001) and Welch's t, Benjamini–Hochberg across the comparisons (with two cohorts, once per part). The figure draws each cohort's cases as stacked bars ordered by \`sort\` (default the first part), beside the cohort's mean, and a cohort × part matrix; the bars come only from participants that may show cases, and past 2,000 cases a cohort is drawn as its mean alone, saying so. Sums only, apart from those bars, which carry no ids |
 | \`mutations\` | \`gene:"<symbol>", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[≤6 names]\` | **one gene's mutation table**, the table under cBioPortal's Mutations-tab lollipop: every called mutation of \`gene\` in each cohort's samples (uncalled calls left out), one row per call — sample, detailed cancer type, protein change, the OncoKB annotation at the pinned version, mutation and variant type, allele frequency (variant / variant + reference reads) with both read counts, the study's MUTATION_COUNT, chromosome, positions, alleles, mutation status. Column ids: \`sample\`, \`cancerType\`, \`proteinChange\`, \`annotation\`, \`mutationType\`, \`variantType\`, \`vaf\`, \`altCount\`, \`refCount\`, \`mutCount\`, \`chr\`, \`start\`, \`end\`, \`ref\`, \`var\`, \`status\`; shown by default: sample, cancerType, proteinChange, annotation, mutationType, mutCount (the portal's own). Searched, filtered and sorted as every table view is (see *Table views* below; default order drivers first, then by codon; \`proteinChange\` sorts by codon, \`annotation\` drivers first). Its rows name samples, so only a patient-level participant contributes them; any other study is named |
 | \`table\` | \`unit?:"sample"\|"patient", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[≤6 names]\` | **the clinical data table**, cBioPortal's Clinical Data tab: one row per sample of each cohort's patients — carrying its patient's attributes too — or per patient (patient attributes only), with every clinical attribute the study records (highest priority first; at most 200 — past that, name the ones you want in \`columns\`), values as recorded. Column ids: \`patient\`, \`sample\` (or \`samples\`, the count, per patient), and the attribute ids; every one is shown by default. Searched, filtered and sorted as every table view is (see *Table views* below; an attribute the study declares NUMBER is numeric; default order patient and sample id). \`attributes\` and \`sort.attribute\` are older spellings of \`columns\` and \`sort.column\`. Its rows are patients, so only a patient-level participant contributes them; an aggregate-only or remote study is named with how many of each cohort's patients it holds. A patient in two cohorts is listed under each. A listing: no statistic |
 | \`timeline\` | \`patient?:{study, id}, collapsed?:[track ids], expandGaps?:false, columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[1 name]\` | **one patient's clinical timeline**, cBioPortal's patient-view Timeline: every clinical event the study records for \`patient\` (default: the first patient of the list), in days from diagnosis, as tracks — one per event type (case-folded), in the portal's order (sample acquisition, sequencing, surgery, … treatment, diagnosis, lab tests), nested by attribute as the portal nests them (Treatment by TREATMENT_TYPE → SUBTYPE → AGENT, Lab_Test by TEST, Diagnosis and Pathology by SUBTYPE; a lone "Other" level is folded into its parent). Points are events, bars are events with a stop date, same-day events stack with their count; samples are numbered markers (collection order) coloured by SAMPLE_TYPE; a lab test whose every RESULT is a number is a line chart (a result recorded as \`<x\`/\`>x\` is drawn hollow at x); STYLE_COLOR / STYLE_SHAPE attributes are honoured. Runs of four or more years with no event are cut to one dashed mark unless \`expandGaps\`. \`collapsed\` names tracks drawn folded, by id: the event type in lower case, then each nesting value, dot-joined (\`treatment\`, \`treatment.Chemo\`, \`lab_test\`). The cohort's patients to choose from — in the lab card, a dialog its navigator opens — are a table view (see *Table views* below) with column ids \`patient\`, \`samples\`, \`events\`, \`first\`, \`last\` (event days), \`span\` (days), \`types\` (event types recorded); default order patients with a timeline first, then by id. A named patient must be one of the cohort's patients. The view reads ONE cohort (name it in \`cohorts\` when the document has several). The result gives the drawn patient's \`position\` in the list's order (its search, filters and sort) — \`index\` from 0, and the \`prev\` and \`next\` patients as \`{study, id}\`, what the card's ‹ prev / next › step to by setting \`patient\`; null when the query leaves the patient out. Both the list and the timeline name a patient, so only a patient-level participant contributes; any other study is named. A listing: no statistic |
@@ -1800,6 +1886,8 @@ export const AGENT_GRAMMAR = `Document shape:
                // every gene's alteration frequency compared between cohorts (Fisher/chi-squared, BH), volcano + table
              {"kind":"assays","profileType":"<generic-assay profile>","minN":3,"cohorts":[2-6 names]},
                // every entity of a generic-assay profile (signatures, arm-level CNA, …) between cohorts (Welch t/ANOVA or chi-squared, BH)
+             {"kind":"composition","profileType":"<generic-assay profile>"|"attributes":["<numeric attribute>",…2-16],"sort":"<part>"?,"normalize":true?,"cohorts":[1-8 names]},
+               // parts of a whole per case (cell types, cell states, signatures) as stacked bars; each cohort vs the rest per part (Welch t, BH)
              {"kind":"mutations","gene":"KRAS","columns":["sample","proteinChange","vaf"]?,"search":"G12"?,"filters":{"<column>":{"op":"contains","value":"Missense"}|{"values":["G12D","G12V"]}|{"min":0.1,"max":1}}?,"sort":{"column":"vaf","desc":true}?,"rows":25},
                // one gene's mutation table: every call with sample, protein change, OncoKB, allele frequency (patient-level studies only)
              {"kind":"table","unit":"sample|patient","columns":["patient","<attribute>", ...]?,"search":"<text>"?,"filters":{"<column>":<filter>}?,"sort":{"column":"<column>","desc":true}?,"rows":25},

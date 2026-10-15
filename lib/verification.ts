@@ -44,7 +44,7 @@ export const STAT_CHECKS: StatCheck[] = [
   { method: "Cochran–Mantel–Haenszel test, McNemar's test", usedFor: "stratified and paired comparisons", keys: ["cmh", "mcnemar"],
     agreement: "p-values and odds ratios to 6 significant digits",
     test: "test/tables-golden.test.ts", fixture: "tables", caseKeys: ["cmh", "mcnemar"] },
-  { method: "Welch's t-test, Welch's ANOVA, Mann–Whitney, Kruskal–Wallis, medians", usedFor: "comparing a clinical value between groups", keys: ["welch", "anova", "ranks"],
+  { method: "Welch's t-test, Welch's ANOVA, Mann–Whitney, Kruskal–Wallis, medians", usedFor: "comparing a clinical value between groups; each part of a composition between cohorts", keys: ["welch", "anova", "ranks"],
     agreement: "p-values to 6 significant digits",
     test: "test/moments-golden.test.ts", fixture: "moments", caseKeys: ["welch", "anova", "ranks"] },
   { method: "Pearson correlation and its meta-analysis across studies", usedFor: "co-expression, scatter plots", keys: ["pearson", "meta"],

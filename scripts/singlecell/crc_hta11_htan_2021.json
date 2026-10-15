@@ -1,0 +1,41 @@
+{
+ "study": "crc_hta11_htan_2021",
+ "id": "hta11-sc",
+ "name": "HTAN Vanderbilt colorectal polyp scRNA-seq (Chen et al., Cell 2021)",
+ "cellExplorer": "htan-vumc-crc-validation-val-set-of-human-colorectal-tumor-epithelial",
+ "patient": {
+  "obs": "donor_id",
+  "attribute": null
+ },
+ "sample": {
+  "obs": "HTAN Specimen ID",
+  "attribute": null
+ },
+ "sources": [
+  {
+   "zarr": [
+    "https://cbioportal-public-imaging.assets.cbioportal.org/htan/htan-vumc-differential-pre-malignant-programs-and-microenvironment-chart-distinct-paths-to/discovery-dis-set-of-human-colorectal-tumor-epithelial.zarr",
+    "https://cbioportal-public-imaging.assets.cbioportal.org/htan/htan-vumc-differential-pre-malignant-programs-and-microenvironment-chart-distinct-paths-to/validation-val-set-of-human-colorectal-tumor-epithelial.zarr"
+   ],
+   "prefix": "EPI",
+   "labels": [
+    "Cell_Type"
+   ],
+   "scores": [],
+   "where": {},
+   "_note": "epithelial cells, discovery and validation sets: the share of each cell type"
+  },
+  {
+   "zarr": "https://cbioportal-public-imaging.assets.cbioportal.org/htan/htan-vumc-differential-pre-malignant-programs-and-microenvironment-chart-distinct-paths-to/val-and-dis-datasets-non-epithelial.zarr",
+   "prefix": "NONEPI",
+   "labels": [
+    "Cell_Type"
+   ],
+   "scores": [],
+   "where": {},
+   "_note": "immune and stromal cells: the share of each cell type"
+  }
+ ],
+ "minCells": 50,
+ "minScoreCells": 20
+}

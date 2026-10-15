@@ -1181,6 +1181,65 @@ export interface AssaysResult {
   excluded?: { study: string; reason: string }[];
 }
 /**
+ * Composition: what each case is made of — cell types, cell states, signature contributions — as
+ * parts of a whole, compared between cohorts (the stacked-bar panels of single-cell studies). The
+ * parts are every entity of one generic-assay profile, or a list of numeric clinical attributes
+ * (custom: uploads included). Each cohort's mean composition and every (cohort, part) enrichment
+ * against the view's other cohorts come from sums computed in the database; the per-case bars are
+ * drawn only where a participant may show cases.
+ */
+export interface CompositionView {
+  note?: string;
+  kind: "composition"; cohorts?: string[];
+  /** a generic-assay profile whose entities are the parts (e.g. cell_type_relative_counts) */
+  profileType?: string;
+  /** with profileType: only these of its entities, in this order */
+  entities?: string[];
+  /** numeric clinical attributes that are the parts, in this order (2–16); custom: names allowed */
+  attributes?: string[];
+  /** attributes only: one bar per patient (default) or per sample */
+  unit?: "patient" | "sample";
+  /** divide each case's parts by their sum, so every bar is a whole (default true) */
+  normalize?: boolean;
+  /** the part cases are ordered by, highest first (default the first part) */
+  sort?: string;
+}
+export interface CompositionPart {
+  /** the entity or attribute it reads */
+  id: string;
+  /** how the figure names it: the entity's name, or the attribute with the parts' shared prefix taken off */
+  name: string;
+}
+export interface CompositionCell {
+  cohort: string; part: string;
+  n: number; mean: number; sd: number | null;
+  /** this cohort against the view's other cohorts pooled: log2 of the ratio of means (each + 0.001) */
+  log2?: number;
+  /** Welch's t on the same split, and Benjamini–Hochberg across every (cohort, part) tested */
+  p?: number; q?: number;
+}
+export interface CompositionResult {
+  source: "genericAssay" | "clinical";
+  /** the profile, or "clinical attributes" */
+  sourceName: string;
+  unit: "samples" | "patients";
+  normalize: boolean;
+  parts: CompositionPart[];
+  sort: string;
+  /** per cohort: cases with every part, cases left out (some part missing, or a part below zero, or all zero) */
+  groups: { cohort: string; n: number; incomplete: number; invalid: number;
+    /** Shannon entropy (natural log) of the normalised parts, mean and SD over the cohort's cases */
+    entropy: { mean: number; sd: number | null } | null;
+    /** the cases' own compositions, sorted by `sort`, highest first; absent when they may not be shown */
+    cases?: number[][];
+    /** why `cases` is absent */
+    casesWhy?: string;
+  }[];
+  cells: CompositionCell[];
+  tested: number; significant: number;
+  excluded?: { study: string; reason: string }[];
+}
+/**
  * Genome-wide co-expression (cBioPortal's results-view Co-expression tab): one gene's expression
  * against every gene's in a profile, over one cohort's patients — Spearman's ρ (ranked by it, as
  * the portal ranks) and Pearson's r, each with a p, and Benjamini–Hochberg over ρ. Sums only.
@@ -1359,7 +1418,7 @@ import type { PlotAxis, PlotData } from "./plot.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView
-  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
+  | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -1663,6 +1722,7 @@ export interface ViewResult {
   overlap?: OverlapResult;                  // how cohorts intersect (UpSet)
   enrichment?: EnrichmentResult;            // genome-wide alteration enrichment
   assays?: AssaysResult;                    // generic-assay comparison
+  composition?: CompositionResult;          // parts of a whole per case, compared between cohorts
   correlates?: CorrelatesResult;            // genome-wide co-expression with one gene
   table?: TableResult;                      // the clinical data table
   timeline?: TimelineResult;                // one patient's timeline, and the patients to choose from
