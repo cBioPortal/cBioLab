@@ -39,6 +39,17 @@ export function useStudies(): StudyInfo[] {
   return q.data ?? NO_STUDIES;
 }
 
+/** Where this deployment's gallery examples run: null for here, else the deployment that holds their
+ *  studies (EXAMPLES_URL, lib/site.ts); undefined until known, and while the lookup has failed. */
+export function useExamplesUrl(): { examplesUrl: string | null | undefined; examplesUrlError: string | null } {
+  const q = useQuery({
+    queryKey: ["site"],
+    staleTime: Infinity,
+    queryFn: async ({ signal }) => (await answer(await api.site({ signal }))).examplesUrl as string | null,
+  });
+  return { examplesUrl: q.data, examplesUrlError: q.error ? String((q.error as Error).message || q.error) : null };
+}
+
 /** The study catalog the survival, course and sequence controls read. A templated document holds
  *  "$study" until its parameter is resolved; asking for a study by that name has no answer, so it
  *  is not asked. `enabled` holds it back until a page that shows those controls is open. */

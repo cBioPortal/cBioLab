@@ -16,6 +16,12 @@ const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [
 
 interface Example { name: string; desc: string; def: CohortDef }
 /** The Saved tab's example cohorts: definitions to preview, save or analyse, one per kind of clause. */
+/** A document as a ?doc= value: base64url of its UTF-8 JSON, as the page reads it back. */
+export function docParam(d: AnalysisDoc | TemplateDoc): string {
+  return btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d))))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 export const EXAMPLES: Example[] = [
   { name: "Immuno-treated", desc: "any immunotherapy on the timeline",
     def: { all: [IMMUNO_EVENT] } },
@@ -109,10 +115,7 @@ export function useLibrary(page: LibraryPage) {
 
   // Accepts the authored form: this only serialises, and a template is exactly
   // what you want to share when the point is that it can be re-pointed.
-  const docLink = (d: AnalysisDoc | TemplateDoc): string =>
-    location.origin + location.pathname + "?doc=" +
-    btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d))))
-      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const docLink = (d: AnalysisDoc | TemplateDoc): string => location.origin + location.pathname + "?doc=" + docParam(d);
 
   const previewExample = async (ex: any) => {
     setExEvals(s => ({ ...s, [ex.name]: { busy: true } }));

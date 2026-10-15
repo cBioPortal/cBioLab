@@ -1,10 +1,13 @@
 "use client";
 // The Examples tab: the documented analyses (lib/dsl-reference.ts EXAMPLES), filtered by tag. The
-// tag belongs to the page, which keeps it while this unmounts.
+// tag belongs to the page, which keeps it while this unmounts. The examples are written against the
+// public warehouse's studies; where this deployment's database does not hold them (EXAMPLES_URL,
+// lib/site.ts), Run opens each on the deployment that does, after saying the reader is leaving.
 import { useState } from "react";
-import { Check, Link2, Play } from "lucide-react";
+import { Check, ExternalLink, Link2, Play } from "lucide-react";
 import { EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
 import { Button } from "../_ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 
 /** a tag filter: an outline chip, filled while it is the one shown */
 const TAG = "group rounded-pill px-2.5 text-sm font-normal aria-pressed:border-link aria-pressed:bg-link aria-pressed:text-card aria-pressed:hover:bg-link/90 aria-pressed:hover:text-card";
@@ -15,16 +18,27 @@ const studiesOf = (ex: DslExample): string[] => [...new Set(Object.values(ex.doc
   .flatMap((c: any) => (c && c.studies) || (c && c.study ? [c.study] : []))
   .concat(ex.doc.study ? [ex.doc.study] : []))];
 
-export function ExamplesTab({ tag, onTag, busy, onRun, link, onError }: {
+const hostOf = (url: string) => { try { return new URL(url).host; } catch { return url; } };
+
+export function ExamplesTab({ tag, onTag, busy, onRun, link, elsewhere, elsewhereError, onError }: {
   tag: string;
   onTag: (t: string) => void;
   busy: boolean;
   onRun: (ex: DslExample) => void;
-  /** the example's shareable ?doc= link */
+  /** the example's shareable ?doc= link — on the deployment that runs it */
   link: (ex: DslExample) => string;
+  /** the deployment the examples run on: null for this one; undefined until known */
+  elsewhere: string | null | undefined;
+  /** why `elsewhere` could not be found out, if it could not */
+  elsewhereError: string | null;
   onError: (msg: string) => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
+  // the example whose Run is waiting on the reader's go-ahead to leave this site
+  const [leaving, setLeaving] = useState<DslExample | null>(null);
+  const run = (ex: DslExample) => { if (elsewhere) setLeaving(ex); else onRun(ex); };
+  const runWhy = elsewhereError ? "can't tell where examples run on this site: " + elsewhereError
+    : elsewhere === undefined ? "checking where this site runs examples…" : null;
   const copy = async (ex: DslExample) => {
     try { await navigator.clipboard.writeText(link(ex)); setCopied(ex.title); setTimeout(() => setCopied(null), 1800); }
     catch { onError("could not copy to clipboard"); }
@@ -41,6 +55,13 @@ export function ExamplesTab({ tag, onTag, busy, onRun, link, onError }: {
           example that stopped working would fail the suite rather than sit here broken. Running one loads it
           into the Analysis tab, where you can edit the JSON and re-run.
         </p>
+        {elsewhere && (
+          <p className="note exintro">
+            They are written for the public cBioPortal datasets, which this site's database does not hold, so
+            each one opens on <a href={elsewhere} target="_blank" rel="noopener noreferrer">{hostOf(elsewhere)}</a>,
+            in a new tab.
+          </p>
+        )}
         <div className="extags">
           <Button variant="outline" size="xs" className={TAG} aria-pressed={tag === "all"} onClick={() => onTag("all")}>
             all <span className={TAG_N}>{EXAMPLES.length}</span>
@@ -82,7 +103,9 @@ export function ExamplesTab({ tag, onTag, busy, onRun, link, onError }: {
                 <pre className="exjson">{JSON.stringify(ex.doc, null, 2)}</pre>
               </details>
               <div className="row exactions">
-                <Button size="sm" onClick={() => onRun(ex)} disabled={busy}><Play />Run</Button>
+                <Button size="sm" onClick={() => run(ex)} disabled={busy || !!runWhy} title={runWhy || undefined}>
+                  {elsewhere ? <ExternalLink /> : <Play />}Run{elsewhere && " on " + hostOf(elsewhere)}
+                </Button>
                 <Button variant="ghost" size="sm" onClick={() => copy(ex)}>
                   {copied === ex.title ? <Check /> : <Link2 />}{copied === ex.title ? "Copied" : "Copy link"}
                 </Button>
@@ -91,6 +114,26 @@ export function ExamplesTab({ tag, onTag, busy, onRun, link, onError }: {
           );
         })}
       </div>
+      {leaving && elsewhere && (
+        <Dialog open onOpenChange={(open) => { if (!open) setLeaving(null); }}>
+          <DialogContent data-tw className="leavedialog gap-3 sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-base">You are leaving this site</DialogTitle>
+              <DialogDescription>
+                “{leaving.title}” is written for the public cBioPortal datasets, which this site's database does
+                not hold. It will open on <strong>{hostOf(elsewhere)}</strong> in a new tab, where it runs on the
+                public data, not on this site's.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="items-center">
+              <Button type="button" variant="ghost" onClick={() => setLeaving(null)}>Cancel</Button>
+              <Button type="button" onClick={() => { window.open(link(leaving), "_blank", "noopener,noreferrer"); setLeaving(null); }}>
+                <ExternalLink />Open on {hostOf(elsewhere)}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

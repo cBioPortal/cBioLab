@@ -20,7 +20,7 @@ list is empty, and the page shows it waiting for one). The analysis page shows t
 summary ("Cohorts in this analysis": size, studies, which views draw each); cohorts come in through
 a view's "+ Add cohort" (`app/lab/add-cohort-dialog.tsx`: the analysis's own, the library, or
 Explore in add mode, which returns the selection to that view). The server compiles it to
-ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (UI at
+ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI at
 `/lab`, MCP at `/api/mcp`, project rationale at `/rationale`).
 
 ## Architecture map
@@ -165,6 +165,12 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
   that never vary within a sample); `build <config>` writes per-patient and per-sample custom datasets
   (label shares, mean scores). Reviewed configs live in `scripts/singlecell/`. Paper-specific design
   (a sorting correction, site pooling, cut-offs) stays a dataset's own script, as SPECTRUM's does.
+- **Where the examples run** — the gallery examples are written for the public warehouse's studies
+  (and their counts are pinned to it), so an instance on another database sets `EXAMPLES_URL`
+  (`lib/site.ts`, served to the page by `GET /api/site` at run time, not baked in at build) to a
+  deployment that holds them. The Examples tab then says so, and Run opens a "you are leaving this
+  site" dialog and the example on that deployment, in a new tab; the assistant's
+  `analysis_load_example` returns that link instead of loading it. Unset, examples run in place.
 - **Requests from the pages** go through **`app/lab/api.ts`** (`api.analysis`, `api.explore`,
   `api.oncoprint`, …), never a bare `fetch`: each takes its endpoint's envelope type from
   **`lib/api-schemas.ts`** and attaches the uploads its body uses (`withCustomData`). The routes

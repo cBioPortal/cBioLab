@@ -16,7 +16,7 @@ import { requestLogin, referencedDatasets, bindUploads, unresolvedUploads } from
 import { useDocStore, EMPTY_DOC } from "./doc-store.ts";
 import { useDocHistory } from "./use-doc-history.ts";
 import { useExploreState } from "./use-explore-state.ts";
-import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
+import { useExamplesUrl, useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
 import { useAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload } from "lucide-react";
@@ -33,7 +33,8 @@ import { useViewOptions } from "./use-view-options.ts";
 import { useViewEdits } from "./use-view-edits.ts";
 import { useCohortEdits } from "./use-cohort-edits.ts";
 import { useWorkspace } from "./use-workspace.ts";
-import { useLibrary, EXAMPLES } from "./use-library.ts";
+import { useLibrary, EXAMPLES, docParam } from "./use-library.ts";
+import type { DslExample } from "../../lib/dsl-reference.ts";
 import { useToolActions } from "./use-tool-actions.ts";
 import { AddCohortDialog, type AddCohortTarget } from "./add-cohort-dialog.tsx";
 import { cellExplorerFor } from "../../lib/cell-explorer.ts";
@@ -311,6 +312,9 @@ export default function AnalysisPage() {
   const { commitDoc, proposePartition, saveAs, validateDoc } = toolActions;
   const library = useLibrary({ docs, evalDef, goTab, persist, saved, sharedSaved: savedArtifacts.sharedCohorts, setError, setStudy, study });
   const { analyzePicked, cohortsSubTab, docLink, exEvals, exTag, picked, previewExample, runDocExample, saveExample, setCohortsSubTab, setExTag, setPicked, togglePick } = library;
+  // where the gallery examples run (EXAMPLES_URL): here, or a deployment that holds their studies
+  const { examplesUrl, examplesUrlError } = useExamplesUrl();
+  const exampleLink = (ex: DslExample) => examplesUrl ? examplesUrl + "/lab?doc=" + docParam(ex.doc) : docLink(ex.doc);
   const workspace = useWorkspace({ canSave, doc, docs, goTab, persistSpaces, removeSpace, setError, setStudy, spaces, study,
     sharedSpaces: savedArtifacts.sharedWorkspaces,
     saveShared: (id, name, d, version) => savedArtifacts.saveShared("workspace", id, name, d, version) });
@@ -337,7 +341,7 @@ export default function AnalysisPage() {
   const webmcp = useLabTools({
     doc, result, busy, error, tab, study, savedAs: analysisSaved ? doc.title || null : null,
     validate: validateDoc, proposePartition, commit: commitDoc, goTab: (t) => goTab(t as typeof TABS[number]),
-    runExample: runDocExample, save: saveAs, link: docLink,
+    runExample: runDocExample, examplesElsewhere: examplesUrl ?? null, exampleLink, save: saveAs, link: docLink,
     exploreStudies: exSel.current, draft: parseDraft(), explore, exploreBusy,
     setExploreStudies, addClause, removeDraftClause, clearDraft, analyzeDraft,
     saveDraft: async (name: string) => {
@@ -464,7 +468,7 @@ export default function AnalysisPage() {
 
         {/* ================= Examples tab ================= */}
         {tab === "examples" && <ExamplesTab tag={exTag} onTag={setExTag} busy={busy}
-          onRun={runDocExample} link={(ex) => docLink(ex.doc)} onError={setError} />}
+          onRun={runDocExample} link={exampleLink} elsewhere={examplesUrl} elsewhereError={examplesUrlError} onError={setError} />}
 
         {/* ================= Analysis tab ================= */}
         {tab === "analysis" && <div className="ana-grid">

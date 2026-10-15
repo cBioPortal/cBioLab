@@ -69,6 +69,7 @@ export const api = {
 
   /** Every study this deployment can reach, with its counts and capabilities. */
   studies: (opts: Opts = {}) => fetch("/api/studies", { signal: opts.signal }),
+  site: (opts: Opts = {}) => fetch("/api/site", { signal: opts.signal }),
 
   /** One study's timeline vocabulary and declared survival endpoints. */
   catalog: (study: string, opts: Opts = {}) => fetch("/api/catalog?study=" + encodeURIComponent(study), { signal: opts.signal }),
