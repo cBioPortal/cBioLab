@@ -184,7 +184,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
     ctx.fillStyle = P.muted;
     if (gw >= 24) ctx.fillText(g.name + (gw >= 90 ? " (" + g.patients.toLocaleString("en-US") + ")" : ""), Math.max(gutter, gx - sx + gutter), 13, Math.max(20, gw + gapPx - 4));
     data.tracks.forEach((t, ti) => {
-      const y = header + ti * (rowH + rowGap);
+      const y = snap(header + ti * (rowH + rowGap));
       if (opts.pctLabels && g.pct && g.pct[ti] != null) {
         ctx.fillStyle = P.muted; ctx.font = "10px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
         if (pctLeft) { ctx.textAlign = "right"; ctx.fillText(formatPct(g.pct[ti]), gx - sx + gutter - 3, y + 14, gapPx - 4); ctx.textAlign = "left"; }
@@ -199,7 +199,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
           // there is one) is cut from the next column's snapped edge, so every gap is the
           // same width and only cell widths absorb the rounding — no beat between the two.
           const xa = snap(gx + k * zoom - sx + gutter), xNext = snap(gx + (k + 1) * zoom - sx + gutter);
-          drawCell(ctx, t, t.cells[order[g.start + k]], xa, y, Math.max(1 / dpr, xNext - xa - pad), rowH, P, S, colors);
+          drawCell(ctx, t, t.cells[order[g.start + k]], xa, y, Math.max(1 / dpr, snap(xNext - pad) - xa), rowH, P, S, colors);
           cellsDrawn++;
         }
       } else {
@@ -210,7 +210,10 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
           const kk1 = Math.min(k1, Math.max(kk0 + 1, Math.floor((px + 1 + sx - gx) / zoom)));
           if (kk0 >= kk1) continue;
           const code = aggregate(t, order, g.start + kk0, g.start + kk1, scratch);
-          drawCell(ctx, t, code, px + gutter, y, 1, rowH, P, S, colors);
+          // snapped like the columns above: at a fractional pixel ratio (1.25, 1.5, browser
+          // zoom) a CSS pixel is not a whole device pixel, and unsnapped buckets seam
+          const xa = snap(px + gutter);
+          drawCell(ctx, t, code, xa, y, snap(px + 1 + gutter) - xa, rowH, P, S, colors);
           bucketsDrawn++;
         }
       }
