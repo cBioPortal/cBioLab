@@ -4,9 +4,10 @@
 // that worked.
 //
 // The URL holds the whole document (`?doc=`), so an entry needs nothing else to be restored. Each
-// entry is stamped with its depth — how many edits since this page was opened — which is what tells
-// Undo it has reached the document the page opened with (it never steps off the app), and Redo
-// whether a later step exists. A tab switch rewrites the current entry rather than adding one, and
+// entry is stamped with its depth, and the page remembers the depth it loaded at: Undo and Redo
+// cover the changes made since this page load, and nothing before it — after a reload there is
+// nothing to undo, and Undo never steps off the app. The browser's own Back and Forward still
+// walk every entry, and restore each one's document. A tab switch rewrites the current entry rather than adding one, and
 // going back keeps the tab the reader is on.
 import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc } from "../../lib/types.ts";
@@ -38,13 +39,16 @@ export function decodeDocParam(search: string): AnalysisDoc | null {
 
 export function useDocHistory(docs: DocStore, emptyDoc: AnalysisDoc, currentTab: () => string): DocHistory {
   const depth = useRef(0);
+  /** the depth this page load started at: Undo goes no further back */
+  const base = useRef(0);
+  /** the furthest step made since then: Redo goes no further forward */
   const max = useRef(0);
   const [, render] = useState(0);
   const sync = () => render((n) => n + 1);
 
   useEffect(() => {
     // stamp the entry the page opened on, so coming back to it is recognised as ours
-    depth.current = max.current = depthOf(history.state) ?? 0;
+    depth.current = base.current = max.current = depthOf(history.state) ?? 0;
     try { history.replaceState({ ...(history.state || {}), [KEY]: depth.current }, "", location.href); } catch { /* history is a convenience */ }
     sync();
 
@@ -68,8 +72,8 @@ export function useDocHistory(docs: DocStore, emptyDoc: AnalysisDoc, currentTab:
       // a text field keeps its own undo
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
       const k = e.key.toLowerCase();
-      if (k === "z" && !e.shiftKey) { if (depth.current > 0) { e.preventDefault(); history.back(); } }
-      else if ((k === "z" && e.shiftKey) || k === "y") { if (depth.current < max.current) { e.preventDefault(); history.forward(); } }
+      if (k === "z" && !e.shiftKey) { if (depth.current > base.current) { e.preventDefault(); history.back(); } }
+      else if ((k === "z" && e.shiftKey) || k === "y") { if (depth.current >= base.current && depth.current < max.current) { e.preventDefault(); history.forward(); } }
     };
 
     window.addEventListener("popstate", onPop);
@@ -90,9 +94,9 @@ export function useDocHistory(docs: DocStore, emptyDoc: AnalysisDoc, currentTab:
         }
       } catch { /* URL state is a convenience, never a failure */ }
     },
-    undo: () => { if (depth.current > 0) history.back(); },
-    redo: () => { if (depth.current < max.current) history.forward(); },
-    get canUndo() { return depth.current > 0; },
-    get canRedo() { return depth.current < max.current; },
+    undo: () => { if (depth.current > base.current) history.back(); },
+    redo: () => { if (depth.current >= base.current && depth.current < max.current) history.forward(); },
+    get canUndo() { return depth.current > base.current; },
+    get canRedo() { return depth.current >= base.current && depth.current < max.current; },
   };
 }
