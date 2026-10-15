@@ -621,6 +621,37 @@ async function main() {
       } catch (e) { mergedWhat = String(e.message).split("\n")[0]; }
       ok("a merged gene row names the genes it pools when its label is hovered", mergedOk, mergedWhat);
 
+      // An edit that breaks a view is one step from the analysis that worked: each change is a
+      // history entry, and the broken oncoprint offers Undo beside its error.
+      let undoWhat = "not reached", undoOk = false;
+      // the broken edit is refused on purpose, and the browser logs that request's 400 — expected,
+      // not a regression, so it is filtered out of the shared error tally as the dead route's 404 is
+      const errsBeforeUndo = errors.length;
+      try {
+        const good = { study: "msk_chord_2024",
+          cohorts: { "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" }] } },
+          views: [{ kind: "oncoprint", cohorts: ["Pancreatic"], genes: ["KRAS", "TP53"] }] };
+        const bad = { ...good, views: [{ ...good.views[0], heatmap: [{ profileType: "NOT_A_PROFILE" }] }] };
+        await page.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify(good)).toString("base64url"));
+        await page.waitForSelector(".onco-legend", { timeout: 300000 });
+        const before = await page.evaluate(() => history.length);
+        await page.getByRole("button", { name: /show document json/i }).click();
+        await page.locator("#docjson").fill(JSON.stringify(bad));
+        await page.locator("dialog[open]").getByRole("button", { name: /^run/i }).first().click();
+        await page.keyboard.press("Escape").catch(() => {});
+        await page.waitForSelector(".undo-error", { timeout: 120000 });
+        const grew = (await page.evaluate(() => history.length)) - before;
+        await page.locator(".undo-error").first().click();
+        await page.waitForSelector(".onco-legend", { timeout: 120000 });
+        const errLeft = await page.locator(".error").filter({ hasText: "NOT_A_PROFILE" }).count();
+        const docBack = await page.evaluate(() => JSON.parse(atob((new URLSearchParams(location.search).get("doc") || "").replace(/-/g, "+").replace(/_/g, "/"))));
+        undoOk = grew === 1 && errLeft === 0 && !JSON.stringify(docBack).includes("NOT_A_PROFILE");
+        undoWhat = "history +" + grew + ", error after undo: " + errLeft + ", document back: " + !JSON.stringify(docBack).includes("NOT_A_PROFILE");
+      } catch (e) { undoWhat = String(e.message).split("\n")[0]; }
+      ok("an edit that breaks a view is undone from the error, and is a browser history step", undoOk, undoWhat);
+      errors.splice(errsBeforeUndo, errors.length - errsBeforeUndo,
+        ...errors.slice(errsBeforeUndo).filter(e => !/status of 400/.test(e)));
+
       // The toolbar separates what is drawn from how it is drawn, and a zone never wraps
       // inside itself — which is what stops a pair like the zoom controls being split by a
       // line break, the failure that started this work.

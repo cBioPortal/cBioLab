@@ -4,7 +4,7 @@
 // document names custom data that is not here. The page holds the state; each section reads it
 // and the page's actions from one AnalysisCtx.
 import { useState } from "react";
-import { Braces, LoaderCircle, Play, Plus, Save, X } from "lucide-react";
+import { Braces, LoaderCircle, Play, Plus, Redo2, Save, Undo2, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { CHIP } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
@@ -92,6 +92,8 @@ export interface AnalysisCtx {
   upgradeNote: DocUpgrade | null;
   viewCtx: Omit<ViewCtx, "result">;
   viewIds: number[];
+  /** the document's history (use-doc-history.ts): each change the reader made is a step */
+  docHistory: { undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean };
 }
 
 
@@ -301,7 +303,7 @@ export function DocDialog({ ctx }: { ctx: AnalysisCtx }) {
 }
 
 export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
-  const { VIEW_KINDS, addView, busy, doc, docDialog, explore, fetchExplore, goTab, openWorkspaceSave, removeViews, result, setCdFocus, spaces, viewCtx, viewIds } = ctx;
+  const { VIEW_KINDS, addView, busy, doc, docDialog, docHistory, explore, fetchExplore, goTab, openWorkspaceSave, removeViews, result, setCdFocus, spaces, viewCtx, viewIds } = ctx;
   return <>
     <div>
       {(busy || result || (doc.views || []).length > 0) && (
@@ -316,6 +318,16 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
                 reading the figures. What it's called and whether it's
                 saved is what the dialog it opens is for; this button's
                 own label stays fixed. */}
+            {(docHistory.canUndo || docHistory.canRedo) && <>
+              <Button variant="outline" size="sm" className="undo-doc" disabled={!docHistory.canUndo} onClick={docHistory.undo}
+                title={docHistory.canUndo ? "undo the last change to this analysis (Ctrl/⌘-Z, or the browser's Back)" : "nothing to undo: this is the analysis as opened"}>
+                <Undo2 />Undo
+              </Button>
+              <Button variant="outline" size="sm" className="redo-doc" disabled={!docHistory.canRedo} onClick={docHistory.redo}
+                title={docHistory.canRedo ? "redo the change just undone (Shift-Ctrl/⌘-Z)" : "nothing to redo"}>
+                <Redo2 />Redo
+              </Button>
+            </>}
             {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
               <Button variant="outline" size="sm" disabled={busy} onClick={openWorkspaceSave}
                 title={doc.title

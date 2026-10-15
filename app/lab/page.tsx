@@ -14,6 +14,7 @@ import { upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
 import { requestLogin, referencedDatasets, bindUploads, unresolvedUploads } from "./custom-data-client.ts";
 import { useDocStore, EMPTY_DOC } from "./doc-store.ts";
+import { useDocHistory } from "./use-doc-history.ts";
 import { useExploreState } from "./use-explore-state.ts";
 import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
 import { useAnalysis, rerunAnalysis } from "./use-analysis.ts";
@@ -157,7 +158,9 @@ export default function AnalysisPage() {
   const docDialog = useRef<HTMLDialogElement | null>(null);
   // the document, its views' ids and the JSON editor's text (app/lab/doc-store.ts); every new
   // document goes into the URL, so a refresh or a shared link shows exactly it
-  const docs = useDocStore(EMPTY_DOC, (d) => syncUrl(undefined, d));
+  const docs = useDocStore(EMPTY_DOC, (d, undoable) => syncUrl(undefined, d, undoable));
+  // each change the reader makes is a browser history entry: Back, Forward, Undo and Redo step through them
+  const docHistory = useDocHistory(docs, EMPTY_DOC, () => tabRef.current);
   const doc = docs.current.doc;
   // an analysis refused for want of its custom data runs once that data arrives (an import, an unlock)
   const unresolvedCount = unresolvedUploads(doc).length;
@@ -201,7 +204,7 @@ export default function AnalysisPage() {
     if (linkLoading || !normalized || normalized === doc) return;
     const up = upgradeDocument(doc);
     if (up.upgrade) setUpgradeNote(up.upgrade);
-    docs.set(normalized);
+    docs.set(normalized, { undoable: false });   // the document as opened, in the current version — not a step of the reader's
   }, [normalized, linkLoading]); // eslint-disable-line react-hooks/exhaustive-deps
   const analysis = useAnalysis(doc, docs.current.ids, docs.current.epoch, study, normalized === doc);
   const result = analysis.result;
@@ -252,7 +255,7 @@ export default function AnalysisPage() {
       if (b64) {
         const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0))));
         if (d.study) { setStudy(d.study); setExStudies([d.study]); exSel.current = [d.study]; }
-        docs.replace(d);
+        docs.replace(d, { undoable: false });   // the link the page opened: the first step, not a new one
         if (tabRef.current === "explore") fetchExplore();
       } else {
         // ?study=a,b opens Explore scoped to those studies (the data sets page links here)
@@ -273,13 +276,15 @@ export default function AnalysisPage() {
   // The document store writes the URL too, from whatever closure set the document — during the
   // mount effect that still holds the initial tab — so the current tab is read from a ref, never
   // from the render closure, or a shared ?doc= link would record the wrong tab.
-  const syncUrl = (nextTab?: string, d?: AnalysisDoc | null) => {
+  // A document change the reader made adds a history entry (use-doc-history.ts); a tab switch, or a
+  // change they did not make, rewrites the current one.
+  const syncUrl = (nextTab?: string, d?: AnalysisDoc | null, push = false) => {
     try {
       const q = new URLSearchParams(window.location.search);
       q.set("tab", nextTab || tabRef.current);
       if (d) q.set("doc", btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d))))
         .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
-      history.replaceState(null, "", "?" + q.toString());
+      docHistory.record("?" + q.toString(), push);
     } catch { /* URL state is a convenience, never a failure */ }
   };
   /** every tab switch goes through here so the URL cannot drift from the UI */
@@ -325,9 +330,9 @@ export default function AnalysisPage() {
   /** what Explore's sections read and the edits they can make (app/lab/explore-sections.tsx) */
   const exploreCtx: ExploreCtx = { ...exploreState, menuStore: menuOpenRef.current, showClauseData, studies };
   /** what every view card reads and the edits it can make (app/lab/view-cards.tsx) */
-  const viewCtx = { VIEW_KINDS, study, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, maxCohortsOf, menuOpenRef, moveView, noteEdit, ocView, openCohortChooser, openGenes, patchView, pendingKeys, profileOptions, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
+  const viewCtx = { VIEW_KINDS, docHistory, study, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, maxCohortsOf, menuOpenRef, moveView, noteEdit, ocView, openCohortChooser, openGenes, patchView, pendingKeys, profileOptions, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
   /** what the Analysis tab's sections read and the actions they take (app/lab/analysis-sections.tsx) */
-  const analysisCtx: AnalysisCtx = { VIEW_KINDS, addView, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortCells, cohortSaveState, cohortSource, openCohortCells, emptyViewHint, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, removeViews, renamePartitionRow, result, saveCohortToLibrary, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
+  const analysisCtx: AnalysisCtx = { VIEW_KINDS, addView, docHistory, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortCells, cohortSaveState, cohortSource, openCohortCells, emptyViewHint, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, removeViews, renamePartitionRow, result, saveCohortToLibrary, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
   // what the page offers the researcher's AI assistant (app/lab/agent-tools.ts), current every render
   const webmcp = useLabTools({
     doc, result, busy, error, tab, study, savedAs: analysisSaved ? doc.title || null : null,

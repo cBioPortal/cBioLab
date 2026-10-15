@@ -16,6 +16,7 @@ import { AxisPicker, HighlightPicker, ViewHelpButton, SplitByNote, PickMenu, Coh
 import { ViewFigure } from "./figure.tsx";
 import { ArrowLeftRight, Plus, Settings2, X } from "lucide-react";
 import { Button } from "../_ui/button";
+import { ErrorAlert } from "../_ui/error-alert.tsx";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
@@ -35,6 +36,8 @@ export interface ViewCtx {
   result: AnalysisResult;
   /** each view's id, in the document's order: what a card is keyed by */
   viewIds: (string | number)[];
+  /** step the document back one change: what an errored view offers */
+  docHistory: { undo: () => void; canUndo: boolean };
   /** the ids of views whose own re-run is in flight */
   pendingKeys: Set<string | number>;
   /** a full document run is in flight */
@@ -889,6 +892,7 @@ function OncoprintViewCard({ ctx, v, vi }: CardProps) {
           onContract={(ct) => { const k = JSON.stringify(v.spec); setContracts((m) => m[k] === ct ? m : { ...m, [k]: ct }); }}
           contract={c || null}
           note={v.note} studies={v.studies}
+          onUndo={ctx.docHistory.canUndo ? ctx.docHistory.undo : undefined}
         />
       </>;
     })()}
@@ -932,15 +936,16 @@ function ErrorHead({ ctx, v, vi }: CardProps) {
   </>;
 }
 
-function ErrorNote({ v }: CardProps) {
+function ErrorNote({ ctx, v }: CardProps) {
+  const { docHistory } = ctx;
   return <>
-    {v.error && <div className="error">{v.kind}: {v.error}{v.participation ? <> <>{v.ms != null && (
+    {v.error && <ErrorAlert onUndo={docHistory.canUndo ? docHistory.undo : undefined}>{v.kind}: {v.error}{v.participation ? <> <>{v.ms != null && (
           <span className="lat" title={
             "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
             (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
             {v.ms.toLocaleString()}ms
             {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
           </span>
-        )}<Participation p={v.participation} /></></> : null}</div>}
+        )}<Participation p={v.participation} /></></> : null}</ErrorAlert>}
   </>;
 }
