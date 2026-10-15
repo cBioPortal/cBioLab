@@ -158,6 +158,24 @@ test("more than one study adds the \"Study of origin\" track from studyOf", () =
   assert.equal(c.study, "s1 + s2");
 });
 
+test("profiled-for rows: one per drawn type some columns lack, after the study track, 'No' as no data", () => {
+  // bits over PROFILED_TYPES: 1 mutations, 2 CNA, 4 SV, 8 mRNA
+  const masks = [{ pid: "P1", mask: 7 }, { pid: "P2", mask: 7 }, { pid: "P3", mask: 1 | 4 }, { pid: "P4", mask: 7 }, { pid: "P5", mask: 7 | 8 }];
+  const c = assembleContract({ ...input(), studies: ["s1", "s2"], studyOf: new Map([["P1", "s1"], ["P2", "s1"], ["P3", "s2"], ["P4", "s2"], ["P5", "s2"]]),
+    profiled: { types: ["MUTATION_EXTENDED", "COPY_NUMBER_ALTERATION", "STRUCTURAL_VARIANT", "MRNA_EXPRESSION"], masks } });
+  const clin = c.tracks.filter((t) => t.kind === "clinical");
+  assert.deepEqual(clin.map((t) => t.label).slice(0, 3), ["Study of origin", "Profiled for copy number alterations", "Profiled for mRNA expression"],
+    "every column has mutations and SV, so those rows say nothing and are left out, as in the portal");
+  const cna = clin[1];
+  assert.equal(cna.profiledFor, "COPY_NUMBER_ALTERATION");
+  assert.deepEqual(cna.categories, ["Yes"]);
+  assert.equal(cna.cells[c.columns.indexOf("P3")], -1);
+  assert.equal(cna.cells[c.columns.indexOf("P1")], 0);
+  // nobody profiled is as silent as everybody profiled
+  const none = assembleContract({ ...input(), profiled: { types: ["PROTEIN_LEVEL"], masks } });
+  assert.ok(!none.tracks.some((t) => t.profiledFor));
+});
+
 // ---- merged gene rows (cBioPortal's `[TP53 MDM2]`) -------------------------
 
 test("a merged row is the OR of its members, and profiled where any member was", () => {

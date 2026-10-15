@@ -6,7 +6,7 @@
 // panel-aware frequencies — separated from where the rows come from. `buildContract`
 // fetches from ClickHouse and calls this; a CLI or a notebook can call it on local
 // tables, and a port in another language has this function as its conformance target.
-import { heatmapTrackLabel, STUDY_TRACK } from "./profile-names.ts";
+import { heatmapTrackLabel, profiledTrackLabel, PROFILED_TYPES, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { STYLE } from "./oncoprint-style.ts";
 import type { Contract, Track, GroupRange, ZReference, ResolvedDisplay, DisplaySpec, SortKeySpec } from "./types.ts";
@@ -110,6 +110,12 @@ export interface AssembleInput {
    * where one integer per patient is far cheaper to send than an array of names).
    */
   coverage: ({ pid: string; genes: string[] } | { pid: string; mask: number })[];
+  /**
+   * The portal's "Profiled for <type>" rows: which alteration types the figure draws (`types`),
+   * and per column a bitmask over PROFILED_TYPES of those its samples were profiled for. A row
+   * appears only for a type some columns were and some were not profiled for, as in the portal.
+   */
+  profiled?: { types: ProfiledType[]; masks: { pid: string; mask: number }[] };
   /** driver call per event, and the source to echo in conventions */
   isDriver: (r: EventRow) => boolean;
   annotationSource: string;
@@ -250,6 +256,20 @@ export function assembleContract(input: AssembleInput): Contract {
     const cells = new Int32Array(allPids.length).fill(-1);
     allPids.forEach((p, i) => { const s = studyOf.get(p); if (s != null) cells[i] = catIdx.get(s)!; });
     clinTracks.push({ kind: "clinical", label: STUDY_TRACK, categories: studies.slice(), cells });
+  }
+  if (input.profiled) {
+    const mask = new Int32Array(allPids.length);
+    for (const r of input.profiled.masks) { const i = pidIndex.get(r.pid); if (i !== undefined) mask[i] |= r.mask; }
+    const rows: Track[] = [];
+    for (const type of input.profiled.types) {
+      const bit = 1 << PROFILED_TYPES.findIndex(([t]) => t === type);
+      const cells = new Int32Array(allPids.length);
+      let yes = 0;
+      for (let i = 0; i < allPids.length; i++) if (mask[i] & bit) yes++; else cells[i] = -1;
+      if (yes === 0 || yes === allPids.length) continue;
+      rows.push({ kind: "clinical", label: profiledTrackLabel(type), categories: [STYLE.glyph.profiled.yes], profiledFor: type, cells });
+    }
+    clinTracks.push(...rows.sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true })));
   }
   for (const { attr, values: valByPid } of clinical) {
     // One string-keyed lookup per column, then three passes over a positional array. The map

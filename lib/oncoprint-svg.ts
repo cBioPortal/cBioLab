@@ -72,6 +72,11 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
       } else parts.push(rect(x, y + ROW_H * l.band[0], w, ROW_H * (l.band[1] - l.band[0]), l.color));
     }
   };
+  // a cell with no value: the portal's no-data glyph, the not-profiled cell's white and midline
+  const noData = (x: number, y: number, w: number): void => {
+    const [s0, s1] = S.glyph.notProfiled.stripe.band;
+    parts.push(rect(x, y, w, ROW_H, S.glyph.notProfiled.fill), rect(x, y + ROW_H * s0, w, ROW_H * (s1 - s0), S.glyph.notProfiled.stripe.color));
+  };
   const scratch = new Int32Array(64);
   const fmtNum = (x: number): string | number => Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : Math.round(x * 10) / 10;
 
@@ -90,8 +95,9 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
         const x = x0 + k0 * colW, w = Math.max((k1 - k0) * colW, 0.5);
         if (t.kind === "gene") geneCell(code, x, y, w);
         else if (t.kind === "derivedEvent") parts.push(rect(x, y, w, ROW_H, code > 0 ? P.derived : P.unaltered));
-        else if (t.numeric) parts.push(rect(x, y, w, ROW_H, code === -1 ? S.glyph.notProfiled.fill : numericColor(code, t.center, S)));
-        else parts.push(rect(x, y, w, ROW_H, code === -1 ? S.glyph.notProfiled.fill : trackCategoryColor(t, code, S, colors)));
+        else if (code === -1) noData(x, y, w);
+        else if (t.numeric) parts.push(rect(x, y, w, ROW_H, numericColor(code, t.center, S)));
+        else parts.push(rect(x, y, w, ROW_H, trackCategoryColor(t, code, S, colors)));
       }
     });
   });
@@ -143,6 +149,10 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
       cx += 14 + name.length * 6.2 + 16;
     });
     if (t.categories!.length > 8) parts.push(`<text x="${cx}" y="${cy}" fill="${P.muted}">+${t.categories!.length - 8} more</text>`);
+    if (t.profiledFor) {
+      parts.push(rect(cx, cy - 9, 10, 10, S.glyph.notProfiled.fill), rect(cx, cy - 4.5, 10, 1, S.glyph.notProfiled.stripe.color));
+      parts.push(`<text x="${cx + 14}" y="${cy}" fill="${P.muted}">${esc(S.glyph.profiled.no)}</text>`);
+    }
   }
   parts.push("</svg>");
   return parts.join("");

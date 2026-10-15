@@ -9,9 +9,9 @@
 // changes cause a refetch; everything else is applied to the decoded arrays in place.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import { GEOM, CAT_COLORS, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
+import { GEOM, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
-import { geneLegend, glyphPresence, resolveStyle, styleForDisplay, trackTooltipLines } from "../../lib/oncoprint-style.ts";
+import { STYLE, geneLegend, glyphPresence, resolveStyle, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { setPngDpi } from "../../lib/png-dpi.ts";
@@ -593,7 +593,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       }
       else if (t.kind === "derivedEvent") lines.push({ text: t.label + ": " + (c > 0 ? "yes" : "no") });
       else if (t.numeric) lines.push({ text: t.label + ": " + (c === -1 ? "no data" : "≈" + (Math.round(((t.min ?? 0) + (c / 255) * ((t.max ?? 1) - (t.min ?? 0))) * 10) / 10)) });
-      else lines.push({ text: t.label + ": " + (c === -1 ? "no data" : (t.categories && t.categories[c]) || "Other") });
+      else lines.push({ text: t.label + ": " + (c === -1 ? (t.profiledFor ? STYLE.glyph.profiled.no : "no data") : (t.categories && t.categories[c]) || "Other") });
     } else if (t.kind === "gene" || t.kind === "derivedEvent") {
       let alt = 0, prof = 0;
       for (let k = hit.k; k < hit.k1; k++) { const c = t.cells[visible.order[k]]; if (c !== -1) prof++; if (c > 0) alt++; }
@@ -847,7 +847,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem", padding: "0.2rem 0.3rem", maxHeight: 200, overflowY: "auto" }}>
                       {t.categories.map((v, ci) => (
                         <label key={v} className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                          <input type="color" value={(display.colors?.[t.label]?.[v]) || CAT_COLORS[ci % CAT_COLORS.length]}
+                          <input type="color" value={trackCategoryColor(t, ci, figureStyle(data, display), display.colors)}
                             onChange={(e) => set({ colors: { ...(display.colors || {}), [t.label]: { ...(display.colors?.[t.label] || {}), [v]: e.target.value } } })}
                             style={{ width: 26, height: 18, padding: 0, border: "none", background: "none" }} />
                           <span style={{ flex: 1 }}>{v}</span>
@@ -1036,7 +1036,8 @@ function Legend({ data, display, colors }: { data: UnpackedContract; display: Fi
       {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (
         <span key={t.label}>{t.label}: {t.numeric
           ? <>{sw(t.center != null ? "linear-gradient(90deg,#2166ac,#fff,#b2182b)" : "linear-gradient(90deg,#deebf7,#084887)", 44)}{t.min} → {t.max}</>
-          : <>{(t.categories || []).slice(0, 8).map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw((colors && colors[t.label] && colors[t.label][c]) || CAT_COLORS[i % CAT_COLORS.length])}{c}</span>)}
+          : <>{(t.categories || []).slice(0, 8).map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw(trackCategoryColor(t, i, S, colors))}{c}</span>)}
+            {t.profiledFor && <span style={{ marginRight: 6 }}>{np}{S.glyph.profiled.no}</span>}
             {(t.categories || []).length > 8 && <span className="meta">+{(t.categories || []).length - 8} more</span>}</>}</span>
       ))}
     </div>

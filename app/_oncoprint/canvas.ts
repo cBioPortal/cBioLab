@@ -14,7 +14,6 @@ export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
 export const BITS = STYLE.bits;
-export const CAT_COLORS = STYLE.palette.categorical;
 export const PALETTE = {
   paper: STYLE.palette.paper, unaltered: STYLE.palette.unaltered, np: STYLE.glyph.notProfiled.fill, npStripe: STYLE.glyph.notProfiled.stripe.color,
   derived: STYLE.palette.derived, text: STYLE.palette.text, muted: STYLE.palette.muted, groupLine: STYLE.palette.groupLine
@@ -77,7 +76,7 @@ export function segmentByTrack(data: UnpackedContract, order: Uint32Array, group
   const t = data.tracks.find((x) => x.label === trackLabel);
   if (!t || !t.categories) return groups;
   const cats = t.categories;
-  const nameOf = (c: number): string => c === -1 ? "no data" : cats[c] ?? "Other";
+  const nameOf = (c: number): string => c === -1 ? (t.profiledFor ? STYLE.glyph.profiled.no : "no data") : cats[c] ?? "Other";
   const out: VisibleGroup[] = [];
   const multi = groups.length > 1;
   for (const g of groups) {
@@ -123,8 +122,15 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
     return;
   }
   if (t.kind === "derivedEvent") { ctx.fillStyle = code > 0 ? P.derived : P.unaltered; ctx.fillRect(x, y, w, h); return; }
-  if (t.numeric) { ctx.fillStyle = code === -1 ? P.np : styleNumericColor(code, t.center, S); ctx.fillRect(x, y, w, h); return; }
-  ctx.fillStyle = code === -1 ? P.np : trackCategoryColor(t, code, S, colors); ctx.fillRect(x, y, w, h);
+  if (code === -1) {
+    // the portal's no-data glyph: the not-profiled cell's white and midline
+    const [s0, s1] = S.glyph.notProfiled.stripe.band;
+    ctx.fillStyle = P.np; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = P.npStripe; ctx.fillRect(x, y + h * s0, w, h * (s1 - s0));
+    return;
+  }
+  if (t.numeric) { ctx.fillStyle = styleNumericColor(code, t.center, S); ctx.fillRect(x, y, w, h); return; }
+  ctx.fillStyle = trackCategoryColor(t, code, S, colors); ctx.fillRect(x, y, w, h);
 }
 
 /** The palette a contract draws with: defaults, or its own `display.style` override. */

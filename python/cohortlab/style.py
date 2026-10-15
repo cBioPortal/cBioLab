@@ -232,7 +232,7 @@ def track_category_color(track: Any, code: int, S: dict[str, Any] = STYLE, color
         override = colors[track.label].get(value)
         if override:
             return override
-    return category_color(code, S)
+    return S["glyph"]["profiled"]["color"] if (track.meta.get("profiledFor") if hasattr(track, "meta") else None) else category_color(code, S)
 
 
 def style_for_display(S: dict[str, Any], display: dict[str, Any] | None) -> dict[str, Any]:

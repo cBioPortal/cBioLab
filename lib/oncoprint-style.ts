@@ -60,6 +60,8 @@ export const STYLE = {
     single: { color: "#008000", vus: "#53d400", label: "Mutation" } },
     /** what a legend entry adds when a glyph's driver and VUS colours differ */
     driverLabels: { driver: " (putative driver)", vus: " (unknown significance)" },
+    /** the "Profiled for <type>" rows: the portal's reserved colour for "yes"; "no" is drawn as no data */
+    profiled: { color: "#1b9e77", yes: "Yes", no: "No" },
     notProfiled: { fill: "#ffffff", stripe: { color: "#bebebe", band: [0.475, 0.525] as [number, number] }, label: "Not profiled" },
     unalteredLabel: "No alterations"
   },
@@ -304,11 +306,11 @@ export function resolveStyle(overrides?: Record<string, unknown> | null): Style 
  * Colour for a categorical cell, honouring a per-track override
  * (`display.colors[trackLabel][value]` — the portal's Edit Colors).
  */
-export function trackCategoryColor(track: { label: string; categories?: string[] }, code: number, S: Style = STYLE,
+export function trackCategoryColor(track: { label: string; categories?: string[]; profiledFor?: string }, code: number, S: Style = STYLE,
   colors?: Record<string, Record<string, string>>): string {
   const value = track.categories && track.categories[code];
   const override = value != null && colors && colors[track.label] ? colors[track.label][value] : undefined;
-  return override || categoryColor(code, S);
+  return override || (track.profiledFor ? S.glyph.profiled.color : categoryColor(code, S));
 }
 
 

@@ -83,6 +83,7 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
     P = S["palette"]
     paper, unaltered, derived = _rgb(P["paper"]), _rgb(P["unaltered"]), _rgb(P["derived"])
     npfill = _rgb(S["glyph"]["notProfiled"]["fill"])
+    npstripe, npband = _rgb(S["glyph"]["notProfiled"]["stripe"]["color"]), S["glyph"]["notProfiled"]["stripe"]["band"]
     plot_w = max(1, width - gutter - GROUP_GAP * max(0, len(c.groups) - 1))
     n = max(1, c.n)
     px_per_col = plot_w / n
@@ -117,10 +118,14 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
                         img[ya:yb, x0:x1] = col
                 elif t.kind == "derivedEvent":
                     img[y0:y0 + ROW_H, x0:x1] = derived if code > 0 else unaltered
+                elif code == -1:
+                    # the portal's no-data glyph: the not-profiled cell's white and midline
+                    img[y0:y0 + ROW_H, x0:x1] = npfill
+                    img[y0 + int(ROW_H * npband[0]):y0 + int(ROW_H * npband[1]), x0:x1] = npstripe
                 elif t.meta.get("numeric"):
-                    img[y0:y0 + ROW_H, x0:x1] = npfill if code == -1 else np.array(numeric_rgb(code, t.meta.get("center"), S), dtype=np.float64)
+                    img[y0:y0 + ROW_H, x0:x1] = np.array(numeric_rgb(code, t.meta.get("center"), S), dtype=np.float64)
                 else:
-                    img[y0:y0 + ROW_H, x0:x1] = npfill if code == -1 else _rgb(track_category_color(t, code, S, colors))
+                    img[y0:y0 + ROW_H, x0:x1] = _rgb(track_category_color(t, code, S, colors))
         x += int(bw.sum()) + GROUP_GAP
     return np.clip(img, 0, 255).astype(np.uint8), extents
 

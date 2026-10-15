@@ -167,6 +167,11 @@
       "driver": " (putative driver)",
       "vus": " (unknown significance)"
     },
+    "profiled": {
+      "color": "#1b9e77",
+      "yes": "Yes",
+      "no": "No"
+    },
     "notProfiled": {
       "fill": "#ffffff",
       "stripe": {

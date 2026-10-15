@@ -1762,6 +1762,11 @@ export interface Track {
   byGroup?: { group: string; altered: number; profiled: number; freqPct: number | null; driverPct: number | null }[];
   /** categorical clinical tracks */
   categories?: string[];
+  /**
+   * A "Profiled for <type>" row: category 0 is "Yes" and a cell without a value means "No".
+   * Renderers draw it in the style's `glyph.profiled` colour.
+   */
+  profiledFor?: string;
   /** numeric clinical + heatmap tracks (cells scaled 0..255; -1 = no data) */
   numeric?: boolean; min?: number; max?: number; center?: number | null;
   gene?: string; profileType?: string; note?: string;
