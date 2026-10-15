@@ -1,6 +1,6 @@
 {
- "ranAt": "2026-10-11T14:22:09.159Z",
- "commit": "af2f1d7",
+ "ranAt": "2026-10-15T22:05:24.562Z",
+ "commit": "6247483",
  "reference": "https://www.cbioportal.org (public API)",
  "studies": [
   "brca_tcga",
@@ -10,8 +10,8 @@
   "luad_tcga_pan_can_atlas_2018",
   "blca_mskcc_solit_2014"
  ],
- "total": 327,
- "agree": 327,
+ "total": 465,
+ "agree": 465,
  "checks": [
   {
    "study": "brca_tcga",
@@ -272,38 +272,6 @@
   {
    "study": "brca_tcga",
    "group": "clinical",
-   "what": "SAMPLE_TYPE = Primary",
-   "ours": "1101",
-   "portal": "1101",
-   "agree": true
-  },
-  {
-   "study": "brca_tcga",
-   "group": "clinical",
-   "what": "SAMPLE_TYPE = Metastasis",
-   "ours": "7",
-   "portal": "7",
-   "agree": true
-  },
-  {
-   "study": "brca_tcga",
-   "group": "clinical",
-   "what": "SAMPLE_TYPE_ID = 1",
-   "ours": "1101",
-   "portal": "1101",
-   "agree": true
-  },
-  {
-   "study": "brca_tcga",
-   "group": "clinical",
-   "what": "SAMPLE_TYPE_ID = 6",
-   "ours": "7",
-   "portal": "7",
-   "agree": true
-  },
-  {
-   "study": "brca_tcga",
-   "group": "clinical",
    "what": "ONCOTREE_CODE = IDC",
    "ours": "814",
    "portal": "814",
@@ -352,49 +320,65 @@
   {
    "study": "brca_tcga",
    "group": "clinical",
-   "what": "CANCER_TYPE_DETAILED = Breast Invasive Ductal Carcinoma",
-   "ours": "814",
-   "portal": "814",
+   "what": "SAMPLE_TYPE = Primary",
+   "ours": "1101",
+   "portal": "1101",
    "agree": true
   },
   {
    "study": "brca_tcga",
    "group": "clinical",
-   "what": "CANCER_TYPE_DETAILED = Breast Invasive Lobular Carcinoma",
-   "ours": "207",
-   "portal": "207",
-   "agree": true
-  },
-  {
-   "study": "brca_tcga",
-   "group": "clinical",
-   "what": "CANCER_TYPE_DETAILED = Breast Mixed Ductal and Lobular Carcinoma",
-   "ours": "28",
-   "portal": "28",
-   "agree": true
-  },
-  {
-   "study": "brca_tcga",
-   "group": "clinical",
-   "what": "CANCER_TYPE_DETAILED = Breast Invasive Mixed Mucinous Carcinoma",
-   "ours": "16",
-   "portal": "16",
-   "agree": true
-  },
-  {
-   "study": "brca_tcga",
-   "group": "clinical",
-   "what": "CANCER_TYPE_DETAILED = Metaplastic Breast Cancer",
-   "ours": "14",
-   "portal": "14",
-   "agree": true
-  },
-  {
-   "study": "brca_tcga",
-   "group": "clinical",
-   "what": "CANCER_TYPE_DETAILED = Breast",
+   "what": "SAMPLE_TYPE = Metastasis",
    "ours": "7",
    "portal": "7",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "SAMPLE_TYPE_ID = 1",
+   "ours": "1101",
+   "portal": "1101",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "SAMPLE_TYPE_ID = 6",
+   "ours": "7",
+   "portal": "7",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "CANCER_TYPE = Breast Cancer",
+   "ours": "1093",
+   "portal": "1093",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "CANCER_TYPE = Breast Cancer, NOS",
+   "ours": "7",
+   "portal": "7",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "CANCER_TYPE = Breast Sarcoma",
+   "ours": "2",
+   "portal": "2",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "clinical",
+   "what": "CANCER_TYPE = Skin Cancer, Non-Melanoma",
+   "ours": "1",
+   "portal": "1",
    "agree": true
   },
   {
@@ -416,9 +400,185 @@
   {
    "study": "brca_tcga",
    "group": "cohort",
-   "what": "patients with SAMPLE_TYPE = Metastasis",
-   "ours": "7",
-   "portal": "7",
+   "what": "patients with ONCOTREE_CODE = ILC",
+   "ours": "207",
+   "portal": "207",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: MUT_(-542)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "97",
+   "portal": "97",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: MUT_(542-1047)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "274",
+   "portal": "274",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: MUT_(542-1047*)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "274",
+   "portal": "274",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: MUT_(1047-)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "141",
+   "portal": "141",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: TRUNC\" (cBioPortal's mutations, its classes)",
+   "ours": "3",
+   "portal": "3",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: MISSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "310",
+   "portal": "310",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: NONSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: FRAMESHIFT\" (cBioPortal's mutations, its classes)",
+   "ours": "2",
+   "portal": "2",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: INFRAME\" (cBioPortal's mutations, its classes)",
+   "ours": "5",
+   "portal": "5",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: SPLICE\" (cBioPortal's mutations, its classes)",
+   "ours": "1",
+   "portal": "1",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: NONSTART\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: NONSTOP\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"PIK3CA: PROMOTER\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: TRUNC\" (cBioPortal's mutations, its classes)",
+   "ours": "1",
+   "portal": "1",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: MISSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "1",
+   "portal": "1",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "1",
+   "portal": "1",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: FRAMESHIFT\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: INFRAME\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: SPLICE\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSTART\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSTOP\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: PROMOTER\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
    "agree": true
   },
   {
@@ -800,31 +960,39 @@
   {
    "study": "nsclc_ctdx_msk_2022",
    "group": "clinical",
-   "what": "SAMPLE_TYPE = Metastasis",
-   "ours": "1964",
-   "portal": "1964",
+   "what": "CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "ours": "2539",
+   "portal": "2539",
    "agree": true
   },
   {
    "study": "nsclc_ctdx_msk_2022",
    "group": "clinical",
-   "what": "SAMPLE_TYPE = Primary",
-   "ours": "490",
-   "portal": "490",
+   "what": "CANCER_TYPE = Cancer of Unknown Primary",
+   "ours": "48",
+   "portal": "48",
    "agree": true
   },
   {
    "study": "nsclc_ctdx_msk_2022",
    "group": "clinical",
-   "what": "SAMPLE_TYPE = Unknown",
-   "ours": "164",
-   "portal": "164",
+   "what": "CANCER_TYPE = Small Cell Lung Cancer",
+   "ours": "8",
+   "portal": "8",
    "agree": true
   },
   {
    "study": "nsclc_ctdx_msk_2022",
    "group": "clinical",
-   "what": "SAMPLE_TYPE = Local Recurrence",
+   "what": "CANCER_TYPE = Breast Cancer",
+   "ours": "5",
+   "portal": "5",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "CANCER_TYPE = Thymic Tumor",
    "ours": "3",
    "portal": "3",
    "agree": true
@@ -832,49 +1000,9 @@
   {
    "study": "nsclc_ctdx_msk_2022",
    "group": "clinical",
-   "what": "GENE_PANEL = ctDx_lung_panel",
-   "ours": "1364",
-   "portal": "1364",
-   "agree": true
-  },
-  {
-   "study": "nsclc_ctdx_msk_2022",
-   "group": "clinical",
-   "what": "GENE_PANEL = IMPACT468",
-   "ours": "848",
-   "portal": "848",
-   "agree": true
-  },
-  {
-   "study": "nsclc_ctdx_msk_2022",
-   "group": "clinical",
-   "what": "GENE_PANEL = ACCESS129",
-   "ours": "303",
-   "portal": "303",
-   "agree": true
-  },
-  {
-   "study": "nsclc_ctdx_msk_2022",
-   "group": "clinical",
-   "what": "GENE_PANEL = IMPACT410",
-   "ours": "59",
-   "portal": "59",
-   "agree": true
-  },
-  {
-   "study": "nsclc_ctdx_msk_2022",
-   "group": "clinical",
-   "what": "GENE_PANEL = IMPACT505",
-   "ours": "33",
-   "portal": "33",
-   "agree": true
-  },
-  {
-   "study": "nsclc_ctdx_msk_2022",
-   "group": "clinical",
-   "what": "GENE_PANEL = IMPACT-HEME-400",
-   "ours": "9",
-   "portal": "9",
+   "what": "CANCER_TYPE = Melanoma",
+   "ours": "2",
+   "portal": "2",
    "agree": true
   },
   {
@@ -928,17 +1056,97 @@
   {
    "study": "nsclc_ctdx_msk_2022",
    "group": "clinical",
-   "what": "SAMPLE_CLASS = cfDNA",
-   "ours": "1667",
-   "portal": "1667",
+   "what": "GENE_PANEL = ctDx_lung_panel",
+   "ours": "1364",
+   "portal": "1364",
    "agree": true
   },
   {
    "study": "nsclc_ctdx_msk_2022",
    "group": "clinical",
-   "what": "SAMPLE_CLASS = Tumor",
-   "ours": "954",
-   "portal": "954",
+   "what": "GENE_PANEL = IMPACT468",
+   "ours": "848",
+   "portal": "848",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "GENE_PANEL = ACCESS129",
+   "ours": "303",
+   "portal": "303",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "GENE_PANEL = IMPACT410",
+   "ours": "59",
+   "portal": "59",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "GENE_PANEL = IMPACT505",
+   "ours": "33",
+   "portal": "33",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "GENE_PANEL = IMPACT-HEME-400",
+   "ours": "9",
+   "portal": "9",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "ONCOTREE_CODE = LUAD",
+   "ours": "2191",
+   "portal": "2191",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "ONCOTREE_CODE = NSCLC",
+   "ours": "190",
+   "portal": "190",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "ONCOTREE_CODE = LUSC",
+   "ours": "124",
+   "portal": "124",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "ONCOTREE_CODE = CUP",
+   "ours": "24",
+   "portal": "24",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "ONCOTREE_CODE = LUNE",
+   "ours": "12",
+   "portal": "12",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "clinical",
+   "what": "ONCOTREE_CODE = ADNOS",
+   "ours": "10",
+   "portal": "10",
    "agree": true
   },
   {
@@ -960,9 +1168,185 @@
   {
    "study": "nsclc_ctdx_msk_2022",
    "group": "cohort",
-   "what": "patients with SAMPLE_TYPE = Primary",
-   "ours": "394",
-   "portal": "394",
+   "what": "patients with CANCER_TYPE = Cancer of Unknown Primary",
+   "ours": "45",
+   "portal": "45",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(-174)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "164",
+   "portal": "164",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(174-273)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "347",
+   "portal": "347",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(174-273*)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "346",
+   "portal": "346",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(273-)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "185",
+   "portal": "185",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: TRUNC\" (cBioPortal's mutations, its classes)",
+   "ours": "205",
+   "portal": "205",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MISSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "408",
+   "portal": "408",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: NONSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "79",
+   "portal": "79",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: FRAMESHIFT\" (cBioPortal's mutations, its classes)",
+   "ours": "70",
+   "portal": "70",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: INFRAME\" (cBioPortal's mutations, its classes)",
+   "ours": "16",
+   "portal": "16",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: SPLICE\" (cBioPortal's mutations, its classes)",
+   "ours": "63",
+   "portal": "63",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: NONSTART\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: NONSTOP\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: PROMOTER\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: TRUNC\" (cBioPortal's mutations, its classes)",
+   "ours": "17",
+   "portal": "17",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: MISSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "16",
+   "portal": "16",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: FRAMESHIFT\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: INFRAME\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: SPLICE\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSTART\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSTOP\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: PROMOTER\" (cBioPortal's mutations, its classes)",
+   "ours": "17",
+   "portal": "17",
    "agree": true
   },
   {
@@ -1104,6 +1488,22 @@
   {
    "study": "msk_ch_2020",
    "group": "clinical",
+   "what": "SEX = Female",
+   "ours": "13121",
+   "portal": "13121",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "SEX = Male",
+   "ours": "11025",
+   "portal": "11025",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
    "what": "TREATMENT_STATUS = Unknown",
    "ours": "14008",
    "portal": "14008",
@@ -1123,22 +1523,6 @@
    "what": "TREATMENT_STATUS = Untreated",
    "ours": "4160",
    "portal": "4160",
-   "agree": true
-  },
-  {
-   "study": "msk_ch_2020",
-   "group": "clinical",
-   "what": "SEX = Female",
-   "ours": "13121",
-   "portal": "13121",
-   "agree": true
-  },
-  {
-   "study": "msk_ch_2020",
-   "group": "clinical",
-   "what": "SEX = Male",
-   "ours": "11025",
-   "portal": "11025",
    "agree": true
   },
   {
@@ -1184,7 +1568,15 @@
   {
    "study": "msk_ch_2020",
    "group": "clinical",
-   "what": "CANCER_TYPE_DETAILED = Atypical Lung Carcinoid",
+   "what": "CANCER_TYPE = Breast Cancer",
+   "ours": "3584",
+   "portal": "3584",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "clinical",
+   "what": "CANCER_TYPE = Non-Small Cell Lung Cancer",
    "ours": "3559",
    "portal": "3559",
    "agree": true
@@ -1192,15 +1584,7 @@
   {
    "study": "msk_ch_2020",
    "group": "clinical",
-   "what": "CANCER_TYPE_DETAILED = Invasive Breast Carcinoma",
-   "ours": "3540",
-   "portal": "3540",
-   "agree": true
-  },
-  {
-   "study": "msk_ch_2020",
-   "group": "clinical",
-   "what": "CANCER_TYPE_DETAILED = Colon Adenocarcinoma In Situ",
+   "what": "CANCER_TYPE = Colorectal Cancer",
    "ours": "2153",
    "portal": "2153",
    "agree": true
@@ -1208,7 +1592,7 @@
   {
    "study": "msk_ch_2020",
    "group": "clinical",
-   "what": "CANCER_TYPE_DETAILED = Prostate Adenocarcinoma",
+   "what": "CANCER_TYPE = Prostate Cancer",
    "ours": "1494",
    "portal": "1494",
    "agree": true
@@ -1216,7 +1600,7 @@
   {
    "study": "msk_ch_2020",
    "group": "clinical",
-   "what": "CANCER_TYPE_DETAILED = Intraductal Papillary Mucinous Neoplasm",
+   "what": "CANCER_TYPE = Pancreatic Cancer",
    "ours": "1416",
    "portal": "1416",
    "agree": true
@@ -1224,7 +1608,7 @@
   {
    "study": "msk_ch_2020",
    "group": "clinical",
-   "what": "CANCER_TYPE_DETAILED = Anaplastic Astrocytoma",
+   "what": "CANCER_TYPE = Glioma",
    "ours": "1094",
    "portal": "1094",
    "agree": true
@@ -1240,9 +1624,185 @@
   {
    "study": "msk_ch_2020",
    "group": "cohort",
-   "what": "patients with TREATMENT_STATUS = Treated",
-   "ours": "5978",
-   "portal": "5978",
+   "what": "patients with SEX = Male",
+   "ours": "11025",
+   "portal": "11025",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: MUT_(-514)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "697",
+   "portal": "697",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: MUT_(514-780)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "1379",
+   "portal": "1379",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: MUT_(514-780*)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "1377",
+   "portal": "1377",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: MUT_(780-)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "715",
+   "portal": "715",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: TRUNC\" (cBioPortal's mutations, its classes)",
+   "ours": "1127",
+   "portal": "1127",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: MISSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "1527",
+   "portal": "1527",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: NONSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "383",
+   "portal": "383",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: FRAMESHIFT\" (cBioPortal's mutations, its classes)",
+   "ours": "466",
+   "portal": "466",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: INFRAME\" (cBioPortal's mutations, its classes)",
+   "ours": "38",
+   "portal": "38",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: SPLICE\" (cBioPortal's mutations, its classes)",
+   "ours": "314",
+   "portal": "314",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: NONSTART\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: NONSTOP\" (cBioPortal's mutations, its classes)",
+   "ours": "1",
+   "portal": "1",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"DNMT3A: PROMOTER\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: TRUNC\" (cBioPortal's mutations, its classes)",
+   "ours": "32",
+   "portal": "32",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: MISSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "14",
+   "portal": "14",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: FRAMESHIFT\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: INFRAME\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: SPLICE\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSTART\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSTOP\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "msk_ch_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: PROMOTER\" (cBioPortal's mutations, its classes)",
+   "ours": "32",
+   "portal": "32",
    "agree": true
   },
   {
@@ -1640,6 +2200,46 @@
   {
    "study": "crc_apc_impact_2020",
    "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Colon Adenocarcinoma",
+   "ours": "347",
+   "portal": "347",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Rectal Adenocarcinoma",
+   "ours": "96",
+   "portal": "96",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Colorectal Adenocarcinoma",
+   "ours": "13",
+   "portal": "13",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Mucinous Adenocarcinoma of the Colon and Rectum",
+   "ours": "10",
+   "portal": "10",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
+   "what": "CANCER_TYPE_DETAILED = Signet Ring Cell Adenocarcinoma of the Colon and Rectum",
+   "ours": "5",
+   "portal": "5",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "clinical",
    "what": "CARCINOMATOSIS = No",
    "ours": "327",
    "portal": "327",
@@ -1679,30 +2279,6 @@
   },
   {
    "study": "crc_apc_impact_2020",
-   "group": "clinical",
-   "what": "TIMING_METS = Synchronous",
-   "ours": "350",
-   "portal": "350",
-   "agree": true
-  },
-  {
-   "study": "crc_apc_impact_2020",
-   "group": "clinical",
-   "what": "TIMING_METS = Metachronous",
-   "ours": "119",
-   "portal": "119",
-   "agree": true
-  },
-  {
-   "study": "crc_apc_impact_2020",
-   "group": "clinical",
-   "what": "TIMING_METS = 2",
-   "ours": "2",
-   "portal": "2",
-   "agree": true
-  },
-  {
-   "study": "crc_apc_impact_2020",
    "group": "cohort",
    "what": "patients with a TP53 mutation (OQL \"TP53: MUT\")",
    "ours": "345",
@@ -1723,6 +2299,182 @@
    "what": "patients with OS_STATUS = 0:LIVING",
    "ours": "160",
    "portal": "160",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(-175)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "106",
+   "portal": "106",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(175-273)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "213",
+   "portal": "213",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(175-273*)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "213",
+   "portal": "213",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(273-)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "96",
+   "portal": "96",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: TRUNC\" (cBioPortal's mutations, its classes)",
+   "ours": "117",
+   "portal": "117",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MISSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "228",
+   "portal": "228",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: NONSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "51",
+   "portal": "51",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: FRAMESHIFT\" (cBioPortal's mutations, its classes)",
+   "ours": "43",
+   "portal": "43",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: INFRAME\" (cBioPortal's mutations, its classes)",
+   "ours": "13",
+   "portal": "13",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: SPLICE\" (cBioPortal's mutations, its classes)",
+   "ours": "22",
+   "portal": "22",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: NONSTART\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: NONSTOP\" (cBioPortal's mutations, its classes)",
+   "ours": "1",
+   "portal": "1",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: PROMOTER\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: TRUNC\" (cBioPortal's mutations, its classes)",
+   "ours": "13",
+   "portal": "13",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: MISSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "5",
+   "portal": "5",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: FRAMESHIFT\" (cBioPortal's mutations, its classes)",
+   "ours": "2",
+   "portal": "2",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: INFRAME\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: SPLICE\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSTART\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSTOP\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "crc_apc_impact_2020",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: PROMOTER\" (cBioPortal's mutations, its classes)",
+   "ours": "11",
+   "portal": "11",
    "agree": true
   },
   {
@@ -2120,49 +2872,17 @@
   {
    "study": "luad_tcga_pan_can_atlas_2018",
    "group": "clinical",
-   "what": "TISSUE_SOURCE_SITE_CODE = 55",
-   "ours": "91",
-   "portal": "91",
+   "what": "IN_PANCANPATHWAYS_FREEZE = Yes",
+   "ours": "502",
+   "portal": "502",
    "agree": true
   },
   {
    "study": "luad_tcga_pan_can_atlas_2018",
    "group": "clinical",
-   "what": "TISSUE_SOURCE_SITE_CODE = 17",
-   "ours": "52",
-   "portal": "52",
-   "agree": true
-  },
-  {
-   "study": "luad_tcga_pan_can_atlas_2018",
-   "group": "clinical",
-   "what": "TISSUE_SOURCE_SITE_CODE = 44",
-   "ours": "46",
-   "portal": "46",
-   "agree": true
-  },
-  {
-   "study": "luad_tcga_pan_can_atlas_2018",
-   "group": "clinical",
-   "what": "TISSUE_SOURCE_SITE_CODE = 86",
-   "ours": "34",
-   "portal": "34",
-   "agree": true
-  },
-  {
-   "study": "luad_tcga_pan_can_atlas_2018",
-   "group": "clinical",
-   "what": "TISSUE_SOURCE_SITE_CODE = 5",
-   "ours": "33",
-   "portal": "33",
-   "agree": true
-  },
-  {
-   "study": "luad_tcga_pan_can_atlas_2018",
-   "group": "clinical",
-   "what": "TISSUE_SOURCE_SITE_CODE = 78",
-   "ours": "33",
-   "portal": "33",
+   "what": "IN_PANCANPATHWAYS_FREEZE = No",
+   "ours": "64",
+   "portal": "64",
    "agree": true
   },
   {
@@ -2216,23 +2936,15 @@
   {
    "study": "luad_tcga_pan_can_atlas_2018",
    "group": "clinical",
-   "what": "TUMOR_TYPE = Lung Adenocarcinoma (NOS)",
-   "ours": "320",
-   "portal": "320",
+   "what": "TISSUE_SOURCE_SITE_CODE = 55",
+   "ours": "91",
+   "portal": "91",
    "agree": true
   },
   {
    "study": "luad_tcga_pan_can_atlas_2018",
    "group": "clinical",
-   "what": "TUMOR_TYPE = Lung Adenocarcinoma, Mixed Subtype",
-   "ours": "107",
-   "portal": "107",
-   "agree": true
-  },
-  {
-   "study": "luad_tcga_pan_can_atlas_2018",
-   "group": "clinical",
-   "what": "TUMOR_TYPE = Lung Adenocarcinoma",
+   "what": "TISSUE_SOURCE_SITE_CODE = 17",
    "ours": "52",
    "portal": "52",
    "agree": true
@@ -2240,25 +2952,33 @@
   {
    "study": "luad_tcga_pan_can_atlas_2018",
    "group": "clinical",
-   "what": "TUMOR_TYPE = Lung Papillary Adenocarcinoma",
-   "ours": "22",
-   "portal": "22",
+   "what": "TISSUE_SOURCE_SITE_CODE = 44",
+   "ours": "46",
+   "portal": "46",
    "agree": true
   },
   {
    "study": "luad_tcga_pan_can_atlas_2018",
    "group": "clinical",
-   "what": "TUMOR_TYPE = Lung Bronchioloalveolar Carcinoma, Non-Mucinous",
-   "ours": "19",
-   "portal": "19",
+   "what": "TISSUE_SOURCE_SITE_CODE = 86",
+   "ours": "34",
+   "portal": "34",
    "agree": true
   },
   {
    "study": "luad_tcga_pan_can_atlas_2018",
    "group": "clinical",
-   "what": "TUMOR_TYPE = Lung Acinar Adenocarcinoma",
-   "ours": "18",
-   "portal": "18",
+   "what": "TISSUE_SOURCE_SITE_CODE = 5",
+   "ours": "33",
+   "portal": "33",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "clinical",
+   "what": "TISSUE_SOURCE_SITE_CODE = 78",
+   "ours": "33",
+   "portal": "33",
    "agree": true
   },
   {
@@ -2283,6 +3003,182 @@
    "what": "patients with OS_STATUS = 1:DECEASED",
    "ours": "186",
    "portal": "186",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(-158)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "85",
+   "portal": "85",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(158-273)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "151",
+   "portal": "151",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(158-273*)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "151",
+   "portal": "151",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(273-)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "87",
+   "portal": "87",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: TRUNC\" (cBioPortal's mutations, its classes)",
+   "ours": "113",
+   "portal": "113",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MISSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "187",
+   "portal": "187",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: NONSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "55",
+   "portal": "55",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: FRAMESHIFT\" (cBioPortal's mutations, its classes)",
+   "ours": "27",
+   "portal": "27",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: INFRAME\" (cBioPortal's mutations, its classes)",
+   "ours": "5",
+   "portal": "5",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: SPLICE\" (cBioPortal's mutations, its classes)",
+   "ours": "31",
+   "portal": "31",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: NONSTART\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: NONSTOP\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: PROMOTER\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: TRUNC\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: MISSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "6",
+   "portal": "6",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: FRAMESHIFT\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: INFRAME\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: SPLICE\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSTART\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSTOP\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "luad_tcga_pan_can_atlas_2018",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: PROMOTER\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
    "agree": true
   },
   {
@@ -2560,22 +3456,6 @@
   {
    "study": "blca_mskcc_solit_2014",
    "group": "clinical",
-   "what": "TISSUE_SEQUENCED = Radical Cystectomy",
-   "ours": "89",
-   "portal": "89",
-   "agree": true
-  },
-  {
-   "study": "blca_mskcc_solit_2014",
-   "group": "clinical",
-   "what": "TISSUE_SEQUENCED = TUR",
-   "ours": "20",
-   "portal": "20",
-   "agree": true
-  },
-  {
-   "study": "blca_mskcc_solit_2014",
-   "group": "clinical",
    "what": "CONCOMITANT_CIS = No",
    "ours": "58",
    "portal": "58",
@@ -2592,17 +3472,65 @@
   {
    "study": "blca_mskcc_solit_2014",
    "group": "clinical",
-   "what": "SURGERY_PROCEDURE = Radical Cystectomy",
-   "ours": "98",
-   "portal": "98",
+   "what": "NEOADJUVANT_CHEMO = No",
+   "ours": "67",
+   "portal": "67",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "clinical",
-   "what": "SURGERY_PROCEDURE = TUR",
-   "ours": "11",
-   "portal": "11",
+   "what": "NEOADJUVANT_CHEMO = Yes",
+   "ours": "42",
+   "portal": "42",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "PATH_T_STAGE = pT3",
+   "ours": "50",
+   "portal": "50",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "PATH_T_STAGE = pT4",
+   "ours": "18",
+   "portal": "18",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "PATH_T_STAGE = pT2",
+   "ours": "12",
+   "portal": "12",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "PATH_T_STAGE = pT1",
+   "ours": "9",
+   "portal": "9",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "PATH_T_STAGE = Ta",
+   "ours": "9",
+   "portal": "9",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "clinical",
+   "what": "PATH_T_STAGE = pTa",
+   "ours": "5",
+   "portal": "5",
    "agree": true
   },
   {
@@ -2627,6 +3555,182 @@
    "what": "patients with OS_STATUS = 1:DECEASED",
    "ours": "40",
    "portal": "40",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(-179)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "19",
+   "portal": "19",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(179-280)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "39",
+   "portal": "39",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(179-280*)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "39",
+   "portal": "39",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MUT_(280-)\" (cBioPortal's mutations, its RANGE rule)",
+   "ours": "18",
+   "portal": "18",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: TRUNC\" (cBioPortal's mutations, its classes)",
+   "ours": "20",
+   "portal": "20",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: MISSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "48",
+   "portal": "48",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: NONSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "11",
+   "portal": "11",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: FRAMESHIFT\" (cBioPortal's mutations, its classes)",
+   "ours": "8",
+   "portal": "8",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: INFRAME\" (cBioPortal's mutations, its classes)",
+   "ours": "1",
+   "portal": "1",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: SPLICE\" (cBioPortal's mutations, its classes)",
+   "ours": "2",
+   "portal": "2",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: NONSTART\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: NONSTOP\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TP53: PROMOTER\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: TRUNC\" (cBioPortal's mutations, its classes)",
+   "ours": "7",
+   "portal": "7",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: MISSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "1",
+   "portal": "1",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSENSE\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: FRAMESHIFT\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: INFRAME\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: SPLICE\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSTART\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: NONSTOP\" (cBioPortal's mutations, its classes)",
+   "ours": "0",
+   "portal": "0",
+   "agree": true
+  },
+  {
+   "study": "blca_mskcc_solit_2014",
+   "group": "cohort",
+   "what": "patients matching OQL \"TERT: PROMOTER\" (cBioPortal's mutations, its classes)",
+   "ours": "7",
+   "portal": "7",
    "agree": true
   }
  ]

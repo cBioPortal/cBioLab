@@ -20,7 +20,7 @@ describe("OQL position range: parsing", () => {
   });
   test("modifiers in any order around the mutation, DRIVER included", () => {
     for (const q of ["TP53: INFRAME_(1-100*)_DRIVER", "TP53: DRIVER_INFRAME_(1-100*)", "TP53: INFRAME_DRIVER_(1-100*)"])
-      assert.deepEqual(spec(q), { type: "MUT", cls: "in_frame", driver: true, range: { start: 1, end: 100, contained: true } }, q);
+      assert.deepEqual(spec(q), { type: "MUT", cls: "inframe", driver: true, range: { start: 1, end: 100, contained: true } }, q);
     assert.deepEqual(spec("APC: (1400-)_DRIVER"), { type: "MUT", driver: true, range: { start: 1400, contained: false } });
   });
   test("the documented MUT= form", () => {
@@ -52,7 +52,7 @@ describe("OQL position range: SQL", () => {
     const s = sql("APC: TRUNC_(1400-)");
     assert.match(s, /FROM \(SELECT .* FROM db\.mutation_derived WHERE studyId = 's1' AND `GENE\.hugoGeneSymbol` = 'APC'\) g/s);
     assert.doesNotMatch(s, /genomic_event_derived/);
-    assert.match(s, /frame_shift%/);
+    assert.match(s, /NOT IN \('missense', 'inframe'\)/);
   });
   test("overlap by default: the mutation ends at or after the start, starts at or before the end", () => {
     const s = sql("KRAS: MUT_(12-13)");

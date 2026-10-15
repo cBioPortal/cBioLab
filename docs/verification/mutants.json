@@ -1,8 +1,8 @@
 {
- "ranAt": "2026-10-11T14:24:40.272Z",
- "commit": "af2f1d7",
- "total": 14,
- "caught": 14,
+ "ranAt": "2026-10-15T22:11:15.855Z",
+ "commit": "6247483",
+ "total": 16,
+ "caught": 16,
  "mutants": [
   {
    "id": "km-censored-as-death",
@@ -132,7 +132,7 @@
    "file": "lib/oql.ts",
    "guard": "portal-parity",
    "caught": true,
-   "failures": 4,
+   "failures": 12,
    "evidence": "FAIL brca_tcga cohort: patients with a PIK3CA mutation (OQL \"PIK3CA: MUT\")  ours 352 / cBioPortal 317"
   },
   {
@@ -144,6 +144,27 @@
    "caught": true,
    "failures": 1,
    "evidence": "FAIL nsclc_ctdx_msk_2022 cohort: patients with CDKN2A deeply deleted (OQL \"CDKN2A: HOMDEL\")  ours 137 / cBioPortal 136"
+  },
+  {
+   "id": "position-range-ignored",
+   "layer": "counts",
+   "effect": "\"APC: TRUNC_(1400-)\" selects every APC truncation, so an N-/C-terminal split puts every truncated patient on the C-terminal side.",
+   "file": "lib/oql.ts",
+   "guard": "portal-parity",
+   "caught": true,
+   "failures": 24,
+   "evidence": "FAIL brca_tcga cohort: patients matching OQL \"PIK3CA: MUT_(-542)\" (cBioPortal's mutations, its RANGE rule)  ours 317 / cBioPortal 97"
+  },
+  {
+   "id": "trunc-excludes-splice",
+   "layer": "counts",
+   "effect": "\"TP53: TRUNC\" leaves out splice-site and start-loss mutations, which cBioPortal counts as truncating.",
+   "file": "lib/oql.ts",
+   "guard": "portal-parity",
+   "history": "Shipped until 2026-10: TRUNC was nonsense, frameshift and nonstop only.",
+   "caught": true,
+   "failures": 10,
+   "evidence": "FAIL brca_tcga cohort: patients matching OQL \"PIK3CA: TRUNC\" (cBioPortal's mutations, its classes)  ours 2 / cBioPortal 3"
   }
  ]
 }

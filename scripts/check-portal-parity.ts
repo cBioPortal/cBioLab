@@ -16,6 +16,9 @@
  *   5. OQL position ranges (MUT_(a-b), (a-), (-b), (a-b*)) on that gene: cBioPortal applies them in
  *      the browser, so its mutations are fetched from the API and its own rule, ported from
  *      cbioportal-frontend, decides which patients match.
+ *   6. OQL mutation classes (TRUNC, MISSENSE, NONSENSE, FRAMESHIFT, INFRAME, SPLICE, NONSTART,
+ *      NONSTOP, PROMOTER) on that gene and on TERT (promoter mutations), the same way: the
+ *      portal's mutations, its own classes.
  *
  * Every comparison must agree EXACTLY; a count is a count. Differences are reported, never
  * tolerated, so a disagreement caused by the two databases holding different releases of a
@@ -169,9 +172,7 @@ for (const study of STUDIES) {
   // cbioportal-frontend (AccessorsForOqlFilter.mut_position, oqlfilter.ts RANGE). Ranges come from
   // the gene's own position quartiles, so every study exercises both bounds and both readings.
   if (topGene && mutProfiles.length) {
-    const [gene] = await api<{ entrezGeneId: number }[]>("/genes/fetch?geneIdType=HUGO_GENE_SYMBOL", [topGene]);
-    const muts = await api<PortalMutation[]>(`/molecular-profiles/${mutProfiles[0]}/mutations/fetch`,
-      { sampleListId: study + "_all", entrezGeneIds: [gene.entrezGeneId] });
+    const muts = await portalMutations(mutProfiles[0], study, topGene);
     const starts = muts.map(portalPosition).filter((p): p is [number, number] => !!p).map((p) => p[0]).sort((a, b) => a - b);
     if (starts.length) {
       const q1 = starts[Math.floor(starts.length / 4)], q3 = starts[Math.floor(starts.length * 3 / 4)];
@@ -189,10 +190,50 @@ for (const study of STUDIES) {
           ours: String(ours), portal: String(pn), agree: ours === pn });
       }
     }
+    // 6. OQL mutation classes, on the same mutations: the portal's class of each, and TRUNC as
+    // every class but missense and in-frame (oqlfilter.ts). TERT as well, for its promoter mutations.
+    for (const g of topGene === "TERT" ? [topGene] : [topGene, "TERT"]) {
+      const gm = g === topGene ? muts : await portalMutations(mutProfiles[0], study, g);
+      for (const kw of ["TRUNC", "MISSENSE", "NONSENSE", "FRAMESHIFT", "INFRAME", "SPLICE", "NONSTART", "NONSTOP", "PROMOTER"]) {
+        const want = kw.toLowerCase();
+        const pn = new Set(gm.filter((m) => {
+          const c = portalClass(m);
+          return want === "trunc" ? c !== "missense" && c !== "inframe" : c === want;
+        }).map((m) => m.patientId)).size;
+        const q = `${g}: ${kw}`;
+        const ours = await oursCount(study, { all: [{ kind: "oql", q }] }, profiles);
+        record({ study, group: "cohort", what: `patients matching OQL "${q}" (cBioPortal's mutations, its classes)`,
+          ours: String(ours), portal: String(pn), agree: ours === pn });
+      }
+    }
   }
 }
 
-interface PortalMutation { patientId: string; proteinPosStart?: number; proteinPosEnd?: number }
+async function portalMutations(profile: string, study: string, symbol: string): Promise<PortalMutation[]> {
+  const [gene] = await api<{ entrezGeneId: number }[]>("/genes/fetch?geneIdType=HUGO_GENE_SYMBOL", [symbol]);
+  return api<PortalMutation[]>(`/molecular-profiles/${profile}/mutations/fetch`, { sampleListId: study + "_all", entrezGeneIds: [gene.entrezGeneId] });
+}
+
+interface PortalMutation { patientId: string; proteinPosStart?: number; proteinPosEnd?: number; mutationType?: string; proteinChange?: string }
+
+/** cbioportal-frontend AccessorsForOqlFilter getMutationSubType + getSimplifiedMutationType; null (Fusion) as "none". */
+function portalClass(m: PortalMutation): string {
+  const t = (m.mutationType || "").toLowerCase();
+  if (t === "fusion") return "none";
+  if ((m.proteinChange || "").toLowerCase() === "promoter") return "promoter";
+  const classes: Record<string, string[]> = {
+    missense: ["missense_mutation", "missense", "missense_variant"],
+    frameshift: ["frame_shift_ins", "frame_shift_del", "frameshift", "frameshift_deletion", "frameshift_insertion", "de_novo_start_outofframe", "frameshift_variant"],
+    nonsense: ["nonsense_mutation", "nonsense", "stopgain_snv"],
+    splice: ["splice_site", "splice", "splice site", "splicing", "splice_site_snp", "splice_site_del", "splice_site_indel", "splice_region"],
+    nonstart: ["translation_start_site", "start_codon_snp", "start_codon_del"],
+    nonstop: ["nonstop_mutation"],
+    fusion: ["fusion"],
+    inframe: ["in_frame_del", "in_frame_ins", "in_frame_deletion", "in_frame_insertion", "indel", "nonframeshift_deletion", "nonframeshift", "nonframeshift insertion", "nonframeshift_insertion"],
+  };
+  for (const [c, types] of Object.entries(classes)) if (types.includes(t)) return c;
+  return "other";
+}
 
 /** cbioportal-frontend AccessorsForOqlFilter.mut_position: no position unless start <= end, neither -1. */
 function portalPosition(m: PortalMutation): [number, number] | null {

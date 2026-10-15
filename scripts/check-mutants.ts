@@ -107,6 +107,11 @@ const MUTANTS: Mutant[] = [
     effect: "\"APC: TRUNC_(1400-)\" selects every APC truncation, so an N-/C-terminal split puts every truncated patient on the C-terminal side.",
     find: "    if (spec.range) conds.push(rangeCond(spec.range));\n",
     replace: "\n" },
+  { id: "trunc-excludes-splice", layer: "counts", guard: "portal-parity", file: "lib/oql.ts",
+    effect: "\"TP53: TRUNC\" leaves out splice-site and start-loss mutations, which cBioPortal counts as truncating.",
+    history: "Shipped until 2026-10: TRUNC was nonsense, frameshift and nonstop only.",
+    find: "\" NOT IN ('missense', 'inframe')\"",
+    replace: "\" IN ('nonsense', 'frameshift', 'nonstop')\"" },
 ];
 
 function run(dir: string, guard: Guard): { ok: boolean; failures: number; firstFailure: string } {
