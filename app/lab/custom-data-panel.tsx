@@ -175,6 +175,7 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
           A header row, then one row per case, tab- or comma-separated. The first column is the case id: name it{" "}
           <code>PATIENT_ID</code> or <code>SAMPLE_ID</code>{studies.length > 1 && <>; prefix one as <code>study:id</code> to pin it to one of the studies</>}.
           Every other column becomes an attribute. Rows whose id matches no {studies.length === 1 ? "patient or sample of the study" : "patient or sample of these studies"} are dropped, and the check below says which.
+          {" "}Cell-level data on Cell Explorer is summarised per patient and sample on <a href="/singlecell">the single-cell page</a> first.
         </details>
         {text.trim() && !parsed && !busy && <div className="row center g5">
           <Button variant="outline" size="sm" className={TB} onClick={() => preview()}>Check ids</Button>
