@@ -6,8 +6,8 @@
 // use-explore.ts.
 import { useEffect, useRef, useState } from "react";
 import { normalizeDef } from "./pills";
-import type { AnalysisDoc, CohortDef, PartitionDef } from "../../lib/types.ts";
-import { foldEventNames } from "../../lib/event-names.ts";
+import type { AnalysisDoc, CohortDef, DerivedRequest, PartitionDef } from "../../lib/types.ts";
+import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
 import { type SplitSpec } from "./partitions.tsx";
 import { armsFromSelection, editSplits, splitKey, type ChartKey } from "../../lib/partition-arms.ts";
 import { DOC_VERSION } from "../../lib/doc-version.ts";
@@ -43,6 +43,14 @@ export interface ExplorePage {
   /** put a new cohort in the view add mode was opened for (use-view-edits.ts) */
   addCohortToView: (target: AddCohortTarget, name: string, def?: CohortDef, studyHint?: string) => void;
 }
+
+/** Explore's "Derived" card (data-shape facets: follow-up, history, distinct altered genes) is
+ *  hidden for now, at the user's request — flip back on rather than delete the render. */
+export const SHOW_DERIVED_FACETS = false;
+/** The derived facets Explore asks for before the reader picks any: the card's three, or none while
+ *  it is hidden. The server computes only what is asked for. */
+const DEFAULT_DERIVED: DerivedRequest[] = SHOW_DERIVED_FACETS
+  ? [{ metric: "followupMonths" }, { metric: "historyMonths" }, { metric: "alteredGenes" }] : [];
 
 export function useExploreState(page: ExplorePage) {
   const { addCohortToView, analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, setError, setStudy, study, tab } = page;
@@ -96,8 +104,8 @@ export function useExploreState(page: ExplorePage) {
   const [geneCharts, setGeneCharts] = useState<string[]>([]);
   const geneChartsRef = useRef<string[]>([]);   // fetchExplore reads this, not the closure
   /** derived facets beyond the fixed three, switched on from "show more derivations" */
-  const [exExtraDerived, setExExtraDerived] = useState<{ metric: "lines" | "treatmentSpan"; eventType: string; lineGap?: number }[]>([]);
-  const exExtraDerivedRef = useRef<typeof exExtraDerived>([]);   // fetchExplore reads this, not the closure
+  const [exDerived, setExDerived] = useState<DerivedRequest[]>(DEFAULT_DERIVED);
+  const exDerivedRef = useRef<DerivedRequest[]>(DEFAULT_DERIVED);   // fetchExplore reads this, not the closure
   const [geneChartInput, setGeneChartInput] = useState("");
   /** the header lists selected studies as chips; past a handful it is summarised */
   const [studyChipsOpen, setStudyChipsOpen] = useState(false);
@@ -298,7 +306,7 @@ export function useExploreState(page: ExplorePage) {
       draft: draftOverride !== undefined ? draftOverride : parseDraft(),
       attributes: attrsOverride ?? attrsForBar(attrCoverage, studiesOverride),
       geneCharts: geneChartsRef.current,
-      extraDerived: exExtraDerivedRef.current,
+      derived: exDerivedRef.current,
       uploads: customDataKey(),
     }, !(attrsOverride ?? []).length && !(attrCoverage > 0));
   };
@@ -396,26 +404,22 @@ export function useExploreState(page: ExplorePage) {
   };
   /** the study's own best guess at "a therapy" — the same heuristic addView's sequence default uses */
   const treatmentEventType = (): { canonical: string; label: string } | null =>
-    exploreEventTypes().find((e) => /treat|therap|regimen|drug|medicat/.test(e.canonical)) || null;
+    treatmentEventOf(exploreEventTypes());
 
-  // "lines" is not offered here: it is added automatically (see the effect
-  // below) once a treatment-like event is detected, because it is cheap
-  // enough to always compute (measured ~0-700ms on top of an Explore fetch
-  // that already takes 0.7-3s) and answers exactly what the "Derived timeline
-  // filters" card wants to show by default. "treatmentSpan" is a second,
-  // separate query with a narrower audience, so it stays opt-in.
-  const EXTRA_DERIVED_KINDS: { metric: "lines" | "treatmentSpan"; label: (name: string) => string }[] = [
+  // the derived facets built on the study's treatment-like event, each opted into from the Derived card
+  const TREATMENT_DERIVED_KINDS: { metric: "lines" | "treatmentSpan"; label: (name: string) => string }[] = [
+    { metric: "lines", label: (name) => "Lines of '" + name + "'" },
     { metric: "treatmentSpan", label: (name) => "Time in '" + name + "' records" }
   ];
-  const extraDerivedOn = (metric: string) => exExtraDerived.some((x) => x.metric === metric);
-  const toggleExtraDerived = (metric: "lines" | "treatmentSpan") => {
+  const derivedOn = (metric: string) => exDerived.some((x) => x.metric === metric);
+  const toggleDerived = (metric: "lines" | "treatmentSpan") => {
     const tx = treatmentEventType();
     if (!tx) return;
-    const next = extraDerivedOn(metric)
-      ? exExtraDerived.filter((x) => x.metric !== metric)
-      : [...exExtraDerived, { metric, eventType: tx.label, ...(metric === "lines" ? { lineGap: 90 } : {}) }];
-    exExtraDerivedRef.current = next;
-    setExExtraDerived(next);
+    const next = derivedOn(metric)
+      ? exDerived.filter((x) => x.metric !== metric)
+      : [...exDerived, { metric, eventType: tx.label, ...(metric === "lines" ? { lineGap: 90 } : {}) }];
+    exDerivedRef.current = next;
+    setExDerived(next);
     fetchExplore();
   };
 
@@ -461,32 +465,6 @@ export function useExploreState(page: ExplorePage) {
     addClause(clause);
     setSeq(s => ({ ...s, aType: "", aLineNo: "", rel: "NONE", bType: "", bLineNo: "" }));
   };
-
-  /**
-   * The real, per-study "lines" bucket counts the "Derived timeline filters"
-   * card shows are just the existing "lines" derived metric — the same one
-   * "show more derivations" used to offer manually — kept in sync here
-   * instead: the study's own event vocabulary (and so `treatmentEventType()`)
-   * is only known once the FIRST Explore response lands, so this fires once
-   * that response reveals a treatment-like event, and again whenever it
-   * changes (switching studies). It is a no-op once `exExtraDerived` already
-   * matches, so it does not loop and does not refetch on every narrowing
-   * click — only on the transitions that actually change what "lines" means.
-   */
-  useEffect(() => {
-    if (!explore) return;
-    const tx = treatmentEventType();
-    const current = exExtraDerivedRef.current;
-    const inSync = tx
-      ? current.some((x) => x.metric === "lines" && x.eventType === tx.label)
-      : !current.some((x) => x.metric === "lines");
-    if (inSync) return;
-    const next = current.filter((x) => x.metric !== "lines");
-    if (tx) next.push({ metric: "lines", eventType: tx.label, lineGap: 90 });
-    exExtraDerivedRef.current = next;
-    setExExtraDerived(next);
-    fetchExplore();
-  }, [explore]); // eslint-disable-line
 
   const removeDraftClause = (i: number) => {
     try {
@@ -577,7 +555,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exExtraDerived, setExExtraDerived, exExtraDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, hiddenAttrs, setHiddenAttrs, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, exploreEventTypes, treatmentEventType, EXTRA_DERIVED_KINDS, extraDerivedOn, toggleExtraDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, hiddenAttrs, setHiddenAttrs, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

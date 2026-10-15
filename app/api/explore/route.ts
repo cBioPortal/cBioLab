@@ -10,6 +10,7 @@ import { studyProfiles, resolveStudy } from "../../../lib/analysis.ts";
 import { chQuery } from "../../../lib/ch.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { assertCustomDataPresent } from "../../../lib/custom-data.ts";
+import type { DerivedRequest } from "../../../lib/types.ts";
 
 export const maxDuration = 60;
 
@@ -88,18 +89,20 @@ async function exploreFor(body: any) {
   const attributes = Array.isArray(body.attributes) ? body.attributes.map(String).slice(0, 60) : undefined;
   // genes the reader has asked to chart as their own alteration facet
   const geneCharts = Array.isArray(body.geneCharts) ? body.geneCharts.map(String).slice(0, 6) : undefined;
-  // Derived facets beyond the fixed three (Explore's "show more derivations"
-  // popup) — local studies only for now: a remote peer answers over its own
-  // MCP tool, which does not yet accept this request, so it simply
-  // contributes none of these facets rather than erroring (mergeExplore).
-  const extraDerived = Array.isArray(body.extraDerived) ? body.extraDerived
-    .filter((x: unknown): x is { metric: string; eventType: string; lineGap?: number } => {
+  // The derived facets to compute — none unless asked for. Local studies only for now: a remote
+  // peer answers over its own MCP tool, which does not accept this request, so it contributes none
+  // of these facets rather than erroring (mergeExplore).
+  const DERIVED = new Set(["followupMonths", "historyMonths", "alteredGenes", "lines", "treatmentSpan"]);
+  const derived = Array.isArray(body.derived) ? body.derived
+    .filter((x: unknown): x is DerivedRequest => {
       const r = x as { metric?: unknown; eventType?: unknown };
-      return !!r && (r.metric === "lines" || r.metric === "treatmentSpan") && typeof r.eventType === "string" && !!r.eventType.trim();
+      if (!r || typeof r.metric !== "string" || !DERIVED.has(r.metric)) return false;
+      // the two built on an event type need one
+      return (r.metric !== "lines" && r.metric !== "treatmentSpan") || (typeof r.eventType === "string" && !!r.eventType.trim());
     })
-    .slice(0, 4)
-    .map((x: { metric: string; eventType: string; lineGap?: number }) => ({ metric: x.metric as "lines" | "treatmentSpan",
-      eventType: x.eventType.slice(0, 200), ...(x.lineGap != null ? { lineGap: Number(x.lineGap) } : {}) }))
+    .slice(0, 8)
+    .map((x: DerivedRequest) => ({ metric: x.metric, ...(x.eventType ? { eventType: String(x.eventType).slice(0, 200) } : {}),
+      ...(x.lineGap != null ? { lineGap: Number(x.lineGap) } : {}) }))
     : undefined;
   const remoteParts = await Promise.all(remote.map((s) => {
     const peer = peers.get(s)!;
@@ -109,8 +112,8 @@ async function exploreFor(body: any) {
     return remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts);
   }
   const localResult = local.length === 1
-    ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch, attributes, geneCharts, extraDerived,
+    ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch, attributes, geneCharts, derived,
         ...profilesByStudy.get(local[0]), conn: connByStudy.get(local[0]) })
-    : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, extraDerived });
+    : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived });
   return remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
 }

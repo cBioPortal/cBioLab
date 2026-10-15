@@ -48,7 +48,9 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
     const views: View[] = [];
     if (ep) views.push({ kind: "survival", endpoint: ep });
     if (hasScatter) views.push({ kind: "plot", unit: "sample", x: { source: "clinical", attribute: X_ATTR, log: true }, y: { source: "clinical", attribute: Y_ATTR }, bins: [48, 32] });
-    api.analysis({ study: studies[0], cohorts: { Selected: cohort }, views })
+    // a superseded request is cancelled, so the server stops its queries instead of finishing them
+    const ac = new AbortController();
+    api.analysis({ study: studies[0], cohorts: { Selected: cohort }, views }, { signal: ac.signal })
       .then((r) => r.json())
       .then((j) => {
         if (want.current !== key) return;   // a newer selection was asked for meanwhile
@@ -59,8 +61,9 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
           ...(sv ? { survival: sv.error ? { error: sv.error } : { curves: sv.curves || [] } } : {}),
           ...(pv ? { plot: pv.error ? { error: pv.error } : { data: pv.plot } } : {}) });
       })
-      .catch((e) => { if (want.current === key) setRes({ key, survival: { error: String(e) }, plot: { error: String(e) } }); })
-      .finally(() => { if (want.current === key) setLoading(false); });
+      .catch((e) => { if (!ac.signal.aborted && want.current === key) setRes({ key, survival: { error: String(e) }, plot: { error: String(e) } }); })
+      .finally(() => { if (!ac.signal.aborted && want.current === key) setLoading(false); });
+    return () => ac.abort();
   }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ep && !hasScatter) return null;

@@ -234,17 +234,17 @@ export function catalogSqls(db: string, study: string): Record<string, string> {
       "SELECT ce.event_type AS t, uniqExact(ce.patient_id) AS n_pat, count() AS n_ev\n" +
       "FROM " + db + ".clinical_event ce WHERE ce.patient_id IN (SELECT internal_id FROM msk)\n" +
       "GROUP BY t ORDER BY n_pat DESC",
-    values: withBlock +
-      "SELECT ce.event_type AS t, d.key AS k, d.value AS v, uniqExact(ce.patient_id) AS n\n" +
-      "FROM " + db + ".clinical_event ce\n" +
-      "JOIN " + db + ".clinical_event_data d ON d.clinical_event_id = ce.clinical_event_id\n" +
-      "WHERE ce.patient_id IN (SELECT internal_id FROM msk)\n" +
-      "GROUP BY t, k, v HAVING n >= 10 ORDER BY n DESC LIMIT 25 BY t, k",
-    keys: withBlock +
-      "SELECT ce.event_type AS t, d.key AS k, uniqExact(d.value) AS nv\n" +
-      "FROM " + db + ".clinical_event ce\n" +
-      "JOIN " + db + ".clinical_event_data d ON d.clinical_event_id = ce.clinical_event_id\n" +
-      "WHERE ce.patient_id IN (SELECT internal_id FROM msk)\n" +
+    // clinical_event_data_derived is the event data pre-joined to its event and study, sorted by
+    // study and event type, so these read one study's rows with no join
+    values:
+      "SELECT event_type AS t, key AS k, value AS v, uniqExact(patient_unique_id) AS n\n" +
+      "FROM " + db + ".clinical_event_data_derived\n" +
+      "WHERE cancer_study_identifier = " + sq(study) + "\n" +
+      "GROUP BY t, k, v HAVING n >= 10 ORDER BY n DESC, v LIMIT 25 BY t, k",
+    keys:
+      "SELECT event_type AS t, key AS k, uniqExact(value) AS nv\n" +
+      "FROM " + db + ".clinical_event_data_derived\n" +
+      "WHERE cancer_study_identifier = " + sq(study) + "\n" +
       "GROUP BY t, k ORDER BY t, k"
   };
 }

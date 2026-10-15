@@ -53,6 +53,8 @@ function unpack<T>(s: string): T {
 
 /** The cached answer, or the direct one when the cache throws or hands back something unreadable. */
 export async function throughCache<T>(read: () => Promise<string>, direct: () => Promise<T>): Promise<T> {
+  // RESULT_CACHE=off answers every request directly, for measuring the uncached path
+  if (process.env.RESULT_CACHE === "off") return direct();
   let packed: string;
   try { packed = await read(); } catch { return direct(); }
   try { return unpack<T>(packed); } catch { return direct(); }

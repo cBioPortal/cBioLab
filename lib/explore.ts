@@ -6,7 +6,7 @@ import { sq } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, type DerivedMetric } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
-import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet, ExtraDerivedRequest } from "./types.ts";
+import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet, DerivedRequest } from "./types.ts";
 import { clinicalValueFoldSql } from "./event-names.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor } from "./custom-data.ts";
 
@@ -188,7 +188,8 @@ export interface ExploreArgs {
   study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[];
   gaProfiles?: string[]; conn?: ChConn; geneSearch?: string; skipBins?: boolean; skipGenes?: boolean;
   binEdges?: Record<string, { edges: number[]; interval: number }>; attributes?: string[]; geneCharts?: string[];
-  extraDerived?: ExtraDerivedRequest[];
+  /** the derived facets to compute; none when omitted */
+  derived?: DerivedRequest[];
 }
 
 /**
@@ -200,7 +201,7 @@ export function buildExplore(args: ExploreArgs): Promise<ExploreResult> {
   return ensureChContext(() => buildExploreOne(args));
 }
 
-async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, binEdges, attributes, geneCharts, extraDerived }: ExploreArgs): Promise<ExploreResult> {
+async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, binEdges, attributes, geneCharts, derived: derivedReq }: ExploreArgs): Promise<ExploreResult> {
   const db = conn.db;
   const t0 = Date.now();
   // An optional allow-list of attribute names. Exploring hundreds of studies at
@@ -225,7 +226,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // collect at the end — serially they cost ~400ms on a ~600ms page, overlapped
   // they cost almost nothing.
   const derivedP = buildDerivedFacets(db, study, conn, cond, draft,
-    { oncokbPin, profiles, gaProfiles }, extraDerived);
+    { oncokbPin, profiles, gaProfiles }, derivedReq);
 
   // how many patients this study contributes under the current draft (or in total)
   const studyN = draftCount ?? Number((await chQuery<ChRow>(
@@ -409,7 +410,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     "GROUP BY id ORDER BY n DESC LIMIT 10", conn);
 
   // ---- derived facets ------------------------------------------------------
-  // Computed from dates and gene symbols, never from a study's event-type names
+  // Only the ones the caller asked for. Computed from dates and gene symbols, never from a study's event-type names
   // or attribute keys, which vary study to study (this database spells the same
   // concept "Treatment" in 87 studies and "TREATMENT" in 10). A study without
   // the underlying table simply yields no buckets and the facet is omitted.
@@ -459,14 +460,16 @@ const DERIVED_SPECS: DerivedSpec[] = [
 ];
 
 /**
- * A reader-requested "lines" or "treatmentSpan" facet, filled out to a full
- * spec. Unlike the fixed three, these need an eventType supplied by the
- * caller (Explore proposes one from the study's own event catalog — see
- * app/lab/page.tsx) because there is no study-independent way to know which
- * timeline event stands for "a therapy" here.
+ * A requested facet filled out to a full spec. "lines" and "treatmentSpan" need
+ * an eventType supplied by the caller, because there is no study-independent way
+ * to know which timeline event stands for "a therapy" here; the other three are
+ * the same everywhere (DERIVED_SPECS).
  */
-function extraDerivedSpec(req: ExtraDerivedRequest): DerivedSpec {
+function derivedSpec(req: DerivedRequest): DerivedSpec | null {
+  const fixed = DERIVED_SPECS.find((s) => s.metric === req.metric);
+  if (fixed) return fixed;
   const et = String(req.eventType || "").trim();
+  if (!et || (req.metric !== "lines" && req.metric !== "treatmentSpan")) return null;
   if (req.metric === "treatmentSpan") return {
     metric: "treatmentSpan", eventType: et,
     label: "Time in '" + et + "' records", unit: "months",
@@ -508,9 +511,9 @@ async function buildDerivedFacets(
   db: string, study: string, conn: ChConn, cond: string,
   draft?: CohortDef | null,
   ctx?: { oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[] },
-  extra?: ExtraDerivedRequest[]
+  requested?: DerivedRequest[]
 ): Promise<DerivedFacet[]> {
-  const specs = [...DERIVED_SPECS, ...(extra || []).map(extraDerivedSpec)];
+  const specs = (requested || []).map(derivedSpec).filter((s): s is DerivedSpec => !!s);
   const out: DerivedFacet[] = [];
   await Promise.all(specs.map(async (spec) => {
     const per = derivedMetricSql(spec.metric, study, db, { eventType: spec.eventType, lineGap: spec.lineGap });
@@ -914,7 +917,7 @@ export interface ExploreFederatedArgs {
   studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null;
   profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>;
   connByStudy?: Map<string, ChConn>; geneSearch?: string; attributes?: string[]; geneCharts?: string[];
-  extraDerived?: ExtraDerivedRequest[];
+  derived?: DerivedRequest[];
 }
 
 /** One context for the whole federated request, so pass 2 can still see pass 1's cohorts. */
@@ -922,7 +925,7 @@ export function buildExploreFederated(args: ExploreFederatedArgs): Promise<Explo
   return ensureChContext(() => buildExploreFederatedInner(args));
 }
 
-async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, extraDerived }: ExploreFederatedArgs): Promise<ExploreResult> {
+async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived }: ExploreFederatedArgs): Promise<ExploreResult> {
   // Pass 1: facets per study, WITHOUT histograms — each study's own quartiles
   // would give it different bin edges, and bars over different ranges cannot be
   // summed. Skip the work rather than compute bins we would throw away.
@@ -946,7 +949,7 @@ async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesB
 
   const [parts, geneParts] = await Promise.all([
     Promise.all(studies.map(s =>
-      buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: poolGenes, attributes, geneCharts, extraDerived,
+      buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: poolGenes, attributes, geneCharts, derived,
         conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}) }))),
     Promise.all([...connGroups.values()].map(async ({ conn, studies: ss }) => {
       const g = await geneTables({ studies: ss, db: conn.db, conn, geneSearch });
@@ -1088,7 +1091,7 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
   };
   // derived facets merge by summing bucket counts — the metric means the same
   // thing in every study, which is the point of deriving it from shape.
-  // Keyed by (metric, eventType) rather than iterated from the fixed
+  // Keyed by (metric, eventType) rather than iterated from the
   // DERIVED_SPECS list: "lines"/"treatmentSpan" name a caller-chosen event
   // type, so their full spec (label, cuts, ...) isn't known ahead of time —
   // it's read from whichever participant actually computed one instead, and a

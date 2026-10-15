@@ -6,7 +6,7 @@
 // fetched), and which kinds draw their own header. Read-only: it edits nothing.
 import { KIND_CARDS, hasKindCard } from "./kind-cards";
 import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
-import { foldEventNames } from "../../lib/event-names.ts";
+import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import type { ExploreResult } from "../../lib/types.ts";
 import type { TrackAttrs } from "./use-catalogs.ts";
@@ -119,7 +119,7 @@ export function useViewOptions(page: ViewOptionsPage) {
       why: () => viewEvents().length ? null
         : "this study records no timeline events (only 131 of 545 studies have any)" },
     { kind: "sequence", label: "Treatment sequence", loading: () => !viewEvents().length && (catLoading || exploreBusy),
-      why: () => viewEvents().some(e => /treat|therap|regimen|drug|medicat/.test(e.canonical)) ? null
+      why: () => treatmentEventOf(viewEvents()) ? null
         : "this study records no treatment events, so there are no lines of therapy to sequence" },
     ...Object.entries(KIND_CARDS).map(([kind, k]) => ({ kind, label: k.label,
       ...(k.why ? { why: () => k.why!({ genes: [], attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) }),

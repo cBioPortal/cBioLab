@@ -123,6 +123,16 @@ export function foldEventNames(rows: { name: string; n: number }[]): FoldedName[
     .sort((a, b) => b.n - a.n || a.canonical.localeCompare(b.canonical));
 }
 
+/** Does this canonical event name record a therapy? The one heuristic behind every "which event is treatment" default. */
+export function isTreatmentEventName(canonical: string): boolean {
+  return /treat|therap|regimen|drug|medicat/.test(canonical);
+}
+
+/** The most frequent treatment-like event among folded names, or null when there is none. */
+export function treatmentEventOf<T extends { canonical: string }>(folded: T[]): T | null {
+  return folded.find((f) => isTreatmentEventName(f.canonical)) || null;
+}
+
 /**
  * Human-readable note naming the spellings folded together, or "" when nothing
  * folded. Goes into the caveat so a reader can see the merge and undo it
