@@ -103,6 +103,10 @@ const MUTANTS: Mutant[] = [
     effect: "\"Deeply deleted\" also selects amplified patients, so a CDKN2A-loss cohort contains CDKN2A-amplified tumours.",
     find: "spec.cna === -2 ? \"g.cna_alteration <= -2\"",
     replace: "spec.cna === -2 ? \"abs(g.cna_alteration) >= 2\"" },
+  { id: "position-range-ignored", layer: "counts", guard: "portal-parity", file: "lib/oql.ts",
+    effect: "\"APC: TRUNC_(1400-)\" selects every APC truncation, so an N-/C-terminal split puts every truncated patient on the C-terminal side.",
+    find: "    if (spec.range) conds.push(rangeCond(spec.range));\n",
+    replace: "\n" },
 ];
 
 function run(dir: string, guard: Guard): { ok: boolean; failures: number; firstFailure: string } {

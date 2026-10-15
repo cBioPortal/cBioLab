@@ -1370,7 +1370,7 @@ rather than silently ignoring what it does not understand.
 | \`caseList\` | \`{"kind":"caseList","id":"sequenced"}\` | portal sample list; bare ids get the study prefix |
 | \`genomicData\` | \`{"kind":"genomicData","gene":G,"profileType":P,"range"\\|"values"}\` | continuous per-gene values (cna, mrna z-scores, …); unknown profiles error listing what the study has |
 | \`genericAssay\` | \`{"kind":"genericAssay","profileType":P,"entity":E,"range"\\|"values"}\` | generic assay values (mutational signatures, …) |
-| \`proteinPosition\` | \`{"kind":"proteinPosition","gene":G,"range":{gt,gte,lt,lte}}\` | patient carries a mutation in \`gene\` whose protein position (the stored proteinPosStart, same column the lollipop draws from) falls in \`range\` — for an N-/C-terminal split when a study doesn't deposit one as a clinical attribute. Position-only: AND with an \`oql\` leaf (e.g. \`{"kind":"oql","q":"APC: TRUNC"}\`) to also restrict by mutation type |
+| \`proteinPosition\` | \`{"kind":"proteinPosition","gene":G,"range":{gt,gte,lt,lte}}\` | patient carries a mutation in \`gene\` whose protein position (the stored proteinPosStart, same column the lollipop draws from) falls in \`range\` — for an N-/C-terminal split when a study doesn't deposit one as a clinical attribute. Position-only: AND with an \`oql\` leaf (e.g. \`{"kind":"oql","q":"APC: TRUNC"}\`) to also restrict by mutation type — the two can then be met by different mutations; an OQL position range (\`APC: TRUNC_(1400-)\`) requires both of one mutation |
 | \`split\` | \`{"kind":"split","part":"discovery"\|"validation"}\` | one fixed half of the study's patients, decided inside the database by a salted hash of the patient id — the same half for every caller, reproducible, and never passed through the client as an id list. It exists for **held-out replication**: test on \`discovery\`, confirm the same document on \`validation\`. A hypothesis campaign (\`/campaign\`, MCP \`campaign_*\`) adds it itself and refuses documents that already carry one, so a generator cannot choose its own half |
 | \`alteration\` | *(deprecated)* | translated to OQL internally; do not write new ones |
 
@@ -1393,6 +1393,7 @@ A patient matches if **any** entry matches (portal "altered in query" semantics)
 - Copy number: \`AMP\`, \`HOMDEL\`, \`CNA\` (either, high-level ±2 only).
 - Structural variants: \`FUSION\`.
 - Drivers: \`DRIVER\` alone (any driver alteration) or as modifier (\`MUT_DRIVER\`, \`DRIVER_G12D\`, \`TRUNC_DRIVER\`). Requires the version-pinned OncoKB annotation store; the pin is reported in every result.
+- Protein position range, on a mutation (cBioPortal's \`(a-b)\` modifier): \`TRUNC_(1400-)\`, \`MUT_(-500)\`, \`MUT_(12-13)\`, \`MUT=(712-979)_DRIVER\`, or a range alone (\`(1400-)\`, any mutation there). By default a mutation matches when its protein range (start-end) **overlaps** the range; with \`*\` (\`(1-100*)\`) it must lie entirely inside it. A mutation with no usable position (missing, -1, or start after end) never matches, as in the portal. The range and the class are tested on the **same** mutation, so \`APC: TRUNC_(1400-)\` is a truncation at or after codon 1400 — unlike ANDing an \`APC: TRUNC\` leaf with a \`proteinPosition\` leaf, which can be satisfied by two different mutations. On anything but a mutation (\`AMP_(1-100)\`) it is refused.
 - Expression: \`EXP>z EXP<z PROT>z\` — only in studies with mRNA/protein profiles (errors otherwise, listing available profiles).
 - **Rejected loudly** (never silently approximated): \`GAIN HETLOSS GERMLINE SOMATIC PROMOTER\`.
 
@@ -1964,10 +1965,12 @@ Leaf kinds:
   per-gene values; profile must exist in the study or it errors listing what does.
 - {"kind":"proteinPosition","gene":"APC","range":{"lt":1400}} — mutated in gene with protein
   position (proteinPosStart) in range, for an N-/C-terminal split; AND with an oql leaf
-  ({"kind":"oql","q":"APC: TRUNC"}) to also require a mutation type.
+  ({"kind":"oql","q":"APC: TRUNC"}) to also require a mutation type — or, to require both of the
+  SAME mutation, use an OQL range instead: {"kind":"oql","q":"APC: TRUNC_(1400-)"}.
 - OQL EXP>z / PROT>z work only if the study has mRNA/protein profiles (msk_chord does not).
 - OQL details for {"kind":"oql"}: per gene MUT,
   MUT=<pchange>, MISSENSE/NONSENSE/TRUNC/INFRAME/SPLICE, AMP, HOMDEL, FUSION, DRIVER and _DRIVER
-  modifiers; entries separated by ';' are OR'd (portal "altered in query" semantics).
+  modifiers, and a protein position range on a mutation (TRUNC_(1400-), MUT_(12-13), (1-100*) = fully inside;
+  class and range checked on the same mutation); entries separated by ';' are OR'd (portal "altered in query" semantics).
   GAIN/HETLOSS/GERMLINE/SOMATIC/PROMOTER are always rejected; EXP/PROT are rejected in studies
   without mRNA/protein profiles — do not use any of these there.`;
