@@ -14,8 +14,9 @@ import { MethodPanel } from "./method-panel.tsx";
 import { viewRequest } from "./use-analysis.ts";
 import { AxisPicker, HighlightPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, SeriesSwatch, Participation } from "./view-chrome.tsx";
 import { ViewFigure } from "./figure.tsx";
-import { ArrowLeftRight, Plus, Settings2, Undo2, X } from "lucide-react";
+import { ArrowLeftRight, Plus, Settings2, X } from "lucide-react";
 import { Button } from "../_ui/button";
+import { ErrorAlert } from "../_ui/error-alert.tsx";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
@@ -938,19 +939,13 @@ function ErrorHead({ ctx, v, vi }: CardProps) {
 function ErrorNote({ ctx, v }: CardProps) {
   const { docHistory } = ctx;
   return <>
-    {v.error && docHistory.canUndo && (
-      <div className="viewtb"><div className="tbz">
-        <Button variant="outline" className={TB + " undo-error"} onClick={docHistory.undo}
-          title="put the analysis back as it was before the last change (Ctrl/⌘-Z)"><Undo2 />Undo last change</Button>
-      </div></div>
-    )}
-    {v.error && <div className="error">{v.kind}: {v.error}{v.participation ? <> <>{v.ms != null && (
+    {v.error && <ErrorAlert onUndo={docHistory.canUndo ? docHistory.undo : undefined}>{v.kind}: {v.error}{v.participation ? <> <>{v.ms != null && (
           <span className="lat" title={
             "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
             (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
             {v.ms.toLocaleString()}ms
             {v.renderMs != null && <span className="latsplit"> ({(v.ms - v.renderMs).toLocaleString()} + {v.renderMs.toLocaleString()} draw)</span>}
           </span>
-        )}<Participation p={v.participation} /></></> : null}</div>}
+        )}<Participation p={v.participation} /></></> : null}</ErrorAlert>}
   </>;
 }
