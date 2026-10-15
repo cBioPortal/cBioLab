@@ -114,13 +114,11 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
   S: Style, colors?: Record<string, Record<string, string>>): void {
   if (t.kind === "gene") {
     for (const l of cellLayers(code, S)) {
-      if (l.alpha < 1) ctx.globalAlpha = l.alpha;
       if (l.stroke) {
         const sw = Math.min(l.stroke, w / 2 || l.stroke);
         ctx.strokeStyle = l.color; ctx.lineWidth = sw;
         ctx.strokeRect(x + sw / 2, y + sw / 2, Math.max(0, w - sw), h - sw);
       } else { ctx.fillStyle = l.color; ctx.fillRect(x, y + h * l.band[0], w, h * (l.band[1] - l.band[0])); }
-      if (l.alpha < 1) ctx.globalAlpha = 1;
     }
     return;
   }
@@ -246,13 +244,14 @@ export function decodeGene(code: number): string {
   if (code === 0) return "no alteration";
   const B = BITS as Record<string, number>;
   const parts: string[] = [];
-  for (const m of STYLE.glyph.mutation.priority) if (code & B[m.bit]) parts.push(m.label.toLowerCase());
-  if (code & BITS.SV) parts.push(STYLE.glyph.sv.label.toLowerCase());
-  for (const o of STYLE.glyph.cna.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase());
+  // driver status is per glyph: the mutation band's, the SV's; a copy number change has none drawn
+  const sig = (bit: number): string => (code & bit ? " (putative driver)" : " (unknown significance)");
+  const muts = STYLE.glyph.mutation.priority.filter((m) => code & B[m.bit]).map((m) => m.label.toLowerCase());
+  if (muts.length) parts.push(muts.join(", ") + sig(BITS.MUT_DRIVER));
+  if (code & BITS.SV) parts.push(STYLE.glyph.sv.label.toLowerCase() + sig(BITS.SV_DRIVER));
+  for (const o of STYLE.glyph.cna.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase() + (code & BITS.DRIVER && !(code & (BITS.MUT_DRIVER | BITS.SV_DRIVER)) ? " (putative driver)" : ""));
   for (const o of STYLE.glyph.mrna.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase());
   for (const o of STYLE.glyph.protein.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase());
-  const ALT = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
-  if (code & ALT) parts.push(code & BITS.DRIVER ? "putative driver" : "unknown significance");
   return parts.join(" · ");
 }
 

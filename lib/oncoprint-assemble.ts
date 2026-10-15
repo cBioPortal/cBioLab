@@ -8,16 +8,11 @@
 // tables, and a port in another language has this function as its conformance target.
 import { heatmapTrackLabel } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
+import { STYLE } from "./oncoprint-style.ts";
 import type { Contract, Track, GroupRange, ZReference, ResolvedDisplay, DisplaySpec, SortKeySpec } from "./types.ts";
 
-// gene-track cell bitmask
-export const BITS = {
-  MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16,
-  SV: 32, AMP: 64, HOMDEL: 128,
-  DRIVER: 256,      // any alteration in the cell is annotated (putative) driver
-  PROMOTER: 512,    // 5'Flank / promoter mutations
-  MRNA_HIGH: 1024, MRNA_LOW: 2048, PROT_HIGH: 4096, PROT_LOW: 8192
-};
+// gene-track cell bitmask: one definition, the style's
+export const BITS = STYLE.bits;
 export const NOT_PROFILED = -1;
 
 export function mutClassBit(mt: string | undefined): number {
@@ -188,15 +183,23 @@ export function assembleContract(input: AssembleInput): Contract {
   // driver amplification and a passenger missense keeps only the amplification, and a merged
   // row's driver in one gene does not smuggle another gene's passenger through. What was
   // dropped is counted so a caption can say so.
+  //
+  // Driver status is per glyph, as in the portal: SV_DRIVER for the structural variant,
+  // MUT_DRIVER for the mutation band, and DRIVER for "some alteration here is a driver" (the
+  // driver %, the sort). The portal ranks every driver mutation above every VUS one whatever
+  // the class, so a VUS mutation's class is held aside and joins the cell only where no driver
+  // mutation does — a VUS truncation beside a driver missense shows as the driver missense.
   const hideVus = !!input.display?.hideVUS;
   let hiddenVus = 0;
+  const vusMut = new Map<Int32Array, Uint16Array>();   // mutation class bits all sit below 1024
   for (const r of events) {
     const i = pidIndex.get(r.pid);
     if (i === undefined) continue;
     const rows = rowsOfGene.get(r.gene);
     if (!rows) continue;
     let bit = 0;
-    if (r.vt === "mutation") bit = mutClassBit(r.mt);
+    const mut = r.vt === "mutation";
+    if (mut) bit = mutClassBit(r.mt);
     else if (r.vt === "structural_variant") bit = BITS.SV;
     else if (r.vt === "cna") bit = Number(r.cna) >= 2 ? BITS.AMP : (Number(r.cna) <= -2 ? BITS.HOMDEL : 0);
     if (!bit) continue;
@@ -206,9 +209,20 @@ export function assembleContract(input: AssembleInput): Contract {
       for (const cells of rows) if (cells[i] === NOT_PROFILED) cells[i] = 0;   // it was still assayed
       continue;
     }
-    if (driver) bit |= BITS.DRIVER;
+    if (mut && !driver) {
+      for (const cells of rows) {
+        let held = vusMut.get(cells);
+        if (!held) { held = new Uint16Array(cells.length); vusMut.set(cells, held); }
+        held[i] |= bit;
+        if (cells[i] === NOT_PROFILED) cells[i] = 0;
+      }
+      continue;
+    }
+    if (driver) bit |= BITS.DRIVER | (mut ? BITS.MUT_DRIVER : bit === BITS.SV ? BITS.SV_DRIVER : 0);
     for (const cells of rows) cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | bit; // an observed event implies profiled
   }
+  for (const [cells, held] of vusMut)
+    for (let i = 0; i < cells.length; i++) if (held[i] && !(cells[i] & BITS.MUT_DRIVER)) cells[i] |= held[i];
 
   phase("gene cells");
 

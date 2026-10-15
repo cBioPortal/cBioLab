@@ -2,7 +2,7 @@
 // Zero data logic and zero style of its own: cells come from the contract, level of detail
 // from lib/oncoprint-lod.ts, every colour, band and label from lib/oncoprint-style.ts.
 import type { Contract, Track } from "./types.ts";
-import { cellLayers, numericColor, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackTooltipLines, geneLegendFor, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
+import { cellLayers, numericColor, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
 import { aggregate, bucketEdges } from "./oncoprint-lod.ts";
 
 const esc = (s: unknown): string => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -22,10 +22,7 @@ function wrap(text: string, perLine: number): string[] {
 
 export function contractToSvg(contract: Contract, width = 1200, style?: Style, physicalWidthIn?: number): string {
   // the figure's own style: an override travels in the contract, so callers need pass nothing
-  const S0 = styleForDisplay(style ?? resolveStyle(contract.display?.style), contract.display);
-  const S = contract.display?.whiteBackground
-    ? { ...S0, palette: { ...S0.palette, unaltered: "#ffffff" }, glyph: { ...S0.glyph, notProfiled: { ...S0.glyph.notProfiled, fill: "#ffffff" } } }
-    : S0;
+  const S = styleForDisplay(style ?? resolveStyle(contract.display?.style), contract.display);
   const colors = contract.display?.colors;
   const P = S.palette, G = S.geometry;
   const { rowH: ROW_H, rowGap: ROW_GAP, gutter: GUTTER, groupGap: GROUP_GAP, header: HEADER_H } = G;
@@ -34,9 +31,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
     (t.kind === "clinical" && ((t.categories && t.categories.length) || t.numeric)) || t.kind === "heatmap");
   // gene legend, wrapped to the available width; each row is 16 px
   // only the alterations these cells actually carry
-  let bitsPresent = 0;
-  for (const t of contract.tracks) if (t.kind === "gene") { const cs = t.cells as ArrayLike<number>; for (let i = 0; i < cs.length; i++) if (cs[i] > 0) bitsPresent |= cs[i]; }
-  const items: { label: string; color: string; kind: string }[] = [...geneLegendFor(bitsPresent, S)];
+  const items: { label: string; color: string; kind: string }[] = geneLegend(S, glyphPresence(contract.tracks as { kind: string; cells: ArrayLike<number> }[], S));
   if (contract.tracks.some((t) => t.kind === "derivedEvent")) items.splice(items.length - 1, 0, { label: "Derived event", color: P.derived, kind: "swatch" });
   const itemW = (label: string): number => 14 + label.length * 6.2 + 16;
   const legendRows: typeof items[] = [[]];
@@ -66,15 +61,15 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
     parts.push(`<text x="${groupX[gi]}" y="13" fill="${P.muted}">${esc(g.name)} (${g.count.toLocaleString("en-US")})</text>`);
   });
 
-  const rect = (x: number, y: number, w: number, h: number, fill: string, alpha = 1): string =>
-    `<rect x="${r2(x)}" y="${r2(y)}" width="${r2(w)}" height="${r2(h)}" fill="${fill}"${alpha < 1 ? ` fill-opacity="${alpha}"` : ""}/>`;
+  const rect = (x: number, y: number, w: number, h: number, fill: string): string =>
+    `<rect x="${r2(x)}" y="${r2(y)}" width="${r2(w)}" height="${r2(h)}" fill="${fill}"/>`;
   const geneCell = (code: number, x: number, y: number, w: number): void => {
     for (const l of cellLayers(code, S)) {
       if (l.stroke) {
         // an outline, so whatever is underneath still shows (the portal draws mRNA this way)
         const sw = Math.min(l.stroke, w / 2 || l.stroke);
         parts.push(`<rect x="${r2(x + sw / 2)}" y="${r2(y + sw / 2)}" width="${r2(Math.max(0, w - sw))}" height="${r2(ROW_H - sw)}" fill="none" stroke="${l.color}" stroke-width="${r2(sw)}"/>`);
-      } else parts.push(rect(x, y + ROW_H * l.band[0], w, ROW_H * (l.band[1] - l.band[0]), l.color, l.alpha));
+      } else parts.push(rect(x, y + ROW_H * l.band[0], w, ROW_H * (l.band[1] - l.band[0]), l.color));
     }
   };
   const scratch = new Int32Array(64);
@@ -108,7 +103,9 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
     for (const it of row) {
       if (it.kind === "notProfiled") {
         parts.push(rect(lx, ly - 9, 10, 10, S.glyph.notProfiled.fill));
-        parts.push(rect(lx, ly - 9 + 10 * S.glyph.notProfiled.stripe.band[0], 10, 10 * (S.glyph.notProfiled.stripe.band[1] - S.glyph.notProfiled.stripe.band[0]), it.color));
+        // a 10px swatch would thin the cell's line below a pixel; keep it one at least
+        const [s0, s1] = S.glyph.notProfiled.stripe.band, sh = Math.max(1, 10 * (s1 - s0));
+        parts.push(rect(lx, ly - 4 - sh / 2, 10, sh, it.color));
       } else if (it.kind === "outline") {
         parts.push(rect(lx, ly - 9, 10, 10, S.palette.unaltered));
         parts.push(`<rect x="${lx + 1}" y="${ly - 8}" width="8" height="8" fill="none" stroke="${it.color}" stroke-width="2"/>`);
@@ -121,7 +118,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   ly -= 16;
   const partial = contract.tracks.some((t) => t.kind === "gene" && t.profiled != null && t.profiled > 0 && t.profiled < contract.columns.length);
   const hidden = contract.stats.hiddenVus;
-  const caption = S.glyph.driverNote + "; gene %: driver / any" +
+  const caption = "gene %: driver / any" +
     (hidden != null ? "; " + hidden.toLocaleString("en-US") + " alterations of unknown significance are hidden and are not in the %" : "") +
     (contract.display?.annotate === "none" ? "; no driver calls were made" : "") + (partial ? "; " + PARTIAL_PROFILE_NOTE : "") +
     " — annotation: " + (contract.conventions ? contract.conventions.annotation || "none" : "none");

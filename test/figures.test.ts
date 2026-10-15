@@ -53,7 +53,7 @@ describe("genome", () => {
   });
   test("gains and losses take the oncoprint's amplification and deletion colours", () => {
     const svg = viewToSvg({ kind: "genome", genome: one, caveat: "c" })!;
-    assert.ok(svg.includes("#e41a1c") && svg.includes("#2166ac"));
+    assert.ok(svg.includes("#ff0000") && svg.includes("#0000ff"));
   });
   test("the q-value strip appears only when two cohorts were tested", () => {
     assert.ok(!viewToSvg({ kind: "genome", genome: one })!.includes("gain differs"));

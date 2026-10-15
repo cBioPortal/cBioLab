@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "bits": {
     "MISSENSE": 1,
     "TRUNCATING": 2,
@@ -14,11 +14,13 @@
     "MRNA_HIGH": 1024,
     "MRNA_LOW": 2048,
     "PROT_HIGH": 4096,
-    "PROT_LOW": 8192
+    "PROT_LOW": 8192,
+    "MUT_DRIVER": 16384,
+    "SV_DRIVER": 32768
   },
   "palette": {
     "paper": "#ffffff",
-    "unaltered": "#e8ecee",
+    "unaltered": "#bebebe",
     "derived": "#0f86a1",
     "text": "#1f2933",
     "muted": "#5b6b76",
@@ -43,15 +45,13 @@
       "options": [
         {
           "bit": "AMP",
-          "color": "#e41a1c",
-          "vus": "#f6a6a5",
+          "color": "#ff0000",
           "label": "Amplification",
           "order": 10
         },
         {
           "bit": "HOMDEL",
-          "color": "#2166ac",
-          "vus": "#a6c4de",
+          "color": "#0000ff",
           "label": "Deep Deletion",
           "order": 12
         }
@@ -66,15 +66,13 @@
       "options": [
         {
           "bit": "MRNA_HIGH",
-          "color": "#c0392b",
-          "vus": "#c0392b",
+          "color": "#ff9999",
           "label": "mRNA High",
           "order": 20
         },
         {
           "bit": "MRNA_LOW",
-          "color": "#2c6fbb",
-          "vus": "#2c6fbb",
+          "color": "#6699cc",
           "label": "mRNA Low",
           "order": 21
         }
@@ -86,21 +84,19 @@
           "bit": "PROT_HIGH",
           "band": [
             0,
-            0.18
+            0.2
           ],
           "color": "#ff3df8",
-          "vus": "#ff3df8",
           "label": "Protein High",
           "order": 30
         },
         {
           "bit": "PROT_LOW",
           "band": [
-            0.82,
+            0.8,
             1
           ],
-          "color": "#00b8d4",
-          "vus": "#00b8d4",
+          "color": "#00e1ff",
           "label": "Protein Low",
           "order": 31
         }
@@ -108,38 +104,38 @@
     },
     "sv": {
       "band": [
-        0.15,
-        0.85
+        0.2,
+        0.8
       ],
       "bit": "SV",
-      "color": "#8e24aa",
+      "color": "#8b00c9",
       "vus": "#ce92e8",
       "label": "Structural Variant",
       "order": 1
     },
     "mutation": {
       "band": [
-        0.3,
-        0.7
+        0.3333333333333333,
+        0.6666666666666666
       ],
       "order": 0,
       "priority": [
         {
           "bit": "TRUNCATING",
-          "color": "#111111",
-          "vus": "#7c8794",
+          "color": "#000000",
+          "vus": "#708090",
           "label": "Truncating Mutation"
         },
         {
           "bit": "SPLICE",
-          "color": "#ff8c00",
-          "vus": "#f5c88f",
+          "color": "#e5802b",
+          "vus": "#f0b87b",
           "label": "Splice Mutation"
         },
         {
           "bit": "INFRAME",
-          "color": "#b8860b",
-          "vus": "#dcc37e",
+          "color": "#993404",
+          "vus": "#a68028",
           "label": "Inframe Mutation"
         },
         {
@@ -150,14 +146,14 @@
         },
         {
           "bit": "MISSENSE",
-          "color": "#2e7d32",
-          "vus": "#8bc98e",
+          "color": "#008000",
+          "vus": "#53d400",
           "label": "Missense Mutation"
         },
         {
           "bit": "OTHER_MUT",
-          "color": "#9467bd",
-          "vus": "#c9b3de",
+          "color": "#cf58bc",
+          "vus": "#f96ae3",
           "label": "Other Mutation"
         }
       ],
@@ -167,21 +163,22 @@
         "label": "Mutation"
       }
     },
-    "vusStyle": "pair",
-    "vusAlpha": 0.35,
+    "driverLabels": {
+      "driver": " (putative driver)",
+      "vus": " (unknown significance)"
+    },
     "notProfiled": {
-      "fill": "#f4f6f7",
+      "fill": "#ffffff",
       "stripe": {
-        "color": "#dfe4e7",
+        "color": "#bebebe",
         "band": [
-          0.45,
-          0.55
+          0.475,
+          0.525
         ]
       },
       "label": "Not profiled"
     },
-    "unalteredLabel": "No alterations",
-    "driverNote": "paler = unknown significance"
+    "unalteredLabel": "No alterations"
   },
   "ramps": {
     "sequential": {

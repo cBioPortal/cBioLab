@@ -34,12 +34,12 @@ test("cells: bitmask, driver bit, NOT_PROFILED from coverage, event implies prof
   const c = assembleContract(input());
   const byLabel = Object.fromEntries(c.tracks.map((t) => [t.label, t]));
   const col = (p: string) => c.columns.indexOf(p);
-  assert.equal(byLabel.TP53.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER);
+  assert.equal(byLabel.TP53.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER | BITS.MUT_DRIVER);
   assert.equal(byLabel.TP53.cells[col("P2")], BITS.TRUNCATING);
   assert.equal(byLabel.KRAS.cells[col("P2")], BITS.AMP | BITS.DRIVER);
   assert.equal(byLabel.KRAS.cells[col("P3")], 0, "gain is below the high-level threshold");
   assert.equal(byLabel.KRAS.cells[col("P4")], NOT_PROFILED, "P4's panel does not cover KRAS");
-  assert.equal(byLabel.TP53.cells[col("P5")], BITS.SV | BITS.DRIVER, "an event on an uncovered patient still draws");
+  assert.equal(byLabel.TP53.cells[col("P5")], BITS.SV | BITS.DRIVER | BITS.SV_DRIVER, "an event on an uncovered patient still draws");
   assert.equal(byLabel.KRAS.cells[col("P5")], NOT_PROFILED);
 });
 
@@ -167,10 +167,10 @@ test("a merged row is the OR of its members, and profiled where any member was",
   const t = c.tracks.find((x) => x.label === "pathway")!;
   const col = (p: string) => c.columns.indexOf(p);
   assert.deepEqual(t.members, ["TP53", "KRAS"]);
-  assert.equal(t.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER);
+  assert.equal(t.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER | BITS.MUT_DRIVER);
   assert.equal(t.cells[col("P2")], BITS.TRUNCATING | BITS.AMP | BITS.DRIVER, "both members' bits land in one cell");
   assert.equal(t.cells[col("P4")], 0, "profiled for TP53 only, and unaltered in both");
-  assert.equal(t.cells[col("P5")], BITS.SV | BITS.DRIVER);
+  assert.equal(t.cells[col("P5")], BITS.SV | BITS.DRIVER | BITS.SV_DRIVER);
 });
 
 test("a merged row's denominator is the union of its members' panels", () => {
@@ -230,7 +230,7 @@ test("hiding unknown significance drops the alteration, not the whole cell", () 
   // P2 has a non-driver TP53 truncation and a driver KRAS amp: the truncation goes, the amp stays.
   // A merged row must not let one gene's driver smuggle another gene's passenger through.
   assert.equal(c.tracks[0].cells[col("P2")], BITS.AMP | BITS.DRIVER);
-  assert.equal(c.tracks[0].cells[col("P1")], BITS.MISSENSE | BITS.DRIVER, "a driver is kept");
+  assert.equal(c.tracks[0].cells[col("P1")], BITS.MISSENSE | BITS.DRIVER | BITS.MUT_DRIVER, "a driver is kept");
   assert.equal(c.stats.hiddenVus, 1);
 });
 

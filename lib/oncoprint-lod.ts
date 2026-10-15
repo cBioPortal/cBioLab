@@ -2,10 +2,16 @@
 // columns than pixels. One implementation for the server SVG and the browser canvas; the
 // Python package mirrors it and a conformance test compares bucket codes.
 //
-//   gene / derived   OR of the altered bitmasks; -1 only when every column is not profiled
+//   gene / derived   OR of the altered bitmasks; -1 only when every column is not profiled.
+//                    The mutation classes follow the portal's precedence: those of columns with
+//                    a driver mutation when there are any, else every column's
 //   numeric          mean of the present values (rounded), -1 when none present
 //   categorical      the most frequent category; ties go to the lower index; -1 when none
 import type { Track } from "./types.ts";
+import { STYLE } from "./oncoprint-style.ts";
+
+const B = STYLE.bits;
+const MUT = B.MISSENSE | B.TRUNCATING | B.INFRAME | B.SPLICE | B.OTHER_MUT | B.PROMOTER;
 
 export type TrackShape = Pick<Track, "kind" | "numeric" | "categories">;
 
@@ -38,9 +44,16 @@ export function aggregate(t: TrackShape, cells: ArrayLike<number>, order: ArrayL
     let best = 0; for (let i = 1; i < m; i++) if (scratch[i] > scratch[best]) best = i;
     return best;
   }
-  let code = -1;
-  for (let k = k0; k < k1; k++) { const c = cells[order ? order[k] : k]; if (c === -1) continue; code = (code === -1 ? 0 : code) | (c > 0 ? c : 0); }
-  return code;
+  let code = -1, drvMut = 0, vusMut = 0;
+  for (let k = k0; k < k1; k++) {
+    const c = cells[order ? order[k] : k];
+    if (c === -1) continue;
+    if (code === -1) code = 0;
+    if (c <= 0) continue;
+    code |= c & ~MUT;
+    if (c & B.MUT_DRIVER) drvMut |= c & MUT; else vusMut |= c & MUT;
+  }
+  return code === -1 ? -1 : code | (drvMut || vusMut);
 }
 
 /** Every bucket's code for one track over one group, the shape the conformance test compares. */

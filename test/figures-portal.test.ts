@@ -44,7 +44,7 @@ describe("cancertypes", () => {
   });
   test("mutations and amplifications take the oncoprint's colours", () => {
     const svg = viewToSvg(v)!;
-    assert.ok(svg.includes("#008000") && svg.includes("#e41a1c"));
+    assert.ok(svg.includes("#008000") && svg.includes("#ff0000"));
   });
   test("nothing profiled, no figure", () => {
     assert.equal(viewToSvg({ ...v, cancertypes: { ...v.cancertypes!, panels: [{ ...v.cancertypes!.panels[0], profiled: 0 }] } }), null);

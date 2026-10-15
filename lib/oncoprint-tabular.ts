@@ -6,14 +6,16 @@ import type { Contract } from "./types.ts";
 export function geneCellLabel(code: number): string {
   if (code === NOT_PROFILED) return "not profiled";
   if (code <= 0) return "";
-  const drv = code & BITS.DRIVER ? " (putative driver)" : " (unknown significance)";
+  // driver status is per glyph, as drawn: the mutation band's and the SV's own bits
+  const mut = code & BITS.MUT_DRIVER ? " (putative driver)" : " (unknown significance)";
   const parts: string[] = [];
-  if (code & BITS.MISSENSE) parts.push("Missense Mutation" + drv);
-  if (code & BITS.TRUNCATING) parts.push("Truncating Mutation" + drv);
-  if (code & BITS.INFRAME) parts.push("Inframe Mutation" + drv);
-  if (code & BITS.SPLICE) parts.push("Splice Mutation" + drv);
-  if (code & BITS.OTHER_MUT) parts.push("Other Mutation" + drv);
-  if (code & BITS.SV) parts.push("Structural Variant" + drv);
+  if (code & BITS.MISSENSE) parts.push("Missense Mutation" + mut);
+  if (code & BITS.TRUNCATING) parts.push("Truncating Mutation" + mut);
+  if (code & BITS.INFRAME) parts.push("Inframe Mutation" + mut);
+  if (code & BITS.SPLICE) parts.push("Splice Mutation" + mut);
+  if (code & BITS.PROMOTER) parts.push("Promoter Mutation" + mut);
+  if (code & BITS.OTHER_MUT) parts.push("Other Mutation" + mut);
+  if (code & BITS.SV) parts.push("Structural Variant" + (code & BITS.SV_DRIVER ? " (putative driver)" : " (unknown significance)"));
   if (code & BITS.AMP) parts.push("Amplification");
   if (code & BITS.HOMDEL) parts.push("Deep Deletion");
   return parts.join(", ");

@@ -13,9 +13,10 @@ from typing import Any
 import numpy as np
 
 from .contract import Contract, Track
-from .style import STYLE, cell_layers, format_gutter_pct, gene_legend, numeric_rgb, resolve_style, style_for_display, track_category_color, track_label_text
+from .style import BITS, STYLE, cell_layers, format_gutter_pct, gene_legend, glyph_presence, numeric_rgb, resolve_style, style_for_display, track_category_color, track_label_text
 
 _G = STYLE["geometry"]
+_MUT = BITS["MISSENSE"] | BITS["TRUNCATING"] | BITS["INFRAME"] | BITS["SPLICE"] | BITS["OTHER_MUT"] | BITS["PROMOTER"]
 ROW_H, ROW_GAP, GROUP_GAP = _G["rowH"], _G["rowGap"], _G["groupGap"]
 
 
@@ -49,10 +50,17 @@ def aggregate(track: Track, cells: np.ndarray, edges: np.ndarray) -> np.ndarray:
         counts = np.add.reduceat(onehot, starts, axis=0)
         code = counts.argmax(axis=1)  # first maximum: ties go to the lower index
         return np.where(counts.sum(axis=1) > 0, code, -1)
+    # OR of the altered bitmasks, the mutation classes taken from driver-mutation columns when a
+    # bucket has any (the portal's precedence), else from every column
     prof = cells != -1
-    code = np.bitwise_or.reduceat(np.where(cells > 0, cells, 0).astype(np.int64), starts)
+    alt = np.where(cells > 0, cells, 0).astype(np.int64)
+    mut = alt & _MUT
+    drv = (alt & BITS["MUT_DRIVER"]) != 0
+    code = np.bitwise_or.reduceat(alt & ~_MUT, starts)
+    drv_mut = np.bitwise_or.reduceat(np.where(drv, mut, 0), starts)
+    vus_mut = np.bitwise_or.reduceat(np.where(drv, 0, mut), starts)
     any_prof = np.add.reduceat(prof.astype(np.int64), starts) > 0
-    return np.where(any_prof, code, -1)
+    return np.where(any_prof, code | np.where(drv_mut > 0, drv_mut, vus_mut), -1)
 
 
 def bucket_codes(c: Contract, buckets: int) -> list[dict[str, Any]]:
@@ -96,7 +104,7 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
                 x0, x1 = int(xs[bi]), int(xs[bi] + bw[bi])
                 code = int(codes[bi])
                 if t.kind == "gene":
-                    for color, (b0, b1), alpha, stroke in cell_layers(code, S):
+                    for color, (b0, b1), stroke in cell_layers(code, S):
                         col = _rgb(color)
                         if stroke:
                             sw = max(1, int(min(stroke, max(1, (x1 - x0) // 2))))
@@ -106,7 +114,7 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
                             img[y0:y0 + ROW_H, max(x0, x1 - sw):x1] = col
                             continue
                         ya, yb = y0 + int(ROW_H * b0), y0 + int(ROW_H * b1)
-                        img[ya:yb, x0:x1] = col if alpha >= 1 else img[ya:yb, x0:x1] + (col - img[ya:yb, x0:x1]) * alpha
+                        img[ya:yb, x0:x1] = col
                 elif t.kind == "derivedEvent":
                     img[y0:y0 + ROW_H, x0:x1] = derived if code > 0 else unaltered
                 elif t.meta.get("numeric"):
@@ -145,7 +153,9 @@ def figure(c: Contract, width: int = 1200, gutter: int | None = None, dpi: int =
         ax.text(4, y, track_label_text(t, S), fontsize=8, color=P["text"], va="center")
         if t.meta.get("freqPct") is not None:
             ax.text(gutter - 8, y, format_gutter_pct(t.meta.get("driverPct"), t.meta.get("freqPct"), t.meta.get("profiled"), c.n), fontsize=7.5, color=P["muted"], va="center", ha="right")
-    handles = [Patch(color=color, label=label) for label, color, kind in gene_legend(S)]
+    gene_cells = np.concatenate([np.asarray(t.cells) for t in c.tracks if t.kind == "gene"] or [np.zeros(0, dtype=np.int32)])
+    present = glyph_presence(np.unique(gene_cells[gene_cells > 0]), S)
+    handles = [Patch(color=color, label=label) for label, color, kind in gene_legend(S, present)]
     if any(t.kind == "derivedEvent" for t in c.tracks):
         handles.append(Patch(color=P["derived"], label="Derived event"))
     fig.legend(handles=handles, loc="lower left", ncol=len(handles), fontsize=7, frameon=False, bbox_to_anchor=(0.005, 0.0), handlelength=1.2, columnspacing=1.0)

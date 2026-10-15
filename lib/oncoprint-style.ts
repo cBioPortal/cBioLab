@@ -7,58 +7,61 @@
 // everywhere at once. `npm run style:gen` regenerates the Python copy; a unit test fails on drift.
 
 export const STYLE = {
-  version: 2,
+  version: 3,
   bits: {
     MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16,
     SV: 32, AMP: 64, HOMDEL: 128,
-    DRIVER: 256,      // any alteration in the cell is annotated (putative) driver
+    DRIVER: 256,      // some alteration in the cell is annotated (putative) driver: the gutter's driver %, the sort
     PROMOTER: 512,    // 5'Flank / promoter mutations, which the portal colours separately
-    MRNA_HIGH: 1024, MRNA_LOW: 2048, PROT_HIGH: 4096, PROT_LOW: 8192
+    MRNA_HIGH: 1024, MRNA_LOW: 2048, PROT_HIGH: 4096, PROT_LOW: 8192,
+    MUT_DRIVER: 16384, // the mutation classes in the cell are its driver mutations' (see the assembler)
+    SV_DRIVER: 32768   // the cell's structural variant is a driver
   },
   palette: {
-    paper: "#ffffff", unaltered: "#e8ecee", derived: "#0f86a1",
+    paper: "#ffffff", unaltered: "#bebebe", derived: "#0f86a1",
     text: "#1f2933", muted: "#5b6b76", groupLine: "#c9d2d8",
     categorical: ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#999999"]
   },
   // A gene cell is drawn as layers, bottom to top: base, CNA (full height), mRNA (an outline
-  // around the whole cell), protein (thin bars at top and bottom), SV (inset band), one
-  // mutation (centre band, chosen by priority). That is the portal's stacking order, so a cell
-  // carrying several kinds of evidence reads the same way in both tools.
+  // around the whole cell), protein (bars at top and bottom), SV (inset band), one mutation
+  // (centre band, chosen by priority). Colours, bands and stacking are the portal's
+  // (cbioportal-frontend geneticrules.ts and AlterationColors.ts), so a cell reads the same way
+  // in both tools.
   //
-  // Each alteration has a driver colour and a paler one for unknown significance: `color` and
-  // `vus`. A cell without the DRIVER bit draws the pale colour.
+  // A mutation and a structural variant each have two colours, `color` for a putative driver
+  // and `vus` for unknown significance, chosen by that glyph's own driver bit; the pairs differ
+  // in hue as well as lightness, so a VUS is a different colour rather than a faded one. A copy
+  // number change has one colour whatever its annotation, as in the portal.
   glyph: {
     cna: { band: [0, 1] as [number, number], options: [
-      { bit: "AMP", color: "#e41a1c", vus: "#f6a6a5", label: "Amplification", order: 10 },
-      { bit: "HOMDEL", color: "#2166ac", vus: "#a6c4de", label: "Deep Deletion", order: 12 }
+      { bit: "AMP", color: "#ff0000", label: "Amplification", order: 10 },
+      { bit: "HOMDEL", color: "#0000ff", label: "Deep Deletion", order: 12 }
     ] },
     // mRNA is an outline rather than a fill so it can coexist with a CNA colour underneath
     mrna: { band: [0, 1] as [number, number], stroke: 2, options: [
-      { bit: "MRNA_HIGH", color: "#c0392b", vus: "#c0392b", label: "mRNA High", order: 20 },
-      { bit: "MRNA_LOW", color: "#2c6fbb", vus: "#2c6fbb", label: "mRNA Low", order: 21 }
+      { bit: "MRNA_HIGH", color: "#ff9999", label: "mRNA High", order: 20 },
+      { bit: "MRNA_LOW", color: "#6699cc", label: "mRNA Low", order: 21 }
     ] },
     protein: { options: [
-      { bit: "PROT_HIGH", band: [0, 0.18] as [number, number], color: "#ff3df8", vus: "#ff3df8", label: "Protein High", order: 30 },
-      { bit: "PROT_LOW", band: [0.82, 1] as [number, number], color: "#00b8d4", vus: "#00b8d4", label: "Protein Low", order: 31 }
+      { bit: "PROT_HIGH", band: [0, 0.2] as [number, number], color: "#ff3df8", label: "Protein High", order: 30 },
+      { bit: "PROT_LOW", band: [0.8, 1] as [number, number], color: "#00e1ff", label: "Protein Low", order: 31 }
     ] },
-    sv: { band: [0.15, 0.85] as [number, number], bit: "SV", color: "#8e24aa", vus: "#ce92e8", label: "Structural Variant", order: 1 },
+    sv: { band: [0.2, 0.8] as [number, number], bit: "SV", color: "#8b00c9", vus: "#ce92e8", label: "Structural Variant", order: 1 },
     // display priority when a cell carries several mutation classes (the portal's rule)
-    mutation: { band: [0.3, 0.7] as [number, number], order: 0, priority: [
-      { bit: "TRUNCATING", color: "#111111", vus: "#7c8794", label: "Truncating Mutation" },
-      { bit: "SPLICE", color: "#ff8c00", vus: "#f5c88f", label: "Splice Mutation" },
-      { bit: "INFRAME", color: "#b8860b", vus: "#dcc37e", label: "Inframe Mutation" },
+    mutation: { band: [1 / 3, 2 / 3] as [number, number], order: 0, priority: [
+      { bit: "TRUNCATING", color: "#000000", vus: "#708090", label: "Truncating Mutation" },
+      { bit: "SPLICE", color: "#e5802b", vus: "#f0b87b", label: "Splice Mutation" },
+      { bit: "INFRAME", color: "#993404", vus: "#a68028", label: "Inframe Mutation" },
       { bit: "PROMOTER", color: "#00b7ce", vus: "#8cedf9", label: "Promoter Mutation" },
-      { bit: "MISSENSE", color: "#2e7d32", vus: "#8bc98e", label: "Missense Mutation" },
-      { bit: "OTHER_MUT", color: "#9467bd", vus: "#c9b3de", label: "Other Mutation" }
+      { bit: "MISSENSE", color: "#008000", vus: "#53d400", label: "Missense Mutation" },
+      { bit: "OTHER_MUT", color: "#cf58bc", vus: "#f96ae3", label: "Other Mutation" }
     ],
     /** one colour for every class, used when a figure turns colour-by-type off */
     single: { color: "#008000", vus: "#53d400", label: "Mutation" } },
-    /** how a cell with no DRIVER bit is drawn: "pair" uses each entry's `vus` colour, "fade" its alpha */
-    vusStyle: "pair",
-    vusAlpha: 0.35,
-    notProfiled: { fill: "#f4f6f7", stripe: { color: "#dfe4e7", band: [0.45, 0.55] as [number, number] }, label: "Not profiled" },
-    unalteredLabel: "No alterations",
-    driverNote: "paler = unknown significance"
+    /** what a legend entry adds when a glyph's driver and VUS colours differ */
+    driverLabels: { driver: " (putative driver)", vus: " (unknown significance)" },
+    notProfiled: { fill: "#ffffff", stripe: { color: "#bebebe", band: [0.475, 0.525] as [number, number] }, label: "Not profiled" },
+    unalteredLabel: "No alterations"
   },
   ramps: {
     sequential: { from: [222, 235, 247], to: [8, 72, 135] },            // #deebf7 -> #084887
@@ -75,7 +78,7 @@ export const STYLE = {
 export type Style = typeof STYLE;
 export type Rgb = readonly [number, number, number];
 export interface Layer {
-  color: string; band: readonly [number, number]; alpha: number;
+  color: string; band: readonly [number, number];
   /** when set, draw an outline of this many pixels instead of a filled band */
   stroke?: number;
 }
@@ -87,18 +90,14 @@ export interface Layer {
  */
 export function cellLayers(code: number, S: Style): Layer[] {
   const G = S.glyph, B = S.bits as Record<string, number>;
-  if (code === -1) return [{ color: G.notProfiled.fill, band: [0, 1], alpha: 1 }, { color: G.notProfiled.stripe.color, band: G.notProfiled.stripe.band, alpha: 1 }];
-  const out: Layer[] = [{ color: S.palette.unaltered, band: [0, 1], alpha: 1 }];
+  if (code === -1) return [{ color: G.notProfiled.fill, band: [0, 1] }, { color: G.notProfiled.stripe.color, band: G.notProfiled.stripe.band }];
+  const out: Layer[] = [{ color: S.palette.unaltered, band: [0, 1] }];
   if (code <= 0) return out;
-  const driver = !!(code & B.DRIVER);
-  const pair = G.vusStyle === "pair";
-  const alpha = driver || pair ? 1 : G.vusAlpha;
-  const paint = (e: { color: string; vus?: string }): string => (driver || !pair ? e.color : (e.vus || e.color));
-  for (const o of G.cna.options) if (code & B[o.bit]) { out.push({ color: paint(o), band: G.cna.band, alpha }); break; }
-  for (const o of G.mrna.options) if (code & B[o.bit]) { out.push({ color: paint(o), band: G.mrna.band, alpha: 1, stroke: G.mrna.stroke }); break; }
-  for (const o of G.protein.options) if (code & B[o.bit]) out.push({ color: paint(o), band: o.band, alpha: 1 });
-  if (code & B[G.sv.bit]) out.push({ color: paint(G.sv), band: G.sv.band, alpha });
-  for (const m of G.mutation.priority) if (code & B[m.bit]) { out.push({ color: paint(m), band: G.mutation.band, alpha }); break; }
+  for (const o of G.cna.options) if (code & B[o.bit]) { out.push({ color: o.color, band: G.cna.band }); break; }
+  for (const o of G.mrna.options) if (code & B[o.bit]) { out.push({ color: o.color, band: G.mrna.band, stroke: G.mrna.stroke }); break; }
+  for (const o of G.protein.options) if (code & B[o.bit]) out.push({ color: o.color, band: o.band });
+  if (code & B[G.sv.bit]) out.push({ color: code & B.SV_DRIVER ? G.sv.color : G.sv.vus, band: G.sv.band });
+  for (const m of G.mutation.priority) if (code & B[m.bit]) { out.push({ color: code & B.MUT_DRIVER ? m.color : m.vus, band: G.mutation.band }); break; }
   return out;
 }
 
@@ -190,33 +189,56 @@ export function trackTooltipLines(t: TrackSummary, columns: number, unit = "pati
   return lines;
 }
 
-/** Gene-legend entries in display order, shared by every renderer. */
-export function geneLegend(S: Style = STYLE): { label: string; color: string; kind: "swatch" | "outline" | "notProfiled" }[] {
-  const items: { label: string; color: string; kind: "swatch" | "outline" | "notProfiled" }[] = [];
-  for (const m of S.glyph.mutation.priority) items.push({ label: m.label, color: m.color, kind: "swatch" });
-  items.push({ label: S.glyph.sv.label, color: S.glyph.sv.color, kind: "swatch" });
-  for (const o of S.glyph.cna.options) items.push({ label: o.label, color: o.color, kind: "swatch" });
-  for (const o of S.glyph.mrna.options) items.push({ label: o.label, color: o.color, kind: "outline" });
-  for (const o of S.glyph.protein.options) items.push({ label: o.label, color: o.color, kind: "swatch" });
-  items.push({ label: S.glyph.notProfiled.label, color: S.glyph.notProfiled.stripe.color, kind: "notProfiled" });
-  return items;
+export interface LegendItem { label: string; color: string; kind: "swatch" | "outline" | "notProfiled" }
+
+/**
+ * What a figure's gene cells actually draw, for its legend: every bit present, and for the
+ * mutation band and the SV band which entries appear as driver and which as VUS. The mutation
+ * entry is the one `cellLayers` picks by priority, not every class a cell carries, so a legend
+ * never lists a colour the figure does not show.
+ */
+export interface GlyphPresence { bits: number; mutDriver: number; mutVus: number; svDriver: boolean; svVus: boolean }
+export function glyphPresence(tracks: readonly { kind: string; cells: ArrayLike<number> }[], S: Style = STYLE): GlyphPresence {
+  const B = S.bits as Record<string, number>;
+  const out: GlyphPresence = { bits: 0, mutDriver: 0, mutVus: 0, svDriver: false, svVus: false };
+  // altered cells take a handful of distinct codes; look each one up once
+  const seen = new Set<number>();
+  for (const t of tracks) {
+    if (t.kind !== "gene") continue;
+    const cs = t.cells;
+    for (let i = 0; i < cs.length; i++) { const c = cs[i]; if (c > 0) seen.add(c); }
+  }
+  for (const c of seen) {
+    out.bits |= c;
+    if (c & B[S.glyph.sv.bit]) { if (c & B.SV_DRIVER) out.svDriver = true; else out.svVus = true; }
+    for (const m of S.glyph.mutation.priority) if (c & B[m.bit]) { if (c & B.MUT_DRIVER) out.mutDriver |= B[m.bit]; else out.mutVus |= B[m.bit]; break; }
+  }
+  return out;
 }
 
-/** Legend entries a contract actually needs: only the alterations its cells carry. */
-export function geneLegendFor(bitsPresent: number, S: Style = STYLE): ReturnType<typeof geneLegend> {
-  const B = S.bits as Record<string, number>;
-  const bitOf = (label: string): number => {
-    for (const m of S.glyph.mutation.priority) if (m.label === label) return B[m.bit];
-    if (label === S.glyph.sv.label) return B[S.glyph.sv.bit];
-    for (const o of S.glyph.cna.options) if (o.label === label) return B[o.bit];
-    for (const o of S.glyph.mrna.options) if (o.label === label) return B[o.bit];
-    for (const o of S.glyph.protein.options) if (o.label === label) return B[o.bit];
-    return 0;
+/**
+ * Gene-legend entries in display order, shared by every renderer. A glyph whose driver and VUS
+ * colours differ gets an entry for each, labelled the way the portal labels them; one whose
+ * colours are the same (driver annotation off) gets one. With `present`, only what the cells draw.
+ */
+export function geneLegend(S: Style = STYLE, present?: GlyphPresence): LegendItem[] {
+  const B = S.bits as Record<string, number>, G = S.glyph, L = G.driverLabels;
+  const items: LegendItem[] = [];
+  const pair = (e: { color: string; vus: string; label: string }, drv: boolean, vus: boolean): void => {
+    if (e.color === e.vus) { if (drv || vus) items.push({ label: e.label, color: e.color, kind: "swatch" }); return; }
+    if (drv) items.push({ label: e.label + L.driver, color: e.color, kind: "swatch" });
+    if (vus) items.push({ label: e.label + L.vus, color: e.vus, kind: "swatch" });
   };
-  const kept = geneLegend(S).filter((it) => it.kind === "notProfiled" || (bitsPresent & bitOf(it.label)) !== 0);
-  // colour-by-type off collapses every mutation class to one label; show it once
+  const has = (bit: string): boolean => !present || (present.bits & B[bit]) !== 0;
+  for (const m of G.mutation.priority) pair(m, !present || (present.mutDriver & B[m.bit]) !== 0, !present || (present.mutVus & B[m.bit]) !== 0);
+  pair(G.sv, !present || present.svDriver, !present || present.svVus);
+  for (const o of G.cna.options) if (has(o.bit)) items.push({ label: o.label, color: o.color, kind: "swatch" });
+  for (const o of G.mrna.options) if (has(o.bit)) items.push({ label: o.label, color: o.color, kind: "outline" });
+  for (const o of G.protein.options) if (has(o.bit)) items.push({ label: o.label, color: o.color, kind: "swatch" });
+  items.push({ label: G.notProfiled.label, color: G.notProfiled.stripe.color, kind: "notProfiled" });
+  // colour-by-type off gives every mutation class one label and colour; list it once
   const seen = new Set<string>();
-  return kept.filter((it) => (seen.has(it.label) ? false : (seen.add(it.label), true)));
+  return items.filter((it) => { const k = it.label + it.color; return seen.has(k) ? false : (seen.add(k), true); });
 }
 
 // ---- user overrides ---------------------------------------------------------
@@ -291,14 +313,26 @@ export function trackCategoryColor(track: { label: string; categories?: string[]
 
 
 /**
- * The style a figure draws with, given its viewing options. Colour-by-type is a style question
- * — it changes no number — so it is applied here rather than threaded through every renderer:
- * with it off, every mutation class takes the single colour and the legend collapses to one
- * entry, exactly as the portal does.
+ * The style a figure draws with, given its viewing options. These change no number, so they
+ * are applied here rather than threaded through every renderer:
+ * - colour-by-type off: every mutation class takes the single colour pair and one label;
+ * - annotation off: nothing is called a driver, so every glyph draws its driver colour and the
+ *   legend has one entry per glyph — the portal's rule set without recurrence;
+ * - white background: unaltered and not-profiled cells are white (not-profiled keeps its line).
  */
-export function styleForDisplay(S: Style, display?: { colorByType?: boolean }): Style {
-  if (display?.colorByType !== false) return S;
-  const one = S.glyph.mutation.single;
-  return { ...S, glyph: { ...S.glyph, mutation: { ...S.glyph.mutation,
-    priority: S.glyph.mutation.priority.map((m) => ({ ...m, color: one.color, vus: one.vus, label: one.label })) } } };
+export function styleForDisplay(S: Style, display?: { colorByType?: boolean; annotate?: string; whiteBackground?: boolean }): Style {
+  let out = S;
+  if (display?.colorByType === false) {
+    const one = out.glyph.mutation.single;
+    out = { ...out, glyph: { ...out.glyph, mutation: { ...out.glyph.mutation,
+      priority: out.glyph.mutation.priority.map((m) => ({ ...m, color: one.color, vus: one.vus, label: one.label })) } } };
+  }
+  if (display?.annotate === "none") {
+    const G = out.glyph;
+    out = { ...out, glyph: { ...G, sv: { ...G.sv, vus: G.sv.color },
+      mutation: { ...G.mutation, priority: G.mutation.priority.map((m) => ({ ...m, vus: m.color })) } } };
+  }
+  if (display?.whiteBackground)
+    out = { ...out, palette: { ...out.palette, unaltered: "#ffffff" }, glyph: { ...out.glyph, notProfiled: { ...out.glyph.notProfiled, fill: "#ffffff" } } };
+  return out;
 }

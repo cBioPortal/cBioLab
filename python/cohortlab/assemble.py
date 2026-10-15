@@ -103,6 +103,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
     # gene cannot smuggle another gene's passenger onto a merged row. The column stays profiled.
     hide_vus = bool((display or {}).get("hideVUS"))
     hidden_vus = 0
+    vus_mut: dict[int, tuple[np.ndarray, np.ndarray]] = {}
     for r in events:
         i = pid_index.get(r["pid"])
         if i is None:
@@ -127,10 +128,22 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 if cells[i] == NOT_PROFILED:
                     cells[i] = 0
             continue
+        mut = r["vt"] == "mutation"
+        if mut and not driver:
+            # a VUS mutation's class joins the cell only where no driver mutation does (the portal's precedence)
+            for cells in rows:
+                held = vus_mut.setdefault(id(cells), (cells, np.zeros(len(cells), dtype=np.uint16)))[1]
+                held[i] |= bit
+                if cells[i] == NOT_PROFILED:
+                    cells[i] = 0
+            continue
         if driver:
-            bit |= BITS["DRIVER"]
+            bit |= BITS["DRIVER"] | (BITS["MUT_DRIVER"] if mut else BITS["SV_DRIVER"] if bit == BITS["SV"] else 0)
         for cells in rows:
             cells[i] = (0 if cells[i] == NOT_PROFILED else int(cells[i])) | bit
+    for cells, held in vus_mut.values():
+        free = (held > 0) & ((cells & BITS["MUT_DRIVER"]) == 0)
+        cells[free] |= held[free].astype(cells.dtype)
 
     # ---- clinical tracks -------------------------------------------------
     clin: list[Track] = []
