@@ -2,7 +2,7 @@
 // Zero data logic and zero style of its own: cells come from the contract, level of detail
 // from lib/oncoprint-lod.ts, every colour, band and label from lib/oncoprint-style.ts.
 import type { Contract, Track } from "./types.ts";
-import { cellLayers, numericColor, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
+import { barBand, cellLayers, numericColor, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
 import { aggregate, bucketEdges } from "./oncoprint-lod.ts";
 
 const esc = (s: unknown): string => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -96,7 +96,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
         if (t.kind === "gene") geneCell(code, x, y, w);
         else if (t.kind === "derivedEvent") parts.push(rect(x, y, w, ROW_H, code > 0 ? P.derived : P.unaltered));
         else if (code === -1) noData(x, y, w);
-        else if (t.bar) { const bh = ROW_H * code / 255; parts.push(rect(x, y + ROW_H - bh, w, bh, S.glyph.bar.color)); }
+        else if (t.bar) { const { band, negative } = barBand(t, code); parts.push(rect(x, y + ROW_H * band[0], w, ROW_H * (band[1] - band[0]), negative ? S.glyph.bar.negative : S.glyph.bar.color)); }
         else if (t.numeric) parts.push(rect(x, y, w, ROW_H, numericColor(code, t.center, S)));
         else parts.push(rect(x, y, w, ROW_H, trackCategoryColor(t, code, S, colors)));
       }
@@ -140,7 +140,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
     let cx = GUTTER;
     if (t.bar) {
       for (let i = 0; i < 4; i++) parts.push(rect(cx + i * 6, cy - 1 - 2.5 * (i + 1), 4, 2.5 * (i + 1), S.glyph.bar.color));
-      parts.push(`<text x="${cx + 4 * 6 + 8}" y="${cy}" fill="${P.muted}">${fmtNum(t.min!)} → ${fmtNum(t.max!)}</text>`);
+      parts.push(`<text x="${cx + 4 * 6 + 8}" y="${cy}" fill="${P.muted}">${fmtNum(t.min!)} → ${fmtNum(t.max!)}${t.logScale ? " (log scale)" : ""}</text>`);
       continue;
     }
     if (t.numeric) {

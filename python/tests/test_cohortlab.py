@@ -147,7 +147,7 @@ class ExceptionRows(unittest.TestCase):
         from cohortlab.render import aggregate, bucket_edges
         prof = Track("clinical", "Profiled for mutations", np.array([0, 0, 0, -1, 0, 0], dtype=np.int32), {"categories": ["Yes"], "profiledFor": "MUTATION_EXTENDED"})
         self.assertEqual(aggregate(prof, prof.cells, bucket_edges(6, 2)).tolist(), [0, -1])
-        bar = Track("clinical", "# Samples per Patient", np.array([128, 128, 255, 128, -1, -1], dtype=np.int32), {"numeric": True, "bar": True})
+        bar = Track("clinical", "# Samples per Patient", np.array([128, 128, 255, 128, -1, -1], dtype=np.int32), {"numeric": True, "peak": True})
         self.assertEqual(aggregate(bar, bar.cells, bucket_edges(6, 3)).tolist(), [128, 255, -1])
 
 

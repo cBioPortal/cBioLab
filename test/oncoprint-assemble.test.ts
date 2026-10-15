@@ -98,6 +98,13 @@ test("clinical typing: categorical with Other, numeric only past 10 distinct val
     clinical: [{ attr: "AGE", values: new Map(pids.map((p, i) => [p, String(40 + i * 3)])) }, { attr: "ST", values: new Map(pids.map((p, i) => [p, "s" + (i % 9)])) }] });
   const num = wide.tracks.find((t) => t.label === "AGE")!;
   assert.equal(num.numeric, true); assert.equal(num.min, 40); assert.equal(num.max, 73);
+  assert.equal(num.bar, true, "a numeric clinical row is drawn as bars, as in the portal");
+  const fga = assembleContract({ ...input(), groups: [{ name: "A", pids }],
+    clinical: [{ attr: "FRACTION_GENOME_ALTERED", values: new Map(pids.map((p, i) => [p, String(0.1 + i * 0.02)])) },
+      { attr: "MUTATION_COUNT", values: new Map(pids.map((p, i) => [p, String(i * i)])) }] });
+  const f = fga.tracks.find((t) => t.label === "FRACTION_GENOME_ALTERED")!;
+  assert.deepEqual([f.min, f.max], [0, 1], "a fraction of the genome is drawn over 0..1");
+  assert.equal(fga.tracks.find((t) => t.label === "MUTATION_COUNT")!.logScale, true, "mutation counts on a log scale");
   assert.equal(num.cells[wide.columns.indexOf("P12")], 255);
   assert.equal(num.cells[wide.columns.indexOf("P1")], 0);
   const st = wide.tracks.find((t) => t.label === "ST")!;

@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 
 from .contract import Contract, Track
-from .style import BITS, STYLE, cell_layers, format_gutter_pct, gene_legend, glyph_presence, numeric_rgb, resolve_style, style_for_display, track_category_color, track_label_text
+from .style import BITS, STYLE, bar_band, cell_layers, format_gutter_pct, gene_legend, glyph_presence, numeric_rgb, resolve_style, style_for_display, track_category_color, track_label_text
 
 _G = STYLE["geometry"]
 _MUT = BITS["MISSENSE"] | BITS["TRUNCATING"] | BITS["INFRAME"] | BITS["SPLICE"] | BITS["OTHER_MUT"] | BITS["PROMOTER"]
@@ -38,7 +38,7 @@ def aggregate(track: Track, cells: np.ndarray, edges: np.ndarray) -> np.ndarray:
     if track.meta.get("profiledFor"):
         # the exception wins: "No" (-1) when any column is unprofiled
         return np.where(np.minimum.reduceat(cells.astype(np.int64), starts) == -1, -1, 0)
-    if track.meta.get("bar"):
+    if track.meta.get("peak"):
         return np.maximum.reduceat(cells.astype(np.int64), starts)
     if track.meta.get("numeric"):
         valid = cells != -1
@@ -128,7 +128,8 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
                     img[y0:y0 + ROW_H, x0:x1] = npfill
                     img[y0 + int(ROW_H * npband[0]):y0 + int(ROW_H * npband[1]), x0:x1] = npstripe
                 elif t.meta.get("bar"):
-                    img[y0 + ROW_H - int(round(ROW_H * code / 255)):y0 + ROW_H, x0:x1] = _rgb(S["glyph"]["bar"]["color"])
+                    (b0, b1), negative = bar_band(t.meta, code)
+                    img[y0 + int(round(ROW_H * b0)):y0 + int(round(ROW_H * b1)), x0:x1] = _rgb(S["glyph"]["bar"]["negative" if negative else "color"])
                 elif t.meta.get("numeric"):
                     img[y0:y0 + ROW_H, x0:x1] = np.array(numeric_rgb(code, t.meta.get("center"), S), dtype=np.float64)
                 else:

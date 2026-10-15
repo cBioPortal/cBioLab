@@ -14,6 +14,7 @@ import numpy as np
 
 from .contract import BITS, DEFAULT_DISPLAY, NOT_PROFILED, Contract, Track
 from .gene_tracks import normalize_gene_tracks
+from .style import encode_numeric
 
 
 def _round(x: float) -> int:
@@ -163,15 +164,19 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             continue
         nums = [x for x in (_js_number(v) for v in present) if math.isfinite(x)]
         if present and len(nums) >= 0.9 * len(present) and len(set(nums)) > 10:
+            # bars over the data's range, as the portal draws them: its fixed range for a fraction of
+            # the genome, its log scale for mutation counts
             lo, hi = min(nums), max(nums)
-            span = (hi - lo) or 1
+            if attr == "FRACTION_GENOME_ALTERED":
+                lo, hi = min(lo, 0), max(hi, 1)
+            log_scale = attr == "MUTATION_COUNT" and lo >= 0
             cells = np.full(n, -1, dtype=np.int32)
             for i, p in enumerate(all_pids):
                 if p in val_by_pid:
                     x = _js_number(val_by_pid[p])
                     if math.isfinite(x):
-                        cells[i] = _round(255 * (x - lo) / span)
-            clin.append(Track("clinical", attr, cells, {"numeric": True, "min": _num(lo), "max": _num(hi)}))
+                        cells[i] = encode_numeric(x, lo, hi, log_scale)
+            clin.append(Track("clinical", attr, cells, {"numeric": True, "bar": True, **({"logScale": True} if log_scale else {}), "min": _num(lo), "max": _num(hi)}))
             continue
         counts: dict[str, int] = {}
         for p in all_pids:

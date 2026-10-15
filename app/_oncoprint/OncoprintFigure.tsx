@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { GEOM, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
-import { STYLE, geneLegend, glyphPresence, resolveStyle, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
+import { STYLE, geneLegend, glyphPresence, numericValue, resolveStyle, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { setPngDpi } from "../../lib/png-dpi.ts";
@@ -592,7 +592,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         if (t.members && t.members.length > 1) lines.push({ text: "merged: " + t.members.join(" · "), dim: true });
       }
       else if (t.kind === "derivedEvent") lines.push({ text: t.label + ": " + (c > 0 ? "yes" : "no") });
-      else if (t.numeric) lines.push({ text: t.label + ": " + (c === -1 ? "no data" : "≈" + (Math.round(((t.min ?? 0) + (c / 255) * ((t.max ?? 1) - (t.min ?? 0))) * 10) / 10)) });
+      else if (t.numeric) lines.push({ text: t.label + ": " + (c === -1 ? "no data" : "≈" + (Math.round(numericValue(t, c) * 10) / 10)) });
       else lines.push({ text: t.label + ": " + (c === -1 ? (t.profiledFor ? STYLE.glyph.profiled.no : "no data") : (t.categories && t.categories[c]) || "Other") });
     } else if (t.kind === "gene" || t.kind === "derivedEvent") {
       let alt = 0, prof = 0;
@@ -1013,6 +1013,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   );
 }
 
+const fmtRange = (x: number): string => (Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : String(Math.round(x * 10) / 10));
+
 function Legend({ data, display, colors }: { data: UnpackedContract; display: FigureDisplay; colors?: Record<string, Record<string, string>> }) {
   const S = figureStyle(data, display);
   const white = display.whiteBackground;
@@ -1036,7 +1038,8 @@ function Legend({ data, display, colors }: { data: UnpackedContract; display: Fi
       {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (
         <span key={t.label}>{t.label}: {t.bar
           ? <><span style={{ display: "inline-flex", alignItems: "flex-end", gap: 1, height: 10, marginRight: 4, verticalAlign: -1 }}>
-              {[3, 5, 7, 10].map((hh) => <span key={hh} style={{ width: 3, height: hh, background: S.glyph.bar.color }} />)}</span>{t.min} → {t.max}</>
+              {[3, 5, 7, 10].map((hh) => <span key={hh} style={{ width: 3, height: hh, background: S.glyph.bar.color }} />)}</span>
+              {fmtRange(t.min!)} → {fmtRange(t.max!)}{t.logScale ? " (log scale)" : ""}</>
           : t.numeric
           ? <>{sw(t.center != null ? "linear-gradient(90deg,#2166ac,#fff,#b2182b)" : "linear-gradient(90deg,#deebf7,#084887)", 44)}{t.min} → {t.max}</>
           : <>{(t.categories || []).slice(0, 8).map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw(trackCategoryColor(t, i, S, colors))}{c}</span>)}

@@ -6,6 +6,7 @@ Python side of the same pure functions; the TypeScript module is the reference.
 from __future__ import annotations
 
 import json
+import math
 import os
 from typing import Any
 
@@ -65,6 +66,43 @@ def numeric_rgb(v: float, center: float | None, S: dict[str, Any] = STYLE) -> tu
 def numeric_color(v: float, center: float | None, S: dict[str, Any] = STYLE) -> str:
     r, g, b = numeric_rgb(v, center, S)
     return f"rgb({r},{g},{b})"
+
+
+# ---- numeric cells (port of encodeNumeric / numericValue / barBand) ------------------------------
+
+def _js_round(x: float) -> int:
+    return int(math.floor(x + 0.5))
+
+
+def encode_numeric(x: float, lo: float, hi: float, log_scale: bool = False) -> int:
+    """The 0..255 code for value x on a track scaled over lo..hi (log(value + |lo| + 1) when log_scale)."""
+    if log_scale:
+        s = abs(lo) + 1
+        base = math.log(lo + s)
+        return _js_round(255 * (math.log(x + s) - base) / ((math.log(hi + s) - base) or 1))
+    return _js_round(255 * (x - lo) / ((hi - lo) or 1))
+
+
+def numeric_value(meta: dict[str, Any], code: int) -> float:
+    """The value a numeric cell's code stands for."""
+    lo, hi, f = meta.get("min", 0), meta.get("max", 1), code / 255
+    if meta.get("logScale"):
+        s = abs(lo) + 1
+        base = math.log(lo + s)
+        return math.exp(base + f * (math.log(hi + s) - base)) - s
+    return lo + f * (hi - lo)
+
+
+def bar_band(meta: dict[str, Any], code: int) -> tuple[tuple[float, float], bool]:
+    """Where a bar sits in its cell (fractions of the row) and whether it is negative: the portal's bar rule."""
+    lo, hi, f = meta.get("min", 0), meta.get("max", 1), code / 255
+    if lo >= 0 or meta.get("logScale"):
+        return (1 - f, 1.0), False
+    if hi <= 0:
+        return (0.0, 1 - f), True
+    v = numeric_value(meta, code)
+    r = v / max(-lo, hi)
+    return ((0.5 - 0.5 * r, 0.5), False) if v >= 0 else ((0.5, 0.5 - 0.5 * r), True)
 
 
 def category_color(i: int, S: dict[str, Any] = STYLE) -> str:

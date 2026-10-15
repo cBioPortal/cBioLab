@@ -13,7 +13,7 @@ from typing import Any, Iterable
 
 import numpy as np
 
-from .style import BITS  # the one bit definition, generated from lib/oncoprint-style.ts
+from .style import BITS, numeric_value  # the one bit definition, generated from lib/oncoprint-style.ts
 
 DEFAULT_DISPLAY: dict[str, Any] = {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all",
                                    "colorByType": True, "hideVUS": False, "annotate": "oncokb", "whiteBackground": False}
@@ -103,8 +103,7 @@ class Contract:
                 vals = ["yes" if c > 0 else "no" for c in t.cells]
                 kind = "DERIVED"
             elif t.meta.get("numeric"):
-                lo, hi = t.meta.get("min", 0), t.meta.get("max", 1)
-                vals = ["" if c == -1 else str(round(lo + (int(c) / 255.0) * (hi - lo), 2)) for c in t.cells]
+                vals = ["" if c == -1 else str(round(numeric_value(t.meta, int(c)), 2)) for c in t.cells]
                 kind = "HEATMAP " + t.meta.get("profileType", "") if t.kind == "heatmap" else "CLINICAL"
             else:
                 cats = t.meta.get("categories") or []

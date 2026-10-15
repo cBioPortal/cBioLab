@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { STYLE, cellLayers, formatPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines } from "../lib/oncoprint-style.ts";
+import { STYLE, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines } from "../lib/oncoprint-style.ts";
 import { assembleContract, mutClassBit, type AssembleInput } from "../lib/oncoprint-assemble.ts";
 import { STYLE_JSON } from "../scripts/gen-style.ts";
 import { bucketCodes, bucketEdges } from "../lib/oncoprint-lod.ts";
@@ -106,7 +106,7 @@ test("level of detail: edges partition the columns, buckets OR genes and average
   assert.deepEqual(bucketCodes({ kind: "clinical", categories: ["a", "b"] }, [0, 1, 1, 2, -1, -1], 0, 6, 3), [0, 1, -1], "ties go to the lower index");
   // rows that point at exceptions keep them at low zoom
   assert.deepEqual(bucketCodes({ kind: "clinical", categories: ["Yes"], profiledFor: "MUTATION_EXTENDED" }, [0, 0, 0, -1, 0, 0], 0, 6, 2), [0, -1], "one unprofiled column shows");
-  assert.deepEqual(bucketCodes({ kind: "clinical", numeric: true, bar: true }, [128, 128, 255, 128, -1, -1], 0, 6, 3), [128, 255, -1], "the largest count shows, not the mean");
+  assert.deepEqual(bucketCodes({ kind: "clinical", numeric: true, peak: true }, [128, 128, 255, 128, -1, -1], 0, 6, 3), [128, 255, -1], "the largest count shows, not the mean");
 });
 
 
@@ -181,4 +181,19 @@ test("a track label explains itself in words, the same words for every renderer"
   assert.deepEqual(trackTooltipLines({ label: "STAGE", categories: ["III", "IV"] }, 12), ["STAGE", "2 values: III, IV"]);
   assert.deepEqual(trackTooltipLines({ label: "AGE", numeric: true, min: 44, max: 80 }, 12), ["AGE", "44 → 80"]);
   assert.deepEqual(trackTooltipLines({ label: "EMPTY", categories: [] }, 12), ["EMPTY", "no values in these columns"]);
+});
+
+test("numeric clinical rows are the portal's bars: from the bottom, both ways across zero, log for counts", () => {
+  assert.deepEqual(barBand({ min: 40, max: 80 }, 255), { band: [0, 1], negative: false });
+  assert.deepEqual(barBand({ min: 40, max: 80 }, 0), { band: [1, 1], negative: false }, "the smallest value is an empty cell, as in the portal");
+  const mixed = { min: -2, max: 4 };
+  assert.deepEqual(barBand(mixed, encodeNumeric(4, -2, 4)), { band: [0, 0.5], negative: false }, "the larger side fills its half");
+  const neg = barBand(mixed, encodeNumeric(-2, -2, 4));
+  assert.equal(neg.negative, true); assert.deepEqual(neg.band, [0.5, 0.75], "scaled by the larger side");
+  assert.deepEqual(barBand({ min: -5, max: -1 }, 0), { band: [0, 1], negative: true }, "all negative hangs from the top");
+  const log = { min: 0, max: 999, logScale: true };
+  const c = encodeNumeric(9, 0, 999, true);
+  assert.equal(c, Math.round(255 * Math.log(10) / Math.log(1000)), "log(value + 1) over log(max + 1)");
+  assert.ok(Math.abs(numericValue(log, c) - 9) < 0.2, "and the code decodes back to the value");
+  assert.equal(numericValue({ min: 40, max: 80 }, 255), 80);
 });

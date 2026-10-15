@@ -9,7 +9,7 @@
 // hiding unaltered columns or re-sorting on the client never touches the data.
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 
-import { STYLE, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatGutterPct, trackLabelText, resolveStyle, type Style } from "../../lib/oncoprint-style.ts";
+import { STYLE, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatGutterPct, trackLabelText, resolveStyle, type Style } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
@@ -129,7 +129,11 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
     ctx.fillStyle = P.npStripe; ctx.fillRect(x, y + h * s0, w, h * (s1 - s0));
     return;
   }
-  if (t.bar) { const bh = h * code / 255; ctx.fillStyle = S.glyph.bar.color; ctx.fillRect(x, y + h - bh, w, bh); return; }
+  if (t.bar) {
+    const { band, negative } = barBand(t, code);
+    ctx.fillStyle = negative ? S.glyph.bar.negative : S.glyph.bar.color; ctx.fillRect(x, y + h * band[0], w, h * (band[1] - band[0]));
+    return;
+  }
   if (t.numeric) { ctx.fillStyle = styleNumericColor(code, t.center, S); ctx.fillRect(x, y, w, h); return; }
   ctx.fillStyle = trackCategoryColor(t, code, S, colors); ctx.fillRect(x, y, w, h);
 }

@@ -168,7 +168,8 @@
       "vus": " (unknown significance)"
     },
     "bar": {
-      "color": "#008000"
+      "color": "#008000",
+      "negative": "#ff0000"
     },
     "profiled": {
       "color": "#1b9e77",

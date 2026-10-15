@@ -61,7 +61,7 @@ export const STYLE = {
     /** what a legend entry adds when a glyph's driver and VUS colours differ */
     driverLabels: { driver: " (putative driver)", vus: " (unknown significance)" },
     /** a numeric track drawn as bars (the portal's bar rule: green up from the bottom of the cell) */
-    bar: { color: "#008000" },
+    bar: { color: "#008000", negative: "#ff0000" },
     /** the "Profiled for <type>" rows: the portal's reserved colour for "yes"; "no" is drawn as no data */
     profiled: { color: "#1b9e77", yes: "Yes", no: "No" },
     notProfiled: { fill: "#ffffff", stripe: { color: "#bebebe", band: [0.475, 0.525] as [number, number] }, label: "Not profiled" },
@@ -118,6 +118,42 @@ export function numericColor(v: number, center: number | null | undefined, S: St
   if (v <= center) { const t = center ? v / center : 1; return rgb([lerp(low[0], mid[0], t), lerp(low[1], mid[1], t), lerp(low[2], mid[2], t)]); }
   const t = (v - center) / (255 - center || 1);
   return rgb([lerp(mid[0], high[0], t), lerp(mid[1], high[1], t), lerp(mid[2], high[2], t)]);
+}
+
+// ---- numeric cells: a value scaled to a 0..255 code over the track's min..max -----------------
+// `logScale` scales log(value + shift) instead, shift = |min| + 1, as the portal does for counts
+// that span orders of magnitude.
+
+export interface NumericScale { min?: number; max?: number; logScale?: boolean }
+const logShift = (min: number): number => Math.abs(min) + 1;
+
+/** The 0..255 code for value `x` on a track scaled over min..max. */
+export function encodeNumeric(x: number, min: number, max: number, logScale = false): number {
+  if (logScale) {
+    const s = logShift(min), lo = Math.log(min + s), span = Math.log(max + s) - lo || 1;
+    return Math.round(255 * (Math.log(x + s) - lo) / span);
+  }
+  return Math.round(255 * (x - min) / (max - min || 1));
+}
+
+/** The value a numeric cell's code stands for (approximately: the code has 256 steps). */
+export function numericValue(t: NumericScale, code: number): number {
+  const min = t.min ?? 0, max = t.max ?? 1, f = code / 255;
+  if (t.logScale) { const s = logShift(min), lo = Math.log(min + s); return Math.exp(lo + f * (Math.log(max + s) - lo)) - s; }
+  return min + f * (max - min);
+}
+
+/**
+ * Where a bar sits in its cell, as fractions of the row height: the portal's bar rule. All values
+ * at or above zero grow up from the bottom; all at or below zero hang down from the top, in the
+ * negative colour; a range spanning zero grows both ways from the middle, scaled by the larger side.
+ */
+export function barBand(t: NumericScale, code: number): { band: [number, number]; negative: boolean } {
+  const min = t.min ?? 0, max = t.max ?? 1, f = code / 255;
+  if (min >= 0 || t.logScale) return { band: [1 - f, 1], negative: false };
+  if (max <= 0) return { band: [0, 1 - f], negative: true };
+  const v = numericValue(t, code), r = v / Math.max(-min, max);
+  return v >= 0 ? { band: [0.5 - 0.5 * r, 0.5], negative: false } : { band: [0.5, 0.5 - 0.5 * r], negative: true };
 }
 
 export function categoryColor(i: number, S: Style = STYLE): string { return S.palette.categorical[i % S.palette.categorical.length]; }

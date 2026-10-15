@@ -8,7 +8,7 @@
 // tables, and a port in another language has this function as its conformance target.
 import { heatmapTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
-import { STYLE } from "./oncoprint-style.ts";
+import { STYLE, encodeNumeric } from "./oncoprint-style.ts";
 import type { Contract, Track, GroupRange, ZReference, ResolvedDisplay, DisplaySpec, SortKeySpec } from "./types.ts";
 
 // gene-track cell bitmask: one definition, the style's
@@ -270,7 +270,7 @@ export function assembleContract(input: AssembleInput): Contract {
     if (max > 1) {
       const cells = new Int32Array(allPids.length);
       for (let i = 0; i < n.length; i++) cells[i] = n[i] ? Math.round(255 * n[i] / max) : -1;
-      clinTracks.push({ kind: "clinical", label: SAMPLES_TRACK, numeric: true, bar: true, min: 0, max, cells });
+      clinTracks.push({ kind: "clinical", label: SAMPLES_TRACK, numeric: true, bar: true, peak: true, min: 0, max, cells });
     }
   }
   if (input.profiled) {
@@ -315,15 +315,19 @@ export function assembleContract(input: AssembleInput): Contract {
       continue;
     }
     if (nNumeric >= 0.9 * nPresent && distinct.size > 10) {
-      const span = max - min || 1;
+      // drawn as bars over the data's range, as the portal does; its fixed range for a fraction
+      // of the genome, and its log scale for mutation counts
+      const fraction = attr === "FRACTION_GENOME_ALTERED";
+      if (fraction) { min = Math.min(min, 0); max = Math.max(max, 1); }
+      const logScale = attr === "MUTATION_COUNT" && min >= 0;
       const cells = new Int32Array(allPids.length).fill(-1);
       for (let i = 0; i < val.length; i++) {
         const v = val[i];
         if (v == null) continue;
         const x = Number(v);
-        if (Number.isFinite(x)) cells[i] = Math.round(255 * (x - min) / span);
+        if (Number.isFinite(x)) cells[i] = encodeNumeric(x, min, max, logScale);
       }
-      clinTracks.push({ kind: "clinical", numeric: true, label: attr, min, max, cells });
+      clinTracks.push({ kind: "clinical", numeric: true, bar: true, ...(logScale ? { logScale } : {}), label: attr, min, max, cells });
       continue;
     }
     const counts = new Map<string, number>();
