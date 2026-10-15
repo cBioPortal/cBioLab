@@ -624,6 +624,9 @@ async function main() {
       // An edit that breaks a view is one step from the analysis that worked: each change is a
       // history entry, and the broken oncoprint offers Undo beside its error.
       let undoWhat = "not reached", undoOk = false;
+      // the broken edit is refused on purpose, and the browser logs that request's 400 — expected,
+      // not a regression, so it is filtered out of the shared error tally as the dead route's 404 is
+      const errsBeforeUndo = errors.length;
       try {
         const good = { study: "msk_chord_2024",
           cohorts: { "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" }] } },
@@ -646,6 +649,8 @@ async function main() {
         undoWhat = "history +" + grew + ", error after undo: " + errLeft + ", document back: " + !JSON.stringify(docBack).includes("NOT_A_PROFILE");
       } catch (e) { undoWhat = String(e.message).split("\n")[0]; }
       ok("an edit that breaks a view is undone from the error, and is a browser history step", undoOk, undoWhat);
+      errors.splice(errsBeforeUndo, errors.length - errsBeforeUndo,
+        ...errors.slice(errsBeforeUndo).filter(e => !/status of 400/.test(e)));
 
       // The toolbar separates what is drawn from how it is drawn, and a zone never wraps
       // inside itself — which is what stops a pair like the zoom controls being split by a
