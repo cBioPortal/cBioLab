@@ -482,7 +482,9 @@ export function assembleContract(input: AssembleInput): Contract {
 
   phase("sort");
   // ---- track meta (panel-aware frequencies) -----------------------------
-  const tracks: Track[] = [];
+  // Rows top to bottom in the portal's order: clinical (the study, sample-count and profiled-for
+  // rows first), then the derived-cohort rows beside them, then genes, then heatmaps.
+  const tracks: Track[] = clinTracks.map((t) => ({ ...t, cells: remap(t.cells) }));
   // an overlay is evidence about the gene, not an alteration of it: expression does not
   // enter the altered fraction, which is what the portal reports too
   const ALT = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
@@ -496,6 +498,11 @@ export function assembleContract(input: AssembleInput): Contract {
       freqPct: profiled ? Math.round(1000 * altered / profiled) / 10 : null,
       driverPct: profiled ? Math.round(1000 * driverAltered / profiled) / 10 : null };
   };
+  for (const t of devTracks) {
+    const cells = remap(t.cells);
+    tracks.push({ ...t, cells, altered: cells.filter((c) => c === 1).length, profiled: cells.length,
+      freqPct: Math.round(1000 * cells.filter((c) => c === 1).length / cells.length) / 10 });
+  }
   for (const gt of geneTracks) {
     const cells = remap(geneCells.get(gt.label)!);
     const { profiled, altered, driverAltered, freqPct, driverPct } = geneCounts(cells);
@@ -512,13 +519,7 @@ export function assembleContract(input: AssembleInput): Contract {
       }) } : {})
     });
   }
-  for (const t of devTracks) {
-    const cells = remap(t.cells);
-    tracks.push({ ...t, cells, altered: cells.filter((c) => c === 1).length, profiled: cells.length,
-      freqPct: Math.round(1000 * cells.filter((c) => c === 1).length / cells.length) / 10 });
-  }
   for (const t of heatTracks) tracks.push({ ...t, cells: remap(t.cells) });
-  for (const t of clinTracks) tracks.push({ ...t, cells: remap(t.cells) });
 
   phase("track meta");
   return {

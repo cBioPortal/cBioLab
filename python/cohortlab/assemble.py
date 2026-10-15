@@ -309,7 +309,8 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
     columns = [all_pids[i] for i in order]
 
     # ---- track meta (panel-aware frequencies) -------------------------------
-    tracks: list[Track] = []
+    # rows top to bottom in the portal's order: clinical, derived-cohort rows, genes, heatmaps
+    tracks: list[Track] = [Track(t.kind, t.label, t.cells[order_arr], t.meta) for t in clin]
 
     def gene_counts(cells: np.ndarray) -> dict[str, Any]:
         """The pooled numbers and each group's: the same formula over a slice of the columns."""
@@ -320,6 +321,10 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 "freqPct": _round(1000 * altered / profiled) / 10 if profiled else None,
                 "driverPct": _round(1000 * driver_altered / profiled) / 10 if profiled else None}
 
+    for t in dev:
+        cells = t.cells[order_arr]
+        alt = int((cells == 1).sum())
+        tracks.append(Track(t.kind, t.label, cells, {**t.meta, "altered": alt, "profiled": int(cells.size), "freqPct": _round(1000 * alt / cells.size) / 10}))
     for gt in gene_tracks:
         cells = gene_cells[gt.label][order_arr]
         by_group = [{"group": g["name"], **{k: v for k, v in gene_counts(cells[g["start"]:g["start"] + g["count"]]).items() if k != "driverAltered"}}
@@ -328,13 +333,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             **({"members": list(gt.members)} if len(gt.members) > 1 else {}),
             **gene_counts(cells),
             **({"byGroup": by_group} if by_group is not None else {})}))
-    for t in dev:
-        cells = t.cells[order_arr]
-        alt = int((cells == 1).sum())
-        tracks.append(Track(t.kind, t.label, cells, {**t.meta, "altered": alt, "profiled": int(cells.size), "freqPct": _round(1000 * alt / cells.size) / 10}))
     for t in heat:
-        tracks.append(Track(t.kind, t.label, t.cells[order_arr], t.meta))
-    for t in clin:
         tracks.append(Track(t.kind, t.label, t.cells[order_arr], t.meta))
 
     return Contract(

@@ -91,7 +91,7 @@ test("clinical typing: categorical with Other, numeric only past 10 distinct val
   const age = c.tracks.find((t) => t.label === "AGE")!;
   assert.equal(age.numeric, undefined, "five distinct values among the columns is categorical, whatever else the map holds");
   assert.ok(c.tracks.some((t) => t.label === "MISSING (no data)"));
-  assert.deepEqual(c.tracks.map((t) => t.kind), ["gene", "gene", "derivedEvent", "clinical", "clinical", "clinical"]);
+  assert.deepEqual(c.tracks.map((t) => t.kind), ["clinical", "clinical", "clinical", "derivedEvent", "gene", "gene"], "the portal's order: clinical above the genes");
 
   const pids = Array.from({ length: 12 }, (_, i) => "P" + (i + 1));
   const wide = assembleContract({ ...input(), groups: [{ name: "A", pids }],
@@ -213,7 +213,7 @@ test("a merged row's denominator is the union of its members' panels", () => {
   // P4's panel covers TP53 but not KRAS; on its own KRAS is profiled in 3 columns, TP53 in 5
   i.genes = [{ genes: ["TP53", "KRAS"] }];
   const c = assembleContract(i);
-  const t = c.tracks[0];
+  const t = c.tracks.find((x) => x.kind === "gene")!;
   assert.equal(t.label, "TP53 / KRAS", "the default label names the members");
   assert.equal(t.profiled, 5, "union: every column profiled for either gene");
   assert.equal(t.altered, 3, "P1, P2 and P5; P3's low-level gain is not an alteration and P4 has none");
@@ -238,7 +238,7 @@ test("the staircase ranks a merged row as one row", () => {
   const i = input();
   i.genes = [{ label: "either", genes: ["TP53", "KRAS"] }];
   const c = assembleContract(i);
-  const t = c.tracks[0];
+  const t = c.tracks.find((x) => x.kind === "gene")!;
   // within group A: P2 (amp, driver) outranks P1 (missense driver) outranks P3 (unaltered)
   assert.deepEqual(c.columns.slice(0, 3), ["P2", "P1", "P3"]);
   assert.ok(t.cells[0] & BITS.AMP);
@@ -249,7 +249,7 @@ test("a merged row draws its members' overlays too", () => {
   i.genes = [{ label: "either", genes: ["TP53", "KRAS"] }];
   i.overlays = [{ kind: "mrna", profileType: "rna", threshold: 2, values: new Map([["P3|KRAS", 3.1], ["P1|TP53", -2.5]]) }];
   const c = assembleContract(i);
-  const t = c.tracks[0];
+  const t = c.tracks.find((x) => x.kind === "gene")!;
   const col = (p: string) => c.columns.indexOf(p);
   assert.ok(t.cells[col("P3")] & BITS.MRNA_HIGH, "KRAS expression lands on the merged row");
   assert.ok(t.cells[col("P1")] & BITS.MRNA_LOW);
@@ -264,8 +264,9 @@ test("hiding unknown significance drops the alteration, not the whole cell", () 
   const col = (p: string) => c.columns.indexOf(p);
   // P2 has a non-driver TP53 truncation and a driver KRAS amp: the truncation goes, the amp stays.
   // A merged row must not let one gene's driver smuggle another gene's passenger through.
-  assert.equal(c.tracks[0].cells[col("P2")], BITS.AMP | BITS.DRIVER);
-  assert.equal(c.tracks[0].cells[col("P1")], BITS.MISSENSE | BITS.DRIVER | BITS.MUT_DRIVER, "a driver is kept");
+  const row = c.tracks.find((x) => x.kind === "gene")!;
+  assert.equal(row.cells[col("P2")], BITS.AMP | BITS.DRIVER);
+  assert.equal(row.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER | BITS.MUT_DRIVER, "a driver is kept");
   assert.equal(c.stats.hiddenVus, 1);
 });
 
