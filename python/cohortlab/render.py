@@ -122,6 +122,8 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
                     # the portal's no-data glyph: the not-profiled cell's white and midline
                     img[y0:y0 + ROW_H, x0:x1] = npfill
                     img[y0 + int(ROW_H * npband[0]):y0 + int(ROW_H * npband[1]), x0:x1] = npstripe
+                elif t.meta.get("bar"):
+                    img[y0 + ROW_H - int(round(ROW_H * code / 255)):y0 + ROW_H, x0:x1] = _rgb(S["glyph"]["bar"]["color"])
                 elif t.meta.get("numeric"):
                     img[y0:y0 + ROW_H, x0:x1] = np.array(numeric_rgb(code, t.meta.get("center"), S), dtype=np.float64)
                 else:

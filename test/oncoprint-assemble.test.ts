@@ -176,6 +176,23 @@ test("profiled-for rows: one per drawn type some columns lack, after the study t
   assert.ok(!none.tracks.some((t) => t.profiledFor));
 });
 
+test("# Samples per Patient: a bar row from zero, only when some patient has more than one sample", () => {
+  const samples = [{ pid: "P1", n: 1 }, { pid: "P2", n: 3 }, { pid: "P3", n: 1 }, { pid: "P4", n: 2 }, { pid: "P5", n: 1 }];
+  const masks = ["P1", "P2", "P3", "P4"].map((pid) => ({ pid, mask: 1 }));
+  const c = assembleContract({ ...input(), samples, profiled: { types: ["MUTATION_EXTENDED"], masks } });
+  const clin = c.tracks.filter((t) => t.kind === "clinical");
+  assert.deepEqual(clin.slice(0, 2).map((t) => t.label), ["# Samples per Patient", "Profiled for mutations"], "the portal's order");
+  const t = clin[0];
+  assert.ok(t.numeric && t.bar);
+  assert.equal(t.min, 0); assert.equal(t.max, 3);
+  assert.equal(t.cells[c.columns.indexOf("P2")], 255);
+  assert.equal(t.cells[c.columns.indexOf("P1")], 85, "one sample of a most of three is a third of the cell");
+  const one = assembleContract({ ...input(), samples: samples.map((r) => ({ ...r, n: 1 })) });
+  assert.ok(!one.tracks.some((x) => x.label === "# Samples per Patient"), "nobody with more than one: no row");
+  const bySample = assembleContract({ ...input(), unit: "sample", samples });
+  assert.ok(!bySample.tracks.some((x) => x.label === "# Samples per Patient"), "a sample column is one sample");
+});
+
 // ---- merged gene rows (cBioPortal's `[TP53 MDM2]`) -------------------------
 
 test("a merged row is the OR of its members, and profiled where any member was", () => {

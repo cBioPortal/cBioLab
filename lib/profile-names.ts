@@ -31,3 +31,6 @@ export type ProfiledType = typeof PROFILED_TYPES[number][0];
 export function profiledTrackLabel(type: ProfiledType): string {
   return "Profiled for " + PROFILED_TYPES.find(([t]) => t === type)![1];
 }
+
+/** the per-patient sample count row, shown when some patient has more than one: the portal's name */
+export const SAMPLES_TRACK = "# Samples per Patient";

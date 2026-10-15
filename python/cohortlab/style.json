@@ -167,6 +167,9 @@
       "driver": " (putative driver)",
       "vus": " (unknown significance)"
     },
+    "bar": {
+      "color": "#008000"
+    },
     "profiled": {
       "color": "#1b9e77",
       "yes": "Yes",

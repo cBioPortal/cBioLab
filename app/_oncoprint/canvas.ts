@@ -129,6 +129,7 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
     ctx.fillStyle = P.npStripe; ctx.fillRect(x, y + h * s0, w, h * (s1 - s0));
     return;
   }
+  if (t.bar) { const bh = h * code / 255; ctx.fillStyle = S.glyph.bar.color; ctx.fillRect(x, y + h - bh, w, bh); return; }
   if (t.numeric) { ctx.fillStyle = styleNumericColor(code, t.center, S); ctx.fillRect(x, y, w, h); return; }
   ctx.fillStyle = trackCategoryColor(t, code, S, colors); ctx.fillRect(x, y, w, h);
 }

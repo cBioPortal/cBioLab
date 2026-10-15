@@ -96,6 +96,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
         if (t.kind === "gene") geneCell(code, x, y, w);
         else if (t.kind === "derivedEvent") parts.push(rect(x, y, w, ROW_H, code > 0 ? P.derived : P.unaltered));
         else if (code === -1) noData(x, y, w);
+        else if (t.bar) { const bh = ROW_H * code / 255; parts.push(rect(x, y + ROW_H - bh, w, bh, S.glyph.bar.color)); }
         else if (t.numeric) parts.push(rect(x, y, w, ROW_H, numericColor(code, t.center, S)));
         else parts.push(rect(x, y, w, ROW_H, trackCategoryColor(t, code, S, colors)));
       }
@@ -137,6 +138,11 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
     cy += 16;
     parts.push(`<text x="4" y="${cy}" fill="${P.text}">${esc(truncateLabel(t.label, S))}</text>`);
     let cx = GUTTER;
+    if (t.bar) {
+      for (let i = 0; i < 4; i++) parts.push(rect(cx + i * 6, cy - 1 - 2.5 * (i + 1), 4, 2.5 * (i + 1), S.glyph.bar.color));
+      parts.push(`<text x="${cx + 4 * 6 + 8}" y="${cy}" fill="${P.muted}">${fmtNum(t.min!)} → ${fmtNum(t.max!)}</text>`);
+      continue;
+    }
     if (t.numeric) {
       for (let i = 0; i < 24; i++) parts.push(rect(cx + i * 4, cy - 9, 4, 10, numericColor(255 * i / 23, t.center, S)));
       parts.push(`<text x="${cx + 24 * 4 + 8}" y="${cy}" fill="${P.muted}">${fmtNum(t.min!)} → ${fmtNum(t.max!)}${t.center != null ? " (0 at white)" : ""}${t.kind === "heatmap" ? " · " + esc(t.profileType) + ", " + esc(t.note || "") : ""}</text>`);

@@ -6,7 +6,7 @@
 // panel-aware frequencies — separated from where the rows come from. `buildContract`
 // fetches from ClickHouse and calls this; a CLI or a notebook can call it on local
 // tables, and a port in another language has this function as its conformance target.
-import { heatmapTrackLabel, profiledTrackLabel, PROFILED_TYPES, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
+import { heatmapTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { STYLE } from "./oncoprint-style.ts";
 import type { Contract, Track, GroupRange, ZReference, ResolvedDisplay, DisplaySpec, SortKeySpec } from "./types.ts";
@@ -116,6 +116,11 @@ export interface AssembleInput {
    * appears only for a type some columns were and some were not profiled for, as in the portal.
    */
   profiled?: { types: ProfiledType[]; masks: { pid: string; mask: number }[] };
+  /**
+   * Samples per column, patient columns only. Adds the portal's "# Samples per Patient" row when
+   * some patient has more than one.
+   */
+  samples?: { pid: string; n: number }[];
   /** driver call per event, and the source to echo in conventions */
   isDriver: (r: EventRow) => boolean;
   annotationSource: string;
@@ -256,6 +261,17 @@ export function assembleContract(input: AssembleInput): Contract {
     const cells = new Int32Array(allPids.length).fill(-1);
     allPids.forEach((p, i) => { const s = studyOf.get(p); if (s != null) cells[i] = catIdx.get(s)!; });
     clinTracks.push({ kind: "clinical", label: STUDY_TRACK, categories: studies.slice(), cells });
+  }
+  if (input.samples && unit === "patient") {
+    const n = new Int32Array(allPids.length);
+    for (const r of input.samples) { const i = pidIndex.get(r.pid); if (i !== undefined) n[i] = r.n; }
+    let max = 0;
+    for (let i = 0; i < n.length; i++) if (n[i] > max) max = n[i];
+    if (max > 1) {
+      const cells = new Int32Array(allPids.length);
+      for (let i = 0; i < n.length; i++) cells[i] = n[i] ? Math.round(255 * n[i] / max) : -1;
+      clinTracks.push({ kind: "clinical", label: SAMPLES_TRACK, numeric: true, bar: true, min: 0, max, cells });
+    }
   }
   if (input.profiled) {
     const mask = new Int32Array(allPids.length);

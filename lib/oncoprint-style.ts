@@ -60,6 +60,8 @@ export const STYLE = {
     single: { color: "#008000", vus: "#53d400", label: "Mutation" } },
     /** what a legend entry adds when a glyph's driver and VUS colours differ */
     driverLabels: { driver: " (putative driver)", vus: " (unknown significance)" },
+    /** a numeric track drawn as bars (the portal's bar rule: green up from the bottom of the cell) */
+    bar: { color: "#008000" },
     /** the "Profiled for <type>" rows: the portal's reserved colour for "yes"; "no" is drawn as no data */
     profiled: { color: "#1b9e77", yes: "Yes", no: "No" },
     notProfiled: { fill: "#ffffff", stripe: { color: "#bebebe", band: [0.475, 0.525] as [number, number] }, label: "Not profiled" },
