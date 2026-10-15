@@ -4,7 +4,9 @@
 //
 // Supported per gene: MUT | MUT=<pchange> | MISSENSE NONSENSE TRUNC INFRAME SPLICE |
 //   AMP HOMDEL | FUSION | DRIVER (standalone = any driver alteration) | _DRIVER /
-//   DRIVER_ modifiers on any of the above | bare gene = any alteration.
+//   DRIVER_ modifiers on any of the above | bare gene = any alteration |
+//   protein position range modifier on a mutation: (a-b) (a-) (-b), with * for fully contained,
+//   e.g. TRUNC_(1400-), MUT_(-500), (1-100*)_DRIVER, MUT=(712-979)_DRIVER.
 // Rejected with an explanation (not silently approximated): GAIN/HETLOSS (only high-level
 // CNA (+-2) is stored), EXP/PROT (no expression thresholds here), GERMLINE/SOMATIC
 // (public studies are germline-stripped), PROMOTER.
@@ -12,10 +14,13 @@ import { DB, STUDY } from "./ch.ts";
 import { sq } from "./compiler.ts";
 
 export type OqlSpecType = "MUT" | "CNA" | "SV" | "ANY" | "EXP" | "PROT";
+/** The portal's RANGE modifier: protein positions, either bound open; `contained` is its `*`. */
+export interface OqlRange { start?: number; end?: number; contained: boolean }
 export interface OqlSpec {
   type: OqlSpecType; driver?: boolean;
   pchange?: string; cls?: string; cna?: number;
   op?: string; z?: number;
+  range?: OqlRange;
 }
 export interface OqlEntry { gene: string; specs: OqlSpec[] }
 
@@ -53,7 +58,34 @@ export function parseOql(q: string): OqlEntry[] {
   });
 }
 
+// A range sits among a token's "_"-joined modifiers, or right after "MUT=" (the portal's
+// grammar: modifiers in any order around the mutation, joined by "_").
+const RANGE_RE = /(^|_|=)\((\d*)-(\d*)(\*?)\)(_|$)/;
+
 function parseSpec(tok0: string, entry: string): OqlSpec {
+  const rm = tok0.match(RANGE_RE);
+  if (!rm) return parseSpecNoRange(tok0, entry);
+  const [whole, lead, a, b, star, trail] = rm;
+  const rest = tok0.slice(0, rm.index) + (lead === "=" ? "=" : lead && trail ? "_" : "") + tok0.slice(rm.index! + whole.length);
+  if (RANGE_RE.test(rest)) throw new Error("OQL '" + entry + "': at most one position range per alteration");
+  if (a === "" && b === "") throw new Error("OQL '" + entry + "': a position range needs a start, an end, or both, e.g. (1400-) or (1-500)");
+  const range: OqlRange = { contained: star === "*" };
+  if (a !== "") range.start = Number(a);
+  if (b !== "") range.end = Number(b);
+  if (range.start != null && range.end != null && range.start > range.end)
+    throw new Error("OQL '" + entry + "': position range (" + a + "-" + b + ") starts after it ends");
+  // A range alone, or with only DRIVER, is any mutation in that range (the portal's reading).
+  const restU = rest.toUpperCase();
+  const base = rest === "" || restU === "MUT=" ? { type: "MUT" as const, driver: false }
+    : restU === "DRIVER" || restU === "MUT=DRIVER" ? { type: "MUT" as const, driver: true }
+    : parseSpecNoRange(rest, entry);
+  if (base.type !== "MUT")
+    throw new Error("OQL '" + entry + "': a position range applies only to mutations, not to " + rest);
+  return { ...base, range };
+}
+
+function parseSpecNoRange(tok0: string, entry: string): OqlSpec {
+  if (/[()]/.test(tok0)) throw new Error("OQL '" + entry + "': unrecognized token '" + tok0.slice(0, 20) + "' — a position range is written (a-b), (a-) or (-b), optionally with * for fully contained");
   let tok = tok0.toUpperCase();
   let driver = false;
   // DRIVER as prefix/suffix modifier (DRIVER_G12D, G12D_DRIVER, MUT=DRIVER_G12D, TRUNC_DRIVER…)
@@ -94,6 +126,7 @@ function specCond(spec: OqlSpec): string {
     if (spec.cls === "trunc") conds.push("(lower(g.mutation_type) LIKE 'nonsense%' OR lower(g.mutation_type) LIKE 'frame_shift%' OR lower(g.mutation_type) LIKE 'nonstop%')");
     else if (spec.cls) conds.push("lower(g.mutation_type) LIKE " + sq(spec.cls + "%"));
     if (spec.pchange) conds.push("g.mutation_variant = " + sq(spec.pchange));
+    if (spec.range) conds.push(rangeCond(spec.range));
   } else if (spec.type === "CNA") {
     conds.push("g.variant_type = 'cna'");
     conds.push(spec.cna === 2 ? "g.cna_alteration >= 2" : spec.cna === -2 ? "g.cna_alteration <= -2" : "abs(g.cna_alteration) >= 2");
@@ -104,6 +137,36 @@ function specCond(spec: OqlSpec): string {
   }
   return conds.join(" AND ");
 }
+
+/**
+ * The portal's RANGE test (oqlfilter.ts, AccessorsForOqlFilter.mut_position): a mutation has a
+ * position only when start and end are both known, neither is -1 and start <= end — otherwise
+ * it never matches a range. Default: the two ranges overlap at all; with `*`: the query range
+ * contains the mutation's.
+ */
+function rangeCond(r: OqlRange): string {
+  const conds = ["g.pos_start IS NOT NULL", "g.pos_end IS NOT NULL", "g.pos_start != -1", "g.pos_end != -1", "g.pos_start <= g.pos_end"];
+  if (r.contained) {
+    if (r.start != null) conds.push("g.pos_start >= " + r.start);
+    if (r.end != null) conds.push("g.pos_end <= " + r.end);
+  } else {
+    if (r.start != null) conds.push("g.pos_end >= " + r.start);
+    if (r.end != null) conds.push("g.pos_start <= " + r.end);
+  }
+  return "(" + conds.join(" AND ") + ")";
+}
+
+/**
+ * Mutations with their protein positions, under genomic_event_derived's column names so specCond
+ * and DRIVER_JOIN read them unchanged. genomic_event_derived stores no positions; this table holds
+ * the same mutation rows (same profiles, uncalled included, same protein change and type).
+ */
+const mutationsWithPositions = (db: string, study: string, gene: string): string =>
+  "(SELECT concat(studyId, '_', sampleId) AS sample_unique_id, concat(studyId, '_', patientId) AS patient_unique_id,\n" +
+  "          studyId AS cancer_study_identifier, `GENE.hugoGeneSymbol` AS hugo_gene_symbol, 'mutation' AS variant_type,\n" +
+  "          proteinChange AS mutation_variant, mutationType AS mutation_type, proteinPosStart AS pos_start, proteinPosEnd AS pos_end,\n" +
+  "          CAST(NULL AS Nullable(Int8)) AS cna_alteration\n" +
+  "     FROM " + db + ".mutation_derived WHERE studyId = " + sq(study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + ") g\n";
 
 const DRIVER_JOIN = (pin: string): string =>
   "  JOIN oncokb_annotation.variant_annotation ann\n" +
@@ -146,7 +209,7 @@ export function oqlCasesSql(q: string, { oncokbPin, profiles, study = STUDY, db 
       }
       parts.push(
         "SELECT DISTINCT replaceOne(g." + caseCol + ", " + sq(study + "_") + ", '') AS pid\n" +
-        "  FROM " + db + ".genomic_event_derived g\n" +
+        "  FROM " + (spec.range ? mutationsWithPositions(db, study, gene) : db + ".genomic_event_derived g\n") +
         (spec.driver ? DRIVER_JOIN(oncokbPin!) : "") +
         "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
         "    AND g.hugo_gene_symbol = " + sq(gene) + "\n" +

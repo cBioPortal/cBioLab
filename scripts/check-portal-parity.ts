@@ -13,6 +13,9 @@
  *   4. Filtered cohorts — patients with a mutation in the study's most-mutated gene, with its
  *      most-altered copy-number gene amplified or deleted, and with one clinical value, compiled by
  *      lib/cohort2.ts and filtered by cBioPortal's study view.
+ *   5. OQL position ranges (MUT_(a-b), (a-), (-b), (a-b*)) on that gene: cBioPortal applies them in
+ *      the browser, so its mutations are fetched from the API and its own rule, ported from
+ *      cbioportal-frontend, decides which patients match.
  *
  * Every comparison must agree EXACTLY; a count is a count. Differences are reported, never
  * tolerated, so a disagreement caused by the two databases holding different releases of a
@@ -160,6 +163,49 @@ for (const study of STUDIES) {
     const pn = new Set(portal.map((s) => s.patientId)).size;
     record({ study, group: "cohort", what: `patients with ${pc.attribute} = ${value}`, ours: String(ours), portal: String(pn), agree: ours === pn });
   }
+
+  // 5. OQL position ranges. The portal applies its RANGE modifier in the browser, so there is no
+  // endpoint to ask; its mutations come from its API and its own rule is applied here, ported from
+  // cbioportal-frontend (AccessorsForOqlFilter.mut_position, oqlfilter.ts RANGE). Ranges come from
+  // the gene's own position quartiles, so every study exercises both bounds and both readings.
+  if (topGene && mutProfiles.length) {
+    const [gene] = await api<{ entrezGeneId: number }[]>("/genes/fetch?geneIdType=HUGO_GENE_SYMBOL", [topGene]);
+    const muts = await api<PortalMutation[]>(`/molecular-profiles/${mutProfiles[0]}/mutations/fetch`,
+      { sampleListId: study + "_all", entrezGeneIds: [gene.entrezGeneId] });
+    const starts = muts.map(portalPosition).filter((p): p is [number, number] => !!p).map((p) => p[0]).sort((a, b) => a - b);
+    if (starts.length) {
+      const q1 = starts[Math.floor(starts.length / 4)], q3 = starts[Math.floor(starts.length * 3 / 4)];
+      const ranges: { text: string; lo?: number; hi?: number; contained: boolean }[] = [
+        { text: `(-${q1})`, hi: q1, contained: false },
+        { text: `(${q1}-${q3})`, lo: q1, hi: q3, contained: false },
+        { text: `(${q1}-${q3}*)`, lo: q1, hi: q3, contained: true },
+        { text: `(${q3}-)`, lo: q3, contained: false },
+      ];
+      for (const r of ranges) {
+        const q = `${topGene}: MUT_${r.text}`;
+        const pn = new Set(muts.filter((m) => inPortalRange(m, r)).map((m) => m.patientId)).size;
+        const ours = await oursCount(study, { all: [{ kind: "oql", q }] }, profiles);
+        record({ study, group: "cohort", what: `patients matching OQL "${q}" (cBioPortal's mutations, its RANGE rule)`,
+          ours: String(ours), portal: String(pn), agree: ours === pn });
+      }
+    }
+  }
+}
+
+interface PortalMutation { patientId: string; proteinPosStart?: number; proteinPosEnd?: number }
+
+/** cbioportal-frontend AccessorsForOqlFilter.mut_position: no position unless start <= end, neither -1. */
+function portalPosition(m: PortalMutation): [number, number] | null {
+  const s = m.proteinPosStart, e = m.proteinPosEnd;
+  return s == null || e == null || isNaN(s) || isNaN(e) || s === -1 || e === -1 || s > e ? null : [s, e];
+}
+
+/** cbioportal-frontend oqlfilter.ts, case 'RANGE': overlap, or containment with `*`. */
+function inPortalRange(m: PortalMutation, r: { lo?: number; hi?: number; contained: boolean }): boolean {
+  const p = portalPosition(m);
+  if (!p) return false;
+  const lo = r.lo ?? Number.NEGATIVE_INFINITY, hi = r.hi ?? Number.POSITIVE_INFINITY;
+  return r.contained ? lo <= p[0] && hi >= p[1] : lo <= p[1] && p[0] <= hi;
 }
 
 const failed = checks.filter((c) => !c.agree).length;
