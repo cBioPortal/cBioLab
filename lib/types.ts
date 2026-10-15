@@ -1903,10 +1903,13 @@ export interface DerivedFacet {
   lineGap?: number;
 }
 
-/** A reader-requested derived facet beyond the fixed three — see buildDerivedFacets. */
-export interface ExtraDerivedRequest {
-  metric: "lines" | "treatmentSpan";
-  eventType: string;
+/**
+ * A derived facet a caller asks Explore for — see buildDerivedFacets. Explore computes only the
+ * facets asked for. "lines" and "treatmentSpan" also name the event type they are built on.
+ */
+export interface DerivedRequest {
+  metric: DerivedFacet["metric"];
+  eventType?: string;
   lineGap?: number;
 }
 export interface ExploreResult {

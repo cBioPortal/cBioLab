@@ -105,6 +105,10 @@ export function linesCtes({ db, study, patientFilter, spec }: LinesSqlArgs): str
     "           argMin(trimBoth(value), (" + fold("key") + " != 'subtype', " + fold("value") + ")) AS cls_raw\n" +
     "    FROM " + db + ".clinical_event_data\n" +
     "    WHERE " + foldedInSql("key", [...CLASS_KEYS]) + " AND " + fold("value") + " != ''\n" +
+    // only this study's treatment records: clinical_event_derived is sorted by study and event
+    // type, so this reads one study's ids instead of folding every study's event data
+    "      AND clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_derived\n" +
+    "        WHERE cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("event_type", spec.eventType || TREATMENT_EVENT) + ")\n" +
     "    GROUP BY clinical_event_id\n" +
     "  ) cl ON cl.clinical_event_id = ce.clinical_event_id\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +

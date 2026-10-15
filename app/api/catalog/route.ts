@@ -33,7 +33,12 @@ async function catalogFor(study: string) {
   const sqls = catalogSqls(DB, study);
   const chk = await chQuery(sqls.studyCheck, conn);
   if (Number(chk.data[0].n) !== 1) throw new Error("Study '" + study + "' not found");
-  const [tRes, vRes, kRes] = [await chQuery(sqls.types, conn), await chQuery(sqls.values, conn), await chQuery(sqls.keys, conn)];
+  const lSqls = lineCatalogSqls(DB, study);
+  // independent queries, run together
+  const [tRes, vRes, kRes, epRes, lStats, lCombos] = await Promise.all([
+    chQuery(sqls.types, conn), chQuery(sqls.values, conn), chQuery(sqls.keys, conn),
+    chQuery(survivalEndpointsSql(study, DB), conn).catch(() => null),
+    chQuery(lSqls.stats, conn), chQuery(lSqls.combos, conn)]);
   const values: Record<string, Record<string, string[]>> = {}, keys: Record<string, string[]> = {};
   vRes.data.forEach((r) => { (values[r.t] = values[r.t] || {}); (values[r.t][r.k] = values[r.t][r.k] || []).push(r.v); });
   kRes.data.forEach((r) => { (keys[r.t] = keys[r.t] || []).push(r.k); });
@@ -46,12 +51,9 @@ async function catalogFor(study: string) {
   // control can offer only what exists rather than a fixed OS/PFS list
   // null, not [], when the lookup fails: [] means "this study has none" and greys out the
   // survival/cox buttons, which a transient query error must not do
-  const epRes = await chQuery(survivalEndpointsSql(study, DB), conn).catch(() => null);
   const survivalEndpoints = epRes ? (epRes.data as { endpoint: string }[]).map((r) => String(r.endpoint)) : null;
   const hasPriorMedFlag = Object.keys(values["Treatment"] || {}).includes("PRIOR_MED_TO_MSK");
   // synthetic event type: derived treatment lines (default gap 90d), queryable like any other event
-  const lSqls = lineCatalogSqls(DB, study);
-  const [lStats, lCombos] = [await chQuery(lSqls.stats, conn), await chQuery(lSqls.combos, conn)];
   const types = [...tRes.data, { t: LINE_TYPE, n_pat: lStats.data[0].n_pat, n_ev: lStats.data[0].n_ev }];
   values[LINE_TYPE] = {
     LINE_NO: ["1", "2", "3", "4", "5"],

@@ -345,6 +345,10 @@ ClickHouse SQL; clients never send SQL. Live at https://cohort-lab.vercel.app (U
    - **Read through `throughCache(cached, direct)`.** A production build replaces the message of
      anything thrown inside a cached function, so when the cached call throws the direct one runs
      and reports the real error. It also covers a cache that cannot be read.
+   - **`RESULT_CACHE=off` turns it off.** `throughCache` then runs the direct call on every
+     request, so a server answers everything cold — for measuring what a first reader waits for.
+     Without a cache handler configured (anywhere but Vercel), the cache is the Node process's own
+     50 MB LRU (`cacheMaxMemorySize`): lost on restart, and not shared between replicas.
    - **Arguments are the key.** A cached function takes only serializable arguments and computes
      everything else itself; a function passed in cannot be called. Anything that changes the
      answer must be an argument.

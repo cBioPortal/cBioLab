@@ -13,10 +13,8 @@
 // "counting" state says it is not current.
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CohortDef, ExploreResult } from "../../lib/types.ts";
+import type { CohortDef, DerivedRequest, ExploreResult } from "../../lib/types.ts";
 import { api } from "./api.ts";
-
-export type ExtraDerived = { metric: "lines" | "treatmentSpan"; eventType: string; lineGap?: number };
 
 /** What decides Explore's answer — the query key. */
 export interface ExploreRequest {
@@ -25,7 +23,8 @@ export interface ExploreRequest {
   /** narrows the server's work to the attributes that will be shown; empty asks for all */
   attributes: string[];
   geneCharts: string[];
-  extraDerived: ExtraDerived[];
+  /** the derived facets to compute; the server computes none it is not asked for */
+  derived: DerivedRequest[];
   /** the uploads' datasets and versions (customDataKey) — they are part of the answer */
   uploads: string;
 }
@@ -53,7 +52,7 @@ export function useExplore(onError: (message: string) => void) {
         studies: r.studies, draft: r.draft,
         ...(r.attributes.length ? { attributes: r.attributes } : {}),
         ...(r.geneCharts.length ? { geneCharts: r.geneCharts } : {}),
-        ...(r.extraDerived.length ? { extraDerived: r.extraDerived } : {}),
+        ...(r.derived.length ? { derived: r.derived } : {}),
       }, { signal });
       if (res.status === 499) throw new Superseded();
       const j = await res.json();

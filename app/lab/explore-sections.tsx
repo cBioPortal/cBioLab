@@ -13,7 +13,7 @@ import { textWidth } from "../../lib/chart/text.ts";
 import { fmtInt, fmtNum, fmtPct } from "../../lib/chart/format.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
-import type { ExploreState } from "./use-explore-state.ts";
+import { SHOW_DERIVED_FACETS, type ExploreState } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { Save, Tag, X } from "lucide-react";
 import { Button } from "../_ui/button";
@@ -48,10 +48,6 @@ const PIE_ATTRIBUTES = new Set([
   "SAMPLE_TYPE", "SOMATIC_STATUS"
 ]);
 
-/** Explore's "Derived" card (data-shape facets: follow-up, history, distinct altered
- *  genes) is hidden for now, at the user's request — flip back on rather than delete
- *  the render, since the underlying facets/logic are unaffected. */
-const SHOW_DERIVED_FACETS = false;
 
 
 /** What Explore's sections read and the edits they can make: Explore's own state and actions
@@ -543,7 +539,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
 }
 
 export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
-  const { EXTRA_DERIVED_KINDS, addClause, explore, extraDerivedOn, menuStore, parseDraft, toggleExtraDerived, treatmentEventType } = ctx;
+  const { TREATMENT_DERIVED_KINDS, addClause, explore, derivedOn, menuStore, parseDraft, toggleDerived, treatmentEventType } = ctx;
   return <>
     {SHOW_DERIVED_FACETS && explore && explore.derived && explore.derived.length > 0 && (
       <div className="card">
@@ -555,11 +551,11 @@ export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
               <span className="meta">from this study's own timeline events</span>
               {(() => {
                 const tx = treatmentEventType();
-                return EXTRA_DERIVED_KINDS.map((k) => (
+                return TREATMENT_DERIVED_KINDS.map((k) => (
                   <label key={k.metric} className="chk"
                     title={tx ? "based on '" + tx.label + "' events" : "this study records no treatment-like timeline events, so this can't be derived here"}>
-                    <Checkbox checked={extraDerivedOn(k.metric)} disabled={!tx}
-                      onCheckedChange={() => toggleExtraDerived(k.metric)} />
+                    <Checkbox checked={derivedOn(k.metric)} disabled={!tx}
+                      onCheckedChange={() => toggleDerived(k.metric)} />
                     {tx ? k.label(tx.label) : k.label("a treatment event")}
                     {!tx && <span className="meta"> — not available for this study</span>}
                   </label>
@@ -568,10 +564,7 @@ export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
           </GearMenu>
         </div>
         <div className="derivedgrid">
-          {/* "lines" is excluded here — it shows in its own "Derived timeline
-              filters" card below (with the treatment-naive example and the
-              custom builder alongside it) rather than twice on the page. */}
-          {explore.derived.filter(d => d.metric !== "lines").map(d => {
+          {explore.derived.map(d => {
             const max = Math.max(...d.buckets.map(b => b.n), 1);
             const dEventType = (d as any).eventType as string | undefined;
             const dLineGap = (d as any).lineGap as number | undefined;

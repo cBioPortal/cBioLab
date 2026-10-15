@@ -10,6 +10,7 @@ import type { GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, OncoprintView } from "../../lib/types.ts";
 import type { AddCohortTarget } from "./add-cohort-dialog.tsx";
 import { expandSplits, type PartitionShape } from "../../lib/partition-arms.ts";
+import { treatmentEventOf } from "../../lib/event-names.ts";
 import { CohortNode } from "./view-chrome.tsx";
 
 import type { DocStore } from "./doc-store.ts";
@@ -115,7 +116,7 @@ export function useViewEdits(page: ViewEditsPage) {
                    binMonths: 3, fromMonths: -12, toMonths: 60 };
         })()
       : kind === "sequence" ? (() => {
-          const tx = viewEvents().find(e => /treat|therap|regimen|drug|medicat/.test(e.canonical));
+          const tx = treatmentEventOf(viewEvents());
           return { kind, ...(tx ? { eventType: tx.canonical } : {}), labelKey: "SUBTYPE",
                    lineGap: 90, maxSteps: 3, topN: 8 };
         })()

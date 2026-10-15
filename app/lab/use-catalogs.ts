@@ -41,11 +41,11 @@ export function useStudies(): StudyInfo[] {
 
 /** The study catalog the survival, course and sequence controls read. A templated document holds
  *  "$study" until its parameter is resolved; asking for a study by that name has no answer, so it
- *  is not asked. */
-export function useStudyCatalog(study: string): { cat: any; catLoading: boolean } {
+ *  is not asked. `enabled` holds it back until a page that shows those controls is open. */
+export function useStudyCatalog(study: string, enabled = true): { cat: any; catLoading: boolean } {
   const q = useQuery({
     queryKey: ["catalog", study],
-    enabled: !!study && !study.startsWith("$"),
+    enabled: enabled && !!study && !study.startsWith("$"),
     placeholderData: keepPreviousData,
     queryFn: async ({ signal }) => answer(await api.catalog(study, { signal })),
   });

@@ -211,8 +211,9 @@ export default function AnalysisPage() {
   const error = uiError || normalizeError || analysis.error;
   // what the pickers offer (app/lab/use-catalogs.ts): the study's timeline and survival endpoints,
   // and the clinical attributes and profiles across the result's studies; while either is being
-  // fetched a picker shows a loader, not "none"
-  const { cat, catLoading } = useStudyCatalog(study);
+  // fetched a picker shows a loader, not "none". Only the Analysis tab shows those pickers, and
+  // `study` is settled only once a ?doc= link has been read.
+  const { cat, catLoading } = useStudyCatalog(study, tab === "analysis" && !linkLoading);
   const { trackAttrs, trackAttrsLoading } = useTrackAttrs(result);
 
   // Saved cohorts and analyses belong to the signed-in user (lib/auth.ts): see use-saved.ts.
