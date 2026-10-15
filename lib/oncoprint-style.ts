@@ -20,7 +20,27 @@ export const STYLE = {
   palette: {
     paper: "#ffffff", unaltered: "#bebebe", derived: "#0f86a1",
     text: "#1f2933", muted: "#5b6b76", groupLine: "#c9d2d8",
-    categorical: ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#999999"]
+    categorical: ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#999999"],
+    /**
+     * Values that always take the same colour, whichever attribute holds them: the portal's
+     * RESERVED_CLINICAL_VALUE_COLORS (shared/lib/Colors.ts). Keys are the value without spaces,
+     * lower-cased, which is how a value is looked up (reservedColor), so "Yes", "YES" and
+     * "Disease Free" / "DiseaseFree" all match as they do there.
+     */
+    reserved: {
+      "true": "#1b9e77", "yes": "#1b9e77", "positive": "#1b9e77", "diseasefree": "#1b9e77", "tumorfree": "#1b9e77", "living": "#1b9e77",
+      "alive": "#1b9e77", "notprogressed": "#1b9e77", "false": "#d95f02", "no": "#d95f02", "negative": "#d95f02", "recurred": "#d95f02",
+      "progressed": "#d95f02", "recurred/progressed": "#d95f02", "withtumor": "#d95f02", "deceased": "#d95f02", "female": "#e0699e", "f": "#e0699e",
+      "male": "#2986e2", "m": "#2986e2", "other": "#a9a9a9", "unknown": "#d3d3d3", "na": "#d3d3d3", "missense": "#008000",
+      "inframe": "#993404", "truncating": "#000000", "fusion": "#8b00c9", "splice": "#e5802b", "promoter": "#00b7ce", "driver": "#008000",
+      "vus": "#53d400", "1:deceased": "#d95f02", "1:recurred/progressed": "#d95f02", "1:recurred": "#d95f02", "1:progressed": "#d95f02", "1:yes": "#d95f02",
+      "1:1": "#d95f02", "1:progression": "#d95f02", "1:event": "#d95f02", "1:deadofmelanoma": "#d95f02", "1:deadwithtumor": "#d95f02", "1:metastaticrelapse": "#d95f02",
+      "1:localizedrelapse": "#d95f02", "0:living": "#1b9e77", "0:alive": "#1b9e77", "0:diseasefree": "#1b9e77", "0:no": "#1b9e77", "0:0": "#1b9e77",
+      "0:progressionfree": "#1b9e77", "0:noprogression": "#1b9e77", "0:notprogressed": "#1b9e77", "0:censored": "#1b9e77", "0:censor": "#1b9e77", "0:aliveorcensored": "#1b9e77",
+      "0:aliveordeadtumorfree": "#1b9e77", "0:norelapse": "#1b9e77", "0:censure": "#1b9e77", "0:ned": "#1b9e77", "wildtype": "#bebebe", "nomutation": "#bebebe",
+      "amplification": "#ff0000", "gain": "#ffb6c1", "diploid": "#bebebe", "unchanged": "#bebebe", "loss": "#8fd8d8", "shallowdeletion": "#8fd8d8",
+      "deepdeletion": "#0000ff"
+    } as Record<string, string>
   },
   // A gene cell is drawn as layers, bottom to top: base, CNA (full height), mRNA (an outline
   // around the whole cell), protein (bars at top and bottom), SV (inset band), one mutation
@@ -340,15 +360,23 @@ export function resolveStyle(overrides?: Record<string, unknown> | null): Style 
   return merged;
 }
 
+/** The portal's fixed colour for a clinical value ("Female", "1:DECEASED", "Unknown"), if it has one. */
+export function reservedColor(value: string, S: Style = STYLE): string | undefined {
+  return S.palette.reserved[value.replace(/\s/g, "").toLowerCase()];
+}
+
 /**
- * Colour for a categorical cell, honouring a per-track override
- * (`display.colors[trackLabel][value]` — the portal's Edit Colors).
+ * Colour for a categorical cell: a per-track override first
+ * (`display.colors[trackLabel][value]` — the portal's Edit Colors), then the value's reserved
+ * colour, then the palette's cycle.
  */
 export function trackCategoryColor(track: { label: string; categories?: string[]; profiledFor?: string }, code: number, S: Style = STYLE,
   colors?: Record<string, Record<string, string>>): string {
   const value = track.categories && track.categories[code];
   const override = value != null && colors && colors[track.label] ? colors[track.label][value] : undefined;
-  return override || (track.profiledFor ? S.glyph.profiled.color : categoryColor(code, S));
+  if (override) return override;
+  if (track.profiledFor) return S.glyph.profiled.color;
+  return (value != null && reservedColor(value, S)) || categoryColor(code, S);
 }
 
 

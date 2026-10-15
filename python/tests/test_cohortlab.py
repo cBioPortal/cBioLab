@@ -151,6 +151,15 @@ class ExceptionRows(unittest.TestCase):
         self.assertEqual(aggregate(bar, bar.cells, bucket_edges(6, 3)).tolist(), [128, 255, -1])
 
 
+class ReservedColors(unittest.TestCase):
+    def test_reserved_values_match_typescript(self):
+        from cohortlab.contract import Track
+        from cohortlab.style import STYLE, track_category_color
+        t = Track("clinical", "OS_STATUS", np.zeros(1, dtype=np.int32), {"categories": ["1:DECEASED", "Disease Free", "Female", "Intersex"]})
+        self.assertEqual([track_category_color(t, i) for i in range(3)], ["#d95f02", "#1b9e77", "#e0699e"])
+        self.assertEqual(track_category_color(t, 3), STYLE["palette"]["categorical"][3])
+
+
 class StyleOverrides(unittest.TestCase):
     """resolve_style mirrors lib/oncoprint-style.ts, and an override reaches the drawn pixels."""
 

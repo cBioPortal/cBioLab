@@ -197,3 +197,12 @@ test("numeric clinical rows are the portal's bars: from the bottom, both ways ac
   assert.ok(Math.abs(numericValue(log, c) - 9) < 0.2, "and the code decodes back to the value");
   assert.equal(numericValue({ min: 40, max: 80 }, 255), 80);
 });
+
+test("clinical values the portal reserves a colour for keep it, whatever the attribute; Edit colours still wins", () => {
+  const sex = { label: "SEX", categories: ["Male", "Female", "Unknown", "Intersex"] };
+  assert.deepEqual([0, 1, 2].map((i) => trackCategoryColor(sex, i, STYLE)), ["#2986e2", "#e0699e", "#d3d3d3"]);
+  assert.equal(trackCategoryColor(sex, 3, STYLE), STYLE.palette.categorical[3], "an unreserved value takes the cycle");
+  const os = { label: "OS_STATUS", categories: ["1:DECEASED", "0:LIVING", "Disease Free", "DISEASEFREE"] };
+  assert.deepEqual([0, 1, 2, 3].map((i) => trackCategoryColor(os, i, STYLE)), ["#d95f02", "#1b9e77", "#1b9e77", "#1b9e77"], "case and spaces do not matter");
+  assert.equal(trackCategoryColor(sex, 1, STYLE, { SEX: { Female: "#123456" } }), "#123456");
+});
