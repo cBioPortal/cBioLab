@@ -31,6 +31,10 @@ export interface LabBridge {
   commit: (d: AnalysisDoc, r: AnalysisResult) => void;
   goTab: (t: string) => void;
   runExample: (ex: DslExample) => void;
+  /** the deployment the gallery examples run on, when not this one (EXAMPLES_URL) */
+  examplesElsewhere: string | null;
+  /** an example's link, on the deployment that runs it */
+  exampleLink: (ex: DslExample) => string;
   save: (name: string) => Promise<void>;
   link: (d: AnalysisDoc) => string;
   // Explore: the draft cohort built by clicking facets, over the ticked studies
@@ -323,6 +327,9 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
       run: async ({ title }) => {
         const ex = EXAMPLES.find((e) => e.title === title) || EXAMPLES.find((e) => e.title.toLowerCase().includes(String(title).toLowerCase()));
         if (!ex) throw new Error(`no example titled "${title}" — see list_examples`);
+        // written for the public warehouse's studies: where this database lacks them, the example runs elsewhere
+        if (get().examplesElsewhere)
+          return `This site's database does not hold the public studies "${ex.title}" is written for, so it runs on ${get().examplesElsewhere} instead: ${get().exampleLink(ex)} — give the user that link (it opens on another site); the page here is unchanged.`;
         undo.push(get().doc);
         get().runExample(ex);
         return `Loaded "${ex.title}" and started running it. Call analysis_get_results in a few seconds.`;
