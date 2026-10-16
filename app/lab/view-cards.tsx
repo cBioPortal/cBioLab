@@ -660,8 +660,9 @@ function PlotCard({ ctx, v, vi }: CardProps) {
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={ch} {...placement(ctx, vi)}
         sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
       <PlotControls spec={docView(vi)} plot={v.plot} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-        highlightOptions={highlightOptions} update={(fn) => updateView(vi, fn)} />
-      <ViewFigure v={v} empty={v.plot?.note || "nothing to draw"} />
+        highlightOptions={highlightOptions} update={(fn) => updateView(vi, fn)}>
+        <ViewFigure v={v} empty={v.plot?.note || "nothing to draw"} />
+      </PlotControls>
     </>}
   </>;
 }
