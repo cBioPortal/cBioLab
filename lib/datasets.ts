@@ -1,7 +1,7 @@
 // The data sets catalog: every study each configured instance holds, with how many of its samples
 // carry each kind of data — the portal's Data Sets page, built from the same tables every view
 // queries. Counts only; restricted studies are left out exactly as the router leaves them out.
-import { chQuery, connections, type ChConn } from "./ch.ts";
+import { chQuery, directConnections, loopbackOnlyConn, type ChConn } from "./ch.ts";
 import { isRestrictedStudy } from "./federation.ts";
 
 export interface DatasetRow {
@@ -84,11 +84,13 @@ export async function datasetsFor(conn: ChConn): Promise<DatasetRow[]> {
 
 /** Every instance's catalog, first instance winning an id collision (the router's rule); the
  *  instances that did not answer are named rather than silently missing. */
-export async function allDatasets(): Promise<{ rows: DatasetRow[]; unreachable: string[] }> {
+export async function allDatasets(): Promise<{ rows: DatasetRow[]; unreachable: string[]; overMcp: string[] }> {
   const unreachable: string[] = [];
-  const per = await Promise.all(connections().map((c) => datasetsFor(c).catch(() => { unreachable.push(c.label); return [] as DatasetRow[]; })));
+  // the simulated peer's database is read only over MCP, which has no per-sample catalog: named, not listed
+  const overMcp = [loopbackOnlyConn()].filter((c) => c != null).map((c) => process.env.LOOPBACK_PEER_LABEL || c.label);
+  const per = await Promise.all(directConnections().map((c) => datasetsFor(c).catch(() => { unreachable.push(c.label); return [] as DatasetRow[]; })));
   const seen = new Set<string>(), rows: DatasetRow[] = [];
   for (const list of per) for (const r of list) if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); }
   rows.sort((a, b) => b.samples - a.samples);
-  return { rows, unreachable };
+  return { rows, unreachable, overMcp };
 }

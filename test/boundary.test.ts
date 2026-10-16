@@ -18,7 +18,7 @@
 // ============================================================================
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 
 import {
   carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotHighlightCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql,
@@ -34,11 +34,11 @@ import { clinicalRowSource } from "../lib/clinical-table.ts";
 import { mutationRowSource } from "../lib/mutation-table.ts";
 import { alterationPatientRowSource, alterationSource, patientSamplesSource } from "../lib/patient-alterations.ts";
 import { pageSql } from "../lib/table-query.ts";
-import { RemoteAggregateResolver, RemotePatientResolver, RemoteTimelineResolver, peerPatientKinds } from "../lib/federation-remote.ts";
+import { RemoteAggregateResolver, RemotePatientResolver, RemoteTimelineResolver, peerPatientKinds, remoteStudies, remoteCatalog } from "../lib/federation-remote.ts";
 import { parseRules, allowedKinds } from "../lib/disclosure.ts";
 import { asLoopbackPeer, isLoopbackRequest, loopbackHeaders, loopbackUrl, LOOPBACK_HEADER } from "../lib/loopback-peer.ts";
 import type { Instance } from "../lib/federation.ts";
-import { PRIMARY } from "../lib/ch.ts";
+import { PRIMARY, chQuery, connById, directConnections, assertNotLoopbackDirect } from "../lib/ch.ts";
 
 const AGG: Instance = { id: "peer", mode: "aggregate-only", label: "test peer", conn: PRIMARY };
 const PL: Instance = { id: "a", mode: "patient-level", label: "test primary", conn: PRIMARY };
@@ -685,6 +685,90 @@ describe("patient-level federation is opt-in, on both sides, per study and kind"
     await withEnv({ LOOPBACK_PEER: undefined }, () => {
       assert.equal(isLoopbackRequest(new Request("http://x/api/mcp", { headers: { [LOOPBACK_HEADER]: "anything" } })), false, "no simulated peer: the header means nothing");
     });
+    // several processes serving one deployment (Vercel) share LOOPBACK_PEER_TOKEN, so a call back that
+    // lands on another instance is still recognised — and only a call carrying exactly that token
+    const shared = "s".repeat(40);
+    await withEnv({ LOOPBACK_PEER: "b", LOOPBACK_PEER_URL: "https://app.invalid/api/mcp", LOOPBACK_PEER_TOKEN: shared }, () => {
+      assert.deepEqual(loopbackHeaders("https://app.invalid/api/mcp"), { [LOOPBACK_HEADER]: shared });
+      const req = (v: string) => new Request("https://app.invalid/api/mcp", { method: "POST", headers: { [LOOPBACK_HEADER]: v } });
+      assert.equal(isLoopbackRequest(req(shared)), true, "another instance's call, carrying the shared token");
+      assert.equal(isLoopbackRequest(req(shared.slice(1))), false);
+      assert.equal(isLoopbackRequest(req("t".repeat(40))), false);
+    });
+    await withEnv({ LOOPBACK_PEER: "b", LOOPBACK_PEER_URL: "https://app.invalid/api/mcp", LOOPBACK_PEER_TOKEN: "short" }, () => {
+      assert.throws(() => loopbackHeaders("https://app.invalid/api/mcp"), /at least 32 characters/, "a guessable token is refused, not used");
+    });
+  });
+
+  // The simulated peer's database is reached only over MCP: every ClickHouse request passes one
+  // check, which refuses its connection — and its database named on any other, since the two may
+  // share a server and a login — unless the request is the peer answering.
+  test("the simulated peer's database is never queried directly, only while answering as the peer", async () => {
+    const env = { LOOPBACK_PEER: "b", CLICKHOUSE2_URL: "http://127.0.0.1:9", CLICKHOUSE2_USER: "u", CLICKHOUSE2_PASSWORD: "p",
+      CLICKHOUSE2_DB: "peer_db", CLICKHOUSE2_LABEL: "PEER" };
+    await withEnv(env, async () => {
+      const b = connById("b")!;
+      await assert.rejects(chQuery("SELECT 1", b), /PEER database is reached only over MCP/);
+      for (const sql of ["SELECT count() FROM peer_db.patient", "SELECT count() FROM `peer_db`.patient", "SELECT 1\nFROM x JOIN peer_db.sample s USING (id)"])
+        await assert.rejects(chQuery(sql, PRIMARY), /reached only over MCP/, "named on another connection: " + sql);
+      assert.doesNotThrow(() => assertNotLoopbackDirect("SELECT count() FROM other_peer_db.patient", PRIMARY), "another database whose name ends the same");
+      assert.deepEqual(directConnections().map((c) => c.id), [PRIMARY.id]);
+      // answering as the peer, it is that peer's own database
+      asLoopbackPeer(() => {
+        assert.doesNotThrow(() => assertNotLoopbackDirect("SELECT 1", b));
+        assert.deepEqual(directConnections().map((c) => c.id), [PRIMARY.id, "b"]);
+      });
+    });
+    await withEnv({ ...env, LOOPBACK_PEER: undefined }, () => {
+      assert.doesNotThrow(() => assertNotLoopbackDirect("SELECT 1", connById("b")!), "no simulated peer: a second database is an ordinary one");
+    });
+  });
+
+  test("lib/ch.ts is the only way to ClickHouse, so the check above sees every query", () => {
+    const files: string[] = [];
+    const walk = (d: string) => { for (const f of readdirSync(d)) { const p = d + "/" + f; if (statSync(p).isDirectory()) walk(p); else if (/\.(ts|tsx|mjs|js)$/.test(f)) files.push(p); } };
+    for (const d of ["app", "lib", "mcp"]) walk(d);
+    // no query runs without a connection's password, so a module that reads one, or the settings, talks to ClickHouse itself
+    const reach = files.filter((f) => f !== "lib/ch.ts" && /CLICKHOUSE2?_(URL|USER|PASSWORD)|\.password\b/.test(readFileSync(f, "utf8")));
+    assert.deepEqual(reach, [], "these reach ClickHouse's address or credentials themselves");
+  });
+
+  // A coordinator that holds none of a peer's databases learns its studies and their catalogs
+  // over MCP too, and a peer answers only for studies it holds itself.
+  test("a federation tool refuses a study PEER_MCP routes to a peer, instead of relaying it or reading its own database", async () => {
+    const { registerTools } = await import("../mcp/tools.ts");
+    const t = new Map<string, (a: any) => Promise<any>>();
+    registerTools({ registerTool: (n: string, _c: unknown, h: (a: any) => Promise<any>) => t.set(n, h), tool: () => {} });
+    await withEnv({ PEER_MCP: PEERS }, async () => {
+      for (const [name, args] of [["federated_aggregates", { study: "s1", cohort: {} }], ["federated_facets", { study: "s1" }], ["federated_catalog", { study: "s1" }]] as const) {
+        const r = await t.get(name)!(args);
+        assert.equal(r.isError, true, name);
+        assert.match(r.content[0].text, /REJECTED: study 's1' is not held by this instance/, name);
+      }
+    });
+  });
+
+  test("the study list keeps from each peer only the studies PEER_MCP routes to it; a peer that does not answer is reported", async () => {
+    const realFetch = globalThis.fetch;
+    const rpc = (result: unknown) => new Response(JSON.stringify({ jsonrpc: "2.0", id: 2, result }), { headers: { "content-type": "application/json" } });
+    const row = (id: string) => ({ id, name: id, cancerType: "", patients: 1, samples: 1, timelinePatients: 0, caps: {}, oncokb: false, instance: "a", instanceLabel: "theirs" });
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      if (String(url).includes("down.invalid")) throw new Error("connection refused");
+      const body = JSON.parse(String(init.body));
+      if (body.method !== "tools/call") return rpc({});
+      if (body.params.name === "federated_studies") return rpc({ structuredContent: { studies: [row("s1"), row("s2"), row("unasked")] } });
+      return rpc({ structuredContent: { study: "other" } });
+    }) as typeof fetch;
+    try {
+      await withEnv({ PEER_MCP: "s1=http://peer.invalid/api/mcp,s3=http://down.invalid/api/mcp", PEER_LABEL: "GENIE" }, async () => {
+        const { rows, failed } = await remoteStudies();
+        assert.deepEqual(rows.map((r) => r.id), ["s1"], "s2 is routed nowhere and 'unasked' was never configured");
+        assert.equal(rows[0].instance, "peer");
+        assert.equal(rows[0].instanceLabel, "GENIE");
+        assert.deepEqual(failed, ["http://down.invalid/api/mcp"]);
+        await assert.rejects(remoteCatalog("s1", "http://peer.invalid/api/mcp"), /peer answered the catalog of 'other' for 's1'/);
+      });
+    } finally { globalThis.fetch = realFetch; }
   });
 
   test("a peer registers the disclosing tools only when MCP_DISCLOSE_PATIENTS is set, and answers only the kinds it allows", async () => {

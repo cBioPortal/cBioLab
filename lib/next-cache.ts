@@ -33,7 +33,7 @@
 // and the tests use the uncached engine directly.
 import { cacheLife } from "next/cache";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { chQuery, connections, connById, withoutFailedQueries, type ChConn } from "./ch.ts";
+import { chQuery, directConnections, loopbackOnlyConn, connById, withoutFailedQueries, type ChConn } from "./ch.ts";
 import { oncokbPin } from "./annotation.ts";
 import { runAnalysis } from "./analysis.ts";
 import { buildContract } from "./oncoprint.ts";
@@ -69,9 +69,12 @@ export function dataVersion(): Promise<string> {
   if (versionMemo && Date.now() - versionMemo.at < 60_000) return versionMemo.value;
   const value = (async () => {
     const parts: string[] = [];
-    for (const conn of connections()) {
+    // not the simulated peer's database, which is read only over MCP: like a real peer's, its
+    // reloads reach this cache when entries expire
+    const peerDb = loopbackOnlyConn()?.db;
+    for (const conn of directConnections()) {
       const dbs = await chQuery<{ name: string }>("SELECT name FROM system.databases WHERE name LIKE 'cbioportal%' ORDER BY name", conn);
-      for (const { name } of dbs.data) {
+      for (const { name } of dbs.data.filter((d) => d.name !== peerDb)) {
         const r = await chQuery<{ m: string }>("SELECT toString(max(import_date)) AS m FROM " + name + ".cancer_study", conn);
         parts.push(conn.id + ":" + name + "@" + (r.data[0]?.m ?? ""));
       }

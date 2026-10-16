@@ -350,7 +350,9 @@ export function PickMenu({ label, title, options, chosen, onChange, min, max, bu
 }
 
 /** one row of a view's cohort picker: a cohort, one of its splits, or one of a split's groups */
-export interface CohortNode { name: string; label: string; kind: "cohort" | "split" | "arm"; depth: number; count: number | null; groups?: number }
+export interface CohortNode { name: string; label: string; kind: "cohort" | "split" | "arm"; depth: number; count: number | null; groups?: number;
+  /** why this view cannot draw it whole (lib/view-coverage.ts): offered disabled, saying so */
+  blocked?: string }
 
 /**
  * Which cohorts a view draws, as the tree they come from: each cohort, its splits under it, each
@@ -402,12 +404,12 @@ export function CohortPicker({ nodes, chosen, max, busy, onChange, onAdd, menuId
     const kids = o.kind === "split" ? nodes.filter((x) => x.kind === "arm" && x.name.startsWith(o.name + " / ") && x.depth === o.depth + 1) : [];
     return (
       <div key={o.name} className={"cpick " + o.kind + (implied ? " implied" : "") + (on ? " on" : "")} style={{ paddingLeft: (0.5 + o.depth * 1.15) + "rem" }}>
-        <label title={last ? "a view draws at least one — tick another to switch" : full ? "this view draws at most " + max
+        <label title={o.blocked && !on ? o.blocked : last ? "a view draws at least one — tick another to switch" : full ? "this view draws at most " + max
             : implied ? "drawn as part of the split — click to draw only this group"
             : replaces ? (mine ? "a view draws one split's groups or whole cohorts — this replaces what is ticked"
               : "a view draws whole cohorts or one split's groups — this replaces “" + current + "”") : o.name}>
           {single && o.kind === "split" ? <span className="cpick-noinput" aria-hidden="true" /> :
-            <input type={single ? "radio" : "checkbox"} checked={on || implied} disabled={busy || full}
+            <input type={single ? "radio" : "checkbox"} checked={on || implied} disabled={busy || full || (!!o.blocked && !on)}
               onChange={() => choose(o.name)} onClick={() => { if (last) choose(o.name); }} />}
           <span className="cpick-label">
             <span className="cpick-line">

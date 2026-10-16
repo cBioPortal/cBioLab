@@ -5,6 +5,7 @@
 // on screen, with the query's fetching state saying it is being replaced.
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { AnalysisResult } from "../../lib/types.ts";
+import type { StudyAccess } from "../../lib/view-coverage.ts";
 import { api } from "./api.ts";
 import { customDataKey } from "./custom-data-client.ts";
 import { isCustomAttr } from "../../lib/custom-data-names.ts";
@@ -12,6 +13,8 @@ import { isCustomAttr } from "../../lib/custom-data-names.ts";
 export type StudyInfo = {
   id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number;
   caps?: Record<string, boolean>; oncokb?: boolean; instance?: string; instanceLabel?: string;
+  /** how this deployment reaches it, for which views can be drawn (lib/view-coverage.ts) */
+  access?: StudyAccess;
 };
 export type TrackAttrs = {
   key: string;

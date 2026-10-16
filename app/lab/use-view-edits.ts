@@ -19,6 +19,8 @@ import type { DocStore } from "./doc-store.ts";
 export interface ViewEditsPage {
   assayOptions: () => string[];
   busy: boolean;
+  /** why a view of this kind cannot draw that cohort whole (lib/view-coverage.ts), or null */
+  cantDrawCohort: (kind: string, cohort: string) => string | null;
   catalogAttrs: () => { attribute: string; kind: string; }[];
   contProfile: () => string | null;
   doc: AnalysisDoc;
@@ -38,7 +40,7 @@ export interface ViewEditsPage {
 }
 
 export function useViewEdits(page: ViewEditsPage) {
-  const { assayOptions, busy, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, viewAttrs, viewEvents, viewGenes, viewIds, VIEW_KINDS, setChooser, setToast, study } = page;
+  const { assayOptions, busy, cantDrawCohort, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, viewAttrs, viewEvents, viewGenes, viewIds, VIEW_KINDS, setChooser, setToast, study } = page;
 
   const viewTitle = (kind: string): string => (VIEW_KINDS.find((k) => k.kind === kind) || { label: kind }).label;
   /** the most cohorts a view of this kind draws at once (its cohorts menu enforces the same) */
@@ -196,11 +198,15 @@ export function useViewEdits(page: ViewEditsPage) {
     const authored = Object.keys(doc.cohorts || {});
     const nodes: CohortNode[] = [];
     const countOf = (n: string) => result?.cohorts[n]?.count ?? null;
+    // a cohort this view cannot draw whole (lib/view-coverage.ts) is offered disabled, saying why;
+    // its splits and groups span the same studies
+    const blockedOf = (n: string) => cantDrawCohort(v.kind, n) ?? undefined;
     const offer = (n: string, label: string, kind: CohortNode["kind"], depth: number) => {
       if (result && !result.cohorts[n]) return;
-      nodes.push({ name: n, label, kind, depth, count: countOf(n) });
+      const blocked = blockedOf(n);
+      nodes.push({ name: n, label, kind, depth, count: countOf(n), ...(blocked ? { blocked } : {}) });
       for (const p of shapes.filter((x) => x.of === n)) {
-        nodes.push({ name: p.name, label: p.name.slice(n.length + 3), kind: "split", depth: depth + 1, count: countOf(n), groups: p.comparable.length });
+        nodes.push({ name: p.name, label: p.name.slice(n.length + 3), kind: "split", depth: depth + 1, count: countOf(n), groups: p.comparable.length, ...(blocked ? { blocked } : {}) });
         for (const c of p.comparable) offer(c, c.slice(p.name.length + 3), "arm", depth + 2);
       }
     };

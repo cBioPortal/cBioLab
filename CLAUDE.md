@@ -58,8 +58,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
 - **View aggregates** — most view kinds after the first few (`genome`, `pathways`, `enrichment`, …)
   query through the resolvers' `viewAggregate`/`viewAggregateMany`/`viewMeta`, whose SQL lives in
   **`lib/federation-views.ts`** (re-exported by `lib/federation.ts`, so the boundary suite sweeps
-  it). Every local participant has those methods, a remote peer does not, and `answering()` in
-  `lib/views/shared.ts` splits a view's studies accordingly so the view names what was left out.
+  it). Every local participant has those methods, a remote peer does not, so such a view is not
+  drawn over a peer's studies (`lib/view-coverage.ts`, below invariant 10).
   Figures: **`lib/figures/<kind>.ts`**, one module per kind (the later kinds registered with their
   title in `lib/figures/index.ts`), dispatched by **`lib/view-svg.ts`**; all browser-safe, laid out
   with **`lib/chart/`** (see "Figures" under UI conventions); cards: `app/lab/kind-cards.tsx`.
@@ -361,7 +361,10 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
    which (see the display popover's "this browser only" group).
 10. **The patient-data boundary** (`docs/DATA-BOUNDARY.md`) — aggregate-only and remote
    participants never emit or receive patient identifiers, and the guarantee is a *missing
-   method* rather than a flag. Views degrade and say so rather than silently narrowing.
+   method* rather than a flag. A view is drawn over every patient of its cohorts or not at all:
+   `lib/view-coverage.ts` is the one rule — the engine refuses by it before a view runs, the page
+   disables the add-view button and the cohort it applies to — and a new view kind that leaves a
+   participant out needs its entry there (`test/view-coverage.test.ts` checks the runners).
    Never add an id-returning path to `AggregateResolver` / `RemoteAggregateResolver`.
 11. **Results are cached with `'use cache: remote'`** (`lib/next-cache.ts`; Next 16 Cache
    Components). On Vercel it is Runtime Cache, shared by every function instance; elsewhere it

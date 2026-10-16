@@ -19,7 +19,7 @@
 // for the transport — a real deployment swaps in a second connection
 // (data-level federation) or an MCP client to a remote cbio-lab
 // (document-level federation) behind the same interface.
-import { chQuery, DB, PRIMARY, connections, isAbortError, type ChConn } from "./ch.ts";
+import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
@@ -48,9 +48,10 @@ export function legendFor(values: string[], ring = false): { label: string; colo
 
 const num = (v: unknown): number | null => { const x = Number(v); return Number.isFinite(x) ? x : null; };
 import type { CohortDef, CompileCtx, ChRow, ChResult, PatientTimeline } from "./types.ts";
+import type { StudyAccess } from "./view-coverage.ts";
 import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } from "./patient-timeline.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";
-import type { PatientKind } from "./disclosure.ts";
+import { PATIENT_KINDS, type PatientKind } from "./disclosure.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -186,9 +187,12 @@ export async function studyRouting(): Promise<Map<string, ChConn>> {
   let complete = true;
   for (const conn of connections()) {
     try {
-      const r = await chQuery<{ id: string; name: string }>(
-        "SELECT cancer_study_identifier AS id, name FROM " + conn.db + ".cancer_study", conn);
-      for (const { id, name } of r.data) {
+      // the simulated peer's studies are learned from it, over MCP, like a real peer's
+      const rows = conn.id === loopbackOnlyConn()?.id
+        ? (await (await import("./federation-remote.ts")).loopbackStudies()).map(({ id, name }) => ({ id, name }))
+        : (await chQuery<{ id: string; name: string }>(
+          "SELECT cancer_study_identifier AS id, name FROM " + conn.db + ".cancer_study", conn)).data;
+      for (const { id, name } of rows) {
         if (isRestrictedStudy(id, name)) { restrictedStudies.add(id); continue; }
         if (map.has(id)) { routingCollisions.push(id); continue; } // first instance wins; surfaced, not hidden
         map.set(id, conn);
@@ -198,6 +202,8 @@ export async function studyRouting(): Promise<Map<string, ChConn>> {
       // it here and memoizing the result below poisoned the process: the map cached empty, every
       // later request answered "unknown study <x>", and only a restart cleared it. Let it out.
       if (isAbortError(e)) throw e;
+      // and a query the boundary refused (lib/ch.ts) is a bug to see, not an instance that is down
+      if (e instanceof LoopbackDirectError) throw e;
       complete = false; /* an unreachable instance simply contributes no studies */
     }
   }
@@ -1340,6 +1346,13 @@ export function peerRowsFor(r: Resolver, kind: PatientKind): (Resolver & RemoteP
 
 export function isPatientLevel(r: Resolver): r is PatientLevelCapable {
   return r.instance.mode === "patient-level";
+}
+
+/** How this app reaches the study `r` answers for, for lib/view-coverage.ts. */
+export function studyAccess(r: Resolver): StudyAccess {
+  // a peer's label also says what it shares; `shares` says that here
+  return { instance: r.instance.label.replace(/ \(shares [^)]*\)$/, ""), patientLevel: isPatientLevel(r), remote: r.instance.id === "peer",
+    shares: PATIENT_KINDS.filter((k) => peerRowsFor(r, k)) };
 }
 
 /**
