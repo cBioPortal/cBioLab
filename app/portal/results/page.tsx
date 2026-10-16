@@ -10,9 +10,10 @@ import { useStudyKnown, expressionProfile, type StudyKnown } from "../study-know
 import { arrange, decodeDoc, usePageDoc, type PageLayout } from "../page-doc";
 import { ALTERATION_CELLS, cellLabel } from "../../../lib/lollipop";
 import { Button } from "../../_ui/button";
-import { Input } from "../../_ui/input";
-import { FIELD } from "../../_ui/toolbar.ts";
-import { cn } from "../../../lib/cn";
+import { TB } from "../../_ui/toolbar.ts";
+import { Pencil } from "lucide-react";
+import { fmtInt } from "../../../lib/chart/format.ts";
+import { PortalHeader, PortalSummary, QueryForm } from "../portal-chrome.tsx";
 
 const CLINICAL_SHOWN = 8;
 
@@ -85,30 +86,32 @@ export default function ResultsPage() {
   const fresh = useMemo(() => known && genes.length && genes.length <= 12 ? resultsLayout(study, genes, known) : null, [known, study, genes]);
   const page = usePageDoc(fresh, linked);
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
+  const [editing, setEditing] = useState(false);
+  const queried = known?.patients || 0;
   const altered = counts?.Altered;
-  const head = <header className="portal-head"><a href="/lab">cbio-lab</a> <span className="meta">· Results</span>
-    <div className="portal-summary">
-      <div>
-        <h1>{known ? known.name : study || "Results"}</h1>
-        {known && <span>All samples ({known.samples.toLocaleString()} samples / {known.patients.toLocaleString()} patients) — {genes.join(", ")}</span>}
-      </div>
-      {known && altered != null && <strong>Queried genes are altered in {altered.toLocaleString()} ({Math.round(100 * altered / (known.patients || 1))}%) of queried patients</strong>}
-    </div></header>;
-  if (!study || !genes.length) return (
-    <main className="portal-main">{head}
-      <form className="card" method="get">
-        <label className="tbfield">study <Input name="study" defaultValue={study} placeholder="msk_chord_2024" className={cn(FIELD, "w-48")} /></label>{" "}
-        <label className="tbfield">genes <Input name="genes" defaultValue={genes.join(" ")} placeholder="KRAS NRAS BRAF" className={cn(FIELD, "w-48")} /></label>{" "}
-        <Button size="sm" className="h-ctl px-3 text-md" type="submit">show</Button>
-      </form>
-    </main>);
-  if (genes.length > 12) return <main className="portal-main">{head}<p className="note">a results page takes at most 12 genes, the oncoprint&apos;s rows; this asks for {genes.length}</p></main>;
-  if (error) return <main className="portal-main">{head}<p className="note">{error}</p></main>;
-  if (!fresh || !page.doc) return <main className="portal-main">{head}<div className="loading-block"><span className="spinner" /> loading {study}…</div></main>;
-  return <main className="portal-main">{head}
+  const shell = (body: React.ReactNode) => <><PortalHeader page="query results" /><main className="analysis-main">{body}</main></>;
+  if (!study || !genes.length) return shell(
+    <section data-tw className="mb-4 rounded-lg border bg-card px-4.5 py-4">
+      <div className="text-sm font-semibold tracking-[0.12em] text-muted-foreground uppercase">Query</div>
+      <p className="mt-1 text-md text-muted-foreground">A study and up to 12 genes: the page shows the patients altered in any of them against the rest, tab by tab, as cBioPortal&apos;s Results page does.</p>
+      <QueryForm study={study} genes={genes} />
+    </section>);
+  if (genes.length > 12) return shell(<p className="note">a results page takes at most 12 genes, the oncoprint&apos;s rows; this asks for {genes.length}</p>);
+  if (error) return shell(<div className="error">{error}</div>);
+  const ready = !!(fresh && page.doc);
+  return shell(<>
+    <PortalSummary eyebrow="Query results" title={known ? known.name : study} study={study} genes={genes}
+      detail={known && <span className="tabular-nums">{fmtInt(known.samples)} samples · {fmtInt(known.patients)} patients</span>}
+      groups={Object.keys(fresh?.doc.cohorts || {})} counts={counts} left={fresh?.left || []}
+      stat={altered != null && queried ? { value: altered, of: queried, label: "queried patients altered in " + (genes.length === 1 ? genes[0] : "any of the " + genes.length + " genes") } : null}
+      action={<Button variant="outline" size="sm" className={TB} aria-expanded={editing} onClick={() => setEditing((e) => !e)}><Pencil />Modify query</Button>}>
+      {editing && <QueryForm study={study} genes={genes} className="mt-0 border-t pt-2.5" />}
+    </PortalSummary>
     {page.note && <p className="note">{page.note}</p>}
-    <PortalTabs doc={page.doc} tabs={fresh.tabs} titles={fresh.titles} left={fresh.left} open={page.open} onOpen={page.openTab} onDoc={page.update}
-      catalog={{ attrs: known!.attrs, profiles: known!.profiles, loading: false }}
-      onCounts={(c) => setCounts((o) => o || c)} />
-  </main>;
+    {!ready
+      ? <><div className="skeleton mb-4 h-10" /><div className="card viewcard viewloading" aria-busy="true"><div className="skeleton skeleton-view" /></div></>
+      : <PortalTabs doc={page.doc!} tabs={fresh!.tabs} titles={fresh!.titles} open={page.open} onOpen={page.openTab} onDoc={page.update}
+          catalog={{ attrs: known!.attrs, profiles: known!.profiles, loading: false }}
+          onCounts={(c) => setCounts((o) => o || c)} />}
+  </>);
 }

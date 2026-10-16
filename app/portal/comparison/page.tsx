@@ -3,12 +3,14 @@
 // arrive in an analysis document (?doc=, the lab's own link encoding); the page's views replace
 // any the link carries unless they are this page's own (a link made on this page), so every
 // setting changed here travels in the same ?doc= (page-doc.ts).
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { AnalysisDoc, View } from "../../../lib/types";
 import { PortalTabs } from "../PortalTabs";
 import { useStudyKnown, expressionProfile, type StudyKnown } from "../study-known";
 import { arrange, decodeDoc, usePageDoc, type PageLayout } from "../page-doc";
+import { PortalHeader, PortalSummary } from "../portal-chrome.tsx";
+import { fmtInt } from "../../../lib/chart/format.ts";
 
 const CLINICAL_SHOWN = 8;
 
@@ -39,18 +41,21 @@ export default function ComparisonPage() {
   const { known, error } = useStudyKnown(study);
   const fresh = useMemo(() => linked && known && names.length >= 2 && names.length <= 6 ? comparisonLayout(linked, study, known) : null, [linked, known, study, names.length]);
   const page = usePageDoc(fresh, linked);
-  const head = <header className="portal-head"><a href="/lab">cbio-lab</a> <span className="meta">· Group comparison</span>
-    <div className="portal-summary"><div>
-      <h1>{known ? known.name : study || "Comparison"}</h1>
-      {known && <span>{names.length} groups: {names.join(", ")}</span>}
-    </div></div></header>;
-  if (!linked || !study) return <main className="portal-main">{head}<p className="note">This page compares the cohorts of an analysis document passed as <code>?doc=</code> (the lab&apos;s own link encoding); none was given.</p></main>;
-  if (names.length < 2 || names.length > 6) return <main className="portal-main">{head}<p className="note">a comparison page compares 2 to 6 cohorts; this analysis has {names.length}</p></main>;
-  if (error) return <main className="portal-main">{head}<p className="note">{error}</p></main>;
-  if (!fresh || !page.doc) return <main className="portal-main">{head}<div className="loading-block"><span className="spinner" /> loading {study}…</div></main>;
-  return <main className="portal-main">{head}
+  const [counts, setCounts] = useState<Record<string, number> | null>(null);
+  const shell = (body: React.ReactNode) => <><PortalHeader page="group comparison" /><main className="analysis-main">{body}</main></>;
+  if (!linked || !study) return shell(<p className="note">This page compares the cohorts of an analysis document passed as <code>?doc=</code> (the lab&apos;s own link encoding); none was given.</p>);
+  if (names.length < 2 || names.length > 6) return shell(<p className="note">a comparison page compares 2 to 6 cohorts; this analysis has {names.length}</p>);
+  if (error) return shell(<div className="error">{error}</div>);
+  const ready = !!(fresh && page.doc);
+  return shell(<>
+    <PortalSummary eyebrow="Group comparison" title={known ? known.name : study} study={study}
+      detail={known && <span className="tabular-nums">{fmtInt(known.samples)} samples · {fmtInt(known.patients)} patients</span>}
+      groups={names} counts={counts} left={fresh?.left || []} />
     {page.note && <p className="note">{page.note}</p>}
-    <PortalTabs doc={page.doc} tabs={fresh.tabs} titles={fresh.titles} left={fresh.left} open={page.open} onOpen={page.openTab} onDoc={page.update}
-      catalog={{ attrs: known!.attrs, profiles: known!.profiles, loading: false }} />
-  </main>;
+    {!ready
+      ? <><div className="skeleton mb-4 h-10" /><div className="card viewcard viewloading" aria-busy="true"><div className="skeleton skeleton-view" /></div></>
+      : <PortalTabs doc={page.doc!} tabs={fresh!.tabs} titles={fresh!.titles} open={page.open} onOpen={page.openTab} onDoc={page.update}
+          catalog={{ attrs: known!.attrs, profiles: known!.profiles, loading: false }}
+          onCounts={(c) => setCounts((o) => o || c)} />}
+  </>);
 }

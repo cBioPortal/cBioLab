@@ -1557,14 +1557,6 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .xc-cell { fill: var(--accent); }
 .xc-brush { fill: color-mix(in srgb, var(--accent) 15%, transparent); stroke: var(--accent); stroke-dasharray: 3 2; }
 
-/* the portal pages (app/portal): cBioPortal's Results and Comparison layouts */
-.portal-main { max-width: 1400px; margin: 0 auto; padding: var(--s4); }
-.portal-head h1 { font-size: var(--t-xl); margin: var(--s2) 0; }
-.portal-head a { color: var(--accent-ink); text-decoration: none; font-weight: 600; }
-.portal-cohorts { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
-.portal-view { margin-top: var(--s3); }
-.portal-view .vtitle { font-size: var(--t-md); margin: 0 0 var(--s2); }
-
 /* the portal-style card bodies (app/lab/portal-bodies.tsx) */
 .pb-scroll { overflow-x: auto; }
 .pb-row { display: flex; gap: var(--s4); align-items: flex-start; flex-wrap: wrap; }
@@ -1583,9 +1575,6 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .ds-controls .spacer { flex: 1; }
 .ds-table .ds-dl a { color: var(--accent-ink); }
 .ds-table .ds-study { min-width: 20rem; }
-.portal-group { color: #fff; border-radius: var(--r-sm); padding: 1px var(--s2); font-size: var(--t-xs); }
-.portal-head .portal-summary { display: flex; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; font-size: var(--t-sm); }
-.portal-chooser { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s2); }
 .pb-loading { opacity: 0.45; transition: opacity 0.15s; }
 
 .pb-pager .tbz { flex-wrap: wrap; }
