@@ -4,7 +4,7 @@
 // and the edits a card can make — so a card holds no state of its own beyond what its body needs.
 import { useLayoutEffect, useRef, useState } from "react";
 import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
-import { KIND_CARDS, hasKindCard, kindSub, KindCardControls, KindCardBody, drawsOwnWaiting } from "./kind-cards";
+import { KIND_CARDS, hasKindCard, kindSub, KindCardControls, KindCardBody, drawsOwnWaiting, figureView } from "./kind-cards";
 import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
 import { OncoprintCard, Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
@@ -568,7 +568,7 @@ function KindCard({ ctx, v, vi }: CardProps) {
         return <>
           <KindCardControls c={mc} />
           {v.note && <p className="note">{v.note}</p>}
-          {body || <ViewFigure v={v} error={v.error} />}
+          {body || <ViewFigure v={figureView(docView(vi), v)} error={v.error} />}
           {body && v.caveat && <p className="note vfoot">{v.caveat}</p>}
         </>;
       })()}

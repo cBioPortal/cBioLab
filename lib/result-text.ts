@@ -4,6 +4,7 @@
 // describe the same result differently. Pure and browser-safe.
 import type { AnalysisDoc, AnalysisResult, ViewResult, AssaysEntity, CorrelatesGene } from "./types.ts";
 import { lollipopSummaryText } from "./lollipop-svg.ts";
+import { riskSpan } from "./figures/riskmodel.ts";
 
 /** a timeline's events listed in text (MCP); the figure draws every one */
 const TIMELINE_TEXT_EVENTS = 400;
@@ -274,8 +275,9 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         `  held-out C-index ${m.cIndex.median.toFixed(3)} (IQR ${m.cIndex.q1.toFixed(3)}–${m.cIndex.q3.toFixed(3)})` +
         (m.validation ? `; trained on the discovery half only (${m.validation.discovery} patients), C-index on the validation half ${m.validation.cIndex.toFixed(3)} (${m.validation.validation} patients)` : "") + "\n" +
         (m.covariates.length ? "  adjusted for: " + m.covariates.map((c) => `${c.name} HR ${c.hr.toFixed(3)}`).join(", ") + "\n" : "") +
+        `  risk score on OncoCast's 0–10 scale (0 and 10 the lowest and highest held-out score${m.validation ? " in the discovery half" : ""}; raw ${m.scale.min.toFixed(3)} to ${m.scale.max.toFixed(3)})\n` +
         `  risk groups (${m.reportedOn}):\n` +
-        m.groups.map((g) => `    ${g.name}: n=${g.curve.n}, ${g.curve.events} events, median ${g.curve.median == null ? "not reached" : g.curve.median.toFixed(1) + "mo"}, ` +
+        m.groups.map((g) => `    ${g.name} (score ${riskSpan(m, g)}): n=${g.curve.n}, ${g.curve.events} events, median ${g.curve.median == null ? "not reached" : g.curve.median.toFixed(1) + "mo"}, ` +
           `12-month ${pc(g.at12)}, 36-month ${pc(g.at36)}` + (g.hr != null ? `, HR vs lowest ${g.hr.toFixed(2)} (95% CI ${g.ciLow!.toFixed(2)}–${g.ciHigh!.toFixed(2)}, ${pFmt(g.p!)})` : "")).join("\n") +
         (m.logrank ? `\n  log-rank p=${pFmt(m.logrank.p)}` : "") +
         (m.refit ? `\n  risk score alone: HR ${m.refit.hr.toFixed(2)} per SD (95% CI ${m.refit.ciLow.toFixed(2)}–${m.refit.ciHigh.toFixed(2)}, ${pFmt(m.refit.p)})` : "") +

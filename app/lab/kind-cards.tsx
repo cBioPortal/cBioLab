@@ -13,6 +13,7 @@ import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { FIELD } from "../_ui/toolbar.ts";
+import { RISK_LABEL_ABOVE } from "../../lib/figures/riskmodel.ts";
 
 /**
  * A text field that keeps what is being typed to itself and hands the page the value only on
@@ -116,6 +117,14 @@ export interface KindCardCtx {
 
 /** the risk model's covariate menus, open or shut, by view (a viewport state, not the document's) */
 const RISK_MENUS = new Map<string, boolean>();
+/** the volcano's label thresholds the card offers */
+const RISK_LABEL_STEPS = [0.1, 0.25, 0.5, 0.75, 0.9, 1];
+
+/** The result as the figure draws it: settings applied in the browser (dataPart) read from the document, not the last run. */
+export function figureView(spec: any, v: any): any {
+  if (v?.kind === "riskmodel" && v.riskmodel) return { ...v, riskmodel: { ...v.riskmodel, labelAbove: Number(spec.labelAbove ?? RISK_LABEL_ABOVE) } };
+  return v;
+}
 
 /** A one-line subtitle for the card header. */
 export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
@@ -391,6 +400,7 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
   }
   if (spec.kind === "riskmodel") {
     const cats = c.attrs.filter((a) => a.kind !== "num").map((a) => a.attribute);
+    const labelAbove = Number(spec.labelAbove ?? RISK_LABEL_ABOVE);
     return (
       <div className="viewtb">
         <div className="tbz"><span className="tbl">data</span>
@@ -448,6 +458,14 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
           <label className="tbfield" title="risk groups, cut at equal quantiles of the score">
             groups <OptionSelect value={String(spec.groups ?? 3)} disabled={busy} onValueChange={(v) => patch({ groups: Number(v) })}>
               {[2, 3, 4, 5].map((g) => <option key={g} value={g}>{g}</option>)}
+            </OptionSelect>
+          </label>
+        </div>
+        <div className="tbz"><span className="tbl">view</span>
+          <label className="tbfield" title="the volcano names the genes the model kept in at least this share of its runs; the rest are drawn unnamed">
+            label genes kept in ≥ <OptionSelect value={String(labelAbove)} disabled={busy} onValueChange={(v) => patch({ labelAbove: Number(v) === RISK_LABEL_ABOVE ? undefined : Number(v) })}>
+              {!RISK_LABEL_STEPS.includes(labelAbove) && <option value={labelAbove}>{Math.round(labelAbove * 100)}%</option>}
+              {RISK_LABEL_STEPS.map((t) => <option key={t} value={t}>{Math.round(t * 100)}%</option>)}
             </OptionSelect>
           </label>
         </div>

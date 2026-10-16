@@ -6,6 +6,7 @@ import { timeScale } from "../lib/chart/time.ts";
 import { paragraph } from "../lib/chart/text.ts";
 import { incidenceSvg } from "../lib/figures/incidence.ts";
 import { riskmodelSvg } from "../lib/figures/riskmodel.ts";
+import { lintSvg } from "../lib/chart/lint.ts";
 import { labsSvg } from "../lib/figures/labs.ts";
 import { courseSvg } from "../lib/figures/course.ts";
 import { timelineSvg } from "../lib/timeline-svg.ts";
@@ -92,7 +93,10 @@ describe("risk model, labs, course and timeline stay inside the frame", () => {
       groups: ["Low risk", "Intermediate-low risk", "Intermediate risk", "Intermediate-high risk", "High risk"].map((name, i) => ({ name, from: i ? i : null, to: null,
         curve: km(2319), at12: 0.85, at36: 0.65, hr: i ? 1.49 : null, ciLow: i ? 1.37 : null, ciHigh: i ? 1.63 : null, p: i ? 2.5e-19 : null })),
       logrank: { chi2: 333.41, df: 4, p: 4e-73, strata: 12, groups: 5 } as any, refit: { hr: 1.37, ciLow: 1.33, ciHigh: 1.42, p: 4.1e-86 },
-      histogram: { edges: [0, 1, 2, 3, 4, 5], counts: [10, 300, 2000, 400, 12] } } } as any;
+      histogram: { edges: [0, 1, 2, 3, 4, 5], counts: [10, 300, 2000, 400, 12] }, scale: { min: 0, max: 5 }, labelAbove: 0.5 } } as any;
+  // a crowded volcano: hundreds of genes kept, many past the label threshold, long names
+  const crowded = { ...rm, riskmodel: { ...rm.riskmodel, labelAbove: 0.1, candidates: 400,
+    features: Array.from({ length: 300 }, (_, i) => ({ gene: "LONGGENENAME" + i, selected: ((i * 37) % 100) / 100 || 0.01, meanCoef: 0, hr: Math.exp(((i * 53) % 61 - 30) / 40), mutated: 30 + (i * 17) % 3000 })) } } as any;
   const labPanel = (i: number, waterfall?: number[]) => ({ cohort: LONG(i), anchored: 12345, baseline: 9876, positiveBaseline: 9000, evaluable: 8765,
     course: [-12, -8, -4, 0, 4, 8, 12].map((week) => ({ week, n: 80, q1: -80, median: -40, q3: 250 })),
     best: new Array(201).fill(0).map((_, k) => k % 7), responders: 4321, ...(waterfall ? { waterfall } : { waterfallWithheld: 8 }) });
@@ -104,6 +108,11 @@ describe("risk model, labs, course and timeline stay inside the frame", () => {
       points: Array.from({ length: 25 }, (_, k) => ({ t: -12 + 3 * k, atRisk: 12345 - k * 300, n: 100, pct: 40 })) }))) } as any;
   for (const width of [480, 760, 1400]) {
     test("risk model at " + width + "px", () => assert.deepEqual(overruns(riskmodelSvg(rm, { width })), []));
+    test("risk model with a crowded volcano at " + width + "px", () => {
+      const svg = riskmodelSvg(crowded, { width });
+      assert.deepEqual(overruns(svg), []);
+      assert.deepEqual(lintSvg(svg), []);
+    });
     test("labs at " + width + "px", () => assert.deepEqual(overruns(labsSvg(labs, { width })), []));
     test("course at " + width + "px", () => assert.deepEqual(overruns(courseSvg(course, { width })), []));
   }

@@ -7,6 +7,7 @@ import { kaplanMeier, logRankK } from "../stats.ts";
 import { riskmodelMethod } from "../method.ts";
 import type { ViewRun } from "./run.ts";
 import { overLimit, refuse } from "./shared.ts";
+import { RISK_LABEL_ABOVE } from "../figures/riskmodel.ts";
 
 const RISK_MAX_RUNS = 100;
 /** patients x runs past which one request would not finish inside the analysis route's time limit */
@@ -45,6 +46,8 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
   if (!(Number.isInteger(nGroups) && nGroups >= 2 && nGroups <= 5)) return refuse("riskmodel", ctx, "groups is 2 to 5");
   if (!(Number.isInteger(minMutated) && minMutated >= 5)) return refuse("riskmodel", ctx, "minMutated is a whole number of patients, at least 5");
   if (!Number.isInteger(seed)) return refuse("riskmodel", ctx, "seed is a whole number");
+  const labelAbove = num(view.labelAbove, RISK_LABEL_ABOVE);
+  if (!(labelAbove >= 0 && labelAbove <= 1)) return refuse("riskmodel", ctx, "labelAbove is a share of runs, 0 to 1");
   const strata = view.strata ? String(view.strata) : null;
   const covNames = (view.covariates || []).map(String);
   for (const a of [strata, ...covNames]) if (a && !/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) return refuse("riskmodel", ctx, "“" + a.slice(0, 40) + "” is not a clinical attribute's name");
@@ -201,6 +204,7 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
     covariates: covOut, validation, reportedOn: validate ? "validation half" : "held-out scores",
     cIndex: { median: pct(0.5), q1: pct(0.25), q3: pct(0.75), values: fit.runs.map((x) => x.cIndex) },
     features, groups, logrank, refit, histogram: { edges: Array.from({ length: bins + 1 }, (_, k) => lo + k * w), counts },
+    scale: { min: sorted[0], max: sorted[sorted.length - 1] }, labelAbove,
   };
   return {
     kind: "riskmodel", cohorts: vNames, riskmodel: result,

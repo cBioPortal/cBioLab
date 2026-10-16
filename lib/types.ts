@@ -957,6 +957,9 @@ export interface RiskmodelView {
   anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
   /** train on the discovery half of the engine's fixed split only, and report on the validation half */
   validate?: boolean;
+  /** the volcano names the genes kept in at least this share of runs (0 to 1, default 0.5); drawn in
+   *  the browser from the whole result, so changing it re-runs nothing */
+  labelAbove?: number;
 }
 
 export interface RiskmodelResult {
@@ -990,8 +993,14 @@ export interface RiskmodelResult {
   logrank: LogRankK | null;
   /** a Cox model of the outcome on the risk score alone (per standard deviation of the score) */
   refit: { hr: number; ciLow: number; ciHigh: number; p: number } | null;
-  /** the scores' distribution, for the histogram: bin edges and counts */
+  /** the scores' distribution, for the histogram: bin edges and counts (raw scores) */
   histogram: { edges: number[]; counts: number[] };
+  /** OncoCast's 0–10 risk score: (raw − min) / (max − min) × 10, min and max the lowest and highest of
+   *  the held-out scores the cuts are placed on (with `validate`, the discovery half's — so a
+   *  validation patient can fall below 0 or above 10) */
+  scale: { min: number; max: number };
+  /** the volcano's label threshold, as the view asked (default 0.5) */
+  labelAbove: number;
 }
 
 export interface LabsView {

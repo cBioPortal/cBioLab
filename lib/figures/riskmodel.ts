@@ -1,7 +1,7 @@
 // Risk model figure: the risk groups' survival curves and the genes the model kept.
 import {
   palette, frame, caption, linear, log, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, label, textWidth,
-  seriesStyle, SERIES, fmtInt, fmtNum, fmtPct, fmtShare, fmtRatio, fmtP, fmtMonths, FS, SW, type SvgOpts
+  seriesStyle, SERIES, esc, fmtInt, fmtNum, fmtPct, fmtShare, fmtRatio, fmtP, fmtMonths, FS, SW, type SvgOpts
 } from "../svg-kit.ts";
 import type { ViewResult } from "../types.ts";
 import { stepPath } from "../chart/marks.ts";
@@ -10,15 +10,94 @@ import { timeScale, timeTitle } from "../chart/time.ts";
 import { paragraph } from "../chart/text.ts";
 import { lineSwatch } from "../chart/legend.ts";
 import { r1 } from "../chart/marks.ts";
+import { placeLabels, type LabelWant } from "../chart/place.ts";
+import { unplacedNote } from "./enrichment.ts";
 
 /** a hazard ratio below 1 and above it take the shared series' blue and vermillion */
 const FAVOURABLE = SERIES[0], ADVERSE = SERIES[4];
+
+/** the volcano names the genes kept in at least this share of runs, unless the view says otherwise */
+export const RISK_LABEL_ABOVE = 0.5;
 
 /** How many of the model's genes the figure lists; the rest are in the result and said in the caption. */
 export const RISK_FIGURE_GENES = 15;
 
 /** the gene chart reads as one unit: past this its bars would sit far from their names */
 const GENE_BARS_MAX = 420;
+
+type Risk = NonNullable<ViewResult["riskmodel"]>;
+
+/** A raw score on OncoCast's 0–10 scale: 0 and 10 are the lowest and highest held-out scores the cuts are placed on. */
+export function riskScaled(m: Pick<Risk, "scale">, raw: number): number {
+  const span = m.scale.max - m.scale.min;
+  return span > 0 ? (raw - m.scale.min) / span * 10 : 5;
+}
+
+/** a group's span of the 0–10 score, "3.1–5.4"; the open ends are the scale's own */
+export function riskSpan(m: Risk, g: Risk["groups"][number]): string {
+  const f = (x: number) => riskScaled(m, x).toFixed(1);
+  return (g.from == null ? "0" : f(g.from)) + "–" + (g.to == null ? "10" : f(g.to));
+}
+
+/** the volcano stays about square: wider than this it would stretch the hazard ratios apart */
+const VOLCANO_MAX_W = 760;
+
+/**
+ * OncoCast's volcano: every gene kept in at least one run, its mean hazard ratio where kept (log
+ * scale, so equal effects either way are equal distances from 1) against the share of runs that
+ * kept it, sized by the patients mutated. The genes kept in at least `labelAbove` of the runs are
+ * named where a label fits; the rest of those are listed under it.
+ */
+function riskVolcano(m: Risk, p: ReturnType<typeof palette>, x0: number, y0: number, width: number): { svg: string; height: number } {
+  const out: string[] = [];
+  const share = (x: number) => fmtPct(x * 100, 0);
+  out.push(label(x0 + 8, y0, "Selection frequency against mean hazard ratio (labelled: kept in ≥ " + share(m.labelAbove) + " of runs)",
+    { size: FS.title, fill: p.ink, weight: 600, maxW: width - 16 }));
+  const fs = m.features;
+  if (!fs.length) {
+    out.push(label(x0 + 8, y0 + FS.title + 8, "No gene was kept in any run.", { size: FS.body, fill: p.muted }));
+    return { svg: out.join(""), height: FS.title + 12 };
+  }
+  const T = y0 + 14, PH = Math.round(Math.max(220, Math.min(340, width * 0.55)));
+  const yTitle = "share of runs kept";
+  // room above the top row for its labels: a gene every run kept sits there, often with many others
+  const ys = linear(0, 1, T + PH - 6, T + 6 + FS.small * 2.5, { nice: false });
+  ys.ticks = [0, 0.25, 0.5, 0.75, 1];
+  const L = x0 + 8 + leftAxisWidth(ys, yTitle, share), Rx = x0 + width - 12;
+  const span = Math.max(1.5, ...fs.map((f) => Math.max(f.hr, 1 / f.hr))) * 1.1;
+  const xs = log(1 / span, span, L + 8, Rx - 8, { nice: false });
+  const xTitle = "mean hazard ratio where kept (log scale) — favourable ← → adverse";
+  out.push(axisLeft(ys, L, p, { title: yTitle, gridTo: Rx, fmt: share }));
+  out.push(axisBottom(xs, T + PH, p, { title: xTitle, minX: x0, maxX: x0 + width, gridTo: T }));
+  out.push(`<line x1="${r1(xs(1))}" y1="${T}" x2="${r1(xs(1))}" y2="${T + PH}" stroke="${p.muted}" stroke-width="${SW.hair}"/>`);
+  // the label threshold
+  const ty = r1(ys(m.labelAbove));
+  out.push(`<line x1="${L}" y1="${ty}" x2="${Rx}" y2="${ty}" stroke="${p.muted}" stroke-width="${SW.line}" stroke-dasharray="4 3"/>`);
+  const maxMut = Math.max(1, ...fs.map((f) => f.mutated));
+  const rOf = (n: number) => 2.2 + 4.8 * Math.sqrt(n / maxMut);
+  const at = fs.map((f) => ({ f, x: xs(Math.min(span, Math.max(1 / span, f.hr))), y: ys(f.selected), r: rOf(f.mutated) }));
+  // largest first, so a small point is never hidden under a large one
+  out.push([...at].sort((a, b) => b.r - a.r).map(({ f, x, y, r }) =>
+    `<circle cx="${r1(x)}" cy="${r1(y)}" r="${r1(r)}" fill="${f.hr < 1 ? FAVOURABLE : ADVERSE}" opacity="0.7" stroke="${p.bg}" stroke-width="0.5">` +
+    `<title>${esc(f.gene + ": kept in " + share(f.selected) + " of runs · mean HR " + fmtRatio(f.hr) + " · " + fmtInt(f.mutated) + " mutated")}</title></circle>`).join(""));
+  const named = at.filter((a) => a.f.selected >= m.labelAbove).sort((a, b) => b.f.selected - a.f.selected || Math.abs(Math.log(b.f.hr)) - Math.abs(Math.log(a.f.hr)));
+  const wants: LabelWant[] = named.map((a) => ({ text: a.f.gene, px: a.x, py: a.y, w: textWidth(a.f.gene, FS.small) + 2, h: FS.small + 2 }));
+  const pl = placeLabels(wants, { x: L + 1, y: T + 1, w: Rx - L - 2, h: PH - 2 }, at, 3);
+  for (const q of pl.placed) {
+    if (q.leader) out.push(`<line x1="${r1(q.leader.x1)}" y1="${r1(q.leader.y1)}" x2="${r1(q.leader.x2)}" y2="${r1(q.leader.y2)}" stroke="${p.muted}" stroke-width="${SW.hair}"/>`);
+    out.push(label(q.box.x + 1, q.box.y + FS.small * 0.85, q.text, { size: FS.small, fill: p.ink,
+      extra: `stroke="${p.bg}" stroke-width="3" stroke-linejoin="round" paint-order="stroke"` }));
+  }
+  let y = T + PH + bottomAxisHeight(xTitle);
+  const lines: string[] = ["Point size: patients mutated (largest " + fmtInt(maxMut) + "). " + fmtInt(named.length) + " of " + fmtInt(fs.length) +
+    " genes kept in ≥ " + share(m.labelAbove) + " of runs are named."];
+  const note = unplacedNote(pl.unplaced, named.length, "genes");
+  if (note) lines.push(note);
+  const para = paragraph(lines.join(" "), x0 + 8, y + 4, width - 16, p.muted, { size: FS.small });
+  out.push(para.svg);
+  y += 4 + para.height;
+  return { svg: out.join(""), height: y - y0 };
+}
 
 /**
  * The risk model: Kaplan–Meier curves of the risk groups, then the genes the model kept most
@@ -31,11 +110,11 @@ export function riskmodelSvg(v: ViewResult, o: SvgOpts): string {
 
   // the group table's columns, measured
   const pc = (x: number | null) => x == null ? "—" : fmtShare(x, 0);
-  const rows = m.groups.map((g, i) => [g.name, fmtInt(g.curve.n) + " · " + fmtInt(g.curve.events),
+  const rows = m.groups.map((g, i) => [g.name, riskSpan(m, g), fmtInt(g.curve.n) + " · " + fmtInt(g.curve.events),
     g.curve.median == null ? "not reached" : fmtMonths(g.curve.median), pc(g.at12), pc(g.at36),
     g.hr == null ? (i === 0 ? "reference" : "—") : fmtRatio(g.hr) + " [" + fmtRatio(g.ciLow!) + "–" + fmtRatio(g.ciHigh!) + "]",
     g.p == null ? "" : fmtP(g.p)]);
-  const heads = ["group", "patients · events", "median", "12 mo", "36 mo", "HR vs lowest [95% CI]", ""];
+  const heads = ["group", "score (0–10)", "patients · events", "median", "12 mo", "36 mo", "HR vs lowest [95% CI]", ""];
   const colW = heads.map((h, k) => Math.max(textWidth(h, FS.small), ...rows.map((r) => textWidth(r[k], FS.body))));
   const SW_X = 8, TX = SW_X + 18 + 6, CG = 18;
   const tableW = (nameW: number) => TX + nameW + colW.slice(1).reduce((a, w) => a + w + CG, 0) + 8;
@@ -95,12 +174,13 @@ export function riskmodelSvg(v: ViewResult, o: SvgOpts): string {
 
   // the distribution of the score the groups are cut from, with the cuts
   yy += 14;
-  out.push(label(8, yy, "Risk score (" + m.reportedOn + "), with the group cuts", { size: FS.title, fill: p.ink, weight: 600, maxW: W - 16 }));
-  yy += 10;
-  const ex = m.histogram.edges, HH = 64;
+  out.push(label(8, yy, "Risk score, 0–10 (" + m.reportedOn + "), with the group cuts", { size: FS.title, fill: p.ink, weight: 600, maxW: W - 16 }));
+  yy += 10 + FS.small + 2;
+  const ex = m.histogram.edges.map((e) => riskScaled(m, e)), HH = 64;
   const hy = linear(0, Math.max(1, ...m.histogram.counts), yy + HH, yy, { count: 2 });
   const hL = 8 + leftAxisWidth(hy, "patients");
-  const hx = linear(ex[0], ex[ex.length - 1], hL, W - R, { nice: false });
+  const hx = linear(Math.min(0, ex[0]), Math.max(10, ex[ex.length - 1]), hL, W - R, { nice: false });
+  hx.ticks = [0, 2, 4, 6, 8, 10].filter((t) => t >= hx.domain[0] && t <= hx.domain[1]);
   out.push(axisLeft(hy, hL, p, { title: "patients", gridTo: W - R }));
   let bars = "";
   m.histogram.counts.forEach((c, k) => {
@@ -108,14 +188,24 @@ export function riskmodelSvg(v: ViewResult, o: SvgOpts): string {
     if (c) bars += `M${r1(x0 + 0.5)} ${r1(yy + HH)}V${r1(top)}H${r1(Math.max(x0 + 1, x1 - 0.5))}V${r1(yy + HH)}Z`;
   });
   out.push(`<path d="${bars}" fill="${p.muted}" opacity="0.55"/>`);
+  let cutRight = -Infinity;
   m.groups.slice(1).forEach((g) => {
     if (g.from == null) return;
-    const x = r1(hx(g.from));
+    const v0 = riskScaled(m, g.from), x = r1(hx(v0));
     out.push(`<line x1="${x}" y1="${yy - 2}" x2="${x}" y2="${yy + HH}" stroke="${p.ink}" stroke-width="${SW.line}" stroke-dasharray="3 2"/>`);
+    // each cut's value over its line, where it clears the last; every cut is also in the table's score column
+    const t = v0.toFixed(1), tw = textWidth(t, FS.small), cx = Math.max(hL + tw / 2, Math.min(W - R - tw / 2, x));
+    if (cx - tw / 2 < cutRight + 4) return;
+    out.push(label(cx, yy - 4, t, { size: FS.small, fill: p.ink, anchor: "middle" }));
+    cutRight = cx + tw / 2;
   });
-  const hTitle = "risk score — lower risk ← → higher risk";
+  const hTitle = "risk score, 0–10 — lower risk ← → higher risk";
   out.push(axisBottom(hx, yy + HH, p, { title: hTitle, minX: 0, maxX: W }));
   yy += HH + bottomAxisHeight(hTitle) + 18;
+
+  const vol = riskVolcano(m, p, 0, yy, Math.min(W, VOLCANO_MAX_W));
+  out.push(vol.svg);
+  yy += vol.height + 18;
 
   // genes kept most often: selection share, and the mean hazard ratio as a bar about HR = 1 on a log scale
   const shown = m.features.slice(0, RISK_FIGURE_GENES);
@@ -154,7 +244,11 @@ export function riskmodelSvg(v: ViewResult, o: SvgOpts): string {
   const text = fmtInt(m.n) + " patients, " + fmtInt(m.events) + " events" + (m.anchoredTo ? ", clock from " + m.anchoredTo : "") +
     (m.validation ? " (trained on " + fmtInt(m.validation.discovery) + " in the discovery half, reported on " + fmtInt(m.validation.validation) + " in the validation half)" : "") +
     "; " + m.candidates + " candidate genes (of " + m.genesCovered + " covered for every patient, mutated in ≥" +
-    m.minMutated + "); elastic net, alpha " + m.alpha + ", seed " + m.seed + "." + (left.length ? " Left out: " + left.join("; ") + "." : "") +
+    m.minMutated + "); elastic net, alpha " + m.alpha + ", seed " + m.seed + "." +
+    " The risk score is OncoCast's 0–10 scale: 0 and 10 are the lowest and highest " + (m.validation ? "held-out score in the discovery half, so a validation patient can fall outside them" : "held-out score") +
+    " (raw linear predictor " + fmtNum(m.scale.min) + " to " + fmtNum(m.scale.max) + ")." +
+    (m.candidates > m.features.length ? " " + fmtInt(m.candidates - m.features.length) + " of the " + fmtInt(m.candidates) + " candidate genes were never kept, so are not on the volcano." : "") +
+    (left.length ? " Left out: " + left.join("; ") + "." : "") +
     (m.features.length > shown.length ? " " + (m.features.length - shown.length) + " more genes were kept in at least one run; they are in the result, not drawn." : "") +
     " " + (v.caveat || "");
   const cap = caption(text, W, yy + 4, p.muted);
