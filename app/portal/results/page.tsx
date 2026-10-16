@@ -46,7 +46,7 @@ function resultsLayout(study: string, genes: string[], known: StudyKnown): PageL
     Unaltered: { all: genes.map((g) => ({ not: { kind: "oql", q: g } })) } as CohortDef,
   };
   const expr = expressionProfile(known.profiles);
-  // the portal correlates over every queried sample, not one group
+  // the portal plots and correlates over every queried sample, not one group
   if (expr) cohorts["All patients"] = { all: [] } as CohortDef;
   const both = ["Altered", "Unaltered"];
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
@@ -55,7 +55,7 @@ function resultsLayout(study: string, genes: string[], known: StudyKnown): PageL
     { title: "Oncoprint", views: [v("Oncoprint", { kind: "oncoprint", genes, cohorts: both })] },
     { title: "Cancer Types Summary", views: [v("Cancer types summary", { kind: "cancertypes", genes, cohorts: ["Altered"] })] },
     ...(genes.length >= 2 ? [{ title: "Mutual Exclusivity", views: [v("Mutual exclusivity", { kind: "cooccurrence", genes, cohorts: both })] }] : []),
-    ...(expr ? [{ title: "Plots", views: [v(genes[0] + " copy number vs mRNA", { kind: "plot", x: { source: "alteration", gene: genes[0], by: "cna" }, y: { source: "molecular", profileType: expr, gene: genes[0] }, cohorts: both })] }] : []),
+    ...(expr ? [{ title: "Plots", views: [v("Plot", { kind: "plot", x: { source: "alteration", gene: genes[0], by: "cna" }, y: { source: "molecular", profileType: expr, gene: genes[0] }, cohorts: ["All patients"], highlight: ["Altered"] })] }] : []),
     // the portal's Mutations tab: one gene at a time, its lollipop over its mutation table
     { title: "Mutations", views: [v("Mutation diagram", { kind: "hotspots", genes: [genes[0]], cohorts: ["Altered"] }),
         v("Mutation table", { kind: "mutations", gene: genes[0], cohorts: ["Altered"] })],
