@@ -8,10 +8,9 @@ import { Braces, LoaderCircle, Play, Plus, Redo2, Save, Undo2, X } from "lucide-
 import { Button } from "../_ui/button";
 import { CHIP } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Textarea } from "../_ui/textarea";
 import CohortPills from "./pills";
-import { GeneListEditor } from "../_oncoprint/OncoprintCard.tsx";
+import { ViewGenesDialog } from "../_genes/GeneQueryDialog.tsx";
 import type { GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef } from "../../lib/types.ts";
 import type { CustomDataFocus } from "./custom-data-dialog.tsx";
@@ -98,23 +97,11 @@ export interface AnalysisCtx {
 
 
 export function GenesDialog({ ctx }: { ctx: AnalysisCtx }) {
-  const { busy, doc, genesFor, setGenesFor, setViewGenes } = ctx;
-  return (
-    <Dialog open={genesFor != null} onOpenChange={(open) => { if (!open) setGenesFor(null); }}>
-      {genesFor != null && (
-        <DialogContent aria-describedby={undefined} className="genedialog gap-3 sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base">Genes <span className="font-normal text-muted-foreground">— {String(((doc.views || [])[genesFor] as any)?.kind || "view")}</span></DialogTitle>
-          </DialogHeader>
-          {/* the DOCUMENT's view, never the result (a result's genes are {gene, driverPct, …}) */}
-          <GeneListEditor view={(doc.views || [])[genesFor] || {}} busy={busy} onGenes={(g) => setViewGenes(genesFor, g)} />
-          <DialogFooter>
-            <DialogClose asChild><Button>Done</Button></DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      )}
-    </Dialog>
-  );
+  const { doc, genesFor, setGenesFor, setViewGenes } = ctx;
+  // the DOCUMENT's view, never the result (a result's genes are {gene, driverPct, …})
+  const view = genesFor != null ? (doc.views || [])[genesFor] || null : null;
+  return <ViewGenesDialog view={view as { kind?: string; genes?: unknown } | null} open={genesFor != null}
+    onOpenChange={(open) => { if (!open) setGenesFor(null); }} onGenes={(g) => { if (genesFor != null) setViewGenes(genesFor, g); }} />;
 }
 
 export function CustomDataWarning({ ctx }: { ctx: AnalysisCtx }) {

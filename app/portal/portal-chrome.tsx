@@ -1,13 +1,9 @@
 "use client";
 // The chrome the portal pages share: the app's header (the lab's own), the summary card over the
-// tabs (the study, the query, the groups and their sizes), and the query form.
+// tabs (the study, the query, the groups and their sizes).
 import { SeriesSwatch } from "../lab/view-chrome.tsx";
-import { Button } from "../_ui/button";
-import { Input } from "../_ui/input";
 import { Badge } from "../_ui/badge";
-import { FIELD } from "../_ui/toolbar.ts";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
-import { cn } from "../../lib/cn";
 
 /** the app's header, as the lab draws it, naming which portal page this is */
 export function PortalHeader({ page }: { page: string }) {
@@ -86,20 +82,5 @@ export function PortalSummary({ eyebrow, title, study, detail, genes, groups, co
       </div>
       {children}
     </section>
-  );
-}
-
-/** the Results page's query: a study and up to 12 genes, submitted as the page's own URL */
-export function QueryForm({ study, genes, className }: { study: string; genes: string[]; className?: string }) {
-  return (
-    <form method="get" action="/portal/results" className={cn("viewtb", className)}>
-      <div className="tbz">
-        <label className="tbfield">study <Input name="study" defaultValue={study} placeholder="msk_chord_2024" className={cn(FIELD, "w-48")} /></label>
-      </div>
-      <div className="tbz">
-        <label className="tbfield">genes <Input name="genes" defaultValue={genes.join(" ")} placeholder="KRAS NRAS BRAF" className={cn(FIELD, "w-64")} /></label>
-        <Button size="sm" className="h-ctl px-3 text-md" type="submit">Submit query</Button>
-      </div>
-    </form>
   );
 }

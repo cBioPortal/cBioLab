@@ -493,11 +493,16 @@ async function main() {
         })).toString("base64")));
         await page.waitForSelector("button.genesbtn", { timeout: 300000 });
         await page.locator("button.genesbtn").first().click();
-        await page.waitForSelector("[role=dialog].genedialog", { timeout: 30000 });
-        const panel = page.locator("[role=dialog].genedialog");
-        const before = await panel.locator("[data-slot=badge]").count();
-        await panel.locator("input[list=view-genes]").fill("PIK3CA");
-        await panel.locator('button:has-text("add")').click();
+        await page.waitForSelector("[role=dialog].gene-query-dialog", { timeout: 30000 });
+        const panel = page.locator("[role=dialog].gene-query-dialog");
+        // the dialog starts from the view's genes, as text, and applies the text as left
+        const text = panel.locator("textarea");
+        const startText = await text.inputValue();
+        const before = startText.trim().split(/\s+/).length;
+        await text.fill(startText.trim() + " PIK3CA");
+        const apply = panel.getByRole("button", { name: "Apply" });
+        await page.waitForFunction(() => { const b = [...document.querySelectorAll("[role=dialog].gene-query-dialog button")].find((x) => x.textContent === "Apply"); return b && !b.disabled; }, null, { timeout: 60000 });
+        await apply.click();
         const genesNow = async () => page.evaluate(() => {
           const v = (JSON.parse(document.querySelector("#docjson").value).views || [])
             .find((x) => x.kind === "compare");
@@ -513,7 +518,11 @@ async function main() {
         // appended, not replaced — reading the RESULT's `genes` field instead of
         // the document's once wiped the list down to the one just typed
         const appended = added.length === before + 1 && added.includes("TP53");
-        await panel.locator("[data-slot=badge]", { hasText: "KRAS" }).first().click();
+        await page.locator("button.genesbtn").first().click();
+        await panel.locator("textarea").waitFor({ timeout: 30000 });
+        await panel.locator("textarea").fill(added.filter((g) => g !== "KRAS").join(" "));
+        await page.waitForFunction(() => { const b = [...document.querySelectorAll("[role=dialog].gene-query-dialog button")].find((x) => x.textContent === "Apply"); return b && !b.disabled; }, null, { timeout: 60000 });
+        await panel.getByRole("button", { name: "Apply" }).click();
         await page.waitForFunction(() => {
           const ta = document.querySelector("#docjson"); if (!ta) return false;
           try { return !(JSON.parse(ta.value).views || [])

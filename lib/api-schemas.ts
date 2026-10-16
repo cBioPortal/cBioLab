@@ -120,6 +120,16 @@ export const TableRequest = z.object({
   ...customData,
 });
 
+/**
+ * POST /api/genes — the gene catalog for the gene query dialog: check `symbols` (gene, alias of
+ * one, or unknown), search genes and gene sets by `search`, or list `geneset`'s members.
+ */
+export const GenesRequest = z.object({
+  symbols: z.array(z.string()).optional(),
+  search: z.string().max(40).optional(),
+  geneset: z.string().max(200).optional(),
+});
+
 /** A spec or a document goes out with the fields the envelope does not name. */
 type Open<T> = T & Record<string, unknown>;
 export type AnalysisBody = z.input<typeof AnalysisRequest>;
@@ -133,6 +143,7 @@ export type CellExplorerBody = z.input<typeof CellExplorerRequest>;
 export type MembersBody = z.input<typeof MembersRequest>;
 export type ViewPageBody = z.input<typeof ViewPageRequest>;
 export type TableBody = z.input<typeof TableRequest>;
+export type GenesBody = z.input<typeof GenesRequest>;
 
 /**
  * The body, checked against its envelope, with its defaults filled in and every field the

@@ -852,13 +852,13 @@ main.analysis-main { max-width: min(132rem, 100%); }
 
 /* Name-a-cohort dialog. Native <dialog>, so Esc, focus trapping and the
    backdrop are the platform's rather than ours. */
-.genedialog, .exportdialog {
+.exportdialog {
   border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card);
   color: var(--ink); padding: 1rem 1.1rem; min-width: 20rem; max-width: 26rem;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
 }
-.genedialog::backdrop, .exportdialog::backdrop { background: rgba(0, 0, 0, 0.32); }
-.genedialog h3, .exportdialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
+.exportdialog::backdrop { background: rgba(0, 0, 0, 0.32); }
+.exportdialog h3 { margin: 0 0 0.5rem; font-size: var(--t-base); }
 /* "+ Add cohort" on a view: the analysis's cohorts, the library, or Explore, as three tabs */
 .acd-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; grid-template-columns: fit-content(16rem) minmax(8rem, 1fr) fit-content(40%) auto; column-gap: var(--s3); }
 .acd-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; padding: var(--s1) 0; border-top: 1px solid var(--line); }
@@ -983,11 +983,7 @@ button.customtag:hover { text-decoration: underline; }
 }
 .customlist td { vertical-align: top; }
 .customlist td.meta { white-space: normal; }
-.genedialog { min-width: 24rem; max-width: 30rem; }
-.genedialog .setcol > .meta { color: var(--muted); font-size: var(--t-sm); }
-.genedialog textarea { width: 100%; box-sizing: border-box; }
-.genedialog .setrow, .exportdialog .setrow { display: flex; gap: 0.4rem; margin-top: 0.5rem; align-items: center; }
-.genedialog .setrow input { flex: 1; min-width: 0; }
+.exportdialog .setrow { display: flex; gap: 0.4rem; margin-top: 0.5rem; align-items: center; }
 /* most of the viewport, so the preview is big enough to actually judge the export by — capped
    and scrollable so a poster-sized export never pushes the dialog itself past the viewport.
    Scoped to [open]: an author `display` on a bare .exportdialog would beat the UA stylesheet's
