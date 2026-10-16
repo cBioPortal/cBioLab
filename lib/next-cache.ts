@@ -121,8 +121,9 @@ export async function cachedCount(conn: ChConn, sql: string): Promise<number> {
 const RISK_FIT_CACHE_MAX_PATIENTS = 60_000;
 
 /**
- * A risk model's fit, keyed by everything that decides it (`RiskFitArgs`) and nothing that only
- * decides its groups, so a change to the groups is answered from here and refits nothing. It is
+ * A risk model's fit, keyed by its arguments (`RiskFitArgs`: the study, the cohort and the whole view
+ * but for the settings that only cut and draw its groups), which are all it reads — so a change to
+ * the groups is answered from here and refits nothing, and any other change refits. It is
  * per-patient survival times and scores without identifiers, cached where the whole answers that
  * already hold patient ids are (docs/DATA-BOUNDARY.md), from the same patient-level resolver.
  */

@@ -2,7 +2,7 @@
 // risk groups, from a fit alone. Synthetic fits, so each rule is checked on numbers it can be read off.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { groupRiskmodel as groupAt, groupQuantiles, riskFitSpec, type RiskFit } from "../lib/views/riskmodel.ts";
+import { groupRiskmodel as groupAt, groupQuantiles, riskFitSpec, riskModelView, RISK_PRESENTATION_KEYS, type RiskFit } from "../lib/views/riskmodel.ts";
 import type { RiskmodelView } from "../lib/types.ts";
 import { cutLandsAt } from "../lib/figures/riskmodel.ts";
 
@@ -111,21 +111,20 @@ describe("risk groups from held-out scores", () => {
   });
 });
 
-// The fit's cache key (lib/next-cache.ts cachedRiskFit) is RiskFitArgs: the study, the resolved
-// cohort definition and its compile context, and riskFitSpec — tested here. A setting that changes
-// the model must change the spec, or a cached fit is served for a different model; one that only
-// changes the groups or the drawing must not, or every such change refits.
-describe("the fit's settings, as its cache key", () => {
+// The fit's cache key (lib/next-cache.ts cachedRiskFit) is its arguments, RiskFitArgs, whose view
+// part is riskModelView: the whole view but for RISK_PRESENTATION_KEYS. The key must fail safe — a
+// setting nobody listed is in it, so the worst a forgotten setting can do is refit needlessly — and
+// the settings left out must truly not decide the model.
+describe("the fit's cache key", () => {
   const base: RiskmodelView = { kind: "riskmodel", cohorts: ["A"], endpoint: "OS", measure: "any", minMutated: 30, strata: "CANCER_TYPE",
-    covariates: ["AGE"], anchor: { eventType: "Treatment" }, validate: false, alpha: 0.5, runs: 10, seed: 1, groups: 3, labelAbove: 0.5 };
-  const key = (v: RiskmodelView, pin: string | null = "v7") => JSON.stringify(riskFitSpec(v, pin));
+    covariates: ["AGE"], anchor: { eventType: "Treatment" }, validate: false, alpha: 0.5, runs: 10, seed: 1, groups: 3, labelAbove: 0.5, note: "n" };
+  const key = (v: RiskmodelView) => JSON.stringify(riskModelView(v));
 
-  test("the groups, the cuts, the label threshold and the note are not part of it", () => {
-    for (const change of [{ groups: 5 }, { cuts: [0.8] }, { labelAbove: 0.9 }, { note: "a note" }, { cohorts: ["B"] }] as Partial<RiskmodelView>[])
-      assert.equal(key({ ...base, ...change }), key(base), JSON.stringify(change));
+  test("a setting nobody listed is in it: a new view option refits rather than reusing a fit", () => {
+    assert.notEqual(key({ ...base, someFutureOption: 1 } as RiskmodelView), key(base));
   });
 
-  test("every setting of the model is", () => {
+  test("every setting of the model is in it", () => {
     const changes: Partial<RiskmodelView>[] = [{ endpoint: "PFS" }, { monthsAttribute: "M", statusAttribute: "S" }, { measure: "driver" },
       { minMutated: 40 }, { strata: "SEX" }, { strata: undefined }, { covariates: ["AGE", "STAGE"] }, { covariates: [] },
       { anchor: { eventType: "Surgery" } }, { anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Immuno" } }, { anchor: { eventType: "Treatment", occurrence: "LAST" } },
@@ -133,13 +132,20 @@ describe("the fit's settings, as its cache key", () => {
     for (const change of changes) assert.notEqual(key({ ...base, ...change }), key(base), JSON.stringify(change));
   });
 
-  test("the OncoKB pin decides a driver model, and not one of any mutation", () => {
-    assert.notEqual(key({ ...base, measure: "driver" }, "v7"), key({ ...base, measure: "driver" }, "v8"));
-    assert.equal(key(base, "v7"), key(base, "v8"));
+  test("the settings left out only cut and draw the groups: the model's settings do not read them", () => {
+    for (const k of RISK_PRESENTATION_KEYS) {
+      const changed = { ...base, [k]: k === "cohorts" ? ["B"] : k === "cuts" ? [0.8] : k === "note" ? "other" : k === "labelAbove" ? 0.9 : 5 } as RiskmodelView;
+      assert.equal(key(changed), key(base), k + " is left out of the key");
+      assert.deepEqual(riskFitSpec(changed, "v7"), riskFitSpec(base, "v7"), k + " must not change what the fit reads");
+    }
   });
 
-  test("defaults are applied, so writing one out does not change it", () => {
-    const bare: RiskmodelView = { kind: "riskmodel", cohorts: ["A"] };
-    assert.equal(key(bare), key({ ...bare, endpoint: "os", measure: "any", minMutated: 30, alpha: 0.5, runs: 10, seed: 1, validate: false }));
+  test("the fit reads nothing of the view that the key leaves out", () => {
+    assert.deepEqual(riskFitSpec(riskModelView(base), "v7"), riskFitSpec(base, "v7"));
+  });
+
+  test("the order a document writes its settings in does not matter", () => {
+    const reversed = Object.fromEntries(Object.entries(base).reverse()) as RiskmodelView;
+    assert.equal(key(reversed), key(base));
   });
 });

@@ -1,7 +1,8 @@
 // Risk model view: an elastic-net Cox ensemble over the cohort's mutated genes, and its risk groups.
 //
 // Two stages. `fitRiskmodel` fetches each patient's row and fits the ensemble — seconds to tens of
-// seconds — and depends only on what decides the model (`RiskFitArgs`). `groupRiskmodel` cuts the
+// seconds — from `RiskFitArgs` alone, which carry the whole view but for the settings named in
+// RISK_PRESENTATION_KEYS. `groupRiskmodel` cuts the
 // held-out scores into risk groups and computes their curves and tests — milliseconds — from the
 // fit alone. The routes cache the fit (lib/next-cache.ts `cachedRiskFit`), so a change to the
 // groups refits nothing.
@@ -39,14 +40,34 @@ export interface RiskFitSpec {
   alpha: number; runs: number; seed: number;
 }
 
-/** A fit's inputs, all plain data: the cache key of `cachedRiskFit`, and what `riskFitDirect` fits from. */
+/**
+ * The view's settings that decide only how its groups are cut and drawn, never the model: the one
+ * list a setting must be on to be left out of the fit's cache key. Everything else in the view —
+ * including any setting added later — is in the key, so a setting nobody thought about costs at
+ * worst a needless refit, never a fit served for a different model. A setting goes here only if
+ * riskFitSpec does not read it (test/riskmodel-groups.test.ts checks each one).
+ */
+export const RISK_PRESENTATION_KEYS = ["groups", "cuts", "labelAbove", "note", "cohorts"] as const;
+
+/** The view without its presentation settings, keys sorted: the part of the fit's key the view gives. */
+export function riskModelView(view: RiskmodelView): RiskmodelView {
+  const skip = new Set<string>(RISK_PRESENTATION_KEYS);
+  return Object.fromEntries(Object.entries(view).filter(([k, v]) => !skip.has(k) && v !== undefined).sort(([a], [b]) => a.localeCompare(b))) as RiskmodelView;
+}
+
+/**
+ * A fit's inputs, all plain data. They are `cachedRiskFit`'s cache key, and they are all a fit
+ * reads (riskFitDirect is given nothing else), so nothing that decides a fit can be missing from
+ * its key; the database and the code it runs are the cache's own (dataVersion(), the deployment).
+ */
 export interface RiskFitArgs {
   study: string;
   /** the cohort's definition as runAnalysis resolved it (parameters, splits and `extends` applied) */
   def: CohortDef;
   /** what the study's resolver compiles the cohort with, as runAnalysis builds it */
   compile: { oncokbPin: string | null; profiles: string[]; gaProfiles: string[] };
-  spec: RiskFitSpec;
+  /** the view, as riskModelView leaves it */
+  view: RiskmodelView;
 }
 
 /**
@@ -97,7 +118,7 @@ export class RiskRefusal extends Error {
 type RiskResolver = PatientLevelCapable & ViewAggregateCapable;
 
 export async function fitRiskmodel(r: RiskResolver, args: RiskFitArgs): Promise<RiskFit> {
-  const s = args.spec;
+  const s = riskFitSpec(args.view, args.compile.oncokbPin);
   const mark = r.queries.length;
   const [rows, panelRows] = await riskViewRows(r, args);
   const logged = () => r.queries.slice(mark).map((q) => ({ label: q.label, sql: q.sql, ...(q.ms != null ? { ms: q.ms } : {}) }));
@@ -176,7 +197,7 @@ export async function fitRiskmodel(r: RiskResolver, args: RiskFitArgs): Promise<
 
 /** The fit's two queries, through the patient-level resolver alone (test/boundary.test.ts sweeps their SQL). */
 function riskViewRows(r: RiskResolver, args: RiskFitArgs) {
-  const s = args.spec;
+  const s = riskFitSpec(args.view, args.compile.oncokbPin);
   return Promise.all([
     r.viewRows("riskmodel:rows", args.def, (c, st, d) => riskmodelRowsSql(c, st, d, { endpoint: s.endpoint, columns: s.columns ?? undefined, strata: s.strata,
       covariates: s.covariates, driverPin: s.driverPin, anchor: s.anchor })),
@@ -305,9 +326,8 @@ function ordinalPct(q: number): string {
 }
 
 /**
- * The view's model settings as the fit reads them — defaults applied, names normalised — and so
- * the fit's cache key. Settings that only decide the groups or the drawing (`groups`, `cuts`,
- * `labelAbove`, `note`) are not in it; test/riskmodel-groups.test.ts holds that line. runRiskmodel validates it.
+ * The view's model settings as the fit reads them — defaults applied, names normalised. The fit
+ * computes it from its own arguments; runRiskmodel computes it to validate them first.
  */
 export function riskFitSpec(view: RiskmodelView, pin: string | null): RiskFitSpec {
   const num = (x: unknown, d: number) => x == null ? d : Number(x);
@@ -366,7 +386,7 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
       cohorts[name].count.toLocaleString("en-US") + " patients, so at most " + Math.max(1, Math.floor(RISK_WORK_LIMIT / Math.max(1, cohorts[name].count))) + " runs (or narrow the cohort)");
 
   const { profiles, gaProfiles } = await ctx.studyProfiles(study);
-  const args: RiskFitArgs = { study, def: doc.cohorts[name], compile: { oncokbPin: ctx.pin, profiles, gaProfiles }, spec };
+  const args: RiskFitArgs = { study, def: doc.cohorts[name], compile: { oncokbPin: ctx.pin, profiles, gaProfiles }, view: riskModelView(view) };
   let fit: RiskFit;
   try { fit = await (ctx.riskFit ?? riskFitDirect)({ ...args, patients: cohorts[name].count }); }
   catch (e) {
