@@ -14,14 +14,17 @@ import {
 } from "../lib/campaign.ts";
 import { HYPOTHESIS_GRAMMAR } from "../lib/hypothesis.ts";
 import { runAnalysis, resolveStudy, studyProfiles } from "../lib/analysis.ts";
-import { resolverFor, carriesPatientIds, studyRouting, PatientLevelResolver, PEER_TABLES, type PeerTable } from "../lib/federation.ts";
+import { resolverFor, carriesPatientIds, studyRouting, routeStudy, PatientLevelResolver, PEER_TABLES, type PeerTable, type CourseOpts, type SequenceOpts } from "../lib/federation.ts";
 import { timelinePatientRowSource, TIMELINE_COLUMNS, PATIENT_ID } from "../lib/patient-timeline.ts";
 import { ALTERATION_COLUMNS, ALTERATION_PATIENT_COLUMNS, PATIENT_SAMPLE_COLUMNS, alterationPatientRowSource, alterationSource, patientSamplesSource } from "../lib/patient-alterations.ts";
 import { loopbackConnId } from "../lib/loopback-peer.ts";
 import { allowedKinds, disclosedByThisInstance, PATIENT_KIND_NAMES, type PatientKind } from "../lib/disclosure.ts";
 import { checkQuery, cleanQuery, type QueryColumn, type RowSource, type TableQuery } from "../lib/table-query.ts";
 import { buildExplore } from "../lib/explore.ts";
-import { PRIMARY } from "../lib/ch.ts";
+import { oncokbPin } from "../lib/annotation.ts";
+import { connections, directConnections } from "../lib/ch.ts";
+import { studiesFor } from "../lib/study-list.ts";
+import { catalogFor } from "../lib/study-catalog.ts";
 import type { AnalysisDoc, AnalysisResult, Contract, OncoprintSpec } from "../lib/types.ts";
 
 // ---------- shared zod fragments (mirrors docs/cohort-query.schema.json) ----------
@@ -81,6 +84,24 @@ export interface ToolEngine {
 }
 const DIRECT: ToolEngine = { runAnalysis: (doc) => runAnalysis(doc), buildContract: (spec) => buildContract(spec) };
 
+/** A timeline event to align on — survival's re-anchoring and the clinical course's day 0. */
+const zEventAnchor = z.object({
+  eventType: z.string().max(120),
+  key: z.string().max(120).nullish(), value: z.string().max(200).nullish(),
+  occurrence: z.enum(["FIRST", "LAST"]).nullish()
+});
+
+/**
+ * A study a federation tool may answer for: one this instance holds in its own databases. A study
+ * it reaches through a peer of its own is refused, so a call is never relayed or answered from the
+ * wrong database.
+ */
+async function ownStudy(study: string): Promise<string> {
+  const { peerForStudy } = await import("../lib/federation-remote.ts");
+  if (await peerForStudy(study)) throw new Error("study '" + study.slice(0, 60) + "' is not held by this instance");
+  return resolveStudy(study);
+}
+
 export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
 
   // ---- federation endpoint -------------------------------------------------
@@ -102,11 +123,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           .describe("Survival endpoint prefix for `survival` — OS, PFS, DFS, DSS… reads <X>_MONTHS/<X>_STATUS (default OS)"),
         endpointColumns: z.object({ months: z.string().max(64), status: z.string().max(64) }).nullish()
           .describe("Override the <endpoint>_MONTHS/<endpoint>_STATUS naming convention with exact column names, for a study whose outcome columns don't follow it — `endpoint` is then just a display label"),
-        anchor: z.object({
-          eventType: z.string().max(120),
-          key: z.string().max(120).nullish(), value: z.string().max(200).nullish(),
-          occurrence: z.enum(["FIRST", "LAST"]).nullish()
-        }).nullish().describe("Re-anchor survival to a timeline event. Returns (entry, months, event, n) — entry is the delayed-entry time, without which anchoring manufactures immortal time."),
+        anchor: zEventAnchor.nullish().describe("Re-anchor survival to a timeline event. Returns (entry, months, event, n) — entry is the delayed-entry time, without which anchoring manufactures immortal time."),
         survivalEndpoints: z.boolean().nullish()
           .describe("Return the survival endpoints THIS study declares, so a caller can offer only what exists"),
         pairs: z.array(z.tuple([z.string(), z.string()])).max(66).nullish()
@@ -125,19 +142,35 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           .describe("Genes for per-codon (lollipop) counts, the way cBioPortal's mutation tab counts them: distinct (patient, protein change) pairs per protein start position, raw rows per mutation type for the colour, per-gene totals and the cohort's sample count"),
         minCount: z.number().int().min(1).max(1000).nullish()
           .describe("Suppression floor applied by THIS instance before returning variant counts; variants carried by fewer patients are withheld"),
+        timelineSpan: z.boolean().nullish()
+          .describe("Per timeline event type: patients, events, distinct days and first/last day — what a clinical-course view needs to know whether the study records time at all"),
+        course: z.object({
+          anchor: zEventAnchor.nullable(),
+          eventTypes: z.array(z.string().max(120)).max(20),
+          binMonths: z.number().positive().max(120),
+          from: z.number().int().min(-600).max(600), to: z.number().int().min(-600).max(600)
+        }).nullish().describe("The clinical course: per time bin relative to the anchor, how many patients were observable and how many were in each event state (counts only)"),
+        sequence: z.object({
+          eventType: z.string().max(120), labelKey: z.string().max(120),
+          exclude: z.array(z.string().max(200)).max(200),
+          lineGap: z.number().int().min(1).max(3650), maxSteps: z.number().int().min(1).max(10),
+          lineClasses: z.union([z.enum(["systemic", "all"]), z.array(z.string().max(120)).max(50)]).nullish()
+        }).nullish().describe("Treatment sequences: (step, from, to, n, fate) flows between derived treatment lines (counts only)"),
+        sequenceKeys: z.string().max(120).nullish()
+          .describe("The attribute keys of this timeline event type that can label a treatment, with how many patients and distinct values each has"),
         profileType: z.string().max(120).nullish()
           .describe("With `pairs`, a continuous molecular profile (e.g. an mRNA z-score profile): returns the six sums (n, Sx, Sy, Sxy, Sxx, Syy) per pair, which are sufficient for a correlation and carry no individual value")
       }
     },
-    async ({ study, cohort, genes, survival, pairs, attributes, attributeHistograms, attributeTopValues, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, endpointColumns, survivalEndpoints, anchor }: { study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; attributeHistograms?: boolean | null; attributeTopValues?: number | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; endpointColumns?: { months: string; status: string } | null; survivalEndpoints?: boolean | null; anchor?: any }) => {
+    async ({ study, cohort, genes, survival, pairs, attributes, attributeHistograms, attributeTopValues, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, endpointColumns, survivalEndpoints, anchor, timelineSpan, course, sequence, sequenceKeys }: { timelineSpan?: boolean | null; course?: CourseOpts | null; sequence?: SequenceOpts | null; sequenceKeys?: string | null; study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; attributeHistograms?: boolean | null; attributeTopValues?: number | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; endpointColumns?: { months: string; status: string } | null; survivalEndpoints?: boolean | null; anchor?: any }) => {
       try {
         // Refused here, by the peer, whatever the caller checked: an explicit list compiles to the
         // ids themselves, and beside a clinical attribute a count of 0 or 1 reads one patient's value.
         if (carriesPatientIds(cohort))
           throw new Error("cohort contains an explicit sample or patient list; identifiers are not accepted across instances");
-        const s = await resolveStudy(study);
+        const s = await ownStudy(study);
         const { profiles, gaProfiles } = await studyProfiles(s);
-        const pin = process.env.ONCOKB_PIN || null;
+        const pin = await oncokbPin();
         const res = await resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
         const [count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, endpointList, lollipopCounts] = await Promise.all([
           res.count(cohort),
@@ -154,13 +187,19 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           survivalEndpoints ? res.survivalEndpoints() : Promise.resolve([] as string[]),
           lollipopGenes && lollipopGenes.length ? res.lollipopCounts(cohort, lollipopGenes, minCount || 1) : Promise.resolve(null)
         ]);
+        const [spans, courseCounts, flows, keys] = await Promise.all([
+          timelineSpan ? res.timelineSpan(cohort) : Promise.resolve(null),
+          course ? res.eventCourse(cohort, course) : Promise.resolve(null),
+          sequence ? res.treatmentSequence(cohort, sequence) : Promise.resolve(null),
+          sequenceKeys ? res.sequenceKeys(cohort, sequenceKeys) : Promise.resolve(null)
+        ]);
         // SQL text carries no patient data, and an id-carrying definition was refused
         // above, so disclosing what we ran restores end-to-end provenance for the
         // caller. A deployment that treats its schema as sensitive sets
         // FEDERATION_HIDE_SQL=1 and the caller degrades gracefully.
         const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
         const cohortSql = hideSql ? null : res.cohortSql(cohort);
-        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, survivalEndpoints: endpointList, ...(lollipopCounts ? { lollipopCounts } : {}), cohortSql, queries: hideSql ? null : res.queries, oncokbPin: pin };
+        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, survivalEndpoints: endpointList, ...(lollipopCounts ? { lollipopCounts } : {}), ...(spans ? { timelineSpan: spans } : {}), ...(courseCounts ? { eventCourse: courseCounts } : {}), ...(flows ? { treatmentSequence: flows } : {}), ...(keys ? { sequenceKeys: keys } : {}), cohortSql, queries: hideSql ? null : res.queries, oncokbPin: pin };
         return {
           content: [{ type: "text" as const, text: `aggregates for ${s}: ${count.toLocaleString()} patients` +
             (geneCounts.length ? `, ${geneCounts.length} gene counts` : "") +
@@ -192,7 +231,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       const loop = loopbackConnId();
       if (loop && (await studyRouting()).get(s)?.id !== loop) throw refuse(s);
       const { profiles, gaProfiles } = await studyProfiles(s);
-      const res = await resolverFor(s, { oncokbPin: process.env.ONCOKB_PIN || null, profiles, gaProfiles });
+      const res = await resolverFor(s, { oncokbPin: await oncokbPin(), profiles, gaProfiles });
       // only what this instance holds itself at patient level: never a peer's data relayed, never an aggregate-only study
       if (!(res instanceof PatientLevelResolver)) throw new Error(s + " is not held here at patient level");
       return { s, res };
@@ -316,17 +355,61 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       try {
         if (carriesPatientIds(draft))
           throw new Error("draft contains an explicit sample or patient list; identifiers are not accepted across instances");
-        const s = await resolveStudy(study);
+        const s = await ownStudy(study);
         const { profiles, gaProfiles } = await studyProfiles(s);
-        const conn = (await studyRouting()).get(s) || PRIMARY;
+        const conn = await routeStudy(s);
         const facets = await buildExplore({
-          study: s, draft: draft || null, oncokbPin: process.env.ONCOKB_PIN || null,
+          study: s, draft: draft || null, oncokbPin: await oncokbPin(),
           geneSearch: geneSearch || undefined, profiles, gaProfiles, conn
         });
         return {
           content: [{ type: "text" as const, text: `facets for ${s}: ${facets.clinical.length} clinical attributes, ` +
             `${facets.genes.length} genes, ${facets.events.length} event types (aggregates only)` }],
           structuredContent: facets as unknown as Record<string, unknown>
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };
+      }
+    });
+
+  // The study list and the study catalog, for a coordinator that holds none of this instance's
+  // databases: the counts and vocabulary its study picker and cohort builder show. Like the
+  // facets, they name no patient.
+  server.registerTool(
+    "federated_studies",
+    {
+      description:
+        "Federation endpoint for another cbio-lab instance: the studies THIS instance holds in its own databases, one row each — name, cancer type, patient and sample counts, how many patients have timeline events, and which data types it carries. Counts only; never returns patient identifiers.",
+      inputSchema: {}
+    },
+    async () => {
+      try {
+        const { servingAsLoopbackPeer } = await import("../lib/loopback-peer.ts");
+        const conns = servingAsLoopbackPeer() ? connections().filter((c) => c.id === loopbackConnId()) : directConnections();
+        const studies = (await Promise.all(conns.map((c) => studiesFor(c)))).flat();
+        return {
+          content: [{ type: "text" as const, text: `${studies.length} studies held by this instance (counts only)` }],
+          structuredContent: { studies }
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };
+      }
+    });
+
+  server.registerTool(
+    "federated_catalog",
+    {
+      description:
+        "Federation endpoint for another cbio-lab instance: the cohort-builder catalog of a study THIS instance holds — timeline event types with patient and event counts, their attribute keys and values, survival endpoints, and the derived treatment lines. Vocabulary and counts only; never returns patient identifiers.",
+      inputSchema: { study: z.string().max(120).describe("Study id held by this instance") }
+    },
+    async ({ study }: { study: string }) => {
+      try {
+        const s = await ownStudy(study);
+        const cat = await catalogFor(s);
+        return {
+          content: [{ type: "text" as const, text: `catalog for ${s}: ${cat.types.length} event types, ${cat.totalPatients} patients` }],
+          structuredContent: cat as unknown as Record<string, unknown>
         };
       } catch (e) {
         return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };

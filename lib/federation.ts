@@ -19,7 +19,7 @@
 // for the transport — a real deployment swaps in a second connection
 // (data-level federation) or an MCP client to a remote cbio-lab
 // (document-level federation) behind the same interface.
-import { chQuery, DB, PRIMARY, connections, isAbortError, type ChConn } from "./ch.ts";
+import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
@@ -186,9 +186,12 @@ export async function studyRouting(): Promise<Map<string, ChConn>> {
   let complete = true;
   for (const conn of connections()) {
     try {
-      const r = await chQuery<{ id: string; name: string }>(
-        "SELECT cancer_study_identifier AS id, name FROM " + conn.db + ".cancer_study", conn);
-      for (const { id, name } of r.data) {
+      // the simulated peer's studies are learned from it, over MCP, like a real peer's
+      const rows = conn.id === loopbackOnlyConn()?.id
+        ? (await (await import("./federation-remote.ts")).loopbackStudies()).map(({ id, name }) => ({ id, name }))
+        : (await chQuery<{ id: string; name: string }>(
+          "SELECT cancer_study_identifier AS id, name FROM " + conn.db + ".cancer_study", conn)).data;
+      for (const { id, name } of rows) {
         if (isRestrictedStudy(id, name)) { restrictedStudies.add(id); continue; }
         if (map.has(id)) { routingCollisions.push(id); continue; } // first instance wins; surfaced, not hidden
         map.set(id, conn);
@@ -198,6 +201,8 @@ export async function studyRouting(): Promise<Map<string, ChConn>> {
       // it here and memoizing the result below poisoned the process: the map cached empty, every
       // later request answered "unknown study <x>", and only a restart cleared it. Let it out.
       if (isAbortError(e)) throw e;
+      // and a query the boundary refused (lib/ch.ts) is a bug to see, not an instance that is down
+      if (e instanceof LoopbackDirectError) throw e;
       complete = false; /* an unreachable instance simply contributes no studies */
     }
   }

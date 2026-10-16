@@ -9,16 +9,17 @@
 // PEER_MCP_PATIENT_LEVEL (what this app accepts).
 //
 // The two sides are told apart per request. A call this app makes to itself carries LOOPBACK_HEADER
-// with a token only this process knows; the MCP route runs such a call as the peer (`asLoopbackPeer`),
+// with a token only this app knows; the MCP route runs such a call as the peer (`asLoopbackPeer`),
 // where nothing is routed to the simulated peer again — so it is answered from its database, and a
-// loopback call can never make another.
+// loopback call can never make another. The token is LOOPBACK_PEER_TOKEN where several processes
+// serve the app (Vercel: the call back lands on another function instance), else one generated per
+// process. With LOOPBACK_PEER_URL naming the deployment's own /api/mcp, that is all a deployment
+// needs to federate over MCP without a second instance.
 //
-// What it does not simulate: two processes with their own settings, a network between them, or a
-// peer on another build. The study list and the study catalog read the connection directly, as they
-// do where a coordinator also holds the peer's database (CLICKHOUSE2_*). Not for Vercel: each
-// function instance has its own token, so a call landing on another instance is not recognized.
+// What it does not simulate: two processes with their own settings or credentials, or a peer on
+// another build. The study list reads the connection directly.
 import { AsyncLocalStorage } from "node:async_hooks";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 
 export const LOOPBACK_HEADER = "x-cbio-loopback-peer";
 
@@ -36,7 +37,19 @@ export const servingAsLoopbackPeer = (): boolean => state.als.getStore() === tru
 export const asLoopbackPeer = <T>(fn: () => T): T => state.als.run(true, fn);
 
 /** Whether `req` is a call this process made to itself — the only kind run as the peer. */
-export const isLoopbackRequest = (req: Request): boolean => !!loopbackConnId() && req.headers.get(LOOPBACK_HEADER) === state.token;
+/** The token: LOOPBACK_PEER_TOKEN, shared by every process of the deployment, else this process's own. */
+function token(): string {
+  const shared = (process.env.LOOPBACK_PEER_TOKEN || "").trim();
+  if (!shared) return state.token;
+  if (shared.length < 32) throw new Error("LOOPBACK_PEER_TOKEN must be at least 32 characters: it is what tells this app's own calls from anyone else's");
+  return shared;
+}
+
+export const isLoopbackRequest = (req: Request): boolean => {
+  if (!loopbackConnId()) return false;
+  const got = req.headers.get(LOOPBACK_HEADER), want = token();
+  return !!got && got.length === want.length && timingSafeEqual(Buffer.from(got), Buffer.from(want));
+};
 
 /** This app's own MCP endpoint: LOOPBACK_PEER_URL, else 127.0.0.1 on PORT. */
 export function loopbackUrl(): string {
@@ -49,5 +62,5 @@ export function loopbackUrl(): string {
 export function loopbackHeaders(url: string): Record<string, string> {
   if (!loopbackConnId() || url !== loopbackUrl()) return {};
   if (servingAsLoopbackPeer()) throw new Error("the simulated peer cannot call itself: a loopback call never makes another");
-  return { [LOOPBACK_HEADER]: state.token };
+  return { [LOOPBACK_HEADER]: token() };
 }

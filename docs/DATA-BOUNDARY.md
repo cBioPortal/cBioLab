@@ -124,23 +124,58 @@ the studies that came over MCP. A failed or refused peer call keeps the answer o
 cache, as a failed query does. A peer names the table it answered with, and an answer for any other table is refused:
 a peer on a build from before named tables answers every call with the timeline's list.
 
-**A simulated peer, for development and the gate.** `LOOPBACK_PEER=<connection>` (e.g. `b`, the
-`CLICKHOUSE2_*` database) has one app serve one of its own databases to itself over MCP
+**A simulated peer — how the public deployment, dev servers and the gate federate.** Federation
+is offered over MCP; a second database is not queried directly. `LOOPBACK_PEER=<connection>` (e.g.
+`b`, the `CLICKHOUSE2_*` database) has one app serve one of its own databases to itself over MCP
 (`lib/loopback-peer.ts`): the studies on that connection are reached through the remote resolvers
 at the app's own `/api/mcp` (`PORT` or `LOOPBACK_PEER_URL` names it), and the MCP side answers those
-calls — recognised by a per-process token — from that connection alone, never routing them back to
-the peer. With it set, the disclosing tools answer only for that connection's studies, and only to
-the app itself: an outside caller gets no patient-level data of either database. The study list and
-study catalog still read the connection directly, as they do wherever a coordinator also holds the
-peer's database. It does not simulate two processes, a network or a peer on another build; not for
-Vercel, whose instances do not share the token. `scripts/gate.sh` restarts its server this way and
-runs `scripts/e2e-federation.cjs` when a second database is configured.
+calls — recognised by a token — from that connection alone, never routing them back to the peer.
+The token is `LOOPBACK_PEER_TOKEN` (32+ characters) where several processes serve the app, as on
+Vercel, where the call back lands on another function instance; otherwise each process makes its
+own. With it set, the disclosing tools answer only for that connection's studies, and only to the
+app itself: an outside caller gets no patient-level data of either database. The study list reads
+the connection directly and badges its studies as the peer's (`LOOPBACK_PEER_LABEL`). It does not
+simulate two processes with their own settings or credentials, or a peer on another build.
+`scripts/gate.sh` restarts its server this way and runs `scripts/e2e-federation.cjs` when a second
+database is configured.
+
+**A coordinator that holds none of a peer's databases** learns the peer's studies over MCP as
+well: `/api/studies` asks each `PEER_MCP` peer once (`federated_studies`) and lists only the
+studies `PEER_MCP` routes to it, and `/api/catalog` answers a peer-held study with the peer's
+`federated_catalog`. Both are counts and vocabulary — what the study picker and the cohort
+builder show for a local study — and name no patient. Every federation tool answers only for a
+study the instance holds in its own databases: one it reaches through a peer of its own is refused,
+never relayed and never looked up in its own database.
 
 **Not built yet, and required before pointing this at restricted data:** caller authentication.
 Today anyone who can reach a disclosing peer's `/api/mcp` can read what it discloses; the setting
 is a statement of intent, not access control. Per-caller tokens (or mTLS), checked by the peer
 before the tool runs, and an access log on the peer are the next step. Answers containing a
 peer's patients also enter the coordinator's result cache (same trust boundary as its own).
+
+## Federation: where it stands
+
+Three modes, of which the prototype offers the two over MCP:
+
+| mode | set by | status |
+|---|---|---|
+| direct second database | `CLICKHOUSE2_*` alone | every view; not how federation is offered (only as the simulated peer's database) |
+| MCP, aggregates | `PEER_MCP`, or `LOOPBACK_PEER` | compare, survival, cooccurrence, coexpression, clinical, hotspots, attrition, course, sequence, Explore, study list, catalog. Left out, and saying so: oncoprint columns, table, mutations, cox, logistic, and every view on `viewAggregate`/`viewMeta` (genome, pathways, enrichment, overlap, incidence, cancertypes, clonality, paired, diffexpr, correlates, assays, labs, composition). Errors: plot, riskmodel, percentile cut-offs |
+| MCP, patient-level | the above + `MCP_DISCLOSE_PATIENTS` / `PEER_MCP_PATIENT_LEVEL` | the aggregate set plus the `timeline` and `alterations` views; every other patient-level view is left out as for an aggregate-only peer |
+
+Known gaps, in the order they matter:
+
+1. **No caller authentication** (above), and the boundary is enforced by the coordinator, not
+   the peer: a peer's own `run_analysis`, `query_cohort` and web API answer patient-level for
+   its patient-level studies to any caller. A peer serving restricted data needs both closed.
+2. **No governance beyond study × kind rules:** no per-caller rules, access log, rate limit,
+   small-cell suppression or defence against differencing.
+3. **Coverage:** a peer has no `viewAggregate`/`viewMeta`, pooled plot or percentile method, and
+   patient-level federation has only two kinds.
+4. **Cost:** each MCP call opens a session (two requests, no reuse, no timeout), and the peer
+   recounts the cohort on every call. Measured on one machine (dev servers, loopback network,
+   result cache off): +0.3–0.4 s per analysis for aggregate views on a small study, +2 s for the
+   patient-level timeline and alterations (18 calls); on a large study the database dominates.
 
 ## What the tests cover
 

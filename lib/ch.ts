@@ -10,6 +10,7 @@
 //
 // Note that the *database name* is per-connection, which is why SQL builders
 // take a `db` argument rather than closing over a module constant.
+import { loopbackConnId, servingAsLoopbackPeer } from "./loopback-peer.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { ChResult, ChRow } from "./types.ts";
 import { customExternalsFor } from "./custom-data.ts";
@@ -179,7 +180,42 @@ function externalsFor(query: string): ChExternalEnc[] {
   return out;
 }
 
+/**
+ * The simulated peer's database (LOOPBACK_PEER, lib/loopback-peer.ts) is read only while answering
+ * as that peer, over MCP — never directly by the app it serves. Refused before anything is sent:
+ * a query on its connection, and a query naming its database on any other connection (the two may
+ * share a server and a login).
+ */
+export function assertNotLoopbackDirect(sql: string, conn: ChConn): void {
+  const peer = loopbackOnlyConn();
+  if (!peer) return;
+  const id = peer.id;
+  const names = peer.db && new RegExp("(^|[^A-Za-z0-9_.])`?" + peer.db.replace(/[^A-Za-z0-9_]/g, "") + "`?\\.").test(sql);
+  if (conn.id === id || names) {
+    const e = new LoopbackDirectError("the " + peer.label + " database is reached only over MCP (LOOPBACK_PEER=" + id + "); this query went to it directly");
+    // logged as well as thrown: a caller that treats a failed instance as an absent one must not hide it
+    console.error("[boundary] " + e.message + "\n" + sql.slice(0, 300) + "\n" + e.stack);
+    throw e;
+  }
+}
+
+/** A query the boundary above refused. Never a sign that an instance is unreachable. */
+export class LoopbackDirectError extends Error {}
+
+/** The connection served to this app as a simulated peer, while it may not be read directly. */
+export function loopbackOnlyConn(): ChConn | null {
+  const id = loopbackConnId();
+  return id && !servingAsLoopbackPeer() ? connById(id) : null;
+}
+
+/** The connections this code may query directly: all of them but the simulated peer's (above). */
+export function directConnections(): ChConn[] {
+  const peer = loopbackOnlyConn();
+  return connections().filter((c) => c.id !== peer?.id);
+}
+
 async function post(sql: string, conn: ChConn, format: string): Promise<string> {
+  assertNotLoopbackDirect(sql, conn);
   if (!conn.url || !conn.user || !conn.password || !conn.db)
     throw new Error("ClickHouse instance '" + conn.id + "' is missing configuration (url/password/db)");
   const ctx = ctxStore.getStore();

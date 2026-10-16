@@ -15,10 +15,12 @@ import type { CohortDef, ExploreResult } from "./types.ts";
 import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest } from "./federation.ts";
 import { carriesPatientIds, studyRouting } from "./federation.ts";
 import { loopbackConnId, loopbackHeaders, loopbackUrl, servingAsLoopbackPeer } from "./loopback-peer.ts";
-import { noteFailedQuery } from "./ch.ts";
+import { loopbackOnlyConn, noteFailedQuery } from "./ch.ts";
 import { PEER_TABLES, type RemotePatientRows, type PeerRowsRequest, type PeerRowsAnswer } from "./federation.ts";
 import { acceptedFromPeers, allowedKinds, PATIENT_KIND_NAMES, type PatientKind } from "./disclosure.ts";
 import type { PatientTimeline, PatientEvent, PatientSample } from "./types.ts";
+import type { StudyRow } from "./study-list.ts";
+import type { StudyCatalog } from "./study-catalog.ts";
 
 interface RemoteAggregates {
   study: string; instance: string; count: number;
@@ -40,20 +42,67 @@ interface RemoteAggregates {
  * that peer, its studies are its own again, so they are read from their database.
  */
 export async function peerForStudy(study: string): Promise<{ url: string; label: string } | null> {
-  const raw = process.env.PEER_MCP || "";
-  for (const entry of raw.split(/[,\s]+/).filter(Boolean)) {
-    const i = entry.indexOf("=");
-    if (i < 0) continue;
-    if (entry.slice(0, i).trim() === study) {
-      const url = entry.slice(i + 1).trim();
-      return { url, label: process.env.PEER_LABEL || "peer via MCP" };
-    }
-  }
+  const url = peerMcpEntries().get(study);
+  if (url) return { url, label: peerLabel() };
   const id = loopbackConnId();
   if (!id || servingAsLoopbackPeer()) return null;
   const conn = (await studyRouting()).get(study);
   if (conn?.id !== id) return null;
   return { url: loopbackUrl(), label: process.env.LOOPBACK_PEER_LABEL || conn.label + " (simulated peer)" };
+}
+
+/** PEER_MCP as a map from study to the peer URL that serves it. */
+export function peerMcpEntries(): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const entry of (process.env.PEER_MCP || "").split(/[,\s]+/).filter(Boolean)) {
+    const i = entry.indexOf("=");
+    if (i < 0) continue;
+    const study = entry.slice(0, i).trim(), url = entry.slice(i + 1).trim();
+    if (study && url && !out.has(study)) out.set(study, url);
+  }
+  return out;
+}
+
+const peerLabel = (): string => process.env.PEER_LABEL || "peer via MCP";
+
+/**
+ * The study list rows of every PEER_MCP peer, for the studies PEER_MCP maps to it: each peer is
+ * asked once (federated_studies) and only the studies routed to it are kept, so a peer cannot add
+ * a study this instance did not configure or take one routed elsewhere. A peer that does not
+ * answer is reported in `failed` rather than thrown, so the reachable ones still list.
+ */
+export async function remoteStudies(): Promise<{ rows: StudyRow[]; failed: string[] }> {
+  const byUrl = new Map<string, Set<string>>();
+  for (const [study, url] of peerMcpEntries()) (byUrl.get(url) ?? byUrl.set(url, new Set()).get(url)!).add(study);
+  const rows: StudyRow[] = [], failed: string[] = [];
+  await Promise.all([...byUrl].map(async ([url, studies]) => {
+    try {
+      const ans = await mcpCall<{ studies: StudyRow[] }>(url, "federated_studies", {});
+      for (const r of ans.studies || [])
+        if (studies.has(r.id)) rows.push({ ...r, instance: "peer", instanceLabel: peerLabel() });
+    } catch { failed.push(url); }
+  }));
+  // the simulated peer lists every study it holds: it is this app's own connection, configured here
+  const loop = loopbackOnlyConn();
+  if (loop) {
+    try {
+      const label = process.env.LOOPBACK_PEER_LABEL || loop.label + " (simulated peer)";
+      for (const r of await loopbackStudies()) rows.push({ ...r, instance: "peer", instanceLabel: label });
+    } catch { failed.push(loopbackUrl()); }
+  }
+  return { rows, failed };
+}
+
+/** The simulated peer's study list, from its own federated_studies (lib/loopback-peer.ts). */
+export async function loopbackStudies(): Promise<StudyRow[]> {
+  return (await mcpCall<{ studies: StudyRow[] }>(loopbackUrl(), "federated_studies", {})).studies || [];
+}
+
+/** The catalog of a study held by a remote peer (federated_catalog): vocabulary and counts only. */
+export async function remoteCatalog(study: string, url: string): Promise<StudyCatalog> {
+  const cat = await mcpCall<StudyCatalog>(url, "federated_catalog", { study });
+  if (cat.study !== study) throw new Error("peer answered the catalog of '" + String(cat.study).slice(0, 60) + "' for '" + study + "'");
+  return cat;
 }
 
 /**
