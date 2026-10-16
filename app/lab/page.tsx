@@ -42,6 +42,7 @@ import { cellExplorerFor } from "../../lib/cell-explorer.ts";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
+import { PAGE_TAB } from "../_ui/toolbar.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
 const TAB_LABELS: [typeof TABS[number], string][] = [["explore", "Explore"], ["cohorts", "Saved"], ["analysis", "Analysis"], ["examples", "Examples"]];
@@ -392,7 +393,7 @@ export default function AnalysisPage() {
         <Tabs value={tab} className="mb-4" onValueChange={(v) => openTab(v as typeof TABS[number])}>
           <TabsList variant="line" aria-label="lab sections" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
             {TAB_LABELS.map(([t, label]) => <TabsTrigger key={t} value={t} onClick={() => { if (t === tab) openTab(t); }}
-              className="h-auto flex-none rounded-none px-3.5 pt-2 pb-1.5 text-base leading-normal after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary">{label}</TabsTrigger>)}
+              className={PAGE_TAB}>{label}</TabsTrigger>)}
           </TabsList>
         </Tabs>
         {error && <div className="error">{error}</div>}
