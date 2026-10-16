@@ -11,7 +11,8 @@ import { sq } from "./compiler.ts";
 import { describeCohortDef } from "./cohort2.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, ViewParticipation, TemplateDoc, SplitBy } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
-import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, type Resolver } from "./federation.ts";
+import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, type Resolver } from "./federation.ts";
+import { cantDraw } from "./view-coverage.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } from "./cohort-partitions.ts";
@@ -422,6 +423,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       vNames = expandSplits(listed, partitionShapes).filter((n) => cohorts[n]);
     }
     const vStudies = [...new Set(vNames.flatMap((n) => cohorts[n].studies))];
+    // A view is drawn over every patient of its cohorts or not at all (lib/view-coverage.ts).
+    const uncovered = cantDraw(view.kind, vStudies, (st) => resolvers[st] && studyAccess(resolvers[st]));
+    if (uncovered) {
+      views.push({ kind: view.kind, cohorts: vNames, error: uncovered, participation: participationFor(vStudies, false) });
+      continue;
+    }
     const mark = queryMark(), pushedBefore = views.length, viewT0 = Date.now();
 
     const run: ViewRun = { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, studyProfiles,

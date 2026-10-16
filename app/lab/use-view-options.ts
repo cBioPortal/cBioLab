@@ -9,7 +9,8 @@ import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
 import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import type { ExploreResult } from "../../lib/types.ts";
-import type { TrackAttrs } from "./use-catalogs.ts";
+import type { StudyInfo, TrackAttrs } from "./use-catalogs.ts";
+import { cantDraw, cohortStudies } from "../../lib/view-coverage.ts";
 
 /** What useViewOptions needs from the analysis page. */
 export interface ViewOptionsPage {
@@ -21,10 +22,27 @@ export interface ViewOptionsPage {
   result: AnalysisResult | null;
   trackAttrs: TrackAttrs;
   trackAttrsLoading: boolean;
+  /** the deployment's study list, each with its access; empty until it arrives */
+  studies: StudyInfo[];
 }
 
 export function useViewOptions(page: ViewOptionsPage) {
-  const { cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading } = page;
+  const { cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading, studies } = page;
+
+  // ---- what federation lets a view draw (lib/view-coverage.ts) --------------
+  const accessById = new Map(studies.map((s) => [s.id, s.access]));
+  /** the studies a cohort spans: the last result's, else its definition's */
+  const studiesOf = (name: string): string[] =>
+    result?.cohorts[name]?.studies ?? cohortStudies(doc.cohorts?.[name] as any, doc.study || "");
+  /** why a view of `kind` cannot draw cohort `name` whole, or null */
+  const cantDrawCohort = (kind: string, name: string): string | null => cantDraw(kind, studiesOf(name), (s) => accessById.get(s));
+  /** a kind none of the document's cohorts can be drawn by is not offered; one some can is */
+  const federationWhy = (kind: string): string | null => {
+    const names = Object.keys(doc.cohorts || {});
+    const reasons = names.map((n) => cantDrawCohort(kind, n));
+    if (!names.length || reasons.some((r) => r == null)) return null;
+    return names.length === 1 ? reasons[0] : "no cohort in this analysis can be drawn by it — " + names[0] + ": " + reasons[0];
+  };
 
   // ---- composing views without editing JSON --------------------------------
   /** Genes to prefill a new view with: whatever the document already studies,
@@ -124,7 +142,10 @@ export function useViewOptions(page: ViewOptionsPage) {
     ...Object.entries(KIND_CARDS).map(([kind, k]) => ({ kind, label: k.label,
       ...(k.why ? { why: () => k.why!({ genes: [], attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) }),
                     loading: () => !profileOptions().length && (trackAttrsLoading || exploreBusy) } : {}) }))
-  ];
+  ].map((k) => ({ ...k,
+    // federation first: it decides whether the view can be drawn at all, the data whether it has anything to draw
+    why: () => federationWhy(k.kind) ?? (k.why ? k.why() : null),
+    loading: () => (!studies.length && Object.keys(doc.cohorts || {}).length > 0) || (k.loading ? k.loading() : false) }));
 
   /**
    * Whether this view's own block renders its header (and with it the remove/move controls).
@@ -155,5 +176,5 @@ export function useViewOptions(page: ViewOptionsPage) {
     return [...new Set([...fromExplore, ...legacy])].slice(0, 60);
   };
 
-  return { viewGenes, viewAttrs, viewEvents, catalogAttrs, numericAttrs, attrsLoading, profileOptions, assayOptions, contProfile, noSurvivalWhy, VIEW_KINDS, drawsOwnHead, GENE_VIEWS, geneChoices };
+  return { viewGenes, viewAttrs, viewEvents, catalogAttrs, numericAttrs, attrsLoading, profileOptions, assayOptions, contProfile, noSurvivalWhy, VIEW_KINDS, drawsOwnHead, GENE_VIEWS, geneChoices, cantDrawCohort };
 }

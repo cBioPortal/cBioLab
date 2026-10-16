@@ -48,9 +48,10 @@ export function legendFor(values: string[], ring = false): { label: string; colo
 
 const num = (v: unknown): number | null => { const x = Number(v); return Number.isFinite(x) ? x : null; };
 import type { CohortDef, CompileCtx, ChRow, ChResult, PatientTimeline } from "./types.ts";
+import type { StudyAccess } from "./view-coverage.ts";
 import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } from "./patient-timeline.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";
-import type { PatientKind } from "./disclosure.ts";
+import { PATIENT_KINDS, type PatientKind } from "./disclosure.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -1345,6 +1346,13 @@ export function peerRowsFor(r: Resolver, kind: PatientKind): (Resolver & RemoteP
 
 export function isPatientLevel(r: Resolver): r is PatientLevelCapable {
   return r.instance.mode === "patient-level";
+}
+
+/** How this app reaches the study `r` answers for, for lib/view-coverage.ts. */
+export function studyAccess(r: Resolver): StudyAccess {
+  // a peer's label also says what it shares; `shares` says that here
+  return { instance: r.instance.label.replace(/ \(shares [^)]*\)$/, ""), patientLevel: isPatientLevel(r), remote: r.instance.id === "peer",
+    shares: PATIENT_KINDS.filter((k) => peerRowsFor(r, k)) };
 }
 
 /**

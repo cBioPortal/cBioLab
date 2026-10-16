@@ -326,9 +326,9 @@ export default function AnalysisPage() {
   const exploreState = useExploreState({ addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
   const { setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies } = exploreState;
   const openTab = (t: typeof TABS[number]) => { goTab(t); if (t === "explore" && !explore) fetchExplore(); };
-  const viewOptions = useViewOptions({ cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading });
-  const { VIEW_KINDS, assayOptions, attrsLoading, catalogAttrs, contProfile, drawsOwnHead, geneChoices, numericAttrs, profileOptions, viewAttrs, viewEvents, viewGenes } = viewOptions;
-  const viewEdits = useViewEdits({ VIEW_KINDS, assayOptions, busy, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, setChooser, setToast, study, viewAttrs, viewEvents, viewGenes, viewIds });
+  const viewOptions = useViewOptions({ cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading, studies });
+  const { VIEW_KINDS, assayOptions, attrsLoading, cantDrawCohort, catalogAttrs, contProfile, drawsOwnHead, geneChoices, numericAttrs, profileOptions, viewAttrs, viewEvents, viewGenes } = viewOptions;
+  const viewEdits = useViewEdits({ VIEW_KINDS, assayOptions, busy, cantDrawCohort, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, setChooser, setToast, study, viewAttrs, viewEvents, viewGenes, viewIds });
   const { addCohortToView, addView, cohortChoice, docView, emptyViewHint, maxCohortsOf, moveView, ocView, openCohortChooser, patchView, removeView, removeViews, setViewAttrs, setViewCohorts, setViewGenes, updateView, updateViewLocal, viewTitle } = viewEdits;
 
   // ---- what the sections read ------------------------------------------------------------

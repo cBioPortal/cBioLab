@@ -72,8 +72,8 @@ async function main() {
     ok("a peer table pages on", page.rows?.length === 5 && page.rows.every((x) => x.patient === PEER_PATIENT), String(page.rows?.length));
     ok("a patient the peer's cohort does not hold is refused", /not a patient of this cohort/.test(notMember.error || ""), notMember.error);
 
-    // every other view keeps the peer aggregate-only
-    ok("the clinical table leaves the peer's patients out, and says so", !table.error && (table.table.excluded || []).some((e) => e.study === PEER), JSON.stringify(table.table?.excluded));
+    // every other view keeps the peer aggregate-only, and one that would leave its patients out is not drawn
+    ok("the clinical table is not drawn without the peer's patients, and says why", !table.table && new RegExp("Cannot be drawn without leaving out the patients of " + PEER).test(table.error || ""), table.error);
     ok("an aggregate view reaches the peer over MCP", !compare.error && remoteQueries(compare) > 0 && compare.participation.studies.some((s) => s.study === PEER && s.remote), compare.error);
 
     // an outside MCP caller: patient-level data of neither database

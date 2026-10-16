@@ -76,11 +76,16 @@ architecture prevents. What varies is who answered, never how.
 
 A new view kind that omits the marker fails the e2e gate.
 
-**6. Views degrade rather than quietly narrowing.** An oncoprint's columns *are*
-patients, so a participant that will not disclose ids cannot contribute columns.
-The view renders what is permitted and states the covered fraction; if no
-participant permits patient-level access it errors with an explanation. It never
-silently drops those patients and reports a smaller cohort as if it were whole.
+**6. A view is drawn over every patient of its cohorts, or not at all.** An oncoprint's
+columns *are* patients, so a participant that will not disclose ids cannot contribute columns;
+a remote peer does not yet serve the aggregates behind genome, pathways and the like. A view
+that one study's participant cannot answer is not drawn — a figure of part of a cohort reads as
+the whole one — and says which study and why ("Cannot be drawn without leaving out the patients
+of …"). One rule decides it, `lib/view-coverage.ts`: the engine refuses by it before a view runs
+(`lib/analysis.ts`), and the page does not offer such a view (the add-view buttons, disabled with
+the reason) or such a cohort (its row in a view's cohort picker). Where every patient is counted
+and only a per-patient detail is withheld — the labs waterfall's bars, composition's per-case
+bars, a plot highlight drawn as density — the view is drawn and says what is withheld.
 
 ## Opt-in patient-level federation (per study and kind of data)
 
@@ -107,14 +112,14 @@ unknown kind is refused naming the setting, never ignored.
 
 Data crosses only where both sides' rules allow the same study and kind. A coordinator that
 accepts a kind the peer does not disclose gets a refusal naming the peer's setting; a peer that
-discloses a kind the coordinator does not accept is never asked, and the view lists the peer's
-study as left out ("a remote peer this instance does not accept patient alterations from").
+discloses a kind the coordinator does not accept is never asked, and the view is not drawn
+("… is a remote peer, which does not share patient alterations with this instance").
 
 The same structural rule holds. A remote patient resolver adds exactly `patientRows()` (the row
 tables of its accepted kinds, refusing any other kind **before** the network is touched) and,
 with timelines, `patientTimeline()` — no `members()`, no plot points, no Cox/logistic rows, no
 `rowsPage` — and its instance stays `aggregate-only`, so every view outside the kinds treats it as
-before (the clinical table names it as left out, an oncoprint degrades). The coordinator never
+before (the clinical table and the oncoprint are not drawn over its studies). The coordinator never
 sends SQL: it names a table and the cohort *definitions*, and the peer builds and runs the query
 in its own database; an explicit id list in a cohort is still refused before the network is
 touched. The patient whose record is shown is the one identifier the coordinator sends, and that
@@ -160,8 +165,8 @@ Three modes, of which the prototype offers the two over MCP:
 | mode | set by | status |
 |---|---|---|
 | direct second database | `CLICKHOUSE2_*` alone | every view; not how federation is offered (only as the simulated peer's database) |
-| MCP, aggregates | `PEER_MCP`, or `LOOPBACK_PEER` | compare, survival, cooccurrence, coexpression, clinical, hotspots, attrition, course, sequence, Explore, study list, catalog. Left out, and saying so: oncoprint columns, table, mutations, cox, logistic, and every view on `viewAggregate`/`viewMeta` (genome, pathways, enrichment, overlap, incidence, cancertypes, clonality, paired, diffexpr, correlates, assays, labs, composition). Errors: plot, riskmodel, percentile cut-offs |
-| MCP, patient-level | the above + `MCP_DISCLOSE_PATIENTS` / `PEER_MCP_PATIENT_LEVEL` | the aggregate set plus the `timeline` and `alterations` views; every other patient-level view is left out as for an aggregate-only peer |
+| MCP, aggregates | `PEER_MCP`, or `LOOPBACK_PEER` | compare, survival, cooccurrence, coexpression, clinical, hotspots, attrition, course, sequence, Explore, study list, catalog. Not drawn over a peer's studies, and saying why: oncoprint, table, mutations, cox, logistic, riskmodel, plot, and every view on `viewAggregate`/`viewMeta` (genome, pathways, enrichment, overlap, incidence, cancertypes, clonality, paired, diffexpr, correlates, assays, labs, composition). Errors: percentile cut-offs |
+| MCP, patient-level | the above + `MCP_DISCLOSE_PATIENTS` / `PEER_MCP_PATIENT_LEVEL` | the aggregate set plus the `timeline` and `alterations` views; every other patient-level view is not drawn, as for an aggregate-only peer |
 
 Known gaps, in the order they matter:
 
