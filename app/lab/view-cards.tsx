@@ -12,9 +12,10 @@ import type { AnalysisDoc, AnalysisResult, OncoprintView, ExploreResult } from "
 import { pDigits } from "../../lib/chart/format.ts";
 import { MethodPanel } from "./method-panel.tsx";
 import { viewRequest } from "./use-analysis.ts";
-import { AxisPicker, HighlightPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, SeriesSwatch, Participation } from "./view-chrome.tsx";
+import { AxisPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, SeriesSwatch, Participation } from "./view-chrome.tsx";
 import { ViewFigure } from "./figure.tsx";
-import { ArrowLeftRight, Plus, Settings2, X } from "lucide-react";
+import { PlotControls } from "./plot-controls.tsx";
+import { Plus, Settings2, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { ErrorAlert } from "../_ui/error-alert.tsx";
 import { Checkbox } from "../_ui/checkbox";
@@ -648,83 +649,18 @@ function SequenceKeyHint({ ctx, v, vi }: CardProps) {
 }
 
 /** a numeric plot axis on a log scale: log10(v + 1), so a zero stays on the axis (lib/plot.ts) */
-function LogToggle({ ctx, vi, side, numeric }: { ctx: ViewCtx; vi: number; side: "x" | "y"; numeric: boolean }) {
-  const axis = ctx.docView(vi)[side];
-  if (!numeric || !axis || !("source" in axis) || (axis.source !== "clinical" && axis.source !== "molecular")) return null;
-  return (
-    <label className="chk" title={"draw " + side + " on a log scale — log10(value + 1), so zero stays on the axis and a negative value is left out"}>
-      <Checkbox checked={!!axis.log} disabled={ctx.busy}
-        onCheckedChange={(c) => ctx.updateView(vi, (vv: any) => {
-          const a = { ...vv[side] };
-          if (c === true) a.log = true; else delete a.log;
-          return { ...vv, [side]: a };
-        })} />
-      log
-    </label>
-  );
-}
-
 function PlotCard({ ctx, v, vi }: CardProps) {
   const { attrsLoading, busy, catalogAttrs, cohortChoice, docView, menuOpenRef, profileOptions, updateView } = ctx;
+  // every cohort the document evaluates, but the plotted one and a split (which stands for several groups, not one set of cases)
+  const ch = cohortChoice(vi, docView(vi), 1);
+  const highlightOptions = ch.nodes.filter((nd) => nd.kind !== "split" && nd.name !== ch.drawn[0])
+    .map((nd) => ({ name: nd.name, label: nd.label, depth: nd.depth }));
   return <>
     {v.kind === "plot" && <>
-      <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} {...placement(ctx, vi)}
+      <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={ch} {...placement(ctx, vi)}
         sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
-      {/* Every control here changes what is DRAWN and costs a query, so there is one
-          zone and it says so — the same toolbar the oncoprint uses. */}
-      <div className="viewtb">
-        <div className="tbz">
-          <span className="tbl" title="these change what is drawn, and re-run the query">data</span>
-          <AxisPicker side="x" axis={docView(vi).x} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-            onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, x: a }))} />
-          <LogToggle ctx={ctx} vi={vi} side="x" numeric={v.plot?.x.kind === "num"} />
-        </div>
-        <div className="tbz">
-          <AxisPicker side="y" axis={docView(vi).y} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-            onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, y: a }))} />
-          <LogToggle ctx={ctx} vi={vi} side="y" numeric={v.plot?.y.kind === "num"} />
-        </div>
-        {/* colour/ring only affect a box plot's violin — a scatter's density and a
-            contingency table have no per-case colour to split, so the controls would
-            sit there doing nothing until a box shape is actually on screen */}
-        {v.plot?.shape === "box" && <div className="tbz">
-          <span className="tbl" title="colours each group's violin by a category">colour</span>
-          <AxisPicker side="fill" axis={docView(vi).colorBy} allowNone categorical
-            attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-            onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
-          <AxisPicker side="ring" axis={docView(vi).ringBy} allowNone categorical
-            attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-            onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
-        </div>}
-        {v.plot?.shape !== "table" && (() => {
-          // every cohort the document evaluates, but the plotted one and a split (which stands for
-          // several groups, not one set of cases)
-          const ch = cohortChoice(vi, docView(vi), 1);
-          const plotted = ch.drawn[0];
-          const options = ch.nodes.filter((nd) => nd.kind !== "split" && nd.name !== plotted)
-            .map((nd) => ({ name: nd.name, label: nd.label, depth: nd.depth }));
-          const chosen: string[] = Array.isArray(docView(vi).highlight) ? docView(vi).highlight : [];
-          if (!options.length && !chosen.length) return null;
-          return <div className="tbz">
-            <HighlightPicker chosen={chosen} options={options} busy={busy}
-              onChange={(next) => updateView(vi, (vv: any) => { const n = { ...vv }; if (next.length) n.highlight = next; else delete n.highlight; return n; })} />
-          </div>;
-        })()}
-        <div className="tbz">
-          <label className="tbfield" title="what a point is; patient mode averages a patient's samples">unit <Choice size="ctl"
-            value={docView(vi).unit || "patient"} disabled={busy}
-            onChange={(u) => updateView(vi, (vv: any) => ({ ...vv, unit: u }))}
-            options={[["patient", "patients"], ["sample", "samples"]]} /></label>
-          {/* a box plot is always drawn categories-on-x, values-on-y regardless of
-              which axis is which in the document (lib/federation.ts's box branch
-              routes by kind, not by x/y) — swapping which is "x" changes nothing a
-              reader can see, so the button is disabled rather than pretending to act */}
-          <Button variant="outline" size="sm" className={TB} disabled={busy || v.plot?.shape === "box"}
-            title={v.plot?.shape === "box" ? "a box plot is always drawn by category, whichever axis holds it — nothing to swap"
-              : "put the x axis on y and the y axis on x"}
-            onClick={() => updateView(vi, (vv: any) => ({ ...vv, x: vv.y, y: vv.x }))}><ArrowLeftRight />swap</Button>
-        </div>
-      </div>
+      <PlotControls spec={docView(vi)} plot={v.plot} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
+        highlightOptions={highlightOptions} update={(fn) => updateView(vi, fn)} />
       <ViewFigure v={v} empty={v.plot?.note || "nothing to draw"} />
     </>}
   </>;

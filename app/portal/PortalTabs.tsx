@@ -16,6 +16,7 @@ import { api } from "../lab/api.ts";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { LINE_TABS, PAGE_TAB, SEG_TAB, SEG_TABS } from "../_ui/toolbar.ts";
 import { ViewHead } from "../lab/view-chrome.tsx";
+import { PlotControls } from "../lab/plot-controls.tsx";
 import { cn } from "../../lib/cn";
 
 type Patch = Record<string, unknown>;
@@ -137,6 +138,9 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
             <ViewHead menuStore={menus.current} v={v && !v.error ? v : { kind: spec.kind }} title={titles[vi]}
               sub={drawn.length ? drawn.join(drawn.length === 2 ? " vs " : ", ") : undefined} />
             {hasKindCard(spec.kind as string) && <KindCardControls c={mc} />}
+            {spec.kind === "plot" && <PlotControls spec={spec} plot={v && !v.error ? v.plot : undefined} attrs={catalog.attrs} profiles={catalog.profiles}
+              loading={catalog.loading} busy={busy} update={(fn) => edit(vi, fn(spec))}
+              highlightOptions={Object.keys(doc.cohorts || {}).filter((n) => n !== drawn[0]).map((n) => ({ name: n, label: n, depth: 0 }))} />}
             {busy && !v && <div className="skeleton skeleton-view" />}
             {busy && v && !(drawsOwnWaiting(v.kind) && !v.error) && <div className="view-updating"><span className="spinner" /> updating…</div>}
             {!busy && st?.error && <p className="note">{st.error}</p>}
