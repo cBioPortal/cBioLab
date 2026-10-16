@@ -293,6 +293,29 @@ export function groupRiskmodel(fit: RiskFit, nGroups: number): RiskGrouping {
 
 // ---- the view ---------------------------------------------------------------------------------
 
+/**
+ * The view's model settings as the fit reads them — defaults applied, names normalised — and so
+ * the fit's cache key. Settings that only decide the groups or the drawing (`groups`, `labelAbove`,
+ * `note`) are not in it; test/riskmodel-groups.test.ts holds that line. runRiskmodel validates it.
+ */
+export function riskFitSpec(view: RiskmodelView, pin: string | null): RiskFitSpec {
+  const num = (x: unknown, d: number) => x == null ? d : Number(x);
+  const measure = view.measure === "driver" ? "driver" as const : "any" as const;
+  const a = view.anchor;
+  return {
+    endpoint: String(view.endpoint || "OS").toUpperCase(),
+    columns: view.monthsAttribute ? { months: String(view.monthsAttribute), status: String(view.statusAttribute) } : null,
+    measure, driverPin: measure === "driver" ? pin : null,
+    minMutated: num(view.minMutated, 30),
+    strata: view.strata ? String(view.strata) : null,
+    covariates: (view.covariates || []).map(String),
+    anchor: a ? { eventType: String(a.eventType).slice(0, 120), ...(a.key ? { key: String(a.key).slice(0, 120), value: String(a.value ?? "") } : {}),
+      occurrence: a.occurrence === "LAST" ? "LAST" as const : "FIRST" as const } : null,
+    validate: !!view.validate,
+    alpha: num(view.alpha, 0.5), runs: num(view.runs, 10), seed: num(view.seed, 1),
+  };
+}
+
 export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<ViewResult> {
   const { doc, cohorts, vNames } = ctx;
   if (vNames.length !== 1) return refuse("riskmodel", ctx, "a risk model is fitted to one cohort; this view names " + vNames.length + " — choose one");
@@ -302,14 +325,13 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
   const study = studies[0];
   const r = ctx.resolvers[study];
   if (!isPatientLevel(r) || !hasViewAggregates(r)) return refuse("riskmodel", ctx, study + " answers in aggregate only; a risk model needs each patient's rows, which only a patient-level participant returns");
-  const endpoint = String(view.endpoint || "OS").toUpperCase();
+  const spec = riskFitSpec(view, ctx.pin);
+  const { endpoint, measure, minMutated, strata, covariates: covNames, anchor, validate, alpha, runs, seed } = spec;
   if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) return refuse("riskmodel", ctx, "endpoint is a name like OS or PFS");
   if (!!view.monthsAttribute !== !!view.statusAttribute) return refuse("riskmodel", ctx, "monthsAttribute and statusAttribute go together");
-  const columns = view.monthsAttribute ? { months: String(view.monthsAttribute), status: String(view.statusAttribute) } : null;
-  const measure = view.measure === "driver" ? "driver" as const : "any" as const;
   if (measure === "driver" && !ctx.pin) return refuse("riskmodel", ctx, "measure \"driver\" needs the OncoKB annotation, which this server has no pinned version of");
   const num = (x: unknown, d: number) => x == null ? d : Number(x);
-  const alpha = num(view.alpha, 0.5), runs = num(view.runs, 10), nGroups = num(view.groups, 3), minMutated = num(view.minMutated, 30), seed = num(view.seed, 1);
+  const nGroups = num(view.groups, 3);
   if (!(alpha >= 0 && alpha <= 1)) return refuse("riskmodel", ctx, "alpha, the l1 share of the penalty, is 0 (ridge) to 1 (lasso)");
   if (!(Number.isInteger(runs) && runs >= 1 && runs <= RISK_MAX_RUNS)) return refuse("riskmodel", ctx, "runs is a whole number from 1 to " + RISK_MAX_RUNS);
   if (!(Number.isInteger(nGroups) && nGroups >= 2 && nGroups <= 5)) return refuse("riskmodel", ctx, "groups is 2 to 5");
@@ -317,23 +339,16 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
   if (!Number.isInteger(seed)) return refuse("riskmodel", ctx, "seed is a whole number");
   const labelAbove = num(view.labelAbove, RISK_LABEL_ABOVE);
   if (!(labelAbove >= 0 && labelAbove <= 1)) return refuse("riskmodel", ctx, "labelAbove is a share of runs, 0 to 1");
-  const strata = view.strata ? String(view.strata) : null;
-  const covNames = (view.covariates || []).map(String);
   for (const a of [strata, ...covNames]) if (a && !/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) return refuse("riskmodel", ctx, "“" + a.slice(0, 40) + "” is not a clinical attribute's name");
   { const e = overLimit("a risk model", RISK_MAX_COVARIATES, covNames.length); if (e) return refuse("riskmodel", ctx, e.replace("at most " + RISK_MAX_COVARIATES, "at most " + RISK_MAX_COVARIATES + " covariates")); }
   if (new Set(covNames).size !== covNames.length || (strata && covNames.includes(strata))) return refuse("riskmodel", ctx, "a covariate is listed twice, or is also the stratum");
-  const a = view.anchor;
-  if (a && !a.eventType) return refuse("riskmodel", ctx, "anchor needs eventType, the timeline event each patient's clock starts at");
-  const anchor = a ? { eventType: String(a.eventType).slice(0, 120), ...(a.key ? { key: String(a.key).slice(0, 120), value: String(a.value ?? "") } : {}),
-    occurrence: a.occurrence === "LAST" ? "LAST" as const : "FIRST" as const } : null;
-  const validate = !!view.validate;
+  if (view.anchor && !view.anchor.eventType) return refuse("riskmodel", ctx, "anchor needs eventType, the timeline event each patient's clock starts at");
   if (cohorts[name].count * runs > RISK_WORK_LIMIT)
     return refuse("riskmodel", ctx, "a risk model fits at most " + RISK_WORK_LIMIT.toLocaleString("en-US") + " patients × runs in one request; “" + name + "” has " +
       cohorts[name].count.toLocaleString("en-US") + " patients, so at most " + Math.max(1, Math.floor(RISK_WORK_LIMIT / Math.max(1, cohorts[name].count))) + " runs (or narrow the cohort)");
 
   const { profiles, gaProfiles } = await ctx.studyProfiles(study);
-  const args: RiskFitArgs = { study, def: doc.cohorts[name], compile: { oncokbPin: ctx.pin, profiles, gaProfiles },
-    spec: { endpoint, columns, measure, driverPin: measure === "driver" ? ctx.pin : null, minMutated, strata, covariates: covNames, anchor, validate, alpha, runs, seed } };
+  const args: RiskFitArgs = { study, def: doc.cohorts[name], compile: { oncokbPin: ctx.pin, profiles, gaProfiles }, spec };
   let fit: RiskFit;
   try { fit = await (ctx.riskFit ?? riskFitDirect)({ ...args, patients: cohorts[name].count }); }
   catch (e) {

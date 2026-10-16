@@ -243,6 +243,12 @@ suite fail. A test that cannot fail is decoration.
   not entitled to is ever computed, so nothing it is not entitled to is cached.
   Anyone pointing this at restricted data should decide whether that store is
   acceptable, or skip caching for patient-level answers.
+  One entry is not a whole answer: a risk model's fit (`cachedRiskFit`), cached
+  apart from its groups so that regrouping refits nothing, holds each modelled
+  patient's survival time, entry, event, stratum and scores — by position, with
+  no identifier — read through `PatientLevelResolver.viewRows` exactly as an
+  uncached fit is. It is never sent to a browser; the view's answer carries
+  only the groups' curves and the summaries.
 
 - **Uploaded custom data is patient-level, and goes only where the request
   boundary sends it.** A researcher's upload (`lib/custom-data.ts`) is stored on

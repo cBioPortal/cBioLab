@@ -2,7 +2,8 @@
 // risk groups, from a fit alone. Synthetic fits, so each rule is checked on numbers it can be read off.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { groupRiskmodel, type RiskFit } from "../lib/views/riskmodel.ts";
+import { groupRiskmodel, riskFitSpec, type RiskFit } from "../lib/views/riskmodel.ts";
+import type { RiskmodelView } from "../lib/types.ts";
 
 /** A fit over these held-out scores (null: never held out): survival times 1…n, every third an event. */
 function fitOf(heldOut: (number | null)[], o: { validation?: number[]; external?: (number | null)[] } = {}): RiskFit {
@@ -64,5 +65,38 @@ describe("risk groups from held-out scores", () => {
     assert.equal(g.scale.min, 0, "the scale is the discovery half's");
     assert.equal(g.scale.max, 59);
     assert.ok(g.histogram.edges[0] >= 160, "the histogram is of the reported (validation) scores");
+  });
+});
+
+// The fit's cache key (lib/next-cache.ts cachedRiskFit) is RiskFitArgs: the study, the resolved
+// cohort definition and its compile context, and riskFitSpec — tested here. A setting that changes
+// the model must change the spec, or a cached fit is served for a different model; one that only
+// changes the groups or the drawing must not, or every such change refits.
+describe("the fit's settings, as its cache key", () => {
+  const base: RiskmodelView = { kind: "riskmodel", cohorts: ["A"], endpoint: "OS", measure: "any", minMutated: 30, strata: "CANCER_TYPE",
+    covariates: ["AGE"], anchor: { eventType: "Treatment" }, validate: false, alpha: 0.5, runs: 10, seed: 1, groups: 3, labelAbove: 0.5 };
+  const key = (v: RiskmodelView, pin: string | null = "v7") => JSON.stringify(riskFitSpec(v, pin));
+
+  test("the groups, the label threshold and the note are not part of it", () => {
+    for (const change of [{ groups: 5 }, { labelAbove: 0.9 }, { note: "a note" }, { cohorts: ["B"] }] as Partial<RiskmodelView>[])
+      assert.equal(key({ ...base, ...change }), key(base), JSON.stringify(change));
+  });
+
+  test("every setting of the model is", () => {
+    const changes: Partial<RiskmodelView>[] = [{ endpoint: "PFS" }, { monthsAttribute: "M", statusAttribute: "S" }, { measure: "driver" },
+      { minMutated: 40 }, { strata: "SEX" }, { strata: undefined }, { covariates: ["AGE", "STAGE"] }, { covariates: [] },
+      { anchor: { eventType: "Surgery" } }, { anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Immuno" } }, { anchor: { eventType: "Treatment", occurrence: "LAST" } },
+      { anchor: undefined }, { validate: true }, { alpha: 1 }, { runs: 20 }, { seed: 2 }];
+    for (const change of changes) assert.notEqual(key({ ...base, ...change }), key(base), JSON.stringify(change));
+  });
+
+  test("the OncoKB pin decides a driver model, and not one of any mutation", () => {
+    assert.notEqual(key({ ...base, measure: "driver" }, "v7"), key({ ...base, measure: "driver" }, "v8"));
+    assert.equal(key(base, "v7"), key(base, "v8"));
+  });
+
+  test("defaults are applied, so writing one out does not change it", () => {
+    const bare: RiskmodelView = { kind: "riskmodel", cohorts: ["A"] };
+    assert.equal(key(bare), key({ ...bare, endpoint: "os", measure: "any", minMutated: 30, alpha: 0.5, runs: 10, seed: 1, validate: false }));
   });
 });
