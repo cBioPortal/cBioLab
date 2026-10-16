@@ -1079,13 +1079,33 @@ async function main() {
       await page.locator("[role=option]", { hasText: "90%" }).click();
       await page.waitForFunction(() => /kept in ≥ 90% of runs/.test(document.querySelector("svg[aria-label^='Risk model']")?.textContent || ""), null, { timeout: 10000 });
       ok("risk model: the label threshold redraws the volcano without a request", requests === 0, requests + " requests");
-      const cut = page.locator(".riskmodel-tb label.tbfield", { hasText: "cut at" }).locator("input");
-      await cut.fill("80");
+      // the risk-groups dialog: its handles move and its preview updates with no request; Apply is one
+      await page.locator(".riskgroupsbtn").click();
+      const dlg = page.locator("[role=dialog].riskgroupsdialog");
+      await dlg.locator("[data-slot=slider-thumb]").nth(1).waitFor({ timeout: 10000 });
+      // measured once the dialog has finished zooming in: mid-animation it is scaled, and so is every control in it
+      await dlg.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+      const dlgAskew = await misalignedControls(page, ".riskgroupsdialog");
+      const onLines = await dlg.evaluate((d) => {
+        const lines = [...d.querySelectorAll("svg line[stroke-dasharray='3 2']")].map((l) => l.getBoundingClientRect().left);
+        return [...d.querySelectorAll("[data-slot=slider-thumb]")].every((t, i) => { const r = t.getBoundingClientRect(); return Math.abs(r.left + r.width / 2 - lines[i]) < 1; });
+      });
+      ok("risk model: the dialog's handles sit on the histogram's cut lines, and its controls align", onLines && dlgAskew.length === 0, dlgAskew.join(" | "));
+      const shares = async () => (await dlg.locator("[aria-live=polite]").innerText()).replace(/\s+/g, " ");
+      await dlg.locator("[data-slot=slider-thumb]").nth(1).focus();
+      for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowRight");
+      const moved = await dlg.locator("input[type=number]").evaluateAll((els) => els.map((e) => e.value));
+      await dlg.getByRole("button", { name: "+ add cut" }).click();
+      const added = await dlg.locator("input[type=number]").count();
+      ok("risk model: the dialog's handles step by a percentile and a cut can be added, with no request",
+        JSON.stringify(moved) === JSON.stringify(["33", "70"]) && added === 3 && requests === 0 && /Risk group 4 of 4/.test(await shares()), JSON.stringify(moved) + ", " + added + " cuts, " + requests + " requests");
+      await dlg.getByRole("button", { name: "Top 20%" }).click();
+      ok("risk model: a preset previews its shares", /Low risk 80%.*High risk 20%/.test(await shares()), await shares());
       const t0 = Date.now();
-      await cut.press("Enter");
+      await dlg.locator(".riskgroupsapply").click();
       await page.waitForFunction(() => { const l = document.querySelector("svg[aria-label^='Risk model']")?.getAttribute("aria-label") || ""; return /Low risk, High risk$/.test(l); }, null, { timeout: 120000 });
       const ms = Date.now() - t0;
-      ok("risk model: a cut at the 80th percentile is one request", requests === 1, requests + " requests, " + ms + " ms");
+      ok("risk model: Apply is one request, and the button then names the cut", requests === 1 && /cut at 80%/.test(await page.locator(".riskgroupsbtn").innerText()), requests + " requests, " + ms + " ms");
       ok("risk model: the caveat says the cuts were chosen", /The cuts were chosen in the view, at the 80th percentile/.test(await text()));
       // the same model regrouped is the cached fit: a seed nothing else here fits, then the same with a cut
       const post = async (view) => (await (await ctx.request.post(BASE + "/api/analysis", { data: { ...doc, views: [{ ...doc.views[0], runs: 5, seed: 7, ...view }] } })).json()).views[0];

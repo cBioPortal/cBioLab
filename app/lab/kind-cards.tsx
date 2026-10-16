@@ -14,6 +14,7 @@ import { Input } from "../_ui/input";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { FIELD } from "../_ui/toolbar.ts";
 import { RISK_LABEL_ABOVE } from "../../lib/figures/riskmodel.ts";
+import { RiskGroupsButton } from "./risk-groups-dialog.tsx";
 
 /**
  * A text field that keeps what is being typed to itself and hands the page the value only on
@@ -117,13 +118,6 @@ export interface KindCardCtx {
 
 /** the risk model's covariate menus, open or shut, by view (a viewport state, not the document's) */
 const RISK_MENUS = new Map<string, boolean>();
-/** a view's cuts as the card shows them: quantiles as percentiles, "80" or "25, 75" */
-const riskCutsText = (cuts?: number[]) => (cuts || []).map((c) => String(Math.round(c * 1000) / 10)).join(", ");
-/** the card's percentiles back to quantiles; empty clears them. A value that is not a percentile is passed on for the engine to refuse, naming the rule */
-function riskCutsOf(text: string): number[] | undefined {
-  const parts = text.split(/[,\s]+/).filter(Boolean);
-  return parts.length ? parts.map((p) => Number(p) / 100) : undefined;
-}
 /** the volcano's label thresholds the card offers */
 const RISK_LABEL_STEPS = [0.1, 0.25, 0.5, 0.75, 0.9, 1];
 
@@ -462,16 +456,7 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
               {[5, 10, 20, 50].map((r) => <option key={r} value={r}>{r}</option>)}
             </OptionSelect>
           </label>
-          <label className="tbfield" title={spec.cuts ? "the groups come from the cuts; clear them to cut at equal quantiles" : "risk groups, cut at equal quantiles of the score"}>
-            groups <OptionSelect value={spec.cuts ? "" : String(spec.groups ?? 3)} disabled={busy} onValueChange={(v) => patch({ groups: Number(v), cuts: undefined })}>
-              {spec.cuts && <option value="">{spec.cuts.length + 1} by cuts</option>}
-              {[2, 3, 4, 5].map((g) => <option key={g} value={g}>{g}</option>)}
-            </OptionSelect>
-          </label>
-          <label className="tbfield" title="cut the groups at these percentiles of the score instead, e.g. 80 for the top fifth against the rest, or 25, 75. Cuts placed by looking at the curves overstate the separation; confirm one with validate">
-            cut at <DraftInput value={riskCutsText(spec.cuts)} disabled={busy} width="6rem" placeholder="e.g. 80"
-              onCommit={(t) => { const cuts = riskCutsOf(t); patch(cuts ? { cuts, groups: undefined } : { cuts: undefined }); }} /> %
-          </label>
+          <RiskGroupsButton spec={spec} m={c.v?.riskmodel} busy={busy} onApply={patch} />
         </div>
         <div className="tbz"><span className="tbl">view</span>
           <label className="tbfield" title="the volcano names the genes the model kept in at least this share of its runs; the rest are drawn unnamed">

@@ -93,7 +93,8 @@ describe("risk model, labs, course and timeline stay inside the frame", () => {
       groups: ["Low risk", "Intermediate-low risk", "Intermediate risk", "Intermediate-high risk", "High risk"].map((name, i) => ({ name, from: i ? i : null, to: null,
         curve: km(2319), at12: 0.85, at36: 0.65, hr: i ? 1.49 : null, ciLow: i ? 1.37 : null, ciHigh: i ? 1.63 : null, p: i ? 2.5e-19 : null })),
       logrank: { chi2: 333.41, df: 4, p: 4e-73, strata: 12, groups: 5 } as any, refit: { hr: 1.37, ciLow: 1.33, ciHigh: 1.42, p: 4.1e-86 },
-      histogram: { edges: [0, 1, 2, 3, 4, 5], counts: [10, 300, 2000, 400, 12] }, scale: { min: 0, max: 5 }, labelAbove: 0.5 } } as any;
+      histogram: { edges: [0, 1, 2, 3, 4, 5], counts: [10, 300, 2000, 400, 12] }, scale: { min: 0, max: 5 }, labelAbove: 0.5, cutsChosen: null,
+      percentiles: Array.from({ length: 101 }, (_, k) => k / 20) } } as any;
   // a crowded volcano: hundreds of genes kept, many past the label threshold, long names
   const crowded = { ...rm, riskmodel: { ...rm.riskmodel, labelAbove: 0.1, candidates: 400,
     features: Array.from({ length: 300 }, (_, i) => ({ gene: "LONGGENENAME" + i, selected: ((i * 37) % 100) / 100 || 0.01, meanCoef: 0, hr: Math.exp(((i * 53) % 61 - 30) / 40), mutated: 30 + (i * 17) % 3000 })) } } as any;

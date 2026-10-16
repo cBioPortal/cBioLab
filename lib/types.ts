@@ -1006,6 +1006,9 @@ export interface RiskmodelResult {
   labelAbove: number;
   /** the quantiles the view chose to cut at; null when the groups are `groups` equal quantiles */
   cutsChosen: number[] | null;
+  /** the held-out score (raw) at each whole percentile 0…100 of the scores the cuts are placed on,
+   *  the rank a cut at that quantile starts from — what the risk-groups dialog places its handles by */
+  percentiles: number[];
 }
 
 export interface LabsView {

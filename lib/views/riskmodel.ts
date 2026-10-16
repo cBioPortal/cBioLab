@@ -13,7 +13,7 @@ import { kaplanMeier, logRankK } from "../stats.ts";
 import { riskmodelMethod } from "../method.ts";
 import type { ViewRun } from "./run.ts";
 import { overLimit, refuse } from "./shared.ts";
-import { RISK_LABEL_ABOVE } from "../figures/riskmodel.ts";
+import { RISK_LABEL_ABOVE, riskGroupNames } from "../figures/riskmodel.ts";
 
 const RISK_MAX_RUNS = 100;
 /** patients x runs past which one request would not finish inside the analysis route's time limit */
@@ -211,6 +211,7 @@ export interface RiskGrouping {
   refit: RiskmodelResult["refit"];
   histogram: RiskmodelResult["histogram"];
   scale: RiskmodelResult["scale"];
+  percentiles: RiskmodelResult["percentiles"];
   /** patients of the pool never held out, so unscored and in no group */
   neverHeldOut: number;
   /** distinct held-out scores, and how many groups the cuts made */
@@ -251,9 +252,7 @@ export function groupRiskmodel(fit: RiskFit, qs: number[]): RiskGrouping {
   const groupOf = (v: number) => { let g = 0; while (g < cuts.length && v > cuts[g]) g++; return g; };
   const reported = validate ? fit.validation : poolScored;
   const scoreOf = (i: number) => (validate ? fit.external[i] : fit.heldOut[i])!;
-  const label = groupsMade === 1 ? ["All patients (the scores do not separate them)"] : groupsMade === 2 ? ["Low risk", "High risk"]
-    : groupsMade === 3 ? ["Low risk", "Intermediate risk", "High risk"]
-    : Array.from({ length: groupsMade }, (_, g) => "Risk group " + (g + 1) + " of " + groupsMade);
+  const label = riskGroupNames(groupsMade);
   const members: number[][] = Array.from({ length: groupsMade }, () => []);
   for (const i of reported) members[groupOf(scoreOf(i))].push(i);
   const rec = (i: number) => ({ t: subj[i].time, event: subj[i].event ? 1 : 0, ...(anchored ? { entry: subj[i].entry } : {}) });
@@ -291,7 +290,9 @@ export function groupRiskmodel(fit: RiskFit, qs: number[]): RiskGrouping {
   const counts = new Array(bins).fill(0);
   for (const v of hist) counts[Math.min(bins - 1, Math.floor((v - lo) / w))]++;
   return { groups, logrank, refit, histogram: { edges: Array.from({ length: bins + 1 }, (_, k) => lo + k * w), counts },
-    scale: { min: sorted[0], max: sorted[sorted.length - 1] }, neverHeldOut: fit.pool.length - poolScored.length, distinct, groupsMade };
+    scale: { min: sorted[0], max: sorted[sorted.length - 1] },
+    percentiles: Array.from({ length: 101 }, (_, k) => sorted[Math.min(sorted.length - 1, Math.floor(k / 100 * sorted.length))]),
+    neverHeldOut: fit.pool.length - poolScored.length, distinct, groupsMade };
 }
 
 // ---- the view ---------------------------------------------------------------------------------
@@ -387,7 +388,7 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
     validation: validate ? { discovery: fit.pool.length, validation: fit.validation.length,
       validationEvents: fit.validation.filter((i) => fit.subjects.event[i] === 1).length, cIndex: fit.validationCIndex! } : null,
     cIndex: { median: pct(0.5), q1: pct(0.25), q3: pct(0.75), values: fit.cIndexRuns },
-    features: fit.features, groups: g.groups, logrank: g.logrank, refit: g.refit, histogram: g.histogram, scale: g.scale, labelAbove, cutsChosen,
+    features: fit.features, groups: g.groups, logrank: g.logrank, refit: g.refit, histogram: g.histogram, scale: g.scale, percentiles: g.percentiles, labelAbove, cutsChosen,
   };
   return {
     kind: "riskmodel", cohorts: vNames, riskmodel: result, queries: fit.queries.map((q) => ({ study, ...q })),

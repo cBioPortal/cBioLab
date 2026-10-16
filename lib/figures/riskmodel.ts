@@ -39,6 +39,73 @@ export function riskSpan(m: Risk, g: Risk["groups"][number]): string {
   return (g.from == null ? "0" : f(g.from)) + "–" + (g.to == null ? "10" : f(g.to));
 }
 
+/**
+ * The held-out scores' histogram on the 0–10 scale, with a dashed line and its value at each cut
+ * (raw scores), `width` wide from x0. Returns the drawing, its height, and the plot's left and
+ * right edges with the scale they span — so a control laid over it (the risk-groups dialog's
+ * slider) can sit exactly on the axis.
+ */
+export function scoreHistogram(m: Risk, p: ReturnType<typeof palette>, x0: number, y0: number, width: number, cuts: number[]):
+  { svg: string; height: number; plotL: number; plotR: number; plotH: number; domain: [number, number] } {
+  const out: string[] = [];
+  const R = 16, HH = 64, yy = y0;
+  const ex = m.histogram.edges.map((e) => riskScaled(m, e));
+  const hy = linear(0, Math.max(1, ...m.histogram.counts), yy + HH, yy, { count: 2 });
+  const hL = x0 + 8 + leftAxisWidth(hy, "patients"), hR = x0 + width - R;
+  const hx = linear(Math.min(0, ex[0]), Math.max(10, ex[ex.length - 1]), hL, hR, { nice: false });
+  hx.ticks = [0, 2, 4, 6, 8, 10].filter((t) => t >= hx.domain[0] && t <= hx.domain[1]);
+  out.push(axisLeft(hy, hL, p, { title: "patients", gridTo: hR }));
+  let bars = "";
+  m.histogram.counts.forEach((c, k) => {
+    const a = hx(ex[k]), b = hx(ex[k + 1]), top = hy(c);
+    if (c) bars += `M${r1(a + 0.5)} ${r1(yy + HH)}V${r1(top)}H${r1(Math.max(a + 1, b - 0.5))}V${r1(yy + HH)}Z`;
+  });
+  out.push(`<path d="${bars}" fill="${p.muted}" opacity="0.55"/>`);
+  let cutRight = -Infinity;
+  for (const raw of cuts) {
+    const v0 = riskScaled(m, raw), x = r1(hx(v0));
+    out.push(`<line x1="${x}" y1="${yy - 2}" x2="${x}" y2="${yy + HH}" stroke="${p.ink}" stroke-width="${SW.line}" stroke-dasharray="3 2"/>`);
+    // each cut's value over its line, where it clears the last; every cut is also in the table's score column
+    const t = v0.toFixed(1), tw = textWidth(t, FS.small), cx = Math.max(hL + tw / 2, Math.min(hR - tw / 2, x));
+    if (cx - tw / 2 < cutRight + 4) continue;
+    out.push(label(cx, yy - 4, t, { size: FS.small, fill: p.ink, anchor: "middle" }));
+    cutRight = cx + tw / 2;
+  }
+  const hTitle = "risk score, 0–10 — lower risk ← → higher risk";
+  out.push(axisBottom(hx, yy + HH, p, { title: hTitle, minX: x0, maxX: x0 + width }));
+  return { svg: out.join(""), height: HH + bottomAxisHeight(hTitle), plotL: hL, plotR: hR, plotH: HH, domain: hx.domain };
+}
+
+/**
+ * Where a cut at percentile `p` lands, by the engine's rule (groupRiskmodel): patients with the same
+ * score stay together, so a cut inside a run of tied scores moves to the run's nearer edge (the lower
+ * one when they are as near). Read from `percentiles` (the score at each whole percentile), so it is
+ * right to about a percentile: what the risk-groups dialog previews.
+ */
+export function cutLandsAt(percentiles: number[], p: number): number {
+  const v = percentiles[p];
+  let a = p, b = p;
+  while (a > 0 && percentiles[a - 1] === v) a--;
+  while (b < 100 && percentiles[b + 1] === v) b++;
+  if (a === b) return p;
+  // the run holds percentiles a…b: a cut before it leaves the lower group a%, after it b + 1%
+  return p - a <= b + 1 - p ? a : Math.min(100, b + 1);
+}
+
+/** The risk groups' names, low to high, for `n` groups. */
+export function riskGroupNames(n: number): string[] {
+  return n === 1 ? ["All patients (the scores do not separate them)"] : n === 2 ? ["Low risk", "High risk"]
+    : n === 3 ? ["Low risk", "Intermediate risk", "High risk"]
+    : Array.from({ length: n }, (_, g) => "Risk group " + (g + 1) + " of " + n);
+}
+
+/** The score histogram alone, framed at `width`, with lines at `cuts` (raw scores): the risk-groups dialog's. */
+export function riskHistogramFigure(m: Risk, width: number, cuts: number[], theme?: SvgOpts["theme"]) {
+  const p = palette(theme), top = 16;
+  const h = scoreHistogram(m, p, 0, top, width, cuts);
+  return { ...h, axisY: top + h.plotH, svg: frame(width, top + h.height + 4, h.svg, p.bg, false, "Risk score histogram with the group cuts") };
+}
+
 /** the volcano stays about square: wider than this it would stretch the hazard ratios apart */
 const VOLCANO_MAX_W = 760;
 
@@ -176,32 +243,9 @@ export function riskmodelSvg(v: ViewResult, o: SvgOpts): string {
   yy += 14;
   out.push(label(8, yy, "Risk score, 0–10 (" + m.reportedOn + "), with the group cuts", { size: FS.title, fill: p.ink, weight: 600, maxW: W - 16 }));
   yy += 10 + FS.small + 2;
-  const ex = m.histogram.edges.map((e) => riskScaled(m, e)), HH = 64;
-  const hy = linear(0, Math.max(1, ...m.histogram.counts), yy + HH, yy, { count: 2 });
-  const hL = 8 + leftAxisWidth(hy, "patients");
-  const hx = linear(Math.min(0, ex[0]), Math.max(10, ex[ex.length - 1]), hL, W - R, { nice: false });
-  hx.ticks = [0, 2, 4, 6, 8, 10].filter((t) => t >= hx.domain[0] && t <= hx.domain[1]);
-  out.push(axisLeft(hy, hL, p, { title: "patients", gridTo: W - R }));
-  let bars = "";
-  m.histogram.counts.forEach((c, k) => {
-    const x0 = hx(ex[k]), x1 = hx(ex[k + 1]), top = hy(c);
-    if (c) bars += `M${r1(x0 + 0.5)} ${r1(yy + HH)}V${r1(top)}H${r1(Math.max(x0 + 1, x1 - 0.5))}V${r1(yy + HH)}Z`;
-  });
-  out.push(`<path d="${bars}" fill="${p.muted}" opacity="0.55"/>`);
-  let cutRight = -Infinity;
-  m.groups.slice(1).forEach((g) => {
-    if (g.from == null) return;
-    const v0 = riskScaled(m, g.from), x = r1(hx(v0));
-    out.push(`<line x1="${x}" y1="${yy - 2}" x2="${x}" y2="${yy + HH}" stroke="${p.ink}" stroke-width="${SW.line}" stroke-dasharray="3 2"/>`);
-    // each cut's value over its line, where it clears the last; every cut is also in the table's score column
-    const t = v0.toFixed(1), tw = textWidth(t, FS.small), cx = Math.max(hL + tw / 2, Math.min(W - R - tw / 2, x));
-    if (cx - tw / 2 < cutRight + 4) return;
-    out.push(label(cx, yy - 4, t, { size: FS.small, fill: p.ink, anchor: "middle" }));
-    cutRight = cx + tw / 2;
-  });
-  const hTitle = "risk score, 0–10 — lower risk ← → higher risk";
-  out.push(axisBottom(hx, yy + HH, p, { title: hTitle, minX: 0, maxX: W }));
-  yy += HH + bottomAxisHeight(hTitle) + 18;
+  const hist = scoreHistogram(m, p, 0, yy, W, m.groups.slice(1).flatMap((g) => g.from == null ? [] : [g.from]));
+  out.push(hist.svg);
+  yy += hist.height + 18;
 
   const vol = riskVolcano(m, p, 0, yy, Math.min(W, VOLCANO_MAX_W));
   out.push(vol.svg);

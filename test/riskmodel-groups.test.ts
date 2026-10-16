@@ -4,6 +4,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { groupRiskmodel as groupAt, groupQuantiles, riskFitSpec, type RiskFit } from "../lib/views/riskmodel.ts";
 import type { RiskmodelView } from "../lib/types.ts";
+import { cutLandsAt } from "../lib/figures/riskmodel.ts";
 
 /** A fit over these held-out scores (null: never held out): survival times 1…n, every third an event. */
 function fitOf(heldOut: (number | null)[], o: { validation?: number[]; external?: (number | null)[] } = {}): RiskFit {
@@ -57,6 +58,15 @@ describe("risk groups from held-out scores", () => {
     assert.equal(g.scale.max, -1 + 59 / 20);
   });
 
+  test("the score at each percentile is the rank a cut there starts from", () => {
+    const g = groupRiskmodel(fitOf(Array.from({ length: 200 }, (_, i) => i)), 3);
+    assert.equal(g.percentiles.length, 101);
+    assert.equal(g.percentiles[0], 0);
+    assert.equal(g.percentiles[80], 160);
+    assert.equal(g.percentiles[100], 199);
+    assert.ok(g.percentiles.every((v, k) => k === 0 || v >= g.percentiles[k - 1]));
+  });
+
   test("cuts a view names: the top fifth against the rest, and three groups at chosen quantiles", () => {
     const fit = fitOf(Array.from({ length: 100 }, (_, i) => i));
     assert.deepEqual(sizes(groupAt(fit, groupQuantiles({ cuts: [0.8] }))), [80, 20]);
@@ -73,6 +83,19 @@ describe("risk groups from held-out scores", () => {
     // 50 patients score 0, 30 score 1, 20 score 2: a cut at the 60th percentile falls inside the 1s
     const g = groupAt(fitOf([...Array(50).fill(0), ...Array(30).fill(1), ...Array(20).fill(2)]), [0.6]);
     assert.deepEqual(sizes(g), [50, 50]);
+  });
+
+  test("the dialog's preview of a cut among ties lands where the engine puts it, to a percentile", () => {
+    // 1,000 patients: a fifth of them tied on one score in the middle, the rest distinct
+    const scores = Array.from({ length: 1000 }, (_, i) => i >= 300 && i < 500 ? 300 : i);
+    const fit = fitOf(scores);
+    const pcts = groupAt(fit, [0.5]).percentiles;
+    for (const p of [10, 31, 35, 39, 41, 45, 49, 60]) {
+      const engine = groupAt(fit, [p / 100]).groups[0].curve.n / 10;
+      assert.ok(Math.abs(cutLandsAt(pcts, p) - engine) <= 1, "cut at " + p + "%: preview " + cutLandsAt(pcts, p) + "%, engine " + engine + "%");
+    }
+    assert.equal(cutLandsAt(pcts, 35), 30, "nearer the run's start: before it");
+    assert.equal(cutLandsAt(pcts, 45), 50, "nearer its end: after it");
   });
 
   test("with validation, the cuts come from the discovery half and the groups are the validation half's", () => {
